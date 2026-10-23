@@ -54,6 +54,7 @@ BOOLEAN_OPS = {"true", "false", "accepted", "fact", "state", "state_next", "even
 TERM_OPS = {"int", "var", "var_next", "input", "add", "sub"}
 TEMPORAL_OPS = set(TEMPORAL_SYMBOLIC)
 ATOMIC_TERMS = {"int", "var", "var_next", "input"}
+GAME_OBJECTIVES = ("eventually", "always", "infinitely often")
 SCOPES = {
     "guard": ({"true", "false", "fact", "state", "not", "and", "or", "implies", "iff", "cmp"},
               {"int", "var", "input", "add", "sub"}),
@@ -574,6 +575,8 @@ class Machine:
     fairness: tuple[tuple[str, Expr], ...] = ()
     properties: tuple[tuple[str, Expr], ...] = ()
     obligations: tuple[tuple[str, str], ...] = ()
+    players: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    games: tuple[tuple[str, str, str, Expr], ...] = ()
 
     def __post_init__(self):
         validate_machine(self)
@@ -592,15 +595,21 @@ class Machine:
                 "events": set(self.events)}
 
     def data(self):
-        return {"profile": PROFILE, "name": self.name, "states": self.states, "events": self.events,
-                "context": self.facts, "inputs": [i.data() for i in self.inputs],
-                "variables": [v.data() for v in self.variables], "initial": self.initial,
-                "default": self.default, "rules": [r.data() for r in self.rules],
-                "invariants": [[n, f.data()] for n, f in self.invariants],
-                "requirements": [[n, f.data()] for n, f in self.requirements],
-                "fairness": [[n, f.data()] for n, f in self.fairness],
-                "properties": [[n, f.data()] for n, f in self.properties],
-                "obligations": self.obligations, "atomic": True, "frame": "control-and-variables"}
+        result = {"profile": PROFILE, "name": self.name, "states": self.states, "events": self.events,
+                  "context": self.facts, "inputs": [i.data() for i in self.inputs],
+                  "variables": [v.data() for v in self.variables], "initial": self.initial,
+                  "default": self.default, "rules": [r.data() for r in self.rules],
+                  "invariants": [[n, f.data()] for n, f in self.invariants],
+                  "requirements": [[n, f.data()] for n, f in self.requirements],
+                  "fairness": [[n, f.data()] for n, f in self.fairness],
+                  "properties": [[n, f.data()] for n, f in self.properties],
+                  "obligations": self.obligations, "atomic": True, "frame": "control-and-variables"}
+        if self.players:
+            result["players"] = [[name, states] for name, states in self.players]
+        if self.games:
+            result["games"] = [[name, player, objective, formula.data()]
+                               for name, player, objective, formula in self.games]
+        return result
 
     @property
     def revision(self):
@@ -629,6 +638,11 @@ class Machine:
             lines += [f"Requirement {n}: {f.render(True)}." for n, f in self.requirements]
             lines += [f"Fairness {n}: assume ({_bare(f.render(True))}) happens infinitely often." for n, f in self.fairness]
             lines += [f"Property {n}: {f.render(True)}." for n, f in self.properties]
+            lines += [f"Player {name} moves in {', '.join(states)}." for name, states in self.players]
+            phrases = {"eventually": "to happen eventually", "always": "to hold always",
+                       "infinitely often": "to happen infinitely often"}
+            lines += [f"Property {name}: {player} can force ({_bare(formula.render(True))}) {phrases[objective]}."
+                      for name, player, objective, formula in self.games]
             lines += [f"Unresolved {kind}: {text}." for kind, text in self.obligations]
         else:
             lines = ["zal 2;", f"machine {self.name};", f"states {', '.join(self.states)};",
@@ -647,6 +661,9 @@ class Machine:
             lines += [f"require {n}: {f.render()};" for n, f in self.requirements]
             lines += [f"fairness {n}: infinitely often ({_bare(f.render())});" for n, f in self.fairness]
             lines += [f"property {n}: {f.render()};" for n, f in self.properties]
+            lines += [f"player {name} moves in {', '.join(states)};" for name, states in self.players]
+            lines += [f"property {name}: {player} can force {objective} ({_bare(formula.render())});"
+                      for name, player, objective, formula in self.games]
             lines += [f"unresolved {kind}: {text};" for kind, text in self.obligations]
         return "\n".join(lines) + "\n"
 
@@ -736,6 +753,13 @@ def step_data(step):
             "context": dict(step.context), "outcome": _outcome_data(step)}
 
 
+def _post_state_only(formula):
+    allowed = {"true", "false", "state_next", "var_next", "int", "not", "and", "or", "implies", "iff",
+               "cmp", "add", "sub"}
+    return (isinstance(formula, Expr) and formula.op in allowed
+            and all(_post_state_only(arg) for arg in formula.args if isinstance(arg, Expr)))
+
+
 def validate_machine(model: Machine):
     """Validate direct IR construction as strictly as surface elaboration."""
     def valid_name(value):
@@ -762,6 +786,25 @@ def validate_machine(model: Machine):
     value_names = [*model.facts, *[i.name for i in model.inputs], *[v.name for v in model.variables]]
     if len(set(value_names)) != len(value_names):
         raise Refusal("Context facts, inputs and variables share one namespace and must be distinct")
+    player_error = "Players need distinct names and disjoint declared states; at most two players"
+    if not isinstance(model.players, tuple) or len(model.players) > 2:
+        raise Refusal(player_error)
+    player_names, owned_states = [], set()
+    for player in model.players:
+        if (not isinstance(player, tuple) or len(player) != 2 or not valid_name(player[0])
+                or player[0] in player_names or not isinstance(player[1], tuple) or not player[1]
+                or any(not isinstance(state, str) for state in player[1])
+                or tuple(sorted(set(player[1]))) != player[1]
+                or any(state not in model.states or state in owned_states for state in player[1])):
+            raise Refusal(player_error)
+        player_names.append(player[0])
+        owned_states.update(player[1])
+    if player_names != sorted(player_names):
+        raise Refusal(player_error)
+    occupied_names = {model.name, model.default, *model.states, *model.events, *model.facts,
+                       *[item.name for item in model.inputs], *[item.name for item in model.variables]}
+    if set(player_names) & occupied_names:
+        raise Refusal(player_error)
     if model.initial not in model.states:
         raise Refusal("Initial set is empty or outside the declared states")
     configurations = len(model.states)
@@ -774,9 +817,12 @@ def validate_machine(model: Machine):
         raise Refusal(f"Declared finite domain has {configurations} configurations and {tuples} input tuples; "
                       f"this profile refuses more than {MAX_CONFIGURATIONS} and {MAX_TUPLES}")
     for values, maximum in [(model.rules, 32), (model.invariants, 8), (model.requirements, 8),
-                            (model.fairness, 4), (model.properties, 8), (model.obligations, 8)]:
+                            (model.fairness, 4), (model.properties, 8), (model.obligations, 8),
+                            (model.games, 4)]:
         if not isinstance(values, tuple) or len(values) > maximum:
             raise Refusal("IR collection is mutable or exceeds the profile bound")
+    if len(model.properties) + len(model.games) > 8:
+        raise Refusal("Bounds: at most 8 temporal and game properties")
     declarations = model.declarations
     identifiers = []
     for rule in model.rules:
@@ -812,8 +858,35 @@ def validate_machine(model: Machine):
             identifiers.append(item[0])
         if [n for n, _ in collection] != sorted(n for n, _ in collection):
             raise Refusal("IR object IDs must be canonically sorted")
+    for item in model.games:
+        if (not isinstance(item, tuple) or len(item) != 4 or not valid_name(item[0])
+                or item[2] not in GAME_OBJECTIVES or not isinstance(item[3], Expr)):
+            raise Refusal("Invalid IR game property")
+        name, player, objective, formula = item
+        if player not in player_names:
+            raise Refusal(f"Game property {name} names an undeclared player")
+        try:
+            if admit_formula(formula, declarations, "invariant") > 128:
+                raise Refusal("Invalid IR game property")
+        except Refusal as error:
+            if str(error) == "Invalid IR game property":
+                raise
+            raise Refusal("Invalid IR game property") from error
+        if any(len(formula.render(english)) > 4096 for english in [False, True]):
+            raise Refusal("Invalid IR game property")
+        identifiers.append(name)
+    if [name for name, _, _, _ in model.games] != sorted(name for name, _, _, _ in model.games):
+        raise Refusal("IR game property IDs must be canonically sorted")
+    if model.games and (len(model.players) != 2 or owned_states != set(model.states)):
+        raise Refusal("Game properties need two players whose states cover every state exactly once")
+    all_declared_names = occupied_names | set(identifiers)
+    if set(player_names) & all_declared_names:
+        raise Refusal(player_error)
     if len(set(identifiers)) != len(identifiers) or "default" in identifiers:
         raise Refusal("Rule, invariant, requirement, fairness and property IDs must be distinct and not default")
+    if any(objective in {"eventually", "infinitely often"} for _, _, objective, _ in model.games):
+        if any(not _post_state_only(formula) for _, formula in model.fairness):
+            raise Refusal("Game fairness reads only the state after a step (state' and primed variables)")
     for name, formula in model.properties:
         if property_shape(formula)["kind"] == "liveness" and not model.fairness:
             raise Refusal(f"Property {name}: liveness needs a fairness declaration")
@@ -853,6 +926,8 @@ def statement_patterns(english=False):
             "invariant": rf"Invariant ({NAME}): (.+)\.",
             "require": rf"Requirement ({NAME}): (.+)\.",
             "fairness": rf"Fairness ({NAME}): assume (.+) happens infinitely often\.",
+            "player": rf"Player ({NAME}) moves in (.+)\.",
+            "game": rf"Property ({NAME}): ({NAME}) can force \((.+)\) to (happen infinitely often|happen eventually|hold always)\.",
             "property": rf"Property ({NAME}): (.+)\.",
             "unresolved": rf"Unresolved ({NAME}): ([a-zA-Z0-9_ ,!?()/-]{{1,200}})\.",
         }
@@ -863,6 +938,8 @@ def statement_patterns(english=False):
         "invariant": rf"invariant ({NAME}): (.+);",
         "require": rf"require ({NAME}): (.+);",
         "fairness": rf"fairness ({NAME}): infinitely often (.+);",
+        "player": rf"player ({NAME}) moves in (.+);",
+        "game": rf"property ({NAME}): ({NAME}) can force (eventually|always|infinitely often) \((.+)\);",
         "property": rf"property ({NAME}): (.+);",
         "unresolved": rf"unresolved ({NAME}): ([a-zA-Z0-9_ ,!?()/-]{{1,200}});",
     }
@@ -927,6 +1004,9 @@ def parse(text: str, syntax="symbolic") -> Machine:
                     locations[(key, match[1])] = (physical, column)
                     break
             else:
+                if line.startswith(("player ", "Player ")):
+                    raise Refusal("Players need distinct names and disjoint declared states; at most two players",
+                                  location=(physical, column))
                 raise grammar_refusal(number, line, english, (physical, column))
     missing = set(singletons) - set(fields)
     if missing:
@@ -955,12 +1035,24 @@ def parse(text: str, syntax="symbolic") -> Machine:
     if fields["initial"] not in states:
         raise Refusal("Initial state is undeclared or empty", location=locations["initial"])
     if (len(found["rule"]) > 32 or len(found["invariant"]) > 8 or len(found["require"]) > 8
-            or len(found["fairness"]) > 4 or len(found["property"]) > 8 or len(found["unresolved"]) > 8
+            or len(found["fairness"]) > 4 or len(found["property"]) + len(found["game"]) > 8
+            or len(found["game"]) > 4 or len(found["unresolved"]) > 8
             or len(inputs) > 2 or len(variables) > 4):
         raise Refusal("Bounds: 2 inputs, 4 variables, 32 rules, 8 invariants, 8 requirements, "
-                      "4 fairness assumptions, 8 properties, 8 unresolved obligations")
+                      "4 fairness assumptions, 8 total properties, 4 game properties, 8 unresolved obligations")
     declarations = {"facts": set(facts), "inputs": {i.name for i in inputs},
                     "variables": {v.name for v in variables}, "states": set(states), "events": set(events)}
+    players = []
+    player_error = "Players need distinct names and disjoint declared states; at most two players"
+    for player, raw_states in found["player"]:
+        owned = tuple(sorted(item.strip() for item in raw_states.split(",")))
+        if (len(players) >= 2 or not owned or len(set(owned)) != len(owned)
+                or player in RESERVED
+                or any(not re.fullmatch(NAME, state) or state not in states for state in owned)
+                or any(player == prior or set(owned) & set(prior_states) for prior, prior_states in players)):
+            raise Refusal(player_error)
+        players.append((player, owned))
+    players = tuple(sorted(players))
     rules = []
     for rid, source, event, guard, outcome in found["rule"]:
         with at_source(locations[("rule", rid)]):
@@ -976,10 +1068,21 @@ def parse(text: str, syntax="symbolic") -> Machine:
             with at_source(locations[(key, name)]):
                 formulas.append((name, parse_formula(body, declarations, scope, english)))
         collections[key] = tuple(sorted(formulas))
+    games = []
+    for item in found["game"]:
+        if english:
+            name, player, body, phrase = item
+            objective = {"happen infinitely often": "infinitely often", "happen eventually": "eventually",
+                         "hold always": "always"}[phrase]
+        else:
+            name, player, objective, body = item
+        with at_source(locations[("game", name)]):
+            games.append((name, player, objective, parse_formula(body, declarations, "invariant", english)))
     try:
         return Machine(fields["name"], states, events, facts, inputs, variables, fields["initial"], fields["default"],
                        tuple(sorted(rules, key=lambda r: r.id)), collections["invariant"], collections["require"],
-                       collections["fairness"], collections["property"], tuple(sorted(found["unresolved"])))
+                       collections["fairness"], collections["property"], tuple(sorted(found["unresolved"])),
+                       players, tuple(sorted(games)))
     except Refusal as error:
         # Admission is still the single validator of ranges and the owned IR.
         # Add the declaration's physical position without changing its verdict.
@@ -1404,6 +1507,9 @@ def semantic_diff(old: Machine, new: Machine) -> dict:
     for key in ["initial", "default", "variables", "invariants", "requirements", "fairness", "properties", "obligations"]:
         if old.data()[key] != new.data()[key]:
             report["changed_objects"].append(key)
+    for key in ["players", "games"]:
+        if old.data().get(key, []) != new.data().get(key, []):
+            report["changed_objects"].append(key)
     if not domain_same:
         report["comparison"] = "domain-changed"
         return report
@@ -1610,8 +1716,13 @@ CONSTRUCTS = {
     "fairness": ("fairness ID: infinitely often (STEP_FORMULA);", "Fairness ID: assume (STEP_FORMULA) happens infinitely often.",
                  "A fairness assumption restricts liveness checking to executions in which its step formula holds at infinitely many steps. "
                  "It is an assumption about the environment, not a checked fact."),
+    "player": ("player NAME moves in STATE;", "Player NAME moves in STATE.",
+               "Players choose events in their disjoint declared state lists. A game property needs two players whose lists cover every state."),
     "property": ("property ID: TEMPORAL_FORMULA;", "Property ID: TEMPORAL_FORMULA.",
                  "A property is a temporal formula over the steps of every infinite execution from the initial configuration."),
+    "game": ("property ID: NAME can force eventually (STATE_FORMULA);",
+             "Property ID: NAME can force (FORMULA) to happen eventually.",
+             "A game property checks whether its player can force its state formula over every play, under the declared fairness assumptions."),
     "unresolved": ("unresolved KIND: TEXT;", "Unresolved KIND: TEXT.",
                    "This records an unsupported requirement. It remains visible and blocks factory lowering."),
 }
@@ -1665,6 +1776,8 @@ def _objects(model):
             **{"requirement:" + n: "require" for n, _ in model.requirements},
             **{"fairness:" + n: "fairness" for n, _ in model.fairness},
             **{"property:" + n: "property" for n, _ in model.properties},
+            **{"player:" + name: "player" for name, _ in model.players},
+            **{"property:" + name: "game" for name, _, _, _ in model.games},
             "initial": "initial", "default": "default", "frame": "frame"}
 
 
@@ -1686,7 +1799,7 @@ def help_topic(model: Machine, topic="", renderer_identity="unbound"):
               "reject": "Returns a declared reason and keeps the control state and every variable unchanged."}
     notes = ["Help describes the current canonical model, not arbitrary editor text or source spans.",
              "Context values are assumptions, not authenticated external truth."]
-    if not (model.invariants or model.requirements or model.properties):
+    if not (model.invariants or model.requirements or model.properties or model.games):
         notes.append("No invariants, requirements or properties declared. Consistency checks do not establish an unstated policy.")
     entries, title, meaning, kind = [], "ZAL profile 2 help", "One finite typed model has exact symbolic and controlled-English views.", "grammar"
     resolved, explicit = topic, topic.startswith("grammar:")
@@ -1702,9 +1815,12 @@ def help_topic(model: Machine, topic="", renderer_identity="unbound"):
         kind, resolved, category = "object", topic, objects[topic]
         title, meaning = "Meaning of " + topic, CONSTRUCTS[category][2]
         prefix = {"rule": "rule", "invariant": "invariant", "require": "require", "fairness": "fairness",
-                  "property": "property", "input": "input", "var": "var"}.get(category)
+                  "property": "property", "game": "property", "input": "input", "var": "var",
+                  "player": "player"}.get(category)
         name = topic.partition(":")[2]
-        entries = ([e for e in pairs if e["symbolic"].startswith(f"{prefix} {name}:" if prefix not in {"input", "var"} else f"{prefix} {name} ")]
+        marker = (f"{prefix} {name} " if category in {"input", "var", "player"}
+                  else f"{prefix} {name}:")
+        entries = ([e for e in pairs if e["symbolic"].startswith(marker)]
                    if prefix else [e for e in pairs if e["concept"] == category])
     elif topic:
         resolved = aliases.get(topic, topic)
