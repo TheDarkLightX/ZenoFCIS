@@ -20,6 +20,7 @@ pub mod handler;
 pub mod laws;
 pub mod port;
 pub mod policy;
+pub mod policy_product;
 pub mod policy_record;
 pub mod program;
 pub mod record;
