@@ -10,7 +10,7 @@
   "scope": "One committed-step observation; all declared copies; holders 0..3. The chosen copy is the command's copy field. No rule, role or rejection guarantee is added.",
   "contract_source": {
     "path": "examples/apps/library-loans/project.zeno",
-    "sha256": "58b48ab07e99bb177d29536a1bb2e7a5cc30cf6e7dc18c5dae85780f81cdbb42",
+    "sha256": "6c5e734363ad828452462aec603b2600a9d9a79dd3c70c4912b7a8f526d4b6e8",
     "law": 502,
     "name": "other_copies_unchanged",
     "when": "commit",

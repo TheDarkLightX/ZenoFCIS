@@ -10,7 +10,7 @@
   "scope": "One post-state snapshot at genesis or commit; two members slots, presence 0..1, loan count 0..2. The source law is per entry; unrelated map behavior is outside this projection.",
   "contract_source": {
     "path": "examples/collections/library/project.zeno",
-    "sha256": "e2ac79849a73a677e9c06c250709a1379415b7410710f337ffa17ad05522f394",
+    "sha256": "20caa85422acbc82117b57f9134e62b542201e5bb19ed99715bc5d5e86eab8c7",
     "law": 501,
     "name": "absent_members_hold_nothing",
     "when": "commit, genesis",
