@@ -54,7 +54,7 @@
         "contract review",
         "contract profile"
       ],
-      "sha256": "e5a57f747fba3ba36fb358339014c2f51c5ccbebf9a016a708185a73f80aab2e"
+      "sha256": "9f2d7b8f6d8989c2b65e4e0dea45d9dc9ecc6144a73bb6daca99238d53db9121"
     },
     {
       "name": "contract-risk",
@@ -174,7 +174,7 @@
         "loop encode",
         "loop print"
       ],
-      "sha256": "128c3a744f9b00f5783ffe80e6c18c0efe8b4aaedb107b4a58665e0144727d0d"
+      "sha256": "3c880ac694bdc86bfb8b95eeebb09d8289aaa50e62b8b6f206d90b651a8b7ef3"
     },
     {
       "name": "new",
