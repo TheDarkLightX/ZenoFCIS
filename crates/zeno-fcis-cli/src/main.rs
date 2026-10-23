@@ -2214,6 +2214,19 @@ mod tests {
                     arguments.extend_from_slice(example(&line[..prefix]));
                     (parsed(&arguments), false)
                 }
+                ["contract", "two-run", ..] => {
+                    // Its mode and field lists are conditionally required,
+                    // so the individually-required arguments omit them.
+                    let mut arguments = line.clone();
+                    arguments.extend([
+                        "--noninterference",
+                        "--secret",
+                        "pre.100.120",
+                        "--public",
+                        "post.100.120",
+                    ]);
+                    (parsed(&arguments), false)
+                }
                 ["contract", "risk", ..] => {
                     // Its query selector is conditionally required, so it is
                     // absent from the individually-required argument list.
