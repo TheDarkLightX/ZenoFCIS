@@ -1,5 +1,22 @@
 # ZenoFCIS release notes
 
+## 2.6 draft: symbolic review scope
+
+The planned 2.5.1 work is included in 2.6; there is no separate 2.5.1 release.
+
+Symbolic contract review supports guarded observations whose active and
+default values have different kinds. Its scope is compiler-produced laws,
+including the compiler's conversion of unsigned delivery counts to signed
+integers before typed comparisons (SCOPE-001). An arbitrary hand-built law
+instruction array can disagree with native evaluation when it compares a raw
+unsigned count with a signed literal. The bounded checks and solver results
+do not establish a general symbolic-to-native refinement theorem.
+
+Unsupported encodings and exhaustion of the 63-split limit leave review and
+lemma questions UNKNOWN, exit 2. An invalid lemma formula still exits 65.
+The account-lockout app-factory route remains unqualified pending performance
+validation. See [symbolic checks](SYMBOLIC_CHECKS.md) for evidence boundaries.
+
 ## 2.6 draft: verdict exit codes
 
 Verdict commands now follow the [shared exit contract](CLI_REFERENCE.md#exit-codes).
