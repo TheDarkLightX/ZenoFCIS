@@ -110,6 +110,24 @@ class TwoRunCli(unittest.TestCase):
         self.assertEqual(packet['result']['first_difference']['kind'],'decision_class')
         (EVIDENCE/'swap-capacity.json').write_text(p.stdout)
 
+    def test_order_invocation_limit_is_unknown_before_execution(self):
+        with tempfile.TemporaryDirectory(dir=BIN.parents[1]) as tmp:
+            folder=Path(tmp);(folder/'v2').mkdir()
+            original=ROOT/'examples/two-run/ledger-private'
+            project=(original/'project.zeno').read_text().replace('field 120 101 amount 107;', 'type 108 int Input in 0..=1023;\nfield 120 101 amount 108;')
+            policy=json.loads((original/'v2/policy.json').read_text())
+            (folder/'project.zeno').write_text(project);(folder/'v2/policy.json').write_text(json.dumps(policy))
+            c=Contract(project,policy)
+            self.assertEqual(c.order('true','true',['post.100.110'],0),('UNKNOWN',0,0))
+            p=self.run_cli([str(folder),'--commute','--first','true','--second','true','--observe','post.100.110'])
+            self.assertEqual(p.returncode,2,p.stderr);packet=json.loads(p.stdout)
+            self.assertEqual(packet['planned_order_invocations'],50331648)
+            self.assertEqual(packet['max_order_invocations'],1048576)
+            self.assertEqual(packet['measured']['authority_invocations'],0)
+            self.assertEqual(packet['measured']['comparisons'],0)
+            self.assertIn('exceeding limit',packet['result']['reason']);self.assertIsNone(packet['claim'])
+            (EVIDENCE/'order-work-limit.json').write_text(p.stdout)
+
     def test_effective_cap_is_reported(self):
         args=['examples/two-run/ledger-private','--noninterference','--secret','pre.100.112','--public','post.100.110','--max-tuples','2000000']
         p=self.run_cli(args);self.assertEqual(p.returncode,0,p.stderr)

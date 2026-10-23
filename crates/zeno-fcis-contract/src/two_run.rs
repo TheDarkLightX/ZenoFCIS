@@ -23,6 +23,8 @@ use zeno_fcis_synthesis::finite::{Domain, Program};
 
 /// Existing finite judge tuple ceiling.
 pub const MAX_TUPLES: u64 = 1 << 20;
+/// Maximum planned Authority invocations for an order-independence check.
+pub const MAX_ORDER_INVOCATIONS: u64 = 1 << 20;
 /// Exact scope retained in every packet, including UNKNOWN.
 pub const SCOPE: &str = "two runs from every admissible state over the declared finite domain; one step per side (noninterference) or two (order independence); longer interleavings are not claimed";
 /// Requested property. State paths use `pre.100.FIELD` or `post.100.FIELD`.
@@ -356,7 +358,7 @@ pub fn check(
     let mut packet = json!({"schema":"zeno-fcis/two-run/1","authority":"none","scope":SCOPE,
         "sources":{"project_sha256":sha(project),"rules_sha256":sha(rules_source)},
         "checker":crate::checked_composition::identity::Identity::current().json(),
-        "max_tuples":max_tuples.min(MAX_TUPLES),"property":format!("{property:?}")});
+        "max_tuples":max_tuples.min(MAX_TUPLES),"max_order_invocations":MAX_ORDER_INVOCATIONS,"property":format!("{property:?}")});
     let mut m = Measured::default();
     let positions = match domain::positions(&declarations) {
         Ok(p) => p,
@@ -485,6 +487,19 @@ pub fn check(
                     &m,
                     Verdict::Unknown,
                     json!({"reason":"selector admits no complete input"}),
+                );
+            }
+            // The tuple cap bounds this product by 4 * MAX_TUPLES^2,
+            // which fits u64. Count all four invocations, including refusals,
+            // before executing any order, even if an early refutation exists.
+            let planned = m.states * left.len() as u64 * right.len() as u64 * 4;
+            packet["planned_order_invocations"] = json!(planned);
+            if planned > MAX_ORDER_INVOCATIONS {
+                return finish(
+                    packet,
+                    &m,
+                    Verdict::Unknown,
+                    json!({"reason":format!("order independence requires {planned} Authority invocations, exceeding limit {MAX_ORDER_INVOCATIONS}")}),
                 );
             }
             for (_, state) in &states {

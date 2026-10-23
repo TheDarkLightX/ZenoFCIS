@@ -251,3 +251,35 @@ fn outbox_and_committed_failure_are_observed() {
         Verdict::Refuted
     );
 }
+
+#[test]
+fn order_work_is_bounded_before_any_invocation() {
+    let (p, r) = fixture(json!([accept(json!({}))]), "", json!({}));
+    let property = Property::Commute {
+        first: "true".into(),
+        second: "true".into(),
+        observe: vec!["post.100.110".into()],
+        within: 0,
+    };
+    let small = checked(&p, &r, &property);
+    assert_eq!(small.verdict(), Verdict::Checked);
+    assert_eq!(small.packet()["planned_order_invocations"], 1152);
+    assert_eq!(small.packet()["measured"]["authority_invocations"], 1152);
+    let p = p.replace("Action in 0..=1", "Action in 0..=1023");
+    let large = checked(&p, &r, &property);
+    assert_eq!(large.verdict(), Verdict::Unknown);
+    assert_eq!(large.packet()["planned_order_invocations"], 301_989_888_u64);
+    assert_eq!(
+        large.packet()["max_order_invocations"],
+        MAX_ORDER_INVOCATIONS
+    );
+    assert_eq!(large.packet()["measured"]["authority_invocations"], 0);
+    assert_eq!(large.packet()["measured"]["comparisons"], 0);
+    assert!(large.packet()["claim"].is_null());
+    assert!(
+        large.packet()["result"]["reason"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("exceeding limit")
+    );
+}

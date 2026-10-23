@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 
 MIN_I128, MAX_I128 = -(2**127), 2**127 - 1
+MAX_ORDER_INVOCATIONS = 1048576
 
 
 def fit(n):
@@ -202,6 +203,8 @@ class Contract:
         left = [i for i in self.inputs if a.evaluate(dict(zip(self.names[self.width:],i)),self.variables)==1]
         right = [i for i in self.inputs if b.evaluate(dict(zip(self.names[self.width:],i)),self.variables)==1]
         indices = [self.names.index(p.replace('post.','pre.')) for p in observe]
+        if len(self.admissible)*len(left)*len(right)*4 > MAX_ORDER_INVOCATIONS:
+            return 'UNKNOWN', 0, 0
         comparisons = 0; max_distance = 0; different = False
         for state, i, j in itertools.product(self.admissible,left,right):
             x=self.outcome(state,i); sx=self.after(state,x); y=self.outcome(sx,j); final1=self.after(sx,y)

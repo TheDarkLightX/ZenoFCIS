@@ -47,7 +47,15 @@ Unknown fields, duplicates, a field designated both secret and public, and
 selectors that read state (including through a variable) are refused.
 Undefined selectors, empty selected input sets, no admissible states, or a
 domain exceeding `--max-tuples` yield UNKNOWN with the reason. The hard tuple
-ceiling is 1,048,576. No boundary sampling produces `checked`.
+ceiling is 1,048,576; the packet reports min(requested cap, 1,048,576).
+Order independence also has a fixed limit of 1,048,576 planned Authority
+invocations. Before running either order, it counts admissible states x |I1|
+x |I2| x 4, including calls that would refuse. If that count exceeds the limit,
+it returns UNKNOWN (exit 2) with the count and reason, even if an early pair
+would refute the property. The packet retains `planned_order_invocations`,
+`max_order_invocations` and the actual invocation count (zero on this UNKNOWN result).
+This bounds invocation count, not wall-clock time or cost per invocation.
+No boundary sampling produces `checked`.
 
 ## What differs from a one-run judge?
 
