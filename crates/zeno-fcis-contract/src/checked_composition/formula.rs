@@ -7,7 +7,7 @@
 //! field of a record, and the library's law evaluator decides it, as `/1`
 //! decides its invariants. A binding is a rule expression: the contract's
 //! decision-program compiler compiles it once into a library program of one
-//! output, with checked 64-bit arithmetic and no multiplication or division,
+//! output, with checked 128-bit arithmetic and no multiplication or division,
 //! and the library's program evaluator computes its value. Nothing here
 //! interprets a formula.
 //!

@@ -30,7 +30,7 @@ lines=['[package]','name = "composition-service-app"','version = "0.1.0"','editi
 for crate in ('zeno-fcis-contract','zeno-fcis-shell-sqlite','zeno-fcis-codec','zeno-fcis-crypto'):
  lines.append(crate+' = { version='+json.dumps('='+version)+', path='+json.dumps(str(repo/'crates'/crate))+' }')
 (out/'Cargo.toml').write_text('\n'.join(lines)+'\n')
-env=os.environ|{'CARGO_PROFILE_DEV_DEBUG':'0','CARGO_PROFILE_TEST_DEBUG':'0','CARGO_BUILD_JOBS':'4','CARGO_NET_OFFLINE':'true','CARGO_INCREMENTAL':'0'}
+env=os.environ|{'CARGO_PROFILE_DEV_DEBUG':'0','CARGO_PROFILE_TEST_DEBUG':'0','CARGO_BUILD_JOBS':'3','CARGO_NET_OFFLINE':'true','CARGO_INCREMENTAL':'0'}
 shutil.copy2(repo/'Cargo.lock',out/'Cargo.lock')
 # Resolve only the generated root while retaining existing locked versions.
 subprocess.run(['nice','-n','19','ionice','-c3','cargo','+1.97.1','metadata','--offline','--format-version','1'],cwd=out,env=env,stdout=subprocess.DEVNULL,check=True)
