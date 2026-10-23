@@ -11,7 +11,8 @@ declared game. Then `check --expand` prints the answer for every state, and laws
 zeno-fcis check --expand examples/contract-tables/games/release-pipeline/project.zeno
 ```
 
-Each `from_<state>` law expands to `true` where the controller wins and `false` where it does not.
+Each `from_<state>` law expands to `true` where the controller wins and `false` where it does not. In the
+fairness examples, the `stable` law must also expand to `true`.
 
 ## Formal model
 A game declares, for each state `i`:
@@ -33,11 +34,14 @@ The controllable predecessor of a set X holds at state i when one of these holds
   starts from every state. Each stratum reads only the one below it.
 - **Fairness:** the controller can force goals g1..gm infinitely often, provided the environment makes assumptions
   a1..an hold infinitely often (a GR(1) game). If the environment breaks an assumption, the controller wins. The
-  winning region is `νZ. ⋀j μY. ⋁i νX. (gj ∧ CPre(Z)) ∨ CPre(Y) ∨ (¬ai ∧ CPre(X))`. Both outer chains are
-  unrolled into N strata, as for recurrence. Each inner greatest fixed point is the complement of one recursive
-  table, `wi = μW. ¬A ∧ (ai ∨ OPre(W))`, where `OPre(W) = ¬CPre(¬W)` is what the environment can force. The
-  complements of the outer strata are positive in these tables, so no recursive table negates another. A last,
-  non-recursive `win` table negates the top stratum.
+  winning region is `νZ. ⋀j μY. ⋁i νX. (gj ∧ CPre(Z)) ∨ CPre(Y) ∨ (¬ai ∧ CPre(X))`. Each inner greatest
+  fixed point is the complement of one recursive table, `wi = μW. ¬A ∧ (ai ∨ OPre(W))`, where
+  `OPre(W) = ¬CPre(¬W)` is what the environment can force. The two outer chains settle in a few steps, so a solver
+  proposes how many strata each needs and the tables build exactly those. The `stable` law checks that the last
+  stratum of each chain equals the one before it: an iteration that repeats has reached its fixed point, so the
+  answer is exact when `stable` expands to `true`, and is refused otherwise. The complements of the
+  outer strata are positive in the `w` tables, so no recursive table negates another. A last, non-recursive `win`
+  table negates the top stratum.
 
 ## Examples
 | Example | Question | Answer |
@@ -51,9 +55,9 @@ The controllable predecessor of a set X holds at state i when one of these holds
 
 Each example was compared with an independent Python solver on every state. The fairness encoding was also
 compared on 1,576 games (every two-state game with one assumption and one guarantee, and 1,000 random games of 3 to
-5 states with up to two of each): the tables, a direct nested fixed point and the trace game's certified parity
-solver agreed on every state. Two planted encoding defects, ignoring the assumption and dropping outer strata, each
-produced disagreements.
+8 states with up to two of each): the tables, a direct nested fixed point and the trace game's certified parity
+solver agreed on every state, and `stable` held. Proposing one stratum too few was refused by `stable` in
+all 876 games tried; ignoring the assumption produced disagreements.
 
 ## Difference
 A hand-written check of "the maintainer can always release" needs either a proof or a search over every behaviour
@@ -67,9 +71,9 @@ contract's own states, against compromised actors, use the trace game's liveness
   is a fairness assumption, and must be stated.
 - An assumption is a state the environment visits infinitely often (justice). "If asked infinitely often, eventually
   answers" (compassion, a Streett condition) is not expressible this way.
-- The fairness encoding uses N·N·m·n recursive tables for N states, m guarantees and n assumptions. In measured
-  runs, 8 states with one guarantee and one assumption, and 6 states with two of each, expanded in under a second;
-  10 states with one of each, and 8 with two of each, exceeded the expansion limit.
+- Each fairness table quantifies over every state in every round, so expansion grows with the cube of the number
+  of states. In measured runs, 20 states with one guarantee and one assumption, and 12 states with two of each,
+  expanded in about a second; 24 states with one of each exceeded the expansion limit.
 - `rounds` must equal the number of entries exactly. A table holds at most 64 entries. Constant table IDs must not
   collide with field IDs.
 - Expansion grows with the size of the game. One table over every state, with nested quantifiers, reaches the

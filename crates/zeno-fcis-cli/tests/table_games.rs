@@ -81,6 +81,15 @@ fn expand(project: &str) -> Output {
 
 /// Every `from_<state>` law's expansion, which the guide says is `true` or `false`.
 fn answers(output: &Output) -> Vec<(String, String)> {
+    laws(output, " from_")
+}
+
+/// The fairness examples' `stable` law, which must expand to exactly `true`.
+fn stable(output: &Output) -> Vec<(String, String)> {
+    laws(output, " stable")
+}
+
+fn laws(output: &Output, prefix: &str) -> Vec<(String, String)> {
     assert!(
         output.status.success(),
         "{}",
@@ -89,7 +98,7 @@ fn answers(output: &Output) -> Vec<(String, String)> {
     String::from_utf8_lossy(&output.stdout)
         .lines()
         .filter_map(|line| {
-            let (_, rest) = line.split_once(" from_")?;
+            let (_, rest) = line.split_once(prefix)?;
             let (state, value) = rest.split_once(" on commit = ")?;
             Some((state.to_owned(), value.trim_end_matches(';').to_owned()))
         })
@@ -129,7 +138,15 @@ fn the_guide_command_gives_the_documented_answer_from_every_state() {
             .iter()
             .map(|(state, wins)| ((*state).to_owned(), wins.to_string()))
             .collect();
-        assert_eq!(answers(&expand(&project)), expected, "{example}");
+        let output = expand(&project);
+        assert_eq!(answers(&output), expected, "{example}");
+        if example.ends_with("-fair") {
+            assert_eq!(
+                stable(&output),
+                [(String::new(), "true".to_owned())],
+                "{example}"
+            );
+        }
     }
 }
 
@@ -154,7 +171,13 @@ fn the_fairness_examples_answer_no_without_their_assumption() {
             &dir,
             &text.replace(&declared, &declared.replace(assumption, &everywhere)),
         );
-        let result = answers(&expand(&project));
+        let output = expand(&project);
+        assert_eq!(
+            stable(&output),
+            [(String::new(), "true".to_owned())],
+            "{example}"
+        );
+        let result = answers(&output);
         assert!(!result.is_empty(), "{example}");
         assert!(
             result.iter().all(|(_, value)| value == "false"),
