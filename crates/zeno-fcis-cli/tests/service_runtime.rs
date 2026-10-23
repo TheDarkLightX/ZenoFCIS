@@ -337,3 +337,34 @@ fn recovery_cannot_activate_a_different_service_identity() {
     drop(Store::open(&path, &a).unwrap_or_else(fail));
     fs::remove_dir_all(dir).unwrap_or_else(fail);
 }
+
+#[test]
+fn duplicate_prepared_request_retains_its_actual_work_without_a_second_commit() {
+    let dir = directory();
+    let a = authority();
+    let mut store = Store::open(&dir.join("duplicate.db"), &a).unwrap_or_else(fail);
+    let command = request("same", 1, 1);
+    let pre = store.snapshot(&a).unwrap_or_else(fail);
+    let prepared = a
+        .decide(&pre.state, &command, pre.version)
+        .unwrap_or_else(fail);
+    let work = prepared.usage();
+    let first = store.execute(&a, &command).unwrap_or_else(fail);
+    let duplicate = store.commit(&a, prepared).unwrap_or_else(fail);
+    assert!(duplicate.recovered);
+    assert_eq!(duplicate.receipt, first.receipt);
+    assert_eq!(
+        duplicate.attempt_usage,
+        Some(work),
+        "recovery must retain the actual prepared invocation's usage"
+    );
+    let recovered = store.execute(&a, &command).unwrap_or_else(fail);
+    assert!(recovered.recovered);
+    assert_eq!(recovered.attempt_usage, None);
+    let head = store.snapshot(&a).unwrap_or_else(fail);
+    assert_eq!(head.version, 1);
+    assert_eq!(head.state.values(), [1, 1]);
+    store.audit(&a).unwrap_or_else(fail);
+    drop(store);
+    fs::remove_dir_all(dir).unwrap_or_else(fail);
+}

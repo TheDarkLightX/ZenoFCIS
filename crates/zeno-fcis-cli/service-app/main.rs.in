@@ -56,7 +56,7 @@ fn handle(stream:&mut (impl Read + Write),authority:&ServiceAuthority,store:&mut
             let request:Request=match serde_json::from_slice(&body){Ok(r)=>r,Err(_)=>return respond(stream,400,json!({"error":"request-shape"}))};
             let request=match ServiceRequest::new(&request.principal,&request.key,&request.values){Ok(r)=>r,Err(reason)=>return respond(stream,400,json!({"error":reason}))};
             match store.execute(authority,&request){
-                Ok(result)=>respond(stream,200,json!({"version":result.version,"receipt":hex(&result.receipt),"recovered":result.recovered})),
+                Ok(result)=>respond(stream,200,json!({"version":result.version,"receipt":hex(&result.receipt),"recovered":result.recovered,"attempt_usage":result.attempt_usage.map(|u|json!({"core":u.core(),"wrapper":u.wrapper()}))})),
                 Err(error)=>respond(stream,422,json!({"error":error.reason,"usage":error.usage.map(|u|json!({"core":u.core(),"wrapper":u.wrapper()}))})),
             }
         },

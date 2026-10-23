@@ -55,6 +55,8 @@ pub(crate) struct Committed {
     pub(crate) version: u64,
     pub(crate) receipt: Vec<u8>,
     pub(crate) recovered: bool,
+    /// Actual current invocation, including when another attempt already committed.
+    pub(crate) attempt_usage: Option<ServiceUsage>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Fault {
@@ -169,6 +171,7 @@ impl Store {
                     version: version as u64,
                     receipt,
                     recovered: true,
+                    attempt_usage: None,
                 }))
             }
             None => Ok(None),
@@ -296,12 +299,18 @@ impl Store {
                 version: next,
                 receipt,
                 recovered: false,
+                attempt_usage: None,
             })
         })();
-        result.map_err(|mut error| {
-            error.usage = Some(usage);
-            error
-        })
+        result
+            .map(|mut committed| {
+                committed.attempt_usage = Some(usage);
+                committed
+            })
+            .map_err(|mut error| {
+                error.usage = Some(usage);
+                error
+            })
     }
     fn rows(
         &self,

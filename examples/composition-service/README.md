@@ -59,7 +59,10 @@ row stores the whole canonical state; one journal row stores the request,
 receipt and replay key. Both change in one SQLite transaction. Every accepted
 read crosses the global version/root fence. Reopening re-executes all checked
 Programs and compares every receipt byte and the complete head. Recovery
-returns the committed receipt; no automatic retry resets invocation usage.
+returns the committed receipt. If a duplicate was already decided locally, its
+actual attempt counters are returned separately from that original receipt; a
+lookup performed before deciding has no core attempt counters. No automatic
+retry resets invocation usage.
 A stale decision is refused. Changed service identities require a fresh store;
 there is no migration or mixed-version activation API.
 
