@@ -1,0 +1,98 @@
+{
+  "Collections.decision_renaming": [
+    "Quot.sound",
+    "propext"
+  ],
+  "Collections.frame_admissible": [],
+  "Collections.frame_renaming": [
+    "Quot.sound",
+    "propext"
+  ],
+  "Collections.role_local_preserved": [
+    "propext"
+  ],
+  "Collections.role_named_outputs": [
+    "propext"
+  ],
+  "Collections.role_only_counterexample": [
+    "Quot.sound",
+    "propext"
+  ],
+  "Collections.role_write_frame": [
+    "propext"
+  ],
+  "Collections.run_preserves": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "Collections.step_preserves": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.ascending": [],
+  "FixedPoints.ascending_repeats": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.below_antisymm": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.below_refl": [],
+  "FixedPoints.below_top": [],
+  "FixedPoints.below_trans": [],
+  "FixedPoints.bottom_below": [],
+  "FixedPoints.descending": [],
+  "FixedPoints.descending_repeats": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.gfp_greatest": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.greatest_of_stable": [],
+  "FixedPoints.greatest_unique": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.inner_monotone": [],
+  "FixedPoints.iter_comparison": [],
+  "FixedPoints.least_of_stable": [],
+  "FixedPoints.least_unique": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.lfp_least": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.nested_stable": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.stable_forever": [],
+  "FixedPoints.strata_are_iterations": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.top_seed_counterexample": [
+    "propext"
+  ],
+  "FixedPoints.weight_bound": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.weight_order": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ]
+}

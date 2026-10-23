@@ -3,6 +3,9 @@
 
 from pathlib import Path
 import argparse
+import hashlib
+import json
+import os
 import re
 import subprocess
 import tempfile
@@ -10,39 +13,106 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 PROOFS = ROOT / "verification" / "lean"
 VERSIONS = ("4.28.0", "4.32.0")
-ALLOWED = {"propext", "Quot.sound", "Classical.choice"}
+ALLOWED = frozenset({"propext", "Quot.sound", "Classical.choice"})
+AUDITOR = ROOT / "tools" / "lean" / "AuditModule.lean"
+FORBIDDEN = re.compile(r"\b(?:sorry|admit|axiom|native_decide|implemented_by|extern|unsafe|csimp)\b")
 AXIOMS = re.compile(
     r"'([^']+)' (?:does not depend on any axioms|depends on axioms: \[([^\]]*)\])"
 )
 
 
-def lean(version, *args):
+def lean(version, *args, search_path=None):
     command = ["nice", "-n", "19", "ionice", "-c3", "elan", "run",
                f"leanprover/lean4:v{version}", "lean", *map(str, args)]
+    env = os.environ.copy()
+    # Only this invocation's freshly compiled modules precede the standard library.
+    env["LEAN_PATH"] = str(search_path) if search_path is not None else ""
     result = subprocess.run(command, cwd=ROOT, text=True, capture_output=True,
-                            timeout=180)
+                            timeout=180, env=env)
     return result.returncode, result.stdout + result.stderr
 
 
-def check_output(source, output):
-    """Require one kernel axiom report for every theorem in the source."""
-    if re.search(r"\b(?:sorry|admit|axiom)\b", source):
-        raise ValueError("placeholder or axiom declaration in proof source")
+def check_source(source):
+    """Defence in depth; this does not discover declarations or prove safety.
+
+    Deliberately conservative: reserved tokens are refused even in comments.
+    The semantic audit is independent of this textual refusal.
+    """
+    if match := FORBIDDEN.search(source):
+        raise ValueError(f"forbidden proof-source token: {match.group()}")
+
+
+def check_output(output, expected):
+    """Compare named reports with the explicit manifest, never source patterns."""
     if re.search(r"\b(?:error|warning):", output):
         raise ValueError("Lean emitted an error or warning")
-    expected = re.findall(r"^theorem\s+(\w+)", source, re.M)
     found = AXIOMS.findall(output)
-    if not expected or len(found) != len(expected):
+    if len(found) != len(expected) or len({name for name, _ in found}) != len(found):
         raise ValueError("missing or duplicate theorem axiom reports")
-    if sorted(name.rsplit(".", 1)[-1] for name, _ in found) != sorted(expected):
+    if {name for name, _ in found} != set(expected):
         raise ValueError("theorem names and axiom reports differ")
     for name, axioms in found:
         used = {a.strip() for a in axioms.split(",") if a.strip()}
         if used - ALLOWED:
             raise ValueError(f"unexpected axioms for {name}: {sorted(used - ALLOWED)}")
+        if sorted(used) != sorted(expected[name]):
+            raise ValueError(f"axiom manifest differs for {name}")
 
 
-def controls(version, path, source):
+def compile_module(version, path, source_root, build):
+    """Compile one snapshot with a stable module identity and fresh output."""
+    relative = path.relative_to(source_root).with_suffix("")
+    module = ".".join(relative.parts)
+    output = build / relative.with_suffix(".olean")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    code, text = lean(version, "--root", source_root, "-o", output, path,
+                      search_path=build)
+    if code or re.search(r"\b(?:error|warning):", text):
+        raise ValueError(f"Lean rejected {module}: exit {code}\n{text}")
+    return module, text
+
+
+def audit_module(version, module, build, auditor=AUDITOR):
+    """Lean owns the module-wide verdict; return its packet and actual exit."""
+    code, text = lean(version, "--run", auditor, module, search_path=build)
+    try:
+        packet = json.loads(text)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"invalid module audit: exit {code}\n{text}") from error
+    if packet.get("schema") != "zeno-fcis/lean-module-audit/1" or packet.get("module") != module:
+        raise ValueError("wrong module audit identity")
+    return code, packet
+
+
+def require_audit(code, packet):
+    """Check the transport and independently enforce the packet's invariant."""
+    records = packet["constants"]
+    if (code != 0 or packet["accepted"] is not True or packet["rejected_count"] != 0
+            or not records or packet["constant_count"] != len(records)
+            or len({r["name"] for r in records}) != len(records)):
+        raise ValueError(f"module axiom audit rejected: exit {code}\n{json.dumps(packet)}")
+    for record in records:
+        if record["unsafe"] or record["forbidden"] or set(record["axioms"]) - ALLOWED:
+            raise ValueError(f"module axiom audit contains forbidden declaration: {record}")
+
+
+def check_module(version, path, source_root, build, named, auditor=AUDITOR):
+    check_source(path.read_text())
+    module, text = compile_module(version, path, source_root, build)
+    print(f"CHECK {version} {module}: exit 0\n{text}", flush=True)
+    code, packet = audit_module(version, module, build, auditor)
+    print(f"AUDIT {version} {module}: exit {code}\n{json.dumps(packet, sort_keys=True)}", flush=True)
+    require_audit(code, packet)
+    actual = {r["name"]: r for r in packet["constants"]}
+    expected = {name: axioms for name, axioms in named.items() if name in actual}
+    check_output(text, expected)
+    for name, axioms in expected.items():
+        if actual[name]["kind"] != "theorem" or sorted(actual[name]["axioms"]) != sorted(axioms):
+            raise ValueError(f"named theorem differs from imported kernel declaration: {name}")
+    return packet, set(expected)
+
+
+def controls(version, path, source, search_path=None):
     # First the unmodified model is compiled by main. Each added assertion
     # states a concrete false claim, so rejection must be a proof failure.
     if path.name == "Collections.lean":
@@ -79,7 +149,7 @@ theorem monotonicity_control :
         with tempfile.TemporaryDirectory(prefix="lean-proof-control-") as directory:
             mutant = Path(directory) / path.name
             mutant.write_text(source + assertion)
-            code, output = lean(version, mutant)
+            code, output = lean(version, "--root", directory, mutant, search_path=search_path)
         print(f"CONTROL {version} {name}: exit {code}\n{output}", flush=True)
         if code != 1 or not re.search(r"error: Tactic `decide` proved that the proposition\n[\s\S]*?\nis false", output):
             raise ValueError(f"{name} did not fail on the expected false assertion")
@@ -88,25 +158,50 @@ theorem monotonicity_control :
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--controls", action="store_true")
+    parser.add_argument("--report", type=Path, help="retain all module audits as JSON")
     args = parser.parse_args()
-    files = sorted(PROOFS.glob("*.lean"))
+    files = sorted(PROOFS.rglob("*.lean"))
     if not files:
         raise ValueError("no proof files")
+    named = json.loads((PROOFS / "AXIOMS.json").read_text())
+    snapshots = {path.relative_to(PROOFS): path.read_bytes() for path in files}
+    auditor_bytes = AUDITOR.read_bytes()
+    results = {"schema": "zeno-fcis/lean-proof-check/2", "source_sha256": {
+        str(p): hashlib.sha256(b).hexdigest() for p, b in snapshots.items()},
+        "auditor_sha256": hashlib.sha256(auditor_bytes).hexdigest(), "toolchains": {}}
     for version in VERSIONS:
         code, output = lean(version, "--version")
         if code or f"version {version}," not in output:
             raise ValueError(f"wrong or unavailable Lean {version}: {output}")
         print(output.strip(), flush=True)
-        for path in files:
-            source = path.read_text()
-            code, output = lean(version, path)
-            print(f"CHECK {version} {path.relative_to(ROOT)}: exit {code}\n{output}", flush=True)
-            if code:
-                raise ValueError(f"Lean rejected {path.name}")
-            check_output(source, output)
-            if args.controls:
-                controls(version, path, source)
-    print("PASS: all proof files, theorem axiom reports and requested controls", flush=True)
+        # Nothing is imported from an old build. Compilation and auditing consume
+        # immutable byte snapshots in invocation-owned temporary directories.
+        with tempfile.TemporaryDirectory(prefix="lean-proof-check-") as directory:
+            temp = Path(directory)
+            source_root, build = temp / "source", temp / "build"
+            build.mkdir()
+            auditor = temp / "AuditModule.lean"
+            auditor.write_bytes(auditor_bytes)
+            for relative, content in snapshots.items():
+                path = source_root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+            packets, seen = [], set()
+            for relative, content in snapshots.items():
+                path = source_root / relative
+                packet, reports = check_module(version, path, source_root, build, named, auditor)
+                if seen & reports:
+                    raise ValueError("named theorem reported by multiple proof modules")
+                seen |= reports
+                packets.append(packet)
+                if args.controls:
+                    controls(version, path, content.decode(), search_path=build)
+            if seen != set(named):
+                raise ValueError(f"named axiom manifest coverage differs: {sorted(set(named) - seen)}")
+            results["toolchains"][version] = packets
+    if args.report:
+        args.report.write_text(json.dumps(results, indent=2, sort_keys=True) + "\n")
+    print("PASS: every module constant, named axiom manifest and requested controls", flush=True)
 
 
 if __name__ == "__main__":

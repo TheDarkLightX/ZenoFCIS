@@ -3,8 +3,10 @@
 These synthesized proofs use only the standard Lean distribution. Run
 `python3 tools/check_lean_proofs.py` from the repository root. The script
 requires the already installed Lean 4.28.0 and 4.32.0 toolchains; it does not
-download dependencies. It checks every theorem's printed axioms and rejects
-placeholders or axioms outside `propext`, `Quot.sound`, `Classical.choice`.
+download dependencies. It compiles fresh module snapshots, then asks Lean to
+enumerate every constant owned by each proof module and collect its transitive
+axioms. Private, protected, instance, definition and auxiliary declarations are
+included. Only `propext`, `Quot.sound`, and `Classical.choice` are allowed.
 Use `--controls` to check deliberately false assertions in temporary copies.
 
 ## Collections
@@ -77,16 +79,24 @@ Python proposal generator, or the implementation of the `stable` law.
 
 ## Checking and axioms
 
-Every theorem, including helpers and counterexamples, has a `#print axioms`
-command. The check script requires exactly one matching report per theorem
-on each toolchain. `least_of_stable` and `greatest_of_stable` are axiom-free;
+The module audit uses Lean's environment ownership and `collectAxioms` API;
+source-text patterns do not select declarations. In addition, each named
+theorem in [AXIOMS.json](AXIOMS.json) must have exactly one `#print axioms`
+report matching both the manifest and its imported kernel declaration on each
+toolchain. `least_of_stable` and `greatest_of_stable` are axiom-free;
 `run_preserves` and `nested_stable` use exactly `propext`, `Quot.sound`, and
 `Classical.choice`. Other theorem reports are printed in full by the script.
 Defect controls first compile the unmodified model, then add a named false
 assertion in an isolated copy. Only rejection by `decide` proving that
 assertion false counts as a killed control; build or transport failures do
 not count. Temporary copies are removed, and the proof sources are unchanged.
-The report-parser tests run with
+The proof sources also refuse `sorry`, `admit`, `axiom`, `native_decide`,
+`implemented_by`, `extern`, `unsafe`, and `csimp` tokens, even in comments.
+This conservative textual guard is defence in depth, not declaration coverage.
+The gate tests compile five declaration forms containing a native decision
+proof, bypass the textual guard, and require rejection by the module audit.
+Their ordinary proof variants pass; an allowed private theorem must be counted
+and pass as well. The parser and module-coverage tests run with
 `python3 -B -m unittest discover -s tools -p test_check_lean_proofs.py`.
 
 ## Background and contribution
