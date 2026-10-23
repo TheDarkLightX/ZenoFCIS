@@ -48,7 +48,10 @@ The generator produces a `GeneratedBundle` containing:
 
 ### Bounds
 
-- Maximum recursive nesting depth: 64 (codec decode), 128 (schema validation).
+- Maximum recursive nesting depth: 64 (codec decode default), 128 (schema validation).
+  Value validation, encoding and decoding cap any configured depth at
+  `ValueLimits::MAX_SUPPORTED_DEPTH` (1,024), the catalog ceiling, so no input
+  recurses deeper whatever limits a caller supplies.
 - Maximum collection length: enforced by `DecodeLimits` and `ValidationLimits`.
 - All generated constants are `u32` (type IDs) or `u16` (field/variant IDs).
 - Generated text is ASCII-only.

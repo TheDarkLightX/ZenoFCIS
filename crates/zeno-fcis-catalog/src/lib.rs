@@ -45,6 +45,8 @@ pub const MAX_TOTAL_VALUE_NODES: u64 = 100_000_000;
 pub const MAX_TOTAL_PAYLOAD_BYTES: u64 = 1_073_741_824;
 /// Maximum recursive value depth admitted by a catalog.
 pub const MAX_VALUE_DEPTH: u16 = 1_024;
+// The value library caps every depth limit at the same ceiling.
+const _: () = assert!(MAX_VALUE_DEPTH as u32 == ValueLimits::MAX_SUPPORTED_DEPTH);
 /// Maximum children in one collection value.
 pub const MAX_COLLECTION_LENGTH: u32 = 1_000_000;
 /// Maximum distinct value-flow descriptors on one effect or channel.

@@ -712,9 +712,9 @@ impl DecodeState {
     }
 
     fn enter(&mut self, depth: u32) -> Result<(), DecodeError> {
-        if depth > self.limits.max_depth {
+        if depth > self.limits.effective_max_depth() {
             return Err(DecodeError::DepthLimit {
-                limit: self.limits.max_depth,
+                limit: self.limits.effective_max_depth(),
                 attempted: depth,
             });
         }
@@ -745,6 +745,23 @@ impl DecodeState {
             });
         }
         Ok(())
+    }
+
+    /// Children to reserve for a collection that declares `count`: no more
+    /// than the remaining wire bytes can encode, and no more than the node
+    /// limit still admits, since every child takes at least one node.
+    fn reservation(
+        &self,
+        count: u32,
+        remaining_wire_bytes: usize,
+        minimum_wire_bytes_per_item: usize,
+    ) -> Result<usize, DecodeError> {
+        let nodes =
+            usize::try_from(self.limits.max_nodes.saturating_sub(self.nodes)).unwrap_or(usize::MAX);
+        Ok(
+            initial_collection_capacity(count, remaining_wire_bytes, minimum_wire_bytes_per_item)?
+                .min(nodes),
+        )
     }
 
     fn collection(&self, length: u32) -> Result<(), DecodeError> {
@@ -799,8 +816,7 @@ fn decode_value_inner(
         TAG_TUPLE | TAG_VECTOR => {
             let count = cursor.take_u32()?;
             state.collection(count)?;
-            let mut items =
-                Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 1)?);
+            let mut items = Vec::with_capacity(state.reservation(count, cursor.remaining(), 1)?);
             for _ in 0..count {
                 items.push(decode_value_inner(
                     cursor,
@@ -818,8 +834,7 @@ fn decode_value_inner(
             let count = cursor.take_u32()?;
             state.collection(count)?;
             // One field requires its u16 identifier and at least one value tag.
-            let mut fields =
-                Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 3)?);
+            let mut fields = Vec::with_capacity(state.reservation(count, cursor.remaining(), 3)?);
             let mut previous = None;
             for _ in 0..count {
                 let id = cursor.take_u16()?;
@@ -858,7 +873,7 @@ fn decode_value_inner(
             // One entry requires two u32 blob lengths plus at least one value
             // tag in each encoded key and value.
             let mut entries =
-                Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 10)?);
+                Vec::with_capacity(state.reservation(count, cursor.remaining(), 10)?);
             // Encoded keys are compared as they are borrowed from the input, so
             // canonical key order is decided on the exact wire bytes.
             let mut previous: Option<&[u8]> = None;
@@ -1676,6 +1691,22 @@ mod tests {
             initial_collection_capacity(1, 1, 0),
             Err(DecodeError::LengthOverflow)
         );
+    }
+
+    #[test]
+    fn collection_reservation_is_bounded_by_the_node_limit() {
+        let mut state = DecodeState::new(ValueLimits {
+            max_nodes: 2,
+            ..ValueLimits::default()
+        });
+        assert_eq!(state.reservation(1_000_000, 1_000_000, 1), Ok(2));
+        assert_eq!(state.enter(0), Ok(()));
+        assert_eq!(state.reservation(1_000_000, 1_000_000, 1), Ok(1));
+        assert_eq!(state.enter(1), Ok(()));
+        assert_eq!(state.reservation(1_000_000, 1_000_000, 3), Ok(0));
+        // The wire bound still applies under a generous node limit.
+        let state = DecodeState::new(ValueLimits::default());
+        assert_eq!(state.reservation(1_000_000, 29, 10), Ok(2));
     }
 
     #[test]

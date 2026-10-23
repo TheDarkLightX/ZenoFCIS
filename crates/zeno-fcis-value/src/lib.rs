@@ -928,6 +928,27 @@ impl ValueLimits {
     /// leaf so their successful outputs are admissible under the default
     /// payload budget.
     pub const DEFAULT_MAX_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
+
+    /// Largest nesting depth any limits admit; a larger `max_depth` is
+    /// capped here. It equals the catalog's value-depth ceiling.
+    ///
+    /// Validation, encoding and decoding recurse once per level. At this
+    /// depth, decoding needs at most 1 MiB of stack in an optimized x86-64
+    /// build (Rust 1.97.1), within a default 2 MiB thread; an unoptimized
+    /// build needs up to 8 MiB. Without the cap, 60,000 levels exhausted an
+    /// 8 MiB stack.
+    pub const MAX_SUPPORTED_DEPTH: u32 = 1_024;
+
+    /// The depth limit enforced: `max_depth`, capped at
+    /// [`Self::MAX_SUPPORTED_DEPTH`].
+    #[must_use]
+    pub const fn effective_max_depth(self) -> u32 {
+        if self.max_depth < Self::MAX_SUPPORTED_DEPTH {
+            self.max_depth
+        } else {
+            Self::MAX_SUPPORTED_DEPTH
+        }
+    }
 }
 
 impl Default for ValueLimits {
@@ -1036,9 +1057,9 @@ fn validate_value(
     limits: ValueLimits,
     metrics: &mut ValueMetrics,
 ) -> Result<(), ValueError> {
-    if depth > limits.max_depth {
+    if depth > limits.effective_max_depth() {
         return Err(ValueError::DepthLimit {
-            limit: limits.max_depth,
+            limit: limits.effective_max_depth(),
             attempted: depth,
         });
     }
@@ -1305,6 +1326,31 @@ mod tests {
             Err(ValueError::DepthLimit {
                 limit: 64,
                 attempted: 65,
+            })
+        );
+    }
+
+    #[test]
+    fn depth_limits_are_capped_at_the_supported_ceiling() {
+        let limits = |max_depth| ValueLimits {
+            max_depth,
+            ..ValueLimits::default()
+        };
+        assert_eq!(limits(u32::MAX).effective_max_depth(), 1_024);
+        assert_eq!(limits(1_025).effective_max_depth(), 1_024);
+        assert_eq!(limits(1_024).effective_max_depth(), 1_024);
+        assert_eq!(limits(1_023).effective_max_depth(), 1_023);
+        assert_eq!(ValueLimits::default().effective_max_depth(), 64);
+        let mut value = Value::unit();
+        for _ in 0..3 {
+            value =
+                Value::vector(vec![value]).unwrap_or_else(|error| panic!("collection: {error}"));
+        }
+        assert_eq!(
+            value.validate_limits(limits(2)).err(),
+            Some(ValueError::DepthLimit {
+                limit: 2,
+                attempted: 3,
             })
         );
     }
