@@ -203,10 +203,6 @@ Read reported work reservations and scope; these are not total CPU-time measurem
 
 Limits: {"constants": 32, "examples": 64, "file_bytes": 65536, "flags": "May only reduce the default enumeration caps.", "inputs": 8, "max_cells": 1000000, "max_conflict_subsets": 10000, "max_meanings": 4096, "max_size": 12, "max_tuples": 4096, "max_work": 2000000, "operations": 20, "outputs": 8}
 
-## Coordinate
-
-Use Commons advise before a checker loop and lease the exact subject. Record the command, exit, verdict, scope and retained evidence, then release the lease. Coordination records and telemetry grant no checker or publication authority.
-
 ## Pitfalls
 
 Counts and uniqueness are bounded enumeration proposals. Only complete reference checking/replay can qualify full-domain equivalence. Eager failures and all output labels are retained; no session or attempt is created.

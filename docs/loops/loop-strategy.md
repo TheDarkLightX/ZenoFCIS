@@ -176,10 +176,6 @@ Read reported work reservations and scope; these are not total CPU-time measurem
 
 Limits: {"deadline_ms": {"cap": 22000, "default": 22000}, "development_tasks": 1, "evaluation_tasks": 1, "file_bytes": 65536, "invocation_control_frames": 62, "knowledge_bindings_cap": 4096, "knowledge_layers_cap": 7, "knowledge_rows_cap": 8192, "knowledge_states_cap": 4096, "knowledge_steps_cap": 16, "knowledge_steps_default": 8, "knowledge_total_source_bytes_cap": 65536, "knowledge_work_cap": 2000000, "max_assignments": {"cap": 20000, "default": 2000}, "max_cells": {"cap": 16777216, "default": 4194304}, "max_checks": {"cap": 30, "default": 24}, "max_gate_pairs": {"cap": 4000000, "default": 1000000}, "max_search_work_per_stage": {"cap": 100000000, "default": 50000000}, "max_terms": {"cap": 512, "default": 128}, "max_tuples": {"cap": 131072, "default": 131072}, "program_inputs_cap": 32, "program_nodes_cap": 256, "program_outputs_cap": 16, "runtime_depth": 1}
 
-## Coordinate
-
-Use Commons advise before a checker loop and lease the exact subject. Record the command, exit, verdict, scope and retained evidence, then release the lease. Coordination records and telemetry grant no checker or publication authority.
-
 ## Pitfalls
 
 Selection ranks proposals already checked at their own gates. Structural facts, typed traces, diagnosis and proposed answers confer no program acceptance. Task exit 0 does not promise every evaluation task qualified.

@@ -187,10 +187,6 @@ Read reported work reservations and scope; these are not total CPU-time measurem
 
 Limits: {"examples_default_and_cap": 4096, "full_status_output_bytes": 1048576, "input_file_bytes": 65536, "invocation_control_frames": 62, "node_visits_cap": 10000000, "node_visits_default": 2000000, "open_table_nodes": 256, "open_tuples": 4096, "rounds_cap": 64, "rounds_default": 32, "session_bytes": 2097152, "whole_page_tuples_cap": 4096, "whole_pages_cap": 20}
 
-## Coordinate
-
-Use Commons advise before a checker loop and lease the exact subject. Record the command, exit, verdict, scope and retained evidence, then release the lease. Coordination records and telemetry grant no checker or publication authority.
-
 ## Pitfalls
 
 Exactness is restricted to the complete observed finite table under a deterministic-reference assumption. Role labels are conventions, not authenticated identities. Keep source, full table, session and status private; public packets and example agreement grant no acceptance.

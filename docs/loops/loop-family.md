@@ -207,10 +207,6 @@ Read reported work reservations and scope; these are not total CPU-time measurem
 
 Limits: {"check_stage_ms": 2000, "file_bytes": 65536, "input_tuples_per_instance": 131072, "instances": 10, "invocation_control_frames": 62, "invocation_ms": 22000, "output_expressions": 256, "program_inputs_cap": 32, "program_nodes_cap": 256, "program_outputs_cap": 16, "search_stage_ms": 5000}
 
-## Coordinate
-
-Use Commons advise before a checker loop and lease the exact subject. Record the command, exit, verdict, scope and retained evidence, then release the lease. Coordination records and telemetry grant no checker or publication authority.
-
 ## Pitfalls
 
 Each success is checked on its listed target reference only; there is no claim for unlisted parameters. Fitting and repair are proposals. No owner adoption, session or attempt is created.
