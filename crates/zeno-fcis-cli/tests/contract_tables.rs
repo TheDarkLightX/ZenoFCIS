@@ -116,6 +116,77 @@ fn contract_tables_expand_prints_the_checked_project() {
 }
 
 #[test]
+fn table_expansion_reports_typed_cardinality_without_enumerating() {
+    let dir = scratch("typed-cardinality");
+    let project = dir.join("project.zeno");
+    let max = u128::MAX.to_string();
+    let half = ((1u128 << 127) + 1).to_string();
+    for (kind, bounds, state_max, input_size, domain_size) in [
+        ("u128", "0..=1".to_owned(), 1, Some("2"), Some("8")),
+        (
+            "u128",
+            format!("{}..={}", u128::MAX - 1, u128::MAX),
+            1,
+            Some("2"),
+            Some("8"),
+        ),
+        (
+            "int",
+            format!("{}..={}", -i128::MAX, i128::MAX),
+            0,
+            Some(max.as_str()),
+            Some(max.as_str()),
+        ),
+        (
+            "int",
+            format!("{}..=0", i128::MIN),
+            0,
+            Some(half.as_str()),
+            Some(half.as_str()),
+        ),
+        (
+            "int",
+            format!("{}..={}", i128::MIN, i128::MAX),
+            0,
+            None,
+            None,
+        ),
+        ("u128", format!("0..={}", u128::MAX), 0, None, None),
+        (
+            "int",
+            format!("{}..={}", -i128::MAX, i128::MAX),
+            1,
+            Some(max.as_str()),
+            None,
+        ),
+    ] {
+        let source = format!(
+            "zeno 1; project 1 typed_cardinality;
+type 100 state S; type 101 command C; type 102 context X;
+type 105 int V in 0..={state_max}; table 110 100 entries 105 size 2;
+type 106 {kind} Position in {bounds}; field 121 101 position 106;
+variant 130 102 Desk none; law 500 defined on commit = true;"
+        );
+        std::fs::write(&project, source).unwrap();
+        let output = cli(&["check", "--expand", "--format", "json"], &[&project]);
+        assert!(output.status.success(), "{output:?}");
+        let packet: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(packet["canonical_match"], true);
+        assert_eq!(
+            packet["inputs"][2]["values"],
+            serde_json::json!(input_size),
+            "{kind} {bounds}"
+        );
+        assert_eq!(
+            packet["domain_size"],
+            serde_json::json!(domain_size),
+            "{kind} {bounds}"
+        );
+    }
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn contract_tables_example_generates_and_its_count_law_is_inductive() {
     let dir = scratch("generate");
     let generated = cli(

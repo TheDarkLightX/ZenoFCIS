@@ -13,6 +13,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
+use zeno_fcis_spec::TableIndexRange;
 
 use super::super::ContractError;
 use super::super::declarations::{Declarations, Kind as TypeKind, Source};
@@ -32,12 +33,11 @@ impl LeafDomain {
     pub fn size(&self) -> Option<u128> {
         match self {
             Self::Bool => Some(2),
-            Self::Int { min, max } => {
-                if min > max {
-                    return None;
-                }
-                min.abs_diff(*max).checked_add(1)
+            Self::Int { min, max } => TableIndexRange::Signed {
+                min: *min,
+                max: *max,
             }
+            .cardinality(),
             Self::Sum { variants, .. } => Some(variants.len() as u128),
         }
     }

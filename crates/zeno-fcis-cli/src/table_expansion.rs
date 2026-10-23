@@ -14,7 +14,8 @@ use std::path::Path;
 use serde_json::json;
 use zeno_fcis_spec::{
     DiagnosticSet, ProjectLimits, ProjectSpec, ProjectionPath, ProjectionRoot, SourceLimits,
-    StableId, TableExpansion, TypeKind, elaborate_project, expand_tables, parse_project,
+    StableId, TableExpansion, TypeKind, declared_table_index_range, elaborate_project,
+    expand_tables, parse_project,
 };
 
 use crate::{FAILURE, INVALID, JSON_SCHEMA, OK, OutputFormat, print_json};
@@ -204,11 +205,9 @@ fn values(spec: &ProjectSpec, path: &ProjectionPath) -> Option<u128> {
             .then_some(variants.len() as u128);
     }
     let declared = spec.types().iter().find(|t| t.id() == leaf)?;
-    match (declared.kind(), declared.range()) {
-        (TypeKind::Bool, _) => Some(2),
-        (TypeKind::Int, Some(range)) => u128::try_from(range.max().checked_sub(range.min())?)
-            .ok()?
-            .checked_add(1),
+    match declared.kind() {
+        TypeKind::Bool => Some(2),
+        TypeKind::Int | TypeKind::U128 => declared_table_index_range(spec, path)?.cardinality(),
         _ => None,
     }
 }

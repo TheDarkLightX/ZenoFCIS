@@ -72,8 +72,8 @@ pub enum DeclaredDomain {
     Range(IntRange),
 }
 
-/// Inclusive typed integer bounds used when proving a projection fits a
-/// finite table's zero-based index set.
+/// Inclusive typed integer bounds used for finite table positions and declared
+/// integer domain sizes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TableIndexRange {
     /// A signed `int` range.
@@ -93,6 +93,18 @@ pub enum TableIndexRange {
 }
 
 impl TableIndexRange {
+    /// The number of values, or `None` for reversed bounds or a size above `u128`.
+    /// Computes no signed difference and never enumerates the domain.
+    #[must_use]
+    pub fn cardinality(self) -> Option<u128> {
+        let width = match self {
+            Self::Signed { min, max } if min <= max => min.abs_diff(max),
+            Self::Unsigned { min, max } => max.checked_sub(min)?,
+            _ => return None,
+        };
+        width.checked_add(1)
+    }
+
     /// Returns true when every value lies in `0..size`.
     #[must_use]
     pub fn fits_table(self, size: u32) -> bool {
