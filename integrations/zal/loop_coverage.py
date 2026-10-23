@@ -111,7 +111,7 @@ def snapshot(packet, project, policy):
 
 
 def disagreement(packet):
-    """Read native negative verdicts before looking at any apparent improvement."""
+    """Retain native genesis or transition failures before considering progress."""
     gaps = packet.get("gaps", {})
     return (gaps.get("false_alarm") or
             (packet if gaps.get("status") in {"proposal-false-alarm", "disagreement"} else None) or
@@ -390,6 +390,8 @@ def markdown(report):
                     if c.get("closed_witnesses"):
                         lines.append("  Closes: " + ", ".join(w["id"] for w in c["closed_witnesses"]))
                     if verdict == "disagreeing":
+                        if isinstance(c["witness"], dict) and c["witness"].get("at") == "genesis":
+                            lines.append("  Disagreement at genesis: state " + canonical(c["witness"]["state"]) + ".")
                         lines.append("  Disagreement witness: " + canonical(c["witness"]))
                     if c.get("reason"):
                         lines.append("  Reason: " + c["reason"])

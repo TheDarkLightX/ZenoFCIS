@@ -55,6 +55,13 @@ class CoverageVerdictTests(unittest.TestCase):
         self.assertEqual(len(rows), 12, "unclassified witnesses were dropped")
         self.assertTrue(all(w["dimensions"] == ["unclassified"] for w in rows))
 
+    def test_native_genesis_alarm_overrides_apparent_progress(self):
+        packet = copy.deepcopy(self.after_packet)
+        packet["gaps"]["false_alarm"] = {"law": 9000, "at": "genesis", "state": [150]}
+        verdict, detail = self.assess(packet, 1)
+        self.assertEqual(verdict, "disagreeing")
+        self.assertEqual(detail["witness"], packet["gaps"]["false_alarm"])
+
     def test_budget_never_becomes_a_measured_result(self):
         with self.assertRaises(coverage.JudgeStop) as raised:
             self.assess({"gaps": {"status": "inconclusive", "reason": "work-over-limit"}}, 2)
@@ -160,6 +167,68 @@ class NativeCoverageTests(unittest.TestCase):
         return subprocess.run([sys.executable, "-B", str(HERE / "run.py"), "coverage", *map(str, args)],
                               cwd=ROOT, text=True, capture_output=True,
                               env={**os.environ, "ZENO_FCIS_BIN": os.environ["COVERAGE_TEST_BIN"]})
+
+    def test_kept_invariant_requires_genesis(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            model = work / "model.zal"
+            model.write_text("zal 2;\nmachine no_commits;\nstates idle, running;\nevents wait;\n"
+                             "context none;\ninitial idle;\nstep atomic; frame control_and_variables;\n"
+                             "default reject not_enabled unchanged;\n")
+            factory.write_new(factory.lower_machine(behavior2.parse(model.read_text())), work / "contract")
+            proposal = work / "proposal.txt"
+            proposal.write_text("invariant impossible: false;\n")
+            result = self.call([work / "contract", "--zal", model, "--proposals", proposal, "--out", work / "out"])
+            self.assertEqual(result.returncode, 1, "kept_invariant_requires_genesis: " + result.stdout + result.stderr)
+            report = json.loads((work / "out/coverage.json").read_text())
+            kept = [c for r in report["rounds"] for c in r["kept"] if c["source"] == "proposed"]
+            self.assertEqual(kept, [], "kept_invariant_requires_genesis")
+            findings = [c for r in report["rounds"] for c in r["disagreeing"] if c["source"] == "proposed"]
+            self.assertEqual(len(findings), 1)
+            finding = findings[0]
+            self.assertEqual(finding["witness"], {"law": 9000, "at": "genesis", "state": [150]})
+            self.assertIn("on commit, genesis = false;", finding["laws"][0])
+            self.assertTrue(finding["plain"].startswith("Invariant impossible:"))
+            reading = (work / "out/COVERAGE.md").read_text()
+            self.assertIn(finding["plain"], reading)
+            self.assertIn("Disagreement at genesis: state [150].", reading)
+            lemma = subprocess.run([os.environ["COVERAGE_TEST_BIN"], "contract", "lemma", str(work / "contract"),
+                                    "--lemma", "false", "--format", "json"], text=True, capture_output=True)
+            self.assertEqual(lemma.returncode, 1, lemma.stdout + lemma.stderr)
+
+    def test_running_invariant_genesis_findings_and_true_invariant_keep(self):
+        cases = [("start-once", "invariant started: state == running;", [150]),
+                 ("context-free", "invariant always_running: state == running;", [150, 0]),
+                 ("context-free", "invariant idle_count: state == running | count == 0;", None)]
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            for index, (name, proposal_text, state) in enumerate(cases):
+                with self.subTest(name=name, proposal=proposal_text):
+                    folder = work / str(index)
+                    folder.mkdir()
+                    model = folder / "model.zal"
+                    if name == "start-once":
+                        text = ("zal 2;\nmachine start_once;\nstates idle, running;\nevents start;\n"
+                                "context none;\ninitial idle;\nstep atomic; frame control_and_variables;\n"
+                                "default reject not_enabled unchanged;\n"
+                                "rule start_once: idle + start [true] -> accept running;\n")
+                    else:
+                        text = (HERE / "examples/context_free2.zal").read_text()
+                    model.write_text(text)
+                    factory.write_new(factory.lower_machine(behavior2.parse(text)), folder / "contract")
+                    proposal = folder / "proposal.txt"
+                    proposal.write_text(proposal_text + "\n")
+                    result = self.call([folder / "contract", "--zal", model, "--proposals", proposal,
+                                        "--out", folder / "out"])
+                    self.assertEqual(result.returncode, 1 if state is not None else 0, result.stdout + result.stderr)
+                    report = json.loads((folder / "out/coverage.json").read_text())
+                    verdict = "disagreeing" if state is not None else "kept"
+                    candidates = [c for r in report["rounds"] for c in r[verdict] if c["source"] == "proposed"]
+                    self.assertEqual(len(candidates), 1)
+                    self.assertIn("on commit, genesis", candidates[0]["laws"][0])
+                    if state is not None:
+                        self.assertEqual(candidates[0]["witness"]["at"], "genesis")
+                        self.assertEqual(candidates[0]["witness"]["state"], state)
 
     def test_card_commands_and_exact_outputs(self):
         text = (ROOT / "docs/zal/COVERAGE_CARD.md").read_text()
