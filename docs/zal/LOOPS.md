@@ -260,6 +260,8 @@ cannot express the complete outbox requirement. A committing answer for a
 channel-bearing contract must give `deliveries: []`, a complete list, or
 `deliveries: "case"`; omission is refused instead of repeating the question.
 The law-only term `decision_reason` also applies to failure laws without genesis.
+Inspect the exported laws before comparing judges: a reason annotation beside a
+law constrains the gaps judge only when its constraint is in the submitted law.
 Conflicts include an input and the requirements responsible; proposed-law
 false alarms include the owning answer, scope and formula beside the law ID.
 
@@ -486,6 +488,8 @@ requirement: adoption stays `zeno-fcis contract adopt`.
 - The gap judge sees exported reason laws. Complete delivery answer requirements
   are not exported as laws; the named uncovered component explains the
   difference between its law-only count and the question door's answer count.
+  A reason annotation beside a law does not add a constraint to the submitted
+  formulas.
 - A decomposition that passes steps 1 to 3 is not claimed to compose to the
   core; the composed check claims it on the core's declared domain only.
 - Steps 1 to 3 of a decomposition are the door's own evaluation of the given
