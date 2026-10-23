@@ -350,7 +350,7 @@ All commands are bounded. The contained loop worker has a 64 MiB memory limit an
         #[arg(long, default_value = "zeno-fcis.tools.json")]
         tools: PathBuf,
     },
-    /// Request and replay a bounded SMT counterexample.
+    /// Request and replay a bounded SMT counterexample. Exit 1 when the claim is refuted; 2 for UNKNOWN, 3 for tool failure.
     Counterexample {
         #[arg(default_value = "project.zeno")]
         project: PathBuf,
@@ -1581,7 +1581,7 @@ fn prove(
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::ProposedUnsat => {
                     println!(
@@ -1589,7 +1589,7 @@ fn prove(
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::KernelChecked if counterexample => {
                     eprintln!(
@@ -1597,7 +1597,7 @@ fn prove(
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::KernelChecked => {
                     println!(
@@ -1605,7 +1605,7 @@ fn prove(
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::Refuted => {
                     println!(
@@ -1613,7 +1613,7 @@ fn prove(
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::Undefined(reason) => {
                     println!(
@@ -1622,7 +1622,7 @@ fn prove(
                         claim.id().get(),
                         reason.name()
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::Blocked(error) => {
                     eprintln!(
@@ -1631,7 +1631,7 @@ fn prove(
                         claim.id().get(),
                         formal_next_step(error)
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::Failed(error) => {
                     eprintln!(
@@ -1640,7 +1640,7 @@ fn prove(
                         claim.id().get(),
                         formal_next_step(error)
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 _ => {
                     eprintln!(
@@ -1971,12 +1971,10 @@ fn failure_exit(error: &ToolFailure) -> u8 {
     }
 }
 
-fn tool_run_exit(status: &ToolRunStatus, counterexample: bool) -> u8 {
+fn tool_run_exit(status: &ToolRunStatus) -> u8 {
     match status {
         ToolRunStatus::ProposedUnsat | ToolRunStatus::Blocked(_) => BLOCKED,
-        ToolRunStatus::KernelChecked if counterexample => BLOCKED,
         ToolRunStatus::KernelChecked => OK,
-        ToolRunStatus::Refuted | ToolRunStatus::Undefined(_) if counterexample => OK,
         ToolRunStatus::Refuted | ToolRunStatus::Undefined(_) => INVALID,
         ToolRunStatus::Failed(_) => FAILURE,
         _ => BLOCKED,
@@ -2621,13 +2619,11 @@ mod tests {
             failure_exit(&ToolFailure::ProcessContainmentFailed),
             FAILURE
         );
-        assert_eq!(tool_run_exit(&ToolRunStatus::ProposedUnsat, false), BLOCKED);
-        assert_eq!(tool_run_exit(&ToolRunStatus::KernelChecked, false), OK);
-        assert_eq!(tool_run_exit(&ToolRunStatus::Refuted, false), INVALID);
-        assert_eq!(tool_run_exit(&ToolRunStatus::Refuted, true), OK);
+        assert_eq!(tool_run_exit(&ToolRunStatus::ProposedUnsat), BLOCKED);
+        assert_eq!(tool_run_exit(&ToolRunStatus::KernelChecked), OK);
+        assert_eq!(tool_run_exit(&ToolRunStatus::Refuted), INVALID);
         let undefined = ToolRunStatus::Undefined(zeno_fcis_formal_tools::UndefinedReason::Overflow);
-        assert_eq!(tool_run_exit(&undefined, false), INVALID);
-        assert_eq!(tool_run_exit(&undefined, true), OK);
+        assert_eq!(tool_run_exit(&undefined), INVALID);
     }
 
     #[test]

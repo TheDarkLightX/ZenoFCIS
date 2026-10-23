@@ -871,6 +871,12 @@ fn rc3_cli_formal_outcomes_and_retention_are_process_level() {
         String::from_utf8_lossy(&cvc5_result.stdout),
         String::from_utf8_lossy(&cvc5_result.stderr)
     );
+    let unknown_counterexample = run(Command::new(cli())
+        .arg("counterexample")
+        .arg(&cvc5_project)
+        .args(["--claim", "500", "--backend", "cvc5", "--tools"])
+        .arg(&cvc5_manifest));
+    assert_eq!(unknown_counterexample.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&cvc5_result.stdout).contains("UNSAT proposal retained"));
     assert!(
         String::from_utf8_lossy(&cvc5_result.stdout)
@@ -940,7 +946,7 @@ fn rc3_cli_formal_outcomes_and_retention_are_process_level() {
         .arg(&z3_project)
         .args(["--claim", "500", "--backend", "z3", "--tools"])
         .arg(&z3_manifest));
-    assert_eq!(counterexample.status.code(), Some(0));
+    assert_eq!(counterexample.status.code(), Some(1));
     let z3_evidence = evidence_directory(&z3_project);
     assert_retained(
         &z3_evidence,
