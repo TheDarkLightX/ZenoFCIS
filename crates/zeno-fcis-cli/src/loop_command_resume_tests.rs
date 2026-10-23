@@ -381,11 +381,14 @@ fn an_uninterrupted_resume_preserves_the_metered_identity_and_complete_transcrip
         "checker identity changed: replay the recorded metered journey before refreshing its digests"
     );
     let found = metered_journey_bytes().map(|bytes| sha256_hex(&bytes));
-    assert_eq!(found, [
-        METERED_LEDGER_SHA256,
-        METERED_HEAD_SHA256,
-        METERED_DIRECT_OUTPUTS_SHA256,
-    ]);
+    assert_eq!(
+        found,
+        [
+            METERED_LEDGER_SHA256,
+            METERED_HEAD_SHA256,
+            METERED_DIRECT_OUTPUTS_SHA256,
+        ]
+    );
 }
 
 // Like the scalar source-manifest generator, this is an explicit maintenance
@@ -397,15 +400,21 @@ fn regenerate_metered_journey_fixture() {
     let digests = bytes.each_ref().map(|bytes| sha256_hex(bytes));
     let evaluator = crate::neural_loop::request::CheckerIdentity::current().evaluator_identity;
     let evidence = std::path::PathBuf::from(
-        std::env::var_os("ZENO_METERED_FIXTURE_EVIDENCE").unwrap_or_else(|| panic!("retain the complete journey bytes"))
+        std::env::var_os("ZENO_METERED_FIXTURE_EVIDENCE")
+            .unwrap_or_else(|| panic!("retain the complete journey bytes")),
     );
     fs::create_dir_all(&evidence).unwrap_or_else(|error| panic!("fixture directory: {error}"));
-    for (name, bytes) in ["ledger.bin", "head.bin", "transcript.bin"].into_iter().zip(&bytes) {
-        fs::write(evidence.join(name), bytes).unwrap_or_else(|error| panic!("fixture bytes: {error}"));
+    for (name, bytes) in ["ledger.bin", "head.bin", "transcript.bin"]
+        .into_iter()
+        .zip(&bytes)
+    {
+        fs::write(evidence.join(name), bytes)
+            .unwrap_or_else(|error| panic!("fixture bytes: {error}"));
     }
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("src/loop_command_resume_tests.rs");
-    let before = fs::read_to_string(&path).unwrap_or_else(|error| panic!("fixture source: {error}"));
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/loop_command_resume_tests.rs");
+    let before =
+        fs::read_to_string(&path).unwrap_or_else(|error| panic!("fixture source: {error}"));
     let mut source = before.clone();
     for (name, digest) in [
         ("METERED_EVALUATOR_IDENTITY", evaluator.as_str()),
@@ -416,13 +425,21 @@ fn regenerate_metered_journey_fixture() {
         assert!(digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit()));
         let anchor = format!("const {name}: &str =\n    \"");
         assert_eq!(source.matches(&anchor).count(), 1);
-        let start = source.find(&anchor).unwrap_or_else(|| panic!("fixture anchor")) + anchor.len();
-        let end = source[start..].find('"').unwrap_or_else(|| panic!("fixture quote")) + start;
+        let start = source
+            .find(&anchor)
+            .unwrap_or_else(|| panic!("fixture anchor"))
+            + anchor.len();
+        let end = source[start..]
+            .find('"')
+            .unwrap_or_else(|| panic!("fixture quote"))
+            + start;
         assert_eq!(end - start, 64);
         source.replace_range(start..end, digest);
     }
-    fs::write(evidence.join("source-before.rs"), &before).unwrap_or_else(|error| panic!("fixture preimage: {error}"));
-    fs::write(evidence.join("source-after.rs"), &source).unwrap_or_else(|error| panic!("fixture postimage: {error}"));
+    fs::write(evidence.join("source-before.rs"), &before)
+        .unwrap_or_else(|error| panic!("fixture preimage: {error}"));
+    fs::write(evidence.join("source-after.rs"), &source)
+        .unwrap_or_else(|error| panic!("fixture postimage: {error}"));
     fs::write(&path, source).unwrap_or_else(|error| panic!("fixture install: {error}"));
 }
 
