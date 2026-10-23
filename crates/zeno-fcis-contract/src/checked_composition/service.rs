@@ -215,6 +215,48 @@ impl ServicePublication {
     pub fn usage(&self) -> ServiceUsage {
         self.usage
     }
+    /// Independently checks the receipt's fields against this genuine publication.
+    /// This data-format utility grants no decision, usage or publication authority.
+    #[must_use]
+    pub fn matches_receipt(&self, bytes: &[u8]) -> bool {
+        let mut remaining = bytes;
+        let request = self
+            .request
+            .as_ref()
+            .map(ServiceRequest::bytes)
+            .unwrap_or_default();
+        if !receipt_part(&mut remaining, b"ZFCIS-SERVICE-RECEIPT-1\0")
+            || !receipt_part(&mut remaining, &self.identity)
+            || !receipt_part(&mut remaining, &self.version.to_be_bytes())
+            || !receipt_part(&mut remaining, &[u8::from(self.request.is_some())])
+            || read_frame(&mut remaining).ok() != Some(request.as_slice())
+            || !receipt_part(&mut remaining, &self.pre_root)
+            || !receipt_part(&mut remaining, &self.post_root)
+            || !receipt_part(&mut remaining, &(self.records.len() as u64).to_be_bytes())
+        {
+            return false;
+        }
+        for record in &self.records {
+            if read_frame(&mut remaining).ok() != Some(record.id.as_bytes())
+                || !receipt_part(&mut remaining, &record.program)
+                || !receipt_part(&mut remaining, &record.schema)
+                || !receipt_part(&mut remaining, &record.pre)
+                || !receipt_part(&mut remaining, &record.post)
+                || !receipt_part(&mut remaining, &record.decision)
+            {
+                return false;
+            }
+        }
+        for value in self.usage.core {
+            if !receipt_part(&mut remaining, &value.to_be_bytes()) {
+                return false;
+            }
+        }
+        receipt_part(&mut remaining, &self.usage.wrapper.to_be_bytes())
+            && receipt_part(&mut remaining, &sha256(b"ZFCIS-SERVICE-EMPTY-OUTBOX-1\0"))
+            && remaining.is_empty()
+    }
+
     /// Complete canonical internal receipt, including every core's roots and decision.
     pub fn receipt(&self) -> Vec<u8> {
         let mut out = b"ZFCIS-SERVICE-RECEIPT-1\0".to_vec();
@@ -750,4 +792,15 @@ fn read_numbers<'a>(bytes: &'a [u8], tag: &[u8]) -> Result<(Vec<i128>, &'a [u8])
         rest = &rest[16..];
     }
     Ok((values, rest))
+}
+
+// The cursor is exclusively owned invocation scratch; the input bytes stay immutable.
+fn receipt_part(remaining: &mut &[u8], expected: &[u8]) -> bool {
+    match remaining.strip_prefix(expected) {
+        Some(rest) => {
+            *remaining = rest;
+            true
+        }
+        None => false,
+    }
 }

@@ -114,6 +114,10 @@ fn inputs_and_results_are_owned_and_canonical() {
     let request = ServiceRequest::new("local", "owned", &args).unwrap_or_else(fail);
     args[1] = 2;
     let publication = service.decide(&state, &request, 0).unwrap_or_else(fail);
+    assert!(publication.matches_receipt(&publication.receipt()));
+    let mut truncated = publication.receipt();
+    truncated.pop();
+    assert!(!publication.matches_receipt(&truncated));
     assert_eq!(publication.post().values(), [1, 1]);
     assert_eq!(state.values(), [0, 2]);
     assert_eq!(

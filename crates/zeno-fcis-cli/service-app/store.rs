@@ -372,7 +372,10 @@ impl Store {
                     .map_err(|e| failure(format!("journal-decision:{}", e.reason)))?
             };
             // Exact comparison detects any missing, substituted or reordered core root.
-            if receipt != expected.receipt() || post != expected.post().bytes() {
+            if !expected.matches_receipt(&receipt)
+                || receipt != expected.receipt()
+                || post != expected.post().bytes()
+            {
                 return Err(failure("receipt-replay"));
             }
             let checksum = chain(&previous, &receipt);

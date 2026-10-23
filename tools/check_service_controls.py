@@ -36,13 +36,12 @@ dom=(work/domain).read_text();ownership=dom.replace('ownership(&manifest, &layou
 assert ownership!=dom,'ownership mutation anchor'
 controls=[('ignored-refusal',service,ignore,'any_refusal_discards_all_provisional_states'),('swapped-order',service,order,'first_refusal_obeys_manifest_order'),('two-owners',domain,ownership,'a_field_with_two_owners_is_refused')]
 if a.include_sqlite:
- path=Path('crates/zeno-fcis-cli/service-app/store.rs')
+ path=service
  original=(work/path).read_text()
- mutated=original.replace('let receipt = publication.receipt();','''let mut receipt = publication.receipt();
-            let id=receipt.windows(6).position(|w|w==b"budget").unwrap_or(0);
-            let post=id+6+32*3;receipt.drain(post..post+32);''')
- assert mutated!=original,'receipt mutation anchor'
+ mutated=original.replace('out.extend(record.post);','''if self.request.is_none() || record.id != "budget" {out.extend(record.post);}''')
+ assert mutated!=original,'receipt encoder mutation anchor'
  controls.append(('missing-post-root',path,mutated,'receipt_covers_all_roots_and_fresh_journal_replay_is_exact'))
+
 results=[]
 for name,path,mutated,test in controls:
  original=(work/path).read_text()

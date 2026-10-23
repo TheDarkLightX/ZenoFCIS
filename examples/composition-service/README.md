@@ -58,7 +58,8 @@ The generated shell consumes only the nominal service publication. One head
 row stores the whole canonical state; one journal row stores the request,
 receipt and replay key. Both change in one SQLite transaction. Every accepted
 read crosses the global version/root fence. Reopening re-executes all checked
-Programs and compares every receipt byte and the complete head. Recovery
+Programs, independently checks every receipt field against their genuine
+publications, and compares the canonical bytes and the complete head. Recovery
 returns the committed receipt. If a duplicate was already decided locally, its
 actual attempt counters are returned separately from that original receipt; a
 lookup performed before deciding has no core attempt counters. No automatic
