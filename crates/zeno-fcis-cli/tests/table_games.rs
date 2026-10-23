@@ -1,7 +1,6 @@
 //! The games guide, docs/TABLE_GAMES.md, run exactly as written: its command on
 //! every example, the answer it states for every state, the fairness examples
 //! without their assumption, and the refusals its scope names.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -76,7 +75,7 @@ fn expand(project: &str) -> Output {
         .current_dir(root())
         .args(["check", "--expand", project])
         .output()
-        .unwrap()
+        .unwrap_or_else(|error| panic!("guide fixture failed: {error:?}"))
 }
 
 /// Every `from_<state>` law's expansion, which the guide says is `true` or `false`.
@@ -108,13 +107,13 @@ fn laws(output: &Output, prefix: &str) -> Vec<(String, String)> {
 fn scratch(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("table-games-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("guide fixture failed: {error:?}"));
     dir
 }
 
 fn write(dir: &Path, text: &str) -> String {
     let path = dir.join("project.zeno");
-    std::fs::write(&path, text).unwrap();
+    std::fs::write(&path, text).unwrap_or_else(|error| panic!("guide fixture failed: {error:?}"));
     path.to_string_lossy().into_owned()
 }
 
@@ -159,7 +158,7 @@ fn the_fairness_examples_answer_no_without_their_assumption() {
         let text = std::fs::read_to_string(root().join(format!(
             "examples/contract-tables/games/{example}/project.zeno"
         )))
-        .unwrap();
+        .unwrap_or_else(|error| panic!("guide fixture failed: {error:?}"));
         let declared = format!(
             "fair 107 size {} {assumption};",
             assumption.matches(',').count() + 1
@@ -191,7 +190,7 @@ fn the_scope_refusals_hold() {
     let text = std::fs::read_to_string(
         root().join("examples/contract-tables/games/withdrawal-window/project.zeno"),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("guide fixture failed: {error:?}"));
     let wide = format!(
         "const table 110 mover 107 size 65 [{}];",
         ["0"; 65].join(",")
