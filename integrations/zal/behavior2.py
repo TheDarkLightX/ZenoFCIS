@@ -169,6 +169,72 @@ def combine(op: str, args: list[Expr]) -> Expr:
 TRUE = Expr("true")
 
 
+def _read_game_group(text):
+    """Read one balanced, parenthesized state formula and return its body and suffix."""
+    text = text.lstrip()
+    if not text.startswith("("):
+        raise Refusal("Game objectives need parenthesized state formulas")
+    depth = 0
+    for index, char in enumerate(text):
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return text[1:index], text[index + 1:].lstrip()
+    raise Refusal("Game objectives need parenthesized state formulas")
+
+
+def _game_mix_refusal(name):
+    raise Refusal(f"Game property {name} cannot mix objectives")
+
+
+def _parse_game_objective(name, tail, declarations, english):
+    """Parse a bounded or existing single-goal game objective."""
+    if english:
+        raw_formula, rest = _read_game_group(tail)
+        formula = parse_formula(raw_formula, declarations, "invariant", english)
+        bound = re.fullmatch(r"to happen within (\S+) steps", rest)
+        if bound:
+            raw = bound[1]
+            if not raw.isascii() or not raw.isdigit() or len(raw) > 2 or int(raw) > MAX_WITHIN:
+                raise Refusal("Game deadline K must be a literal from 0 to 64")
+            return "within", Expr("within", (int(raw), formula))
+        suffixes = {"to happen eventually": "eventually", "to hold always": "always",
+                    "to happen infinitely often": "infinitely often"}
+        if rest in suffixes:
+            return suffixes[rest], formula
+        if rest.startswith("and ") or " and " in rest:
+            _game_mix_refusal(name)
+        if any(word in rest for word in ("eventually", "always", "infinitely often")):
+            _game_mix_refusal(name)
+        raise Refusal("Invalid game property objective")
+
+    deadline = re.match(r"within (\S+)\s+(.+)", tail)
+    if deadline:
+        raw, body = deadline.groups()
+        if not raw.isascii() or not raw.isdigit() or len(raw) > 2 or int(raw) > MAX_WITHIN:
+            raise Refusal("Game deadline K must be a literal from 0 to 64")
+        formula, rest = _read_game_group(body)
+        if rest:
+            if rest.startswith("and ") or " and " in rest:
+                _game_mix_refusal(name)
+            raise Refusal("Invalid game property objective")
+        return "within", Expr("within", (int(raw), parse_formula(formula, declarations, "invariant")))
+
+    objective = next((item for item in ("infinitely often", "eventually", "always")
+                      if tail.startswith(item + " ")), None)
+    if objective is None:
+        raise Refusal("Invalid game property objective")
+    body = tail[len(objective):].lstrip()
+    raw_formula, body = _read_game_group(body)
+    if body:
+        if body.startswith("and ") or " and " in body:
+            _game_mix_refusal(name)
+        raise Refusal("Invalid game property objective")
+    return objective, parse_formula(raw_formula, declarations, "invariant")
+
+
 class _Parser:
     """Recursive descent over one formula; English words are matched only in their phrases."""
 
@@ -641,8 +707,14 @@ class Machine:
             lines += [f"Player {name} moves in {', '.join(states)}." for name, states in self.players]
             phrases = {"eventually": "to happen eventually", "always": "to hold always",
                        "infinitely often": "to happen infinitely often"}
-            lines += [f"Property {name}: {player} can force ({_bare(formula.render(True))}) {phrases[objective]}."
-                      for name, player, objective, formula in self.games]
+            for name, player, objective, formula in self.games:
+                if objective == "within":
+                    bound, formula = formula.args
+                    lines.append(f"Property {name}: {player} can force ({_bare(formula.render(True))}) "
+                                 f"to happen within {bound} steps.")
+                else:
+                    lines.append(f"Property {name}: {player} can force "
+                                 f"({_bare(formula.render(True))}) {phrases[objective]}.")
             lines += [f"Unresolved {kind}: {text}." for kind, text in self.obligations]
         else:
             lines = ["zal 2;", f"machine {self.name};", f"states {', '.join(self.states)};",
@@ -662,8 +734,13 @@ class Machine:
             lines += [f"fairness {n}: infinitely often ({_bare(f.render())});" for n, f in self.fairness]
             lines += [f"property {n}: {f.render()};" for n, f in self.properties]
             lines += [f"player {name} moves in {', '.join(states)};" for name, states in self.players]
-            lines += [f"property {name}: {player} can force {objective} ({_bare(formula.render())});"
-                      for name, player, objective, formula in self.games]
+            for name, player, objective, formula in self.games:
+                if objective == "within":
+                    bound, formula = formula.args
+                    lines.append(f"property {name}: {player} can force within {bound} ({_bare(formula.render())});")
+                else:
+                    lines.append(f"property {name}: {player} can force {objective} "
+                                 f"({_bare(formula.render())});")
             lines += [f"unresolved {kind}: {text};" for kind, text in self.obligations]
         return "\n".join(lines) + "\n"
 
@@ -860,19 +937,28 @@ def validate_machine(model: Machine):
             raise Refusal("IR object IDs must be canonically sorted")
     for item in model.games:
         if (not isinstance(item, tuple) or len(item) != 4 or not valid_name(item[0])
-                or item[2] not in GAME_OBJECTIVES or not isinstance(item[3], Expr)):
+                or item[2] not in {*GAME_OBJECTIVES, "within"}):
             raise Refusal("Invalid IR game property")
-        name, player, objective, formula = item
+        name, player, objective, payload = item
         if player not in player_names:
             raise Refusal(f"Game property {name} names an undeclared player")
-        try:
-            if admit_formula(formula, declarations, "invariant") > 128:
+        if objective == "within":
+            if not isinstance(payload, Expr) or payload.op != "within":
                 raise Refusal("Invalid IR game property")
+            formulas = (payload.args[1],)
+        elif isinstance(payload, Expr):
+            formulas = (payload,)
+        else:
+            raise Refusal("Invalid IR game property")
+        try:
+            for formula in formulas:
+                if admit_formula(formula, declarations, "invariant") > 128:
+                    raise Refusal("Invalid IR game property")
         except Refusal as error:
             if str(error) == "Invalid IR game property":
                 raise
             raise Refusal("Invalid IR game property") from error
-        if any(len(formula.render(english)) > 4096 for english in [False, True]):
+        if any(len(formula.render(english)) > 4096 for formula in formulas for english in [False, True]):
             raise Refusal("Invalid IR game property")
         identifiers.append(name)
     if [name for name, _, _, _ in model.games] != sorted(name for name, _, _, _ in model.games):
@@ -927,7 +1013,7 @@ def statement_patterns(english=False):
             "require": rf"Requirement ({NAME}): (.+)\.",
             "fairness": rf"Fairness ({NAME}): assume (.+) happens infinitely often\.",
             "player": rf"Player ({NAME}) moves in (.+)\.",
-            "game": rf"Property ({NAME}): ({NAME}) can force \((.+)\) to (happen infinitely often|happen eventually|hold always)\.",
+            "game": rf"Property ({NAME}): ({NAME}) can force (.+)\.",
             "property": rf"Property ({NAME}): (.+)\.",
             "unresolved": rf"Unresolved ({NAME}): ([a-zA-Z0-9_ ,!?()/-]{{1,200}})\.",
         }
@@ -939,7 +1025,7 @@ def statement_patterns(english=False):
         "require": rf"require ({NAME}): (.+);",
         "fairness": rf"fairness ({NAME}): infinitely often (.+);",
         "player": rf"player ({NAME}) moves in (.+);",
-        "game": rf"property ({NAME}): ({NAME}) can force (eventually|always|infinitely often) \((.+)\);",
+        "game": rf"property ({NAME}): ({NAME}) can force (.+);",
         "property": rf"property ({NAME}): (.+);",
         "unresolved": rf"unresolved ({NAME}): ([a-zA-Z0-9_ ,!?()/-]{{1,200}});",
     }
@@ -1069,15 +1155,10 @@ def parse(text: str, syntax="symbolic") -> Machine:
                 formulas.append((name, parse_formula(body, declarations, scope, english)))
         collections[key] = tuple(sorted(formulas))
     games = []
-    for item in found["game"]:
-        if english:
-            name, player, body, phrase = item
-            objective = {"happen infinitely often": "infinitely often", "happen eventually": "eventually",
-                         "hold always": "always"}[phrase]
-        else:
-            name, player, objective, body = item
+    for name, player, body in found["game"]:
         with at_source(locations[("game", name)]):
-            games.append((name, player, objective, parse_formula(body, declarations, "invariant", english)))
+            objective, payload = _parse_game_objective(name, body, declarations, english)
+            games.append((name, player, objective, payload))
     try:
         return Machine(fields["name"], states, events, facts, inputs, variables, fields["initial"], fields["default"],
                        tuple(sorted(rules, key=lambda r: r.id)), collections["invariant"], collections["require"],
@@ -1479,6 +1560,176 @@ def _game_table_project(graph, proposed_strata=None):
     return "\n".join(source) + "\n"
 
 
+def _deadline_fixed_winners(graph, goal, bound):
+    """Solver A: backward induction over complete configuration-to-configuration steps."""
+    configurations = tuple(graph.configuration_nodes)
+    winning = {node for node in configurations if goal[node]}
+    for _ in range(bound):
+        previous = winning
+        added = set()
+        for node in configurations:
+            choices = graph.successors[node]
+            if graph.owners[node] == 0:
+                if choices and graph.configurations[choices[0]][0] == "context":
+                    can_force = any(all(child in previous for child in graph.successors[event_choice])
+                                    for event_choice in choices)
+                else:
+                    can_force = any(child in previous for child in choices)
+            else:
+                can_force = all(child in previous for child in choices)
+            if can_force:
+                added.add(node)
+        winning = previous | added
+    return frozenset(winning)
+
+
+def _deadline_parity_winners(graph, goal, bound):
+    """Solver B: product with a remaining-step counter and ordinary reachability attractors."""
+    configuration_set = frozenset(graph.configuration_nodes)
+
+    def reachability_attractor(owners, successors, targets):
+        winning = set(targets)
+        while True:
+            added = set()
+            for node, choices in enumerate(successors):
+                if node in winning:
+                    continue
+                if ((owners[node] == 0 and any(child in winning for child in choices))
+                        or (owners[node] == 1 and choices and all(child in winning for child in choices))):
+                    added.add(node)
+            if not added:
+                return frozenset(winning)
+            winning.update(added)
+
+    previous = {node: node in configuration_set and goal[node]
+                for node in range(len(graph.successors))}
+    for remaining in range(1, bound + 1):
+        current_count = len(graph.successors)
+        owners = list(graph.owners) + list(graph.owners)
+        successors = [[] for _ in range(2 * current_count)]
+        targets = set()
+        for node in range(current_count):
+            if node in configuration_set and goal[node]:
+                targets.add(node)
+                successors[node].append(node)
+            else:
+                for child in graph.successors[node]:
+                    if node in configuration_set and child not in configuration_set:
+                        successors[node].append(child)
+                    else:
+                        successors[node].append(current_count + child)
+        for node in range(current_count):
+            boundary_node = current_count + node
+            successors[boundary_node].append(boundary_node)
+            if previous[node]:
+                targets.add(boundary_node)
+        reached = reachability_attractor(owners, successors, targets)
+        previous = {node: node in reached for node in range(current_count)}
+    return frozenset(node for node in configuration_set if previous[node])
+
+
+def _deadline_config_graph(transitions, model, player, formula):
+    """Keep only reachable configurations while preserving every event/context outcome slot."""
+    arena = _game_graph(transitions, model, player)
+    indices = {raw: index for index, raw in enumerate(transitions.order)}
+    successors = tuple(tuple(indices[step.post] for step in transitions.steps[raw])
+                       for raw in transitions.order)
+    configurations = arena.configurations[:len(transitions.order)]
+    return _GameGraph(successors, arena.owners[:len(transitions.order)],
+                      tuple(_configuration_holds(formula, node) for node in configurations), (),
+                      configurations, tuple(range(len(configurations))), indices[transitions.start],
+                      arena.numbered_names)
+
+
+def _deadline_table_project(graph, model, bound):
+    """Emit bounded reachability strata over configurations, grouping context by event."""
+    count = len(graph.successors)
+    contexts = list(model.contexts())
+    context_count = len(contexts)
+    has_context = bool(model.facts or model.inputs)
+    slots = graph.successors
+    width = max(len(row) for row in slots)
+    goal_table = max(840, 800 + width)
+    context_table = goal_table + 1
+    first_stratum = max(1000, context_table + (1 if has_context else 0))
+    listing = lambda values: "[" + ",".join(map(str, values)) + "]"
+    source = [
+        "zeno 1;",
+        "project 1 constant_role_hierarchy;",
+        "namespace 2 permissions;",
+        "type 100 state Roles;",
+        "type 101 command Request;",
+        "type 102 context Session;",
+        f"type 105 int Parent in 0..={count};",
+        "type 106 index Role of 110;",
+        "type 107 int Grant in 0..=1;",
+        f"type 108 int ContextChoice in 0..={context_count - 1};",
+        "// Who moves: 0 = the property's player, 1 = the other player.",
+        f"const table 110 mover 107 size {count} {listing(graph.owners)};",
+    ]
+    for slot in range(width):
+        values = [row[slot] + 1 if slot < len(row) else 0 for row in slots]
+        source.append(f"const table {800 + slot} next{slot} 105 size {count} {listing(values)};")
+    source.append(f"const table {goal_table} goal 107 size {count} "
+                  f"{listing(int(value) for value in graph.goal)};")
+    if has_context:
+        source.append(f"const table {context_table} context_choice 108 size {context_count} "
+                      f"{listing(range(context_count))};")
+    source += [
+        f"table 210 100 grants 107 size {count};",
+        "field 120 101 role 106;",
+        "variant 130 102 Session none;",
+        "reason 200 permission_required precedence 0;",
+        "component 400 inheritance {",
+        "  owns 100;",
+        "  reads pre.100;",
+        "  writes post.100;",
+        "  contexts context.102;",
+        "  budget steps 4096;",
+        "}",
+        "merge [400];",
+    ]
+    edge = "(" + " || ".join(f"next{slot}[s] == t + 1" for slot in range(width)) + ")"
+    universal = f"forall t in table 110 {{ !{edge} || r{{previous}}[t] }}"
+    if has_context:
+        per_event = []
+        for event_index in range(len(model.events)):
+            context_edges = " || ".join(
+                f"(c == {context_index} && next{event_index * context_count + context_index}[s] == t + 1)"
+                for context_index in range(context_count))
+            per_event.append(f"forall c in table {context_table} {{ forall t in table 110 {{ "
+                             f"!({context_edges}) || r{{previous}}[t] }} }}")
+        player_pre = "(" + " || ".join(per_event) + ")"
+    else:
+        player_pre = (f"exists t in table 110 {{ {edge} && "
+                      "r{previous}[t] }")
+
+    def instantiate_predecessor(previous):
+        opponent_pre = universal.replace("{previous}", str(previous))
+        player = player_pre.replace("{previous}", str(previous))
+        return f"((mover[s] == 0 && {player}) || (mover[s] == 1 && {opponent_pre}))"
+
+    source.append(f"derived table {first_stratum} r0[s] in table 110 rounds {count} {{")
+    source += ["  when true then goal[s] == 1;", "  default false;", "};"]
+    for step_count in range(1, bound + 1):
+        ident = first_stratum + step_count
+        predecessor = instantiate_predecessor(step_count - 1)
+        source += [f"derived table {ident} r{step_count}[s] in table 110 rounds {count} {{",
+                   f"  when true then (r{step_count - 1}[s] || {predecessor});",
+                   "  default false;",
+                   "};"]
+    for node, descriptor in enumerate(graph.configurations):
+        if graph.numbered_names:
+            law_name = f"from_n{node}"
+            _, state, pairs = descriptor
+            detail = f"configuration state={state} variables={','.join(f'{name}={value}' for name, value in pairs)}"
+            source.append(f"// n{node}: {detail}")
+        else:
+            law_name = f"from_{descriptor[1]}"
+        source.append(f"law {600 + node} {law_name} on commit = r{bound}[{node}];")
+    return "\n".join(source) + "\n"
+
+
 def export_game_project(model, property_id):
     """Lower one game's reduced reachable graph; table export never changes check authority."""
     selected = next((item for item in model.games if item[0] == property_id), None)
@@ -1493,8 +1744,15 @@ def export_game_project(model, property_id):
             raise Refusal("Game export needs every accepted transition to stay within variable ranges")
         steps[ci].append(result[1])
     graph.explore(steps)
-    _, player, objective, formula = selected
-    reduced = _reduce_game(_game_graph(graph, model, player), model, objective, formula)
+    _, player, objective, payload = selected
+    if objective == "within":
+        bound, formula = payload.args
+        bounded = _deadline_config_graph(graph, model, player, formula)
+        count = len(bounded.successors)
+        if count > 64:
+            raise Refusal(f"The table form of this game has {count} nodes; a table holds at most 64")
+        return _deadline_table_project(bounded, model, bound), count
+    reduced = _reduce_game(_game_graph(graph, model, player), model, objective, payload)
     count = len(reduced.successors)
     if count > 64:
         raise Refusal(f"The table form of this game has {count} nodes; a table holds at most 64")
@@ -1770,18 +2028,30 @@ def check(model: Machine, checker_identity="unbound") -> dict:
     checks["temporal_properties"] = "pass-with-scope"
     for name, player, objective, formula in model.games:
         base = _game_graph(graph, model, player)
-        game = _reduce_game(base, model, objective, formula)
-        fixed = _fixed_point_winners(game)
-        parity = _parity_winners(game)
-        english_objective = {"eventually": "to happen eventually", "always": "to hold always",
-                             "infinitely often": "to happen infinitely often"}[objective]
-        english = f"Property {name}: {player} can force ({_bare(formula.render(True))}) {english_objective}."
+        if objective == "within":
+            bound, formula = formula.args
+            goal = tuple(_configuration_holds(formula, node) for node in base.configurations)
+            game = base
+            fixed = _deadline_fixed_winners(game, goal, bound)
+            parity = _deadline_parity_winners(game, goal, bound)
+            result_objective = f"within {bound}"
+            english = (f"Property {name}: {player} can force ({_bare(formula.render(True))}) "
+                       f"to happen within {bound} steps.")
+        else:
+            game = _reduce_game(base, model, objective, formula)
+            fixed = _fixed_point_winners(game)
+            parity = _parity_winners(game)
+            result_objective = objective
+            english_objective = {"eventually": "to happen eventually", "always": "to hold always",
+                                 "infinitely often": "to happen infinitely often"}[objective]
+            english = (f"Property {name}: {player} can force "
+                       f"({_bare(formula.render(True))}) {english_objective}.")
         config_data = lambda node: {"state": game.configurations[node][1],
                                     "variables": dict(game.configurations[node][2])}
         winning_configs = [node for node in game.configuration_nodes if node in fixed]
         if fixed != parity:
             result = counterexample(model, checker_identity, "game", {**checks, "game_properties": "unknown"},
-                                    property=name, english=english, player=player, objective=objective,
+                                    property=name, english=english, player=player, objective=result_objective,
                                     initial=config_data(game.initial),
                                     winning_configurations=[config_data(node) for node in winning_configs[:16]],
                                     winning_configuration_count=len(winning_configs),
@@ -1790,12 +2060,12 @@ def check(model: Machine, checker_identity="unbound") -> dict:
             return result
         if game.initial not in fixed:
             return counterexample(model, checker_identity, "game", {**checks, "game_properties": "counterexample"},
-                                  property=name, english=english, player=player, objective=objective,
+                                  property=name, english=english, player=player, objective=result_objective,
                                   initial=config_data(game.initial),
                                   winning_configurations=[config_data(node) for node in winning_configs[:16]],
                                   winning_configuration_count=len(winning_configs))
         results[name] = {"status": "pass-with-scope", "kind": "game", "player": player,
-                         "objective": objective, "english": english,
+                         "objective": result_objective, "english": english,
                          "configurations": len(game.configuration_nodes),
                          "winning_configurations": len(winning_configs), "initial_wins": True,
                          "solvers": ["fixed-point", "parity"]}
@@ -2066,23 +2336,35 @@ def game_readings(model: Machine):
     readings = []
     for name, player, objective, formula in model.games:
         other = next(owner for owner, _ in model.players if owner != player)
-        formula_text = formula.render().replace(" == ", " = ").replace(" != ", " ≠ ")
-        formula_rung = f"⟨⟨{player}⟩⟩ {modal[objective]} ({formula_text})"
-        if formula.op == "state":
-            condition = f"the state is {formula.args[0]}"
-            lead = "make sure "
+        if objective == "within":
+            bound, goal = formula.args
+            formula_text = goal.render().replace(" == ", " = ").replace(" != ", " ≠ ")
+            formula_rung = f"⟨⟨{player}⟩⟩ within {bound} ({formula_text})"
+            condition = (f"the state is {goal.args[0]}" if goal.op == "state"
+                         else f"the condition ({goal.render(True)}) holds")
+            outcome = f"reach a configuration where {condition} within {bound} "
+            outcome += "step" if bound == 1 else "steps"
+            fairness = ""
+            result_objective = f"within {bound}"
         else:
-            condition = f"the condition ({formula.render(True)}) holds"
-            lead = "make sure that "
-        if objective == "infinitely often":
-            outcome = f"{lead}{condition} again and again"
-        elif objective == "eventually":
-            outcome = f"{lead}{condition} at least once"
-        else:
-            outcome = f"{lead}{condition} at every step"
-        fairness = (", provided every declared fairness condition holds infinitely often"
-                    if objective != "always" and model.fairness else "")
-        readings.append({"property": name, "player": player, "objective": objective,
+            formula_text = formula.render().replace(" == ", " = ").replace(" != ", " ≠ ")
+            formula_rung = f"⟨⟨{player}⟩⟩ {modal[objective]} ({formula_text})"
+            if formula.op == "state":
+                condition = f"the state is {formula.args[0]}"
+                lead = "make sure "
+            else:
+                condition = f"the condition ({formula.render(True)}) holds"
+                lead = "make sure that "
+            if objective == "infinitely often":
+                outcome = f"{lead}{condition} again and again"
+            elif objective == "eventually":
+                outcome = f"{lead}{condition} at least once"
+            else:
+                outcome = f"{lead}{condition} at every step"
+            fairness = (", provided every declared fairness condition holds infinitely often"
+                        if objective != "always" and model.fairness else "")
+            result_objective = objective
+        readings.append({"property": name, "player": player, "objective": result_objective,
                          "formula_rung": formula_rung,
                          "plain_rung": f"The {player} can {outcome}, whatever the {other} does{fairness}."})
     return readings
@@ -2124,9 +2406,11 @@ CONSTRUCTS = {
                "Players choose events in their disjoint declared state lists. A game property needs two players whose lists cover every state."),
     "property": ("property ID: TEMPORAL_FORMULA;", "Property ID: TEMPORAL_FORMULA.",
                  "A property is a temporal formula over the steps of every infinite execution from the initial configuration."),
-    "game": ("property ID: NAME can force eventually (STATE_FORMULA);",
-             "Property ID: NAME can force (FORMULA) to happen eventually.",
-             "A game property checks whether its player can force its state formula over every play, under the declared fairness assumptions."),
+    "game": ("property ID: NAME can force eventually (STATE_FORMULA); | "
+             "property ID: NAME can force within K (STATE_FORMULA);",
+             "Property ID: NAME can force (FORMULA) to happen eventually. | "
+             "Property ID: NAME can force (FORMULA) to happen within K steps.",
+             "Game properties check whether their player can force a state goal over every play under the declared objective and fairness assumptions."),
     "unresolved": ("unresolved KIND: TEXT;", "Unresolved KIND: TEXT.",
                    "This records an unsupported requirement. It remains visible and blocks factory lowering."),
 }

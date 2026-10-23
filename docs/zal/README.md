@@ -558,7 +558,7 @@ The first command prints this JSON:
   "status": "pass-with-scope",
   "revision": "62f361bbe3dbdb74bdbfe7050626e26f4d029990be5ddc1d37f9187dd729b8e0",
   "profile": "zal/finite-fsm/2",
-  "checker": "34774f7aae6955d14ca797365a16fb16eab23fed72d95f3303b6c0026ceae759",
+  "checker": "8d0e6890b047854f0037fa1ce9b5b8ef90e51549ebef35395e21cbdbf0167a33",
   "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
   "checks": {
     "initial_nonempty": "pass-with-scope",
@@ -647,6 +647,153 @@ profile 2 game tests. The exporter supports up to 64 nodes and includes a
 a lower practical limit: measured expansion is about 20 nodes with one goal
 and one fairness assumption, and about 12 nodes with two of each. Beyond that
 limit, `zeno-fcis check --expand` refuses and the ZAL check result stands.
+
+### Bounded game example
+
+The deadline example asks whether the user can reach `withdrawn` within one
+rule application, while the operator chooses the context. It exercises the
+inclusive deadline and whole-step context rule.
+
+```sh
+python3 integrations/zal/run.py check integrations/zal/examples/deadline_game2.zal
+python3 integrations/zal/run.py export-game integrations/zal/examples/deadline_game2.zal --property quick_withdrawal --out /tmp/withdrawal-deadline/project.zeno
+zeno-fcis check --expand /tmp/withdrawal-deadline/project.zeno
+```
+
+The first command prints:
+
+<!-- deadline-game-check-output -->
+```json
+{
+  "status": "pass-with-scope",
+  "revision": "f9d5a4db71761f0ef6b9a5dff04bfec3189c617f56ff8cfe18b77facd49e9aef",
+  "profile": "zal/finite-fsm/2",
+  "checker": "8d0e6890b047854f0037fa1ce9b5b8ef90e51549ebef35395e21cbdbf0167a33",
+  "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
+  "checks": {
+    "initial_nonempty": "pass-with-scope",
+    "typing": "pass-with-scope",
+    "determinism": "pass-with-scope",
+    "update_ranges": "pass-with-scope",
+    "coverage_with_explicit_default": "pass-with-scope",
+    "reachable_invariants": "pass-with-scope",
+    "invariant_preservation": "pass-with-scope",
+    "transition_requirements": "pass-with-scope",
+    "temporal_properties": "pass-with-scope",
+    "game_properties": "pass-with-scope"
+  },
+  "input_tuples": 8,
+  "configurations": 2,
+  "admissible_configurations": 2,
+  "reachable_configurations": 2,
+  "reachable_states": [
+    "open",
+    "withdrawn"
+  ],
+  "unreachable_rules": [],
+  "invariant_count": 0,
+  "requirement_count": 0,
+  "property_count": 1,
+  "fairness_count": 0,
+  "properties": {
+    "quick_withdrawal": {
+      "status": "pass-with-scope",
+      "kind": "game",
+      "player": "user",
+      "objective": "within 1",
+      "english": "Property quick_withdrawal: user can force (state is withdrawn) to happen within 1 steps.",
+      "configurations": 2,
+      "winning_configurations": 2,
+      "initial_wins": true,
+      "solvers": [
+        "fixed-point",
+        "parity"
+      ]
+    }
+  },
+  "advisories": [],
+  "default_count": 4,
+  "default_witness": {
+    "state": "open",
+    "variables": {},
+    "event": "wait",
+    "context": {
+      "signal": false
+    },
+    "outcome": {
+      "class": "Reject",
+      "state": "open",
+      "variables": {},
+      "reason": "not_allowed",
+      "rule": "default"
+    }
+  },
+  "unresolved": [],
+  "factory": "not-run",
+  "authority": "none",
+  "game_property_count": 1
+}
+```
+
+The export command prints:
+
+<!-- deadline-game-export-output -->
+```json
+{
+  "status": "exported",
+  "format": "contract-tables",
+  "property": "quick_withdrawal",
+  "nodes": 2,
+  "out": "/tmp/withdrawal-deadline/project.zeno",
+  "authority": "none"
+}
+```
+
+The native expansion prints:
+
+<!-- deadline-game-native-output -->
+```text
+zeno 1;
+project 1 constant_role_hierarchy;
+namespace 2 permissions;
+type 100 state Roles;
+type 101 command Request;
+type 102 context Session;
+type 105 int Parent in 0..=2;
+type 106 int Role in 0..=1;
+type 107 int Grant in 0..=1;
+type 108 int ContextChoice in 0..=1;
+// Who moves: 0 = the property's player, 1 = the other player.
+
+
+
+
+
+
+
+field 210 100 grants_0 107;
+field 211 100 grants_1 107;
+field 120 101 role 106;
+variant 130 102 Session none;
+reason 200 permission_required precedence 0;
+component 400 inheritance {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+
+
+// n0: configuration state=open variables=
+law 600 from_n0 on commit = true;
+// n1: configuration state=withdrawn variables=
+law 601 from_n1 on commit = true;
+expanded /tmp/withdrawal-deadline/project.zeno: tables=1 entries=2 inputs=4 domain=8
+```
+
+The README replay test compares the first two command outputs byte for byte and, when `ZENO_FCIS_BIN` is set, compares the native `from_` laws with solver A. Bounded exports contain `r0` through `rK` and have no `stable` law.
 
 ## Types and effect signatures
 

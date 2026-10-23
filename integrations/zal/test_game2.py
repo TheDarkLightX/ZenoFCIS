@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 import behavior
 import behavior2 as b
@@ -21,10 +22,13 @@ EXAMPLES = HERE / "examples"
 REPOSITORY = HERE.parents[1]
 README = REPOSITORY / "docs" / "zal" / "README.md"
 WITHDRAWAL_PROJECT = Path("/tmp/withdrawal-game/project.zeno")
+DEADLINE_PROJECT = Path("/tmp/withdrawal-deadline/project.zeno")
 PLAYER_ERROR = "Players need distinct names and disjoint declared states; at most two players"
 GAME_COVERAGE_ERROR = "Game properties need two players whose states cover every state exactly once"
 UNKNOWN_PLAYER = "Game property reaches names an undeclared player"
 POST_STATE_FAIRNESS = "Game fairness reads only the state after a step (state' and primed variables)"
+DEADLINE_ERROR = "Game deadline K must be a literal from 0 to 64"
+MIXED_OBJECTIVE_ERROR = "Game property quick_withdrawal cannot mix objectives"
 
 GAME_SOURCE = """zal 2;
 machine mini_game;
@@ -59,6 +63,37 @@ fairness reopens: infinitely often (state' == open);
 property keep_withdrawing: user can force infinitely often (state == withdrawn);
 """
 
+DEADLINE_SOURCE = """zal 2;
+# Can the user reach withdrawn within one rule application, whatever the operator chooses as context?
+machine deadline_game;
+states open, withdrawn;
+events withdraw, wait;
+context signal;
+initial open;
+step atomic; frame control_and_variables;
+default reject not_allowed unchanged;
+rule w1: open + withdraw [true] -> accept withdrawn;
+rule r1: withdrawn + wait [true] -> accept open;
+player user moves in open;
+player operator moves in withdrawn;
+property quick_withdrawal: user can force within 1 (state == withdrawn);
+"""
+
+CONTEXT_DEADLINE_SOURCE = """zal 2;
+machine context_deadline;
+states open, withdrawn;
+events tick;
+context authorized;
+initial open;
+step atomic; frame control_and_variables;
+default reject blocked unchanged;
+rule take: open + tick [authorized] -> accept withdrawn;
+rule stay: withdrawn + tick [true] -> accept open;
+player user moves in open;
+player operator moves in withdrawn;
+property quick_withdrawal: user can force within 1 (state == withdrawn);
+"""
+
 # Canonical profile revisions captured before any game-language changes.
 EXAMPLE_REVISIONS = {
     "context_free2.zal": "07466304cde3923ab1b1516cdc566e578c8f98c53946d69c8422ad93d3419c07",
@@ -69,6 +104,9 @@ EXAMPLE_REVISIONS = {
     "revoked_mail2.zal": "49f300b4cdfed8bae570cb675126fe2a45a32ecb475f519a22d453cd4683c73f",
     "shell_effects.zal": "ea53f58838ddf927bb66080b7bf4d672e11ff63fad03a0396b747c3091a8e9c0",
     "withdrawal2.zal": "8057b15d9b23224d2e7907009f9cb47cd738f970ae3bdc7ff9487bfe1b24cab0",
+}
+GAME_EXAMPLE_REVISIONS = {
+    "deadline_game2.zal": "f9d5a4db71761f0ef6b9a5dff04bfec3189c617f56ff8cfe18b77facd49e9aef",
 }
 
 
@@ -83,6 +121,12 @@ def parse_example(path):
 
 
 def reduced_for(model, game_index=0):
+    transitions, arena = game_arena_for(model, game_index)
+    _, player, objective, formula = model.games[game_index]
+    return b._reduce_game(arena, model, objective, formula)
+
+
+def game_arena_for(model, game_index=0):
     transitions = b._Graph(model)
     rows = [[] for _ in transitions.configs]
     for ci, _, _, result in transitions.raw():
@@ -91,7 +135,17 @@ def reduced_for(model, game_index=0):
         rows[ci].append(result[1])
     transitions.explore(rows)
     _, player, objective, formula = model.games[game_index]
-    return b._reduce_game(b._game_graph(transitions, model, player), model, objective, formula)
+    return transitions, b._game_graph(transitions, model, player)
+
+
+def deadline_parts(model, game_index=0):
+    _, player, objective, formula = model.games[game_index]
+    if objective != "within":
+        raise AssertionError("expected a bounded game property")
+    transitions, arena = game_arena_for(model, game_index)
+    bound, goal_formula = formula.args
+    goal = tuple(b._configuration_holds(goal_formula, node) for node in arena.configurations)
+    return transitions, arena, goal, bound
 
 
 def random_game_source(rng, case):
@@ -137,6 +191,17 @@ def random_game_source(rng, case):
         goal = f"({goal} & x == {rng.randint(0, 1)})"
     player = rng.choice(("user", "operator"))
     lines.append(f"property game_{case}: {player} can force {objective} ({goal});")
+    return "\n".join(lines) + "\n"
+
+
+def random_deadline_source(rng, case):
+    lines = random_game_source(rng, case).splitlines()
+    match = re.fullmatch(r"property game_\d+: ([a-z][a-z0-9_]*) can force "
+                         r"(?:eventually|always|infinitely often) \((.+)\);", lines[-1])
+    if not match:
+        raise AssertionError(lines[-1])
+    lines[-1] = (f"property game_{case}: {match[1]} can force within {rng.randint(0, 5)} "
+                 f"({match[2]});")
     return "\n".join(lines) + "\n"
 
 
@@ -203,6 +268,88 @@ class GameGrammarTests(unittest.TestCase):
         always = GAME_SOURCE.replace("eventually", "always").replace("state == bb", "state == aa")
         self.assertEqual(b.parse(always.replace("initial aa;", "initial aa;\n" + fairness)).games[0][2], "always")
 
+    def test_within_deadline_round_trips_in_both_surfaces(self):
+        model = b.parse(DEADLINE_SOURCE)
+        self.assertEqual(b.parse(model.render()), model)
+        self.assertEqual(b.parse(model.render(True), "english"), model)
+        self.assertEqual(
+            model.games[0][2:],
+            ("within", b.Expr("within", (1, b.Expr("state", ("withdrawn",))))),
+        )
+        self.assertIn("property quick_withdrawal: user can force within 1 (state == withdrawn);", model.render())
+        self.assertIn("Property quick_withdrawal: user can force (state is withdrawn) to happen within 1 steps.",
+                      model.render(True))
+        maximum = b.parse(DEADLINE_SOURCE.replace("within 1", "within 64"))
+        self.assertEqual(maximum.games[0][3].args[0], 64)
+        self.assertEqual(b.parse(maximum.render(True), "english"), maximum)
+
+    def test_within_deadline_and_mixed_objective_refusals_are_exact(self):
+        for bound in ("-1", "65", "1+1", "999999999999999999999999999999"):
+            with self.subTest(bound=bound), self.assertRaises(b.Refusal) as raised:
+                b.parse(DEADLINE_SOURCE.replace("within 1", f"within {bound}"))
+            self.assertEqual(str(raised.exception), DEADLINE_ERROR)
+        mixed = DEADLINE_SOURCE.replace(
+            "within 1 (state == withdrawn)",
+            "within 1 (state == withdrawn) and eventually (state == open)")
+        with self.assertRaises(b.Refusal) as raised:
+            b.parse(mixed)
+        self.assertEqual(str(raised.exception), MIXED_OBJECTIVE_ERROR)
+        english = b.parse(DEADLINE_SOURCE).render(True).replace(
+            "to happen within 1 steps.", "and (state is open) to happen eventually.")
+        with self.assertRaises(b.Refusal) as raised:
+            b.parse(english, "english")
+        self.assertEqual(str(raised.exception), MIXED_OBJECTIVE_ERROR)
+
+    def test_within_offsets_include_zero_ignore_fairness_and_keep_context_inside_step(self):
+        model = b.parse(DEADLINE_SOURCE)
+        self.assertEqual(b.check(model)["properties"]["quick_withdrawal"]["initial_wins"], True)
+        zero_steps = b.check(b.parse(DEADLINE_SOURCE.replace(
+            "initial open;", "initial withdrawn;").replace("within 1", "within 0")))
+        self.assertTrue(zero_steps["properties"]["quick_withdrawal"]["initial_wins"])
+        at_zero = b.parse(DEADLINE_SOURCE.replace("within 1", "within 0"))
+        self.assertEqual((b.check(at_zero)["status"], b.check(at_zero)["obligation"]),
+                         ("counterexample", "game"))
+        with_fairness = DEADLINE_SOURCE.replace(
+            "property quick_withdrawal:", "fairness current: infinitely often (state == open);\n"
+            "property quick_withdrawal:")
+        self.assertEqual(b.check(b.parse(with_fairness))["status"], "pass-with-scope")
+
+    def test_within_k_includes_exact_bound(self):
+        model = b.parse(DEADLINE_SOURCE)
+        result = b.check(model)
+        self.assertEqual(result["status"], "pass-with-scope")
+        self.assertTrue(result["properties"]["quick_withdrawal"]["initial_wins"])
+
+
+    def test_context_nodes_do_not_consume_deadline_steps(self):
+        model = b.parse(DEADLINE_SOURCE)
+        _, arena, goal, bound = deadline_parts(model)
+        self.assertTrue(any(node[0] == "context" for node in arena.configurations))
+        fixed = b._deadline_fixed_winners(arena, goal, bound)
+        parity = b._deadline_parity_winners(arena, goal, bound)
+        self.assertEqual(fixed, parity)
+        self.assertIn(arena.initial, fixed)
+
+    def test_context_choice_is_opponent_owned_and_can_block_deadline(self):
+        model = b.parse(CONTEXT_DEADLINE_SOURCE)
+        transitions, arena, goal, bound = deadline_parts(model)
+        fixed = b._deadline_fixed_winners(arena, goal, bound)
+        parity = b._deadline_parity_winners(arena, goal, bound)
+        self.assertEqual(fixed, parity)
+        self.assertNotIn(arena.initial, fixed)
+        result = b.check(model)
+        self.assertEqual((result["status"], result["obligation"], result["objective"]),
+                         ("counterexample", "game", "within 1"))
+
+    def test_solver_agreement_2000_random_deadline_machines_on_every_node(self):
+        rng = random.Random(20261023)
+        for case in range(2000):
+            model = b.parse(random_deadline_source(rng, case))
+            _, arena, goal, bound = deadline_parts(model)
+            fixed = b._deadline_fixed_winners(arena, goal, bound)
+            parity = b._deadline_parity_winners(arena, goal, bound)
+            self.assertEqual(fixed, parity, f"deadline solver disagreement in random machine {case}")
+
     def test_game_ids_participate_in_property_identifier_uniqueness(self):
         duplicate = GAME_SOURCE + "property reaches: user can force always (state == aa);\n"
         with self.assertRaisesRegex(b.Refusal, "IDs must be distinct"):
@@ -242,8 +389,12 @@ property t4: always(state == aa);
         self.assertIn("games", game_change["changed_objects"])
 
     def test_existing_example_revisions_are_unchanged(self):
-        paths = sorted(path for path in EXAMPLES.rglob("*.zal") if path.name != "withdrawal_game2.zal")
+        new_examples = {"withdrawal_game2.zal", "deadline_game2.zal"}
+        paths = sorted(path for path in EXAMPLES.rglob("*.zal") if path.name not in new_examples)
         self.assertEqual({path.name: parse_example(path).revision for path in paths}, EXAMPLE_REVISIONS)
+        self.assertEqual({path.name: b.parse(path.read_text(encoding="ascii")).revision
+                          for path in sorted(EXAMPLES.glob("deadline_game2.zal"))},
+                         GAME_EXAMPLE_REVISIONS)
 
     def test_game_readings_have_formula_and_plain_rungs(self):
         model = b.parse(WITHDRAWAL_SOURCE)
@@ -419,6 +570,42 @@ class GameTableTests(unittest.TestCase):
             expected_winners = b._fixed_point_winners(game)
             self.assertEqual(actual, {node: node in expected_winners for node in range(3)})
 
+        deadline_project = DEADLINE_PROJECT
+        deadline_project.parent.mkdir(parents=True, exist_ok=True)
+        deadline_commands = [
+            ["python3", "integrations/zal/run.py", "check",
+             "integrations/zal/examples/deadline_game2.zal"],
+            ["python3", "integrations/zal/run.py", "export-game",
+             "integrations/zal/examples/deadline_game2.zal", "--property", "quick_withdrawal",
+             "--out", str(deadline_project)],
+        ]
+        deadline_markers = ["deadline-game-check-output", "deadline-game-export-output"]
+        for command, marker in zip(deadline_commands, deadline_markers):
+            with self.subTest(command=command):
+                completed = subprocess.run(command, cwd=REPOSITORY, text=True, encoding="utf-8",
+                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertEqual(completed.stdout, documented_output(marker))
+        if binary:
+            checked = subprocess.run([binary, "check", "--expand", str(deadline_project)],
+                                     cwd=REPOSITORY, text=True, stdout=subprocess.PIPE,
+                                     stderr=subprocess.STDOUT, timeout=120)
+            self.assertEqual(checked.returncode, 0, checked.stdout[-2000:])
+            native = re.search(r"<!-- deadline-game-native-output -->\s*```text\n(.*?)\n```",
+                               readme, re.DOTALL)
+            self.assertIsNotNone(native, "missing documented native deadline expansion")
+            self.assertEqual(checked.stdout, native.group(1) + "\n")
+            self.assertNotRegex(checked.stdout, r"law 510 stable on commit")
+            rows = re.findall(r"^law (6\d\d) from_n(\d+) on commit = (true|false);$",
+                              checked.stdout, flags=re.MULTILINE)
+            model = b.parse((EXAMPLES / "deadline_game2.zal").read_text(encoding="ascii"))
+            _, arena, goal, bound = deadline_parts(model)
+            expected_winners = b._deadline_fixed_winners(arena, goal, bound)
+            self.assertEqual(len(rows), len(arena.configuration_nodes), checked.stdout[-2000:])
+            actual = {int(node): value == "true" for _, node, value in rows}
+            self.assertEqual(actual, {node: node in expected_winners
+                                      for node in arena.configuration_nodes})
+
     def test_300_random_reduced_games_export_tables(self):
         rng = random.Random(20261023)
         binary = os.environ.get("ZENO_FCIS_BIN")
@@ -460,6 +647,39 @@ class GameTableTests(unittest.TestCase):
             print("ZENO_FCIS_BIN is unset; skipped zeno-fcis check --expand and stable-law replay for the "
                   "300 exported games.")
 
+    def test_300_random_bounded_games_expand_natively_and_match_solver_a(self):
+        binary = os.environ.get("ZENO_FCIS_BIN")
+        if not binary:
+            self.skipTest("ZENO_FCIS_BIN is unset; native bounded-game expansion was not run")
+        rng = random.Random(20261024)
+        model = SimpleNamespace(facts=(), inputs=(), events=("tick",),
+                                contexts=lambda: iter(({},)))
+        with tempfile.TemporaryDirectory(prefix="zal-deadlines-") as temporary:
+            for case in range(300):
+                count = rng.randint(1, 8)
+                successors = tuple(tuple(sorted(rng.sample(range(count), rng.randint(1, min(3, count)))))
+                                   for _ in range(count))
+                owners = tuple(rng.randint(0, 1) for _ in range(count))
+                goal = tuple(bool(rng.getrandbits(1)) for _ in range(count))
+                bound = rng.randint(0, 5)
+                configurations = tuple(("configuration", f"s{node}", ()) for node in range(count))
+                arena = b._GameGraph(successors, owners, goal, (), configurations,
+                                     tuple(range(count)), 0, False)
+                project = b._deadline_table_project(arena, model, bound)
+                path = Path(temporary) / f"deadline-{case:03}.zeno"
+                path.write_text(project, encoding="ascii")
+                checked = subprocess.run([binary, "check", "--expand", str(path)], text=True,
+                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
+                self.assertEqual(checked.returncode, 0, checked.stdout[-2000:])
+                self.assertNotRegex(checked.stdout, r"law 510 stable on commit")
+                rows = re.findall(r"^law (6\d\d) from_s(\d+) on commit = (true|false);$",
+                                  checked.stdout, flags=re.MULTILINE)
+                expected = b._deadline_fixed_winners(arena, goal, bound)
+                self.assertEqual(len(rows), count, checked.stdout[-2000:])
+                actual = {int(node): value == "true" for _, node, value in rows}
+                self.assertEqual(actual, {node: node in expected for node in range(count)},
+                                 f"bounded table mismatch in random reduced game {case}")
+
     def test_one_fewer_outer_stratum_makes_stable_false(self):
         rng = random.Random(20261024)
         for case in range(500):
@@ -500,6 +720,19 @@ class GameTableTests(unittest.TestCase):
             with patch.object(b, "_reduce_game", return_value=too_wide):
                 b.export_game_project(model, "reaches")
         self.assertEqual(str(raised.exception), "The table form of this game has 65 nodes; a table holds at most 64")
+
+    def test_bounded_export_refuses_more_than_sixty_four_configurations(self):
+        model = b.parse(DEADLINE_SOURCE)
+        count = 65
+        configurations = tuple(("configuration", "open", ()) for _ in range(count))
+        too_wide = b._GameGraph(tuple((node,) for node in range(count)), tuple(0 for _ in range(count)),
+                                tuple(False for _ in range(count)), (), configurations,
+                                tuple(range(count)), 0, False)
+        with self.assertRaises(b.Refusal) as raised:
+            with patch.object(b, "_deadline_config_graph", return_value=too_wide):
+                b.export_game_project(model, "quick_withdrawal")
+        self.assertEqual(str(raised.exception),
+                         "The table form of this game has 65 nodes; a table holds at most 64")
 
 
 if __name__ == "__main__":

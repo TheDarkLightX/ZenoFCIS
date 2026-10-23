@@ -1,0 +1,14 @@
+zal 2;
+# Can the user reach withdrawn within one rule application, whatever the operator chooses as context?
+machine deadline_game;
+states open, withdrawn;
+events withdraw, wait;
+context signal;
+initial open;
+step atomic; frame control_and_variables;
+default reject not_allowed unchanged;
+rule w1: open + withdraw [true] -> accept withdrawn;
+rule r1: withdrawn + wait [true] -> accept open;
+player user moves in open;
+player operator moves in withdrawn;
+property quick_withdrawal: user can force within 1 (state == withdrawn);
