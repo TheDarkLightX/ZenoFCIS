@@ -61,7 +61,8 @@ def validate_declarations(model):
             a, c = pair
             if a == c or used & set(pair) or not any(set(pair) <= kind for kind in kinds):
                 refuse(name, "declaration", "pairs must be disjoint declared names of the same kind")
-            if sum(set(pair) <= kind for kind in kinds) != 1:
+            if (any(sum(n in kind for kind in kinds) != 1 for n in pair)
+                    or set(pair) & (set(model.facts) | {i.name for i in model.inputs})):
                 refuse(name, "declaration", "swapped names have ambiguous declaration kinds")
             if a in variables and variables[a] != variables[c]:
                 refuse(name, "declaration", "swapped variables need the same range and initial value")
@@ -196,8 +197,78 @@ def check_obligations(model):
         check_players(model, name, permutation)
 
 
+def canonical_representative(orbit):
+    return min(orbit)
+
+
+class OrbitGraph(b._Graph):
+    """Invocation-owned graph with concrete domain auditing and orbit reachability.
+
+    Configuration ordinals retain the existing canonical state/value order.
+    Edges retain the representative's event and complete context choice; only
+    successor ordinals are quotiented. This preserves event/context correlation.
+    """
+
+    def __init__(self, model):
+        super().__init__(model)
+        self.full = b._Graph(model)
+        self.permutations = tuple(rename(pairs) for _, pairs in model.symmetries)
+        self.representatives = {}
+        self.members = {}
+        for start in range(len(self.configs)):
+            if start in self.representatives:
+                continue
+            orbit = self._orbit(start)
+            representative = canonical_representative(orbit)
+            self.members[representative] = tuple(sorted(orbit))
+            for ci in orbit:
+                self.representatives[ci] = representative
+        self.weights = {ci: len(members) for ci, members in self.members.items()}
+
+    def _orbit(self, start):
+        orbit = {start}
+        queue = deque([start])
+        while queue:
+            ci = queue.popleft()
+            for permutation in self.permutations:
+                state, values = configuration(self.model, permutation, self.configs[ci][0], self.value_dicts[ci])
+                target = self.index[(state, tuple(values[n] for n in self.names))]
+                if target not in orbit:
+                    orbit.add(target)
+                    queue.append(target)
+        return orbit
+
+    def explore(self, steps):
+        self.full.explore(steps)
+        rows = [[] for _ in self.configs]
+        for ci in self.members:
+            for original in steps[ci]:
+                # Never mutate the concrete table shared with the temporal view.
+                step = b._Step(original.state, dict(original.values), original.event, dict(original.context))
+                step.accepted, step.rule, step.reason = original.accepted, original.rule, original.reason
+                step.post_state, step.post_values = original.post_state, dict(original.post_values)
+                step.pre, step.post = ci, self.representatives[original.post]
+                rows[ci].append(step)
+        super().explore(rows)
+
+    def trace_to(self, ci):
+        # The full graph is already retained for temporal checking. Its path
+        # reaches the actual representative with consistent concrete identities.
+        return self.full.trace_to(ci)
+
+
 def check(model, checker_identity, no_symmetry=False):
     check_obligations(model)
-    # The graph adapter is supplied in the next implementation stage.
-    result = b._check(model, checker_identity)
+    graph = OrbitGraph(model)
+    selected = graph.full if no_symmetry else graph
+    result = b._check(model, checker_identity, selected)
+    result["symmetry"] = {"generators": len(model.symmetries), "configurations": len(graph.configs),
+                          "orbits": len(graph.members)}
+    if result["status"] in {"pass-with-scope", "unsupported"}:
+        # Reports keep concrete counts and concrete reachability diagnostics.
+        full = graph.full
+        result["reachable_configurations"] = len(full.order)
+        result["reachable_states"] = sorted({full.configs[ci][0] for ci in full.order})
+        result["unreachable_rules"] = sorted({r.id for r in model.rules}
+                                             - {step.rule for step in full.reachable_steps()})
     return result

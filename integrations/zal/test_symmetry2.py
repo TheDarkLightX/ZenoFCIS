@@ -1,6 +1,7 @@
 """Finite symmetry regressions and reproducible mirrored-machine differential."""
 
 from dataclasses import replace
+from pathlib import Path
 import random
 import unittest
 from unittest.mock import patch
@@ -96,6 +97,195 @@ class SymmetryDeclarationTests(unittest.TestCase):
         model = b.parse(BASE + 'invariant observed: aa == 0;')
         with self.assertRaisesRegex(b.Refusal, 'Symmetry rivals: claim-invariance'):
             b.check(model, no_symmetry=True)
+
+
+def random_machine(rng, index):
+    """Generate one half of a policy, then mirror its rules by a random swap."""
+    x, y, observer = rng.sample(['aa', 'bb', 'cc'], 3)
+    ex, ey, fixed_event = rng.sample(['left', 'right', 'tick'], 3)
+    bound = rng.randint(1, 2)
+    context = rng.choice(['none', 'ready'])
+    integer_input = rng.choice([False, True])
+    lines = ['zal 2;', f'machine generated_{index};', 'states env, user;',
+             'events left, right, tick;', f'context {context};']
+    if integer_input:
+        lines.append('input amount in 0..=1;')
+    lines += [f'var {n} in 0..={bound} initially 0;' for n in ['aa', 'bb', 'cc']]
+    lines += ['initial user;', 'step atomic; frame control_and_variables;',
+              'default reject unavailable unchanged;']
+    for state in ['env', 'user']:
+        guard = f'{x} {rng.choice(["==", "<=", ">="])} {rng.randint(0,bound)}'
+        if context != 'none':
+            guard += rng.choice([' & ready', ' & !ready'])
+        if integer_input:
+            guard += f' & amount == {rng.randint(0,1)}'
+        target = rng.choice(['env', 'user'])
+        outcome = (f'accept {target}, {x} = {rng.randint(0,bound)}, {observer} = {rng.randint(0,bound)}'
+                   if rng.randrange(4) else 'reject denied unchanged')
+        original = f'rule {state}_a: {state} + {ex} [{guard}] -> {outcome};'
+        mirrored = original.replace(f'{state}_a:', f'{state}_b:')
+        import re
+        mirrored = re.sub(r'\b' + x + r'\b', y, mirrored)
+        mirrored = re.sub(r'\b' + ex + r'\b', ey, mirrored)
+        lines += [original, mirrored]
+        lines.append(f'rule {state}_fixed: {state} + {fixed_event} [true] -> accept '
+                     f'{rng.choice(["env", "user"])}, {observer} = {rng.randint(0,bound)};')
+    invariant_bound = 2 * bound if index % 7 else rng.randint(0, 2 * bound)
+    lines += [f'invariant total: {x} + {y} <= {invariant_bound};',
+              f'require accounting: !accepted => ({x}\' + {y}\' == {x} + {y});',
+              'player controller moves in user;', 'player environment moves in env;']
+    if rng.choice([False, True]):
+        lines.append(f'fairness visits: infinitely often ({observer}\' == {rng.randint(0,bound)});')
+    for gi, objective in enumerate(b.GAME_OBJECTIVES):
+        player = rng.choice(['controller', 'environment'])
+        goal = rng.choice([f'{observer} == {rng.randint(0,bound)}',
+                           f'{x} + {y} >= {rng.randint(0,2*bound)}',
+                           f'state == {rng.choice(["user", "env"])}'])
+        lines.append(f'property game_{gi}: {player} can force {objective} ({goal});')
+    lines.append(f'symmetry rivals: swap ({x} {y}) ({ex} {ey});')
+    return b.parse('\n'.join(lines))
+
+
+def explore(graph):
+    rows = [[] for _ in graph.configs]
+    for ci, _, _, result in graph.raw():
+        if result[0] != 'step':
+            raise AssertionError(result[0])
+        rows[ci].append(result[1])
+    graph.explore(rows)
+    return graph
+
+
+class SymmetryGraphTests(unittest.TestCase):
+    def test_state_swap_and_ownership(self):
+        source = '''zal 2;
+machine state_swap;
+states origin, xx, yy;
+events left, right;
+context none;
+initial origin;
+step atomic; frame control_and_variables;
+default reject unavailable unchanged;
+rule go_left: origin + left [true] -> accept xx;
+rule go_right: origin + right [true] -> accept yy;
+player controller moves in origin;
+player environment moves in xx, yy;
+property leaves: controller can force eventually (!(state == origin));
+symmetry rivals: swap (xx yy) (left right);
+'''
+        model = b.parse(source)
+        self.assertEqual(b.check(model)['properties'], b.check(model, no_symmetry=True)['properties'])
+        self.assertEqual(b.check(model)['symmetry']['orbits'], 2)
+        bad = source.replace('controller moves in origin;', 'controller moves in origin, xx;')
+        bad = bad.replace('environment moves in xx, yy;', 'environment moves in yy;')
+        with self.assertRaisesRegex(b.Refusal, 'Symmetry rivals: players'):
+            b.check(b.parse(bad))
+
+    def test_overlap_traps_and_reasons(self):
+        for extra in ['rule extra_a: user + left [aa == 0] -> accept env, aa = 1;\n'
+                      'rule extra_b: user + right [bb == 0] -> accept env, bb = 1;',
+                      '']:
+            model = b.parse(BASE + extra)
+            s.check_obligations(model)
+        self.assertEqual(b.check(b.parse(BASE + extra))['status'], 'pass-with-scope')
+        trap = BASE.replace('[aa == 0]', '[true]').replace('[bb == 0]', '[true]')
+        trap = trap.replace('aa = 1', 'aa += 1').replace('bb = 1', 'bb += 1')
+        model = b.parse(trap)
+        self.assertEqual(b.check(model)['obligation'], 'range')
+        self.assertEqual(b.check(model, no_symmetry=True)['obligation'], 'range')
+        asymmetric = trap.replace('bb += 1', 'bb = 1')
+        with self.assertRaisesRegex(b.Refusal, 'Symmetry rivals: automorphism'):
+            b.check(b.parse(asymmetric))
+        rejection = BASE.replace('accept env, aa = 1', 'reject refused_a unchanged')
+        rejection = rejection.replace('accept env, bb = 1', 'reject refused_b unchanged')
+        with self.assertRaisesRegex(b.Refusal, 'Symmetry rivals: automorphism'):
+            b.check(b.parse(rejection))
+
+    def test_example_and_legacy_revision_pins(self):
+        from test_game2 import EXAMPLE_REVISIONS, parse_example
+        here = Path(__file__).parent / 'examples'
+        for name, revision in EXAMPLE_REVISIONS.items():
+            self.assertEqual(parse_example(here / name).revision, revision)
+        self.assertEqual(parse_example(here / 'withdrawal_game2.zal').revision,
+                         '62f361bbe3dbdb74bdbfe7050626e26f4d029990be5ddc1d37f9187dd729b8e0')
+        model = b.parse((here / 'ladder_symmetry2.zal').read_text())
+        self.assertEqual(b.check(model)['properties'], b.check(model, no_symmetry=True)['properties'])
+        self.assertEqual(b.check(model)['symmetry'], {'generators': 1, 'configurations': 54, 'orbits': 36})
+
+    def test_canonical_control(self):
+        graph = s.OrbitGraph(b.parse(BASE))
+        for representative, members in graph.members.items():
+            self.assertEqual(representative, min(members))
+            self.assertEqual(graph.configs[representative], min(graph.configs[ci] for ci in members))
+        self.assertEqual(len(graph.members), 6)
+
+    def test_noncommuting_generators(self):
+        model = b.parse(BASE.replace('var bb in 0..=1 initially 0;',
+                                    'var bb in 0..=1 initially 0;\nvar cc in 0..=1 initially 0;')
+                        .replace('symmetry rivals: swap (aa bb) (left right);',
+                                 'symmetry first: swap (aa bb);\nsymmetry second: swap (bb cc);'))
+        graph = s.OrbitGraph(model)
+        self.assertEqual(len(graph.configs), 16)
+        self.assertEqual(len(graph.members), 8)
+        self.assertEqual(sorted(graph.weights.values()), [1, 1, 1, 1, 3, 3, 3, 3])
+
+    def test_weighted_winning_counts_and_reduced_arena(self):
+        model = b.parse(BASE + 'property either: controller can force eventually (aa + bb >= 1);')
+        quotient, full = b.check(model), b.check(model, no_symmetry=True)
+        self.assertEqual(quotient['properties'], full['properties'])
+        self.assertEqual(quotient['symmetry'], {'generators': 1, 'configurations': 8, 'orbits': 6})
+        graph = explore(s.OrbitGraph(model))
+        self.assertLess(len(b._game_graph(graph, model, 'controller').successors),
+                        len(b._game_graph(graph.full, model, 'controller').successors))
+
+    def test_temporal_checks_receive_full_graph(self):
+        model = b.parse(BASE + 'property bounded: always(within(2, aa + bb >= 0));')
+        original = b._check_property
+        seen = []
+        def inspect(graph, *args):
+            seen.append(len(graph.order))
+            return original(graph, *args)
+        with patch.object(b, '_check_property', inspect):
+            b.check(model)
+        graph = explore(s.OrbitGraph(model))
+        self.assertEqual(seen, [len(graph.full.order)])
+        self.assertGreater(len(graph.full.order), len(graph.order))
+
+    def test_concrete_counterexample_trace_replays(self):
+        model = b.parse(BASE + 'invariant limited: aa + bb <= 1;')
+        result = b.check(model)
+        self.assertEqual(result['obligation'], 'invariant')
+        state, values = model.initial, model.initial_values()
+        for step in result['witness']['trace']:
+            self.assertEqual((state, values), (step['state'], step['variables']))
+            outcome = model.decide(state, values, step['event'], step['context'])
+            self.assertEqual(outcome, step['outcome'])
+            state, values = outcome['state'], outcome['variables']
+        self.assertEqual((state, values), (result['witness']['state'], result['witness']['variables']))
+
+    def test_2000_mirrored_machines(self):
+        rng = random.Random(260022)
+        for index in range(2000):
+            model = random_machine(rng, index)
+            quotient = b.check(model)
+            full = b.check(model, no_symmetry=True)
+            for key in ['status', 'obligation', 'checks', 'properties', 'winning_configuration_count']:
+                self.assertEqual(quotient.get(key), full.get(key), (index, key, model.render()))
+            # Inspect all three objectives even when an earlier claim fails.
+            graph = explore(s.OrbitGraph(model))
+            for _, player, objective, formula in model.games:
+                reduced_game = b._reduce_game(b._game_graph(graph, model, player), model, objective, formula)
+                full_game = b._reduce_game(b._game_graph(graph.full, model, player), model, objective, formula)
+                reduced_wins = b._fixed_point_winners(reduced_game)
+                full_wins = b._fixed_point_winners(full_game)
+                self.assertEqual(reduced_wins, b._parity_winners(reduced_game), index)
+                self.assertEqual(full_wins, b._parity_winners(full_game), index)
+                expected = {graph.full.order[node] for node in full_game.configuration_nodes if node in full_wins}
+                actual = {ci for node in reduced_game.configuration_nodes if node in reduced_wins
+                          for ci in graph.members[graph.order[node]]}
+                self.assertEqual(actual, expected, (index, objective, model.render()))
+
+
 
 
 if __name__ == '__main__':

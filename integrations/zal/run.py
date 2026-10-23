@@ -24,6 +24,8 @@ def main():
         p.add_argument("source", type=Path, nargs="?" if command in {"legend", "ui"} else None,
                        default=Path(__file__).parent / "examples/order.zal")
         p.add_argument("--syntax", choices=["symbolic", "english"], default="symbolic")
+        if command == "check":
+            p.add_argument("--no-symmetry", action="store_true", help="Check the full graph after validating symmetry obligations")
         if command == "render":
             p.add_argument("--to", choices=["symbolic", "english"], required=True)
         if command in {"export", "export-game", "lower"}:
@@ -75,7 +77,8 @@ def main():
             print(model.render(options.to == "english"), end="")
             return 0
         if options.command == "check":
-            result = profile.check(model, checker_identity())
+            result = (profile.check(model, checker_identity(), no_symmetry=options.no_symmetry)
+                      if profile is behavior2 else profile.check(model, checker_identity()))
         elif options.command == "explain":
             if profile is not behavior2:
                 raise behavior.Refusal("The explain command supports zal/effects/1 and zal/typed-fsm/1 sources")

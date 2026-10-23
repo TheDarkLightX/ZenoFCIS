@@ -2121,7 +2121,7 @@ def _check(model, checker_identity, graph=None):
         shape = property_shape(formula)
         mode = ("every infinite execution that satisfies every fairness declaration" if shape["kind"] == "liveness"
                 else "every infinite execution")
-        found = _check_property(graph, model, name, formula)
+        found = _check_property(getattr(graph, "full", graph), model, name, formula)
         if found is not None:
             witness = {"property": name, "english": formula.render(True), "kind": found["kind"], "mode": mode}
             if "trace" in found:
@@ -2163,12 +2163,15 @@ def _check(model, checker_identity, graph=None):
         config_data = lambda node: {"state": game.configurations[node][1],
                                     "variables": dict(game.configurations[node][2])}
         winning_configs = [node for node in game.configuration_nodes if node in fixed]
+        weights = getattr(graph, "weights", {})
+        winning_count = sum(weights.get(graph.order[node], 1) for node in winning_configs)
+        configuration_count = sum(weights.get(ci, 1) for ci in graph.order)
         if fixed != parity:
             result = counterexample(model, checker_identity, "game", {**checks, "game_properties": "unknown"},
                                     property=name, english=english, player=player, objective=result_objective,
                                     initial=config_data(game.initial),
                                     winning_configurations=[config_data(node) for node in winning_configs[:16]],
-                                    winning_configuration_count=len(winning_configs),
+                                    winning_configuration_count=winning_count,
                                     diagnostic="solvers disagree")
             result["status"] = "unknown"
             return result
@@ -2177,11 +2180,11 @@ def _check(model, checker_identity, graph=None):
                                   property=name, english=english, player=player, objective=result_objective,
                                   initial=config_data(game.initial),
                                   winning_configurations=[config_data(node) for node in winning_configs[:16]],
-                                  winning_configuration_count=len(winning_configs))
+                                  winning_configuration_count=winning_count)
         results[name] = {"status": "pass-with-scope", "kind": "game", "player": player,
                          "objective": result_objective, "english": english,
-                         "configurations": len(game.configuration_nodes),
-                         "winning_configurations": len(winning_configs), "initial_wins": True,
+                         "configurations": configuration_count,
+                         "winning_configurations": winning_count, "initial_wins": True,
                          "solvers": ["fixed-point", "parity"]}
     if model.games:
         checks["game_properties"] = "pass-with-scope"
@@ -2203,7 +2206,7 @@ def _check(model, checker_identity, graph=None):
               "unreachable_rules": sorted({r.id for r in model.rules} - {s.rule for s in graph.reachable_steps()}),
               "invariant_count": len(model.invariants), "requirement_count": len(model.requirements),
               "property_count": len(model.properties) + len(model.games), "fairness_count": len(model.fairness),
-              "properties": results, "advisories": _advisories(model, graph, [s for row in steps for s in row], admitted_steps),
+              "properties": results, "advisories": _advisories(model, getattr(graph, "full", graph), [s for row in steps for s in row], admitted_steps),
               "default_count": len(defaults), "default_witness": step_data(defaults[0]) if defaults else None,
               "unresolved": list(model.obligations), "factory": "not-run", "authority": "none"}
     if model.games:
