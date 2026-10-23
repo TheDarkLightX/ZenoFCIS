@@ -70,7 +70,7 @@ def main():
         parser.error("configured worktree differs from control source")
     args.out.mkdir(parents=True, exist_ok=False)
     args.work.mkdir(parents=True, exist_ok=False)
-    env = dict(os.environ, CARGO_BUILD_JOBS="4", CARGO_PROFILE_DEV_DEBUG="0",
+    env = dict(os.environ, CARGO_BUILD_JOBS=os.environ.get("CARGO_BUILD_JOBS", "4"), CARGO_PROFILE_DEV_DEBUG="0",
                CARGO_PROFILE_TEST_DEBUG="0", CARGO_NET_OFFLINE="true", CARGO_INCREMENTAL="0")
     target = Path(env["CARGO_TARGET_DIR"]).resolve()
     cli = target / "debug/zeno-fcis"

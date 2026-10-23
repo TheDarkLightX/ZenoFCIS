@@ -43,7 +43,7 @@ def main():
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     args.work.mkdir(parents=True, exist_ok=False)
-    env = dict(os.environ, CARGO_BUILD_JOBS="4", CARGO_PROFILE_DEV_DEBUG="0",
+    env = dict(os.environ, CARGO_BUILD_JOBS=os.environ.get("CARGO_BUILD_JOBS", "4"), CARGO_PROFILE_DEV_DEBUG="0",
                CARGO_PROFILE_TEST_DEBUG="0", CARGO_NET_OFFLINE="true", CARGO_INCREMENTAL="0")
     rows = []
     costs = []
