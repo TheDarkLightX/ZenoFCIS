@@ -82,3 +82,46 @@ fn tally_metadata_is_bound_into_format_seven() -> Result<(), Box<dyn std::error:
     assert_ne!(bytes, encode(&PROJECT.replace("count 115", "sum 115.145"))?);
     Ok(())
 }
+
+#[test]
+fn tally_aliases_are_counted_once_on_both_maps() -> Result<(), Box<dyn std::error::Error>> {
+    let project = format!(
+        "{PROJECT}\nentry 165 same_member of 110 at command.101.131;\nentry 175 same_copy of 115 at command.101.132;\n"
+    );
+    let mut rules: serde_json::Value = serde_json::from_str(RULES)?;
+    for field in ["165", "166", "175", "176", "177"] {
+        rules["genesis"][field] = 0.into();
+    }
+    let result = check(&project, &rules.to_string(), Limits::default())?;
+    assert_eq!(result.verdict(), Verdict::Checked, "{}", result.packet());
+    // A selected on-loan bit is a unit weight, so this is the same invariant.
+    let weighted = PROJECT.replace("count 115", "sum 115.145");
+    assert_eq!(
+        check(&weighted, RULES, Limits::default())?.verdict(),
+        Verdict::Checked
+    );
+    Ok(())
+}
+
+#[test]
+fn source_holder_changes_include_keys_without_a_named_target()
+-> Result<(), Box<dyn std::error::Error>> {
+    let project = PROJECT.replace(
+        "post.100.171 == 1 && post.100.172 == command.101.131",
+        "true",
+    );
+    let mut rules: serde_json::Value = serde_json::from_str(RULES)?;
+    let borrow = rules["cases"]
+        .as_array_mut()
+        .ok_or("cases")?
+        .iter_mut()
+        .find(|c| c["rule"] == "borrow")
+        .ok_or("borrow")?;
+    // Count the borrower but put the copy on loan to its old shelf holder.
+    // Some views have a different old holder whose member entry is unnamed.
+    borrow["post"]["172"] = "pre.100.172".into();
+    let result = check(&project, &rules.to_string(), Limits::default())?;
+    assert_eq!(result.verdict(), Verdict::Refuted, "{}", result.packet());
+    assert_eq!(result.packet()["result"]["obligation"], "cross-map delta");
+    Ok(())
+}

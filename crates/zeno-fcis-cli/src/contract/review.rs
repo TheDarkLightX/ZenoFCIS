@@ -19,6 +19,8 @@
 
 // The review's input domains and its evaluation live in the library.
 pub(super) use zeno_fcis_contract::internals::review::{domain, evaluate};
+#[cfg(test)]
+mod collection_tests;
 pub(crate) mod decision_space;
 pub(crate) mod deliveries;
 mod examples;
@@ -27,8 +29,6 @@ pub(crate) mod gaps;
 mod genesis_tests;
 #[cfg(test)]
 mod judge_tests;
-#[cfg(test)]
-mod collection_tests;
 pub(crate) mod lemma;
 mod machine;
 mod mutants;
