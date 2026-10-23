@@ -88,6 +88,24 @@ def released_24_source_extension(raw, copies):
         raise ValueError('unsafe historical source path')
     return {**raw, 'paths': sorted(set(raw['paths']) | set(additions))}
 
+VALUE_DECODER_SOURCES = (
+    'crates/zeno-fcis-codec/src/decoder_bytes.rs',
+    'crates/zeno-fcis-codec/src/decoder_induction.rs',
+    'crates/zeno-fcis-codec/src/decoder_refinement.rs',
+    'crates/zeno-fcis-codec/src/decoder_spec.rs',
+    'crates/zeno-fcis-value/src/decoder_bytes.rs',
+    'crates/zeno-fcis-value/src/decoder_model.rs',
+    'crates/zeno-fcis-value/src/decoder_refinement.rs',
+)
+
+def value_decoder_source_extension(raw):
+    """Add exactly the seven decoder modules; retain every source and fixed pin."""
+    return {**raw, 'paths': sorted(set(raw['paths']) | set(VALUE_DECODER_SOURCES))}
+
+def include_value_decoder_sources():
+    return _include_source_extension(value_decoder_source_extension(
+        source_manifest(ROOT/SOURCE_MANIFEST)))
+
 def include_released_24_sources():
     """Generate both membership guards from the checked additive release copy.
 
@@ -95,12 +113,24 @@ def include_released_24_sources():
     approved source or alter any runtime, verifier or core-profile pin bytes.
     The usual source preflight still refuses any subsequent omission.
     """
-    import hashlib
     import check_historical_24_copy as historical
     path = ROOT/SOURCE_MANIFEST
     raw = source_manifest(path)
     copies = json.loads(historical.RECORD.read_text())
     historical.check(copies)
+    return _include_source_extension(released_24_source_extension(raw, copies))
+
+def _include_source_extension(extended):
+    """Generate both guards only after retaining all old membership and pins."""
+    path = ROOT/SOURCE_MANIFEST
+    raw = source_manifest(path)
+    if (set(extended) != set(raw) or extended['pins'] != raw['pins']
+            or extended['schema'] != raw['schema']
+            or not set(raw['paths']) <= set(extended['paths'])
+            or extended['paths'] != sorted(set(extended['paths']))
+            or not all(evaluator.safe_name(name) for name in extended['paths'])):
+        raise ValueError('source extension must preserve approved paths and fixed pin bytes')
+    import hashlib
     test = ROOT/'crates/zeno-fcis-synthesis/tests/v2_evaluator_identity.rs'
     text = test.read_text()
     pattern = r'(let approved_manifest = \[)(.*?)(\n    \];)'
@@ -110,7 +140,6 @@ def include_released_24_sources():
     old = bytes(int(value) for value in re.findall(r'(\d+)_u8', match[2]))
     if old.hex() != APPROVED_SOURCE_CLOSURE_SHA256:
         raise ValueError('independent membership guard differs before generation')
-    extended = released_24_source_extension(raw, copies)
     for name in extended['paths']: evaluator.read_regular(ROOT/name)
     encoded = (json.dumps(extended, indent=2, sort_keys=True)+'\n').encode()
     value = hashlib.sha256(encoded).digest()
@@ -446,7 +475,9 @@ def check(out:Path,refresh=False,positive_only=False,selected=None):
     return {'schema':'zeno-fcis/authority-v2-evidence/1','status':'passed','revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'source_sha256':before, "source_bindings": verifier.evidence_bindings(before, HARNESS),'source_generation':generation,'verus_report':report,'translated_function_coverage':coverage,'mutations':results,'custody_controls':custody,'proof_exit':positive.returncode,'native_exit':native_result.returncode,'no_std_exit':no_std.returncode,'positive_only':positive_only,'selected_controls':selected,'all_mutation_controls':not positive_only and not selected,'unproved':['compiler/platform/allocator and external shell','root combined Miri/ATDD/template/law and ledger/migration integration','whole V2 release and exact-head review/CI']}
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--out',type=Path);p.add_argument('--refresh-coverage',action='store_true');p.add_argument('--positive-only',action='store_true');p.add_argument('--controls',nargs='+');p.add_argument('--generate-sources',type=Path);p.add_argument('--check-sources',action='store_true');p.add_argument('--include-released-24',action='store_true');a=p.parse_args()
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--out',type=Path);p.add_argument('--refresh-coverage',action='store_true');p.add_argument('--positive-only',action='store_true');p.add_argument('--controls',nargs='+');p.add_argument('--generate-sources',type=Path);p.add_argument('--check-sources',action='store_true');p.add_argument('--include-released-24',action='store_true');p.add_argument('--include-value-decoder',action='store_true');a=p.parse_args()
+    if a.include_value_decoder:
+        print(json.dumps(include_value_decoder_sources(),sort_keys=True));return 0
     if a.include_released_24:
         print(json.dumps(include_released_24_sources(),sort_keys=True));return 0
     if a.check_sources:

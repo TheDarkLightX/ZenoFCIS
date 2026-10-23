@@ -31,6 +31,28 @@ class GateTests(unittest.TestCase):
         copies['files'] = [{'copy': '../omitted.rs'}]
         with self.assertRaises(ValueError): gate.released_24_source_extension(raw, copies)
 
+    def test_decoder_extension_retains_membership_pins_and_input(self):
+        raw = {'schema': 'zeno-fcis/authority-source-closure/1',
+               'paths': ['retained.rs'],
+               'pins': [{'path': '@pin/runtime-toolchain', 'bytes': 'fixed\n'}]}
+        before = copy.deepcopy(raw)
+        extended = gate.value_decoder_source_extension(raw)
+        self.assertEqual(raw, before)
+        self.assertEqual(extended['pins'], before['pins'])
+        self.assertIn('retained.rs', extended['paths'])
+        self.assertEqual(len(extended['paths']), 8)
+        self.assertIn('crates/zeno-fcis-codec/src/decoder_spec.rs', extended['paths'])
+        self.assertIn('crates/zeno-fcis-value/src/decoder_model.rs', extended['paths'])
+        for defect in ('omission', 'pin'):
+            changed = copy.deepcopy(extended)
+            if defect == 'omission':
+                changed['paths'].remove('retained.rs')
+            else:
+                changed['pins'][0]['bytes'] = 'substituted'
+            with self.subTest(defect=defect), patch.object(gate, 'source_manifest', return_value=raw):
+                with self.assertRaisesRegex(ValueError, 'preserve approved'):
+                    gate._include_source_extension(changed)
+
     def test_before_loop_invariant_keeps_source_and_resource_guards(self):
         pin=json.loads((gate.ROOT/gate.verifier.PIN).read_text())
         report={'verus':{'version':pin['version'],'commit':pin['commit'],
@@ -130,7 +152,7 @@ class GateTests(unittest.TestCase):
 
     def test_evaluator_matches_complete_approved_generation(self):
         result = gate.check_generated_sources()
-        self.assertEqual(result['paths'], 260)
+        self.assertEqual(result['paths'], 267)
         self.assertIn('crates/zeno-fcis-synthesis/src/finite/value/scalar.rs', gate.source_manifest(gate.ROOT / gate.SOURCE_MANIFEST)['paths'])
         self.assertEqual(result['pins'], 3)
         self.assertEqual(result['approved_manifest_sha256'], gate.APPROVED_SOURCE_CLOSURE_SHA256)
