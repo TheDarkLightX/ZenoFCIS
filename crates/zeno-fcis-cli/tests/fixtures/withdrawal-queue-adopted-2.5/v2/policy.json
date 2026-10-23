@@ -295,7 +295,8 @@
     "510": "DebitCreditEffectEquality",
     "511": "AuthoritySubjectRecipient",
     "512": "AuthoritySubjectRecipient",
-    "513": "RejectNoAuthority"
+    "513": "RejectNoAuthority",
+    "514": "DebitCreditEffectEquality"
   },
   "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes.",
   "framework_reject_law": 509,
@@ -333,6 +334,14 @@
           "destination": "settlement"
         }
       }
+    },
+    "514": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        }
+      }
     }
   },
   "clock": {
@@ -346,7 +355,7 @@
       "candidate_sha256": "b8b51e2b2647831cc685d38bec838090210716c0a9c3f5945479d751d857e3e2",
       "receipt_sha256": "099951eac19d9706c9a9ad31f5b981ce3e750d9883647a6ce727be5bccc2a7f5",
       "usage": "new-version",
-      "superseded_policy_sha256": "e14c58e11b05262d66233f61951fe652074988f0d8e60f5c089db4c50e48a469"
+      "superseded_policy_sha256": "6aa54c1f37a09d94765da53a2745753dbee0e8190149108ce7ddc0be10b33c39"
     }
   ]
 }
