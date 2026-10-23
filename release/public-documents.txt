@@ -431,3 +431,8 @@ verification/kernel-laws/src/oracle/templates/withdrawal-queue/README.md
 verification/kernel-laws/src/oracle/templates/withdrawal-queue/original/README.md
 verification/lean/README.md
 verification/verus/README.md
+docs/TWO_RUN_PROPERTIES.md
+examples/two-run/constant-product/README.md
+examples/two-run/ledger-leak/README.md
+examples/two-run/ledger-private/README.md
+examples/two-run/uniform-price/README.md
