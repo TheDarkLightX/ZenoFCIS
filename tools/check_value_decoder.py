@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check production value encoding/decoding, their proofs, six semantic defects and two native-configuration defects."""
+"""Check production value encoding/decoding, their proofs and defect controls."""
 from __future__ import annotations
 
 import argparse
