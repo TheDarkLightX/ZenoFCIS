@@ -43,7 +43,7 @@ fn compares_every_observed_field() {
     assert_eq!(result.verdict(), Verdict::Refuted);
     assert_eq!(
         result.packet()["result"]["first_difference"]["path"],
-        "pre.100.111"
+        "post.100.111"
     );
     assert_eq!(
         checked(&p, &r, &order(&["pre.100.110", "pre.100.111"], 1)).verdict(),
@@ -83,6 +83,17 @@ fn secret_group_excludes_secret_and_detects_leak() {
         result.packet()["result"]["first_difference"]["kind"],
         "public_field"
     );
+    assert_eq!(
+        result.packet()["result"]["first_difference"]["path"],
+        "post.100.111"
+    );
+    for run in result.packet()["result"]["runs"]
+        .as_array()
+        .unwrap_or_else(|| panic!("runs"))
+    {
+        assert!(run["observed"].get("post.100.111").is_some());
+        assert!(run["observed"].get("pre.100.111").is_none());
+    }
 }
 #[test]
 fn independent_secret_is_linear_and_deterministic() {

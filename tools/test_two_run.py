@@ -34,6 +34,11 @@ class TwoRunCli(unittest.TestCase):
             self.assertEqual(p.stderr,'')
             packet=json.loads((EVIDENCE/filename).read_text())
             self.assertEqual(packet['authority'],'none')
+            if p.returncode==1:
+                for run in packet['result']['runs']:
+                    self.assertTrue(all(path.startswith('post.') for path in run['observed']))
+                difference=packet['result']['first_difference']
+                if 'path' in difference:self.assertTrue(difference['path'].startswith('post.'))
             self.assertEqual(packet['scope'],'two runs from every admissible state over the declared finite domain; one step per side (noninterference) or two (order independence); longer interleavings are not claimed')
             if p.returncode==1:
                 folder=ROOT/args[0]
@@ -62,7 +67,7 @@ class TwoRunCli(unittest.TestCase):
             left=witness['runs'][0];right=witness['runs'][1]
             obs=args[args.index('--observe')+1].split(',')
             k=int(args[args.index('--within')+1]) if '--within' in args else 0
-            differs=any(left['decisions'][n]['class']!=right['decisions'][1-n]['class'] for n in (0,1)) or any(abs(int(left['observed'][p.replace('post.','pre.')])-int(right['observed'][p.replace('post.','pre.')]))>k for p in obs)
+            differs=any(left['decisions'][n]['class']!=right['decisions'][1-n]['class'] for n in (0,1)) or any(abs(int(left['observed'][p.replace('pre.','post.')])-int(right['observed'][p.replace('pre.','post.')]))>k for p in obs)
             self.assertTrue(differs)
         else:
             b=state(witness['other_state']);self.assertTrue(c.valid(b));self.assertEqual(i,j)
@@ -104,6 +109,21 @@ class TwoRunCli(unittest.TestCase):
         packet=json.loads(p.stdout)
         self.assertEqual(packet['result']['first_difference']['kind'],'decision_class')
         (EVIDENCE/'swap-capacity.json').write_text(p.stdout)
+
+    def test_effective_cap_is_reported(self):
+        args=['examples/two-run/ledger-private','--noninterference','--secret','pre.100.112','--public','post.100.110','--max-tuples','2000000']
+        p=self.run_cli(args);self.assertEqual(p.returncode,0,p.stderr)
+        packet=json.loads(p.stdout);self.assertEqual(packet['max_tuples'],1048576)
+        (EVIDENCE/'effective-cap.json').write_text(p.stdout)
+        with tempfile.TemporaryDirectory(dir=BIN.parents[1]) as tmp:
+            folder=Path(tmp);(folder/'v2').mkdir()
+            original=ROOT/'examples/two-run/ledger-private'
+            (folder/'project.zeno').write_text((original/'project.zeno').read_text().replace('Balance in 0..=2','Balance in 0..=131072'))
+            (folder/'v2/policy.json').write_text((original/'v2/policy.json').read_text())
+            p=self.run_cli([str(folder),*args[1:]]);self.assertEqual(p.returncode,2,p.stderr)
+            packet=json.loads(p.stdout);self.assertEqual(packet['max_tuples'],1048576)
+            self.assertIn('tuple limit',packet['result']['reason']);self.assertIsNone(packet['claim'])
+            (EVIDENCE/'above-hard-cap.json').write_text(p.stdout)
 
     def test_unknown_has_reason_and_no_claim(self):
         args=['examples/two-run/ledger-private','--noninterference','--secret','pre.100.112','--public','post.100.110','--max-tuples','1']

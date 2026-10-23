@@ -252,7 +252,12 @@ fn coordinates(positions: &[Position], values: &[i128]) -> Value {
 fn observed(positions: &[Position], indices: &[usize], state: &[i128]) -> Value {
     indices
         .iter()
-        .map(|i| (positions[*i].name.clone(), json!(state[*i].to_string())))
+        .map(|i| {
+            (
+                positions[*i].name.replacen("pre.", "post.", 1),
+                json!(state[*i].to_string()),
+            )
+        })
         .collect()
 }
 struct Run {
@@ -296,7 +301,7 @@ fn difference(
         let r = right.final_state[*index];
         if l.abs_diff(r) > within {
             return Some(
-                json!({"kind":"observed_field","path":positions[*index].name,"left":l.to_string(),"right":r.to_string(),"distance":l.abs_diff(r).to_string(),"within":within.to_string()}),
+                json!({"kind":"observed_field","path":positions[*index].name.replacen("pre.", "post.", 1),"left":l.to_string(),"right":r.to_string(),"distance":l.abs_diff(r).to_string(),"within":within.to_string()}),
             );
         }
     }
@@ -326,7 +331,9 @@ fn ni_difference(
                 let x = a.post.iter().find(|(f, _)| Some(*f) == id);
                 let y = b.post.iter().find(|(f, _)| Some(*f) == id);
                 if x != y {
-                    return Some(json!({"kind":"public_field","path":positions[*i].name}));
+                    return Some(
+                        json!({"kind":"public_field","path":positions[*i].name.replacen("pre.", "post.", 1)}),
+                    );
                 }
             }
             (a.outbox != b.outbox).then(|| json!({"kind":"outbox"}))

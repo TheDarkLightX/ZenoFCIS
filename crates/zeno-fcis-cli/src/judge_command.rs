@@ -703,7 +703,7 @@ fn judge(
         "sources": sources,
         "status": status,
     });
-    if enumerates {
+    if enumerates && body.get("max_tuples").is_none() {
         packet["max_tuples"] = json!(common.max_tuples);
     }
     if let (Value::Object(packet), Value::Object(body)) = (&mut packet, body) {
