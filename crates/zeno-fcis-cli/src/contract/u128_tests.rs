@@ -590,3 +590,172 @@ fn numeric_count_probe_keeps_undefined_and_refused_separate() {
     assert_eq!(undefined["refused"], 0);
     assert_eq!(undefined["answer"], 0);
 }
+
+#[test]
+fn u128_count_and_scenario_share_native_numeric_binding() {
+    for min in [0, H, u128::MAX - 1] {
+        let p = project(min, min + 1);
+        let r = rules(min);
+        let count = review::probe::probe(
+            &p,
+            &r,
+            &review::probe::Question::Count {
+                condition: format!("post.100.110 == u128({min})"),
+            },
+            8,
+        )
+        .unwrap_or_else(|error| panic!("numeric count: {error}"));
+        let review::probe::Answer::Answered(count) = count else {
+            panic!("count was incomplete")
+        };
+        assert_eq!(count["answer"], 4);
+        assert_eq!(count["fails"], 4);
+        assert_eq!(count["of"], 8);
+        let text = format!(
+            "# scenario numeric_round_trip\n{min} {} 0 | accept - {} | -\n{} {min} 1 | accept - {min} | -\n",
+            min + 1,
+            min + 1,
+            min + 1
+        );
+        let result = review::scenario::replay(&p, &r, &text, "numeric-scenarios");
+        assert!(
+            result.is_ok(),
+            "numeric scenario must bind without narrowing: {result:?}"
+        );
+        let result = result.unwrap_or_else(|error| panic!("asserted bound scenario: {error}"));
+        assert_eq!(result.failed, 0);
+        assert_eq!(result.packet["scenarios"][0]["start"], "genesis");
+        assert_eq!(result.packet["scenarios"][0]["steps"], 2);
+        let repeated = review::scenario::replay(&p, &r, &text, "numeric-scenarios")
+            .unwrap_or_else(|error| panic!("repeat numeric scenario: {error}"));
+        assert_eq!(result.packet, repeated.packet);
+        let limited = review::probe::probe(
+            &p,
+            &r,
+            &review::probe::Question::Count {
+                condition: "true".into(),
+            },
+            7,
+        )
+        .unwrap_or_else(|error| panic!("limited count: {error}"));
+        assert!(matches!(limited, review::probe::Answer::Inconclusive(_)));
+    }
+}
+
+#[test]
+fn u128_scenario_enforces_continuity_and_withholds_failed_credit() {
+    let p = project(H, H + 1);
+    let r = rules(H);
+    let text = format!(
+        "# scenario discontinuous\n{H} {} 0 | accept - {} | -\n{H} {H} 0 | accept - {H} | -\n",
+        H + 1,
+        H + 1
+    );
+    let result = review::scenario::replay(&p, &r, &text, "numeric-scenarios")
+        .unwrap_or_else(|error| panic!("numeric scenario: {error}"));
+    assert_eq!(result.failed, 1);
+    assert_eq!(result.packet["scenarios"][0]["failure"]["step"], 2);
+    assert_eq!(result.packet["mutants"]["status"], "withheld");
+    assert_eq!(result.packet["reject_everything"]["status"], "withheld");
+    let wrong = format!(
+        "# scenario wrong_post\n{H} {} 0 | accept - {H} | -\n",
+        H + 1
+    );
+    let result = review::scenario::replay(&p, &r, &wrong, "numeric-scenarios")
+        .unwrap_or_else(|error| panic!("numeric mismatch: {error}"));
+    assert_eq!(result.failed, 1);
+    assert!(result.packet.to_string().contains(&(H + 1).to_string()));
+    let outcome = &result.packet["scenarios"][0]["failure"]["outcome"];
+    assert_eq!(outcome["class"], "Accept");
+    assert_eq!(outcome["post"], json!([(H + 1).to_string()]));
+    assert_eq!(outcome["deliveries"], 0);
+    let p = p.replace(
+        &format!("post.100.110 >= u128({H})"),
+        &format!("post.100.110 > u128({H})"),
+    );
+    let result = review::scenario::replay(&p, &r, &wrong, "numeric-scenarios")
+        .unwrap_or_else(|error| panic!("numeric genesis: {error}"));
+    assert_eq!(result.failed, 1);
+    assert!(
+        result.packet["scenarios"][0]["failure"]["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("no admissible starting state"))
+    );
+}
+
+#[test]
+fn permission_word_count_and_scenarios_use_the_numeric_authority() {
+    let p = include_str!("../../../../examples/contract-tables/permission-words/project.zeno");
+    let r = include_str!("../../../../examples/contract-tables/permission-words/v2/policy.json");
+    let examples = include_str!(
+        "../../../../examples/contract-tables/permission-words/tests/decision-examples.txt"
+    );
+    let count = review::probe::probe(
+        p,
+        r,
+        &review::probe::Question::Count {
+            condition: "subset(3,u128(4),permissions[1])".into(),
+        },
+        3584,
+    )
+    .unwrap_or_else(|error| panic!("permission count: {error}"));
+    let review::probe::Answer::Answered(count) = count else {
+        panic!("permission count incomplete")
+    };
+    assert_eq!(count["answer"], 2240);
+    assert_eq!(count["of"], 3584);
+    let scenarios = examples
+        .lines()
+        .filter(|line| !line.trim().is_empty() && !line.starts_with('#'))
+        .enumerate()
+        .map(|(index, line)| format!("# scenario permission_word_{index}\n{line}\n"))
+        .collect::<String>();
+    let result = review::scenario::replay(p, r, &scenarios, "permission-scenarios")
+        .unwrap_or_else(|error| panic!("permission scenario: {error}"));
+    assert_eq!(result.failed, 0);
+    assert_eq!(result.packet["count"], 9);
+}
+
+#[test]
+fn u128_scenario_checks_full_width_deliveries_and_committed_failures() {
+    let p = (project(H, H + 1)
+        + " type 103 destination Target; type 104 payload Notice; field 140 104 amount 105; channel 301 notice destination 103 payload 104;")
+        .replace("contexts context.102;", "contexts context.102; outbox outbox.301;");
+    for committed_failure in [false, true] {
+        let p = if committed_failure {
+            format!(
+                "{p} reason 302 Failed precedence 1; law 502 failure_post on failure = post.100.110 == command.101.120;"
+            )
+        } else {
+            p.clone()
+        };
+        let mut r: Value = serde_json::from_str(&rules(H))
+            .unwrap_or_else(|error| panic!("numeric policy: {error}"));
+        r["leaf_bindings"]["103"] = json!(["Text", 1, 16]);
+        r["cases"][1]["outbox"] = json!([{"channel":301,"ordinal":0,"idempotency_ordinal":0,
+            "destination":"target","payload":{"140":"command.101.120"}}]);
+        let decision = if committed_failure {
+            r["cases"][1]["class"] = json!("CommittedFailure");
+            r["cases"][1]["reason"] = json!(302);
+            r["law_kinds"]["502"] = json!("CommittedFailureEffects");
+            "failure 302"
+        } else {
+            "accept -"
+        };
+        let r = r.to_string();
+        let text = format!(
+            "# scenario numeric_delivery\n{H} {} 0 | {decision} {} | 301 {}\n",
+            H + 1,
+            H + 1,
+            H + 1
+        );
+        let result = review::scenario::replay(&p, &r, &text, "numeric-deliveries")
+            .unwrap_or_else(|error| panic!("numeric delivery: {error}"));
+        assert_eq!(result.failed, 0);
+        let wrong = text.replace(&format!("301 {}", H + 1), &format!("301 {H}"));
+        let result = review::scenario::replay(&p, &r, &wrong, "numeric-deliveries")
+            .unwrap_or_else(|error| panic!("numeric delivery mismatch: {error}"));
+        assert_eq!(result.failed, 1);
+        assert_eq!(result.packet["mutants"]["status"], "withheld");
+    }
+}

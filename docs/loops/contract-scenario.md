@@ -3,7 +3,7 @@
   "name": "contract-scenario",
   "title": "Replay an intended run",
   "synopsis": "zeno-fcis contract scenario DIR --file FILE",
-  "engine": "Replay ordered decision-example runs through the Authority; only passing runs receive mutation-kill credit.",
+  "engine": "Replay ordered decision-example runs through the scalar or full-width numeric Authority; only passing runs receive mutation-kill credit.",
   "use_when": [
     "replay intended steps",
     "check a user journey",
@@ -93,7 +93,7 @@ proof on untested histories; mutant equivalence.
 
 Contract DIR; FILE: decision-example lines under # scenario NAME headers; default tests/decision-scenarios.txt. File cap: unknown.
 
-Engine: Replay ordered decision-example runs through the Authority; only passing runs receive mutation-kill credit.
+Engine: Replay ordered decision-example runs through the scalar or full-width numeric Authority; only passing runs receive mutation-kill credit.
 
 Synopsis: "zeno-fcis contract scenario DIR --file FILE"
 
@@ -148,3 +148,5 @@ Expected: exit 0; {"status": "passed"}.
 Sources: {"engine": "docs/CONTRACT_JUDGES.md:145-168; zeno-fcis contract scenario --help", "exit_codes": "docs/CONTRACT_JUDGES.md:145-168; zeno-fcis contract scenario --help", "inputs": "docs/CONTRACT_JUDGES.md:145-168; zeno-fcis contract scenario --help", "limits": "docs/CONTRACT_JUDGES.md:145-168; zeno-fcis contract scenario --help", "outputs": "docs/CONTRACT_JUDGES.md:145-168; zeno-fcis contract scenario --help", "refusals": "docs/CONTRACT_JUDGES.md:145-168; zeno-fcis contract scenario --help", "synopsis": "docs/CONTRACT_JUDGES.md:145-168; zeno-fcis contract scenario --help", "verdicts": "docs/CONTRACT_JUDGES.md:145-168; zeno-fcis contract scenario --help"}
 
 Run `zeno-fcis guide find "replay intended steps"` for related cards.
+
+Background: Glenford J. Myers, *The Art of Software Testing*, Wiley, 1979, describes comparing observed and expected results. This adapter reuses the existing numeric example grammar and Authority binding; no new testing method is claimed. Scope: decimal u128 values retain all 128 bits. Only the listed runs are checked; numeric steps use accept, reject or failure and channel/payload delivery expectations.

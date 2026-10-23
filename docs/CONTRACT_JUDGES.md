@@ -257,6 +257,20 @@ core: one concrete run rules out the core the declared laws allowed. When a run
 fails on the contract, no kill is credited, since a mutant could fail it for
 the same reason.
 
+Unsigned `u128` subjects use the same full-width numeric Authority and
+numeric decision-example grammar as contract review. Write unsigned values as
+canonical decimal text, including values above the signed range. Numeric
+scenarios check accept, reject and committed-failure decisions, channel/payload
+deliveries, step continuity and genesis admission. The signed grammar also
+supports the identity suffixes and technical-refusal observations described
+below; those extensions are not part of the numeric example grammar.
+
+`contract probe count` uses the existing numeric space on unsigned subjects.
+It counts the original Authority decisions, with separate false, undefined and
+refused totals; the condition is an observation and never an admission law.
+A domain above `--max-tuples` remains inconclusive. Neither command narrows an
+unsigned value through a signed integer.
+
 ## Can the seller be paid twice?
 
 A seller wants to know that a repeated release cannot pay them again, and that

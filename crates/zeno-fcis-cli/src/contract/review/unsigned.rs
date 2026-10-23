@@ -22,6 +22,9 @@ use zeno_fcis_synthesis::finite::{
 pub(super) mod examples;
 #[path = "unsigned_probe.rs"]
 mod numeric_probe;
+#[path = "unsigned_scenario.rs"]
+mod numeric_scenario;
+pub(super) use numeric_scenario::replay as scenario;
 pub(super) fn count_probe(
     project: &str,
     rules: &str,
@@ -335,6 +338,43 @@ fn evaluate(
         context: &f[2],
     })))
 }
+
+fn example_agrees(example: &examples::Line, result: &Outcome, width: usize) -> bool {
+    match result {
+        Outcome::Decision(d) => {
+            d.class
+                == match example.class {
+                    examples::Class::Accept => Class::Accept,
+                    examples::Class::Reject => Class::Reject,
+                    examples::Class::Failure => Class::CommittedFailure,
+                }
+                && d.reason == example.reason
+                && if d.class == Class::Reject {
+                    d.post.is_empty() && example.post == example.inputs[..width]
+                } else {
+                    d.post.len() == example.post.len()
+                        && d.post
+                            .iter()
+                            .zip(&example.post)
+                            .all(|((_, a), b)| same_value(a, *b))
+                }
+                && d.outbox.len() == example.outbox.len()
+                && d.outbox
+                    .iter()
+                    .zip(&example.outbox)
+                    .all(|(a, (channel, values))| {
+                        a.channel == *channel
+                            && a.payload.len() == values.len()
+                            && a.payload
+                                .iter()
+                                .zip(values)
+                                .all(|((_, a), b)| same_value(a, *b))
+                    })
+        }
+        _ => false,
+    }
+}
+
 pub(super) fn review(
     sources: ReviewSources<'_>,
     max: u64,
@@ -363,39 +403,7 @@ pub(super) fn review(
         let mut disagreements = Vec::new();
         for example in &examples {
             let result = evaluate(&contract, authority, &example.inputs)?;
-            let agrees = match &result {
-                Outcome::Decision(d) => {
-                    d.class
-                        == match example.class {
-                            examples::Class::Accept => Class::Accept,
-                            examples::Class::Reject => Class::Reject,
-                            examples::Class::Failure => Class::CommittedFailure,
-                        }
-                        && d.reason == example.reason
-                        && if d.class == Class::Reject {
-                            d.post.is_empty() && example.post == example.inputs[..space.state_width]
-                        } else {
-                            d.post.len() == example.post.len()
-                                && d.post
-                                    .iter()
-                                    .zip(&example.post)
-                                    .all(|((_, a), b)| same_value(a, *b))
-                        }
-                        && d.outbox.len() == example.outbox.len()
-                        && d.outbox
-                            .iter()
-                            .zip(&example.outbox)
-                            .all(|(a, (channel, values))| {
-                                a.channel == *channel
-                                    && a.payload.len() == values.len()
-                                    && a.payload
-                                        .iter()
-                                        .zip(values)
-                                        .all(|((_, a), b)| same_value(a, *b))
-                            })
-                }
-                _ => false,
-            };
+            let agrees = example_agrees(example, &result, space.state_width);
             if !agrees {
                 disagreements.push(json!({"line":example.number,"inputs":example.inputs.iter().copied().map(atom_json).collect::<Vec<_>>(),"expected_post":example.post.iter().copied().map(atom_json).collect::<Vec<_>>(),"actual":normalized(&result)}));
             }
