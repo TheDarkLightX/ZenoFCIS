@@ -6,6 +6,10 @@ that promise to the application's generated contract and checks each at its
 own evidence level. Like every ladder, it has authority none: it grants no
 admission, release, publication or deployment permission.
 
+This controller pilot uses deposits, requests and ticks with `now = 0`.
+It excludes the template's `TimeoutWithdrawal` action. Its results therefore
+cover that explicit projection, rather than every action of the current template.
+
 ## The journey
 
 An owner asks to withdraw 2 units on lane A, and the other owner asks on lane
@@ -50,8 +54,10 @@ cycles of four ticks: three paused ticks, then one must-serve tick.
 `integrations/zal/withdrawal_pilot.py` reads the contract's decision graph. The
 `withdrawal_queue_decisions` example of `zeno-fcis-synthesis` builds that graph
 through the generated contract's checked Authority. It covers every vault
-reachable from the genesis under the complete declared command and context
-domain: 420 vaults and 40,320 decisions. Over every decision, the adapter checks:
+reachable from the genesis within the pilot domain: actions 160, 161 and 162,
+lanes 170 and 171, amounts 1 and 2, callers 190 through 193, either alarm value,
+and `now = 0`. This is 420 vaults and 40,320 decisions. Over every decision,
+the adapter checks:
 
 - initialization: the genesis commits, a changed genesis is refused and
   nothing is pending at genesis;
@@ -106,6 +112,11 @@ python3 -m unittest discover -s integrations/zal -p 'test_withdrawal_pilot.py'
 python3 integrations/zal/check_withdrawal_pilot.py run --lean ROOT/bin/lean --lean-root ROOT
 python3 integrations/zal/check_withdrawal_pilot.py planted --lean ROOT/bin/lean --lean-root ROOT
 ```
+
+After an intentional contract-source change, refresh the two statements'
+derived source revision with
+`python3 integrations/zal/check_withdrawal_pilot.py bind-source`, review the
+statement's scope, then rerun its checks. A refreshed binding is not proof.
 
 The unit tests replay every word through length 8. `run` replays through
 length 12 and prints a receipt binding the contract sources, the graph, both
