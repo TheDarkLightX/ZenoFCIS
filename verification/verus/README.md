@@ -24,6 +24,7 @@ checks the authority and synthesis crates without default features.
 | `lemma-kernel` | `check_lemma_kernel.py` | [State lemma decision core](#state-lemma-decision-core) over validated finite tables |
 | `reachable-probe` | `check_reachable_probe.py` | [Reachable probe](#reachable-probe-and-shared-fixed-points), effective traces and fixed-point verdict forms |
 | `canonical-bytes` | `check_canonical_bytes.py` | [Production V2 integer byte readers](#v2-integer-byte-interpretation); not schema admission |
+| `value-decoder` | `check_value_decoder.py` | Production `decode_value`, abstract ZCVE model, resource invariants and refinement; qualification status is pinned in `value-decoder.json` |
 | `protected-input` | `check_protected_input.py` | [Owned V2 protected record projection](#v2-protected-flat-record-projection) |
 | `envelope-frame` | `check_envelope_frame_v2.py` | Original-envelope framing and exact payload custody |
 | `schema-binding` | `check_schema_binding_v2.py` | Complete original schema bytes, closed metadata and private custody |
@@ -632,3 +633,74 @@ compilation and erasure, standard-library contracts, the allocator and host
 remain trusted. Shortest-trace minimality, physical cost/OOM, unsigned/symbolic
 reachability and whole-CLI correctness remain outside this proof. The probe
 remains advisory and grants no application authority.
+
+## Value decoder refinement
+
+`value_decoder.rs` includes the actual value and codec libraries with `#[path]`.
+The qualification profile is [value-decoder.json](value-decoder.json). The gate
+uses the tool files pinned in [toolchain.json](toolchain.json), verifies the
+whole crate, requires the exact obligation count and function inventory, and
+refuses verifier errors, incomplete coverage, timeouts and nonsemantic control
+failures. The CI matrix runs the same gate.
+
+The proof layers are:
+
+1. `zeno-fcis-value/src/decoder_model.rs`: canonical values, `wf`, `spec_encode`,
+   resource accounting and wire order.
+2. `zeno-fcis-codec/src/decoder_spec.rs` and `decoder_induction.rs`: a total
+   decoder and depth/count induction for consumption and resource bounds.
+3. Named `Cursor::invariant` and `DecodeState::invariant` predicates, preserved
+   by every reader and state method.
+4. Contracts on the production constructors, validators, encoding functions,
+   collection loops, `decode_value_inner`, `decode_complete_value`,
+   `decode_value_with_metrics` and `decode_value`.
+
+The top contract is
+`decoded_result(&result, bytes@.len()) == spec_decode(bytes@, limits.model())`.
+An accepted result additionally ensures `wf(value.model(), limits.model())`,
+`bytes@ == spec_encode(value.model())` and
+`bytes.len() <= limits.max_input_bytes`. The entry point has no precondition.
+All executable recursion has decreasing measures, and every loop has a
+termination argument. No application body or termination check is exempted.
+This completes Tier 1 (T1 safety/termination, T2 canonical acceptance, T3 input
+limit). Tier 2 encoder agreement and Tier 3 completeness are not claimed.
+The encoder contracts used in refinement include a representable output-length
+condition; they must not be reported as unrestricted encoder agreement.
+
+`value_decoder_vectors.rs` checks literal encodings, admission rules and
+resource totals from the existing codec corpus and the public canonical-byte
+examples. Map charges include both encoded frames and recursive payloads.
+`value_decoder_differential.rs` emits seeded byte inputs, explicit limits and
+canonical output or exact error `Debug` text for behavior comparison.
+
+The trusted base is Verus (including translation, ghost erasure and bundled
+`vstd`), Z3, rustc and the execution platform. Five additional `std`/`alloc`
+contracts are isolated in `value_decoder_std.rs`: `Vec::into_boxed_slice`,
+`String::into_boxed_str`, slice `to_vec`, byte-slice `is_ascii`, and
+`str::from_utf8`; the UTF-8 error type is opaque. Their native sample tests are
+in `value_decoder_std_tests.rs`. Slice cloning specifies the `Clone` relation,
+not equality for arbitrary element types. The source audit admits only the
+exact reviewed standard-contract file and rejects application trust escapes.
+`--no-cheating` is incompatible with these explicitly admitted standard
+contracts, so the gate uses this audit and `--no-external-by-default` while
+retaining lifetime, erasure, overflow, bounds and termination checking.
+
+The four defects are checked in separate copies: acceptance of trailing input,
+removal of map-key order checking, removal of the depth check, and a
+little-endian blob length. Each must produce a semantic proof failure in its
+named production function. Normal and restored runs must both pass, and the
+original source hashes must remain unchanged. A compiler error, solver resource
+limit or timeout never counts as a successful control.
+
+```sh
+python3 tools/test_check_value_decoder.py
+python3 tools/check_value_decoder.py --install --out evidence/value-decoder/receipt.json
+```
+
+The profile qualifies Linux x86-64. Stack bytes and allocation availability are
+outside the formal result; stack limits are exercised natively. Envelope and
+commit-bundle decoders, machine-code correspondence and the native behavior of
+unverified configurations are outside this proof. The contract review/lemma/
+probe loops used for project contracts do not apply to this Rust decoder proof.
+See [canonical bytes](../../docs/CANONICAL_BYTES.md#verified-value-decoder) for
+the user-facing guarantee and the seL4 and Verus references.

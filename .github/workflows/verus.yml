@@ -61,6 +61,7 @@ jobs:
           - {gate: lemma-kernel, script: check_lemma_kernel.py, output: receipt.json}
           - {gate: reachable-probe, script: check_reachable_probe.py, output: receipt.json}
           - {gate: canonical-bytes, script: check_canonical_bytes.py, output: receipt.json}
+          - {gate: value-decoder, script: check_value_decoder.py, output: receipt.json}
           - {gate: protected-input, script: check_protected_input.py, output: receipt.json}
           - {gate: envelope-frame, script: check_envelope_frame_v2.py, output: receipt.json}
           - {gate: schema-binding, script: check_schema_binding_v2.py, output: receipt.json}

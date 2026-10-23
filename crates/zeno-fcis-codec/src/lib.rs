@@ -10,18 +10,45 @@
 
 extern crate alloc;
 
+#[cfg(verus_keep_ghost)]
+use decoder_spec::{read_blob, tail};
+#[cfg(verus_keep_ghost)]
+use vstd::prelude::*;
+#[cfg(verus_keep_ghost)]
+use zeno_fcis_value::decoder_model::*;
+#[cfg(verus_keep_ghost)]
+use zeno_fcis_value::{
+    entries_model, entries_model_properties, entries_model_push, entries_valid, entry_values_fit,
+    fields_model, fields_model_properties, fields_model_push, fields_valid, values_model,
+    values_model_properties, values_model_push, values_valid,
+};
+#[cfg(verus_keep_ghost)]
+include!("decoder_refinement.rs");
+#[cfg(verus_keep_ghost)]
+pub mod decoder_induction;
+#[cfg(verus_keep_ghost)]
+pub mod decoder_spec;
+
+#[cfg(not(verus_keep_ghost))]
 mod artifact;
+#[cfg(not(verus_keep_ghost))]
 mod providers;
 #[cfg(feature = "libcrux")]
 pub use providers::LibcruxSha256;
+#[cfg(not(verus_keep_ghost))]
 pub use providers::RustCryptoSha256;
+#[cfg(not(verus_keep_ghost))]
 pub mod domains;
+#[cfg(not(verus_keep_ghost))]
 pub use artifact::EvidenceArtifact;
 
-use alloc::string::String;
+use alloc::borrow::ToOwned;
+
 use alloc::vec::Vec;
 use core::fmt;
 
+mod decoder_bytes;
+use decoder_bytes::{bits_to_signed, bytes_before, read_word};
 use zeno_fcis_value::zcve::{
     TAG_BOOL_FALSE, TAG_BOOL_TRUE, TAG_BYTES, TAG_ENUM, TAG_I128, TAG_MAP, TAG_RECORD, TAG_SUM,
     TAG_TEXT, TAG_TUPLE, TAG_U128, TAG_UNIT, TAG_VECTOR,
@@ -29,16 +56,24 @@ use zeno_fcis_value::zcve::{
 use zeno_fcis_value::{
     AdmittedValue, Field, MapEntry, Value, ValueError, ValueLimits, ValueMetrics,
 };
+#[cfg(not(verus_keep_ghost))]
 const ENVELOPE_MAGIC: &[u8; 8] = b"ZFCISV1\0";
+#[cfg(not(verus_keep_ghost))]
 const ENVELOPE_OVERHEAD_BYTES: u64 = 8 + 4 + 32 + 4;
+#[cfg(not(verus_keep_ghost))]
 const HASH_MAGIC: &[u8; 14] = b"ZENOFCIS-HASH\0";
 
 /// A 256-bit commitment value.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(
+    not(verus_keep_ghost),
+    derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)
+)]
 pub struct Hash32([u8; 32]);
 
+#[cfg(not(verus_keep_ghost))]
 impl Hash32 {
     /// The all-zero hash, useful only for explicit sentinel schemas.
+    #[cfg_attr(verus_keep_ghost, verus_verify)]
     pub const ZERO: Self = Self([0; 32]);
 
     /// Creates a hash from exact bytes.
@@ -60,6 +95,7 @@ impl Hash32 {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl fmt::Display for Hash32 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         for byte in self.0 {
@@ -69,6 +105,7 @@ impl fmt::Display for Hash32 {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 mod hasher_seal {
     pub trait Sealed {}
 }
@@ -91,8 +128,10 @@ mod hasher_seal {
 /// struct Impostor;
 /// impl zeno_fcis_codec::hasher_seal::Sealed for Impostor {}
 /// ```
+#[cfg(not(verus_keep_ghost))]
 pub trait CommitmentHasher: hasher_seal::Sealed {
     /// Stable algorithm identifier, such as `sha2-256/rustcrypto-0.11`.
+    #[cfg_attr(verus_keep_ghost, verus_verify)]
     const ALGORITHM_ID: &'static str;
 
     /// Hashes exact bytes to 32 bytes.
@@ -110,12 +149,13 @@ pub trait CommitmentHasher: hasher_seal::Sealed {
 }
 
 /// A versioned domain-separation tag.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(not(verus_keep_ghost), derive(Clone, Copy, Debug, Eq, PartialEq))]
 pub struct Domain<'a> {
     name: &'a str,
     version: u16,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl<'a> Domain<'a> {
     /// Validates a project domain outside the reserved library namespace.
     ///
@@ -146,15 +186,18 @@ impl<'a> Domain<'a> {
 }
 
 /// Namespace reserved for fixed library commitment identities.
+#[cfg(not(verus_keep_ghost))]
 pub const RESERVED_DOMAIN_NAMESPACE: &str = "zeno-fcis";
 
 /// Tests the exact reserved namespace boundary without normalization.
 #[must_use]
+#[cfg(not(verus_keep_ghost))]
 pub fn is_reserved_domain_name(name: &str) -> bool {
     name == RESERVED_DOMAIN_NAMESPACE || name.starts_with("zeno-fcis/")
 }
 
 /// Builds the exact domain-separated hash preimage.
+#[cfg(not(verus_keep_ghost))]
 pub fn domain_preimage(domain: Domain<'_>, payload: &[u8]) -> Result<Vec<u8>, EncodeError> {
     let domain_length =
         u16::try_from(domain.name.len()).map_err(|_| EncodeError::LengthOverflow)?;
@@ -171,6 +214,7 @@ pub fn domain_preimage(domain: Domain<'_>, payload: &[u8]) -> Result<Vec<u8>, En
 }
 
 /// Computes a domain-separated commitment with a selected provider.
+#[cfg(not(verus_keep_ghost))]
 pub fn commitment<H: CommitmentHasher>(
     domain: Domain<'_>,
     payload: &[u8],
@@ -188,6 +232,7 @@ pub fn commitment<H: CommitmentHasher>(
     ];
     // Small commitments need only one primitive call. The bounded local
     // buffer avoids both a heap allocation and multiple incremental updates.
+    #[cfg_attr(verus_keep_ghost, verus_verify)]
     const SMALL_PREIMAGE_BYTES: usize = 128;
     let header_length = HASH_MAGIC.len() + 2 + 2 + domain.name.len() + 8;
     if let Some(length) = header_length
@@ -206,6 +251,7 @@ pub fn commitment<H: CommitmentHasher>(
     Ok(H::hash_parts(&parts))
 }
 
+#[cfg(not(verus_keep_ghost))]
 mod canonical_seal {
     pub trait Sealed {}
     impl Sealed for zeno_fcis_value::Value {}
@@ -228,6 +274,7 @@ mod canonical_seal {
 /// impl zeno_fcis_codec::canonical_seal::Sealed for Forged {}
 /// struct Forged;
 /// ```
+#[cfg(not(verus_keep_ghost))]
 pub trait CanonicalEncode: canonical_seal::Sealed {
     /// Appends one canonical encoding.
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError>;
@@ -240,12 +287,14 @@ pub trait CanonicalEncode: canonical_seal::Sealed {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl CanonicalEncode for Value {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.encode_zcve_to(output).map_err(map_value_encode_error)
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl CanonicalEncode for AdmittedValue {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.encode_zcve_to(output).map_err(map_value_encode_error)
@@ -254,6 +303,13 @@ impl CanonicalEncode for AdmittedValue {
 
 /// Appends a canonical value using exactly the supplied structural limits.
 /// Every refusal preserves the existing output prefix.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures value.representation_valid() ==> result.is_ok() == (wf(value.model(), limits.model(0))
+        && old(output)@.len() + spec_encode(value.model()).len() <= usize::MAX),
+        value.representation_valid() && result.is_ok() ==>
+            final(output)@ == old(output)@ + spec_encode(value.model()),
+        result.is_err() ==> final(output)@ == old(output)@,
+))]
 pub fn encode_value_with_limits(
     value: &Value,
     output: &mut Vec<u8>,
@@ -265,6 +321,11 @@ pub fn encode_value_with_limits(
 }
 
 /// Returns canonical value bytes using exactly the supplied structural limits.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures value.representation_valid() ==> result.is_ok() == (wf(value.model(), limits.model(0))
+        && spec_encode(value.model()).len() <= usize::MAX),
+        value.representation_valid() && result.is_ok() ==> result->Ok_0@ == spec_encode(value.model()),
+))]
 pub fn canonical_value_bytes_with_limits(
     value: &Value,
     limits: ValueLimits,
@@ -284,13 +345,14 @@ fn map_value_encode_error(error: ValueError) -> EncodeError {
 }
 
 /// A canonical typed value envelope.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(not(verus_keep_ghost), derive(Clone, Debug, Eq, PartialEq))]
 pub struct Envelope {
     type_id: u32,
     schema_hash: Hash32,
     value: Value,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Envelope {
     /// Creates an envelope.
     #[must_use]
@@ -374,7 +436,7 @@ impl Envelope {
 /// };
 /// # Ok::<(), zeno_fcis_value::ValueError>(())
 /// ```
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(not(verus_keep_ghost), derive(Clone, Debug, Eq, PartialEq))]
 pub struct AdmittedEnvelope {
     type_id: u32,
     schema_hash: Hash32,
@@ -383,6 +445,7 @@ pub struct AdmittedEnvelope {
     max_input_bytes: u64,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl AdmittedEnvelope {
     /// Creates an envelope whose complete canonical bytes fit the default
     /// decoder input limit.
@@ -522,6 +585,7 @@ impl AdmittedEnvelope {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn append_envelope(
     output: &mut Vec<u8>,
     type_id: u32,
@@ -553,6 +617,7 @@ fn append_envelope(
     Ok(())
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl CanonicalEncode for Envelope {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.encode_to_with_limits(
@@ -565,6 +630,7 @@ impl CanonicalEncode for Envelope {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl CanonicalEncode for AdmittedEnvelope {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         let payload = self.value.canonical_bytes()?;
@@ -579,7 +645,8 @@ impl CanonicalEncode for AdmittedEnvelope {
 }
 
 /// Canonical decoder with explicit structural limits.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(not(verus_keep_ghost), derive(Clone, Copy, Debug, Eq, PartialEq))]
+#[cfg_attr(verus_keep_ghost, derive(Clone, Copy))]
 pub struct DecodeLimits {
     /// Maximum input bytes.
     pub max_input_bytes: u64,
@@ -587,6 +654,7 @@ pub struct DecodeLimits {
     pub value: ValueLimits,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Default for DecodeLimits {
     fn default() -> Self {
         Self {
@@ -596,17 +664,43 @@ impl Default for DecodeLimits {
     }
 }
 
+#[cfg(verus_keep_ghost)]
+verus! {
+impl DecodeLimits {
+    pub open spec fn model(self) -> ModelLimits { self.value.model(self.max_input_bytes) }
+}
+}
+
 impl DecodeLimits {
     /// Reviewed default maximum for complete input bytes.
+    #[cfg_attr(verus_keep_ghost, verus_verify)]
     pub const DEFAULT_MAX_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 }
 
 /// Decodes one value and rejects trailing bytes and noncanonical aliases.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures decoded_result(&result, bytes@.len()) == decoder_spec::spec_decode(bytes@, limits.model()),
+        result matches Ok(value) ==> value.representation_valid()
+            && wf(value.model(), limits.model()) && bytes@ == spec_encode(value.model())
+            && bytes.len() <= limits.max_input_bytes,
+))]
 pub fn decode_value(bytes: &[u8], limits: DecodeLimits) -> Result<Value, DecodeError> {
-    decode_value_with_metrics(bytes, limits).map(|(value, _)| value)
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        decoder_spec::spec_t2_canonical(bytes@, limits.model());
+        decoder_spec::spec_t3_input_limit(bytes@, limits.model());
+    }
+    match decode_value_with_metrics(bytes, limits) {
+        Ok((value, _)) => Ok(value),
+        Err(error) => Err(error),
+    }
 }
 
 /// Decodes a value and returns the exact counters observed by the actual decoder.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures decoded_metrics_result(&result, bytes@.len()) == decoder_spec::spec_decode(bytes@, limits.model()),
+        result matches Ok((value, _)) ==> value.representation_valid(),
+))]
 pub fn decode_value_with_metrics(
     bytes: &[u8],
     limits: DecodeLimits,
@@ -634,6 +728,7 @@ pub fn decode_value_with_metrics(
 /// rejected before the payload was decoded. Re-encoding the assembled envelope
 /// and comparing it with the input can therefore only ever succeed, so this
 /// function does not repeat that work.
+#[cfg(not(verus_keep_ghost))]
 pub fn decode_envelope(bytes: &[u8], limits: DecodeLimits) -> Result<Envelope, DecodeError> {
     enforce_input_limit(bytes, limits)?;
     let mut cursor = Cursor::new(bytes);
@@ -663,6 +758,17 @@ pub fn decode_envelope(bytes: &[u8], limits: DecodeLimits) -> Result<Envelope, D
 /// parent's state and enters at `depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?`, so nesting inside a blob is
 /// charged against the same depth, node, and payload budgets as nesting on the
 /// wire. Reported trailing-byte offsets are relative to `bytes`.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    requires old(state).invariant(),
+    ensures final(state).invariant(), final(state).limits == old(state).limits,
+        result matches Ok(value) ==> value.representation_valid(),
+        result matches Ok(value) ==> wf(value.model(), old(state).limits.model(0))
+            && bytes@ == spec_encode(value.model()),
+        parsed_result(&result, bytes@.len(), final(state).nodes as nat, final(state).payload_bytes as nat)
+            == decoder_spec::parse_complete(bytes@, old(state).limits.model(0), depth as nat,
+                old(state).nodes as nat, old(state).payload_bytes as nat),
+    decreases if depth <= 1024 { 1025 - depth as int } else { 0 }, 1nat,
+))]
 fn decode_complete_value(
     bytes: &[u8],
     state: &mut DecodeState,
@@ -675,14 +781,21 @@ fn decode_complete_value(
             offset: cursor.offset,
         });
     }
-    if canonical_value_bytes_with_limits(&value, state.limits).map_err(DecodeError::Encode)?
-        != bytes
-    {
+    #[cfg(verus_keep_ghost)]
+    proof! { assert(cursor.offset == bytes.len()); }
+    let canonical =
+        canonical_value_bytes_with_limits(&value, state.limits).map_err(map_decode_encode_error)?;
+    if canonical.as_slice() != bytes {
         return Err(DecodeError::NonCanonical);
     }
+    #[cfg(verus_keep_ghost)]
+    proof! { assert(canonical@ == bytes@); }
     Ok(value)
 }
 
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result.is_ok() == (bytes.len() <= limits.max_input_bytes),
+))]
 fn enforce_input_limit(bytes: &[u8], limits: DecodeLimits) -> Result<(), DecodeError> {
     let actual = u64::try_from(bytes.len()).map_err(|_| DecodeError::LengthOverflow)?;
     if actual > limits.max_input_bytes {
@@ -694,6 +807,20 @@ fn enforce_input_limit(bytes: &[u8], limits: DecodeLimits) -> Result<(), DecodeE
     Ok(())
 }
 
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result == DecodeError::InvalidValue(error),
+))]
+fn map_value_decode_error(error: ValueError) -> DecodeError {
+    DecodeError::InvalidValue(error)
+}
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result == DecodeError::Encode(error),
+))]
+fn map_decode_encode_error(error: EncodeError) -> DecodeError {
+    DecodeError::Encode(error)
+}
+
 struct DecodeState {
     limits: ValueLimits,
     nodes: u64,
@@ -701,8 +828,25 @@ struct DecodeState {
     depth: u32,
 }
 
+#[cfg(verus_keep_ghost)]
+verus! {
 impl DecodeState {
-    const fn new(limits: ValueLimits) -> Self {
+    pub closed spec fn invariant(&self) -> bool {
+        self.nodes <= self.limits.max_nodes
+        && self.payload_bytes <= self.limits.max_payload_bytes
+        && self.depth <= zeno_fcis_value::decoder_model::depth_limit(self.limits.model(u64::MAX))
+    }
+}
+}
+
+impl DecodeState {
+    fn new(limits: ValueLimits) -> Self {
+        #[cfg(verus_keep_ghost)]
+        verus_proof_expr!(ensures(|result: Self| result.invariant()
+            && result.limits == limits
+            && result.nodes == 0
+            && result.payload_bytes == 0
+            && result.depth == 0));
         Self {
             limits,
             nodes: 0,
@@ -711,6 +855,16 @@ impl DecodeState {
         }
     }
 
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        requires old(self).invariant(),
+        ensures final(self).invariant(), final(self).limits == old(self).limits,
+            final(self).payload_bytes == old(self).payload_bytes,
+            result.is_ok() == (depth <= zeno_fcis_value::decoder_model::depth_limit(old(self).limits.model(u64::MAX))
+                && old(self).nodes < old(self).limits.max_nodes),
+            result.is_ok() ==> final(self).nodes == old(self).nodes + 1,
+            result.is_ok() ==> final(self).depth == if old(self).depth > depth { old(self).depth } else { depth },
+            result.is_err() ==> *final(self) == *old(self),
+    ))]
     fn enter(&mut self, depth: u32) -> Result<(), DecodeError> {
         if depth > self.limits.effective_max_depth() {
             return Err(DecodeError::DepthLimit {
@@ -718,52 +872,74 @@ impl DecodeState {
                 attempted: depth,
             });
         }
-        self.depth = self.depth.max(depth);
-        self.nodes = self
+        let nodes = self
             .nodes
             .checked_add(1)
             .ok_or(DecodeError::LengthOverflow)?;
-        if self.nodes > self.limits.max_nodes {
+        if nodes > self.limits.max_nodes {
             return Err(DecodeError::NodeLimit {
                 limit: self.limits.max_nodes,
-                attempted: self.nodes,
+                attempted: nodes,
             });
         }
+        self.depth = self.depth.max(depth);
+        self.nodes = nodes;
         Ok(())
     }
 
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        requires old(self).invariant(),
+        ensures final(self).invariant(), final(self).limits == old(self).limits,
+            final(self).nodes == old(self).nodes, final(self).depth == old(self).depth,
+            result.is_ok() == (old(self).payload_bytes + length <= old(self).limits.max_payload_bytes),
+            result.is_ok() ==> final(self).payload_bytes == old(self).payload_bytes + length,
+            result.is_err() ==> *final(self) == *old(self),
+    ))]
     fn payload(&mut self, length: usize) -> Result<(), DecodeError> {
         let length = u64::try_from(length).map_err(|_| DecodeError::LengthOverflow)?;
-        self.payload_bytes = self
+        let payload_bytes = self
             .payload_bytes
             .checked_add(length)
             .ok_or(DecodeError::LengthOverflow)?;
-        if self.payload_bytes > self.limits.max_payload_bytes {
+        if payload_bytes > self.limits.max_payload_bytes {
             return Err(DecodeError::PayloadLimit {
                 limit: self.limits.max_payload_bytes,
-                attempted: self.payload_bytes,
+                attempted: payload_bytes,
             });
         }
+        self.payload_bytes = payload_bytes;
         Ok(())
     }
 
     /// Children to reserve for a collection that declares `count`: no more
     /// than the remaining wire bytes can encode, and no more than the node
     /// limit still admits, since every child takes at least one node.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        requires self.invariant(),
+        ensures result matches Ok(capacity) ==> capacity <= count
+            && capacity <= self.limits.max_nodes - self.nodes,
+            minimum_wire_bytes_per_item > 0 ==> result.is_ok(),
+    ))]
     fn reservation(
         &self,
         count: u32,
         remaining_wire_bytes: usize,
         minimum_wire_bytes_per_item: usize,
     ) -> Result<usize, DecodeError> {
-        let nodes =
-            usize::try_from(self.limits.max_nodes.saturating_sub(self.nodes)).unwrap_or(usize::MAX);
+        let nodes = match usize::try_from(self.limits.max_nodes.saturating_sub(self.nodes)) {
+            Ok(nodes) => nodes,
+            Err(_) => usize::MAX,
+        };
         Ok(
             initial_collection_capacity(count, remaining_wire_bytes, minimum_wire_bytes_per_item)?
                 .min(nodes),
         )
     }
 
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        requires self.invariant(),
+        ensures result.is_ok() == (length <= self.limits.max_collection_len),
+    ))]
     fn collection(&self, length: u32) -> Result<(), DecodeError> {
         if length > self.limits.max_collection_len {
             return Err(DecodeError::CollectionLimit {
@@ -775,6 +951,19 @@ impl DecodeState {
     }
 }
 
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    requires old(cursor).invariant(), old(state).invariant(),
+    ensures final(cursor).invariant(), final(state).invariant(),
+        final(cursor).bytes == old(cursor).bytes, final(state).limits == old(state).limits,
+        final(cursor).offset >= old(cursor).offset,
+        final(cursor).unread() == tail(old(cursor).unread(), (final(cursor).offset - old(cursor).offset) as nat),
+        result matches Ok(value) ==> value.representation_valid(),
+        parsed_result(&result, (final(cursor).offset - old(cursor).offset) as nat,
+            final(state).nodes as nat, final(state).payload_bytes as nat)
+            == decoder_spec::parse_inner(old(cursor).unread(), old(state).limits.model(0), depth as nat,
+                old(state).nodes as nat, old(state).payload_bytes as nat),
+    decreases if depth <= 1024 { 1025 - depth as int } else { 0 }, 0nat,
+))]
 fn decode_value_inner(
     cursor: &mut Cursor<'_>,
     state: &mut DecodeState,
@@ -782,6 +971,11 @@ fn decode_value_inner(
 ) -> Result<Value, DecodeError> {
     state.enter(depth)?;
     let tag = cursor.take_u8()?;
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        reveal_with_fuel(decoder_spec::parse_inner, 2);
+        assert(cursor.unread() == tail(old(cursor).unread(), 1));
+    }
     match tag {
         TAG_UNIT => Ok(Value::unit()),
         TAG_BOOL_FALSE => Ok(Value::boolean(false)),
@@ -789,18 +983,27 @@ fn decode_value_inner(
         TAG_U128 => {
             let mut bytes = [0_u8; 16];
             bytes.copy_from_slice(cursor.take(16)?);
-            Ok(Value::unsigned(u128::from_be_bytes(bytes)))
+            #[cfg(verus_keep_ghost)]
+            proof! { assert(bytes@ == old(cursor).unread().subrange(1, 17)); }
+            Ok(Value::unsigned(read_word(&bytes)))
         }
         TAG_I128 => {
             let mut bytes = [0_u8; 16];
             bytes.copy_from_slice(cursor.take(16)?);
-            Ok(Value::signed(i128::from_be_bytes(bytes)))
+            #[cfg(verus_keep_ghost)]
+            proof! { assert(bytes@ == old(cursor).unread().subrange(1, 17)); }
+            Ok(Value::signed(bits_to_signed(read_word(&bytes))))
         }
         TAG_BYTES => {
             let bytes = cursor.take_blob(state.limits.max_payload_bytes)?;
             state.payload(bytes.len())?;
-            Value::bytes_with_limits(bytes.to_vec(), state.limits)
-                .map_err(DecodeError::InvalidValue)
+            let owned = bytes.to_vec();
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                assert(owned@ == bytes@);
+                assert(wf(ModelValue::Bytes(bytes@), state.limits.model(0)));
+            }
+            Value::bytes_with_limits(owned, state.limits).map_err(map_value_decode_error)
         }
         TAG_TEXT => {
             let bytes = cursor.take_blob(state.limits.max_payload_bytes)?;
@@ -808,55 +1011,88 @@ fn decode_value_inner(
             if !bytes.is_ascii() {
                 return Err(DecodeError::NonAsciiText);
             }
+            #[cfg(verus_keep_ghost)]
+            proof! { ascii_is_utf8(bytes@); }
             let text = core::str::from_utf8(bytes).map_err(|_| DecodeError::Utf8)?;
-            Value::text_ascii_with_limits(String::from(text), state.limits)
-                .map_err(DecodeError::InvalidValue)
+            Value::text_ascii_with_limits(text.to_owned(), state.limits)
+                .map_err(map_value_decode_error)
         }
-        TAG_ENUM => Ok(Value::enumeration(cursor.take_u32()?, cursor.take_u16()?)),
+        TAG_ENUM => {
+            let type_id = cursor.take_u32()?;
+            #[cfg(verus_keep_ghost)]
+            proof! { assert(cursor.unread() == tail(old(cursor).unread(), 5)); }
+            let variant = cursor.take_u16()?;
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                assert(tail(old(cursor).unread(), 1).subrange(0, 4)
+                    == old(cursor).unread().subrange(1, 5));
+                assert(tail(old(cursor).unread(), 5).subrange(0, 2)
+                    == old(cursor).unread().subrange(5, 7));
+                assert(type_id == unsigned_bytes(old(cursor).unread().subrange(1, 5)) as u32);
+                assert(variant == unsigned_bytes(old(cursor).unread().subrange(5, 7)) as u16);
+            }
+            Ok(Value::enumeration(type_id, variant))
+        }
         TAG_TUPLE | TAG_VECTOR => {
             let count = cursor.take_u32()?;
-            state.collection(count)?;
-            let mut items = Vec::with_capacity(state.reservation(count, cursor.remaining(), 1)?);
-            for _ in 0..count {
-                items.push(decode_value_inner(
-                    cursor,
-                    state,
-                    depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?,
-                )?);
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                assert(tail(old(cursor).unread(), 1).subrange(0, 4)
+                    == old(cursor).unread().subrange(1, 5));
+                assert(cursor.unread() == tail(old(cursor).unread(), 5));
             }
+            state.collection(count)?;
+            let items = decode_items(
+                cursor,
+                state,
+                depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?,
+                count,
+            )?;
             if tag == TAG_TUPLE {
-                Value::tuple(items).map_err(DecodeError::InvalidValue)
+                Value::tuple(items).map_err(map_value_decode_error)
             } else {
-                Value::vector(items).map_err(DecodeError::InvalidValue)
+                Value::vector(items).map_err(map_value_decode_error)
             }
         }
         TAG_RECORD => {
             let count = cursor.take_u32()?;
-            state.collection(count)?;
-            // One field requires its u16 identifier and at least one value tag.
-            let mut fields = Vec::with_capacity(state.reservation(count, cursor.remaining(), 3)?);
-            let mut previous = None;
-            for _ in 0..count {
-                let id = cursor.take_u16()?;
-                if previous.is_some_and(|value| value >= id) {
-                    return Err(DecodeError::NonCanonicalRecord);
-                }
-                previous = Some(id);
-                fields.push(Field::new(
-                    id,
-                    decode_value_inner(
-                        cursor,
-                        state,
-                        depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?,
-                    )?,
-                ));
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                assert(tail(old(cursor).unread(), 1).subrange(0, 4)
+                    == old(cursor).unread().subrange(1, 5));
+                assert(cursor.unread() == tail(old(cursor).unread(), 5));
             }
-            Value::record_canonical(fields).map_err(DecodeError::InvalidValue)
+            state.collection(count)?;
+            let fields = decode_fields(
+                cursor,
+                state,
+                depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?,
+                count,
+            )?;
+            Value::record_canonical(fields).map_err(map_value_decode_error)
         }
         TAG_SUM => {
             let type_id = cursor.take_u32()?;
+            #[cfg(verus_keep_ghost)]
+            proof! { assert(cursor.unread() == tail(old(cursor).unread(), 5)); }
             let variant = cursor.take_u16()?;
-            let payload = match cursor.take_u8()? {
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                assert(tail(old(cursor).unread(), 1).subrange(0, 4)
+                    == old(cursor).unread().subrange(1, 5));
+                assert(tail(old(cursor).unread(), 5).subrange(0, 2)
+                    == old(cursor).unread().subrange(5, 7));
+                assert(cursor.unread() == tail(old(cursor).unread(), 7));
+                assert(type_id == unsigned_bytes(old(cursor).unread().subrange(1, 5)) as u32);
+                assert(variant == unsigned_bytes(old(cursor).unread().subrange(5, 7)) as u16);
+            }
+            let flag = cursor.take_u8()?;
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                assert(flag == old(cursor).unread()[7]);
+                assert(cursor.unread() == tail(old(cursor).unread(), 8));
+            }
+            let payload = match flag {
                 0 => None,
                 1 => Some(decode_value_inner(
                     cursor,
@@ -869,48 +1105,261 @@ fn decode_value_inner(
         }
         TAG_MAP => {
             let count = cursor.take_u32()?;
-            state.collection(count)?;
-            // One entry requires two u32 blob lengths plus at least one value
-            // tag in each encoded key and value.
-            let mut entries =
-                Vec::with_capacity(state.reservation(count, cursor.remaining(), 10)?);
-            // Encoded keys are compared as they are borrowed from the input, so
-            // canonical key order is decided on the exact wire bytes.
-            let mut previous: Option<&[u8]> = None;
-            for _ in 0..count {
-                let encoded_key = cursor.take_blob(state.limits.max_payload_bytes)?;
-                state.payload(encoded_key.len())?;
-                if previous.is_some_and(|value| value >= encoded_key) {
-                    return Err(DecodeError::NonCanonicalMap);
-                }
-                let encoded_value = cursor.take_blob(state.limits.max_payload_bytes)?;
-                state.payload(encoded_value.len())?;
-
-                let key = decode_complete_value(
-                    encoded_key,
-                    state,
-                    depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?,
-                )?;
-                let value = decode_complete_value(
-                    encoded_value,
-                    state,
-                    depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?,
-                )?;
-
-                let entry = MapEntry::try_new_with_limits(key, value, state.limits)
-                    .map_err(DecodeError::InvalidValue)?;
-                if entry.encoded_key() != encoded_key {
-                    return Err(DecodeError::NonCanonical);
-                }
-                previous = Some(encoded_key);
-                entries.push(entry);
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                assert(tail(old(cursor).unread(), 1).subrange(0, 4)
+                    == old(cursor).unread().subrange(1, 5));
+                assert(cursor.unread() == tail(old(cursor).unread(), 5));
             }
-            Value::map_canonical(entries).map_err(DecodeError::InvalidValue)
+            state.collection(count)?;
+            let entries = decode_entries(
+                cursor,
+                state,
+                depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?,
+                count,
+            )?;
+            Value::map_canonical(entries).map_err(map_value_decode_error)
         }
         other => Err(DecodeError::UnknownTag(other)),
     }
 }
 
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    requires old(cursor).invariant(), old(state).invariant(),
+    ensures final(cursor).invariant(), final(state).invariant(),
+        final(cursor).bytes == old(cursor).bytes, final(state).limits == old(state).limits,
+        final(cursor).offset >= old(cursor).offset,
+        result matches Ok(items) ==> values_valid(items@) && items.len() == count,
+        parsed_items_result(&result, (final(cursor).offset - old(cursor).offset) as nat,
+            final(state).nodes as nat, final(state).payload_bytes as nat)
+            == decoder_spec::parse_items(old(cursor).unread(), old(state).limits.model(0), depth as nat,
+                count as nat, old(state).nodes as nat, old(state).payload_bytes as nat),
+    decreases if depth <= 1024 { 1025 - depth as int } else { 0 }, 2nat,
+))]
+fn decode_items(
+    cursor: &mut Cursor<'_>,
+    state: &mut DecodeState,
+    depth: u32,
+    count: u32,
+) -> Result<Vec<Value>, DecodeError> {
+    let mut items = Vec::with_capacity(state.reservation(count, cursor.remaining(), 1)?);
+    let mut index = 0;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant index <= count, items.len() == index, values_valid(items@),
+            cursor.invariant(), state.invariant(), cursor.bytes == old(cursor).bytes,
+            state.limits == old(state).limits, cursor.offset >= old(cursor).offset,
+            decoder_spec::parse_items(old(cursor).unread(), old(state).limits.model(0), depth as nat,
+                count as nat, old(state).nodes as nat, old(state).payload_bytes as nat)
+            == prepend_items(values_model(items@), (cursor.offset - old(cursor).offset) as nat,
+                decoder_spec::parse_items(cursor.unread(), state.limits.model(0), depth as nat,
+                    (count - index) as nat, state.nodes as nat, state.payload_bytes as nat)),
+        decreases count - index,
+    ))]
+    while index < count {
+        #[cfg(verus_keep_ghost)]
+        let start = cursor.offset;
+        #[cfg(verus_keep_ghost)]
+        let nodes_before = state.nodes;
+        #[cfg(verus_keep_ghost)]
+        let payload_before = state.payload_bytes;
+        let child = decode_value_inner(cursor, state, depth)?;
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            let before = old(cursor).bytes@.subrange(start as int, old(cursor).bytes@.len() as int);
+            let used = (cursor.offset - start) as nat;
+            let rest = decoder_spec::parse_items(cursor.unread(), state.limits.model(0), depth as nat,
+                (count - index - 1) as nat, state.nodes as nat, state.payload_bytes as nat);
+            assert(tail(before, used) == cursor.unread());
+            assert(decoder_spec::parse_items(before, state.limits.model(0), depth as nat,
+                (count - index) as nat, nodes_before as nat, payload_before as nat)
+                == prepend_items(seq![child.model()], used, rest));
+            prepend_items_associative(values_model(items@), (start - old(cursor).offset) as nat, child.model(), used, rest);
+            values_model_push(items@, child);
+        }
+        items.push(child);
+        index += 1;
+    }
+    Ok(items)
+}
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    requires old(cursor).invariant(), old(state).invariant(),
+    ensures final(cursor).invariant(), final(state).invariant(),
+        final(cursor).bytes == old(cursor).bytes, final(state).limits == old(state).limits,
+        final(cursor).offset >= old(cursor).offset,
+        result matches Ok(fields) ==> fields_valid(fields@) && fields.len() == count
+            && fields_ordered(fields_model(fields@)),
+        parsed_fields_result(&result, (final(cursor).offset - old(cursor).offset) as nat,
+            final(state).nodes as nat, final(state).payload_bytes as nat)
+            == decoder_spec::parse_fields(old(cursor).unread(), old(state).limits.model(0), depth as nat,
+                count as nat, None, old(state).nodes as nat, old(state).payload_bytes as nat),
+    decreases if depth <= 1024 { 1025 - depth as int } else { 0 }, 2nat,
+))]
+fn decode_fields(
+    cursor: &mut Cursor<'_>,
+    state: &mut DecodeState,
+    depth: u32,
+    count: u32,
+) -> Result<Vec<Field>, DecodeError> {
+    // A field has a u16 identifier followed by at least one value tag.
+    let mut fields = Vec::with_capacity(state.reservation(count, cursor.remaining(), 3)?);
+    let mut previous = None;
+    let mut index = 0;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant index <= count, fields.len() == index, fields_valid(fields@),
+            fields_model(fields@).len() == index, fields_ordered(fields_model(fields@)),
+            previous == if index == 0 { None } else { Some(fields_model(fields@).last().0) },
+            cursor.invariant(), state.invariant(), cursor.bytes == old(cursor).bytes,
+            state.limits == old(state).limits, cursor.offset >= old(cursor).offset,
+            decoder_spec::parse_fields(old(cursor).unread(), old(state).limits.model(0), depth as nat,
+                count as nat, None, old(state).nodes as nat, old(state).payload_bytes as nat)
+            == prepend_fields(fields_model(fields@), (cursor.offset - old(cursor).offset) as nat,
+                decoder_spec::parse_fields(cursor.unread(), state.limits.model(0), depth as nat,
+                    (count - index) as nat, previous, state.nodes as nat, state.payload_bytes as nat)),
+        decreases count - index,
+    ))]
+    while index < count {
+        #[cfg(verus_keep_ghost)]
+        let start = cursor.offset;
+        #[cfg(verus_keep_ghost)]
+        let nodes_before = state.nodes;
+        #[cfg(verus_keep_ghost)]
+        let payload_before = state.payload_bytes;
+        #[cfg(verus_keep_ghost)]
+        let previous_before = previous;
+        let id = cursor.take_u16()?;
+        if match previous {
+            Some(value) => value >= id,
+            None => false,
+        } {
+            return Err(DecodeError::NonCanonicalRecord);
+        }
+        previous = Some(id);
+        let child = decode_value_inner(cursor, state, depth)?;
+        let field = Field::new(id, child);
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            fields_model_properties(fields@);
+            let before = old(cursor).bytes@.subrange(start as int, old(cursor).bytes@.len() as int);
+            let used = (cursor.offset - start) as nat;
+            let head = (id, field.spec_value().model());
+            let rest = decoder_spec::parse_fields(cursor.unread(), state.limits.model(0), depth as nat,
+                (count - index - 1) as nat, Some(id), state.nodes as nat, state.payload_bytes as nat);
+            assert(tail(before, used) == cursor.unread());
+            assert(decoder_spec::parse_fields(before, state.limits.model(0), depth as nat,
+                (count - index) as nat, previous_before, nodes_before as nat, payload_before as nat)
+                == prepend_fields(seq![head], used, rest));
+            prepend_fields_associative(fields_model(fields@), (start - old(cursor).offset) as nat, head, used, rest);
+            fields_ordered_push(fields_model(fields@), head);
+            fields_model_push(fields@, field);
+        }
+        fields.push(field);
+        index += 1;
+    }
+    Ok(fields)
+}
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    requires old(cursor).invariant(), old(state).invariant(),
+    ensures final(cursor).invariant(), final(state).invariant(),
+        final(cursor).bytes == old(cursor).bytes, final(state).limits == old(state).limits,
+        final(cursor).offset >= old(cursor).offset,
+        result matches Ok(entries) ==> entries_valid(entries@) && entry_values_fit(entries@)
+            && entries.len() == count && entries_ordered(entries_model(entries@)),
+        parsed_entries_result(&result, (final(cursor).offset - old(cursor).offset) as nat,
+            final(state).nodes as nat, final(state).payload_bytes as nat)
+            == decoder_spec::parse_entries(old(cursor).unread(), old(state).limits.model(0), depth as nat,
+                count as nat, None, old(state).nodes as nat, old(state).payload_bytes as nat),
+    decreases if depth <= 1024 { 1025 - depth as int } else { 0 }, 2nat,
+))]
+fn decode_entries(
+    cursor: &mut Cursor<'_>,
+    state: &mut DecodeState,
+    depth: u32,
+    count: u32,
+) -> Result<Vec<MapEntry>, DecodeError> {
+    // An entry has two u32 frames, each holding at least one value tag.
+    let mut entries = Vec::with_capacity(state.reservation(count, cursor.remaining(), 10)?);
+    let mut previous: Option<&[u8]> = None;
+    let mut index = 0;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant index <= count, entries.len() == index,
+            entries_valid(entries@), entry_values_fit(entries@),
+            entries_model(entries@).len() == index, entries_ordered(entries_model(entries@)),
+            (match previous { None => None, Some(bytes) => Some(bytes@) })
+                == if index == 0 { None } else { Some(spec_encode(entries_model(entries@).last().0)) },
+            cursor.invariant(), state.invariant(), cursor.bytes == old(cursor).bytes,
+            state.limits == old(state).limits, cursor.offset >= old(cursor).offset,
+            decoder_spec::parse_entries(old(cursor).unread(), old(state).limits.model(0), depth as nat,
+                count as nat, None, old(state).nodes as nat, old(state).payload_bytes as nat)
+            == prepend_entries(entries_model(entries@), (cursor.offset - old(cursor).offset) as nat,
+                decoder_spec::parse_entries(cursor.unread(), state.limits.model(0), depth as nat,
+                    (count - index) as nat, match previous { None => None, Some(bytes) => Some(bytes@) },
+                    state.nodes as nat, state.payload_bytes as nat)),
+        decreases count - index,
+    ))]
+    while index < count {
+        #[cfg(verus_keep_ghost)]
+        let start = cursor.offset;
+        #[cfg(verus_keep_ghost)]
+        let nodes_before = state.nodes;
+        #[cfg(verus_keep_ghost)]
+        let payload_before = state.payload_bytes;
+        #[cfg(verus_keep_ghost)]
+        let previous_before = previous;
+        let encoded_key = cursor.take_blob(state.limits.max_payload_bytes)?;
+        #[cfg(verus_keep_ghost)]
+        let key_end = cursor.offset;
+        state.payload(encoded_key.len())?;
+        if match previous {
+            Some(value) => !bytes_before(value, encoded_key),
+            None => false,
+        } {
+            return Err(DecodeError::NonCanonicalMap);
+        }
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            assert(previous matches Some(bytes) ==> lex_less(bytes@, encoded_key@));
+        }
+        let encoded_value = cursor.take_blob(state.limits.max_payload_bytes)?;
+        state.payload(encoded_value.len())?;
+        let key = decode_complete_value(encoded_key, state, depth)?;
+        let value = decode_complete_value(encoded_value, state, depth)?;
+        let entry = MapEntry::try_new_with_limits(key, value, state.limits)
+            .map_err(map_value_decode_error)?;
+        if entry.encoded_key() != encoded_key {
+            return Err(DecodeError::NonCanonical);
+        }
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            entries_model_properties(entries@);
+            let before = old(cursor).bytes@.subrange(start as int, old(cursor).bytes@.len() as int);
+            let used = (cursor.offset - start) as nat;
+            let head = (entry.spec_key().model(), entry.spec_value().model());
+            let rest = decoder_spec::parse_entries(cursor.unread(), state.limits.model(0), depth as nat,
+                (count - index - 1) as nat, Some(encoded_key@), state.nodes as nat, state.payload_bytes as nat);
+            assert(tail(before, used) == cursor.unread());
+            assert(read_blob(before, state.limits.max_payload_bytes as nat)
+                == Some((encoded_key@, (key_end - start) as nat)));
+            assert(decoder_spec::parse_entries(before, state.limits.model(0), depth as nat,
+                (count - index) as nat, match previous_before { None => None, Some(bytes) => Some(bytes@) },
+                nodes_before as nat, payload_before as nat)
+                == prepend_entries(seq![head], used, rest));
+            prepend_entries_associative(entries_model(entries@), (start - old(cursor).offset) as nat, head, used, rest);
+            entries_ordered_push(entries_model(entries@), head);
+            entries_model_push(entries@, entry);
+        }
+        previous = Some(encoded_key);
+        entries.push(entry);
+        index += 1;
+    }
+    Ok(entries)
+}
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result matches Ok(capacity) ==> capacity <= count && capacity <= remaining_wire_bytes,
+        minimum_wire_bytes_per_item > 0 ==> result.is_ok(),
+))]
 fn initial_collection_capacity(
     count: u32,
     remaining_wire_bytes: usize,
@@ -928,15 +1377,42 @@ struct Cursor<'a> {
     offset: usize,
 }
 
+#[cfg(verus_keep_ghost)]
+verus! {
 impl<'a> Cursor<'a> {
-    const fn new(bytes: &'a [u8]) -> Self {
+    pub closed spec fn invariant(&self) -> bool { self.offset <= self.bytes@.len() }
+    pub closed spec fn consumed(&self) -> Seq<u8> { self.bytes@.subrange(0, self.offset as int) }
+    pub closed spec fn unread(&self) -> Seq<u8> { self.bytes@.subrange(self.offset as int, self.bytes@.len() as int) }
+}
+}
+
+impl<'a> Cursor<'a> {
+    fn new(bytes: &'a [u8]) -> Self {
+        #[cfg(verus_keep_ghost)]
+        verus_proof_expr!(ensures(|result: Self| result.invariant() && result.bytes == bytes && result.offset == 0
+            && result.consumed() == Seq::<u8>::empty() && result.unread() == bytes@));
         Self { bytes, offset: 0 }
     }
 
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        requires self.invariant(),
+        ensures result == self.bytes.len() - self.offset,
+            result == self.unread().len(), self.bytes@ == self.consumed() + self.unread(),
+    ))]
     const fn remaining(&self) -> usize {
         self.bytes.len() - self.offset
     }
 
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        requires old(self).invariant(),
+        ensures final(self).invariant(), final(self).bytes == old(self).bytes,
+            result.is_ok() == (old(self).offset + length <= old(self).bytes.len()),
+            result matches Ok(bytes) ==> bytes@ == old(self).bytes@.subrange(old(self).offset as int, old(self).offset + length)
+                && final(self).offset == old(self).offset + length
+                && bytes@ == old(self).unread().subrange(0, length as int)
+                && final(self).unread() == tail(old(self).unread(), length as nat),
+            result.is_err() ==> final(self).offset == old(self).offset,
+    ))]
     fn take(&mut self, length: usize) -> Result<&'a [u8], DecodeError> {
         let end = self
             .offset
@@ -952,26 +1428,69 @@ impl<'a> Cursor<'a> {
         Ok(value)
     }
 
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        requires old(self).invariant(),
+        ensures final(self).invariant(), final(self).bytes == old(self).bytes,
+            result.is_ok() == (old(self).offset + 1 <= old(self).bytes.len()),
+            result matches Ok(word) ==> word as u128 == unsigned_bytes(old(self).bytes@.subrange(old(self).offset as int, old(self).offset + 1))
+                && final(self).offset == old(self).offset + 1
+                && word == old(self).unread()[0]
+                && final(self).unread() == tail(old(self).unread(), 1),
+            result.is_err() ==> final(self).offset == old(self).offset,
+    ))]
     fn take_u8(&mut self) -> Result<u8, DecodeError> {
         let bytes = self.take(1)?;
-        bytes.first().copied().ok_or(DecodeError::UnexpectedEnd {
-            offset: self.offset,
-            requested: 1,
-        })
+        #[cfg(verus_keep_ghost)]
+        proof! { zeno_fcis_value::decoder_model::unsigned_small(bytes@); }
+        Ok(bytes[0])
     }
 
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        requires old(self).invariant(),
+        ensures final(self).invariant(), final(self).bytes == old(self).bytes,
+            result.is_ok() == (old(self).offset + 2 <= old(self).bytes.len()),
+            result matches Ok(word) ==> word as u128 == unsigned_bytes(old(self).bytes@.subrange(old(self).offset as int, old(self).offset + 2))
+                && final(self).offset == old(self).offset + 2
+                && word as u128 == unsigned_bytes(old(self).unread().subrange(0, 2))
+                && final(self).unread() == tail(old(self).unread(), 2),
+            result.is_err() ==> final(self).offset == old(self).offset,
+    ))]
     fn take_u16(&mut self) -> Result<u16, DecodeError> {
         let mut bytes = [0_u8; 2];
         bytes.copy_from_slice(self.take(2)?);
-        Ok(u16::from_be_bytes(bytes))
+        #[cfg(verus_keep_ghost)]
+        proof! { zeno_fcis_value::decoder_model::unsigned_small(bytes@); }
+        Ok(read_word(&bytes) as u16)
     }
 
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        requires old(self).invariant(),
+        ensures final(self).invariant(), final(self).bytes == old(self).bytes,
+            result.is_ok() == (old(self).offset + 4 <= old(self).bytes.len()),
+            result matches Ok(word) ==> word as u128 == unsigned_bytes(old(self).bytes@.subrange(old(self).offset as int, old(self).offset + 4))
+                && final(self).offset == old(self).offset + 4
+                && word as u128 == unsigned_bytes(old(self).unread().subrange(0, 4))
+                && final(self).unread() == tail(old(self).unread(), 4),
+            result.is_err() ==> final(self).offset == old(self).offset,
+    ))]
     fn take_u32(&mut self) -> Result<u32, DecodeError> {
         let mut bytes = [0_u8; 4];
         bytes.copy_from_slice(self.take(4)?);
-        Ok(u32::from_be_bytes(bytes))
+        #[cfg(verus_keep_ghost)]
+        proof! { zeno_fcis_value::decoder_model::unsigned_small(bytes@); }
+        Ok(read_word(&bytes) as u32)
     }
 
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        requires old(self).invariant(),
+        ensures final(self).invariant(), final(self).bytes == old(self).bytes,
+            final(self).offset >= old(self).offset,
+            result matches Ok(bytes) ==> bytes@.len() <= maximum && bytes@.len() <= u32::MAX
+                && read_blob(old(self).unread(), maximum as nat)
+                    == Some((bytes@, (final(self).offset - old(self).offset) as nat))
+                && final(self).unread() == tail(old(self).unread(), (final(self).offset - old(self).offset) as nat),
+            result.is_err() ==> read_blob(old(self).unread(), maximum as nat) is None,
+    ))]
     fn take_blob(&mut self, maximum: u64) -> Result<&'a [u8], DecodeError> {
         let length = self.take_u32()?;
         if u64::from(length) > maximum {
@@ -986,7 +1505,7 @@ impl<'a> Cursor<'a> {
 }
 
 /// Canonical encoding failure.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(not(verus_keep_ghost), derive(Clone, Debug, Eq, PartialEq))]
 #[non_exhaustive]
 pub enum EncodeError {
     /// A collection cannot be represented by the canonical length field.
@@ -1014,8 +1533,10 @@ pub enum EncodeError {
     UnsupportedProtocolVariant(&'static str),
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl core::error::Error for EncodeError {}
 
+#[cfg(not(verus_keep_ghost))]
 impl fmt::Display for EncodeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -1040,7 +1561,7 @@ impl fmt::Display for EncodeError {
 }
 
 /// Canonical decoding failure.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(not(verus_keep_ghost), derive(Clone, Debug, Eq, PartialEq))]
 #[non_exhaustive]
 pub enum DecodeError {
     /// Input exceeds the global byte limit.
@@ -1121,8 +1642,10 @@ pub enum DecodeError {
     Encode(EncodeError),
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl core::error::Error for DecodeError {}
 
+#[cfg(not(verus_keep_ghost))]
 impl fmt::Display for DecodeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -1974,6 +2497,7 @@ mod tests {
     fn commitment_preserves_exact_framing_with_sealed_provider() {
         // Independent literal: magic, big-endian version, domain length/name,
         // big-endian payload length, payload. Empty parts add no framing.
+        #[cfg_attr(verus_keep_ghost, verus_verify)]
         const EXPECTED: &[u8] =
             b"ZENOFCIS-HASH\0\x12\x34\x00\x01x\x00\x00\x00\x00\x00\x00\x00\x03abc";
         let domain =
