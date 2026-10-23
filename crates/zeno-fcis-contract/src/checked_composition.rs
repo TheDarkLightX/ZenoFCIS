@@ -139,6 +139,9 @@ mod receipt;
 mod receipt_tests;
 mod refusal;
 mod resolve;
+pub mod service;
+#[cfg(test)]
+mod service_tests;
 mod structure;
 #[cfg(test)]
 mod structure_tests;

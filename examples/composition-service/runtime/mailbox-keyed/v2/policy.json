@@ -1,0 +1,121 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "example_mail-mailbox-keyed",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "st1": "pre.100.110",
+    "g1": "pre.100.111",
+    "st2": "pre.100.112",
+    "g2": "pre.100.113",
+    "action": "command.101.120",
+    "slot": "command.101.121",
+    "reader": "context.102.130",
+    "reader_gen": "context.102.131",
+    "current": "context.102.132",
+    "target": "choose(slot == 1, st1, st2)",
+    "target_gen": "choose(slot == 1, g1, g2)"
+  },
+  "cases": [
+    {
+      "rule": "reviewed read-only validation command",
+      "when": "action == 153",
+      "class": "Accept",
+      "reason": null,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "a delivery needs a current key",
+      "when": "action == 150 && current == 0",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "a full mailbox refuses delivery",
+      "when": "action == 150 && st1 != 140 && st2 != 140",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "deliver into the first empty slot under the current generation",
+      "when": "action == 150",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "choose(st1 == 140, 141, st1)",
+        "111": "choose(st1 == 140, current, g1)",
+        "112": "choose(st1 == 140, st2, 141)",
+        "113": "choose(st1 == 140, g2, current)"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "the chosen slot must hold a message",
+      "when": "target == 140",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "only an active device reads or purges",
+      "when": "action != 150 && reader != 144",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "the device must hold the message's key generation",
+      "when": "action == 151 && target_gen > reader_gen",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "read",
+      "when": "action == 151",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "choose(slot == 1, 142, st1)",
+        "112": "choose(slot == 2, 142, st2)"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "purge",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "choose(slot == 1, 140, st1)",
+        "111": "choose(slot == 1, 0, g1)",
+        "112": "choose(slot == 2, 140, st2)",
+        "113": "choose(slot == 2, 0, g2)"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 140,
+    "111": 0,
+    "112": 140,
+    "113": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AuthoritySubjectRecipient"
+  }
+}

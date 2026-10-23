@@ -24,3 +24,18 @@ and Lamport, *Specifying Systems*, Addison-Wesley, 2002, describe composition
 and explicit state-machine reasoning. These references do not certify this
 implementation. Prior-art search pending. Evidence is exhaustive only over the
 declared finite domains and the specified admissibility predicates.
+
+## Local service authority
+
+`runtime/` adds explicit read-only validation commands so every core's actual
+checked Program participates on every request. `service.json` pins the nested
+composition, the schemas, request/decision laws and the service budget. Run
+`tools/make_service_manifest.py --binary PRODUCT_BINARY runtime_directory` to
+regenerate these pins. A schema, policy, program, binding, order or checker
+change changes the service identity and requires a new store version.
+
+`ServiceAuthority` returns a private, immutable `ServicePublication` only when
+all actual per-core publications and global laws pass. Rejection discards all
+provisional successors and retains actual core and wrapper accounting. Its
+preparation tables supply bindings, not decision or publication authority.
+This scalar profile refuses channels, CommittedFailure and skipped cores.

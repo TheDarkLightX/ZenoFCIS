@@ -23,7 +23,7 @@ def repin(binary, root):
     result = subprocess.run([binary, 'pins', str(root)], capture_output=True, text=True, check=True)
     manifest = json.loads((root / 'composition.json').read_text())
     for entry, pins in zip(manifest['components'], json.loads(result.stdout), strict=True):
-        entry.update(pins)
+        entry.update({k:v for k,v in pins.items() if k != "schema_sha256"})
     (root / 'composition.json').write_text(json.dumps(manifest, indent=2) + '\n')
 
 def admissible(comp):
@@ -43,7 +43,7 @@ def read_law(state, request, outcome, post):
         assert state[slot] != 140 and state[slot+1] <= state[3+device], 'read_law: missing key'
         assert post[slot] == 142, 'read_law: read route did not run mailbox'
 
-def compare(binary, root, cap=CAP, control=None):
+def compare(binary, root, cap=CAP, control=None, mode="product", shard=0, shards=1):
     comp = reference.Composition(root / 'composition.json')
     states = list(admissible(comp))
     requests = list(comp.requests())
@@ -55,8 +55,12 @@ def compare(binary, root, cap=CAP, control=None):
     if control:
         states = [{'keydir': (145,144,2,1,2,0), 'mailbox': (141,2,140,0)}]
         requests = [{'op':5, 'target':1}]
+    ordinal = 0
     for state in states:
         for request in requests:
+            ordinal += 1
+            if (ordinal - 1) % shards != shard:
+                continue
             flat = [v for core in comp.owned for v in state[core.name]]
             req = [request[n] for n, _ in comp.request]
             rows.append({'state':flat, 'request':req})
@@ -67,8 +71,8 @@ def compare(binary, root, cap=CAP, control=None):
                 observed['class' if kind[0] == 'Refused' else 'reason'] = kind[2]
             expected.append((observed, [v for core in comp.owned for v in post[core.name]]))
     data = ''.join(json.dumps(row, separators=(',',':'))+'\n' for row in rows)
-    result = subprocess.run([binary, 'product', str(root)], input=data, capture_output=True, text=True)
-    assert result.returncode == 0, f'joint build/run failed: {result.stderr}'
+    result = subprocess.run([binary, mode, str(root)], input=data, stdout=subprocess.PIPE, text=True)
+    assert result.returncode == 0, f'joint build/run failed: exit {result.returncode}'
     actual = [json.loads(line) for line in result.stdout.splitlines()]
     assert len(actual) == len(rows), 'complete product was not evaluated'
     counts = {}
@@ -80,17 +84,22 @@ def compare(binary, root, cap=CAP, control=None):
         counts[kind['kind']] = counts.get(kind['kind'],0)+1
     return {'planned_rows':planned, 'compared_rows':len(rows), 'admissible_states':len(states), 'requests':len(requests),
             'outcomes':counts, 'domain':'all declared states satisfying component invariants and global couplings, all requests',
-            'input_sha256':sha(data.encode()), 'output_sha256':sha(result.stdout.encode()), 'cap':cap}
+            'input_sha256':sha(data.encode()), 'output_sha256':sha(result.stdout.encode()), 'cap':cap, 'shard':shard, 'shards':shards}
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary', required=True)
     parser.add_argument('--fixture',type=Path,default=Path('examples/composition-service'))
+    parser.add_argument('--shard',type=int,default=0)
+    parser.add_argument('--shards',type=int,default=1)
+    parser.add_argument('--mode',choices=['product','service'],default='product')
     parser.add_argument('--repin',action='store_true')
     parser.add_argument('--control',choices=['wrong-device','wrong-route'])
     parser.add_argument('--scratch',type=Path)
     parser.add_argument('--cap',type=int,default=CAP)
     args = parser.parse_args()
+    if args.shards < 1 or not 0 <= args.shard < args.shards:
+        parser.error('invalid shard')
     if args.repin:
         repin(args.binary,args.fixture)
         return
@@ -112,7 +121,7 @@ def main():
             (root/'composition.json').write_text(json.dumps(manifest))
             compare(args.binary,root,control=args.control)
     else:
-        print(json.dumps(compare(args.binary,args.fixture,args.cap),indent=2))
+        print(json.dumps(compare(args.binary,args.fixture,args.cap,mode=args.mode,shard=args.shard,shards=args.shards),indent=2))
 
 if __name__ == '__main__':
     main()

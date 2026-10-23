@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let contract = Contract::build(&declarations, &rules, commitment)?;
             let program =
                 policy::with_authority(&contract, &schema, |authority| hash(authority.identity()))?;
-            pins.push(json!({"project_sha256":hash(source.project.as_bytes()),"policy_sha256":hash(source.rules.as_bytes()),"program_sha256":program}));
+            pins.push(json!({"project_sha256":hash(source.project.as_bytes()),"policy_sha256":hash(source.rules.as_bytes()),"program_sha256":program, "schema_sha256":hash(&schema)}));
         }
         println!("{}", json!(pins));
         return Ok(());
@@ -61,8 +61,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{}", check_domain(&inputs)?.json());
         return Ok(());
     }
-    let joint = JointComposition::from_sources(&inputs)?;
-    for line in io::stdin().lock().lines() {
+    let service = if args[1] == "service" {
+        Some(
+            zeno_fcis_contract::checked_composition::service::ServiceAuthority::from_sources(
+                &fs::read_to_string(root.join("service.json"))?,
+                &sources,
+            )?,
+        )
+    } else {
+        None
+    };
+    let joint = if service.is_none() {
+        Some(JointComposition::from_sources(&inputs)?)
+    } else {
+        None
+    };
+    for (ordinal, line) in io::stdin().lock().lines().enumerate() {
+        if ordinal % 1000 == 0 {
+            eprintln!("product rows decided: {ordinal}");
+        }
         let row: Value = serde_json::from_str(&line?)?;
         let read = |key: &str| -> Result<Vec<i128>, Box<dyn std::error::Error>> {
             row[key]
@@ -72,10 +89,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map(|n| n.as_i64().map(i128::from).ok_or_else(|| "integer".into()))
                 .collect()
         };
-        let outcome = joint
-            .joint_step(&read("state")?, &read("request")?)
-            .map_err(|e| e.reason)?;
-        println!("{}", outcome.json());
+        if let Some(service) = &service {
+            use zeno_fcis_contract::checked_composition::service::ServiceRequest;
+            let state = service.state(&read("state")?)?;
+            let request = ServiceRequest::new("reference", "row", &read("request")?)?;
+            let (kind, post) = match service.decide(&state, &request, 0) {
+                Ok(publication) => (
+                    json!({"kind":"Accept"}),
+                    publication.post().values().to_vec(),
+                ),
+                Err(refusal) => {
+                    let parts: Vec<&str> = refusal.reason.split(':').collect();
+                    let kind = if parts.first() == Some(&"reject") {
+                        json!({"kind":"Reject","component":parts[1],"reason":parts[2].parse::<u32>()?})
+                    } else {
+                        json!({"kind":"Refused","class":refusal.reason})
+                    };
+                    (kind, state.values().to_vec())
+                }
+            };
+            println!("{}", json!({"outcome":kind,"successor":post}));
+        } else if let Some(joint) = &joint {
+            let outcome = joint
+                .joint_step(&read("state")?, &read("request")?)
+                .map_err(|e| e.reason)?;
+            println!("{}", outcome.json());
+        }
     }
     Ok(())
 }

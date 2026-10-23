@@ -1,0 +1,58 @@
+zeno 1;
+project 1 example_mail_keydir_no_outbox;
+namespace 2 keydir;
+// Local scalar directory with two devices; no delivery or external fact authority.
+type 100 state Directory;
+type 101 command DirectoryCommand;
+type 102 context Caller;
+type 105 data DeviceStatus;
+type 106 int Generation in 0..=3;
+type 107 data DirectoryAction;
+type 108 int DeviceNumber in 1..=2;
+type 109 bool Pending;
+field 110 100 device_1 105;
+field 111 100 device_2 105;
+field 112 100 generation 106;
+field 113 100 device_1_generation 106;
+field 114 100 device_2_generation 106;
+field 115 100 anchor_pending 109;
+field 120 101 action 107;
+field 121 101 device 108;
+variant 130 102 AccountController none;
+variant 131 102 LedgerFinality none;
+variant 132 102 Stranger none;
+variant 143 105 Absent none;
+variant 144 105 Active none;
+variant 145 105 Revoked none;
+variant 150 107 Publish none;
+variant 151 107 Rotate none;
+variant 152 107 Revoke none;
+variant 153 107 Anchor none;
+variant 154 107 Validate none;
+reason 200 wrong_party precedence 0;
+reason 201 nothing_to_anchor precedence 1;
+reason 202 checkpoint_pending precedence 2;
+reason 203 device_not_absent precedence 3;
+reason 204 device_not_active precedence 4;
+reason 205 no_active_device precedence 5;
+reason 206 generation_exhausted precedence 6;
+component 400 directory {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 256;
+}
+merge [400];
+// An absent device holds no key, an active device holds the current
+// generation, and a revoked device holds only an older one. Generation 0
+// means no device was ever published.
+law 500 devices_hold_right_keys on commit, genesis = (post.100.110 == 143 -> post.100.113 == 0) && (post.100.110 == 144 -> post.100.113 == post.100.112) && (post.100.110 == 145 -> post.100.113 < post.100.112) && (post.100.111 == 143 -> post.100.114 == 0) && (post.100.111 == 144 -> post.100.114 == post.100.112) && (post.100.111 == 145 -> post.100.114 < post.100.112) && (post.100.112 == 0 -> post.100.110 == 143 && post.100.111 == 143);
+// A revoked device is never reactivated and never receives another key.
+law 501 revocation_is_final on commit = (pre.100.110 == 145 -> post.100.110 == 145 && post.100.113 == pre.100.113) && (pre.100.111 == 145 -> post.100.111 == 145 && post.100.114 == pre.100.114);
+// The key generation never goes back and moves at most one step.
+law 502 generation_monotone on commit = post.100.112 >= pre.100.112 && post.100.112 <= pre.100.112 + 1;
+// The account controller changes devices and keys; the ledger reports anchors.
+law 503 right_party on accept = command.101.120 == 154 || (command.101.120 == 153 -> context.102 == 131) && (command.101.120 != 153 -> context.102 == 130);
+// Every directory change leaves a checkpoint pending; an anchor clears it.
+law 504 change_leaves_checkpoint_pending on accept = command.101.120 == 154 || (command.101.120 != 153 -> post.100.115 == 1) && (command.101.120 == 153 -> post.100.115 == 0);

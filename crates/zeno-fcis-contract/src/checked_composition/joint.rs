@@ -902,8 +902,8 @@ impl<'a> Odometer<'a> {
 /// ```
 #[derive(Debug)]
 pub struct JointComposition {
-    composition: Composition,
-    tables: Tables,
+    pub(super) composition: Composition,
+    pub(super) tables: Tables,
     layout: Vec<StateSlot>,
     request: Vec<RequestSlot>,
     genesis: Vec<i128>,
