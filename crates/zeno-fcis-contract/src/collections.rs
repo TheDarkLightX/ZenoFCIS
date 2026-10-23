@@ -88,7 +88,7 @@ pub enum Verdict {
     Checked,
     /// One admissible view refuted an obligation or was refused.
     Refuted,
-    /// The view domain exceeded the limit.
+    /// No complete result: a limit, undefined relation or empty lemma scope.
     Unknown,
 }
 
@@ -173,6 +173,17 @@ pub fn check(
     project: &str,
     policy_source: &str,
     limits: Limits,
+) -> Result<CheckResult, ContractError> {
+    check_with_committed_successors(project, policy_source, limits, |_, _, _, _| {})
+}
+
+/// Visit only lawful canonical committed successors. The observer is advisory
+/// and cannot change collection admission, obligations or enumeration.
+fn check_with_committed_successors(
+    project: &str,
+    policy_source: &str,
+    limits: Limits,
+    mut observe: impl FnMut(&Framer, &[i128], &evaluate::Decision, &[i128]),
 ) -> Result<CheckResult, ContractError> {
     let invalid = |reason: String| ContractError::new("collections", reason);
     let spec = zeno_fcis_spec::parse_project(project, Default::default())
@@ -524,6 +535,9 @@ pub fn check(
                                     },
                                     &decision.outbox,
                                 );
+                                if result.0 {
+                                    observe(&framer, &tuple, &decision, merged);
+                                }
                                 result.0
                             }) {
                                 return (

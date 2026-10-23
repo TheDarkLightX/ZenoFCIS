@@ -276,7 +276,7 @@ fn map_lemmas(
     let mut results = Vec::new();
     for formula in formulas {
         let result = judges::lemma(project, rules, formula, transition, Limits { max_tuples })?;
-        if result.verdict() == Verdict::Unknown {
+        if result.verdict() == Verdict::Unknown && result.packet()["verdict"].is_null() {
             return Ok(Lemmas::Inconclusive(Inconclusive {
                 reason: "collection view domain exceeds the tuple limit",
                 size: result.packet()["view_domain"]

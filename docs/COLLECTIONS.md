@@ -267,7 +267,11 @@ abstract counterexample, which need not be reachable. It does not report a
 reachable-state count or a shortest concrete run. A role-only predicate such as
 `post.100.161 == 0` is refused when another entry of that map has no matching
 predicate. Use `forall` to ask about all members. `--transition` checks a relation
-on all admitted views without assuming it as a precondition.
+on all admitted committed views without assuming it as a precondition. As with
+the scalar judge, an empty committed set is `vacuous`, and a relation without
+a value is `undefined`; both exit 2 and make no passing claim. A defined false
+witness takes precedence over undefined cases and exits 1. Relations are
+evaluated separately from base admission on the canonical stored successor.
 
 A map scenario is JSON with schema `zeno-fcis/collection-scenarios/1` and a
 `scenarios` array. Each item has a unique `name` and nonempty `steps`. A step has

@@ -84,7 +84,11 @@ pub fn lemma(
     } else {
         "StateInvariant"
     });
-    let mut result = check(&extended, &rules.to_string(), limits)?;
+    let mut result = if transition {
+        transition_relation(project, policy, &extended, &rules.to_string(), id, limits)?
+    } else {
+        check(&extended, &rules.to_string(), limits)?
+    };
     result.packet["mode"] = json!(if transition {
         "map-transition"
     } else {
@@ -94,15 +98,119 @@ pub fn lemma(
     result.packet["scope"] = json!(
         "every map size up to capacity under the stated collection premises; abstract refutations need not be reachable"
     );
-    result.packet["verdict"] = json!(match (result.verdict, transition) {
-        (Verdict::Checked, false) => "inductive",
-        (Verdict::Checked, true) => "checked",
-        (Verdict::Refuted, false) => "not-inductive",
-        (Verdict::Refuted, true) => "false",
-        (Verdict::Unknown, _) => "UNKNOWN",
-    });
+    if !transition {
+        result.packet["verdict"] = json!(match (result.verdict, transition) {
+            (Verdict::Checked, false) => "inductive",
+            (Verdict::Checked, true) => "checked",
+            (Verdict::Refuted, false) => "not-inductive",
+            (Verdict::Refuted, true) => "false",
+            (Verdict::Unknown, _) => "UNKNOWN",
+        });
+    }
     result.packet["base_sources"] = base.packet["sources"].clone();
     Ok(result)
+}
+
+// Evaluate the relation separately from the base decision. Installing it as
+// an admission law would hide the decisions being classified and could judge
+// raw payloads instead of the canonical alias-merged successor.
+fn transition_relation(
+    project: &str,
+    policy_source: &str,
+    extended: &str,
+    extended_policy: &str,
+    id: u32,
+    limits: Limits,
+) -> Result<CheckResult, ContractError> {
+    use zeno_fcis_synthesis::finite::v2_laws::{Failure, Verdict as LawVerdict};
+    let rules = Rules::read(extended_policy)?;
+    let declarations = Declarations::read(extended, &rules.leaf_bindings)?;
+    let positions = super::domain::positions(&declarations)?;
+    let schema = schema::encode(&declarations)?;
+    let contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
+    policy::with_authority(&contract, &schema, |authority| {
+        let laws = LawSet::new(authority.descriptor(), &[id]);
+        let mut held = 0u64;
+        let mut failed = 0u64;
+        let mut undefined = 0u64;
+        let mut false_witness = None;
+        let mut undefined_witness = None;
+        let mut result = super::check_with_committed_successors(
+            project,
+            policy_source,
+            limits,
+            |framer, tuple, decision, merged| {
+                let (_, diagnostics) = laws.on_transition_with_outbox(
+                    framer,
+                    tuple,
+                    &Proposed {
+                        class: decision.class,
+                        reason: decision.reason,
+                        post: merged,
+                    },
+                    &decision.outbox,
+                );
+                let witness = || {
+                    json!({
+                        "view": positions.iter().zip(tuple)
+                            .map(|(p,v)| (p.name.clone(),v.to_string())).collect::<BTreeMap<_,_>>(),
+                        "post": positions.iter().zip(merged)
+                            .filter(|(p,_)| p.source == Source::State)
+                            .map(|(p,v)| (p.name.clone(),v.to_string())).collect::<BTreeMap<_,_>>(),
+                    })
+                };
+                match diagnostics.first().map(|d| d.verdict) {
+                    Some(LawVerdict::Satisfied) => held += 1,
+                    Some(LawVerdict::Refused(Failure::Violated)) => {
+                        failed += 1;
+                        if false_witness.is_none() {
+                            false_witness = Some(witness());
+                        }
+                    }
+                    _ => {
+                        undefined += 1;
+                        if undefined_witness.is_none() {
+                            undefined_witness = Some(witness());
+                        }
+                    }
+                }
+            },
+        )?;
+        if result.verdict != Verdict::Checked {
+            return Ok(result);
+        }
+        let admitted = held + failed + undefined;
+        let (verdict, name) = if failed != 0 {
+            (Verdict::Refuted, "false")
+        } else if undefined != 0 {
+            (Verdict::Unknown, "undefined")
+        } else if admitted == 0 {
+            (Verdict::Unknown, "vacuous")
+        } else {
+            (Verdict::Checked, "checked")
+        };
+        result.verdict = verdict;
+        result.packet["verdict"] = json!(name);
+        result.packet["status"] = json!(match verdict {
+            Verdict::Unknown => "inconclusive",
+            Verdict::Refuted => "refuted",
+            Verdict::Checked => "checked",
+        });
+        if verdict != Verdict::Checked {
+            result.packet["claim"] = Value::Null;
+        }
+        result.packet["result"] = json!({
+            "admitted":admitted, "checked":held, "failed":failed,
+            "undefined":undefined,
+            "counterexample":false_witness.or(undefined_witness),
+        });
+        // Bind the separately compiled relation as well as the base sources.
+        result.packet["relation_sources"] = json!({
+            "project_sha256":evaluate::hex(&evaluate::digest(extended.as_bytes())),
+            "rules_sha256":evaluate::hex(&evaluate::digest(extended_policy.as_bytes())),
+        });
+        Ok(result)
+    })?
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]

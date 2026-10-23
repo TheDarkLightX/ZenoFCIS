@@ -203,3 +203,92 @@ fn initial_conditions_are_checked_only_at_empty_map_genesis()
     assert!(judges::profile(&bad, &good, 1, Limits::default()).is_err());
     Ok(())
 }
+
+fn transition_fixture(reject: bool) -> Result<(String, String), Box<dyn std::error::Error>> {
+    let mut project = include_str!("../../../test-data/collections/deletion/project.zeno")
+        .lines()
+        .filter(|line| !line.starts_with("law 500"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut rules: Value = serde_json::from_str(include_str!(
+        "../../../test-data/collections/deletion/v2/policy.json"
+    ))?;
+    rules["law_kinds"]
+        .as_object_mut()
+        .ok_or("law_kinds")?
+        .remove("500");
+    rules["cases"] = json!([{"rule":"only","when":"true",
+        "class":if reject {"Reject"} else {"Accept"},
+        "reason":if reject {Some(200)} else {None},"post":{},"outbox":[]}]);
+    if reject {
+        project.push_str("\nreason 200 no precedence 0;\n");
+    }
+    Ok((project, rules.to_string()))
+}
+#[test]
+fn map_transition_false_is_vacuous_when_every_decision_rejects()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (project, rules) = transition_fixture(true)?;
+    let result = judges::lemma(&project, &rules, "false", true, Limits::default())?;
+    assert_eq!(result.verdict(), Verdict::Unknown, "{}", result.packet());
+    assert_eq!(result.packet()["verdict"], "vacuous");
+    assert_eq!(result.packet()["measured"]["committed"], 0);
+    assert!(result.packet()["claim"].is_null());
+    Ok(())
+}
+#[test]
+fn map_transition_undefined_is_inconclusive_and_false_has_priority()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (project, rules) = transition_fixture(false)?;
+    for (formula, expected) in [
+        ("div_floor(1,0) == 0", "undefined"),
+        ("div_floor(1,pre.100.161) == 0", "false"),
+    ] {
+        let result = judges::lemma(&project, &rules, formula, true, Limits::default())?;
+        assert_eq!(result.packet()["verdict"], expected, "{}", result.packet());
+        assert!(
+            result.packet()["result"]["undefined"]
+                .as_u64()
+                .ok_or("undefined")?
+                > 0
+        );
+        assert_eq!(
+            result.verdict(),
+            if expected == "false" {
+                Verdict::Refuted
+            } else {
+                Verdict::Unknown
+            }
+        );
+        assert!(result.packet()["claim"].is_null());
+    }
+    Ok(())
+}
+
+#[test]
+fn map_transition_relations_observe_canonical_successors() -> Result<(), Box<dyn std::error::Error>>
+{
+    let project = include_str!("../../../test-data/collections/deletion/project.zeno")
+        .lines()
+        .filter(|line| !line.starts_with("law 500"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut rules: Value = serde_json::from_str(include_str!(
+        "../../../test-data/collections/deletion/v2/policy.json"
+    ))?;
+    rules["law_kinds"]
+        .as_object_mut()
+        .ok_or("law_kinds")?
+        .remove("500");
+    let result = judges::lemma(
+        &project,
+        &rules.to_string(),
+        "command.101.130 == 151 -> post.100.161 == 0",
+        true,
+        Limits::default(),
+    )?;
+    assert_eq!(result.verdict(), Verdict::Checked, "{}", result.packet());
+    assert_eq!(result.packet()["verdict"], "checked");
+    assert_eq!(result.packet()["result"]["failed"], 0);
+    Ok(())
+}
