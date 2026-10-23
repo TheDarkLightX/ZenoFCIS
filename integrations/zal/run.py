@@ -70,6 +70,7 @@ def main():
             raise behavior.Refusal("The guide command supports zal/effects/1 and zal/typed-fsm/1 sources")
         model = behavior2.parse_any(source, options.syntax)
         profile = behavior2 if isinstance(model, behavior2.Machine) else behavior
+        game_export_exit = None
         if options.command == "render":
             print(model.render(options.to == "english"), end="")
             return 0
@@ -119,13 +120,12 @@ def main():
             result = {"status": "lowered" if options.command == "lower" else "exported",
                       "revision": model.revision, "authority": "none"}
         elif options.command == "export-game":
-            if profile is not behavior2:
-                raise behavior.Refusal("Game export needs a profile-2 game property model")
-            project, nodes = behavior2.export_game_project(model, options.property)
+            decision = behavior2.export_game_decision(model, options.property, str(options.out))
+            if decision["refusal"] is not None:
+                raise behavior.Refusal(decision["refusal"])
             options.out.parent.mkdir(parents=True, exist_ok=True)
-            options.out.write_text(project, encoding="ascii")
-            result = {"status": "exported", "format": "contract-tables", "property": options.property,
-                      "nodes": nodes, "out": str(options.out), "authority": "none"}
+            options.out.write_text(decision["text"], encoding="ascii")
+            result, game_export_exit = decision["result"], decision["exit_code"]
         elif options.command == "refine-check":
             from factory import refine_check
             result, code = refine_check(model, options.contract, options.cli, options.max_checks)
@@ -145,6 +145,8 @@ def main():
             serve(source if options.syntax == "symbolic" else model.render(), Path.cwd(), options.port, options.workspace)
             return 0
         print(json.dumps(result, indent=2))
+        if game_export_exit is not None:
+            return game_export_exit
         return 1 if result.get("status") in {"counterexample", "unfinished", "unknown"} else 3 if result.get("status") == "unsupported" else 0
     except (ValueError, OSError) as error:
         from diagnostics import describe

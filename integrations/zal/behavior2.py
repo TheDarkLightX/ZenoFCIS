@@ -1759,6 +1759,21 @@ def export_game_project(model, property_id):
     return _game_table_project(reduced), count
 
 
+def export_game_decision(model, property_id, output_path):
+    """Return the pure game-export decision, result, generated text and CLI disposition."""
+    try:
+        if not isinstance(model, Machine):
+            raise Refusal("Game export needs a profile-2 game property model")
+        project, nodes = export_game_project(model, property_id)
+    except Refusal as error:
+        return {"status": "refused", "refusal": str(error), "text": None, "node_count": None,
+                "result": None, "exit_code": 2}
+    result = {"status": "exported", "format": "contract-tables", "property": property_id,
+              "nodes": nodes, "out": output_path, "authority": "none"}
+    return {"status": "exported", "refusal": None, "text": project, "node_count": nodes,
+            "result": result, "exit_code": 0}
+
+
 def _shortest_path(graph, sources, targets, allowed):
     """Shortest path of allowed steps from any source to a target configuration; None if none."""
     parent = {s: None for s in sources}
