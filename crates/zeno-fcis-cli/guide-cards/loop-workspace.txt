@@ -28,7 +28,7 @@
     "zeno-fcis/transform-loop/1; read status, detail, accounting and report; session ledger, receipts, witnesses and artifacts"
   ],
   "exit_codes": {
-    "0": "requested result completed",
+    "0": "positive verdict or completed query/operation",
     "1": "invalid specification or refutation",
     "2": "blocked or inconclusive; no acceptance",
     "3": "filesystem or execution failure",
@@ -203,6 +203,8 @@ Expected: exit 0; {"status": "opened"}.
 
 ## Verdicts
 
+Question disagreements and wrong teach-back rules exit 1. Requirements-only questions and an unresolved `loop learn` question exit 2. Session lifecycle reports remain completed operations; inspect their individual attempt outcomes.
+
 `opened`: Request admitted; submit candidate or run proposer.
 
 `different`: Counterexample retained; revise candidate against all witnesses.
@@ -223,7 +225,7 @@ Expected: exit 0; {"status": "opened"}.
 
 `duplicate-of-original / duplicate-of-attempt:<N>`: Canonical/JSON duplicates exit 1; expression/sketch duplicates independently confirmed by check/replay exit 0. Both consume an attempt.
 
-Exit codes: {"0": "requested result completed", "1": "invalid specification or refutation", "2": "blocked or inconclusive; no acceptance", "3": "filesystem or execution failure", "64": "invalid command-line usage"}
+Exit codes: {"0": "positive verdict or completed query/operation", "1": "invalid specification or refutation", "2": "blocked or inconclusive; no acceptance", "3": "filesystem or execution failure", "64": "invalid command-line usage"}
 
 Outputs: ["zeno-fcis/transform-loop/1; read status, detail, accounting and report; session ledger, receipts, witnesses and artifacts"]
 
@@ -268,3 +270,7 @@ suggested questions retain their stated advisory status.
 Sources: {"engine": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "exit_codes": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "inputs": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "limits": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "outputs": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "refusals": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "synopsis": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "verdicts": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs"}
 
 Run `zeno-fcis guide find "propose and revise a program"` for related cards.
+
+Background: IEEE and The Open Group, *POSIX.1-2024*, Shell Command Language, 2024,
+defines shell exit status conventions. See the [shared exit contract](../CLI_REFERENCE.md#exit-codes)
+for this interface; the packet defines the finite scope of each verdict.

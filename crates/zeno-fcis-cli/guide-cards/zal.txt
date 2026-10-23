@@ -21,10 +21,9 @@
     "check stdout JSON: status, profile, scope, checks, counterexamples, authority and factory; no runtime publication"
   ],
   "exit_codes": {
-    "0": "completed result; check can report pass-with-scope and diff can still contain differences",
-    "1": "counterexample or unfinished (finite-fsm); counterexample or fail (typed/effects)",
-    "2": "refused input, I/O or malformed command-line arguments",
-    "3": "unsupported"
+    "0": "positive verdict or completed query/operation",
+    "1": "counterexample, fail, different or none-in-scope",
+    "2": "UNKNOWN, unfinished, unsupported, incomparable diff or input refusal"
   },
   "verdicts": {
     "pass-with-scope": "Only reported finite checks hold; inspect missing invariants and factory:not-run.",
@@ -115,7 +114,9 @@ Expected: exit 0; {"authority": "none", "status": "pass-with-scope"}.
 
 ## Verdicts
 
-`pass-with-scope`: Only reported finite checks hold; inspect missing invariants and factory:not-run.
+`diff` uses the core comparison field: a different result is negative, while domain changes and overlapping rules are incomparable. `why-not` reports a negative verdict when no input in scope can produce the wanted result.
+
+`pass-with-scope`: Only reported finite checks hold under declared domains; inspect missing invariants and factory:not-run.
 
 `counterexample`: Inspect the retained witness, revise requirements, then check.
 
@@ -127,7 +128,7 @@ Expected: exit 0; {"authority": "none", "status": "pass-with-scope"}.
 
 `refused`: Repair grammar, profile or input access.
 
-Exit codes: {"0": "completed result; check can report pass-with-scope and diff can still contain differences", "1": "counterexample or unfinished (finite-fsm); counterexample or fail (typed/effects)", "2": "refused input, I/O or malformed command-line arguments", "3": "unsupported"}
+Exit codes: {"0": "positive verdict or completed query/operation", "1": "counterexample, fail, different or none-in-scope", "2": "UNKNOWN, unfinished, unsupported, incomparable diff or input refusal"}
 
 Outputs: ["check stdout JSON: status, profile, scope, checks, counterexamples, authority and factory; no runtime publication"]
 
@@ -162,3 +163,7 @@ Background: Edmund M. Clarke, Orna Grumberg and Doron A. Peled, “Model Checkin
 Sources: {"engine": "integrations/zal/run.py; docs/zal/README.md", "exit_codes": "integrations/zal/run.py; docs/zal/README.md", "inputs": "integrations/zal/run.py; docs/zal/README.md", "limits": "integrations/zal/run.py; docs/zal/README.md", "outputs": "integrations/zal/run.py; docs/zal/README.md", "refusals": "integrations/zal/run.py; docs/zal/README.md", "synopsis": "integrations/zal/run.py; docs/zal/README.md", "verdicts": "integrations/zal/run.py; docs/zal/README.md"}
 
 Run `zeno-fcis guide find "review intended state machine behaviour"` for related cards.
+
+Background: IEEE and The Open Group, *POSIX.1-2024*, Shell Command Language, 2024,
+defines shell exit status conventions. See the [shared exit contract](../CLI_REFERENCE.md#exit-codes)
+for this interface; the packet defines the finite scope of each verdict.

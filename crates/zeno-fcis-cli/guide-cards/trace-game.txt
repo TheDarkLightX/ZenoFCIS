@@ -26,17 +26,17 @@
     "Retained tables, certificates and bindings; game.py writes game-binding.json, native-table.json, certificate.json and verdict.json. Read evidence and claim; fixed-game result schemas differ."
   ],
   "exit_codes": {
-    "0": "game.py completed, including counterexample or no guard in class; certificate_check accepted the evidence, including UNKNOWN diagnostics",
-    "2": "game.py malformed input/resource stop (UNKNOWN), or certificate_check refusal/argument error",
-    "other": "legacy run.py/run_v11.py failures; inspect their retained logs"
+    "0": "checked or certified positive verdict",
+    "1": "counterexample, no guard in class, exhausted fixed grammar or certified unrealizability",
+    "2": "UNKNOWN, binding refusal or argument error"
   },
   "verdicts": {
     "checked-through-K": "Legacy prefix-search run.status: complete declared histories only through K.",
     "checked up to K": "User-game checker evidence: complete declared histories through K only.",
-    "counterexample": "Replayed violation or infinite target-avoiding cycle; game.py still exits 0.",
+    "counterexample": "Replayed violation or infinite target-avoiding cycle; game.py exits 1.",
     "certified safety": "Closed safe set covers all histories of the declared finite game.",
     "certified reachability": "Checked ranks force the target against every permitted event.",
-    "no guard in class": "Every declared user-game fixed guard was refuted; game.py exits 0.",
+    "no guard in class": "Every declared user-game fixed guard was refuted; game.py exits 1.",
     "exhausted fixed grammar": "Legacy fixed-guard checker exhausted its declared grammar.",
     "certified guard": "Legacy fixed or reactive controller passed the certificate checker.",
     "certified winning strategy": "Legacy fixed or reactive controller passed the certificate checker.",
@@ -131,21 +131,25 @@ Expected: exit 0; ["withdrawal-safety"].
 
 ## Verdicts
 
+`game.py check/certify/select-guard` and `certificate_check.py` return the same verdict exit. Replaying a counterexample remains a negative verdict; replaying an incomplete diagnostic remains UNKNOWN. The campaign runners retain their harness completion exits.
+
 `checked-through-K`: Legacy prefix-search run.status: complete declared histories only through K.
 
 `checked up to K`: User-game checker evidence: complete declared histories through K only.
 
-`counterexample`: Replayed violation or infinite target-avoiding cycle; game.py still exits 0.
+`counterexample`: Replayed violation or infinite target-avoiding cycle; game.py exits 1.
 
 `certified safety`: Closed safe set covers all histories of the declared finite game.
 
 `certified reachability`: Checked ranks force the target against every permitted event.
 
-`no guard in class`: Every declared user-game fixed guard was refuted; game.py exits 0.
+`no guard in class`: Every declared user-game fixed guard was refuted; game.py exits 1.
 
 `exhausted fixed grammar`: Legacy fixed-guard checker exhausted its declared grammar.
 
 `certified guard`: Legacy fixed or reactive controller passed the certificate checker.
+
+Exit codes: {"0": "checked or certified positive verdict", "1": "counterexample, no guard in class, exhausted fixed grammar or certified unrealizability", "2": "UNKNOWN, binding refusal or argument error"}
 
 `certified winning strategy`: Legacy fixed or reactive controller passed the certificate checker.
 
@@ -188,3 +192,7 @@ Background: Edmund M. Clarke and E. Allen Emerson, “Design and Synthesis of Sy
 Sources: {"engine": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "exit_codes": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "inputs": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "limits": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "outputs": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "refusals": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "synopsis": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "verdicts": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md"}
 
 Run `zeno-fcis guide find "find an adversarial history"` for related cards.
+
+Background: IEEE and The Open Group, *POSIX.1-2024*, Shell Command Language, 2024,
+defines shell exit status conventions. See the [shared exit contract](../CLI_REFERENCE.md#exit-codes)
+for this interface; the packet defines the finite scope of each verdict.
