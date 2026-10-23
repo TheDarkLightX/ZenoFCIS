@@ -100,13 +100,10 @@ pub(crate) enum Lemmas {
     Inconclusive(Inconclusive),
 }
 
-/// What a verdict says.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Verdict {
-    Inductive,
-    NotInductive,
-    False,
-}
+#[path = "lemma_kernel.rs"]
+mod kernel;
+
+pub(crate) use kernel::Verdict;
 
 impl Verdict {
     pub(crate) fn name(self) -> &'static str {
@@ -327,7 +324,18 @@ pub(super) fn state_holds(
 fn verdict(observation: &Observation, holds: &[bool], formula: &str) -> Value {
     let machine = &observation.machine;
     let space = &machine.space;
-    let (reachable, parent) = machine.reachable();
+    let mut after = Vec::with_capacity(machine.observed.len());
+    let mut commits = Vec::with_capacity(machine.observed.len());
+    for state in 0..space.states {
+        for input in 0..space.inputs {
+            let outcome = machine.of(state, input);
+            after.push(outcome.after(state));
+            commits.push(outcome.commits());
+        }
+    }
+    let decision = kernel::decide(space.inputs, machine.genesis, &after, &commits, holds)
+        .unwrap_or_else(|| unreachable!("observed machine tables are bounded and complete"));
+    let reachable = decision.search.seen;
     let admitted = holds.iter().filter(|holds| **holds).count();
     let reachable_count = reachable.iter().filter(|seen| **seen).count();
     let mut out = json!({
@@ -335,52 +343,29 @@ fn verdict(observation: &Observation, holds: &[bool], formula: &str) -> Value {
         "holds_sha256": machine::table_digest(
             holds.iter().map(|holds| u8::from(*holds).to_string())
         ),
-        "initiation": holds[machine.genesis],
+        "initiation": decision.initiation,
         "states": {
             "declared": space.states,
             "admitted": admitted,
             "reachable": reachable_count,
         },
     });
-    let mut first = None;
-    let mut count = 0usize;
-    for state in (0..space.states).filter(|state| holds[*state]) {
-        for input in 0..space.inputs {
-            let outcome = machine.of(state, input);
-            if outcome.commits() && !holds[outcome.after(state)] {
-                count += 1;
-                first.get_or_insert((state, input));
-            }
-        }
-    }
-    // The nearest reachable state outside the lemma, nearest first, then
-    // least: its shortest trace's last step leaves a reachable state the
-    // lemma admits, since a nearer violation would have been chosen.
-    let (_, failed_run) = induction(
-        machine.genesis,
-        holds[machine.genesis],
-        space.inputs,
-        |state, input| {
-            let next = machine.of(*state, input).after(*state);
-            Ok((next, holds[next]))
-        },
-    )
-    .unwrap_or_else(|_| unreachable!("state lookup cannot fail"));
-    // Retain the state judge's established tie break: nearest violation,
-    // then least state ordinal. Run predicates use the first BFS witness.
-    let violation = failed_run.and_then(|_| {
-        (0..space.states)
-            .filter(|state| reachable[*state] && !holds[*state])
-            .map(|state| (Machine::trace(&parent, state), state))
-            .min_by_key(|(trace, state)| (trace.len(), *state))
-    });
-    let verdict = if !holds[machine.genesis] {
+    let count = decision.count;
+    let first = decision
+        .counterexample
+        .map(|(state, input, _)| (state, input));
+    let violation = if decision.verdict == Verdict::False {
+        decision.target.map(|state| (decision.trace, state))
+    } else {
+        None
+    };
+    let verdict = if !decision.initiation {
         out["reason"] = json!("genesis does not satisfy the lemma");
         out["genesis"] = crate::report_numbers::integers(&space.state(machine.genesis));
         Verdict::False
     } else if let Some((trace, state)) = violation {
         let last = *trace.last().unwrap_or(&0);
-        let before = parent[state].map_or(machine.genesis, |(before, _)| before);
+        let before = first.map_or(machine.genesis, |(before, _)| before);
         out["reason"] = json!("a reachable state lies outside the lemma");
         out["counterexample_to_induction"] = json!({
             "state": crate::report_numbers::integers(&space.state(before)),
