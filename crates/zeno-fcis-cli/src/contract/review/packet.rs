@@ -35,6 +35,7 @@ pub(super) struct Report<'r> {
     pub(super) agreement: &'r [Result<(), String>],
     pub(super) classified: &'r [Classified<'r>],
     pub(super) findings: &'r [Finding],
+    pub(super) case_coverage: &'r Value,
     pub(super) summary: &'r Summary,
     pub(super) state_width: usize,
 }
@@ -58,6 +59,7 @@ pub(super) fn build(report: &Report<'_>) -> Value {
         "examples": examples(report),
         "mutants": mutants(report),
         "findings": report.findings.iter().map(finding).collect::<Vec<_>>(),
+        "case_coverage": report.case_coverage,
         "summary": report.summary.json(),
     })
 }
@@ -300,6 +302,7 @@ fn finding(finding: &Finding) -> Value {
             "line": line,
             "mutant": mutant,
         }),
+        Finding::Case(found) => found.clone(),
         Finding::LawRefusal(found) => json!({
             "kind": "law-refusal-on-law-consistent-state",
             "law": found.law,

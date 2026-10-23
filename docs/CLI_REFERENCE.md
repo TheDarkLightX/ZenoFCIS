@@ -1682,8 +1682,10 @@ The packet records:
 
 - The inputs: every program input position with its admitted domain, and the
   input set. A domain of at most `--max-tuples` tuples (default 2^20) is
-  enumerated in full (`full-domain`). Otherwise each integer position takes a
-  boundary set: its endpoints and every integer constant the rules compare
+  enumerated in full (`full-domain`). Above that cap the command uses symbolic
+  law checking and leaves case coverage `not checked`. The pure review helper
+  retains deterministic boundary inputs for native example checks: each
+  integer position takes a boundary set: its endpoints and every integer constant the rules compare
   with, add to, subtract from or assign to a value of its type, with that
   constant's two neighbours, where in domain; genesis values count as
   constants; a sum takes every variant and a boolean both values. When the
@@ -1742,6 +1744,24 @@ The packet records:
   shares; `equivalent-over-full-domain`, only after a fully enumerated
   domain; otherwise `not-distinguished-within-boundary-set`, which claims
   nothing more.
+- Case coverage, only after complete enumeration: `case_coverage.status` is
+  `checked`, `scope` is `full-domain`, and `tuples` is the domain count.
+  `case_coverage.cases[]` carries `case`, `rule`, `when`, `guard_true`,
+  `decided` and `law_consistent`. Counts measure first-match selections
+  before Authority admission, including selections whose resulting decision
+  is refused; the second selection count restricts to pre-states satisfying
+  every state law. A `case-never-decides` finding has `decided: 0` and `cause`
+  `guard never true` or `covered by earlier cases`. `covered_by[]` gives each
+  actual earlier decider's `case`, `when` and first `witness.{ordinal,input}`;
+  witness inputs use decimal strings in program order.
+  `case-only-on-excluded-pre-states` has a positive `decided` count and zero
+  `law_consistent`, with `first.{ordinal,input,unsatisfied_state_law}`.
+  Both carry the human `text`. The [case-coverage guide](CONTRACT_JUDGES.md#does-every-case-decide)
+  gives an example and scope. `summary.case_findings` counts these findings,
+  included in `summary.findings`. Above the cap, symbolic reports explicitly
+  use `case_coverage.status: "not checked"`, `reason` and `cases: null`;
+  boundary-only or undefined-guard coverage makes no live/dead claim either.
+  These are additive fields in the existing scalar review packet schemas.
 - The findings: owner examples the contract decides differently; owner
   examples whose outcome is a mutant's rather than the contract's, the
   signature of a wrong constant or comparison in the rules; and law
@@ -1752,7 +1772,8 @@ The packet records:
   decision program selects for it. A law refusal for which the library's
   diagnostics name no law, such as a malformed law frame, is named by that
   case and input alone. Refusals of other classes are counted but are not
-  findings.
+  findings. Cases that never decide and cases selecting only excluded
+  pre-states are separate findings as described above.
 
 The human summary labels original example disagreements and law refusals,
 declared-law `gaps` and scenario coverage separately. Review does not run the
@@ -1767,8 +1788,10 @@ them, removes the finding. A pre-state that breaks a state law is never a
 committed state, so a refusal there is reported apart and is not a finding.
 
 Exit codes: 0 `reviewed`; 1 `disagreement` when an owner example disagrees,
-otherwise `law-refusal` when a law refusal is a finding, the packet still
-written in both cases, or `contract-invalid`, nothing written and the entry
+otherwise `law-refusal` when a law refusal is a finding, otherwise
+`case-coverage` when either case finding kind is present. Each exits 1 with
+the packet written, including the weaker excluded-only finding; or
+`contract-invalid`, nothing written and the entry
 at fault named; 3 when a file could not be read or the packet could not be
 written; 64 for usage, including `--max-tuples 0`. The human summary counts
 the refusals by class and by pre-state, and gives one line for each law
@@ -1790,6 +1813,12 @@ the transform checker's own verdict against the contract's program
 (`program_equivalent`), and the optimizer and the loop check it again before
 using it. The JSON summary lists each seed's path, size and SHA-256 under
 `mutant_programs`; an existing directory is refused (exit 3).
+
+Case-coverage lineage: first-match subsumption, overlap and missing-rule
+analysis are established decision-table techniques. A DMN analysis
+bibliography could not be confirmed offline; no unverified citation is
+asserted. This integration counts the generated selection graph exhaustively
+over the declared domain only; prior-art search pending.
 
 ## Generated application command line
 

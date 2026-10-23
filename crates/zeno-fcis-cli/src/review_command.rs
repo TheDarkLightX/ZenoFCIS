@@ -260,6 +260,8 @@ fn review_directory(
         "disagreement"
     } else if summary.law_refusals > 0 {
         "law-refusal"
+    } else if summary.case_findings > 0 {
+        "case-coverage"
     } else {
         review.gaps().map_or("reviewed", gaps::Gaps::review_status)
     };
@@ -387,6 +389,7 @@ fn symbolic_directory(
                 }
             }
         };
+        report["case_coverage"] = json!({"status": "not checked", "reason": "domain not fully enumerated; symbolic path", "cases": null});
         report["application"] = json!(application);
         if let Some(path) = out {
             if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
@@ -525,6 +528,7 @@ fn lines(review: &Review, status: &str) -> Vec<String> {
         ),
     ];
     lines.extend(review.law_refusal_lines());
+    lines.extend(review.case_finding_lines().iter().cloned());
     lines.push(format!(
         "original decisions: {} example disagreements, {} law refusals",
         summary.disagreements, summary.law_refusals

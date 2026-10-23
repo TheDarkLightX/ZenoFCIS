@@ -467,6 +467,28 @@ pub(super) fn review(
                 )
             })
             .transpose()?;
+        let case_coverage = super::case_coverage::measure(
+            &contract,
+            &rules,
+            space.full,
+            space.rows.len(),
+            |ordinal| space.rows[ordinal].clone(),
+            |ordinal| state_check(&contract, &space.rows[ordinal], &laws),
+        );
+        let mut findings: Vec<Value> = disagreements
+            .iter()
+            .cloned()
+            .map(|mut f| {
+                f["kind"] = json!("example-disagrees");
+                f
+            })
+            .chain(law_findings.iter().map(|(_, f)| {
+                let mut f = f.clone();
+                f["kind"] = json!("law-refusal-on-law-consistent-state");
+                f
+            }))
+            .collect();
+        findings.extend(case_coverage.findings.iter().cloned());
         let summary = Summary {
             application: rules.template.clone(),
             construction: if space.full {
@@ -485,14 +507,16 @@ pub(super) fn review(
             undistinguished: if space.full { 0 } else { equal },
             refusals: tally,
             law_refusals,
-            findings: disagreements.len() + law_refusals,
+            case_findings: case_coverage.findings.len(),
+            findings: findings.len(),
             gaps: gaps.as_ref().map(gaps::Gaps::summary),
         };
-        let packet = json!({"schema":"zeno-fcis/contract-review/4","authority":"none","identity":evaluate::hex(authority.identity()),"summary":summary.json(),"domain_size":space.size.map(|s|s.to_string()),"scope":if space.full{"whole declared domain"}else{"boundary probes; no equivalence claim"},"rows":rows,"example_disagreements":disagreements,"law_refusals":law_findings.iter().map(|(_,v)|v).collect::<Vec<_>>(),"mutants":classified,"gaps":gaps.as_ref().map(gaps::Gaps::json)});
+        let packet = json!({"schema":"zeno-fcis/contract-review/4","authority":"none","identity":evaluate::hex(authority.identity()),"summary":summary.json(),"case_coverage":case_coverage.packet,"findings":findings,"domain_size":space.size.map(|s|s.to_string()),"scope":if space.full{"whole declared domain"}else{"boundary probes; no equivalence claim"},"rows":rows,"example_disagreements":disagreements,"law_refusals":law_findings.iter().map(|(_,v)|v).collect::<Vec<_>>(),"mutants":classified,"gaps":gaps.as_ref().map(gaps::Gaps::json)});
         Ok(Review {
             packet: serde_json::to_string(&packet).map_err(|e| error(e.to_string()))? + "\n",
             summary,
             law_refusals: law_findings.into_iter().map(|(line, _)| line).collect(),
+            case_findings: case_coverage.lines,
             gaps,
         })
     })?

@@ -83,6 +83,60 @@ pre-state uses the state-invariant checks instead: initial-condition law 990
 constrains startup, rather than every later state. Existing decision laws,
 resource limits and rejection order remain independent checks.
 
+## Does every case decide?
+
+Ordinary `contract review` and `review --gaps` include `case_coverage` for
+scalar policies, including the typed numeric profile. When `status` is
+`checked`, `scope` is `full-domain` and `tuples` is the complete declared
+input count. Each `cases` entry records its zero-based `case` index, optional
+`rule` note, rendered `when`, `guard_true` count, `decided` count and
+`law_consistent` count. `decided` counts first-match selections before the
+Authority admits or refuses the decision. `law_consistent` counts those
+selections whose pre-state satisfies every state law. Neither is a claim
+about reachability or eventual progress through a history.
+
+A `case-never-decides` finding has `decided: 0` and one of two `cause` values:
+`guard never true`, when the guard holds on no declared tuple; or
+`covered by earlier cases`, when every matching tuple selects an earlier
+case. `covered_by` names each earlier case that actually selects such a tuple,
+its `when`, and one `witness` with the first tuple's `ordinal` and `input`.
+Witness `input` coordinates are decimal strings in program order, with
+Boolean values as 0/1 and variants by ID, including full-width integers.
+Several earlier cases can cover one case together. A mere overlap is not a
+dead-case finding. A `case-only-on-excluded-pre-states` finding is weaker:
+`decided` is positive but `law_consistent` is zero. Its `first` witness names
+`unsatisfied_state_law`. Every finding includes the exact human `text`.
+
+For example, inserting `status == 151 -> Reject 200` immediately after the
+dual-approval rule `status != 150` reports:
+
+```text
+dead case: cases[1] `status == 151` decides no tuple: covered by earlier cases; cases[0] `status != 150` at 151 160 160 140 160
+```
+
+The inserted guard holds on 128 tuples but decides none. The shipped
+dual-approval policy has no case-coverage findings. Both new finding kinds
+contribute to `summary.case_findings` and `summary.findings`, use status
+`case-coverage` when no example or law-refusal finding takes precedence, and
+exit 1 like existing findings. No new exit code or packet schema is introduced:
+these fields extend the ordinary `/2` and gap `/4` packets additively.
+
+Above the enumeration cap, the symbolic packet says
+`case_coverage.status: "not checked"`, with a `reason` and `cases: null`.
+Boundary reviews also make no case-coverage claim. Undefined guard evaluation
+likewise leaves coverage `not checked`, with its first refused tuple; it is
+never interpreted as a false guard. Runtime refusals remain separately
+reported. This coverage applies to scalar case tables; the separate
+`tables/1` review format does not provide this analysis.
+
+**Background and lineage.** First-match rule subsumption, overlapping rules
+and missing rules are established decision-table analysis questions. A DMN
+decision-table analysis citation could not be confirmed offline, so no
+unverified bibliographic citation is asserted here. The scoped integration
+reports the existing library's generated guard and selection graph over a
+fully enumerated domain; **prior-art search pending**. It grants no runtime,
+resource or publication authority.
+
 ## Do the laws pin the contract down?
 
 ```text

@@ -338,6 +338,9 @@ pub(crate) fn review(
     let schema = schema::encode(&declarations)?;
     let c = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
     let mut report = json!({"schema":"zeno-fcis/numeric-law-review/1","authority":"none","mode":"symbolic","scope":"all declared inputs; eager arithmetic and candidate construction; no reachability claim","sources":{"project_sha256":crate::transform::sha256_hex(sources.project.as_bytes()),"rules_sha256":crate::transform::sha256_hex(sources.rules.as_bytes()),"schema_sha256":crate::transform::sha256_hex(&schema)},"domain_size":size(&c).map(|n|n.to_string()),"status":"UNKNOWN"});
+    report["case_coverage"] =
+        super::case_coverage::Coverage::not_checked("domain not fully enumerated; symbolic path")
+            .packet;
     if !rules.adoptions.is_empty() || !rules.evolutions.is_empty() {
         report["reason"] = json!(
             "symbolic numeric review requires a standalone contract; retained lineage replay is unsupported"

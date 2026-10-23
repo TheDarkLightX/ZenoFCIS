@@ -19,6 +19,7 @@
 
 // The review's input domains and its evaluation live in the library.
 pub(super) use zeno_fcis_contract::internals::review::{domain, evaluate};
+mod case_coverage;
 #[cfg(test)]
 mod collection_tests;
 pub(crate) mod decision_space;
@@ -116,6 +117,7 @@ pub(crate) struct Review {
     packet: String,
     summary: Summary,
     law_refusals: Vec<String>,
+    case_findings: Vec<String>,
     gaps: Option<gaps::Gaps>,
 }
 
@@ -132,6 +134,11 @@ impl Review {
     /// The specification-gap judge's result, when it ran.
     pub(crate) fn gaps(&self) -> Option<&gaps::Gaps> {
         self.gaps.as_ref()
+    }
+
+    /// One line for each case-coverage finding.
+    pub(crate) fn case_finding_lines(&self) -> &[String] {
+        &self.case_findings
     }
 
     /// One line for each law-refusal finding.
@@ -157,6 +164,7 @@ pub(crate) struct Summary {
     refusals: Tally,
     /// Findings of law refusals on pre-states that satisfy every state law.
     pub(crate) law_refusals: usize,
+    pub(crate) case_findings: usize,
     pub(crate) findings: usize,
     /// The specification-gap judge's counts, when it ran.
     pub(crate) gaps: Option<Value>,
@@ -178,6 +186,7 @@ impl Summary {
             },
             "refusals": self.refusals.json(),
             "law_refusal_findings": self.law_refusals,
+            "case_findings": self.case_findings,
             "findings": self.findings,
         });
         if let Some(gaps) = &self.gaps {
@@ -267,6 +276,8 @@ enum Finding {
     ExampleAgreesWithMutant { line: usize, mutant: String },
     /// A law refuses inputs whose pre-state satisfies every state law.
     LawRefusal(LawRefusal),
+    /// A case never decides, or decides only on excluded pre-states.
+    Case(Value),
 }
 
 /// One refusal by one law, on inputs whose pre-state satisfies every state
@@ -352,6 +363,7 @@ fn review_with(
         state_laws,
         table,
         at_examples,
+        case_coverage,
     } = policy::with_authority(&contract, &schema, |authority| {
         let descriptor = authority.descriptor();
         // The examples are read against the descriptor, as the application
@@ -400,6 +412,34 @@ fn review_with(
             .iter()
             .map(|example| evaluate::evaluate(authority, &framer, &example.inputs))
             .collect();
+        let case_coverage = case_coverage::measure(
+            &contract,
+            &rules,
+            inputs.construction == Construction::FullDomain,
+            inputs.len(),
+            |ordinal| {
+                use zeno_fcis_synthesis::finite::{
+                    V2NumericAtom as Atom, V2NumericDomain as Domain,
+                };
+                inputs
+                    .tuple(ordinal)
+                    .iter()
+                    .zip(&contract.input_domains)
+                    .map(|(value, domain)| match policy::numeric_domain(domain) {
+                        Domain::Bool => Atom::Bool(*value == 1),
+                        _ => Atom::I128(*value),
+                    })
+                    .collect()
+            },
+            |ordinal| {
+                evaluate::first_unsatisfied_state_law(
+                    descriptor,
+                    &state_laws,
+                    &framer,
+                    inputs.tuple(ordinal),
+                )
+            },
+        );
         Ok::<_, ContractError>(Bound {
             identity: evaluate::hex(&evaluate::digest(authority.identity())),
             examples,
@@ -407,6 +447,7 @@ fn review_with(
             state_laws,
             table,
             at_examples,
+            case_coverage,
         })
     })??;
     let agreement: Vec<Result<(), String>> = examples
@@ -473,6 +514,7 @@ fn review_with(
         .filter_map(|group| law_refusal(group, &table, &inputs, program.as_ref(), &rules))
         .collect();
     findings.extend(law_refusals.iter().cloned().map(Finding::LawRefusal));
+    findings.extend(case_coverage.findings.iter().cloned().map(Finding::Case));
 
     let count = |wanted: &str| {
         classified
@@ -494,6 +536,7 @@ fn review_with(
         undistinguished: count("not-distinguished-within-boundary-set"),
         refusals: Tally::of(&table, &groups),
         law_refusals: law_refusals.len(),
+        case_findings: case_coverage.findings.len(),
         findings: findings.len(),
         gaps: gap_result.as_ref().map(gaps::Gaps::summary),
     };
@@ -519,6 +562,7 @@ fn review_with(
         agreement: &agreement,
         classified: &classified,
         findings: &findings,
+        case_coverage: &case_coverage.packet,
         summary: &summary,
         state_width,
     };
@@ -540,6 +584,7 @@ fn review_with(
         packet: crate::transform::canonical_json(&packet),
         summary,
         law_refusals: law_refusals.iter().map(LawRefusal::line).collect(),
+        case_findings: case_coverage.lines,
         gaps: gap_result,
     })
 }
@@ -674,6 +719,7 @@ struct Bound {
     state_laws: Vec<u32>,
     table: Table,
     at_examples: Vec<Outcome>,
+    case_coverage: case_coverage::Coverage,
 }
 
 /// What every mutant is classified against.

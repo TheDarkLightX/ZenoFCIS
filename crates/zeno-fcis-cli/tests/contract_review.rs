@@ -478,3 +478,81 @@ fn the_command_is_described_with_its_effects() {
         "command-group"
     );
 }
+#[test]
+fn case_coverage_findings_exit_one_and_restoration_clears_them() {
+    let root = TempRoot::new("case-coverage");
+    let app = root.path().join("dual");
+    copy_application(&dual_approval(), &app);
+    let file = app.join("v2/policy.json");
+    let original = fs::read_to_string(&file).unwrap_or_else(|e| panic!("{e}"));
+    for (index, when, kind, cause) in [
+        (
+            1,
+            "status == 151",
+            "case-never-decides",
+            Some("covered by earlier cases"),
+        ),
+        (
+            1,
+            "status == 150 && status != 150",
+            "case-never-decides",
+            Some("guard never true"),
+        ),
+        (
+            0,
+            "status == 151 && first == 160",
+            "case-only-on-excluded-pre-states",
+            None,
+        ),
+    ] {
+        let mut policy: Value = serde_json::from_str(&original).unwrap_or_else(|e| panic!("{e}"));
+        policy["cases"].as_array_mut().unwrap_or_else(|| panic!("cases")).insert(index,
+            serde_json::json!({"when": when, "class": "Reject", "reason": 200, "post": {}, "outbox": []}));
+        fs::write(&file, policy.to_string()).unwrap_or_else(|e| panic!("{e}"));
+        let output = review(&app, &[]);
+        assert_eq!(
+            output.status.code(),
+            Some(1),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let report = json(&output.stdout);
+        assert_eq!(report["case_coverage"]["status"], "checked");
+        assert_eq!(report["summary"]["case_findings"], 1);
+        assert_eq!(report["findings"][0]["kind"], kind);
+        assert_eq!(report["findings"][0]["cause"].as_str(), cause);
+        assert!(String::from_utf8_lossy(&output.stderr).starts_with("case-coverage dual-approval"));
+        assert!(
+            String::from_utf8_lossy(&output.stderr)
+                .contains(report["findings"][0]["text"].as_str().unwrap_or_default())
+        );
+        // The packet remains additive; the existing law and mutant fields stay present.
+        assert_eq!(report["schema"], "zeno-fcis/contract-review/2");
+        assert_eq!(report["summary"]["law_refusal_findings"], 0);
+        fs::write(&file, &original).unwrap_or_else(|e| panic!("{e}"));
+        let restored = review(&app, &[]);
+        assert_eq!(restored.status.code(), Some(0));
+        assert_eq!(json(&restored.stdout)["summary"]["case_findings"], 0);
+    }
+}
+
+#[test]
+fn symbolic_review_explicitly_leaves_case_coverage_unchecked() {
+    let output = Command::new(env!("CARGO_BIN_EXE_zeno-fcis"))
+        .args(["contract", "review"])
+        .arg(dual_approval())
+        .args(["--max-tuples", "383", "--format", "json"])
+        .env_remove("ZENO_FCIS_Z3")
+        .env_remove("ZENO_FCIS_CVC5")
+        .output()
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(output.status.code(), Some(2));
+    let packet = json(&output.stdout);
+    assert_eq!(packet["mode"], "symbolic");
+    assert_eq!(packet["case_coverage"]["status"], "not checked");
+    assert_eq!(packet["case_coverage"]["cases"], Value::Null);
+    assert!(packet["findings"].as_array().is_none_or(|fs| {
+        !fs.iter()
+            .any(|f| f["kind"].as_str().is_some_and(|k| k.starts_with("case-")))
+    }));
+}

@@ -1000,3 +1000,6 @@ fn every_template_examples_file_reads_as_it_did_before_the_shared_grammar() {
     // The eighth template keeps no examples file.
     assert!(App::template("prepared-counter").examples.is_none());
 }
+
+#[path = "case_tests.rs"]
+mod case_tests;
