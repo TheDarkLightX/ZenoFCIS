@@ -291,6 +291,10 @@ Read reported work reservations and scope; these are not total CPU-time measurem
 
 Limits: {"deadline_ms": {"cap": 22000, "default": 22000}, "file_bytes": 65536, "invocation_control_frames": 62, "max_assignments": {"cap": 20000, "default": 2000}, "max_cells": {"cap": 16777216, "default": 4194304}, "max_checks": {"cap": 30, "default": 24}, "max_gate_pairs": {"cap": 4000000, "default": 1000000}, "max_search_work_per_stage": {"cap": 100000000, "default": 50000000}, "max_terms": {"cap": 512, "default": 128}, "max_tuples": {"cap": 131072, "default": 131072}, "program_inputs_cap": 32, "program_nodes_cap": 256, "program_outputs_cap": 16}
 
+## Coordinate
+
+Retain the command, exit status, verdict, declared scope and supporting receipt when passing a result to another workflow. Reports and suggestions do not grant adoption or publication authority.
+
 ## Pitfalls
 
 The summary is derived diagnostics, not an acceptance gate. Qualified counts term rules passing target check/replay; refuted counts rules with a target or whole-program counterexample. These counts can overlap when a qualified term rule yields a refuted replacement. Refused/inconclusive entries do not count as refutations; unexamined rules have no target-rule row. Only the listed finite domain is checked.

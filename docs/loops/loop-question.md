@@ -214,6 +214,10 @@ Read reported work reservations and scope; these are not total CPU-time measurem
 
 Limits: {"contract_admissibility_checks": 4000000, "contract_tuples": 131072, "document_bytes": 65536, "invocation_ms": 22000, "search_stage_ms": 5000, "spec_cells": {"cap": 8000000, "default": 1000000}, "spec_conflict_subsets": {"cap": 1000000, "default": 10000}, "spec_domain": {"cap": 65536, "default": 4096}, "spec_holes_cap": 16, "spec_inputs_plus_outputs_cap": 32, "spec_lowering_bound": "4 * total sketch nodes + inputs <= 256; 4 * law nodes + inputs + outputs <= 256", "spec_meanings": {"cap": 16384, "default": 4096}, "spec_outputs_range": [1, 16], "spec_requirements_cap": 64, "spec_work": {"cap": 100000000, "default": 2000000}}
 
+## Coordinate
+
+Retain the command, exit status, verdict, declared scope and supporting receipt when passing a result to another workflow. Reports and suggestions do not grant adoption or publication authority.
+
 ## Pitfalls
 
 A completed question report may contain disagreements. Contract determination includes delivery requirements beyond exported law-only constraints and need not equal a separate gaps judgment. No answer is adopted and no session or attempt is created.

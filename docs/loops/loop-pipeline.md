@@ -239,6 +239,10 @@ Read reported work reservations and scope; these are not total CPU-time measurem
 
 Limits: {"deadline_ms": {"cap": 22000, "default": 22000}, "file_bytes": 65536, "invocation_control_frames": 62, "max_assignments": {"cap": 20000, "default": 2000}, "max_cells": {"cap": 16777216, "default": 4194304}, "max_checks": {"cap": 30, "default": 24}, "max_gate_pairs": {"cap": 4000000, "default": 1000000}, "max_search_work_per_stage": {"cap": 100000000, "default": 50000000}, "max_terms": {"cap": 512, "default": 128}, "max_tuples": {"cap": 131072, "default": 131072}, "program_inputs_cap": 32, "program_nodes_cap": 256, "program_outputs_cap": 16}
 
+## Coordinate
+
+Retain the command, exit status, verdict, declared scope and supporting receipt when passing a result to another workflow. Reports and suggestions do not grant adoption or publication authority.
+
 ## Pitfalls
 
 Stage guards and proposer ranking grant no acceptance. The reference must have a successful observation. Qualification covers only the declared finite domain and does not adopt or publish code.

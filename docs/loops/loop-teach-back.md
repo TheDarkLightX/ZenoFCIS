@@ -145,6 +145,10 @@ Read reported work reservations and scope; these are not total CPU-time measurem
 
 Limits: {"admissibility_checks": 4000000, "core_tuples": 131072, "document_bytes": 65536, "invocation_ms": 22000, "search_stage_ms": 5000}
 
+## Coordinate
+
+Retain the command, exit status, verdict, declared scope and supporting receipt when passing a result to another workflow. Reports and suggestions do not grant adoption or publication authority.
+
 ## Pitfalls
 
 Rule agreement checks the implemented finite core; it does not establish owner intent or adopt the restatement. The judged status retains each rule verdict: wrong/refused exits 1 and vacuous/incomplete exits 2.
