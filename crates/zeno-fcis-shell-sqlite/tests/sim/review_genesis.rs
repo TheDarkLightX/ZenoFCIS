@@ -46,6 +46,35 @@ pub(crate) fn with_catalog(run: impl FnOnce(&catalog::BoundCatalog<'_>)) {
     // The state-update and genesis laws stay intact. The simulation's
     // decision law checks the two-notification branch shape. Exact application
     // behavior is separately compared against all 24 legal command inputs.
+    let payloads = [
+        l::Op::Observe(l::Observation::OutboxLength),
+        l::Op::ToI128(0),
+        l::Op::Literal(l::Atom::I128(2)),
+        l::Op::Eq(1, 2),
+        l::Op::Observe(l::Observation::Post(110)),
+        l::Op::Observe(l::Observation::Post(111)),
+        l::Op::Observe(l::Observation::OutboxPayload(0, 112)),
+        l::Op::Eq(6, 4),
+        l::Op::Observe(l::Observation::OutboxPayload(0, 113)),
+        l::Op::Eq(8, 5),
+        l::Op::Observe(l::Observation::OutboxPayload(1, 112)),
+        l::Op::Eq(10, 4),
+        l::Op::Observe(l::Observation::OutboxPayload(1, 113)),
+        l::Op::Eq(12, 5),
+        l::Op::And(7, 9),
+        l::Op::And(11, 13),
+        l::Op::And(14, 15),
+        l::Op::And(3, 16),
+    ];
+    let destinations = [
+        l::Op::Observe(l::Observation::OutboxDestination(0)),
+        l::Op::Literal(l::Atom::Text(b"local-observer")),
+        l::Op::Eq(0, 1),
+        l::Op::Observe(l::Observation::OutboxDestination(1)),
+        l::Op::Literal(l::Atom::Text(b"local-observer")),
+        l::Op::Eq(3, 4),
+        l::Op::And(2, 5),
+    ];
     let branch_shape = [
         l::Op::Observe(l::Observation::OutboxLength),
         l::Op::ToI128(0),
@@ -71,6 +100,10 @@ pub(crate) fn with_catalog(run: impl FnOnce(&catalog::BoundCatalog<'_>)) {
             program: l::Program {
                 nodes: if law.id == 990 {
                     &valid_genesis
+                } else if law.id == 510 {
+                    &payloads
+                } else if law.id == 511 {
+                    &destinations
                 } else if law.id == 991 {
                     &branch_shape
                 } else {
@@ -78,6 +111,10 @@ pub(crate) fn with_catalog(run: impl FnOnce(&catalog::BoundCatalog<'_>)) {
                 },
                 root: if law.id == 990 {
                     0
+                } else if law.id == 510 {
+                    17
+                } else if law.id == 511 {
+                    6
                 } else if law.id == 991 {
                     10
                 } else {

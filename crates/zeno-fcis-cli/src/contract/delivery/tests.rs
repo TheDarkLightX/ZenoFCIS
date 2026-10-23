@@ -708,12 +708,12 @@ fn old_contract_bytes_stay_equal_and_new_bound_channel_field_are_policy_bound() 
     {
         case["outbox"] = json!([]);
     }
-    rules["law_kinds"]["510"] = json!("AssetConservation");
+    rules["law_kinds"]["9000"] = json!("AssetConservation");
     let mut policies = Vec::new();
     for field in [112, 113] {
         let name = format!("outbox.104.{field}");
-        rules["delivery_laws"] = json!({"510":{"max_deliveries":0,"observations":{(name.clone()):{"channel":300,"field":field}}}});
-        let project = format!("{base}\nlaw 510 no_deliveries on commit = {name} == 0;\n");
+        rules["delivery_laws"]["9000"] = json!({"max_deliveries":0,"observations":{(name.clone()):{"channel":300,"field":field}}});
+        let project = format!("{base}\nlaw 9000 no_deliveries on commit = {name} == 0;\n");
         policies.push(
             generated(&project, &rules)
                 .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
@@ -728,16 +728,16 @@ fn old_contract_bytes_stay_equal_and_new_bound_channel_field_are_policy_bound() 
 fn symbolic_delivery_observations_are_explicitly_inconclusive() {
     use crate::contract::symbolic::{Status, SymbolicSources, check};
     let project = format!(
-        "{}\nlaw 510 notification_count on commit = outbox.104 == 1;\n",
+        "{}\nlaw 9000 notification_count on commit = outbox.104 == 1;\n",
         include_str!("../../../templates/durable-counter/project.zeno")
     );
     let mut rules: Value = serde_json::from_str(include_str!(
         "../../../templates/durable-counter/v2/policy.json"
     ))
     .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
-    rules["law_kinds"]["510"] = json!("AssetConservation");
-    rules["delivery_laws"] =
-        json!({"510":{"max_deliveries":1,"observations":{"outbox.104":{"channel":300}}}});
+    rules["law_kinds"]["9000"] = json!("AssetConservation");
+    rules["delivery_laws"]["9000"] =
+        json!({"max_deliveries":1,"observations":{"outbox.104":{"channel":300}}});
     let checked = check(
         SymbolicSources {
             project: &project,
@@ -757,7 +757,7 @@ fn symbolic_delivery_observations_are_explicitly_inconclusive() {
             .any(|cause| cause
                 .as_str()
                 .is_some_and(|text| text.contains("unsupported delivery observations")
-                    && text.contains("510")))
+                    && text.contains("9000")))
     );
 }
 

@@ -1804,14 +1804,34 @@ fn a_step_limit_must_cover_each_program_and_every_law_node() {
 /// The durable counter with a second delivery, ordinal 1 and idempotency
 /// ordinal 2, on its accepting case.
 fn counter_with_two_deliveries() -> Template {
-    template("durable-counter").with_rules(|rules| {
+    let mut counter = template("durable-counter").with_rules(|rules| {
         let mut second = rules["cases"][2]["outbox"][0].clone();
         second["ordinal"] = 1.into();
         second["idempotency_ordinal"] = 2.into();
         if let Some(outbox) = rules["cases"][2]["outbox"].as_array_mut() {
             outbox.push(second);
         }
-    })
+        for law in ["510", "511"] {
+            rules["delivery_laws"][law]["max_deliveries"] = 2.into();
+        }
+    });
+    // This resource fixture intentionally sends two notifications on Increment.
+    // Retain exact payload and destination checks for that two-entry variant.
+    counter.project = counter
+        .project
+        .lines()
+        .map(|line| {
+            if line.starts_with("law 510 ") {
+                "law 510 notification_matches_both_post_counters on commit = (command.101 == 120 -> outbox.104 == 2 && outbox.104.112 == post.100.110 + post.100.110 && outbox.104.113 == post.100.111 + post.100.111) && (command.101 == 121 -> outbox.104 == 1 && outbox.104.112 == post.100.110 && outbox.104.113 == post.100.111);"
+            } else if line.starts_with("law 511 ") {
+                "law 511 notification_goes_to_the_local_observer on commit = (command.101 == 120 -> outbox.104 == 2) && (command.101 == 121 -> outbox.104 == 1);"
+            } else {
+                line
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    counter
 }
 
 /// The counter's framed state, command and context.
@@ -1949,10 +1969,18 @@ fn a_case_delivers_in_increasing_ordinal_order() {
 
 #[test]
 fn a_committed_failure_needs_a_committed_failure_law() {
-    // Law 502 is the counter's only CommittedFailureEffects law; case 3 is
-    // its committed failure.
+    // Reclassify every failure law in this scratch fixture; case 3 must not
+    // remain admissible when its required law family is absent.
     let unlawful = template("durable-counter").with_rules(|rules| {
-        rules["law_kinds"]["502"] = "AuthoritySubjectRecipient".into();
+        for kind in rules["law_kinds"]
+            .as_object_mut()
+            .unwrap_or_else(|| panic!("required law bindings are missing"))
+            .values_mut()
+        {
+            if kind.as_str() == Some("CommittedFailureEffects") {
+                *kind = "AuthoritySubjectRecipient".into();
+            }
+        }
     });
     let (place, reason) = unlawful.refusal();
     assert_eq!(place, "v2/policy.json cases[3]");

@@ -184,6 +184,81 @@ class TemplateRules(unittest.TestCase):
         self.assertEqual(outcome['class'], 'Refused', outcome)
         self.assertEqual(outcome['law'], 510, outcome)
 
+    def test_counter_denial_precedes_capacity(self):
+        def mutate(policy):
+            case = dict(policy['cases'][0])
+            case['reason'] = 201
+            policy['cases'].insert(0, case)
+        outcome = self.probe('crates/zeno-fcis-cli/templates/durable-counter',
+                             mutate, '3 0 120 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 504, outcome)
+
+    def test_counter_full_selected_counter_names_capacity(self):
+        def mutate(policy):
+            case = dict(policy['cases'][1])
+            case['when'] = 'allowed && full'
+            case['reason'] = 200
+            policy['cases'].insert(0, case)
+        for values in ['3 0 120 1', '0 3 121 1']:
+            with self.subTest(input=values):
+                outcome = self.probe('crates/zeno-fcis-cli/templates/durable-counter',
+                                     mutate, values)
+                self.assertEqual(outcome['class'], 'Refused', outcome)
+                self.assertEqual(outcome['law'], 504, outcome)
+
+    def test_counter_failure_has_the_recorded_failure_reason(self):
+        def mutate(policy):
+            case = dict(policy['cases'][-1])
+            case['when'] = 'allowed && action == 121'
+            case['reason'] = 200
+            policy['cases'][0]['reason'] = 201
+            policy['cases'].insert(-1, case)
+        outcome = self.probe('crates/zeno-fcis-cli/templates/durable-counter',
+                             mutate, '0 0 121 1')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 505, outcome)
+
+    def test_counter_notification_contains_both_post_counters(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                for delivery in case['outbox']:
+                    delivery['payload']['113'] = 0
+        outcome = self.probe('crates/zeno-fcis-cli/templates/durable-counter',
+                             mutate, '1 2 120 1')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 510, outcome)
+
+    def test_counter_notification_uses_the_local_observer(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                for delivery in case['outbox']:
+                    delivery['destination'] = 'other-observer'
+        outcome = self.probe('crates/zeno-fcis-cli/templates/durable-counter',
+                             mutate, '0 0 121 1')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 511, outcome)
+
+    def test_counter_both_committing_actions_must_notify(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                case['outbox'] = []
+        for values in ['0 0 120 1', '0 0 121 1']:
+            with self.subTest(input=values):
+                outcome = self.probe('crates/zeno-fcis-cli/templates/durable-counter',
+                                     mutate, values)
+                self.assertEqual(outcome['class'], 'Refused', outcome)
+                self.assertEqual(outcome['law'], 510, outcome)
+
+    def test_counter_original_progress_law_still_refuses_deny_all(self):
+        def mutate(policy):
+            policy['cases'].insert(0, {'when': 'true', 'class': 'Reject', 'reason': 200,
+                                       'post': {}, 'outbox': []})
+        outcome = self.probe('crates/zeno-fcis-cli/templates/durable-counter',
+                             mutate, '0 0 120 1')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 503, outcome)
+
     def test_treasury_swap_request_cannot_be_omitted(self):
         def mutate(policy):
             for case in policy['cases']:

@@ -1,6 +1,6 @@
 # Generated durable counter
 
-This local, non-value-moving application connects authored shapes, generated
+This local, non-value-moving application connects declared shapes, generated
 Rust types, the library V2 decision and law interpreter, SQLite publication,
 and an idempotent demonstration destination.
 
@@ -16,12 +16,38 @@ committed failure 202. A false context rejects with reason 200; a full selected
 counter rejects with reason 201. Denial takes precedence over capacity. Each
 committing result queues exactly one notification of the new state.
 
-The law checker evaluates the authored formulas against the exact pre-state,
+The law checker evaluates the declared formulas against the exact pre-state,
 post-state, numeric command tag (120 or 121), and Boolean context (0 or 1).
-It separately checks the complete notification, empty commit effects, failure
-reason, rejection conditions, and zero genesis. Missing predicates and
+Law 503 still forbids rejection of an eligible request. New law 504 pins the
+rejection reason and precedence: denial (200) before selected-counter capacity
+(201). Law 505 requires committed failure 202. Law 510 requires exactly one
+notification on channel 300 containing both post-decision counters, and law
+511 requires destination `local-observer`. These laws read the actual candidate
+outbox and also constrain separately compiled replacement policies. The schema
+and framework separately check empty effects, rejection without publication,
+and zero genesis. Missing predicates and
 indeterminate evaluation fail closed. External proof submissions receive no
 authority.
+
+## Policy for the owner
+
+- Each counter retains its independent capacity of 3; neither consumes the
+  other's capacity. Denial keeps precedence even when the selected counter is full.
+- `RecordFailure` commits the failure count and notifies even though the
+  operation reports failure; a rejection changes neither counter and sends nothing.
+- The Boolean context remains a trusted authorization input. The notification
+  is a local request, with remote durable delivery supplied by the destination.
+
+## Background and scope
+
+The relational obligations follow C. A. R. Hoare, "An Axiomatic Basis for
+Computer Programming," Communications of the ACM, 1969. Finite-domain checking
+follows E. M. Clarke, E. A. Emerson and A. P. Sistla, "Automatic Verification of
+Finite-State Concurrent Systems Using Temporal Logic Specifications," ACM
+Transactions on Programming Languages and Systems, 1986. This example applies
+the existing library interpreter; it claims no new verification method.
+Decision and notification regressions cover the 64 declared input tuples and
+named counterpolicies, not arbitrary external receivers or owner intent.
 
 ## V2 execution and retained legacy evidence
 

@@ -128,11 +128,14 @@ fn admitted_facts(
         AdmittedFact::DecisionKinds,
     );
     for law in spec.laws() {
-        let rendered = render_relation(
+        let Ok(rendered) = render_relation(
             law.formula(),
             &mut SmtRenderBudget::new(ExportLimits::default()),
-        )
-        .unwrap_or_else(|_| unreachable!());
+        ) else {
+            // Unassumed laws may use observations outside this restricted
+            // renderer. If one is emitted, the unknown-fact check below fails.
+            continue;
+        };
         let holds = satisfied(&rendered);
         add(holds.clone(), AdmittedFact::Law(law.clone(), None));
         for kind in [1, 2] {

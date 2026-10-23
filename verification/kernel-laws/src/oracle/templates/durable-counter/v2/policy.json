@@ -94,7 +94,38 @@
     "500": "StateInvariant",
     "501": "AuthoritySubjectRecipient",
     "502": "CommittedFailureEffects",
-    "503": "RejectNoAuthority"
+    "503": "RejectNoAuthority",
+    "504": "RejectNoAuthority",
+    "505": "CommittedFailureEffects",
+    "510": "AuthoritySubjectRecipient",
+    "511": "AuthoritySubjectRecipient"
   },
-  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes."
+  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes.",
+  "delivery_laws": {
+    "510": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.112": {
+          "channel": 300,
+          "field": 112
+        },
+        "outbox.104.113": {
+          "channel": 300,
+          "field": 113
+        }
+      }
+    },
+    "511": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300,
+          "destination": "local-observer"
+        }
+      }
+    }
+  }
 }
