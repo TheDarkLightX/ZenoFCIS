@@ -611,7 +611,17 @@ def given_part(model, root, template, path):
 
 def narrate_check(model, report, checker_identity="unbound"):
     """Tell one profile 2 checker counterexample as a short numbered story."""
-    if report.get("status") != "counterexample":
+    status = report.get("status")
+    if status == "unknown":
+        if report.get("revision") != model.revision:
+            raise Refusal("Check result belongs to a different revision")
+        return bounded({"kind": "narrative", "schema": NARRATIVE, "profile": PROFILE, "revision": model.revision,
+                        "checker": checker_identity, "source": "check", "status": "unknown",
+                        "check_status": "unknown", "diagnostic": report.get("diagnostic", "unknown check result"),
+                        "sentences": [], "english": [], "symbolic": [],
+                        "method": "the check result is unknown; no game result is narrated",
+                        "authority": "none"})
+    if status != "counterexample":
         return bounded({"kind": "narrative", "schema": NARRATIVE, "profile": PROFILE, "revision": model.revision,
                         "checker": checker_identity, "source": "check", "status": "no-counterexample",
                         "check_status": report.get("status"), "sentences": [], "english": [], "symbolic": [],
@@ -619,6 +629,14 @@ def narrate_check(model, report, checker_identity="unbound"):
                         "authority": "none"})
     if report.get("revision") != model.revision:
         raise Refusal("Counterexample belongs to a different revision")
+    if report.get("obligation") == "game":
+        return bounded({"kind": "narrative", "schema": NARRATIVE, "profile": PROFILE, "revision": model.revision,
+                        "checker": checker_identity, "source": "check", "status": "counterexample",
+                        "check_status": "counterexample", "obligation": "game", "property": report["property"],
+                        "player": report["player"], "objective": report["objective"],
+                        "initial": report["initial"], "sentences": [], "english": [], "symbolic": [],
+                        "method": "the game property loses from the initial configuration; no finite trace or strategy is claimed",
+                        "authority": "none"})
     obligation, witness = report.get("obligation"), report["witness"]
     W = ["witness"]
     if obligation == "determinism":

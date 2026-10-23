@@ -1,15 +1,21 @@
 """Profile 2 why-not, what-if and narratives: goldens, brute-force oracles and an independent story oracle."""
 
 import itertools
+import json
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 import random
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 
 import behavior2 as B
 from behavior import Refusal
 import explain
 import explain2 as E
+import run as CLI
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE / "oracles"))
@@ -267,6 +273,24 @@ class Narrative2Tests(unittest.TestCase):
         self.assertEqual(explain.narrate_trace(lane, [])["schema"], "zal/narrative/2")
         self.assertEqual(self.narrate(lane, B.check(lane))["status"], "no-counterexample")
 
+    def test_game_failure_and_unknown_remain_explicit_in_narratives(self):
+        source = (HERE / "examples/withdrawal_game2.zal").read_text().replace(
+            "fairness reopens: infinitely often (state' == open);\n", "")
+        model = B.parse(source)
+        failed = B.check(model)
+        story = self.narrate(model, failed)
+        self.assertEqual((story["status"], story["check_status"], story["obligation"], story["property"]),
+                         ("counterexample", "counterexample", "game", "keep_withdrawing"))
+        self.assertEqual(story["initial"], failed["initial"])
+        self.assertEqual(story["sentences"], [])
+        self.assertIn("no finite trace or strategy is claimed", story["method"])
+
+        with patch.object(B, "_parity_winners", return_value=frozenset()):
+            unknown = B.check(B.parse((HERE / "examples/withdrawal_game2.zal").read_text()))
+        story = self.narrate(B.parse((HERE / "examples/withdrawal_game2.zal").read_text()), unknown)
+        self.assertEqual((story["status"], story["check_status"], story["diagnostic"]),
+                         ("unknown", "unknown", "solvers disagree"))
+
     def test_narrative_sentences_are_backed_by_the_witness(self):
         """Independent oracle: re-derive every step, the lasso and each claim with the separate temporal oracle."""
         told = 0
@@ -343,6 +367,23 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual((code, why["schema"], why["minimal_changes"][0]["rule"]), (0, "zal/why-not/1", "approve_order"))
         code, refused = self.run_cli(v1, "what-if", "--input", '{"state": "pending", "event": "approve"}', "--change", "{}")
         self.assertEqual((code, refused["status"]), (2, "refused"))
+
+    def test_story_preserves_game_failure_and_unknown_exit_status(self):
+        game = (HERE / "examples/withdrawal_game2.zal").read_text().replace(
+            "fairness reopens: infinitely often (state' == open);\n", "")
+        code, story = self.run_cli(game, "story")
+        self.assertEqual((code, story["status"], story["obligation"]), (1, "counterexample", "game"))
+
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "model.zal"
+            source.write_text((HERE / "examples/withdrawal_game2.zal").read_text())
+            output = StringIO()
+            with patch.object(B, "_parity_winners", return_value=frozenset()), \
+                    patch.object(sys, "argv", ["run.py", "story", str(source)]), redirect_stdout(output):
+                code = CLI.main()
+        story = json.loads(output.getvalue())
+        self.assertEqual((code, story["status"], story["check_status"], story["diagnostic"]),
+                         (1, "unknown", "unknown", "solvers disagree"))
 
 
 if __name__ == "__main__":
