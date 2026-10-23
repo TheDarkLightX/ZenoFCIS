@@ -2174,6 +2174,7 @@ mod tests {
                     "run" => &["--session", "s", "--proposer", "local"],
                     "resume" => &["--session", "s"],
                     "encode" => &["--program", "p.json", "--out", "p.zcve"],
+                    "print" => &["--program", "p.zcve"],
                     "sketch" => &["--session", "s", "--sketch", "k.json"],
                     "family" => &["--instances", "m.json", "--program", "p.json"],
                     "transfer" => &["--from", "p.json", "--to-instances", "m.json"],

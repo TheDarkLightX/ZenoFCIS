@@ -2325,7 +2325,7 @@ fn required_profile(command: &crate::Command) -> Result<Profile, String> {
             operation: crate::knowledge_command::Operation::AssessmentTask { .. },
         } => Ok(Profile::FiniteData),
         crate::Command::Loop { command } => match command {
-            L::Open { .. } | L::Encode { .. } => Ok(Profile::FiniteData),
+            L::Open { .. } | L::Encode { .. } | L::Print { .. } => Ok(Profile::FiniteData),
             L::Candidate { session, .. } | L::Run { session, .. } | L::Resume { session } => {
                 session_profile(session)
             }
@@ -2640,7 +2640,8 @@ pub(crate) fn refuse(command: &crate::Command, failure: SupervisorFailure) -> u8
             use crate::neural_loop::acquisition::{Acquisition, Mode};
             Some(Acquisition::reserve(match command {
                 crate::loop_command::Command::Open { .. } => Mode::Open,
-                crate::loop_command::Command::Encode { .. } => Mode::Encode,
+                crate::loop_command::Command::Encode { .. }
+                | crate::loop_command::Command::Print { .. } => Mode::Encode,
                 _ => Mode::Resume,
             }))
         }

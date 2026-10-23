@@ -7,14 +7,16 @@
     "zeno-fcis loop candidate --session DIR --candidate PROGRAM",
     "zeno-fcis loop run --session DIR --proposer local",
     "zeno-fcis loop resume --session DIR",
-    "zeno-fcis loop encode --program JSON --out PROGRAM"
+    "zeno-fcis loop encode --program JSON --out PROGRAM",
+    "zeno-fcis loop print --program PROGRAM"
   ],
   "engine": "Session mode: durable proposal ledger, full-domain transform checking, structured feedback and replay of the retained best program.",
   "use_when": [
     "propose and revise a program",
     "drive a checked optimization loop",
     "resume a candidate workspace",
-    "encode canonical program bytes"
+    "encode canonical program bytes",
+    "print a decision program as JSON"
   ],
   "not_for": [
     "hosted execution in this build",
@@ -22,10 +24,11 @@
     "turning provenance into acceptance"
   ],
   "inputs": [
-    "Canonical Bool/signed-i128 PROGRAM <= 65,536 bytes; finite-program JSON (inputs/outputs/nodes/roots) <= 1,048,576 bytes, with Int bounds/literals as canonical decimal strings. Expression documents <= 65,536 bytes; script/config/provenance <= 262,144 bytes. Open creates the session."
+    "Canonical Bool/signed-i128 PROGRAM <= 65,536 bytes; finite-program JSON (inputs/outputs/nodes/roots) <= 1,048,576 bytes, with Int bounds/literals as canonical decimal strings. Expression documents <= 65,536 bytes; script/config/provenance <= 262,144 bytes. Open creates the session. Print reads canonical Bool/signed-i128 bytes, at most 524,288 bytes; data interchange admits at most 64 inputs, 64 outputs and 4,096 nodes."
   ],
   "outputs": [
-    "zeno-fcis/transform-loop/1; read status, detail, accounting and report; session ledger, receipts, witnesses and artifacts"
+    "zeno-fcis/transform-loop/1; read status, detail, accounting and report; session ledger, receipts, witnesses and artifacts",
+    "Successful print emits raw finite-program JSON (inputs/outputs/nodes/roots), compact with sorted keys and one LF; failures use zeno-fcis/transform-loop/1. No caller files, session or receipt are changed by print."
   ],
   "exit_codes": {
     "0": "positive verdict or completed query/operation",
@@ -44,7 +47,8 @@
     "completed": "Run driver returned; inspect attempts and stop reason, including failures and no improvement.",
     "encoded": "Program JSON admitted and encoded; no equivalence check or receipt.",
     "resumed": "Ledger/request validated and retained evidence replayed; replay reservation stays charged.",
-    "duplicate-of-original / duplicate-of-attempt:<N>": "Canonical/JSON duplicates exit 1; expression/sketch duplicates independently confirmed by check/replay exit 0. Both consume an attempt."
+    "duplicate-of-original / duplicate-of-attempt:<N>": "Canonical/JSON duplicates exit 1; expression/sketch duplicates independently confirmed by check/replay exit 0. Both consume an attempt.",
+    "print success": "Exit 0 emits only canonical program JSON, directly reusable by encode; malformed/unsupported/oversized bytes exit 1, I/O 3, containment 2, usage 64."
   },
   "limits": {
     "attempts_cap": 8,
@@ -61,7 +65,8 @@
     "transcript_bytes": 524288,
     "storage_bytes": 2097152,
     "program_json_bytes": 1048576,
-    "script_config_provenance_bytes": 262144
+    "script_config_provenance_bytes": 262144,
+    "print_program_bytes": 524288
   },
   "refusals": {
     "work-policy-changed": "Open a fresh session with this checker; do not rewrite request identity.",
@@ -107,7 +112,8 @@
     "loop candidate",
     "loop run",
     "loop resume",
-    "loop encode"
+    "loop encode",
+    "loop print"
   ],
   "pitfalls": "Read the operation-specific status, not only the exit. Encode/resume do not submit proposals; run can complete without improvement; meaning can return unequal keys; teach-back can report wrong rules. No report grants runtime or publication authority."
 }
@@ -142,6 +148,7 @@ Set WORK to a fresh writable directory outside the source tree. Run commands fro
 | Drive local, fake, or disabled hosted proposals | `loop run` | Same session checker for every submitted candidate |
 | Recover retained evidence | `loop resume` | Request/ledger validation and reserved checker replay |
 | Convert finite-program JSON to canonical bytes | `loop encode` | Library program admission and codec; no equivalence verdict |
+| Inspect canonical bytes as program JSON | `loop print` | Existing library decoder and admission; no equivalence verdict |
 | Compare a candidate with a complete paged arithmetic reference | `loop capture whole` | Transform checker and receipt replay on every complete lookup piece |
 | Freeze an executable observation table | `loop capture open` | Repeated observations plus table/evaluator consistency; no candidate acceptance |
 | Obtain public capture examples | `loop capture packet` | Session-binding validation; no program verdict |
@@ -163,7 +170,7 @@ Set WORK to a fresh writable directory outside the source tree. Run commands fro
 | Check restated rules against the core | `loop teach-back` | Door evaluator over declared inputs and reachable states; wrong rules still give a completed report |
 | Evaluate component interfaces/tables | `loop decompose` | Door simulation; `--compose` additionally uses the composition checker and obligation check |
 
-All reports have `authority: none`. A session is a persistent directory holding
+Successful `loop print` emits the program object alone. All reports have `authority: none`. A session is a persistent directory holding
 a frozen request and charged attempt/check/replay ledger. An **attempt** is one
 proposal submitted to its driver, including malformed or duplicate proposals;
 intake or an unfinished preliminary stage may return before submission.
@@ -204,6 +211,20 @@ Expected: exit 0; {"status": "opened"}.
 ## Verdicts
 
 Question disagreements and wrong teach-back rules exit 1. Requirements-only questions and an unresolved `loop learn` question exit 2. Session lifecycle reports remain completed operations; inspect their individual attempt outcomes.
+
+Encode/print data interchange permits the existing extended scalar shape:
+64 inputs, 64 outputs and 4,096 nodes; print reads at most 524,288 bytes.
+Small graphs retain their existing profiles and bytes. Candidate/checker
+limits remain unchanged. Historical i64 profiles are refused, not reinterpreted.
+`SignedMulDivFloor` uses `["SignedMulDivFloor", a, b, d]` in program JSON.
+
+`loop print --program PROGRAM` emits exactly `inputs`, `outputs`, `nodes`,
+`roots` on exit 0: compact JSON, sorted object keys and one trailing newline.
+Int bounds/literals are decimal strings; references are integer indices. Feed
+this JSON to `loop encode --program` for byte-identical canonical program bytes.
+Malformed/unsupported/oversized bytes exit 1, containment 2, I/O 3 and usage 64;
+failures use `zeno-fcis/transform-loop/1` with status and reason. Print changes
+no caller files and creates no session or receipt.
 
 `opened`: Request admitted; submit candidate or run proposer.
 
@@ -254,6 +275,10 @@ zeno-fcis loop resume --session "$WORK/session"
 Expected: exit 0; ["zeno-fcis/transform-loop/1"].
 
 ## See also
+
+Background for program interchange: Tim Bray, "The JavaScript Object Notation
+(JSON) Data Interchange Format", RFC 8259, IETF, 2017. Print reuses the existing
+decoder and adds no new decoding method; its scope is representation inspection.
 
 Background: Armando Solar-Lezama, Liviu Tancau, Rastislav Bodik, Sanjit Seshia and
 Vijay Saraswat, “Combinatorial Sketching for Finite Programs”, ASPLOS, 2006

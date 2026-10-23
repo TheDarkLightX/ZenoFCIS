@@ -67,6 +67,7 @@ const ENGINE_PHASES: [&str; 6] = [
 ];
 const PROGRAM_LIMIT: u64 = acquisition::PROGRAM_BYTES;
 const PROGRAM_JSON_LIMIT: u64 = acquisition::JSON_BYTES;
+const PRINT_PROGRAM_LIMIT: u64 = 512 * 1024;
 const LEDGER_LIMIT: u64 = acquisition::LEDGER_BYTES;
 const HEAD_LIMIT: u64 = acquisition::HEAD_BYTES;
 
@@ -213,7 +214,7 @@ JSON: zeno-fcis/transform-loop/1. Exit 0 resumed; 2 resume-refused, resume-incon
     },
     #[command(
         about = "Admit finite-program JSON and write its canonical bytes to a new file.",
-        long_about = r#"Read --program (at most 1,048,576 bytes) as an object with exactly inputs, outputs, nodes and roots. Domains are Bool or Int with canonical signed-i128 decimal-string bounds; Int literals are decimal strings, Bool literals are JSON booleans, and node references/roots are integer indices. Library admission precedes canonical encoding.
+        long_about = r#"Read --program (at most 1,048,576 bytes) as an object with exactly inputs, outputs, nodes and roots. Domains are Bool or Int with canonical signed-i128 decimal-string bounds; Int literals are decimal strings, Bool literals are JSON booleans, and node references/roots are integer indices. Library data admission permits at most 64 inputs, 64 outputs and 4,096 nodes; small graphs retain their existing profile and bytes. This does not enlarge candidate/checker profiles. Library admission precedes canonical encoding.
 
 Write --out only if the path does not exist. This command checks representation and admission, not equivalence. It creates neither a session nor a receipt. JSON: zeno-fcis/transform-loop/1. Exit 0 encoded; 1 refused or output-exists; 2 acquisition/containment inconclusive; 3 I/O error."#
     )]
@@ -224,6 +225,17 @@ Write --out only if the path does not exist. This command checks representation 
         /// New file for the canonical bytes.
         #[arg(long)]
         out: PathBuf,
+    },
+    #[command(
+        about = "Print a canonical decision program as finite-program JSON without changing files.",
+        long_about = r#"Read --program as canonical Bool/signed-i128 program bytes (at most 524,288 bytes, 64 inputs, 64 outputs and 4,096 nodes). Reuse library scalar decoding and admission, then print exactly inputs, outputs, nodes and roots in the JSON vocabulary accepted by loop encode. Historical i64 profiles are refused rather than reinterpreted. Int bounds/literals are canonical decimal strings; node references are integer indices. Output is compact JSON with sorted object keys and one trailing newline.
+
+No session, receipt or output file is created. This is representation inspection, with no equivalence or decision authority. Exit 0 prints the program; 1 refuses malformed, unsupported or oversized bytes; 2 containment unavailable/inconclusive; 3 I/O error; 64 invalid command-line usage. Failures use zeno-fcis/transform-loop/1 diagnostics instead of program JSON."#
+    )]
+    Print {
+        /// Canonical decision program to inspect; at most 524,288 bytes.
+        #[arg(long)]
+        program: PathBuf,
     },
     #[command(flatten)]
     Doors(doors::DoorCommand),
@@ -241,6 +253,7 @@ pub(crate) fn run_with_policy(
     command: Command,
     knowledge: Option<&crate::loop_knowledge::LoopPolicy>,
 ) -> u8 {
+    let print_program = matches!(&command, Command::Print { .. });
     let (exit, report) = match command {
         Command::Open {
             original,
@@ -301,6 +314,7 @@ pub(crate) fn run_with_policy(
         ),
         Command::Resume { session } => resume_command(&session),
         Command::Encode { program, out } => encode_command(&program, &out),
+        Command::Print { program } => print_command(&program),
         Command::Doors(command) => match knowledge {
             Some(k) => doors::run_with_policy(command, Some(k)),
             None => doors::run(command),
@@ -311,7 +325,16 @@ pub(crate) fn run_with_policy(
     {
         eprintln!("knowledge: outcome-observation-unavailable");
     }
-    crate::print_json(&report);
+    if print_program && exit == crate::OK {
+        if std::io::stdout()
+            .write_all(&canonical_json(&report))
+            .is_err()
+        {
+            return crate::FAILURE;
+        }
+    } else {
+        crate::print_json(&report);
+    }
     exit
 }
 
@@ -596,6 +619,46 @@ fn open_acquired(
     )
 }
 
+fn print_command(path: &Path) -> (u8, Value) {
+    // One invocation exclusively owns the intake meter, byte snapshot and
+    // decoded program. Only owned JSON escapes; no state is retained. Reuse
+    // the data-interchange intake reservation, including on refusal. This
+    // reservation is diagnostic, not checker or resource authority.
+    let mut acquisition = Acquisition::reserve(AcquisitionMode::Encode);
+    let outcome = (|| {
+        let bytes = match acquire_read(&mut acquisition, path, PRINT_PROGRAM_LIMIT) {
+            Ok(bytes) if crate::transform_command::over(&bytes, PRINT_PROGRAM_LIMIT) => {
+                return result(
+                    crate::INVALID,
+                    "refused",
+                    json!({"reason":"program-too-large", "max_bytes":PRINT_PROGRAM_LIMIT}),
+                );
+            }
+            Ok(bytes) => bytes,
+            Err(error) => return io_failure(&error),
+        };
+        use zeno_fcis_synthesis::finite_runtime::{ImportedScalarProgram, import_scalar_program};
+        match import_scalar_program(&bytes) {
+            Ok(ImportedScalarProgram::I128(program)) => (crate::OK, program_to_json(&program)),
+            Ok(ImportedScalarProgram::I64(_)) => result(
+                crate::INVALID,
+                "refused",
+                json!({"reason":"historical-i64-profile-unsupported"}),
+            ),
+            Err(error) => result(
+                crate::INVALID,
+                "refused",
+                json!({"reason":"program-not-admitted", "code":format!("{error:?}")}),
+            ),
+        }
+    })();
+    if outcome.0 == crate::OK && !acquisition.exhausted() {
+        outcome
+    } else {
+        acquisition_outcome(outcome, &acquisition)
+    }
+}
+
 fn encode_command(program: &Path, out: &Path) -> (u8, Value) {
     let mut acquisition = Acquisition::reserve(AcquisitionMode::Encode);
     let outcome = encode_command_acquired(program, out, &mut acquisition);
@@ -681,10 +744,11 @@ fn encode_command_acquired(
         },
         Err(error) => return io_failure(&error),
     };
-    let encoded = program_from_json(&value).and_then(|program| {
-        let bytes = encode(&program)?;
-        Ok((program, bytes))
-    });
+    let encoded =
+        crate::neural_loop::program_json::encoding_program_from_json(&value).and_then(|program| {
+            let bytes = encode(&program)?;
+            Ok((program, bytes))
+        });
     let (program, bytes) = match encoded {
         Ok(pair) => pair,
         Err(error) => return result(crate::INVALID, "refused", error.json()),
@@ -1857,7 +1921,7 @@ pub(crate) fn knowledge_subjects(command: &crate::Command) -> Option<Vec<String>
         return None;
     };
     let names = match command {
-        Command::Encode { .. } => return None,
+        Command::Encode { .. } | Command::Print { .. } => return None,
         Command::Open { .. } | Command::Run { .. } | Command::Resume { .. } => vec!["loop-runtime"],
         Command::Candidate {
             expressions: Some(_),
@@ -1939,3 +2003,7 @@ pub(crate) fn knowledge_session(command: &crate::Command) -> Option<(&Path, bool
         _ => None,
     }
 }
+
+#[cfg(test)]
+#[path = "loop_print_tests.rs"]
+mod print_tests;

@@ -1514,9 +1514,21 @@ mod runtime {
         let mut public: serde_json::Value = serde_json::from_slice(&stdout.bytes)
             .map_err(|_| "contained-result-json".to_string())?;
         crate::telemetry::observe(&public);
-        super::super::label_public_result(&mut public);
-        stdout.bytes = serde_json::to_vec(&public).map_err(|e| e.to_string())?;
-        stdout.bytes.push(b'\n');
+        // A successful print is program interchange data, not a report. All
+        // containment/cleanup evidence above is still required and retained;
+        // adding report fields would make these bytes unusable by loop encode.
+        if !(code == crate::OK
+            && matches!(
+                command,
+                crate::Command::Loop {
+                    command: crate::loop_command::Command::Print { .. }
+                }
+            ))
+        {
+            super::super::label_public_result(&mut public);
+            stdout.bytes = serde_json::to_vec(&public).map_err(|e| e.to_string())?;
+            stdout.bytes.push(b'\n');
+        }
         let diagnostic = std::io::stderr().write_all(&stderr.bytes);
         let output = std::io::stdout().write_all(&stdout.bytes);
         if let Err(error) = diagnostic.and(output) {

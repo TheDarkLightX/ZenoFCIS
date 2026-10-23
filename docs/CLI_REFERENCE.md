@@ -1020,6 +1020,7 @@ does not perform.
 | Drive local, fake, or disabled hosted proposals | `loop run` | Same session checker for every submitted candidate |
 | Recover retained evidence | `loop resume` | Request/ledger validation and reserved checker replay |
 | Convert finite-program JSON to canonical bytes | `loop encode` | Library program admission and codec; no equivalence verdict |
+| Inspect canonical bytes as finite-program JSON | `loop print` | Library decoder/admission; representation only |
 | Compare a candidate with a complete paged arithmetic reference | `loop capture whole` | Transform checker and receipt replay on every complete lookup piece |
 | Freeze an executable observation table | `loop capture open` | Repeated observations plus table/evaluator consistency; no candidate acceptance |
 | Obtain public capture examples | `loop capture packet` | Session-binding validation; no program verdict |
@@ -1094,11 +1095,31 @@ or a "passed" flag cannot build one. Proposals are data, never code.
 | `loop run --session DIR --proposer local\|fake\|hosted [--script S] [--hosted-config H] [--seed P]...` | Drives attempts until the proposer is exhausted or a limit stops the session. Each `--seed` program (canonical bytes, such as an `optimize --candidate-out` candidate or a `contract review --mutant-programs` mutant) is proposed first, in order, as an ordinary candidate attempt with no model call metered; a seed is never trusted, only checked. `local` is a deterministic rewriter; `fake` replays a script (`zeno-fcis/fake-provider-script/1`) and is metered as a model; `hosted` is the provider adapter, which is disabled in this build and answers "unavailable" without any network, credential or spending path. |
 | `loop resume --session DIR` | Re-admits the request, verifies the ledger chain against its head, replays the incumbent through the checker and prints the report. Any failure leaves no trusted incumbent. |
 | `loop encode --program J --out P` | Encodes finite-program JSON as canonical bytes after library admission; the output file is never overwritten. |
+| `loop print --program P` | Reads canonical Bool/signed-i128 bytes (at most 524,288 bytes) with the library decoder and prints the finite-program JSON accepted by encode. No caller file, session or receipt is created or changed. |
 
-Results use schema `zeno-fcis/transform-loop/1` with `authority: none`.
+Except for successful `print`, results use schema `zeno-fcis/transform-loop/1`
+with `authority: none`.
 `open` exits 0 (`opened`) when the request is admitted and 1 when it is refused.
 `encode` exits 0 (`encoded`) on success and 1 for malformed programs or an
 existing output path (`output-exists`).
+For data interchange, encode and print support the existing extended scalar
+shape (at most 64 inputs, 64 outputs and 4,096 nodes). Small graphs retain
+their existing profiles and bytes. Candidate and checker shape limits remain
+unchanged. `SignedMulDivFloor` is represented as `["SignedMulDivFloor", a, b, d]`
+in program JSON. Historical i64 profiles are refused rather than reinterpreted.
+
+`print` exits 0 with exactly `inputs`, `outputs`, `nodes` and `roots`: compact
+JSON, sorted object keys, one trailing newline. Int bounds and literals are
+canonical signed-i128 decimal strings; indices are JSON integers. This success
+has no report wrapper, schema field or equivalence verdict. Redirect it to a
+file and pass that file to `loop encode --program` to recover identical canonical
+program bytes. Malformed, unsupported and oversized bytes are refused (1);
+containment unavailable/inconclusive exits 2; filesystem failures exit 3;
+invalid command-line usage exits 64. Failure diagnostics use
+`zeno-fcis/transform-loop/1`, with `status` and `detail.reason`.
+The representation follows Tim Bray, "The JavaScript Object Notation (JSON)
+Data Interchange Format", RFC 8259, IETF, 2017. This command exposes the existing
+codec and adds no decoding or verification method.
 `candidate` exits 0 for an equivalent candidate (`checked-improvement` or
 `equivalent-without-improvement:<reason>`), 1 for a
 difference, refusal or duplicate for canonical/JSON proposals, and 2 for an

@@ -97,6 +97,11 @@ fn node(value: &Value, index: usize) -> Result<Op, ProgramJsonError> {
             id(2).ok_or_else(error)?,
             id(3).ok_or_else(error)?,
         ),
+        (Some("SignedMulDivFloor"), 4) => Op::SignedMulDivFloor(
+            id(1).ok_or_else(error)?,
+            id(2).ok_or_else(error)?,
+            id(3).ok_or_else(error)?,
+        ),
         (Some("ProductsGe"), 7) => Op::ProductsGe(
             [
                 id(1).ok_or_else(error)?,
@@ -125,6 +130,16 @@ fn node(value: &Value, index: usize) -> Result<Op, ProgramJsonError> {
 
 /// Builds a program through the library's own admission.
 pub(crate) fn program_from_json(value: &Value) -> Result<Program, ProgramJsonError> {
+    parse_program(value, false)
+}
+
+/// Data interchange also admits the library's larger scalar shape. This does
+/// not change the small-program admission used by candidates and checkers.
+pub(crate) fn encoding_program_from_json(value: &Value) -> Result<Program, ProgramJsonError> {
+    parse_program(value, true)
+}
+
+fn parse_program(value: &Value, allow_extended: bool) -> Result<Program, ProgramJsonError> {
     if !super::only_fields(value, &["inputs", "outputs", "nodes", "roots"]) {
         return Err(ProgramJsonError::Shape);
     }
@@ -157,7 +172,12 @@ pub(crate) fn program_from_json(value: &Value) -> Result<Program, ProgramJsonErr
         .enumerate()
         .map(|(position, value)| reference(value).ok_or(ProgramJsonError::Root { position }))
         .collect::<Result<Vec<_>, _>>()?;
-    Program::try_new(inputs, outputs, nodes, roots).map_err(|error| ProgramJsonError::NotAdmitted {
+    let admitted = if allow_extended {
+        Program::try_new_extended(inputs, outputs, nodes, roots)
+    } else {
+        Program::try_new(inputs, outputs, nodes, roots)
+    };
+    admitted.map_err(|error| ProgramJsonError::NotAdmitted {
         code: format!("{error:?}"),
     })
 }
@@ -200,6 +220,7 @@ fn op_json(op: &Op) -> Value {
         Op::DivCeil(a, b) => json!(["DivCeil", a, b]),
         Op::MulDivFloor(a, b, d) => json!(["MulDivFloor", a, b, d]),
         Op::MulDivCeil(a, b, d) => json!(["MulDivCeil", a, b, d]),
+        Op::SignedMulDivFloor(a, b, d) => json!(["SignedMulDivFloor", a, b, d]),
         Op::ProductsGe(a, b) => json!(["ProductsGe", a[0], a[1], a[2], b[0], b[1], b[2]]),
         Op::Eq(a, b) => json!(["Eq", a, b]),
         Op::Lt(a, b) => json!(["Lt", a, b]),

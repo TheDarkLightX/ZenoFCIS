@@ -335,6 +335,12 @@ effects! { crate::loop_command::Command {
                 checker_process::loop_profile().is_some(),
                 None,
             ));
+        "print" => Self::Print { .. } => declared((
+                &["canonical-program", "caller-cpu-limits"],
+                &["transient-user-unit"],
+                checker_process::loop_profile().is_some(),
+                None,
+            ));
     }
     groups {
     }
@@ -616,7 +622,7 @@ pub(super) fn describe(path: &[String]) -> Value {
                 "classification": "declared", "reads": reads, "writes": writes,
                 "executes_tools": executes_tools, "read_only_flag": read_only_flag,
             });
-            if path.first() == Some(&"loop") && path.get(1) != Some(&"encode") {
+            if path.first() == Some(&"loop") && !matches!(path.get(1), Some(&"encode" | &"print")) {
                 if let Some(reads) = result["reads"].as_array_mut() {
                     reads.push(json!("optional-knowledge-layers-and-session-binding"));
                 }
