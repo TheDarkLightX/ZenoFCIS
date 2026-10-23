@@ -155,6 +155,11 @@ docs/adr/0003-epistemic-status.md
 docs/adr/0004-v2-ledger.md
 docs/adr/0005-decision-gate.md
 docs/adr/README.md
+docs/agent-tasks/2.6/P1_SHELL_SIMULATION.md
+docs/agent-tasks/2.6/P2_LEAN_INDUCTION.md
+docs/agent-tasks/2.6/P3_COMPOSED_DOMAIN_PROOF.md
+docs/agent-tasks/2.6/P4_STRUCTURE_SEARCH_GATE.md
+docs/agent-tasks/2.6/README.md
 docs/assets/marketing/README.md
 docs/assets/marketing/accumulated-diagnostics.png
 docs/assets/marketing/accumulated-diagnostics.svg
