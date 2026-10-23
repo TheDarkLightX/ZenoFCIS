@@ -1,11 +1,18 @@
 """Public guide and help contracts through the installed binary."""
 import json
+import hashlib
 import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import tempfile
 import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+INVENTORY = ROOT / "crates/zeno-fcis-cli/guide-card-inventory.json"
+HELP_SNAPSHOTS = ROOT / "crates/zeno-fcis-cli/guide-help-snapshots.json"
 
 
 @unittest.skipUnless(os.environ.get("ZENO_FCIS_CLI"), "set ZENO_FCIS_CLI")
@@ -61,10 +68,36 @@ class GuideCli(unittest.TestCase):
             report = json.loads(result.stdout)
             self.assertEqual(report["schema"], "zeno-fcis/guide/1")
             self.assertEqual(report["authority"], "none")
-            self.assertEqual(len(report["cards"]), 20)
+            self.assertEqual(len(report["cards"]), 29)
+            self.assertEqual({c["name"] for c in report["cards"]},
+                             {c["name"] for c in json.loads(INVENTORY.read_text())["cards"]})
             self.assertIn("contract-risk", {c["name"] for c in report["cards"]})
             self.assertIn("contract-probe", {card["name"] for card in report["cards"]})
             self.assertEqual(list(Path(directory).iterdir()), [])
+
+    def test_guide_inventory_matches_generated_source(self):
+        inventory = json.loads(INVENTORY.read_text())
+        self.assertEqual(inventory["schema"], "zeno-fcis/guide-card-inventory/1")
+        actual = json.loads(self.call("guide", "list").stdout)["cards"]
+        self.assertEqual([c["name"] for c in actual], [c["name"] for c in inventory["cards"]])
+        for row in inventory["cards"]:
+            with self.subTest(card=row["name"]):
+                source = (ROOT / "docs/loops" / (row["name"] + ".md")).read_bytes()
+                self.assertEqual(hashlib.sha256(source).hexdigest(), row["sha256"])
+                shown = self.call("guide", "show", row["name"])
+                self.assertEqual(shown.returncode, 0, shown.stderr)
+                self.assertEqual(shown.stdout.encode(), source)
+
+    def test_generated_help_snapshots_match_the_compiled_commands(self):
+        snapshots = json.loads(HELP_SNAPSHOTS.read_text())
+        self.assertEqual(snapshots["schema"], "zeno-fcis/guide-help-snapshots/1")
+        commands = {command for row in json.loads(INVENTORY.read_text())["cards"] for command in row["commands"]}
+        self.assertEqual(set(snapshots["help"]), commands)
+        for command, expected in snapshots["help"].items():
+            with self.subTest(command=command):
+                result = self.call(*shlex.split(command), "--help")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, expected)
 
     def test_unknown_card_has_actionable_refusal(self):
         result = self.call("guide", "show", "missing-card")

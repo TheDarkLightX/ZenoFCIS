@@ -29,6 +29,7 @@ const CARDS: &[&str] = &[
     include_str!("../guide-cards/contract-scenario.txt"),
     include_str!("../guide-cards/generate.txt"),
     include_str!("../guide-cards/knowledge.txt"),
+    include_str!("../guide-cards/loop-rules.txt"),
     include_str!("../guide-cards/loop-workspace.txt"),
     include_str!("../guide-cards/new.txt"),
     include_str!("../guide-cards/program-search.txt"),
@@ -246,6 +247,17 @@ mod tests {
                 assert!(!card[field].is_null(), "missing {field}");
             }
         }
-        assert_eq!(names.len(), 19);
+        let inventory: Value = serde_json::from_str(include_str!("../guide-card-inventory.json"))
+            .unwrap_or_else(|error| panic!("guide inventory: {error}"));
+        let expected: BTreeSet<_> = inventory["cards"]
+            .as_array()
+            .unwrap_or_else(|| panic!("guide inventory cards"))
+            .iter()
+            .map(|row| row["name"].as_str().unwrap_or_default().to_owned())
+            .collect();
+        assert_eq!(
+            names, expected,
+            "embedded cards must match the generated inventory"
+        );
     }
 }

@@ -445,6 +445,13 @@ fn rules_a_forged_bank_and_dead_eager_trap_cannot_authorize_a_rewrite() {
             .iter()
             .any(|r| r["stage"] == "whole-program" && r["check"]["verdict"] == "counterexample")
     );
+    assert!(
+        report["rules_summary"]["refutations"]
+            .as_array()
+            .unwrap_or_else(|| panic!("summary refutations"))
+            .iter()
+            .any(|row| row["stage"] == "whole-program" && row["input"].is_array())
+    );
 }
 
 #[test]
@@ -1051,3 +1058,109 @@ fn strategy_profiles_io_failures_are_not_successful_questions() {
     assert_ne!(report["status"], "qualified");
 }
 // END typed strategy modes.
+
+#[test]
+fn rules_summary_exposes_refutations_without_changing_qualification() {
+    let dir = Directory::new();
+    let original_bytes = bytes(&long(3));
+    let original = dir.file("original.zcve", &original_bytes);
+    let wrong = scalar(3, vec![Op::Input(0), Op::Int(1), Op::Add(0, 1)], 2);
+    let x = scalar(3, vec![Op::Input(0)], 0);
+    let bank = dir.json(
+        "bank.json",
+        &json!({"schema":"zeno-fcis/loop-rule-bank/1",
+        "rules":[{"lhs":exported(&wrong),"rhs":exported(&x)}]}),
+    );
+    let out = dir.0.join("out");
+    let output = Command::new(env!("CARGO_BIN_EXE_zeno-fcis"))
+        .args([
+            "loop",
+            "rules",
+            "--original",
+            &original.to_string_lossy(),
+            "--bank",
+            &bank.to_string_lossy(),
+            "--out",
+            &out.to_string_lossy(),
+        ])
+        .output()
+        .unwrap_or_else(|error| panic!("{error}"));
+    let report: Value = serde_json::from_slice(&output.stdout)
+        .unwrap_or_else(|error| panic!("{error}: {output:?}"));
+    assert_eq!(output.status.code(), Some(0), "{report}");
+    assert_eq!(report["status"], "qualified");
+    assert_eq!(report["detail"]["result_kind"], "unchanged-original");
+    assert_eq!(report["detail"]["improved"], false);
+    assert_eq!(report["detail"]["rules_requalified"], 0);
+    assert_eq!(report["detail"]["baseline_check"]["verdict"], "equivalent");
+    assert_eq!(report["detail"]["baseline_check"]["replay"], "matched");
+    let summary = &report["rules_summary"];
+    for (field, value) in [
+        ("considered", 1),
+        ("qualified", 0),
+        ("refuted", 1),
+        ("refused", 0),
+        ("inconclusive", 0),
+        ("unexamined", 0),
+    ] {
+        assert_eq!(summary[field], value, "top-level {field}: {report}");
+    }
+    let witness = &summary["refutations"][0];
+    assert_eq!(witness["rule"], 0);
+    assert_eq!(witness["stage"], "target-rule");
+    assert_eq!(witness["ordinal"], 0);
+    assert_eq!(witness["input"], json!(["0"]));
+    assert_eq!(witness["original"]["ok"], json!(["1"]));
+    assert_eq!(witness["candidate"]["ok"], json!(["0"]));
+    assert_eq!(
+        witness["input"],
+        report["detail"]["checks"][0]["check"]["input"]
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .lines()
+            .any(|line| line == "rules: rule 0 refuted at target-rule input=[\"0\"]"),
+        "{output:?}"
+    );
+    let saved: Value =
+        serde_json::from_slice(&fs::read(out.join("result.json")).unwrap_or_default())
+            .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(saved["rules_summary"], *summary);
+    assert_eq!(
+        fs::read(out.join("candidate.zcve")).unwrap_or_default(),
+        original_bytes
+    );
+
+    // Refusals and unexamined work must not become zero-counterexample claims.
+    let bank = dir.json(
+        "mixed.json",
+        &json!({"schema":"zeno-fcis/loop-rule-bank/1",
+        "rules":[{"lhs":exported(&x),"rhs":exported(&long(3))},
+                  {"lhs":exported(&wrong),"rhs":exported(&x)}]}),
+    );
+    let arguments = args(&[
+        "loop",
+        "rules",
+        "--original",
+        &original.to_string_lossy(),
+        "--bank",
+        &bank.to_string_lossy(),
+    ]);
+    let (exit, report) = run(&arguments);
+    assert_eq!(exit, 0, "{report}");
+    assert_eq!(report["rules_summary"]["considered"], 2);
+    assert_eq!(report["rules_summary"]["refuted"], 1);
+    assert_eq!(report["rules_summary"]["refused"], 1);
+    assert_eq!(
+        report["rules_summary"]["refusals"][0]["code"],
+        "nondecreasing-rule"
+    );
+    let mut stopped = arguments;
+    stopped.extend(args(&["--max-checks", "0"]));
+    let (exit, report) = run(&stopped);
+    assert_eq!(exit, 2, "{report}");
+    assert_eq!(report["rules_summary"]["considered"], 2);
+    assert_eq!(report["rules_summary"]["unexamined"], 2);
+    assert_eq!(report["rules_summary"]["refuted"], 0);
+    assert_eq!(report["rules_summary"]["qualified"], 0);
+}

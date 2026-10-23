@@ -3058,6 +3058,32 @@ an improving rule. Exact all-failure originals can be checked
 as unchanged; this makes no successful-output or improvement claim. Rules are
 concrete finite-domain proposals, not universal arithmetic identities.
 
+The additive top-level `rules_summary` makes rule outcomes visible without
+changing `status`, `detail.checks`, `rules_requalified` or any acceptance gate.
+It is also retained in `detail.rules_summary` and the exported `result.json`.
+After valid bank/corpus intake and qualification processing it contains:
+
+| Field | Meaning |
+| --- | --- |
+| `considered` | Number of supplied or discovered rule entries |
+| `qualified` | Rules passing target-domain equivalence and matching replay; equals `detail.rules_requalified` |
+| `refuted` | Distinct rule indices with a checker counterexample at either stage |
+| `refused` | Distinct rule indices with a structural or checker refusal |
+| `inconclusive` | Distinct rule indices with an unfinished check or unmatched replay |
+| `unexamined` | Rules with no `target-rule` check/refusal row, for example after a baseline stop |
+| `refutations` | First counterexample per rule, ordered by zero-based `rule` index: `stage`, `ordinal`, `input`, `original`, `candidate`, and `verdict: counterexample` |
+| `refusals` | First refusal per rule, with zero-based `rule`, `stage` and `code` |
+
+The two stages are `target-rule` and `whole-program`. Counterexample `input`
+is an array of decimal strings. At `target-rule`, the observations are lhs/rhs;
+at `whole-program`, they are the fixed reference/replacement. Each observation
+has `ok` (decimal-string output array) or `error` (evaluation-failure tag).
+A term rule may qualify but produce a refuted replacement, so `qualified` and
+`refuted` can overlap. A refusal or budget stop is not a refutation. Early
+input errors can return before any summary is available. One stderr line per
+refuted rule names its index, refuting stage and witness input. These are
+derived diagnostics; they grant no equivalence, resource or publication authority.
+
 ### Shared bounds and output
 
 Each file is at most 64 KiB. All three commands accept `--max-tuples`

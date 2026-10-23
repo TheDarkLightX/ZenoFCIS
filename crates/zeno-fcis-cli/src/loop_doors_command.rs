@@ -188,6 +188,8 @@ Check proposed cheaper concrete rules on this target input domain, then transfor
 
 An unchanged original can qualify with improved:false, including when mining cannot type its arithmetic nodes and proposes no rules. An empty detail.checks means no rule/replacement checks; detail.baseline_check still records the original-versus-itself transform check and matching replay. This qualifies only original equivalence, not search support or improvement.
 
+Top-level rules_summary counts considered/qualified/refuted/refused/inconclusive/unexamined rules and retains the first refuting stage/input per rule; detail.rules_summary and exported result.json retain it too. One stderr line per refuted rule names the witness. Counts are diagnostics, not new verdicts; a qualified term rule can have a refuted whole-program application.
+
 No session or attempts. JSON: zeno-fcis/loop-doors/2. Exit 0 qualified; 1 refused/refuted; 2 inconclusive; 3 I/O error."#
     )]
     Rules {

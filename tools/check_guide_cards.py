@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Keep embedded cards exact; execute every Steps and Worked example contract."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -12,6 +13,9 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 SECTIONS = ["Use when", "Not for", "Inputs", "Steps", "Verdicts", "Cost", "Coordinate", "Pitfalls", "Worked example", "See also"]
+INVENTORY = ROOT / "crates/zeno-fcis-cli/guide-card-inventory.json"
+HELP_SNAPSHOTS = ROOT / "crates/zeno-fcis-cli/guide-help-snapshots.json"
+
 FIELDS = ["synopsis", "engine", "inputs", "outputs", "exit_codes", "verdicts", "limits", "refusals", "cost", "use_when", "not_for", "example", "sources"]
 
 
@@ -43,6 +47,43 @@ def check_copies(write):
         assert copy.read_bytes() == path.read_bytes(), f"embedded card differs: {path.stem}"
         expected.add(copy.name)
     assert {path.name for path in target.iterdir()} == expected
+
+
+def check_inventory(write):
+    source = ROOT / "crates/zeno-fcis-cli/src/guide.rs"
+    rows = [{"name": m["name"], "commands": m["commands"],
+             "sha256": hashlib.sha256(text.encode()).hexdigest()}
+            for _, text, m in cards()]
+    document = {"schema": "zeno-fcis/guide-card-inventory/1", "cards": rows}
+    content = json.dumps(document, indent=2) + "\n"
+    includes = "const CARDS: &[&str] = &[\n" + "".join(
+        '    include_str!("../guide-cards/' + row["name"] + '.txt"),\n'
+        for row in rows) + "];"
+    text = source.read_text()
+    updated, count = re.subn(r"const CARDS: &\[&str\] = &\[.*?\n\];", lambda _: includes, text, count=1, flags=re.S)
+    assert count == 1, "embedded card inventory block missing"
+    if write:
+        source.write_text(updated)
+        INVENTORY.write_text(content)
+    assert source.read_text() == updated, "embedded card inventory differs; run check_guide_cards.py --write"
+    assert INVENTORY.read_text() == content, "card inventory snapshot differs; run --write"
+
+
+def check_help(cli, write):
+    assert cli, "help snapshots require --cli"
+    commands = sorted({command for _, _, card in cards() for command in card["commands"]})
+    env = {key: value for key, value in os.environ.items()
+           if key not in ("ZENO_FCIS_KB", "ZENO_FCIS_TELEMETRY")}
+    snapshots = {}
+    for command in commands:
+        result = subprocess.run([str(cli), *shlex.split(command), "--help"],
+                                env=env, capture_output=True, text=True, check=False)
+        assert result.returncode == 0, (command, result.stderr)
+        snapshots[command] = result.stdout
+    content = json.dumps({"schema": "zeno-fcis/guide-help-snapshots/1", "help": snapshots}, indent=2) + "\n"
+    if write:
+        HELP_SNAPSHOTS.write_text(content)
+    assert HELP_SNAPSHOTS.read_text() == content, "compiled help differs from snapshot; regenerate with --write-help --cli"
 
 
 def run_examples(cli, destination, only=()):
@@ -104,11 +145,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--run", action="store_true")
+    parser.add_argument("--write-help", action="store_true", help="snapshot compiled help after rebuilding generated cards")
+    parser.add_argument("--check-help", action="store_true", help="compare compiled help with the generated snapshot")
     parser.add_argument("--card", action="append", default=[])
     parser.add_argument("--cli", type=Path)
     parser.add_argument("--evidence", type=Path)
     args = parser.parse_args()
     check_copies(args.write)
+    check_inventory(args.write)
+    if args.write_help or args.check_help:
+        check_help(args.cli, args.write_help)
     if args.run:
         assert args.cli and args.evidence, "--run requires --cli and --evidence"
         run_examples(args.cli, args.evidence, args.card)

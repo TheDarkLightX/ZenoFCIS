@@ -329,6 +329,7 @@ docs/loops/contract-risk.md
 docs/loops/contract-scenario.md
 docs/loops/generate.md
 docs/loops/knowledge.md
+docs/loops/loop-rules.md
 docs/loops/loop-workspace.md
 docs/loops/new.md
 docs/loops/program-search.md
