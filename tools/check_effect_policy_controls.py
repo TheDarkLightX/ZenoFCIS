@@ -7,6 +7,7 @@ A compiler error, signal, unrelated failure or surviving mutant is not a kill.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -91,9 +92,10 @@ def main() -> None:
         for name, test, marker, edits in CONTROLS:
             named = [TESTS + test, "--", "--exact", "--nocapture"]
             baseline = run(copy, named)
+            args.out.with_name(f"{args.out.stem}-{name}-normal.log").write_text(baseline.stdout)
             if baseline.returncode or "1 passed" not in baseline.stdout:
                 raise SystemExit(f"BASELINE FAILED {name}:\n{baseline.stdout}")
-            original = {path: (copy / path).read_text() for path, _, _ in edits}
+            original = {path: (copy / path).read_bytes() for path, _, _ in edits}
             for path, before, after in edits:
                 text = (copy / path).read_text()
                 if text.count(before) != 1:
@@ -104,16 +106,22 @@ def main() -> None:
                 raise SystemExit(f"BUILD FAILURE, not a kill, {name}:\n{build.stdout}")
             mutant = run(copy, named)
             args.out.with_name(f"{args.out.stem}-{name}.log").write_text(build.stdout + mutant.stdout)
-            if mutant.returncode != 101 or "test result: FAILED." not in mutant.stdout or marker not in mutant.stdout:
+            if (mutant.returncode != 101 or "test result: FAILED." not in mutant.stdout
+                    or marker not in mutant.stdout or "assertion" not in mutant.stdout):
                 raise SystemExit(f"NOT KILLED for named reason {name}:\n{mutant.stdout}")
-            for path, text in original.items():
-                (copy / path).write_text(text)
+            for path, data in original.items():
+                (copy / path).write_bytes(data)
+                if (copy / path).read_bytes() != data:
+                    raise RuntimeError(f"restoration changed source bytes: {path}")
             restored = run(copy, named)
             if restored.returncode or "1 passed" not in restored.stdout:
                 raise SystemExit(f"RESTORED BASELINE FAILED {name}:\n{restored.stdout}")
             args.out.with_name(f"{args.out.stem}-{name}-restored.log").write_text(restored.stdout)
-            row = dict(control=name, check=TESTS + test, build_exit=build.returncode,
+            row = dict(control=name, check=TESTS + test, normal_exit=baseline.returncode,
+                       build_exit=build.returncode,
                        check_exit=mutant.returncode, restored_exit=restored.returncode, result="killed")
+            row["source_sha256"] = {path: hashlib.sha256(data).hexdigest() for path, data in original.items()}
+            row["restored_sha256"] = {path: hashlib.sha256((copy / path).read_bytes()).hexdigest() for path in original}
             rows.append(row)
             print(json.dumps(row), flush=True)
     args.out.write_text(json.dumps(rows, indent=2) + "\n")

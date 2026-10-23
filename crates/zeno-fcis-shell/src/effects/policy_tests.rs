@@ -339,8 +339,11 @@ fn explored(retries: u8, scenario: Scenario, allowed: bool, budget: u64) -> expl
         budget,
         &policies(allowed),
     );
-    let report =
-        result.unwrap_or_else(|violation| panic!("policy product violation: {violation:?}"));
+    assert!(
+        result.is_ok(),
+        "assertion failed: policy product violation: {result:?}"
+    );
+    let report = result.unwrap_or_else(|_| unreachable!("checked policy product result"));
     assert_eq!(
         report.exploration,
         Exploration::Complete,
