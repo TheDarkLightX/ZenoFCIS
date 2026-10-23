@@ -126,7 +126,8 @@ def _observe(model, result, state, values, event, context, permutation):
 def _claims(model):
     for collection in (model.invariants, model.requirements, model.fairness, model.properties):
         yield from collection
-    yield from ((name, formula) for name, _, _, formula in model.games)
+    for name, _, objective, payload in model.games:
+        yield from ((name, formula) for formula in b._game_formulas(objective, payload))
 
 
 def _step_predicates(formula):

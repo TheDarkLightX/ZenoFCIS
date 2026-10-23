@@ -129,6 +129,31 @@ class SymmetryDeclarationTests(unittest.TestCase):
         with self.assertRaisesRegex(b.Refusal, 'Symmetry rivals: players'):
             s.check_players(model, 'rivals', {'env': 'user', 'user': 'env'})
 
+    def test_extended_objectives_preserve_full_results(self):
+        for objective in ['within 0 (state == user)', 'within 2 (state == env)',
+                          'infinitely often (state == user) and infinitely often (state == env)',
+                          'infinitely often (true) and infinitely often (aa + bb >= 0)']:
+            with self.subTest(objective=objective):
+                model = b.parse(BASE + f'property extended: controller can force {objective};')
+                self.assertEqual(model, b.parse(model.render()))
+                self.assertEqual(model, b.parse(model.render(True), 'english'))
+                reduced = b.check(model)
+                full = b.check(model, no_symmetry=True)
+                self.assertEqual(reduced, full)
+                if reduced['status'] == 'pass-with-scope':
+                    self.assertEqual(reduced['properties']['extended']['configurations'], 7)
+                else:
+                    self.assertEqual(reduced['winning_configuration_count'], 0)
+
+    def test_each_extended_goal_requires_invariance(self):
+        for objective in ['within 2 (aa == 1)',
+                          'infinitely often (true) and infinitely often (aa == 1)']:
+            with self.subTest(objective=objective):
+                model = b.parse(BASE + f'property extended: controller can force {objective};')
+                for full in [False, True]:
+                    with self.assertRaisesRegex(b.Refusal, 'claim-invariance'):
+                        b.check(model, no_symmetry=full)
+
     def test_valid_mirrored_rules(self):
         self.assertEqual(b.check(b.parse(BASE))['status'], 'pass-with-scope')
 
