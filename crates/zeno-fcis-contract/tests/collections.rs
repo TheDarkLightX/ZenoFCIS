@@ -181,3 +181,38 @@ fn opaque_collection_invariants_are_uniform_and_input_independent() {
         );
     }
 }
+
+#[test]
+fn stored_post_keys_require_a_concrete_pre_invocation_binding()
+-> Result<(), Box<dyn std::error::Error>> {
+    let project = "zeno 1; project 1 copy_keys; namespace 2 copies;
+type 100 state Store; type 101 command Command; type 102 context Desk;
+type 103 key HolderId; type 104 key CopyId; type 105 data Copy;
+field 140 105 holder 103; map 110 100 copies 104 105 capacity 4;
+field 130 101 copy 104; entry 160 copy of 110 at command.101.130;
+variant 180 102 Librarian none;
+component 400 core { owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 128; }
+merge [400]; law 500 marker on commit, genesis = true;";
+    let mut rules = serde_json::json!({
+        "schema":"zeno-fcis/template-declarative-policy/2", "template":"copy-keys",
+        "roots":{"state":100,"command":101,"context":102},"leaf_bindings":{},"variables":{},
+        "cases":[{"rule":"insert","when":"true","class":"Accept","reason":null,
+            "post":{"160":"1","161":"pre.100.161"},"outbox":[]}],
+        "genesis":{"160":0,"161":0},"law_kinds":{"500":"StateInvariant"}
+    });
+    let result = check(project, &rules.to_string(), Limits::default())?;
+    assert_eq!(result.verdict(), Verdict::Refuted, "{}", result.packet());
+    assert_eq!(
+        result.packet()["result"]["obligation"],
+        "stored key provenance"
+    );
+    // Supplying a real HolderId makes the same insertion representable.
+    let project = project.replace(
+        "field 130 101 copy 104;",
+        "field 130 101 copy 104; field 131 101 holder 103;",
+    );
+    rules["cases"][0]["post"]["161"] = "command.101.131".into();
+    let result = check(&project, &rules.to_string(), Limits::default())?;
+    assert_eq!(result.verdict(), Verdict::Checked, "{}", result.packet());
+    Ok(())
+}

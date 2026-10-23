@@ -47,7 +47,7 @@ use crate::internals::{
 /// The premises every result rests on; the checker and type checker
 /// enforce the first three, and the fourth is the runtime's.
 pub const PREMISES: [&str; 4] = [
-    "keys are compared only for equality, with keys of the same type",
+    "keys are compared only for equality, with keys of the same type; stored post-keys resolve to concrete pre-invocation key bindings",
     "a decision reads and writes only scalar state and the entries its command and context keys name",
     "laws are per entry or over named entries, and aggregates are declared summaries whose changes are checked",
     "the runtime frames each decision from the stored entries at those keys and writes back only them",
@@ -385,7 +385,7 @@ pub fn check(
     });
     if !ordered.is_empty() {
         packet["premises"][0] = json!(
-            "opaque keys admit equality only; ordered keys admit same-type equality and order comparisons"
+            "opaque keys admit equality only; ordered keys admit same-type equality and order comparisons; stored post-keys resolve to concrete pre-invocation bindings"
         );
         packet["ordered_premises"] = json!(ORDERED_PREMISES);
         packet["order_reads"] = json!(
@@ -798,6 +798,33 @@ impl Shape<'_> {
             if merged[entry.presence] == 0 {
                 for position in &entry.values {
                     merged[*position] = self.positions[*position].domain.least().unwrap_or(0);
+                }
+            }
+        }
+        // An absent field's default class need not name any concrete key.
+        // Layout can publish a stored key only if this invocation bound it.
+        let mut bound: BTreeMap<u32, BTreeSet<i128>> = BTreeMap::new();
+        for (position, key_type) in self.keys {
+            bound.entry(*key_type).or_default().insert(tuple[*position]);
+        }
+        for entry in self.entries.iter().filter(|e| tuple[e.presence] == 1) {
+            for (position, key_type) in &entry.stored_keys {
+                bound.entry(*key_type).or_default().insert(tuple[*position]);
+            }
+        }
+        for entry in self.entries.iter().filter(|e| merged[e.presence] == 1) {
+            for (position, key_type) in &entry.stored_keys {
+                if !bound
+                    .get(key_type)
+                    .is_some_and(|keys| keys.contains(&merged[*position]))
+                {
+                    return Some((
+                        "stored key provenance",
+                        format!(
+                            "entry {} stores a key class with no concrete pre-invocation binding",
+                            entry.id
+                        ),
+                    ));
                 }
             }
         }

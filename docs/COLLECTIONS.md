@@ -97,6 +97,11 @@ requires that it does not refuse; that the entries naming one key write at
 most one new value (alias merge); and that each summary changes by exactly
 the change of its distinct named entries (summary delta). The genesis state
 must have every entry absent and every summary 0.
+Every stored key in a present successor entry must resolve to a concrete key
+bound by a command/context field or a present pre-entry's stored key of that
+type. An absent field's default class alone supplies no concrete key. The
+checker refuses an unbound post-key with `stored key provenance`, matching
+the runtime's inability to resolve that class into a stored 32-byte key.
 
 ## Why the check covers every size
 
