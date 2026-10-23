@@ -36,7 +36,7 @@ def canonical(value):
 
 
 def read_text(path):
-    with Path(path).open(encoding="utf-8") as stream:
+    with Path(path).open(encoding="utf-8", newline="") as stream:
         text = stream.read(MAX_FILE + 1)
     if len(text.encode()) > MAX_FILE:
         raise ValueError(f"input exceeds {MAX_FILE} bytes: {path}")

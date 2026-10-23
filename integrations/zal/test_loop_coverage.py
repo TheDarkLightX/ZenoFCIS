@@ -2,6 +2,7 @@
 
 import dataclasses
 import copy
+import hashlib
 import json
 import os
 import re
@@ -182,6 +183,21 @@ class NativeCoverageTests(unittest.TestCase):
                              ("idiom", instance["idiom"], instance["source"]))
             self.assertEqual((first["gaps_closed"], first["mutants_rejected"]), (4, 6))
             self.assertIn("Idiom: required-acceptance", (work / "out/COVERAGE.md").read_text())
+
+    def test_crlf_subject_hash_matches_the_binary_source_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            for name in ("project.zeno", "v2/policy.json", "tests/decision-examples.txt"):
+                target = work / "contract" / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((ROOT / "examples/guide-counter" / name).read_bytes().replace(b"\n", b"\r\n"))
+            result = self.call([work / "contract", "--out", work / "out"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            report = json.loads((work / "out/coverage.json").read_text())
+            native = json.loads((work / "out/packets/0001.stdout").read_text())
+            expected = hashlib.sha256((work / "contract/project.zeno").read_bytes()).hexdigest()
+            self.assertEqual(report["sources"]["project_sha256"], expected, "report normalized CRLF source bytes")
+            self.assertEqual(native["sources"]["project_sha256"], expected)
 
 
 class ProposalLoweringTests(unittest.TestCase):
