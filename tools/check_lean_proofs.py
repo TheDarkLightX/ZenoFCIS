@@ -23,6 +23,24 @@ AXIOMS = re.compile(
 )
 
 
+def proof_files(root):
+    """Refuse every symlink before taking the regular proof-source snapshot.
+
+    Path.rglob does not descend into directory symlinks. Refusing those entries
+    avoids a second module set that compilation could see but this gate skips.
+    Non-source links, broken links and a linked proof root are refused as well.
+    """
+    if root.is_symlink():
+        raise ValueError(f"symlink in proof tree: {root}")
+    files = []
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            raise ValueError(f"symlink in proof tree: {path}")
+        if path.is_file() and path.suffix == ".lean":
+            files.append(path)
+    return sorted(files)
+
+
 def lean(version, *args, search_path=None, tool="lean"):
     command = ["nice", "-n", "19", "ionice", "-c3", "elan", "run",
                f"leanprover/lean4:v{version}", tool, *map(str, args)]
@@ -191,7 +209,7 @@ def main():
     parser.add_argument("--controls", action="store_true")
     parser.add_argument("--report", type=Path, help="retain all module audits as JSON")
     args = parser.parse_args()
-    files = sorted(PROOFS.rglob("*.lean"))
+    files = proof_files(PROOFS)
     if not files:
         raise ValueError("no proof files")
     named = json.loads((PROOFS / "AXIOMS.json").read_text())

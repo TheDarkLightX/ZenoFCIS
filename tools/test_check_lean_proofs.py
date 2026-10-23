@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -48,6 +49,58 @@ class ProofReports(unittest.TestCase):
         for source in ("import Lean", "import Lean.Elab.Command", "import all Lean", "import FixedPoints"):
             with self.subTest(source=source), self.assertRaisesRegex(ValueError, "forbidden proof-source import"):
                 check.check_source(source)
+
+
+class ProofTree(unittest.TestCase):
+    def test_symlinked_directory_is_refused(self):
+        with tempfile.TemporaryDirectory(prefix="lean-tree-test-") as tmp:
+            root = Path(tmp)
+            proofs, outside = root / "proofs", root / "outside"
+            proofs.mkdir()
+            outside.mkdir()
+            (proofs / "Good.lean").write_text("import Std\ntheorem checked : True := by trivial\n")
+            (proofs / "AXIOMS.json").write_text("{}\n")
+            bad = outside / "Bad.lean"
+            bad.write_text("import Std\naxiom injected : False\ntheorem false_proved : False := injected\n")
+            # Establish that the skipped source compiles and replays, but its
+            # extra axiom makes it ineligible for the proof gate.
+            for version in check.VERSIONS:
+                build = root / ("build-" + version)
+                build.mkdir()
+                module, _ = check.compile_module(version, bad, outside, build)
+                check.replay_module(version, module, build)
+                code, packet = check.audit_module(version, module, build)
+                self.assertEqual(code, 1, packet)
+                self.assertFalse(packet["accepted"])
+                self.assertTrue(any("injected" in r["forbidden"] for r in packet["constants"]))
+            with mock.patch.object(check, "PROOFS", proofs), \
+                    mock.patch.object(sys, "argv", ["check_lean_proofs.py"]), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                check.main()  # The same regular tree is eligible.
+                (proofs / "linked").symlink_to(outside, target_is_directory=True)
+                with self.assertRaisesRegex(ValueError, "symlink in proof tree",
+                                            msg="symlinked_directory_must_not_escape_audit"):
+                    check.main()
+
+    def test_refuses_file_broken_non_source_and_root_symlinks(self):
+        with tempfile.TemporaryDirectory(prefix="lean-tree-test-") as tmp:
+            root = Path(tmp)
+            proofs = root / "proofs"
+            proofs.mkdir()
+            target = root / "target"
+            target.write_text("data")
+            for name, destination in (("Alias.lean", target), ("broken", root / "missing"),
+                                      ("data-link", target)):
+                with self.subTest(name=name):
+                    link = proofs / name
+                    link.symlink_to(destination)
+                    with self.assertRaisesRegex(ValueError, "symlink in proof tree"):
+                        check.proof_files(proofs)
+                    link.unlink()
+            alias = root / "alias"
+            alias.symlink_to(proofs, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "symlink in proof tree"):
+                check.proof_files(alias)
 
 
 class ModuleCoverage(unittest.TestCase):
