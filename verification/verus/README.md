@@ -6,7 +6,7 @@ law projection and signed-law division projection require fresh whole-source
 proofs and reviewed translated inventories. Historical counts and receipts
 below do not qualify these changed bytes. Qualification is pending.
 
-The [Verus workflow](../../.github/workflows/verus.yml) runs 20 qualification
+The [Verus workflow](../../.github/workflows/verus.yml) runs 21 qualification
 gates. Each gate first runs its script's own tests, then the script itself;
 for the `shared-runtime` gate these are `python3 tools/test_check_verus.py` and
 `python3 tools/check_verus.py --out` with an evidence path. The script requires
@@ -21,6 +21,7 @@ checks the authority and synthesis crates without default features.
 | `finite-execution` | `check_finite_execution.py` | [Finite admission and eager evaluation](#v2-finite-admission-and-eager-execution) |
 | `metered-execution` | `check_metered_execution.py` | [Owned V2 instruction metering](#owned-v2-instruction-metering); not transition authorization |
 | `shared-finite-checker` | `check_checker.py` | The [shared finite checker](#shared-finite-checker) against its real metered evaluator |
+| `lemma-kernel` | `check_lemma_kernel.py` | [State lemma decision core](#state-lemma-decision-core) over validated finite tables |
 | `canonical-bytes` | `check_canonical_bytes.py` | [Production V2 integer byte readers](#v2-integer-byte-interpretation); not schema admission |
 | `protected-input` | `check_protected_input.py` | [Owned V2 protected record projection](#v2-protected-flat-record-projection) |
 | `envelope-frame` | `check_envelope_frame_v2.py` | Original-envelope framing and exact payload custody |
@@ -512,3 +513,49 @@ for omitted cuts, dropped read-only invariants, wrong prefixes, own-only
 application, read-only writes and an extra callback after Reject. Native
 specimens and reference disagreement can be replayed separately with
 `python3 tools/test_composed_domain_runtime_controls.py --out evidence/composed-native.json`.
+
+
+## State lemma decision core
+
+[lemma_kernel.rs](lemma_kernel.rs) includes the production CLI
+[decision kernel](../../crates/zeno-fcis-cli/src/contract/review/lemma_kernel.rs)
+by path. The abstract specification defines Reach as the least genesis-containing
+set closed under effective steps, Init as genesis admission, and Cons as
+preservation by every committed edge. A separate induction theorem proves
+Init and Cons imply admission of every reachable state. The executable table
+validator, FIFO search with parents, complete consecution count, violation
+selection, trace construction and verdict refine these specifications.
+
+`Inductive` implies Init, Cons and admission of every reachable state.
+`False` has a genesis failure or a real trace to an excluded state; its final
+step leaves an admitted reachable state. `NotInductive` admits every reachable
+state but supplies a committed induction counterexample and its complete count.
+These statements quantify over arbitrary finite, representable tables admitted
+by the validator. The frozen [profile](lemma-kernel.json) binds every translated
+contract, mathematical function and executable body and fixes the obligation
+count. Internal helper preconditions are discharged by the unconditional
+`decide` boundary after table validation.
+
+```sh
+python3 tools/test_check_lemma_kernel.py
+python3 tools/check_lemma_kernel.py --out evidence/lemma-kernel.json
+```
+
+The gate checks the pinned whole crate with `--no-cheating`, native allocation,
+slice, vector, option and checked-product contracts, an independent FIFO oracle
+on every small table, and transitive-closure verdict comparisons. Four planted
+defects must compile, fail their named native assertion and fail a Verus
+obligation: omitted initiation, approval of an excluded genesis, a noncommit
+treated as a commit, premature search exit and an admitted counterexample
+successor. Each specimen is restored
+byte for byte and its SHA-256 recorded.
+
+The method builds on Klein et al., *seL4: Formal Verification of an OS Kernel*
+(SOSP 2009), and the [seL4 refinement proof organization](https://github.com/seL4/l4v).
+This is a scoped specification/refinement application, not a whole-system
+verification claim. Verus/vstd/Z3, Rust compilation and erasure, the allocator
+and the host remain trusted. Native tests exercise the assumed standard-library
+contracts. Shortest-trace minimality, the Machine/table adapter, `state_holds`,
+the law evaluator, generic `induction<S>`, unsigned/symbolic routes and JSON
+rendering are outside this theorem; adapter behavior and rendering are checked
+separately. No evaluator identity or application authority is changed.
