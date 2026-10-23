@@ -81,6 +81,7 @@ def operation(phase, current):
 
 
 def check_actions(authorized, committed, refused, pending):
+    """Precedence: unauthorized commit, duplicate commit, then silent drop."""
     # The independent acceptance rule counts occurrences, not distinct keys.
     counts = Counter(committed)
     if counts.keys() - set(authorized):

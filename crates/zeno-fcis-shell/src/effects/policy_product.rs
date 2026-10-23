@@ -123,6 +123,7 @@ pub fn invoices() -> Vec<Delivery> {
 
 /// Independent acceptance over occurrence bags. Policy reservations are not
 /// consulted here. Two identical commits exceed a bound even with one set key.
+/// Diagnostic precedence: unauthorized commit, duplicate commit, silent drop.
 #[must_use]
 pub fn check_actions(
     authorized: &[EffectKey],
@@ -138,7 +139,9 @@ pub fn check_actions(
         if count > 1 {
             return Some("duplicate commit");
         }
-        if count == 0 && !refused.contains(key) && !pending.contains(key) {
+    }
+    for key in authorized {
+        if !committed.contains(key) && !refused.contains(key) && !pending.contains(key) {
             return Some("silent drop");
         }
     }
@@ -607,6 +610,24 @@ mod tests {
             check_actions(&[key], &[key, key], &[], &[]),
             Some("duplicate commit"),
             "two commits of one key accepted"
+        );
+    }
+    #[test]
+    fn checker_diagnostic_precedence() {
+        let a = (Hash32::ZERO, Hash32::new([1; 32]));
+        let b = (Hash32::ZERO, Hash32::new([2; 32]));
+        assert_eq!(
+            check_actions(&[a, b], &[b, b], &[], &[]),
+            Some("duplicate commit"),
+            "duplicate commit must precede the silent drop of an earlier key"
+        );
+        assert_eq!(
+            check_actions(&[b, a], &[b, b], &[], &[]),
+            Some("duplicate commit")
+        );
+        assert_eq!(
+            check_actions(&[a], &[b, b], &[], &[]),
+            Some("unauthorized commit")
         );
     }
     #[test]

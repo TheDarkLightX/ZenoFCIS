@@ -33,8 +33,8 @@ CONTROLS = [
      'Authorized=[key]; committed=[key,key]; distinct-key count is one but occurrence count is two.'),
     ('silent-drop-accepted', 'checker_rejects_silent_drop', 'authorized send ended in no state',
      EFFECTS+'policy_product.rs',
-     'if count == 0 && !refused.contains(key) && !pending.contains(key) {',
-     'if false && count == 0 && !refused.contains(key) && !pending.contains(key) {',
+     'if !committed.contains(key) && !refused.contains(key) && !pending.contains(key) {',
+     'if false && !committed.contains(key) && !refused.contains(key) && !pending.contains(key) {',
      'Authorized=[key]; committed=[], refused=[], pending=[]; the invoice has no terminal or incomplete state.'),
 ]
 
