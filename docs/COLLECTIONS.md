@@ -138,8 +138,24 @@ on all data with the same equality pattern.
 
 The check does not establish P4. The runtime must establish it with its own
 tests and planted controls. Capacity is the runtime's: an insert into
-a full map is refused there, outside the view. A Lean statement of step 1 is
-future work.
+a full map is refused there, outside the view.
+
+The scoped renaming part of step 1 is proved by `frame_renaming` and
+`decision_renaming` in
+[Collections.lean](../verification/lean/Collections.lean): equal scalar and
+named-record observations, together with the same key equality pattern, give
+equal views and decisions, even across key types. The proof does not establish
+the parser or runtime encoding, canonical enumeration of equality patterns,
+stored key-field translation, summary identities, capacity refusals, or
+serialization and ownership; see the [proof scope](../verification/lean/README.md).
+
+The model's `run_preserves` additionally requires a uniform, scalar-independent
+entry predicate at every stored entry and every named post-entry, including
+absence, plus lawful empty genesis and merged-write framing. P3's locality
+alone is insufficient: `role_only_counterexample` preserves a law at role `a`,
+writes an unlawful value at distinct role `b`, and violates the law when that
+key is later selected as `a`. The model makes this closure an explicit
+`Checked` premise; it does not prove that the executable checker enforces it.
 
 ## Difference
 
