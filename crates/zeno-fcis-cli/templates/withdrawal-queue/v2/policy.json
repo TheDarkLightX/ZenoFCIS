@@ -295,7 +295,8 @@
     "510": "DebitCreditEffectEquality",
     "511": "AuthoritySubjectRecipient",
     "512": "AuthoritySubjectRecipient",
-    "513": "RejectNoAuthority"
+    "513": "RejectNoAuthority",
+    "514": "DebitCreditEffectEquality"
   },
   "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes.",
   "framework_reject_law": 509,
@@ -331,6 +332,14 @@
         "outbox.104": {
           "channel": 300,
           "destination": "settlement"
+        }
+      }
+    },
+    "514": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
         }
       }
     }

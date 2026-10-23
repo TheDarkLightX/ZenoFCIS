@@ -222,7 +222,7 @@ pub fn manifest() -> Result<LawManifest, BindingError> {
                 DecisionScope::Committing,
                 no_genesis()?,
             ),
-            503 | 504 | 510 => (
+            503 | 504 | 510 | 514 => (
                 LawKind::DebitCreditEffectEquality,
                 DecisionScope::Committing,
                 no_genesis()?,

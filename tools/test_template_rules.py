@@ -357,6 +357,57 @@ class TemplateRules(unittest.TestCase):
         self.assertEqual(outcome['class'], 'Refused', outcome)
         self.assertEqual(outcome['law'], 504, outcome)
 
+    def test_withdrawal_payout_action_cannot_erase_a_zero_reservation_request(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                case['outbox'] = []
+        # These schema-admitted raw pre-states violate the occupied-lane
+        # invariant. A replacement policy must not turn the original payload
+        # domain refusal into an accepted action by deleting its request.
+        for values in ['0 181 0 180 0 0 0 170 162 170 1 193 0 0',
+                       '0 181 0 180 0 0 0 170 163 170 1 191 0 2']:
+            with self.subTest(input=values):
+                outcome = self.probe('crates/zeno-fcis-cli/templates/withdrawal-queue',
+                                     mutate, values)
+                self.assertEqual(outcome['class'], 'Refused', outcome)
+                self.assertEqual(outcome['law'], 514, outcome)
+
+    def test_withdrawal_exact_request_keeps_its_amount(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                for delivery in case['outbox']:
+                    delivery['payload']['151'] = 1
+        outcome = self.probe('crates/zeno-fcis-cli/templates/withdrawal-queue', mutate,
+                             '2 181 2 180 0 0 0 170 162 170 1 193 0 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 510, outcome)
+
+    def test_withdrawal_exact_request_keeps_its_destination(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                for delivery in case['outbox']:
+                    delivery['destination'] = 'other-settlement'
+        outcome = self.probe('crates/zeno-fcis-cli/templates/withdrawal-queue', mutate,
+                             '2 181 2 180 0 0 0 170 163 170 1 191 0 2')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 512, outcome)
+
+    def test_withdrawal_other_actions_cannot_send_a_payout(self):
+        def mutate(policy):
+            payout = next(c['outbox'] for c in policy['cases'] if c['when'] == 'pay == 1')
+            for case in policy['cases']:
+                if case['class'] == 'Accept' and not case['outbox']:
+                    case['outbox'] = payout
+        for values in ['2 181 2 180 0 0 0 170 160 170 1 190 0 0',
+                       '3 181 2 180 0 0 0 170 161 171 1 192 0 0',
+                       '2 181 2 180 0 1 0 170 162 170 1 193 0 0',
+                       '2 181 2 180 0 0 0 170 162 170 1 193 1 0']:
+            with self.subTest(input=values):
+                outcome = self.probe('crates/zeno-fcis-cli/templates/withdrawal-queue',
+                                     mutate, values)
+                self.assertEqual(outcome['class'], 'Refused', outcome)
+                self.assertEqual(outcome['law'], 510, outcome)
+
     def test_withdrawal_debit_cannot_omit_payout(self):
         def mutate(policy):
             for case in policy['cases']:

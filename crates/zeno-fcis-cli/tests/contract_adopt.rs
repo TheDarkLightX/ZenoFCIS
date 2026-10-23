@@ -260,8 +260,8 @@ fn adopting_the_withdrawal_queue_candidate_reproduces_the_committed_fixture() {
             "decision_conformance_law": true, "receipt_equivalent": true,
             "step_limits_never_bind": true,
             "steps": {
-                "program": {"before": 132, "after": 123}, "laws": 1693,
-                "limit": {"before": 1830, "after": 1821}
+                "program": {"before": 132, "after": 123}, "laws": 1758,
+                "limit": {"before": 1895, "after": 1886}
             }
         })
     );

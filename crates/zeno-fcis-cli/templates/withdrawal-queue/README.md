@@ -43,6 +43,15 @@ debit to one payout with the same amount, the debited lane and destination
 rejection and checks the first failed guard. Claims 600 and 601 retain their
 solvency and pause predicates and include the new timeout transition law.
 
+Law 514 also counts requests from the action: an accepted owner timeout, or an
+unpaused tick that is allowed to serve a due lane, requires exactly one request
+on channel 300. Its payload is the paid lane and that lane's reserved amount,
+and its destination is `settlement`, as required by laws 510..512. Every other
+accepted action emits none; rejections and committed failures retain their
+independent framework checks. The count check does not rely solely on a positive
+balance debit. All four delivery laws inspect the candidate's actual outbox;
+the complete delivery count is bounded by one.
+
 The checked policy is generated into `src/v2_contract.rs`; `build.rs` separately
 lowers the schema, and `profile.rs` binds every law. Existing synthesized controller
 artifacts describe the unchanged keeper step. Their finite controller result
@@ -62,6 +71,14 @@ zeno-fcis generate contract crates/zeno-fcis-cli/templates/withdrawal-queue --ch
 zeno-fcis contract scenario crates/zeno-fcis-cli/templates/withdrawal-queue \
   --file crates/zeno-fcis-cli/templates/withdrawal-queue/tests/decision-scenarios.txt
 ```
+
+## Policy for the owner
+
+The existing choices remain: a deposit ignores its lane, a keeper tick ignores
+the command's lane and amount, and a timeout ignores the command's amount.
+Priority selects one of two due lanes. There is no deposit-credit ledger and no
+automatic payment without an available owner, keeper or scheduler. These choices
+are unchanged by the delivery obligations.
 
 ## Scope and background
 
