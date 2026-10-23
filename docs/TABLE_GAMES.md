@@ -14,7 +14,37 @@ zeno-fcis check --expand examples/contract-tables/games/release-pipeline/project
 Each `from_<state>` law expands to `true` where the controller wins and `false` where it does not. In the
 fairness examples, read the `stable` law first: the answers count only when it expands to `true`.
 
-## Formal model
+## Recurrence table: some run
+
+"Does some run from this state visit a good state infinitely often?" is a simpler question than a game.
+For this question on a finite domain, use a **recurrence table**: one binary least-fixed-point table `path[i][j]`
+for paths with at least one move. Its rule is a direct edge from `i` to `j`, or an edge from `i` to some `k`
+followed by `path[k][j]`. Starting from false excludes zero-step paths. The query is
+`exists a { good[a] && path[s][a] && path[a][a] }`, with the quantifier over the state table.
+
+This is the standard lasso argument for finite Büchi acceptance: an infinite good run visits some good state
+repeatedly, so there is a path to it and a nonempty walk back to it. Conversely, repeat that return walk forever.
+The recurrence table applies to the **some run** form on finite domains only. For **every run** and for games,
+use the layered construction below with the appropriate predecessor. It does not follow that any party can
+force the run found by the recurrence table.
+
+```
+zeno-fcis check --expand examples/contract-tables/games/recurrence/project.zeno
+zeno-fcis check --expand examples/contract-tables/games/recurrence-reflexive-trap/project.zeno
+```
+
+In `recurrence`, entry leads to good, good leads to return, and return leads back to good. An isolated state is
+also good, but has no move. The expanded laws `from_entry`, `from_good`, and `from_return` evaluate to `true`;
+`from_isolated` evaluates to `false`.
+
+The negative example `recurrence-reflexive-trap` has just one isolated good state. Its deliberately wrong rule
+adds `i == j`, so every state reaches itself in zero steps. The checker exposes the problem by printing
+`law 500 from_isolated on commit = (1 == 1 && true && true);`, which is true although no infinite run exists.
+Expansion checks the supplied rule;
+it does not validate its intended meaning. The regression compares nonempty paths against independent simple
+lasso enumeration on all 4,164 graphs and good-state sets with 1–3 states, including dead ends.
+
+## Formal model for games
 A game declares, for each state `i`:
 - who moves there (`mover[i]`: 0 for the controller, 1 for the environment);
 - whether it is a goal (`goal[i]`);
@@ -89,6 +119,9 @@ evaluation and judges as every other table, and the table itself is the certific
 - Results are exact over the declared game, and say nothing about behaviour outside it.
 
 ## Background
+- Acceptance of infinite sequences: J. R. Büchi, "On a Decision Method in Restricted Second Order Arithmetic",
+  Proceedings of the 1960 International Congress for Logic, Methodology and Philosophy of Science, 1962,
+  pp. 1–11. The recurrence table uses the standard finite accepting-lasso argument; no new method is claimed.
 - Least fixed points of logic programs: van Emden and Kowalski, "The Semantics of Predicate Logic as a Programming
   Language", JACM 1976.
 - Stratified negation: Apt, Blair and Walker, "Towards a Theory of Declarative Knowledge", 1988.

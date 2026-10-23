@@ -1,0 +1,24 @@
+zeno 1;
+project 1 recurrence_reflexive_trap;
+type 100 state S;
+type 101 command C;
+type 102 context X;
+type 103 int Zero in 0..=0;
+type 104 int Bit in 0..=1;
+field 300 100 padding 103;
+field 301 101 dummy 103;
+variant 302 102 Session none;
+// Negative example: one isolated good state, with no infinite run.
+const table 110 good 104 size 1 [1];
+const table 120 edge0 104 size 1 [0];
+component 400 core {
+  owns 100; reads pre.100; writes post.100; contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+// Deliberately wrong: the reflexive seed counts a zero-step path as a cycle.
+derived table 700 path[i][j] in table 110 rounds 1 {
+  default i == j || edge0[j] == 1 || exists k in table 110 { edge0[k] == 1 && path[k][j] };
+};
+law 499 domain on commit, genesis = true;
+law 500 from_isolated on commit = exists a in table 110 { good[a] == 1 && path[0][a] && path[a][a] };
