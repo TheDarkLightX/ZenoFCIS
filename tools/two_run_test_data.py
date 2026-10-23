@@ -81,6 +81,26 @@ def contracts(rng, count):
     for name in ('refusal-reason-only','no-admissible','invalid-payload'):
         folder=ROOT/'test-data/two-run'/name
         yield 'regression:'+name,(folder/'project.zeno').read_text(),json.loads((folder/'v2/policy.json').read_text()),[privacy(secret='pre.100.111',public=['post.100.110'])]
+    # Isolate each observed channel: public state and class cannot mask a leak.
+    for index in range(8):
+        bound=index%3+1
+        fields='field 110 100 marker 105; field 111 100 value 105; field 112 100 secret 106; field 120 101 user 107;'
+        types=f'type 105 int Amount in 0..={bound}; type 106 bool Flag; type 107 int Bit in 0..=1;'
+        for channel in ('reject-reason','outbox'):
+            name=f'{channel}-only-{index:02}'
+            if channel=='reject-reason':
+                cases=[dict(when='pre.100.112',**{'class':'Reject'},reason=200,post={},outbox=[]),
+                       dict(when=True,**{'class':'Reject'},reason=201,post={},outbox=[])]
+                extra='reason 200 a precedence 0; reason 201 b precedence 1;'
+                bindings={'106':['Bool']}
+            else:
+                delivery=dict(ordinal=0,channel=300,destination='public',payload={'130':f'choose(pre.100.112, {bound}, 0)'},idempotency_ordinal=index)
+                cases=[accept({},outbox=[delivery])]
+                extra='type 103 destination Desk; type 104 payload Notice; field 130 104 amount 105; channel 300 notify destination 103 payload 104;'
+                bindings={'106':['Bool'],'103':['Text',1,16]}
+            project,policy=base(name,types,fields,{'110':0,'111':0,'112':False},cases,extra,bindings=bindings)
+            question=privacy();question['expected_difference_kind']='reason' if channel=='reject-reason' else 'outbox'
+            yield 'targeted:'+name,project,policy,[question]
     for index in range(count):
         bound=rng.randint(1,3); coefficient=rng.randint(0,3); k=rng.randint(0,2)
         expressions=['command.101.120','pre.100.111 + command.101.121',

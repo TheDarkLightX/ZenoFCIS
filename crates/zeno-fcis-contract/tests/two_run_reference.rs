@@ -126,6 +126,13 @@ fn reference_corpus_matches_every_input_and_property() {
                 "contract {name}: {:?}",
                 result.packet()
             );
+            if let Some(kind) = q.get("expected_difference_kind") {
+                assert_eq!(
+                    result.packet()["result"]["first_difference"]["kind"],
+                    *kind,
+                    "contract {name}"
+                );
+            }
             assert_eq!(
                 result.packet()["measured"]["admissible_states"],
                 record["admissible_states"],
