@@ -143,6 +143,16 @@ theorem monotonicity_control :
   change true = false
   decide
 """}
+    elif path.name == "IndexedFixedPoints.lean":
+        cases = {"indexed_middle_seed_control": """
+theorem indexed_middle_seed_control :
+    FixedPoints.iter
+      (IndexedFixedPoints.middle IndexedFixedPoints.middleIdentity 0 FixedPoints.top)
+      FixedPoints.top 1 (0 : Fin 1) =
+    IndexedFixedPoints.value IndexedFixedPoints.middleIdentity (0 : Fin 1) := by
+  change true = false
+  decide
+"""}
     else:
         raise ValueError(f"no defect control defined for {path.name}")
     for name, assertion in cases.items():

@@ -94,5 +94,131 @@
     "Classical.choice",
     "Quot.sound",
     "propext"
+  ],
+  "IndexedFixedPoints.bounded_certificate": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.complement_eq_iff": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.complement_involution": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.complement_join": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.complement_meet": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.complement_order": [
+    "propext"
+  ],
+  "IndexedFixedPoints.complemented_lfp": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.concrete_certificate": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.dual_iteration": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.dual_monotone": [
+    "propext"
+  ],
+  "IndexedFixedPoints.full_middle_repeat": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.full_strata_iterations": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.generator_stable": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.greatest_of_last_repeat": [
+    "propext"
+  ],
+  "IndexedFixedPoints.join_mono": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.join_monotone": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.join_reindex": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.join_true": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.least_of_last_repeat": [
+    "propext"
+  ],
+  "IndexedFixedPoints.meet_mono": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.meet_monotone": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.meet_reindex": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.meet_true": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.middle_identity_monotone": [],
+  "IndexedFixedPoints.middle_monotone_y": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.middle_monotone_z": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.nested_extremal": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.outer_monotone": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.strata_step": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.tableMiddle_eq": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.value_reindex": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.wrong_middle_seed_counterexample": [
+    "propext"
   ]
 }

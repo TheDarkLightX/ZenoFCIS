@@ -72,10 +72,52 @@ The comparison is `z[K] = z[K+1]`, so it checks `K+1` outer evaluations.
 The wrong-seed counterexample uses the identity on one bit: starting at
 all-true is stable but is not least. The controls also reject a claimed
 repeat for one-bit negation, which oscillates without monotonicity.
-This proves an abstract greatest/least nesting. It does not prove the game
-semantics, the full GR(1) encoding with conjunctions and an additional inner
-greatest fixed point, Boolean complement translation, table expansion, the
-Python proposal generator, or the implementation of the `stable` law.
+This is the two-level case. The indexed extension below supplies the finite
+conjunction and additional inner greatest fixed point needed by the games guide.
+
+## Indexed strata and the games guide
+
+[IndexedFixedPoints.lean](IndexedFixedPoints.lean) models
+`greatest z. meet_j least y. join_i greatest x. F[j,i](z,y,x)` on
+`Fin n → Bool`. Every `F[j,i]` must be monotone in **all three** arguments.
+`meet_monotone` and `join_monotone` prove closure of finite meets and joins;
+`nested_extremal` proves the greatest/least/greatest extremal properties of
+the resulting operators. Empty meets are top and empty joins are bottom,
+including a zero-dimensional state space.
+
+`value_reindex` proves invariance under relabelling either finite index set.
+Surjective index maps suffice, so duplicate conjuncts or disjuncts are harmless. Omitting
+an index is not covered. This equality holds even for the finite iteration
+definitions without monotonicity; their fixed-point interpretation requires it.
+
+`dual_iteration`, `complemented_lfp`, and the finite De Morgan identities
+connect each inner greatest chain to the complemented least chain in the
+generated tables. `tableMiddle` complements the meet of those inner tables;
+`strata` complements the join of the complemented middle results. The inner
+tables run exactly `n` rounds, which is sufficient under monotonicity.
+
+`generator_stable` uses the guide's indexing: `K > 0`, outer seed top,
+middle seed bottom, and the shared proposed length `L[k]` in round `k`.
+For every `k` from 1 through `K` and every guarantee `j`, `L[k] > 0` and
+the middle results at `L[k]` and `L[k]-1` must agree. The outer results at
+`K` and `K-1` must also agree. Equality of complemented tables is equivalent
+to equality of their values (`complement_eq_iff`). These checks identify
+the result with the exact indexed nested fixed point. The theorem accepts
+the first repeat, or any later repeat; it does not trust minimality.
+`bounded_certificate` proves that `K = n+1` and every `L[k] = n+1` satisfy
+the premises for every monotone family. `concrete_certificate` instantiates
+them on a nonempty one-bit family. `wrong_middle_seed_counterexample`
+shows that a top-seeded middle identity chain can repeat with the wrong value.
+
+The guide may cite these results for this finite, total, monotone recurrence
+and its checked stopping rule. They do **not** prove that a particular game
+has those operators, that the nested value is its winning region, or that
+strategies meet temporal assumptions. Full game semantics remains out of scope.
+The Python source generator, parsing, table expansion, bounded arithmetic,
+definedness and traps, and the executable `stable` check are not refined by
+these proofs. The model's empty-family algebra does not assert that a source
+generator accepts empty table or index declarations. A false `stable` table
+must still be explicitly rejected by the guide's validation procedure.
 
 ## Checking and axioms
 
@@ -106,4 +148,7 @@ Properties of Programs in Propositional Temporal Logic,” POPL 1986, for data
 independence. Finite monotone fixed-point iteration builds on Alfred Tarski,
 “A Lattice-Theoretical Fixpoint Theorem and Its Applications,” Pacific Journal
 of Mathematics, 1955. These files formalize the scoped checker arguments and
-premise counterexamples. Comparative prior-art search pending; no novelty claim.
+premise counterexamples. The indexed nesting follows the GR(1) fixed-point form
+in Piterman, Pnueli and Sa'ar, “Synthesis of Reactive(1) Designs,” VMCAI 2006;
+only the algebraic recurrence is formalized here. Comparative prior-art search
+pending; no novelty claim.
