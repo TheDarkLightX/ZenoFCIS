@@ -320,8 +320,67 @@
     "500": "StateInvariant",
     "501": "AuthoritySubjectRecipient",
     "502": "AuthoritySubjectRecipient",
-    "503": "CommittedFailureEffects"
+    "503": "CommittedFailureEffects",
+    "504": "AuthoritySubjectRecipient",
+    "505": "CommittedFailureEffects",
+    "506": "RejectNoAuthority",
+    "510": "AuthoritySubjectRecipient",
+    "511": "AuthoritySubjectRecipient",
+    "512": "AuthoritySubjectRecipient",
+    "513": "AuthoritySubjectRecipient"
   },
   "framework_reject_law": 509,
-  "original_domain": "Standing strikes 0..3; identity tier 0..3; amount band 0..4; both original actions and reviewer flags; all three original region and counterparty-risk variants; reinstatement precedes all screening rules."
+  "original_domain": "Standing strikes 0..3; identity tier 0..3; amount band 0..4; both original actions and reviewer flags; all three original region and counterparty-risk variants; reinstatement precedes all screening rules.",
+  "delivery_laws": {
+    "510": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.145": {
+          "channel": 300,
+          "field": 145
+        },
+        "outbox.104.146": {
+          "channel": 300,
+          "field": 146
+        }
+      }
+    },
+    "511": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.106": {
+          "channel": 301
+        },
+        "outbox.106.147": {
+          "channel": 301,
+          "field": 147
+        },
+        "outbox.106.148": {
+          "channel": 301,
+          "field": 148
+        }
+      }
+    },
+    "512": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300,
+          "destination": "review-queue"
+        }
+      }
+    },
+    "513": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.106": {
+          "channel": 301,
+          "destination": "compliance-team"
+        }
+      }
+    }
+  }
 }

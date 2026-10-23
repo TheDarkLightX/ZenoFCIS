@@ -133,4 +133,8 @@ pub(crate) const FILES: &[(&str, &[u8])] = &[
         "v2/policy.zcve",
         include_bytes!("../templates/compliance-gateway/v2/policy.zcve"),
     ),
+    (
+        "v2/run-properties.json",
+        include_bytes!("../templates/compliance-gateway/v2/run-properties.json"),
+    ),
 ];

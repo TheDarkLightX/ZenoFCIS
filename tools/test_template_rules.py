@@ -114,9 +114,42 @@ class TemplateRules(unittest.TestCase):
         self.assertEqual(outcome['class'], 'Refused', outcome)
         self.assertEqual(outcome['law'], 511, outcome)
 
+    def test_compliance_required_block_cannot_be_allowed(self):
+        def mutate(policy):
+            policy['cases'].insert(3, {'when':'identity_tier == 0 && risk == 167 && amount_band == 0',
+                'class':'Accept','reason':None,'post':{'120':'strikes'},'outbox':[]})
+        outcome = self.probe('crates/zeno-fcis-cli/templates/compliance-gateway', mutate,
+                             '0 150 160 0 167 0 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 504, outcome)
 
+    def test_compliance_screen_cannot_be_arbitrarily_rejected(self):
+        def mutate(policy):
+            policy['cases'].insert(0, {'when':'action == 150','class':'Reject','reason':200,'post':{},'outbox':[]})
+        outcome = self.probe('crates/zeno-fcis-cli/templates/compliance-gateway', mutate,
+                             '0 150 160 1 165 2 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 506, outcome)
 
+    def test_compliance_required_notice_cannot_be_omitted(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                case['outbox'] = []
+        outcome = self.probe('crates/zeno-fcis-cli/templates/compliance-gateway', mutate,
+                             '0 150 161 2 165 2 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 510, outcome)
 
+    def test_compliance_alert_cannot_name_a_lower_priority_rule(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                for delivery in case['outbox']:
+                    if delivery['channel'] == 301:
+                        delivery['payload']['147'] = 174
+        outcome = self.probe('crates/zeno-fcis-cli/templates/compliance-gateway', mutate,
+                             '0 150 162 4 167 0 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 511, outcome)
 
 
 
