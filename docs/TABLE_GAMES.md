@@ -55,9 +55,10 @@ The controllable predecessor of a set X holds at state i when one of these holds
 
 Each example was compared with an independent Python solver on every state. The fairness encoding was also
 compared on 1,576 games (every two-state game with one assumption and one guarantee, and 1,000 random games of 3 to
-8 states with up to two of each): the tables, a direct nested fixed point and the trace game's certified parity
-solver agreed on every state, and `stable` held. Proposing one stratum too few was refused by `stable` in
-all 876 games tried; ignoring the assumption produced disagreements.
+8 states with up to two of each): the tables, a direct nested fixed point and the trace game's parity solver agreed on
+every state, and `stable` held. Every certificate from the parity solver was replayed by the trace game's
+independent checker. Proposing one stratum too few was refused by `stable` in all 876 games tried; ignoring the
+assumption produced disagreements.
 
 ## Difference
 A hand-written check of "the maintainer can always release" needs either a proof or a search over every behaviour
