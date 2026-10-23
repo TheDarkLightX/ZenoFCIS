@@ -191,6 +191,8 @@ def policy_expression(text, policy, positions, value=False):
     subject = {"names": list(paths), "kinds": ["Bool" if p["domain"]["kind"] == "bool" else "I128" for p in positions],
                "variants": {}}
     def parse(raw):
+        if type(raw) is bool:
+            raw = "true" if raw else "false"
         for alias, path in sorted(paths.items(), key=lambda item: -len(item[1])):
             raw = re.sub(re.escape(path) + r"(?![\d.])", alias, str(raw))
         return parse_expression(str(raw), allow_holes=False, allow_params=False)

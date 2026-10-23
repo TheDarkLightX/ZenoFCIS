@@ -228,6 +228,24 @@ class NativeCoverageTests(unittest.TestCase):
             self.assertEqual(report["sources"]["project_sha256"], expected, "report normalized CRLF source bytes")
             self.assertEqual(native["sources"]["project_sha256"], expected)
 
+    def test_json_boolean_policy_guards_are_lowered_as_native_literals(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            for name in ("project.zeno", "v2/policy.json", "tests/decision-examples.txt"):
+                target = work / "contract" / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((ROOT / "examples/guide-counter" / name).read_bytes())
+            policy_path = work / "contract/v2/policy.json"
+            policy = json.loads(policy_path.read_text())
+            policy["cases"][-1]["when"] = True
+            policy["cases"].insert(0, {"when": False, "class": "Reject", "reason": 200, "post": {}, "outbox": []})
+            policy_path.write_text(json.dumps(policy))
+            result = self.call([work / "contract", "--out", work / "out"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            report = json.loads((work / "out/coverage.json").read_text())
+            self.assertEqual(report["residual"]["gaps"], 0)
+            self.assertEqual(report["residual"]["admitted_mutants"], 0)
+
 
 class ProposalLoweringTests(unittest.TestCase):
     def test_export_and_proposals_share_expression_lowering(self):
