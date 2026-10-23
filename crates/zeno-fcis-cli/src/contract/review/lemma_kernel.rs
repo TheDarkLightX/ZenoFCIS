@@ -95,6 +95,15 @@ verus! {
             }
         }
     }
+    pub proof fn parent_facts(after:Seq<usize>,commits:Seq<bool>,k:int,g:int,seen:Seq<bool>,parent:Seq<Option<(usize,usize)>>,depth:Seq<usize>,s:int)
+        requires parents_valid(after,commits,k,g,seen,parent,depth), 0 <= s < seen.len(), seen[s],
+        ensures (s == g) == (depth[s] == 0),
+            s != g ==> parent[s].is_some()
+                && parent[s].unwrap().0 < seen.len() && parent[s].unwrap().1 < k
+                && seen[parent[s].unwrap().0 as int]
+                && step(after,commits,k,parent[s].unwrap().0 as int,parent[s].unwrap().1 as int) == s
+                && depth[parent[s].unwrap().0 as int]+1 == depth[s],
+    {}
     pub open spec fn frontier(queue:Seq<usize>, depth:Seq<usize>, at:int) -> bool {
         0 <= at <= queue.len()
         && (forall|j:int| 0 <= j < queue.len() ==> #[trigger] depth[queue[j] as int] <= j)
@@ -217,4 +226,341 @@ pub fn reachable(n: usize, k: usize, g: usize, after: &[usize], commits: &[bool]
         }
     }
     Search { seen, parent, depth }
+}
+
+#[cfg(verus_keep_ghost)]
+verus! {
+    pub open spec fn bad(holds:Seq<bool>,after:Seq<usize>,commits:Seq<bool>,k:int,j:int) -> bool {
+        holds[j/k] && commits[j] && !holds[after[j] as int]
+    }
+    pub open spec fn failure_count(holds:Seq<bool>,after:Seq<usize>,commits:Seq<bool>,k:int,end:nat) -> nat
+        decreases end,
+    {
+        if end == 0 { 0 } else {
+            failure_count(holds,after,commits,k,(end-1) as nat)
+                + if bad(holds,after,commits,k,end-1) {1nat} else {0nat}
+        }
+    }
+    pub open spec fn cons(holds:Seq<bool>,after:Seq<usize>,commits:Seq<bool>,k:int) -> bool {
+        forall|j:int| 0 <= j < after.len() ==> !bad(holds,after,commits,k,j)
+    }
+    pub proof fn count_facts(holds:Seq<bool>,after:Seq<usize>,commits:Seq<bool>,k:int,end:nat)
+        ensures failure_count(holds,after,commits,k,end) <= end,
+            (failure_count(holds,after,commits,k,end) == 0)
+                == (forall|j:int| 0 <= j < end ==> !bad(holds,after,commits,k,j)),
+        decreases end,
+    {
+        if end > 0 { count_facts(holds,after,commits,k,(end-1) as nat); }
+    }
+    pub open spec fn first_failure(holds:Seq<bool>,after:Seq<usize>,commits:Seq<bool>,k:int,end:int,first:Option<usize>) -> bool {
+        match first {
+            None => forall|j:int| 0 <= j < end ==> !bad(holds,after,commits,k,j),
+            Some(j) => 0 <= j < end && bad(holds,after,commits,k,j as int)
+                && forall|l:int| 0 <= l < j ==> !bad(holds,after,commits,k,l),
+        }
+    }
+}
+
+/// Complete committed-edge count and least ordinal induction counterexample.
+pub struct Scan {
+    pub count: usize,
+    pub first: Option<usize>,
+}
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    requires table_valid(holds@.len() as int,k as int,g as int,after@,commits@),
+    ensures result.count == failure_count(holds@,after@,commits@,k as int,after@.len()),
+        first_failure(holds@,after@,commits@,k as int,after@.len() as int,result.first),
+        (result.count == 0) == cons(holds@,after@,commits@,k as int),
+        result.first.is_none() == (result.count == 0),
+))]
+pub fn consecution(k: usize, g: usize, after: &[usize], commits: &[bool], holds: &[bool]) -> Scan {
+    let mut ordinal = 0usize;
+    let mut count = 0usize;
+    let mut first = None;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant table_valid(holds@.len() as int,k as int,g as int,after@,commits@),
+            ordinal <= after@.len(), count <= ordinal,
+            count == failure_count(holds@,after@,commits@,k as int,ordinal as nat),
+            first_failure(holds@,after@,commits@,k as int,ordinal as int,first),
+            first.is_none() == (count == 0),
+        decreases after@.len() - ordinal,
+    ))]
+    while ordinal < after.len() {
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            assert(ordinal / k < holds@.len()) by(nonlinear_arith)
+                requires k > 0, ordinal < holds@.len() * k;
+        }
+        if holds[ordinal / k] && commits[ordinal] && !holds[after[ordinal]] {
+            count += 1;
+            if first.is_none() { first = Some(ordinal); }
+        }
+        ordinal += 1;
+    }
+    #[cfg(verus_keep_ghost)]
+    proof! { count_facts(holds@,after@,commits@,k as int,after@.len()); }
+    Scan { count, first }
+}
+
+/// Validate all table dimensions and successor indices before making a decision.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result == table_valid(n as int,k as int,g as int,after@,commits@),
+))]
+pub fn valid_tables(n: usize, k: usize, g: usize, after: &[usize], commits: &[bool]) -> bool {
+    if n == 0 || k == 0 || g >= n { return false; }
+    let total = match n.checked_mul(k) { Some(total) => total, None => return false };
+    if after.len() != total || commits.len() != total { return false; }
+    let mut j = 0usize;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant n > 0, k > 0, g < n, (n as int)*(k as int) == after@.len(),
+            commits@.len() == after@.len(), j <= after@.len(),
+            forall|i:int| 0 <= i < j ==> (#[trigger] after@[i]) < n,
+        decreases after@.len() - j,
+    ))]
+    while j < after.len() {
+        if after[j] >= n { return false; }
+        j += 1;
+    }
+    true
+}
+
+#[derive(Clone, Copy)]
+#[cfg_attr(not(verus_keep_ghost), derive(Debug, Eq, PartialEq))]
+pub enum Verdict { False, NotInductive, Inductive }
+
+#[cfg(verus_keep_ghost)]
+verus! {
+    pub open spec fn init(holds:Seq<bool>, g:int) -> bool { holds[g] }
+    pub open spec fn all_reachable_hold(after:Seq<usize>,commits:Seq<bool>,k:int,g:int,holds:Seq<bool>) -> bool {
+        forall|s:int| 0 <= s < holds.len() && reach(after,commits,holds.len() as int,k,g,s)
+            ==> #[trigger] holds[s]
+    }
+    pub open spec fn verdict_spec(after:Seq<usize>,commits:Seq<bool>,k:int,g:int,holds:Seq<bool>) -> Verdict {
+        if !all_reachable_hold(after,commits,k,g,holds) { Verdict::False }
+        else if !cons(holds,after,commits,k) { Verdict::NotInductive }
+        else { Verdict::Inductive }
+    }
+    pub proof fn inductive_sound(after:Seq<usize>,commits:Seq<bool>,k:int,g:int,holds:Seq<bool>)
+        requires table_valid(holds.len() as int,k,g,after,commits),
+            verdict_spec(after,commits,k,g,holds) == Verdict::Inductive,
+        ensures init(holds,g), cons(holds,after,commits,k),
+            all_reachable_hold(after,commits,k,g,holds),
+    { reach_genesis(after,commits,holds.len() as int,k,g); }
+
+    pub open spec fn selected(seen:Seq<bool>,holds:Seq<bool>,depth:Seq<usize>,end:int,best:Option<usize>) -> bool {
+        match best {
+            None => forall|s:int| 0 <= s < end ==> !(seen[s] && !holds[s]),
+            Some(b) => b < end && seen[b as int] && !holds[b as int]
+                && forall|s:int| 0 <= s < end && seen[s] && !holds[s] ==> {
+                    &&& #[trigger] depth[b as int] <= #[trigger] depth[s]
+                    &&& (depth[b as int] == depth[s] ==> b <= s)
+                },
+        }
+    }
+    pub open spec fn walk(after:Seq<usize>,commits:Seq<bool>,k:int,s:int,path:Seq<usize>) -> int
+        decreases path.len(),
+    {
+        if path.len() == 0 { s }
+        else if 0 <= s && 0 <= path[0] < k && 0 <= s*k+path[0] < after.len() {
+            walk(after,commits,k,step(after,commits,k,s,path[0] as int),path.subrange(1,path.len() as int))
+        } else { -1 }
+    }
+}
+
+/// Least parent depth, then least ordinal, among reachable excluded states.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    requires seen@.len() == holds@.len(), depth@.len() == holds@.len(),
+    ensures selected(seen@,holds@,depth@,holds@.len() as int,result),
+))]
+pub fn nearest(seen: &[bool], holds: &[bool], depth: &[usize]) -> Option<usize> {
+    let mut best = None;
+    let mut s = 0usize;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant seen@.len() == holds@.len(), depth@.len() == holds@.len(),
+            s <= holds@.len(), selected(seen@,holds@,depth@,s as int,best),
+        decreases holds@.len() - s,
+    ))]
+    while s < holds.len() {
+        if seen[s] && !holds[s] {
+            let better = match best { None => true, Some(b) => depth[s] < depth[b] };
+            if better { best = Some(s); }
+        }
+        s += 1;
+    }
+    best
+}
+
+/// Fill the owned trace backwards along decreasing parent depths.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    requires table_valid(search.seen@.len() as int,k as int,g as int,after@,commits@),
+        parents_valid(after@,commits@,k as int,g as int,search.seen@,search.parent@,search.depth@),
+        target < search.seen@.len(), search.seen@[target as int],
+    ensures result@.len() == search.depth@[target as int],
+        walk(after@,commits@,k as int,g as int,result@) == target,
+        forall|j:int| 0 <= j < result@.len() ==> (#[trigger] result@[j]) < k,
+        target != g ==> result@.len() > 0
+            && result@[result@.len()-1] == search.parent@[target as int].unwrap().1
+            && walk(after@,commits@,k as int,g as int,result@.subrange(0,result@.len() as int-1))
+                == search.parent@[target as int].unwrap().0,
+))]
+pub fn trace(k: usize, g: usize, after: &[usize], commits: &[bool], search: &Search, target: usize) -> Vec<usize> {
+    let mut remaining = search.depth[target];
+    let mut path = vec![0; remaining];
+    let mut state = target;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant table_valid(search.seen@.len() as int,k as int,g as int,after@,commits@),
+            parents_valid(after@,commits@,k as int,g as int,search.seen@,search.parent@,search.depth@),
+            target < search.seen@.len(), search.seen@[target as int],
+            state < search.seen@.len(), search.seen@[state as int],
+            path@.len() == search.depth@[target as int], remaining <= path@.len(),
+            search.depth@[state as int] == remaining,
+            walk(after@,commits@,k as int,state as int,path@.subrange(remaining as int,path@.len() as int)) == target,
+            forall|j:int| remaining <= j < path@.len() ==> (#[trigger] path@[j]) < k,
+            remaining < path@.len() ==> path@[path@.len()-1] == search.parent@[target as int].unwrap().1
+                && walk(after@,commits@,k as int,state as int,path@.subrange(remaining as int,path@.len() as int-1))
+                    == search.parent@[target as int].unwrap().0,
+        decreases remaining,
+    ))]
+    while remaining > 0 {
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            parent_facts(after@,commits@,k as int,g as int,search.seen@,search.parent@,search.depth@,state as int);
+        }
+        let (before, input) = match search.parent[state] {
+            Some(pair) => pair,
+            None => return path,
+        };
+        #[cfg(verus_keep_ghost)]
+        proof_decl! { let ghost old_path = path@; }
+        path[remaining - 1] = input;
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            assert((before as int)*k+input < after@.len()) by(nonlinear_arith)
+                requires before < search.seen@.len(), input < k, k > 0,
+                    after@.len() == search.seen@.len()*k;
+            assert(path@.subrange(remaining as int,path@.len() as int)
+                =~= old_path.subrange(remaining as int,old_path.len() as int));
+            assert(path@.subrange(remaining as int-1,path@.len() as int).subrange(1,path@.len() as int-remaining as int+1)
+                =~= old_path.subrange(remaining as int,old_path.len() as int));
+            assert(walk(after@,commits@,k as int,before as int,path@.subrange(remaining as int-1,path@.len() as int)) == target);
+            if remaining < path@.len() {
+                assert(path@.subrange(remaining as int-1,path@.len() as int-1).subrange(1,path@.len() as int-remaining as int)
+                    =~= old_path.subrange(remaining as int,old_path.len() as int-1));
+                assert(walk(after@,commits@,k as int,before as int,path@.subrange(remaining as int-1,path@.len() as int-1))
+                    == search.parent@[target as int].unwrap().0);
+            } else { assert(state == target); }
+        }
+        state = before;
+        remaining -= 1;
+    }
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        parent_facts(after@,commits@,k as int,g as int,search.seen@,search.parent@,search.depth@,state as int);
+        assert(state == g); assert(path@.subrange(0,path@.len() as int) =~= path@);
+    }
+    path
+}
+
+/// Decision plus owned witnesses; no table reference escapes the invocation.
+pub struct Decision {
+    pub verdict: Verdict,
+    pub initiation: bool,
+    pub search: Search,
+    pub count: usize,
+    pub counterexample: Option<(usize, usize, usize)>,
+    pub target: Option<usize>,
+    pub trace: Vec<usize>,
+}
+
+#[cfg(verus_keep_ghost)]
+verus! {
+    pub open spec fn decision_spec(d:Decision,after:Seq<usize>,commits:Seq<bool>,k:int,g:int,holds:Seq<bool>) -> bool {
+        &&& d.verdict == verdict_spec(after,commits,k,g,holds)
+        &&& d.initiation == init(holds,g)
+        &&& d.count == failure_count(holds,after,commits,k,after.len())
+        &&& d.search.seen@.len() == holds.len()
+        &&& parents_valid(after,commits,k,g,d.search.seen@,d.search.parent@,d.search.depth@)
+        &&& (forall|s:int| 0 <= s < holds.len() ==> (#[trigger] d.search.seen@[s])
+            == reach(after,commits,holds.len() as int,k,g,s))
+        &&& match d.verdict {
+            Verdict::False => {
+                &&& d.target.is_some()
+                &&& {
+                    let t=d.target.unwrap() as int;
+                    &&& 0 <= t < holds.len() && d.search.seen@[t] && !holds[t]
+                    &&& walk(after,commits,k,g,d.trace@) == t
+                    &&& d.trace@.len() == d.search.depth@[t]
+                    &&& (forall|j:int| 0 <= j < d.trace@.len() ==> (#[trigger] d.trace@[j]) < k)
+                    &&& if !holds[g] { t == g && d.trace@.len() == 0 && d.counterexample.is_none() }
+                        else { match d.counterexample {
+                            None => false,
+                            Some((s,i,u)) => s < holds.len() && i < k && u == t && holds[s as int]
+                                && d.search.seen@[s as int] && commits[s*k+i]
+                                && step(after,commits,k,s as int,i as int) == t
+                                && d.trace@.len() > 0 && d.trace@[d.trace@.len()-1] == i
+                                && walk(after,commits,k,g,d.trace@.subrange(0,d.trace@.len() as int-1)) == s,
+                        } }
+                }
+            },
+            Verdict::NotInductive => d.target.is_none() && d.trace@.len() == 0 && d.count > 0
+                && match d.counterexample {
+                    None => false,
+                    Some((s,i,u)) => s < holds.len() && i < k && u == after[s*k+i]
+                        && holds[s as int] && commits[s*k+i] && !holds[u as int]
+                        && first_failure(holds,after,commits,k,after.len() as int,Some((s*k+i) as usize)),
+                },
+            Verdict::Inductive => init(holds,g) && cons(holds,after,commits,k)
+                && all_reachable_hold(after,commits,k,g,holds)
+                && d.count == 0 && d.counterexample.is_none() && d.target.is_none() && d.trace@.len() == 0,
+        }
+    }
+}
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result.is_some() == table_valid(holds@.len() as int,k as int,g as int,after@,commits@),
+        match result { None => true, Some(d) => decision_spec(d,after@,commits@,k as int,g as int,holds@) },
+))]
+pub fn decide(k: usize, g: usize, after: &[usize], commits: &[bool], holds: &[bool]) -> Option<Decision> {
+    let n = holds.len();
+    if !valid_tables(n,k,g,after,commits) { return None; }
+    #[cfg(verus_keep_ghost)]
+    proof! { reach_genesis(after@,commits@,n as int,k as int,g as int); }
+    let search = reachable(n,k,g,after,commits);
+    let scan = consecution(k,g,after,commits,holds);
+    let initiation = holds[g];
+    let violation = nearest(&search.seen,holds,&search.depth);
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        assert(violation.is_none() == all_reachable_hold(after@,commits@,k as int,g as int,holds@));
+    }
+    let (verdict, target, counterexample, path) = if !initiation {
+        (Verdict::False,Some(g),None,Vec::new())
+    } else if let Some(state) = violation {
+        #[cfg(verus_keep_ghost)]
+        proof! { parent_facts(after@,commits@,k as int,g as int,search.seen@,search.parent@,search.depth@,state as int); }
+        let (before,input) = match search.parent[state] {
+            Some(pair) => pair,
+            None => return None,
+        };
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            assert(holds@[before as int]);
+            assert(commits@[before as int*k+input]);
+        }
+        let path = trace(k,g,after,commits,&search,state);
+        (Verdict::False,Some(state),Some((before,input,state)),path)
+    } else if let Some(ordinal) = scan.first {
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            assert(ordinal/k < n) by(nonlinear_arith) requires k>0, ordinal < n*k;
+            assert((ordinal/k)*k+ordinal%k == ordinal) by(nonlinear_arith) requires k>0;
+        }
+        (Verdict::NotInductive,None,Some((ordinal/k,ordinal%k,after[ordinal])),Vec::new())
+    } else {
+        #[cfg(verus_keep_ghost)]
+        proof! { inductive_sound(after@,commits@,k as int,g as int,holds@); }
+        (Verdict::Inductive,None,None,Vec::new())
+    };
+    Some(Decision { verdict, initiation, search, count:scan.count, counterexample, target, trace:path })
 }
