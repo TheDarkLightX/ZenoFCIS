@@ -99,7 +99,7 @@ class WideCliReports(unittest.TestCase):
                 rules.write_text(json.dumps({'schema': 'zeno-fcis/loop-rules/1', 'rules': [
                     {'id': 'wrong', 'where': 'true', 'class': 'Accept', 'reason': None,
                      'sets': {'value': '1 - value', 'anchor': str(value)}}]}))
-                judged = self.run_cli('loop', 'teach-back', '--contract', folder, '--rule', rules)
+                judged = self.run_cli('loop', 'teach-back', '--contract', folder, '--rule', rules, exits=(1,))
                 self.assertEqual(judged['detail']['rules'][0]['verdict'], 'wrong')
                 self.assertGreater(judged['detail']['rules'][0]['exceptions'], 0)
                 self.assert_named(judged, 'amount', value)
