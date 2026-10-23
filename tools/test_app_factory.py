@@ -57,6 +57,17 @@ class NumericRefusalTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "U128SubjectUnsupported"):
                 app_factory.build_ui("checker")
 
+    def test_review_enumerates_up_to_the_factory_cap(self):
+        commands = []
+        def review(*command, **kwargs):
+            commands.append([str(part) for part in command])
+            Path(command[command.index("--out") + 1]).write_text('{"mode":"exhaustive","status":"reviewed"}')
+        with patch.object(app_factory, "run", side_effect=review):
+            app_factory.contract_review(Path("test-cli"), Path("test-contract"))
+        command = commands[0]
+        self.assertIn("--max-tuples", command)
+        self.assertEqual(command[command.index("--max-tuples") + 1], str(1 << 22))
+
     def test_symbolic_review_unknown_is_not_admitted(self):
         def review(*command, **kwargs):
             packet = Path(command[command.index("--out") + 1])

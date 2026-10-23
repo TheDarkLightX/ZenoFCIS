@@ -43,12 +43,18 @@ def build_ui(*command):
     if result.stdout:
         print(result.stdout, end="", flush=True)
 
+# Enumeration is exact and, at this size, far faster than the dual-solver
+# review, whose queries grow with the declared pre-states (a 1,296,000-input
+# template enumerates in under two minutes; the solver review gave no answer in
+# 45). Larger domains still need a solver-checked symbolic review.
+FACTORY_MAX_TUPLES = 1 << 22
+
 def contract_review(cli, contract):
     """Retain native exhaustive or dual-solver law evidence before emission."""
     with tempfile.TemporaryDirectory(prefix="app-review-") as temporary:
         packet = Path(temporary) / "review.json"
-        run(cli.resolve(), "contract", "review", contract, "--out", packet,
-            "--format", "json", capture_output=True, text=True)
+        run(cli.resolve(), "contract", "review", contract, "--max-tuples", FACTORY_MAX_TUPLES,
+            "--out", packet, "--format", "json", capture_output=True, text=True)
         review = json.loads(packet.read_text())
         if review.get("mode") == "symbolic" and review.get("status") != "solver-checked":
             raise ValueError("AppContractLawsUnknownOrRefuted")
