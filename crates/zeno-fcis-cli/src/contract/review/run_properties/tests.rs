@@ -258,6 +258,7 @@ fn current_escrow_with_recovery_preserves_all_run_properties() {
         match judge(project, policy, properties, 1_244_160).unwrap_or_else(|e| panic!("{e}")) {
             lemma::Lemmas::Judged(values) => values,
             lemma::Lemmas::Inconclusive(stop) => panic!("{stop:?}"),
+            lemma::Lemmas::NoStartingState(value) => panic!("no starting state: {value}"),
         };
     assert!(
         checked.iter().all(|p| p["verdict"] == "inductive"),
