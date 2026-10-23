@@ -604,6 +604,10 @@ class RepairedRegistryTests(unittest.TestCase):
 # test file imports every TestCase the file defines, so the host's
 # unittest.main() runs them.
 RUN_INSIDE = {
+    "tools/test_service_app.py": ("tools/check_service_app.py", "runs", (),
+        "Builds a fresh service and runs the complete stdio refusal, recovery, reopen and replay journey"),
+    "tools/test_two_run.py": ("tools/atdd.py", "runs", ("run",),
+        "two-run-reference supplies its binary; the argparse entry point runs every TestCase without a selector"),
     "tools/test_third_party_notices.py": ("tools/rc_package.py", "runs", ("self-test",),
                                          "`rc_package.py self-test` runs it"),
     "tools/test_composed_domain_runtime_controls.py": ("tools/atdd.py", "runs", ("run",),
@@ -845,10 +849,19 @@ def imported(path, module):
             for alias in node.names}
 
 
+def repository_environment(root):
+    """Keep temporary repositories separate from configured source metadata."""
+    environment = dict(os.environ)
+    if root.resolve() != atdd.ROOT.resolve():
+        environment.pop("GIT_DIR", None)
+        environment.pop("GIT_WORK_TREE", None)
+    return environment
+
+
 def repository_tests(root):
     """Every test_*.py git tracks or would track: the index plus untracked files it does not ignore."""
     listed = subprocess.run(["git", "--no-optional-locks", "ls-files", "--cached", "--others", "--exclude-standard",
-                             "-z"], cwd=root, check=True, capture_output=True).stdout.decode().split("\0")
+                             "-z"], cwd=root, env=repository_environment(root), check=True, capture_output=True).stdout.decode().split("\0")
     return sorted({name for name in listed
                    if Path(name).name.startswith("test_") and name.endswith(".py") and (root / name).is_file()})
 
@@ -1035,7 +1048,7 @@ class TestFileRegistryTests(unittest.TestCase):
         main = "\nif __name__ == '__main__':\n    unittest.main()\n"
         with tempfile.TemporaryDirectory(prefix="zeno-fcis-test-registry-") as raw:
             root = Path(raw)
-            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            subprocess.run(["git", "init", "-q"], cwd=root, env=repository_environment(root), check=True)
             for name in ("tools/test_alpha.py", "tools/test_beta.py", "tools/test_gamma.py",
                          "tools/test_data/apps/test_delta.py"):
                 (root / name).parent.mkdir(parents=True, exist_ok=True)
@@ -1079,7 +1092,7 @@ class TestFileRegistryTests(unittest.TestCase):
             with self.subTest(planted.__name__), \
                     tempfile.TemporaryDirectory(prefix="zeno-fcis-test-registry-") as raw:
                 root = Path(raw)
-                subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+                subprocess.run(["git", "init", "-q"], cwd=root, env=repository_environment(root), check=True)
                 case = planted(root)
                 problems = planted_problems(root, case)
                 for refused in case["refused"]:

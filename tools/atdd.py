@@ -989,6 +989,28 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
             ),
         ),
     ),
+    "lean-proof-tools": AcceptanceScenario(
+        "Check Lean source closure, axiom auditing and proof-gate controls",
+        (("python3", "tools/test_check_lean_proofs.py"),),
+    ),
+    "effect-policy-tools": AcceptanceScenario(
+        "Check complete effect control spaces and payment policy products",
+        (("python3", "tools/test_effect_control_space.py"),
+         ("python3", "tools/test_payment_policy_product.py")),
+    ),
+    "meaning-client-exits": AcceptanceScenario(
+        "Preserve verdict exit classes in meaning clients",
+        (("python3", "tools/test_meaning_exit_clients.py"),),
+    ),
+    "service-runtime-tools": AcceptanceScenario(
+        "Check generated services and their independent controls",
+        (("python3", "tools/check_service_app.py"),
+         ("python3", "tools/test_service_controls.py")),
+    ),
+    "two-run-reference": AcceptanceScenario(
+        "Compare two-run properties with the independent finite reference",
+        (("python3", "tools/test_two_run.py", "--binary", str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis")),),
+    ),
     "probity-guardrails": AcceptanceScenario(
         "Reject unsafe agent workflow actions deterministically",
         (("python3", "tools/check_probity.py"),),
