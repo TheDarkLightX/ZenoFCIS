@@ -119,7 +119,7 @@ CONTROLS = [
      'outcome: a truncated transcript replays to an outcome.',
      [(RECORD, '        let binding = binding.clone();\n',
        '        let binding = binding.clone();\n        let asked_live = operation.clone();\n'),
-      (RECORD, '            None => return Err(ReplayError::Missing(at + 1)),',
+      (RECORD, '            None => return Err(ReplayError::Missing(at)),\n        }\n        at += 1;',
        '            None => {\n'
        '                let mut live = super::simulation::Simulation::new(\n'
        '                    super::simulation::World::new(super::simulation::Durable::genesis()),\n'
@@ -133,9 +133,9 @@ CONTROLS = [
        '                        at = links.len();\n'
        '                        continue;\n'
        '                    }\n'
-       '                    _ => return Err(ReplayError::Missing(at + 1)),\n'
+       '                    _ => return Err(ReplayError::Missing(at)),\n'
        '                }\n'
-       '            }'),
+       '            }\n        }\n        at += 1;'),
       (RECORD, '                None => return Err(ReplayError::Missing(at)),\n            }\n            if at + 1',
        '                None => return Ok(Ended::Done(done(outcome))),\n            }\n            if at + 1')]),
     ('broken-link', SHELL, 'effects::explore_tests::transcript_chain',
@@ -243,11 +243,13 @@ def main() -> None:
         return run(root, cargo + target + [name, '--', '--exact'])
 
     selected = [control for control in CONTROLS if args.only in (None, control[0])]
+    baseline_exits = {}
     for name, target, test, *_ in selected:
         baseline = check(ROOT, target, test)
         passed = 'purity: clean' in baseline.stdout if target is None else ' 1 passed' in baseline.stdout
         if baseline.returncode or not passed:
             raise SystemExit(f'BASELINE FAILED {name} ({test}):\n{baseline.stdout}')
+        baseline_exits[name] = baseline.returncode
     rows = []
     with tempfile.TemporaryDirectory(prefix='shell-effects-controls-') as temp:
         copy = Path(temp) / 'source'
@@ -273,16 +275,22 @@ def main() -> None:
             missing = [marker for marker in markers if marker not in result.stdout]
             if not killed or missing:
                 raise SystemExit(f'NOT KILLED for the named reason {name} (missing {missing}):\n{result.stdout}')
+            for path, text in original.items():
+                (copy / path).write_text(text)
+            restored = check(copy, target, test)
+            passed = 'purity: clean' in restored.stdout if target is None else ' 1 passed' in restored.stdout
+            if restored.returncode or not passed:
+                raise SystemExit(f'RESTORED BASELINE FAILED {name}:\n{restored.stdout}')
             row = dict(control=name, check=test, witness=witness, build_exit=build.returncode,
-                       check_exit=result.returncode, result='killed',
+                       normal_exit=baseline_exits[name], check_exit=result.returncode,
+                       restored_exit=restored.returncode, result='killed',
                        seconds=round(time.monotonic() - start, 3))
             rows.append(row)
             print(json.dumps(row), flush=True)
             if args.out:
                 args.out.parent.mkdir(parents=True, exist_ok=True)
                 args.out.with_name(f'{args.out.stem}-{name}.log').write_text(build.stdout + '\n' + result.stdout)
-            for path, text in original.items():
-                (copy / path).write_text(text)
+                args.out.with_name(f'{args.out.stem}-{name}-restored.log').write_text(restored.stdout)
     if args.out:
         args.out.write_text(json.dumps(rows, indent=2) + '\n')
     print(f'PASS: baselines and {len(rows)} source controls killed for their named reasons')
