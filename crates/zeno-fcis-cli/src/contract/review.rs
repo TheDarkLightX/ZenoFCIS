@@ -25,6 +25,9 @@ pub(crate) mod decision_space;
 pub(crate) mod deliveries;
 mod examples;
 #[cfg(verus_keep_ghost)]
+#[path = "../../../../verification/verus/finite_machine_proofs.rs"]
+mod finite_machine_proofs;
+#[cfg(verus_keep_ghost)]
 #[path = "../../../../verification/verus/finite_machine_spec.rs"]
 mod finite_machine_spec;
 pub(crate) mod gaps;
@@ -40,6 +43,7 @@ pub(crate) mod numeric_symbolic;
 mod observations;
 mod packet;
 pub(crate) mod probe;
+mod probe_kernel;
 pub(crate) mod profile;
 mod refusals;
 pub(crate) mod run_properties;

@@ -37,6 +37,7 @@ use super::lemma;
 use super::machine::{self, Inconclusive, Loaded, Machine, Observed};
 use super::mutants;
 use super::parallel;
+use super::probe_kernel;
 use zeno_fcis_synthesis::finite::v2_laws::{Failure, Verdict};
 
 /// A question.
@@ -133,9 +134,29 @@ pub(crate) fn probe(
         Question::Explain { .. } => unreachable!("answered above"),
         Question::Reachable { state } => {
             let holds = lemma::state_holds(project, &loaded, machine, "--state", state)?;
-            let (reachable, parent) = machine.reachable();
-            let reachable_count = reachable.iter().filter(|seen| **seen).count();
-            match (0..space.states).find(|state| holds[*state] && reachable[*state]) {
+            let (after, commits) = machine.kernel_tables();
+            let result = probe_kernel::decide_reachable(
+                space.inputs,
+                machine.genesis,
+                &after,
+                &commits,
+                &holds,
+                max_tuples,
+            )
+            .unwrap_or_else(|| unreachable!("observed machine tables are bounded and complete"));
+            let probe_kernel::Answer::Known {
+                target,
+                trace,
+                reachable_count,
+            } = result
+            else {
+                return Ok(Answer::Inconclusive(Inconclusive {
+                    reason: "domain-over-limit",
+                    size: Some(after.len() as u128),
+                    limit: max_tuples,
+                }));
+            };
+            match target {
                 None => json!({
                     "answer": "no",
                     "proof": format!("exhaustive over the {reachable_count} reachable states"),
@@ -143,7 +164,7 @@ pub(crate) fn probe(
                 Some(found) => json!({
                     "answer": "yes",
                     "state": crate::report_numbers::integers(&space.state(found)),
-                    "trace_from_genesis": Machine::trace(&parent, found)
+                    "trace_from_genesis": trace
                         .into_iter()
                         .map(|input| crate::report_numbers::integers(&space.input(input)))
                         .collect::<Vec<_>>(),

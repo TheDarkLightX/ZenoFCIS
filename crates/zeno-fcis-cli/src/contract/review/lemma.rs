@@ -323,15 +323,7 @@ pub(super) fn state_holds(
 fn verdict(observation: &Observation, holds: &[bool], formula: &str) -> Value {
     let machine = &observation.machine;
     let space = &machine.space;
-    let mut after = Vec::with_capacity(machine.observed.len());
-    let mut commits = Vec::with_capacity(machine.observed.len());
-    for state in 0..space.states {
-        for input in 0..space.inputs {
-            let outcome = machine.of(state, input);
-            after.push(outcome.after(state));
-            commits.push(outcome.commits());
-        }
-    }
+    let (after, commits) = machine.kernel_tables();
     let decision = kernel::decide(space.inputs, machine.genesis, &after, &commits, holds)
         .unwrap_or_else(|| unreachable!("observed machine tables are bounded and complete"));
     let reachable = decision.search.seen;

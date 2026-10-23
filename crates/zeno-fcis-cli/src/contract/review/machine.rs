@@ -136,9 +136,8 @@ impl Space {
             size: domain::domain_size(positions),
             limit: max_tuples,
         };
-        match domain::domain_size(positions) {
-            Some(size) if size <= u128::from(max_tuples) => {}
-            _ => return Err(too_large()),
+        if !super::probe_kernel::within_limit(domain::domain_size(positions), max_tuples) {
+            return Err(too_large());
         }
         let values: Vec<Vec<i128>> = positions
             .iter()
@@ -368,6 +367,21 @@ impl Machine {
     /// The outcome of `state` on `input`.
     pub(super) fn of(&self, state: usize, input: usize) -> Observed {
         self.observed[state * self.space.inputs + input]
+    }
+
+    /// Complete immutable-table projection, states then inputs ascending.
+    /// Each returned vector is exclusively owned by this invocation's caller.
+    pub(super) fn kernel_tables(&self) -> (Vec<usize>, Vec<bool>) {
+        let mut after = Vec::with_capacity(self.observed.len());
+        let mut commits = Vec::with_capacity(self.observed.len());
+        for state in 0..self.space.states {
+            for input in 0..self.space.inputs {
+                let outcome = self.of(state, input);
+                after.push(outcome.after(state));
+                commits.push(outcome.commits());
+            }
+        }
+        (after, commits)
     }
 
     /// Every state reachable from genesis through committed decisions, and
