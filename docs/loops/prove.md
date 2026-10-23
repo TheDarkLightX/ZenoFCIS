@@ -3,7 +3,7 @@
   "name": "prove",
   "title": "Run a separately pinned formal backend",
   "synopsis": "zeno-fcis prove PROJECT --claim ID --backend cvc5 --tools TOOLS",
-  "engine": "Export a claim, execute the separately pinned backend, retain its report and replay a SAT model.",
+  "engine": "Export a supported SMT or inductive Lean claim, execute the pinned backend, retain its report, and replay a SAT model or check the Lean theorem and axioms.",
   "use_when": [
     "run an SMT claim",
     "check an inductive claim with a solver",
@@ -11,7 +11,7 @@
   ],
   "not_for": [
     "treating unchecked UNSAT as a proof",
-    "public Lean export in this build",
+    "treating emitted Lean source as kernel-checked evidence",
     "application authorization"
   ],
   "inputs": [
@@ -32,7 +32,7 @@
     "Refuted": "Replayed model refutes the claim; inspect and revise assumptions.",
     "Undefined": "Replayed model makes strict arithmetic undefined; repair the formula.",
     "Blocked": "Tool/evidence unavailable or unsupported; inspect tools and doctor.",
-    "KernelChecked": "Historical retained evidence type; current public Lean exporter refuses; do not claim this result here."
+    "KernelChecked": "A compatible inductive Lean claim passed the pinned kernel and allowed-axiom checks; the history theorem retains its runtime premises. Pinned Lean 4.30 end-to-end acceptance remains unverified in this qualification."
   },
   "limits": {
     "source_bytes": 1048576,
@@ -40,7 +40,7 @@
   },
   "refusals": {
     "tools-manifest-blocked": "Supply a zeno-fcis/tools/2 manifest; run backend inspect --tools FILE and doctor --tools FILE.",
-    "unsupported-lean": "Use a supported backend; current public exporter refuses Lean."
+    "unsupported-lean": "Select an inductive claim in the supported fragment; non-inductive Lean export remains unsupported."
   },
   "cost": {
     "measured_units": "unknown",
@@ -94,13 +94,13 @@ run an SMT claim; check an inductive claim with a solver; inspect a replayed cou
 
 ## Not for
 
-treating unchecked UNSAT as a proof; public Lean export in this build; application authorization.
+treating unchecked UNSAT as a proof; treating emitted Lean source as kernel-checked evidence; application authorization.
 
 ## Inputs
 
 PROJECT: .zeno <= 1048576 bytes; TOOLS: zeno-fcis/tools/2 with executable identities. Origins: authored project and separately configured pinned tools. Other caps: unknown.
 
-Engine: Export a claim, execute the separately pinned backend, retain its report and replay a SAT model.
+Engine: Export a supported SMT or inductive Lean claim, execute the pinned backend, retain its report, and replay a SAT model or check the Lean theorem and axioms.
 
 Synopsis: "zeno-fcis prove PROJECT --claim ID --backend cvc5 --tools TOOLS"
 
@@ -116,7 +116,16 @@ Expected: exit 0; {"status": "valid"}.
 
 ## Verdicts
 
-A replayed counterexample exits 1 under both `prove` and `counterexample`. The public solver routes still return UNKNOWN for unchecked UNSAT; this exit mapping adds no proof route.
+A replayed counterexample exits 1 under both `prove` and `counterexample`. The SMT routes return UNKNOWN for unchecked UNSAT; this exit mapping adds no proof route.
+
+Public `prove --backend lean` dispatches compatible inductive claims to
+`export_inductive_lean`. Its `history_holds` theorem retains the initial-state,
+law-enforcement and runtime-observation premises described in
+[inductive claims](../INDUCTIVE_CLAIMS.md). Source export alone is not an
+accepted proof: the pinned runtime, expected theorem and allowed axioms must
+also pass their checks. End-to-end acceptance with pinned Lean 4.30 remains
+unverified in this qualification. Non-inductive Lean export is unsupported;
+`counterexample` accepts only CVC5 and Z3.
 
 `ProposedUnsat`: Unchecked CVC5 output retained; exit 2; seek independent evidence.
 
@@ -126,7 +135,7 @@ A replayed counterexample exits 1 under both `prove` and `counterexample`. The p
 
 `Blocked`: Tool/evidence unavailable or unsupported; inspect tools and doctor.
 
-`KernelChecked`: Historical retained evidence type; current public Lean exporter refuses; do not claim this result here.
+`KernelChecked`: A compatible inductive Lean claim passed the pinned kernel and allowed-axiom checks; the history theorem retains its runtime premises. Pinned Lean 4.30 end-to-end acceptance remains unverified in this qualification.
 
 Exit codes: {"0": "positive checked verdict", "1": "invalid specification or refutation, including counterexample mode", "2": "blocked or inconclusive; no acceptance", "3": "filesystem or execution failure", "64": "invalid command-line usage"}
 
@@ -146,7 +155,7 @@ Run Commons `advise` for the task first. Compute the exact subject digest, take 
 
 Read the result scope before revising the input. No report grants runtime or publication authority.
 
-Refusals and remedies: {"tools-manifest-blocked": "Supply a zeno-fcis/tools/2 manifest; run backend inspect --tools FILE and doctor --tools FILE.", "unsupported-lean": "Use a supported backend; current public exporter refuses Lean."}
+Refusals and remedies: {"tools-manifest-blocked": "Supply a zeno-fcis/tools/2 manifest; run backend inspect --tools FILE and doctor --tools FILE.", "unsupported-lean": "Select an inductive claim in the supported fragment; non-inductive Lean export remains unsupported."}
 
 ## Worked example
 

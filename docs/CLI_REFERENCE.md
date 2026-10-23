@@ -362,12 +362,20 @@ Formal commands apply the exit classes to each backend result:
 | CVC5 returns UNSAT with proof-shaped output | 2 | 2 | The proposal and output are retained. The current path does not independently check the proof. |
 | Z3 returns UNSAT | 2 | 2 | The result remains blocked because the current path has no Z3 proof checker. |
 | CVC5 or Z3 returns SAT and the built-in evaluator replays the model | 1 | 1 | A normalized counterexample is retained. |
-| `--backend lean` | 2 | 2 | The current public exporter refuses this unsupported mode. The historical exporter is test-only. |
+| `--backend lean` with a compatible inductive claim | 0 if kernel-checked; 2 if blocked | 64 (SMT backends only) | Public `prove` dispatches to `export_inductive_lean`; acceptance requires the pinned kernel and allowed-axiom checks. |
 | Tool is missing, reports `unknown`, or supplies unsupported evidence | 2 | 2 | The requested result remains blocked. |
 | Tool crashes, times out, exceeds a bound, or encounters a filesystem failure | 3 | 3 | The bounded execution failed. |
 
-The retained `KernelChecked` evidence type does not provide a public Lean
-exporter. For independently checked scalar program equivalence, use
+Public `prove --backend lean` exports compatible inductive claims through
+`export_inductive_lean`. The generated `history_holds` theorem is conditional
+on the initial-state, law-enforcement and runtime-observation premises described
+in [inductive claims](INDUCTIVE_CLAIMS.md). Emitting that source does not establish
+`KernelChecked`: the configured pinned runtime, expected theorem and allowed
+axioms must also pass their checks. End-to-end acceptance with the pinned
+Lean 4.30 runtime remains unverified in this qualification. Non-inductive Lean
+export remains unsupported, and `counterexample` accepts only CVC5 and Z3.
+
+For independently checked scalar program equivalence, use
 `transform check-certificates` and `transform replay-certificates`; see the
 [certificate route](SYMBOLIC_CHECKS.md#independently-checked-scalar-certificates)
 for its restricted fragment, checker setup, receipt format and trusted base.
