@@ -65,17 +65,18 @@ class DecoderGateTests(unittest.TestCase):
             proc = subprocess.CompletedProcess([], 1, text, "")
             self.assertEqual(gate.parse_report(proc), {})
 
-    def test_four_unique_mutations_preserve_original_source(self):
+    def test_six_unique_mutations_preserve_original_source(self):
         original = (gate.ROOT / gate.SUBJECT).read_bytes()
         source = original.decode()
         mutants = gate.mutation_sources(source)
-        self.assertEqual(set(mutants), set(gate.SEMANTIC_TARGETS))
-        self.assertEqual(len(mutants), 4)
+        self.assertEqual(set(mutants), set(gate.SEMANTIC_TARGETS) | set(gate.NATIVE_TARGETS))
+        self.assertEqual(len(mutants), 6)
         for name, changed in mutants.items():
             self.assertNotEqual(source, changed, name)
-            start, end = verifier.function_lines(changed, gate.SEMANTIC_TARGETS[name])
-            self.assertGreaterEqual(start, 1)
-            self.assertGreater(end, start)
+            if name in gate.SEMANTIC_TARGETS:
+                start, end = verifier.function_lines(changed, gate.SEMANTIC_TARGETS[name])
+                self.assertGreaterEqual(start, 1)
+                self.assertGreater(end, start)
         self.assertEqual((gate.ROOT / gate.SUBJECT).read_bytes(), original)
         for source in ("no anchor", "same same"):
             with self.assertRaises(ValueError):
@@ -146,6 +147,143 @@ class DecoderGateTests(unittest.TestCase):
             self.assertTrue(record["timed_out"])
             self.assertEqual(record["command"], ["verus"])
             self.assertIsNone(record["exit_code"])
+
+
+class NativeBindingTests(unittest.TestCase):
+    def audit(self, source, names=("reader",), extra_sources=None):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            sources = {gate.SUBJECT: source, **(extra_sources or {})}
+            for path, text in sources.items():
+                target = root / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(text)
+            report = {"func-details": dict.fromkeys("value_decoder::codec::" + name for name in names)}
+            with patch.object(gate, "UNIT_SOURCES", tuple(sources)):
+                return gate.audit_native_binding(root, report)
+
+    def refused(self, source, line, names=("reader",), function="reader", **kwargs):
+        with self.assertRaises(gate.NativeBindingRefused) as caught:
+            self.audit(source, names, **kwargs)
+        error = caught.exception
+        self.assertEqual(error.path, gate.SUBJECT)
+        self.assertEqual(error.line, line)
+        self.assertEqual(error.function, "value_decoder::codec::" + function)
+        self.assertIn(f"{gate.SUBJECT}:{line}:", str(error))
+
+    def test_native_cfg_inside_nested_body_refuses_exact_line(self):
+        self.refused("fn reader() {\n    if true {\n        #[cfg(not(verus_keep_ghost))]\n"
+                     "        { return; }\n    }\n}\nfn outside() {}", 3)
+
+    def test_native_cfg_outside_body_passes(self):
+        source = ("#[cfg(not(verus_keep_ghost))]\nfn outside() { return; }\n"
+                  "fn reader() { if true { } }\n#[cfg(not(verus_keep_ghost))]\nfn after() {}")
+        bindings = self.audit(source)
+        self.assertEqual([(b["start_line"], b["end_line"]) for b in bindings], [(3, 3)])
+
+    def test_native_attribute_on_verified_function_refuses(self):
+        self.refused("#[cfg(not(verus_keep_ghost))]\nfn reader() {}", 1)
+        self.refused("#[cfg_attr(not(verus_keep_ghost), inline)]\nfn reader() {}", 1)
+
+    def test_cfg_algebra_and_other_native_configurations_refuse(self):
+        for predicate in ("not(verus_keep_ghost)", "any(not(verus_keep_ghost), feature = \"std\")",
+                          "all(not(verus_keep_ghost), target_os = \"linux\")", "feature = \"std\"",
+                          "not(all(verus_keep_ghost, unix))", "all()", "unix"):
+            with self.subTest(predicate=predicate):
+                self.refused(f"fn reader() {{\n#[cfg({predicate})]\nreturn;\n}}", 2)
+        for predicate in ("verus_keep_ghost", "all(verus_keep_ghost, unix)",
+                          "not(not(verus_keep_ghost))", "any()"):
+            with self.subTest(predicate=predicate):
+                self.audit(f"fn reader() {{ #[cfg({predicate})] proof! {{ }} }}")
+
+    def test_cfg_attr_and_cfg_expression_refuse(self):
+        for syntax in ("#[cfg_attr(not(verus_keep_ghost), allow(unused))] let x = 1;",
+                       "#[cfg_attr(verus_keep_ghost, cfg(any()))] return;",
+                       "#[cfg_attr(verus_keep_ghost, cfg_attr(all(), cfg(any())))] return;",
+                       "#![cfg(not(verus_keep_ghost))]",
+                       "let x = cfg!(verus_keep_ghost);", "let x = cfg!(feature = \"std\");"):
+            with self.subTest(syntax=syntax):
+                self.refused("fn reader() {\n" + syntax + "\n}", 2)
+
+    def test_comments_literals_proof_annotations_and_body_end(self):
+        source = '''#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result,))]
+fn reader<'a>(value: &'a str) -> bool {
+    // } #[cfg(not(verus_keep_ghost))] fn decoy() {
+    /* nested /* } */ #[cfg(not(verus_keep_ghost))] */
+    let s = r###"} fn decoy() { #[cfg(not(verus_keep_ghost))]"###;
+    let c = '}';
+    let s = "\\\" } #[cfg(not(verus_keep_ghost))]";
+    #[cfg(verus_keep_ghost)] proof! { assert(true); }
+    true
+}
+#[cfg(not(verus_keep_ghost))]
+fn outside() {}
+'''
+        bindings = self.audit(source)
+        self.assertEqual(bindings[0]["start_line"], 2)
+        self.assertEqual(bindings[0]["end_line"], 10)
+
+    def test_native_alternative_method_and_inherited_cfg_refuse(self):
+        source = ("struct Cursor;\nimpl Cursor { fn reader() {} }\n"
+                  "#[cfg(not(verus_keep_ghost))]\nimpl Cursor { fn reader() {} }")
+        self.refused(source, 3, names=("Cursor::reader",), function="Cursor::reader")
+        self.refused("#[cfg(not(verus_keep_ghost))]\nmod nested { fn reader() {} }",
+                     1, names=("nested::reader",), function="nested::reader")
+
+    def test_external_module_attribute_is_inherited(self):
+        path = Path("crates/zeno-fcis-codec/src/decoder_bytes.rs")
+        self.refused("#[cfg(not(verus_keep_ghost))]\nmod decoder_bytes;", 1,
+                     names=("decoder_bytes::reader",), function="decoder_bytes::reader",
+                     extra_sources={path: "fn reader() {}"})
+        self.refused('#[cfg_attr(verus_keep_ghost, path = "other.rs")]\nmod decoder_bytes;', 1,
+                     names=("decoder_bytes::reader",), function="decoder_bytes::reader",
+                     extra_sources={path: "fn reader() {}"})
+
+    def test_verus_contract_braces_do_not_truncate_body(self):
+        source = ("proof fn reader()\n    ensures if true { 1 } else { 2 } == 1,\n"
+                  "        forall|x: int| x > 0 ==> { x + 1 > 0 },\n{\n"
+                  "    #[cfg(not(verus_keep_ghost))]\n    return;\n}\nfn outside() {}")
+        self.refused(source, 5)
+
+    def test_native_alternative_types_refuse_but_derives_pass(self):
+        self.audit("#[cfg_attr(not(verus_keep_ghost), derive(Clone, Debug))]\n"
+                   "struct Cursor;\nimpl Cursor { fn reader() {} }", ("Cursor::reader",))
+        self.refused("#[cfg(verus_keep_ghost)]\nstruct Cursor;\n"
+                     "#[cfg(not(verus_keep_ghost))]\nstruct Cursor;\nfn reader() {}", 3,
+                     function="Cursor")
+        self.refused("struct Cursor;\n#[cfg_attr(verus_keep_ghost, cfg(any()))]\n"
+                     "struct Cursor;\nfn reader() {}", 2, function="Cursor")
+
+    def test_generated_clone_constant_and_projection_map_to_declarations(self):
+        bindings = self.audit("#[cfg_attr(verus_keep_ghost, derive(Clone))]\nstruct Cursor;\n"
+                              "impl Cursor { const LIMIT: u32 = 4; }\nenum Model { Unit }",
+                              ("Cursor::clone", "impl&%0::LIMIT", "Model::arrow_0"))
+        self.assertEqual({b["kind"] for b in bindings}, {"struct", "const", "enum"})
+
+    def test_missing_mapping_and_bad_delimiters_fail_closed(self):
+        for source in ("fn other() {}", "fn reader() {", "/* unterminated"):
+            with self.subTest(source=source), self.assertRaises((ValueError, RuntimeError)):
+                self.audit(source)
+
+    def test_real_production_inventory_and_two_native_controls(self):
+        profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
+        report = {"func-details": dict.fromkeys(profile["target_functions"])}
+        normal = gate.audit_native_binding(gate.ROOT, report)
+        self.assertGreater(len(normal), 200)
+        original = (gate.ROOT / gate.SUBJECT).read_text()
+        for name, function in gate.NATIVE_TARGETS.items():
+            changed = gate.mutation_sources(original)[name]
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                for path in gate.UNIT_SOURCES:
+                    target = root / path
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(changed if path == gate.SUBJECT else (gate.ROOT / path).read_text())
+                with self.assertRaises(gate.NativeBindingRefused) as caught:
+                    gate.audit_native_binding(root, report)
+                self.assertEqual(caught.exception.function, function)
+                self.assertIn("cfg", changed.splitlines()[caught.exception.line - 1])
+        self.assertEqual((gate.ROOT / gate.SUBJECT).read_text(), original)
 
 
 if __name__ == "__main__":
