@@ -1,5 +1,4 @@
 //! Checked table expansion retains eager arithmetic refusals.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 use serde_json::json;
 use zeno_fcis_contract::internals::{
     declarations::Declarations,
@@ -32,18 +31,30 @@ fn outcomes_at_size(size: u32, extra: &str, formula: &str) -> Vec<Outcome> {
             "post":{"110":"pre.100.110","111":"pre.100.111"},"outbox":[]}],
         "genesis":{"110":0,"111":0},"law_kinds":{"499":"StateInvariant","500":"FeeAndRounding"}});
     if size == 1 {
-        policy["genesis"].as_object_mut().unwrap().remove("111");
+        policy["genesis"]
+            .as_object_mut()
+            .unwrap_or_else(|| panic!("fixture must be an object"))
+            .remove("111");
         policy["cases"][0]["post"]
             .as_object_mut()
-            .unwrap()
+            .unwrap_or_else(|| panic!("fixture post must be an object"))
             .remove("111");
     }
-    let rules = Rules::read_for_project(&project, &policy.to_string()).unwrap();
-    let declarations = Declarations::read(&project, &rules.leaf_bindings).unwrap();
-    let positions = domain::positions(&declarations).unwrap();
-    let schema = schema::encode(&declarations).unwrap();
-    let contract =
-        Contract::build(&declarations, &rules, schema_commitment(&schema).unwrap()).unwrap();
+    let rules = Rules::read_for_project(&project, &policy.to_string())
+        .unwrap_or_else(|error| panic!("table fixture failed: {error:?}"));
+    let declarations = Declarations::read(&project, &rules.leaf_bindings)
+        .unwrap_or_else(|error| panic!("table fixture failed: {error:?}"));
+    let positions = domain::positions(&declarations)
+        .unwrap_or_else(|error| panic!("table fixture failed: {error:?}"));
+    let schema = schema::encode(&declarations)
+        .unwrap_or_else(|error| panic!("table fixture failed: {error:?}"));
+    let contract = Contract::build(
+        &declarations,
+        &rules,
+        schema_commitment(&schema)
+            .unwrap_or_else(|error| panic!("table fixture failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("table fixture failed: {error:?}"));
     let framer = Framer::new(&positions, &contract);
     policy::with_authority(&contract, &schema, |authority| {
         [
@@ -62,7 +73,7 @@ fn outcomes_at_size(size: u32, extra: &str, formula: &str) -> Vec<Outcome> {
         })
         .collect()
     })
-    .unwrap()
+    .unwrap_or_else(|error| panic!("table fixture failed: {error:?}"))
 }
 
 fn assert_undefined(outcome: &Outcome) {
