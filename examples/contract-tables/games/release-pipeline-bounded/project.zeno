@@ -1,0 +1,42 @@
+zeno 1;
+project 1 release-pipeline-bounded;
+namespace 2 permissions;
+type 100 state Roles;
+type 101 command Request;
+type 102 context Session;
+type 105 int Parent in 0..=8;
+type 106 index Role of 110;
+type 107 int Grant in 0..=1;
+// Release pipeline with at most two review rounds
+// States: 0 draft, 1 review_1, 2 changes_1, 3 review_2, 4 changes_2, 5 escalated, 6 approved, 7 released
+// Who moves: 0 = controller (the party we ask about), 1 = environment (anyone else).
+const table 110 mover 107 size 8 [0,1,0,1,0,0,0,0];
+const table 111 goal 107 size 8 [0,0,0,0,0,0,0,1];
+const table 800 next0 105 size 8 [2,3,4,5,6,7,8,0];
+const table 801 next1 105 size 8 [0,7,0,7,0,0,0,0];
+table 210 100 grants 107 size 8;
+field 120 101 role 106;
+variant 130 102 Session none;
+reason 200 permission_required precedence 0;
+component 400 inheritance {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+// win[i]: the controller can force reaching a goal state from state i, whatever the environment does.
+derived table 700 win[i] in table 110 rounds 8 {
+  when true then goal[i] == 1 || ((mover[i] == 0 && exists j in table 110 { (next0[i] == j + 1 || next1[i] == j + 1) && win[j] }) || (mover[i] == 1 && (next0[i] != 0 || next1[i] != 0) && forall j in table 110 { !(next0[i] == j + 1 || next1[i] == j + 1) || win[j] }));
+  default false;
+};
+law 500 domains on commit, genesis = forall i in table 110 { post.100.210[i] >= 0 && post.100.210[i] <= 1 };
+law 600 from_draft on commit = win[0];
+law 601 from_review_1 on commit = win[1];
+law 602 from_changes_1 on commit = win[2];
+law 603 from_review_2 on commit = win[3];
+law 604 from_changes_2 on commit = win[4];
+law 605 from_escalated on commit = win[5];
+law 606 from_approved on commit = win[6];
+law 607 from_released on commit = win[7];
