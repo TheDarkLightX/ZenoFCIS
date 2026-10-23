@@ -795,7 +795,7 @@ pub(crate) fn entry_predicate(formula: &RelExpr, owner: u32, entry: u32) -> RelE
     fn rel(f: &mut RelExpr, owner: u32, entry: u32) {
         match f {
             RelExpr::Circuit(c) => {
-                *c = Box::new(c.map(|child| entry_predicate(child, owner, entry)));
+                **c = c.map(|child| entry_predicate(child, owner, entry));
             }
             RelExpr::Bool(_) => {}
             RelExpr::Not(a) | RelExpr::ForAll { body: a, .. } | RelExpr::Exists { body: a, .. } => {
