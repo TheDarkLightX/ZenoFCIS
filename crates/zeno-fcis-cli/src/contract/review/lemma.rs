@@ -129,6 +129,9 @@ pub(crate) fn judge(
     lemmas: &[String],
     max_tuples: u64,
 ) -> Result<Lemmas, ContractError> {
+    if zeno_fcis_contract::collections::judges::has_maps(project)? {
+        return map_lemmas(project, rules, lemmas, max_tuples, false);
+    }
     if super::super::rules::Rules::read_for_project(project, rules)?.unsigned {
         return super::unsigned::lemmas(project, rules, lemmas, max_tuples, false);
     }
@@ -160,6 +163,9 @@ pub(crate) fn judge_transitions(
     lemmas: &[String],
     max_tuples: u64,
 ) -> Result<Lemmas, ContractError> {
+    if zeno_fcis_contract::collections::judges::has_maps(project)? {
+        return map_lemmas(project, rules, lemmas, max_tuples, true);
+    }
     if lemmas.is_empty() {
         return Err(ContractError::new(
             "transition lemmas",
@@ -251,6 +257,37 @@ pub(crate) fn judge_transitions(
         judged.push(result);
     }
     Ok(Lemmas::Judged(judged))
+}
+
+fn map_lemmas(
+    project: &str,
+    rules: &str,
+    formulas: &[String],
+    max_tuples: u64,
+    transition: bool,
+) -> Result<Lemmas, ContractError> {
+    use zeno_fcis_contract::collections::{Limits, Verdict, judges};
+    if formulas.is_empty() {
+        return Err(ContractError::new(
+            "map lemma",
+            "requires at least one formula",
+        ));
+    }
+    let mut results = Vec::new();
+    for formula in formulas {
+        let result = judges::lemma(project, rules, formula, transition, Limits { max_tuples })?;
+        if result.verdict() == Verdict::Unknown {
+            return Ok(Lemmas::Inconclusive(Inconclusive {
+                reason: "collection view domain exceeds the tuple limit",
+                size: result.packet()["view_domain"]
+                    .as_str()
+                    .and_then(|s| s.parse().ok()),
+                limit: max_tuples,
+            }));
+        }
+        results.push(result.packet().clone());
+    }
+    Ok(Lemmas::Judged(results))
 }
 
 #[cfg(test)]

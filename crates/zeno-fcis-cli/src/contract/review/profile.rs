@@ -44,6 +44,28 @@ pub(crate) fn profile(
     rules: &str,
     max_tuples: u64,
 ) -> Result<Profile, ContractError> {
+    profile_with_keys(project, rules, 2, max_tuples)
+}
+
+pub(crate) fn profile_with_keys(
+    project: &str,
+    rules: &str,
+    map_keys: u8,
+    max_tuples: u64,
+) -> Result<Profile, ContractError> {
+    if zeno_fcis_contract::collections::judges::has_maps(project)? {
+        use zeno_fcis_contract::collections::{Limits, Verdict, judges};
+        let result = judges::profile(project, rules, map_keys, Limits { max_tuples })?;
+        return Ok(if result.verdict() == Verdict::Unknown {
+            Profile::Inconclusive(Inconclusive {
+                reason: "concrete map profile exceeded an input, transition or snapshot limit; no complete reachability claim",
+                size: None,
+                limit: max_tuples,
+            })
+        } else {
+            Profile::Measured(result.packet().clone())
+        });
+    }
     let loaded = Loaded::read(project, rules)?;
     let observation = match machine::observe_contract(&loaded, max_tuples)? {
         Ok(observation) => observation,

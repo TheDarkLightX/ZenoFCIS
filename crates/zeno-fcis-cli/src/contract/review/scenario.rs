@@ -68,6 +68,13 @@ pub(crate) fn replay(
     text: &str,
     label: &str,
 ) -> Result<Replayed, ContractError> {
+    if zeno_fcis_contract::collections::judges::has_maps(project)? {
+        let result = zeno_fcis_contract::collections::judges::scenarios(project, rules, text)?;
+        return Ok(Replayed {
+            failed: result.packet()["failed"].as_u64().unwrap_or(1) as usize,
+            packet: result.packet().clone(),
+        });
+    }
     let loaded = Loaded::read(project, rules)?;
     let width = loaded.state_width;
     let genesis = genesis_values(&loaded);

@@ -214,9 +214,65 @@ A fixed table, `table ID OWNER name TYPE size N`, has N fields, and every
 check enumerates all of them; it suits up to a handful of entries. A map has
 no size in the view: a check enumerates only the entries a command names,
 their equality patterns and the scalars, so its cost does not grow with the
-map. The existing judges, `contract review`, `lemma` and `scenario`, decide
-the view contract too, but they treat the view's entry fields as ordinary
-state: their state counts and reachability are about views, not maps.
+map. `contract review` still examines the ordinary lowered view. The lemma,
+scenario and profile judges use map semantics as described below.
+
+## Map-aware judges
+
+```text
+zeno-fcis contract lemma examples/collections/library --lemma 'forall m in entries 110 { post.100.m.140 <= 2 }'
+zeno-fcis contract scenario examples/collections/token-balances
+zeno-fcis contract profile examples/collections/library --map-keys 2
+```
+
+A map lemma is a uniform per-entry predicate or a scalar-state predicate. The
+base collections contract must check first. The judge checks empty genesis and
+consecution with that predicate as an additional invariant, using the same
+admissibility, alias merge, summary and tally obligations. `inductive` has the
+all-size claim conditional on P1–P4 and any T/O premises; `not-inductive` has an
+abstract counterexample, which need not be reachable. It does not report a
+reachable-state count or a shortest concrete run. A role-only predicate such as
+`post.100.161 == 0` is refused when another entry of that map has no matching
+predicate. Use `forall` to ask about all members. `--transition` checks a relation
+on all admitted views without assuming it as a precondition.
+
+A map scenario is JSON with schema `zeno-fcis/collection-scenarios/1` and a
+`scenarios` array. Each item has a unique `name` and nonempty `steps`. A step has
+`command`, `context` and `expect`. Inputs map decimal field IDs to numbers or
+keys; field `0` denotes a scalar root. Every declared input must be supplied,
+with no extra fields. Keys are exactly 64 lowercase hexadecimal digits, and a
+key keeps its identity when later commands name it in another role. Every run
+starts at empty-map genesis. The token example's
+[scenario file](../examples/collections/token-balances/tests/decision-scenarios.txt)
+mints to one key, then uses it as sender and receiver in subsequent transfers.
+
+`expect` names a `class` (`Accept`, `Reject`, `CommittedFailure` or `Refused`), an
+optional `reason`, optional `scalars`, and optional `entries`. Each expected
+entry is `{ "map": ID, "key": HEX, "record": { FIELD: VALUE, ... } }`, or has
+`record: null` for absence. A supplied record must name every record field.
+Integers also accept decimal strings to preserve full-width values. The result
+contains each concrete successor snapshot and the first mismatching step.
+Refusals retain state. Map scenarios report no scalar-view mutant score.
+Limits are 1 MiB of input, 128 scenarios, 4,096 total steps and 8 MiB of output;
+exceeding a limit refuses the request without a passing result.
+
+A map profile exhaustively explores concrete maps over the printed finite key
+universes, starting empty. `--map-keys N` chooses 1 through 4 keys of each opaque
+key type, default 2. All declared command/context scalar values are considered.
+The result's reachable count is about those concrete maps, including stored
+keys and scalars, and its digest binds the complete reachable set. For example,
+two-key token balances have 25 reachable maps; two keys of each library key
+type give 66 reachable maps. This is not an all-size reachability count, a
+Moore-minimality result, or a count of lowered view states. Alias writes merge,
+post-laws are checked on the canonical merged view, invariants are checked on
+concrete maps, and capacity refusal applies atomically to the complete update.
+
+`--max-tuples` bounds profile transition work, capped at 4,194,304. Input storage
+is bounded before enumeration by a 32 MiB estimate; at most 65,536 snapshots
+and a 64 MiB snapshot-storage estimate are retained. An incomplete result has
+no complete reachable count or claim. Ordered map scenarios and profiles are
+refused until their concrete framing is supported; ordered map lemmas can use
+the reduction above. Neither a profile nor a scenario grants runtime authority.
 
 ## Background
 
@@ -410,6 +466,9 @@ these candidate references are not invoked as a theorem proving it.
 **What is new here.** This integration combines bounded observations,
 weak-order views, explicit absence intervals and grouped tally deltas. Prior-art search pending;
 no novelty claim is made.
+
+**Background for reachability.** E. M. Clarke, O. Grumberg and D. A. Peled,
+*Model Checking*, MIT Press, 1999, describes finite-state reachability.
 
 **Background for tally maintenance.** A. Gupta, I. S. Mumick and V. S. Subrahmanian,
 *Maintaining Views Incrementally*, SIGMOD, 1993, studies incremental maintenance

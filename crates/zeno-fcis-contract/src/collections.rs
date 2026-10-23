@@ -22,6 +22,7 @@
 //! holds for every number of entries up to each map's capacity and for any
 //! key values. `docs/COLLECTIONS.md` gives the argument.
 
+pub mod judges;
 pub mod runtime;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -788,6 +789,15 @@ impl Shape<'_> {
                             merged[position] = *v;
                         }
                     }
+                }
+            }
+        }
+        // Removed entries have the canonical absent view at the invocation
+        // boundary; stored field bytes do not survive a removal.
+        for entry in self.entries {
+            if merged[entry.presence] == 0 {
+                for position in &entry.values {
+                    merged[*position] = self.positions[*position].domain.least().unwrap_or(0);
                 }
             }
         }

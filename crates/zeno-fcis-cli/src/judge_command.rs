@@ -26,7 +26,7 @@ const RULES: &str = "v2/policy.json";
 const ADVISORY: &str = "Advisory only. This packet grants no authority and changes no \
 application file. Native decisions and replayed violations use the bound library Authority \
 and law evaluator. Symbolic results state their solver evidence separately. Results hold \
-over the stated declared-domain scope only; UNKNOWN and inconclusive claim nothing.";
+only within the packet's stated scope and premises; UNKNOWN and inconclusive claim nothing.";
 
 /// What every judge reads and writes.
 #[derive(Args)]
@@ -92,12 +92,15 @@ pub(super) enum Command {
         #[command(flatten)]
         common: Common,
     },
-    /// Profile a contract's states, memory and robustness exactly over its declared domain: valid, reachable and Moore-minimal states, and what happens on pre-states that break a state law. Advisory; the application is not changed.
+    /// Profile scalar states over their declared domains, or concrete map reachability over --map-keys keys per type. A map profile states its finite universe and grants no all-size reachability claim. Advisory.
     Profile {
+        /// Concrete keys per opaque key type for map reachability (1..=4); scalar profiles ignore this.
+        #[arg(long, default_value_t = 2)]
+        map_keys: u8,
         #[command(flatten)]
         common: Common,
     },
-    /// Judge state invariants by induction, or --transition relations on actual before/after decisions. Exit 0 when every invariant is inductive or relation is checked, 1 when refuted, 2 when incomplete, undefined or vacuous, 65 for a formula with no contract form. Advisory, finite-domain results only.
+    /// Judge state invariants by induction, or --transition relations. Maps use the collections reduction with its all-size premises; scalar results use finite declared domains. Exit 0 inductive/checked, 1 refuted, 2 incomplete or not-inductive, 65 for an unsupported formula. Advisory.
     Lemma {
         /// A project.zeno state formula, or with --transition a before/after relation. Repeat for more lemmas.
         #[arg(long = "lemma", required = true)]
@@ -110,7 +113,7 @@ pub(super) enum Command {
         #[command(flatten)]
         common: Common,
     },
-    /// Replay scenarios, runs of decision examples under `# scenario NAME` headers, through the contract and, when every scenario passes on it, through every mutant of the extended catalog and the reject-everything core. Exit 1 when a scenario fails on the contract, 65 for a malformed scenario file. Advisory.
+    /// Replay scalar decision examples under `# scenario NAME` headers, or collection-scenarios/1 JSON with concrete keys and expected map entries. Map scenarios start at empty genesis and receive no view-mutant score. Exit 1 for a mismatch, 65 for malformed input. Advisory.
     Scenario {
         /// The scenario file; by default tests/decision-scenarios.txt in the application.
         #[arg(long)]
@@ -318,14 +321,23 @@ pub(super) fn run(command: Command) -> u8 {
                 },
             )
         }
-        Command::Profile { common } => judge(
+        Command::Profile { common, map_keys } => judge(
             &common,
             "zeno-fcis/contract-profile/2",
             None,
             true,
             |sources| {
                 Ok(
-                    match profile::profile(sources.project, sources.rules, common.max_tuples)? {
+                    match if map_keys == 2 {
+                        profile::profile(sources.project, sources.rules, common.max_tuples)?
+                    } else {
+                        profile::profile_with_keys(
+                            sources.project,
+                            sources.rules,
+                            map_keys,
+                            common.max_tuples,
+                        )?
+                    } {
                         profile::Profile::Measured(value) => Judged::Done(value, OK, "measured"),
                         profile::Profile::NoStartingState(value) => {
                             Judged::Done(value, INVALID, "no-admissible-starting-state")

@@ -27,6 +27,8 @@ pub(crate) mod gaps;
 mod genesis_tests;
 #[cfg(test)]
 mod judge_tests;
+#[cfg(test)]
+mod collection_tests;
 pub(crate) mod lemma;
 mod machine;
 mod mutants;
