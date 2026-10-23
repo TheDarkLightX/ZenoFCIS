@@ -158,3 +158,31 @@ fn committed_failure_and_budget_exhaustion_cannot_publish() {
         .unwrap_or_else(|| panic!("CommittedFailure profile"));
     assert!(error.contains("service-profile:wire"), "{error}");
 }
+
+#[test]
+fn remaining_budget_is_checked_before_invoking_a_core() {
+    let mut component = counter();
+    assert!(component.sources.project.contains("budget steps 64;"));
+    component.sources.project = component
+        .sources
+        .project
+        .replace("budget steps 64;", "budget steps 100000;");
+    let [project, policy, program] = super::domain_tests::pins(&component.sources);
+    component.entry["project_sha256"] = json!(project);
+    component.entry["policy_sha256"] = json!(policy);
+    component.entry["program_sha256"] = json!(program);
+    let (text, sources) = subject_for(vec![component]);
+    let service = ServiceAuthority::from_sources(&text, &sources).unwrap_or_else(fail);
+    let genesis = service.genesis().unwrap_or_else(fail);
+    let actual = genesis.usage().wrapper() + genesis.usage().core()[7];
+    assert!(
+        actual < 100000,
+        "witness must separate actual work from checked reservation"
+    );
+    let mut limited: Value = serde_json::from_str(&text).unwrap_or_else(fail);
+    limited["max_steps"] = json!(actual);
+    let error = ServiceAuthority::from_sources(&limited.to_string(), &sources)
+        .err()
+        .unwrap_or_else(|| panic!("unaffordable checked core must not start"));
+    assert_eq!(error, "genesis:service-budget");
+}

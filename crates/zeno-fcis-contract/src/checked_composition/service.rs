@@ -535,6 +535,15 @@ impl ServiceAuthority {
                     &contract,
                     &core.bound.schema,
                     |authority| -> Result<CoreRecord, String> {
+                        // Reserve from the actual checked descriptor, never a preparation handle.
+                        let bound = authority.descriptor().limits.limit(V2Resource::Step);
+                        if usage
+                            .steps()
+                            .and_then(|used| used.checked_add(bound))
+                            .is_none_or(|reserved| reserved > self.max_steps)
+                        {
+                            return Err("service-budget".into());
+                        }
                         let outcome = if request.is_some() {
                             authority.publish(c::Raw {
                                 state: &frames[0],

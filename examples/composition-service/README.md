@@ -36,7 +36,9 @@ change changes the service identity and requires a new store version.
 
 `ServiceAuthority` returns a private, immutable `ServicePublication` only when
 all actual per-core publications and global laws pass. Rejection discards all
-provisional successors and retains actual core and wrapper accounting. Its
+provisional successors and retains actual core and wrapper accounting. Each core's
+checked step bound must fit the remaining service budget before it runs; the
+receipt charges actual usage. Its
 preparation tables supply bindings, not decision or publication authority.
 This scalar profile refuses channels, CommittedFailure and skipped cores.
 
