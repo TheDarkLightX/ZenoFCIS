@@ -434,9 +434,14 @@ individual action completion are separate results.
 Send carries no publication replay key. Its effect key is the store identity
 and delivery ID, shared across handles. It is not a payload hash or a subset
 comparison. Every actual attempt consumes its reservation, including NotSent,
-Unknown and crash; capacity exhaustion refuses. A simulation suspension has
-not forwarded and consumes nothing. Transport duplication can still produce
-multiple copies from that single send.
+Unknown and crash; capacity exhaustion refuses. A suspension releases a
+reservation only with explicit evidence that no effect invocation occurred.
+`Terminal::handle_with_invocation` returns an owned outcome and conservative
+invocation report; its default is `MayHaveInvoked`, including on Suspend.
+The direct simulators establish `NotInvoked` at their unselected branches.
+`Fault` combines every inner invocation report: once any call may have
+forwarded, a later Suspend keeps the reservation. Transport duplication can
+still produce multiple copies from that single admitted send.
 
 The versioned policy identity binds the canonical allowlist, capacity, field
 declarations, and source of `policy.rs`, `handler.rs`, `policy_record.rs`,
@@ -457,8 +462,12 @@ owned state. Its cloned reservation vector is exclusive scratch, never a
 mutable alias of the input. `Monitor` and `Stack` are retained shell handles,
 not decision, metering or publication authority. Only their exclusive owner
 installs a successor after all policies admit, before calling the terminal,
-including if that call unwinds. Another
-policy's rejection or a suspension discards tentative state. The monitor's
+including if that call unwinds. Another policy's rejection discards all
+proposals. A suspension rolls back only when the terminal establishes
+non-invocation across the complete composed call. Invocation evidence is owned
+per-call scratch, not a retained last-call flag; unqualified terminals keep
+reservations conservatively. Suspended prefixes remain incomplete and do not
+constitute completed replay evidence. The monitor's
 private bound configuration permits caching its identity without invalidation.
 The source digest above pins this review to the implementation being checked.
 A closed two-case policy enum and projected fields avoid a callback runtime,

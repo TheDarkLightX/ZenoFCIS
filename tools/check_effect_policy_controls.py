@@ -26,13 +26,11 @@ TESTS = "effects::policy_tests::"
 # name, named test, required behavioural diagnostic, source edits
 CONTROLS = [
     ("rewrite-recipient", "policy_preserves_request", "policy rewrote requested operation", [
-        (HANDLER, "None => terminal.handle(binding, operation),", """None => {
-                let mut rewritten = operation.clone();
+        (HANDLER, "let report = terminal.handle_with_invocation(binding, operation);", """let mut rewritten = operation.clone();
                 if let Operation::Send(_, delivery) = &mut rewritten {
                     delivery.destination = b"rerouted".to_vec();
                 }
-                terminal.handle(binding, &rewritten)
-            },"""),
+                let report = terminal.handle_with_invocation(binding, &rewritten);"""),
     ]),
     ("second-send", "policy_multiset", "second identical send allowed", [
         (POLICY, "if state.attempts.contains(&key) {", "if false && state.attempts.contains(&key) {"),

@@ -28,12 +28,40 @@ pub enum Handled {
     Suspend,
 }
 
+/// Conservative evidence about this request reaching an effect invocation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Invocation {
+    /// The handler establishes that no effect invocation occurred.
+    NotInvoked,
+    /// An invocation occurred, or its absence has not been established.
+    MayHaveInvoked,
+}
+
+/// Owned per-call outcome and invocation evidence, never retained scratch.
+#[must_use]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Handling {
+    /// The existing answer, crash or incomplete simulation result.
+    pub outcome: Handled,
+    /// Evidence combined across every inner invocation of this request.
+    pub invocation: Invocation,
+}
+
 /// A handler that carries requests out.
 pub trait Terminal {
     /// The ports it covers.
     fn ports(&self) -> &'static [Port];
     /// Carries out one request.
     fn handle(&mut self, binding: &Binding, operation: &Operation) -> Handled;
+    /// Reports invocation evidence for exactly this call. The default keeps
+    /// reservations even on Suspend. An override may return NotInvoked only
+    /// when its implementation establishes non-invocation on every branch.
+    fn handle_with_invocation(&mut self, binding: &Binding, operation: &Operation) -> Handling {
+        Handling {
+            outcome: self.handle(binding, operation),
+            invocation: Invocation::MayHaveInvoked,
+        }
+    }
     /// The process crashed around the request with this binding: drop its
     /// handle's volatile state. Durable state stays as the handler left it.
     fn crash(&mut self, binding: &Binding) {
@@ -62,24 +90,31 @@ impl<'a, T: Terminal + ?Sized> Fault<'a, T> {
         }
     }
 
-    fn forward(&mut self, binding: &Binding, operation: &Operation) -> Handled {
-        let handled = self.inner.handle(binding, operation);
-        self.forwarded = Some(handled.clone());
-        handled
+    fn forward(
+        &mut self,
+        binding: &Binding,
+        operation: &Operation,
+        invocation: &mut Invocation,
+    ) -> Handled {
+        let report = self.inner.handle_with_invocation(binding, operation);
+        if report.invocation == Invocation::MayHaveInvoked {
+            *invocation = Invocation::MayHaveInvoked;
+        }
+        self.forwarded = Some(report.outcome.clone());
+        report.outcome
     }
 
     fn crash(&mut self, binding: &Binding) -> Handled {
         self.inner.crash(binding);
         Handled::Crash
     }
-}
 
-impl<T: Terminal + ?Sized> Terminal for Fault<'_, T> {
-    fn ports(&self) -> &'static [Port] {
-        self.inner.ports()
-    }
-
-    fn handle(&mut self, binding: &Binding, operation: &Operation) -> Handled {
+    fn handle_request(
+        &mut self,
+        binding: &Binding,
+        operation: &Operation,
+        invocation: &mut Invocation,
+    ) -> Handled {
         self.forwarded = None;
         let port = operation.port();
         let options = match port {
@@ -94,7 +129,7 @@ impl<T: Terminal + ?Sized> Terminal for Fault<'_, T> {
         };
         if matches!(port, Port::Clock | Port::Random | Port::Wait) {
             return if choice == 0 {
-                self.forward(binding, operation)
+                self.forward(binding, operation, invocation)
             } else if port == Port::Wait && choice == 1 {
                 Handled::Answer(Response::Wait(Err(super::port::WaitError::Interrupted)))
             } else {
@@ -114,7 +149,7 @@ impl<T: Terminal + ?Sized> Terminal for Fault<'_, T> {
             Port::ReadState | Port::ReadHistory | Port::ReadOutbox | Port::Reopen
         ) {
             return match choice {
-                0 => self.forward(binding, operation),
+                0 => self.forward(binding, operation, invocation),
                 1 => Handled::Answer(Response::not_applied(port, FaultKind::Busy)),
                 2 => self.crash(binding),
                 3 => Handled::Answer(Response::not_applied(port, FaultKind::Full)),
@@ -125,24 +160,43 @@ impl<T: Terminal + ?Sized> Terminal for Fault<'_, T> {
         // ambiguous answer without forwarding, a lost answer after it, a
         // crash before or after it, and for Send a duplicate in transit.
         match choice {
-            0 => self.forward(binding, operation),
+            0 => self.forward(binding, operation, invocation),
             1 => Handled::Answer(Response::not_applied(port, FaultKind::Busy)),
             2 => Handled::Answer(Response::unknown(port)),
-            3 => match self.forward(binding, operation) {
+            3 => match self.forward(binding, operation, invocation) {
                 Handled::Answer(_) => Handled::Answer(Response::unknown(port)),
                 other => other,
             },
             4 => self.crash(binding),
-            5 => match self.forward(binding, operation) {
+            5 => match self.forward(binding, operation, invocation) {
                 Handled::Answer(_) => self.crash(binding),
                 other => other,
             },
             6 if port == Port::Send => {
-                let _ = self.forward(binding, operation);
-                self.forward(binding, operation)
+                let _ = self.forward(binding, operation, invocation);
+                self.forward(binding, operation, invocation)
             }
             6 => Handled::Answer(Response::not_applied(port, FaultKind::Full)),
             _ => Handled::Answer(Response::not_applied(port, FaultKind::Io)),
+        }
+    }
+}
+
+impl<T: Terminal + ?Sized> Terminal for Fault<'_, T> {
+    fn ports(&self) -> &'static [Port] {
+        self.inner.ports()
+    }
+
+    fn handle(&mut self, binding: &Binding, operation: &Operation) -> Handled {
+        self.handle_with_invocation(binding, operation).outcome
+    }
+
+    fn handle_with_invocation(&mut self, binding: &Binding, operation: &Operation) -> Handling {
+        let mut invocation = Invocation::NotInvoked;
+        let outcome = self.handle_request(binding, operation, &mut invocation);
+        Handling {
+            outcome,
+            invocation,
         }
     }
 }
@@ -202,21 +256,26 @@ impl Stack {
         binding: &Binding,
         operation: &Operation,
     ) -> Handled {
-        // Tentative reservations are private invocation scratch. A rejection
-        // by any layer or a simulation Suspend discards all of them. There is
-        // one terminal call, with the caller's exact immutable operation.
+        // A layer veto discards every proposal. Otherwise reserve before the
+        // terminal's single outer call with the exact immutable operation.
+        // Its invocation report covers all calls made by composed handlers.
         let previous = self.monitors();
         self.bind_recording(&previous);
         let (next, check) = policy_record::admit(&previous, operation);
         let rejection = check.rejection();
         self.install(next);
+        let mut invocation = Invocation::MayHaveInvoked;
         let handled = match rejection {
             Some(code) => Handled::Answer(Response::Send(Sent::Refused(code))),
-            None => terminal.handle(binding, operation),
+            None => {
+                let report = terminal.handle_with_invocation(binding, operation);
+                invocation = report.invocation;
+                report.outcome
+            }
         };
-        // Reserve before the terminal call, including if it unwinds. Only a
-        // model suspension certifies that no invocation took place.
-        if handled == Handled::Suspend {
+        // Suspend alone is not non-invocation evidence. A composed handler
+        // may have forwarded before a later inner call suspended.
+        if handled == Handled::Suspend && invocation == Invocation::NotInvoked {
             self.install(previous);
         }
         let entry = match &handled {

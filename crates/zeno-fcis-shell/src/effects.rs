@@ -30,6 +30,8 @@ pub mod simulation;
 #[cfg(test)]
 mod explore_tests;
 #[cfg(test)]
+mod handler_tests;
+#[cfg(test)]
 mod policy_record_tests;
 #[cfg(test)]
 mod policy_tests;

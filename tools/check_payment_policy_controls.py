@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -16,6 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 EFFECTS = 'crates/zeno-fcis-shell/src/effects/'
 PREFIX = 'effects::policy_product::tests::'
 CONTROLS = [
+    ('composed-suspend-rollback', 'effects::handler_tests::policy_composed_suspend_retains_forwarded_reservation',
+     'composed Suspend erased a forwarded reservation', EFFECTS+'handler.rs',
+     ' && invocation == Invocation::NotInvoked', '',
+     'Fault(Simulation): outer [6], inner [0] forwards once then suspends; outer [0], inner [0] retry must refuse and leave one carried copy.'),
     ('runtime-skipped', 'runtime_policy_blocks_hidden_success', 'double payment after hidden success',
      EFFECTS+'handler.rs',
      'let (next, check) = policy_record::admit(&previous, operation);',
@@ -55,13 +60,15 @@ def main():
             return subprocess.run(cargo+extra, cwd=copy, env=source_environment(copy, env),
                                   text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=900)
         for name, test, marker, relative, before, after, witness in CONTROLS:
-            check = [PREFIX+test, '--', '--exact', '--nocapture']
+            named = test if test.startswith('effects::') else PREFIX+test
+            check = [named, '--', '--exact', '--nocapture']
             baseline = run(check)
             args.out.with_name(name+'-normal.log').write_text(baseline.stdout)
             if baseline.returncode or '1 passed' not in baseline.stdout:
                 raise RuntimeError(f'{name}: baseline failed')
             source = copy/relative
-            original = source.read_text()
+            original_bytes = source.read_bytes()
+            original = original_bytes.decode()
             if original.count(before) != 1:
                 raise RuntimeError(f'{name}: mutation anchor count {original.count(before)}')
             source.write_text(original.replace(before, after))
@@ -74,18 +81,22 @@ def main():
             if (mutated.returncode != 101 or 'test result: FAILED.' not in mutated.stdout
                     or marker not in mutated.stdout or 'assertion' not in mutated.stdout):
                 raise RuntimeError(f'{name}: did not fail its named assertion')
-            source.write_text(original)
+            source.write_bytes(original_bytes)
+            if source.read_bytes() != original_bytes:
+                raise RuntimeError(f'{name}: restoration changed source bytes')
             restored = run(check)
             args.out.with_name(name+'-restored.log').write_text(restored.stdout)
             if restored.returncode or '1 passed' not in restored.stdout:
                 raise RuntimeError(f'{name}: restored baseline failed')
-            row = dict(control=name, check=PREFIX+test, normal=baseline.returncode,
+            row = dict(control=name, check=named, normal=baseline.returncode,
                        build=build.returncode, mutated=mutated.returncode, restored=restored.returncode,
+                       source_sha256=hashlib.sha256(original_bytes).hexdigest(),
+                       restored_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
                        witness=witness, verdict='killed-by-named-assertion')
             rows.append(row)
             print(json.dumps(row), flush=True)
     args.out.write_text(json.dumps(rows, indent=2)+'\n')
-    print('PASS: three mutants built, failed named assertions, then restored baselines passed')
+    print('PASS: four mutants built, failed named assertions, then byte-identical restored baselines passed')
 
 
 if __name__ == '__main__':

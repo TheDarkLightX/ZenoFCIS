@@ -1,8 +1,9 @@
 //! First-order safety monitors. They only veto the program's exact request.
 //!
 //! Admission reserves an attempt before forwarding, even if its answer is
-//! NotSent, Unknown or a crash. A suspended simulation has not forwarded and
-//! must discard that tentative state. Responses cannot release reservations.
+//! NotSent, Unknown or a crash. Only explicit non-invocation evidence permits
+//! rollback on Suspend; composed partial forwards stay reserved. Responses
+//! cannot release reservations.
 
 use alloc::vec::Vec;
 

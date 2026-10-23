@@ -193,6 +193,25 @@ impl Environment<'_> {
 }
 
 impl Terminal for Environment<'_> {
+    fn handle_with_invocation(
+        &mut self,
+        binding: &Binding,
+        operation: &Operation,
+    ) -> super::handler::Handling {
+        let outcome = self.handle(binding, operation);
+        // Every direct suspension precedes the selected branch's mutations.
+        // Composed handlers must combine this evidence with earlier calls.
+        let invocation = if outcome == Handled::Suspend {
+            super::handler::Invocation::NotInvoked
+        } else {
+            super::handler::Invocation::MayHaveInvoked
+        };
+        super::handler::Handling {
+            outcome,
+            invocation,
+        }
+    }
+
     fn ports(&self) -> &'static [Port] {
         DeliveryProgram::PORTS
     }
