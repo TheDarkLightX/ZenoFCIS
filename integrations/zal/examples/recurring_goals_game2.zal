@@ -1,0 +1,14 @@
+zal 2;
+# Can the user make both states recur, whatever the operator does?
+machine recurring_goals;
+states open, withdrawn;
+events tick;
+context none;
+initial open;
+step atomic; frame control_and_variables;
+default reject not_allowed unchanged;
+rule alternate_open: open + tick [true] -> accept withdrawn;
+rule alternate_withdrawn: withdrawn + tick [true] -> accept open;
+player user moves in open;
+player operator moves in withdrawn;
+property both_goals: user can force infinitely often (state == open) and infinitely often (state == withdrawn);

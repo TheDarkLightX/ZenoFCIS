@@ -169,6 +169,13 @@ def combine(op: str, args: list[Expr]) -> Expr:
 TRUE = Expr("true")
 
 
+def _game_formulas(objective, payload):
+    """Return the state goals represented by one game-property payload."""
+    if objective == "within":
+        return (payload.args[1],)
+    return payload if isinstance(payload, tuple) else (payload,)
+
+
 def _read_game_group(text):
     """Read one balanced, parenthesized state formula and return its body and suffix."""
     text = text.lstrip()
@@ -190,7 +197,7 @@ def _game_mix_refusal(name):
 
 
 def _parse_game_objective(name, tail, declarations, english):
-    """Parse a bounded or existing single-goal game objective."""
+    """Parse bounded, single-goal, and recurring multi-goal objectives."""
     if english:
         raw_formula, rest = _read_game_group(tail)
         formula = parse_formula(raw_formula, declarations, "invariant", english)
@@ -204,9 +211,17 @@ def _parse_game_objective(name, tail, declarations, english):
                     "to happen infinitely often": "infinitely often"}
         if rest in suffixes:
             return suffixes[rest], formula
-        if rest.startswith("and ") or " and " in rest:
+        if rest.startswith("and "):
+            formulas = [formula]
+            while rest.startswith("and "):
+                next_formula, rest = _read_game_group(rest[4:])
+                formulas.append(parse_formula(next_formula, declarations, "invariant", english))
+                if len(formulas) > 4:
+                    raise Refusal("Game properties support at most four infinitely-often goals")
+            if len(formulas) >= 2 and rest == "to each happen infinitely often":
+                return "infinitely often", tuple(formulas)
             _game_mix_refusal(name)
-        if any(word in rest for word in ("eventually", "always", "infinitely often")):
+        if " and " in rest or any(word in rest for word in ("eventually", "always", "infinitely often")):
             _game_mix_refusal(name)
         raise Refusal("Invalid game property objective")
 
@@ -227,12 +242,23 @@ def _parse_game_objective(name, tail, declarations, english):
     if objective is None:
         raise Refusal("Invalid game property objective")
     body = tail[len(objective):].lstrip()
-    raw_formula, body = _read_game_group(body)
+    formulas = []
+    while True:
+        raw_formula, body = _read_game_group(body)
+        formulas.append(parse_formula(raw_formula, declarations, "invariant"))
+        if objective != "infinitely often" or not body.startswith("and "):
+            break
+        repeated = body[4:]
+        if not repeated.startswith("infinitely often "):
+            _game_mix_refusal(name)
+        body = repeated[len("infinitely often "):]
+        if len(formulas) >= 4:
+            raise Refusal("Game properties support at most four infinitely-often goals")
     if body:
-        if body.startswith("and ") or " and " in body:
+        if " and " in body or any(word in body for word in ("eventually", "always", "infinitely often")):
             _game_mix_refusal(name)
         raise Refusal("Invalid game property objective")
-    return objective, parse_formula(raw_formula, declarations, "invariant")
+    return objective, tuple(formulas) if len(formulas) > 1 else formulas[0]
 
 
 class _Parser:
@@ -642,7 +668,7 @@ class Machine:
     properties: tuple[tuple[str, Expr], ...] = ()
     obligations: tuple[tuple[str, str], ...] = ()
     players: tuple[tuple[str, tuple[str, ...]], ...] = ()
-    games: tuple[tuple[str, str, str, Expr], ...] = ()
+    games: tuple[tuple[str, str, str, Expr | tuple[Expr, ...]], ...] = ()
 
     def __post_init__(self):
         validate_machine(self)
@@ -673,8 +699,10 @@ class Machine:
         if self.players:
             result["players"] = [[name, states] for name, states in self.players]
         if self.games:
-            result["games"] = [[name, player, objective, formula.data()]
-                               for name, player, objective, formula in self.games]
+            result["games"] = [[name, player, objective,
+                                [formula.data() for formula in payload] if isinstance(payload, tuple)
+                                else payload.data()]
+                               for name, player, objective, payload in self.games]
         return result
 
     @property
@@ -707,14 +735,17 @@ class Machine:
             lines += [f"Player {name} moves in {', '.join(states)}." for name, states in self.players]
             phrases = {"eventually": "to happen eventually", "always": "to hold always",
                        "infinitely often": "to happen infinitely often"}
-            for name, player, objective, formula in self.games:
+            for name, player, objective, payload in self.games:
                 if objective == "within":
-                    bound, formula = formula.args
+                    bound, formula = payload.args
                     lines.append(f"Property {name}: {player} can force ({_bare(formula.render(True))}) "
                                  f"to happen within {bound} steps.")
+                elif isinstance(payload, tuple):
+                    formulas = " and ".join(f"({_bare(formula.render(True))})" for formula in payload)
+                    lines.append(f"Property {name}: {player} can force {formulas} to each happen infinitely often.")
                 else:
                     lines.append(f"Property {name}: {player} can force "
-                                 f"({_bare(formula.render(True))}) {phrases[objective]}.")
+                                 f"({_bare(payload.render(True))}) {phrases[objective]}.")
             lines += [f"Unresolved {kind}: {text}." for kind, text in self.obligations]
         else:
             lines = ["zal 2;", f"machine {self.name};", f"states {', '.join(self.states)};",
@@ -734,13 +765,16 @@ class Machine:
             lines += [f"fairness {n}: infinitely often ({_bare(f.render())});" for n, f in self.fairness]
             lines += [f"property {n}: {f.render()};" for n, f in self.properties]
             lines += [f"player {name} moves in {', '.join(states)};" for name, states in self.players]
-            for name, player, objective, formula in self.games:
+            for name, player, objective, payload in self.games:
                 if objective == "within":
-                    bound, formula = formula.args
+                    bound, formula = payload.args
                     lines.append(f"property {name}: {player} can force within {bound} ({_bare(formula.render())});")
+                elif isinstance(payload, tuple):
+                    goals = " and ".join(f"infinitely often ({_bare(formula.render())})" for formula in payload)
+                    lines.append(f"property {name}: {player} can force {goals};")
                 else:
                     lines.append(f"property {name}: {player} can force {objective} "
-                                 f"({_bare(formula.render())});")
+                                 f"({_bare(payload.render())});")
             lines += [f"unresolved {kind}: {text};" for kind, text in self.obligations]
         return "\n".join(lines) + "\n"
 
@@ -949,6 +983,11 @@ def validate_machine(model: Machine):
             if not isinstance(payload, Expr) or payload.op != "within":
                 raise Refusal("Invalid IR game property")
             formulas = (payload.args[1],)
+        elif isinstance(payload, tuple):
+            if (objective != "infinitely often" or not 2 <= len(payload) <= 4
+                    or any(not isinstance(formula, Expr) for formula in payload)):
+                raise Refusal("Invalid IR game property")
+            formulas = payload
         elif isinstance(payload, Expr):
             formulas = (payload,)
         else:
@@ -1264,6 +1303,7 @@ class _GameGraph:
     configuration_nodes: tuple[int, ...]
     initial: int
     numbered_names: bool
+    goals: tuple[tuple[bool, ...], ...] = ()
 
 
 def _game_graph(graph, model, player):
@@ -1307,7 +1347,10 @@ def _configuration_holds(formula, descriptor):
 
 
 def _reduce_game(graph, model, objective, formula):
-    goal = [_configuration_holds(formula, node) for node in graph.configurations]
+    formulas = formula if isinstance(formula, tuple) else (formula,)
+    goals = tuple(tuple(_configuration_holds(item, node) for node in graph.configurations)
+                  for item in formulas)
+    goal = list(goals[0])
     successors = [tuple(row) for row in graph.successors]
     if objective == "always":
         fairness = (tuple(True for _ in graph.successors),)
@@ -1317,7 +1360,8 @@ def _reduce_game(graph, model, objective, formula):
                 goal[node] = False
                 successors[node] = (node,)
         return _GameGraph(tuple(successors), graph.owners, tuple(goal), fairness,
-                          graph.configurations, graph.configuration_nodes, graph.initial, graph.numbered_names)
+                          graph.configurations, graph.configuration_nodes, graph.initial, graph.numbered_names,
+                          (tuple(goal),))
 
     if model.fairness:
         fairness = [tuple(_configuration_holds(item, node) for node in graph.configurations)
@@ -1333,12 +1377,14 @@ def _reduce_game(graph, model, objective, formula):
                     row[node] = True
                     fairness[index] = tuple(row)
     return _GameGraph(tuple(successors), graph.owners, tuple(goal), tuple(fairness),
-                      graph.configurations, graph.configuration_nodes, graph.initial, graph.numbered_names)
+                      graph.configurations, graph.configuration_nodes, graph.initial, graph.numbered_names,
+                      (tuple(goal),) if objective == "eventually" else goals)
 
 
 def _fixed_point_strata(graph):
-    """Solver A returns its winning set and the first stable outer/middle strata."""
+    """Solver A proposes the first stable outer and per-goal middle strata."""
     universe = set(range(len(graph.successors)))
+    goals = graph.goals or (graph.goal,)
 
     def cpre(target):
         return {node for node, choices in enumerate(graph.successors)
@@ -1352,37 +1398,43 @@ def _fixed_point_strata(graph):
     while True:
         outer += 1
         cpre_z = cpre(z)
-        y = set()
-        y_chain = [frozenset(y)]
-        level = 0
-        while True:
-            level += 1
-            cpre_y = cpre(y)
-            union = set()
-            for assumption in graph.fairness:
-                x = set(universe)
-                while True:
-                    cpre_x = cpre(x)
-                    updated_x = {
-                        node for node in universe
-                        if ((graph.goal[node] and node in cpre_z)
-                            or node in cpre_y
-                            or (not assumption[node] and node in cpre_x))
-                    }
-                    if updated_x == x:
-                        break
-                    x = updated_x
-                union.update(x)
-            y_chain.append(frozenset(union))
-            if union == y:
-                break
-            y = union
-        levels[outer] = level
-        middle_chains[outer] = tuple(y_chain)
-        z_chain.append(frozenset(y))
-        if y == z:
+        next_z = set(universe)
+        goal_levels, goal_chains = [], []
+        for goal in goals:
+            y = set()
+            y_chain = [frozenset(y)]
+            level = 0
+            while True:
+                level += 1
+                cpre_y = cpre(y)
+                union = set()
+                for assumption in graph.fairness:
+                    x = set(universe)
+                    while True:
+                        cpre_x = cpre(x)
+                        updated_x = {
+                            node for node in universe
+                            if ((goal[node] and node in cpre_z)
+                                or node in cpre_y
+                                or (not assumption[node] and node in cpre_x))
+                        }
+                        if updated_x == x:
+                            break
+                        x = updated_x
+                    union.update(x)
+                y_chain.append(frozenset(union))
+                if union == y:
+                    break
+                y = union
+            goal_levels.append(level)
+            goal_chains.append(tuple(y_chain))
+            next_z.intersection_update(y)
+        levels[outer] = tuple(goal_levels)
+        middle_chains[outer] = tuple(goal_chains)
+        z_chain.append(frozenset(next_z))
+        if next_z == z:
             return outer, levels, tuple(z_chain), middle_chains
-        z = y
+        z = next_z
 
 
 def _fixed_point_winners(graph):
@@ -1392,19 +1444,25 @@ def _fixed_point_winners(graph):
 
 
 def _parity_winners(graph):
-    """Solver B: round-robin parity product, solved by Zielonka recursion."""
+    """Solver B: round-robin goal and assumption product, solved by Zielonka recursion."""
     count = len(graph.successors)
     assumptions = len(graph.fairness)
-    product_size = count * assumptions
+    goals = graph.goals or (graph.goal,)
+    guarantees = len(goals)
+    product_size = count * guarantees * assumptions
     owners, priorities, successors = [], [], []
     for node in range(count):
-        for counter in range(assumptions):
-            owners.append(graph.owners[node])
-            priorities.append(2 if graph.goal[node] else
-                              1 if graph.fairness[counter][node] and counter == assumptions - 1 else 0)
-            next_counter = ((counter + 1) % assumptions
-                            if graph.fairness[counter][node] else counter)
-            successors.append(tuple(child * assumptions + next_counter for child in graph.successors[node]))
+        for guarantee in range(guarantees):
+            for counter in range(assumptions):
+                owners.append(graph.owners[node])
+                priorities.append(2 if goals[guarantee][node] and guarantee == guarantees - 1 else
+                                  1 if graph.fairness[counter][node] and counter == assumptions - 1 else 0)
+                next_counter = ((counter + 1) % assumptions
+                                if graph.fairness[counter][node] else counter)
+                next_guarantee = ((guarantee + 1) % guarantees
+                                  if goals[guarantee][node] else guarantee)
+                successors.append(tuple((child * guarantees + next_guarantee) * assumptions + next_counter
+                                        for child in graph.successors[node]))
 
     def attractor(player, target, subgame):
         reached = set(target)
@@ -1439,22 +1497,24 @@ def _parity_winners(graph):
         return second_winners[0], second_winners[1]
 
     even_wins, _ = zielonka(set(range(product_size)))
-    return frozenset(node for node in range(count) if node * assumptions in even_wins)
+    return frozenset(node for node in range(count) if node * guarantees * assumptions in even_wins)
 
 
 def _game_table_project(graph, proposed_strata=None):
     """Render a reduced game using solver-proposed strata and a checked stability table."""
     count, assumptions = len(graph.successors), graph.fairness
+    goals = graph.goals or (graph.goal,)
     if proposed_strata is None:
         outer, levels, _, _ = _fixed_point_strata(graph)
     else:
         outer, levels = proposed_strata
-    if outer < 1 or set(levels) != set(range(1, outer + 1)) or any(levels[k] < 1 for k in levels):
+    if (outer < 1 or set(levels) != set(range(1, outer + 1))
+            or any(len(levels[k]) != len(goals) or any(level < 1 for level in levels[k]) for k in levels)):
         raise Refusal("Invalid fixed-point stratum proposal")
     slots = tuple(tuple(dict.fromkeys(row)) for row in graph.successors)
     width = max(len(row) for row in slots)
     goal_table = max(840, 800 + width)
-    fairness_table = max(860, goal_table + 1)
+    fairness_table = max(860, goal_table + len(goals))
     listing = lambda values: "[" + ",".join(map(str, values)) + "]"
     source = [
         "zeno 1;",
@@ -1472,7 +1532,10 @@ def _game_table_project(graph, proposed_strata=None):
     for slot in range(width):
         values = [row[slot] + 1 if slot < len(row) else 0 for row in slots]
         source.append(f"const table {800 + slot} next{slot} 105 size {count} {listing(values)};")
-    source.append(f"const table {goal_table} goal 107 size {count} {listing(int(value) for value in graph.goal)};")
+    for index, goal in enumerate(goals):
+        name = "goal" if len(goals) == 1 else f"goal{index}"
+        source.append(f"const table {goal_table + index} {name} 107 size {count} "
+                      f"{listing(int(value) for value in goal)};")
     for index, row in enumerate(assumptions):
         name = "fair" if len(assumptions) == 1 else f"fair{index}"
         source.append(f"const table {fairness_table + index} {name} 107 size {count} {listing(int(value) for value in row)};")
@@ -1497,35 +1560,41 @@ def _game_table_project(graph, proposed_strata=None):
         return (f"((mover[s] == 0 && forall t in table 110 {{ !{edge} || {target} }})"
                 f" || (mover[s] == 1 && (!{has_successor} || exists t in table 110 {{ {edge} && {target} }})))")
 
-    def escape(k, level, fair, at):
-        return f"w{k}_{level}_{fair}[{at}]"
+    def escape(k, goal, level, fair, at):
+        return f"w{k}_{goal}_{level}_{fair}[{at}]"
 
-    def not_y(k, level, at):
+    def not_y(k, goal, level, at):
         if level == 0:
             return "true"
-        return "(" + " && ".join(escape(k, level, i, at) for i in range(len(assumptions))) + ")"
+        return "(" + " && ".join(escape(k, goal, level, i, at)
+                                  for i in range(len(assumptions))) + ")"
 
     def not_z(k, at):
         if k == 0:
             return "false"
-        return "(" + " && ".join(escape(k, levels[k], i, at) for i in range(len(assumptions))) + ")"
+        return "(" + " || ".join(
+            "(" + " && ".join(escape(k, goal, levels[k][goal], i, at)
+                              for i in range(len(assumptions))
+            ) + ")" for goal in range(len(goals))) + ")"
 
     next_table = max(1000, fairness_table + len(assumptions))
     source.append("// w(k,l,i)[s]: the other player can escape middle stratum (k,l) through assumption i.")
     for outer_index in range(1, outer + 1):
-        for level in range(1, levels[outer_index] + 1):
-            for fair_index in range(len(assumptions)):
-                fair_name = "fair" if len(assumptions) == 1 else f"fair{fair_index}"
-                not_a = (f"((goal[s] == 0 || {other_predecessor(not_z(outer_index - 1, 't'))}) && "
-                         f"{other_predecessor(not_y(outer_index, level - 1, 't'))})")
-                body = (f"{not_a} && ({fair_name}[s] == 1 || "
-                        f"{other_predecessor(escape(outer_index, level, fair_index, 't'))})")
-                source += [f"derived table {next_table} w{outer_index}_{level}_{fair_index}[s] "
-                           f"in table 110 rounds {count} {{",
-                           f"  when true then {body};",
-                           "  default false;",
-                           "};"]
-                next_table += 1
+        for goal_index, goal in enumerate(goals):
+            goal_name = "goal" if len(goals) == 1 else f"goal{goal_index}"
+            for level in range(1, levels[outer_index][goal_index] + 1):
+                for fair_index in range(len(assumptions)):
+                    fair_name = "fair" if len(assumptions) == 1 else f"fair{fair_index}"
+                    not_a = (f"(({goal_name}[s] == 0 || {other_predecessor(not_z(outer_index - 1, 't'))}) && "
+                             f"{other_predecessor(not_y(outer_index, goal_index, level - 1, 't'))})")
+                    body = (f"{not_a} && ({fair_name}[s] == 1 || "
+                            f"{other_predecessor(escape(outer_index, goal_index, level, fair_index, 't'))})")
+                    source += [f"derived table {next_table} w{outer_index}_{goal_index}_{level}_{fair_index}[s] "
+                               f"in table 110 rounds {count} {{",
+                               f"  when true then {body};",
+                               "  default false;",
+                               "};"]
+                    next_table += 1
     source += ["// win[s]: the property player wins from s under the fairness assumptions.",
                f"derived table {next_table} win[s] in table 110 rounds {count} {{",
                f"  when true then !{not_z(outer, 's')};",
@@ -1537,9 +1606,9 @@ def _game_table_project(graph, proposed_strata=None):
         return f"(({left} && {right}) || (!{left} && !{right}))"
 
     stable_conditions = [same(not_z(outer, "t"), not_z(outer - 1, "t"))]
-    stable_conditions.extend(same(not_y(index, levels[index], "t"),
-                                  not_y(index, levels[index] - 1, "t"))
-                             for index in range(1, outer + 1))
+    stable_conditions.extend(same(not_y(index, goal, levels[index][goal], "t"),
+                                  not_y(index, goal, levels[index][goal] - 1, "t"))
+                             for index in range(1, outer + 1) for goal in range(len(goals)))
     stable_body = "forall t in table 110 { " + " && ".join(stable_conditions) + " }"
     source += [f"derived table {next_table} stable[s] in table 110 rounds {count} {{",
                f"  when true then {stable_body};",
@@ -2044,10 +2113,10 @@ def check(model: Machine, checker_identity="unbound") -> dict:
                                   property=name, witness=witness)
         results[name] = {"status": "pass-with-scope", "kind": shape["kind"], "mode": mode}
     checks["temporal_properties"] = "pass-with-scope"
-    for name, player, objective, formula in model.games:
+    for name, player, objective, payload in model.games:
         base = _game_graph(graph, model, player)
         if objective == "within":
-            bound, formula = formula.args
+            bound, formula = payload.args
             goal = tuple(_configuration_holds(formula, node) for node in base.configurations)
             game = base
             fixed = _deadline_fixed_winners(game, goal, bound)
@@ -2056,14 +2125,19 @@ def check(model: Machine, checker_identity="unbound") -> dict:
             english = (f"Property {name}: {player} can force ({_bare(formula.render(True))}) "
                        f"to happen within {bound} steps.")
         else:
-            game = _reduce_game(base, model, objective, formula)
+            formulas = _game_formulas(objective, payload)
+            game = _reduce_game(base, model, objective, payload)
             fixed = _fixed_point_winners(game)
             parity = _parity_winners(game)
             result_objective = objective
-            english_objective = {"eventually": "to happen eventually", "always": "to hold always",
-                                 "infinitely often": "to happen infinitely often"}[objective]
-            english = (f"Property {name}: {player} can force "
-                       f"({_bare(formula.render(True))}) {english_objective}.")
+            if isinstance(payload, tuple):
+                goals_english = " and ".join(f"({_bare(formula.render(True))})" for formula in formulas)
+                english = f"Property {name}: {player} can force {goals_english} to each happen infinitely often."
+            else:
+                english_objective = {"eventually": "to happen eventually", "always": "to hold always",
+                                     "infinitely often": "to happen infinitely often"}[objective]
+                english = (f"Property {name}: {player} can force "
+                           f"({_bare(payload.render(True))}) {english_objective}.")
         config_data = lambda node: {"state": game.configurations[node][1],
                                     "variables": dict(game.configurations[node][2])}
         winning_configs = [node for node in game.configuration_nodes if node in fixed]
@@ -2352,10 +2426,10 @@ def game_readings(model: Machine):
     """Build display-only ATL formula and plain-language rungs for declared game properties."""
     modal = {"eventually": "◇", "always": "□", "infinitely often": "□◇"}
     readings = []
-    for name, player, objective, formula in model.games:
+    for name, player, objective, payload in model.games:
         other = next(owner for owner, _ in model.players if owner != player)
         if objective == "within":
-            bound, goal = formula.args
+            bound, goal = payload.args
             formula_text = goal.render().replace(" == ", " = ").replace(" != ", " ≠ ")
             formula_rung = f"⟨⟨{player}⟩⟩ within {bound} ({formula_text})"
             condition = (f"the state is {goal.args[0]}" if goal.op == "state"
@@ -2364,14 +2438,26 @@ def game_readings(model: Machine):
             outcome += "step" if bound == 1 else "steps"
             fairness = ""
             result_objective = f"within {bound}"
+        elif isinstance(payload, tuple):
+            formula_rungs = []
+            conditions = []
+            for goal in payload:
+                formula_text = goal.render().replace(" == ", " = ").replace(" != ", " ≠ ")
+                formula_rungs.append(f"□◇ ({formula_text})")
+                conditions.append(f"({goal.render(True)})")
+            formula_rung = f"⟨⟨{player}⟩⟩ (" + " ∧ ".join(formula_rungs) + ")"
+            outcome = "make sure every goal happens again and again: " + "; ".join(conditions)
+            fairness = (", provided every declared fairness condition holds infinitely often"
+                        if model.fairness else "")
+            result_objective = objective
         else:
-            formula_text = formula.render().replace(" == ", " = ").replace(" != ", " ≠ ")
+            formula_text = payload.render().replace(" == ", " = ").replace(" != ", " ≠ ")
             formula_rung = f"⟨⟨{player}⟩⟩ {modal[objective]} ({formula_text})"
-            if formula.op == "state":
-                condition = f"the state is {formula.args[0]}"
+            if payload.op == "state":
+                condition = f"the state is {payload.args[0]}"
                 lead = "make sure "
             else:
-                condition = f"the condition ({formula.render(True)}) holds"
+                condition = f"the condition ({payload.render(True)}) holds"
                 lead = "make sure that "
             if objective == "infinitely often":
                 outcome = f"{lead}{condition} again and again"
@@ -2436,9 +2522,11 @@ CONSTRUCTS = {
     "property": ("property ID: TEMPORAL_FORMULA;", "Property ID: TEMPORAL_FORMULA.",
                  "A property is a temporal formula over the steps of every infinite execution from the initial configuration."),
     "game": ("property ID: NAME can force eventually (STATE_FORMULA); | "
-             "property ID: NAME can force within K (STATE_FORMULA);",
+             "property ID: NAME can force within K (STATE_FORMULA); | "
+             "property ID: NAME can force infinitely often (Q1) and infinitely often (Q2);",
              "Property ID: NAME can force (FORMULA) to happen eventually. | "
-             "Property ID: NAME can force (FORMULA) to happen within K steps.",
+             "Property ID: NAME can force (FORMULA) to happen within K steps. | "
+             "Property ID: NAME can force (Q1) and (Q2) to each happen infinitely often.",
              "Game properties check whether their player can force a state goal over every play under the declared objective and fairness assumptions."),
     "unresolved": ("unresolved KIND: TEXT;", "Unresolved KIND: TEXT.",
                    "This records an unsupported requirement. It remains visible and blocks factory lowering."),

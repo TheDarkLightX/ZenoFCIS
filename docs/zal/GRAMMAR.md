@@ -301,6 +301,7 @@ an input, fairness and every temporal operator.
 | `property ID: NAME can force always (FORMULA);` | `Property ID: NAME can force (FORMULA) to hold always.` |
 | `property ID: NAME can force infinitely often (FORMULA);` | `Property ID: NAME can force (FORMULA) to happen infinitely often.` |
 | `property ID: NAME can force within K (FORMULA);` | `Property ID: NAME can force (FORMULA) to happen within K steps.` |
+| `property ID: NAME can force infinitely often (Q1) and infinitely often (Q2);` | `Property ID: NAME can force (Q1) and (Q2) to each happen infinitely often.` |
 
 The `machine`, `states`, `events`, `context`, `initial`, `default`, reject
 rule and `unresolved` forms are unchanged from profile 1. An Accept rule
@@ -367,16 +368,34 @@ complete list is in the legend.
 `NAME` is one of two declared players, and the two players' disjoint state
 lists cover the machine's states. `FORMULA` is a state formula in invariant
 scope. The bound `K` in a `within` game property is a literal from 0 to 64. A
-game property counts toward the eight-property limit; at most four game
-properties may be declared.
+recurring multi-goal property has two to four state formulas. A game property
+counts toward the eight-property limit; at most four game properties may be
+declared.
 
-A play starts at the initial configuration (control state and variables). In a configuration whose state is in
-player P's list, P chooses the event. When the model declares context, the context of each step is chosen against the property's player: by the other player. The step follows the rules exactly as `check` does: an accepted rule moves, a rejection keeps the configuration. Every configuration has a step for every event, so plays are infinite.
+A play starts at the initial configuration (control state and variables). In a
+configuration whose state is in player P's list, P chooses the event. When the
+model declares context, the context of each step is chosen against the
+property's player: by the other player. The step follows the rules exactly as
+`check` does: an accepted rule moves, a rejection keeps the configuration.
+Every configuration has a step for every event, so plays are infinite.
 A fairness formula holds on a step when it holds on the configuration after the step.
-- `P can force eventually (Q)`: P can play so that every play reaches Q, or some fairness formula holds on only finitely many steps.
-- `P can force infinitely often (Q)`: P can play so that every play visits Q infinitely often, or some fairness formula holds on only finitely many steps.
-- `P can force always (Q)`: P can play so that every play stays in Q. Fairness does not apply: a violation happens at a finite time.
-- `P can force within K (Q)`: P can play so that every play reaches a configuration satisfying Q at one of the step offsets 0 through K inclusive, as `within` already means. A step is one rule application; the context node inside a step is not a step. Fairness does not apply. The context rule is unchanged.
+
+- `P can force eventually (Q)`: P can play so that every play reaches Q,
+  or some fairness formula holds on only finitely many steps.
+- `P can force infinitely often (Q)`: P can play so that every play visits
+  Q infinitely often, or some fairness formula holds on only finitely many
+  steps.
+- `P can force always (Q)`: P can play so that every play stays in Q.
+  Fairness does not apply: a violation happens at a finite time.
+- `P can force within K (Q)`: P can play so that every play reaches a
+  configuration satisfying Q at one of the step offsets 0 through K
+  inclusive, as `within` already means. A step is one rule application; the
+  context node inside a step is not a step. Fairness does not apply. The
+  context rule is unchanged.
+- `P can force infinitely often (Q1) and infinitely often (Q2) ...`: P can
+  play so that every play visits each of Q1, Q2, and any additional declared
+  goal infinitely often, or some fairness formula holds on only finitely
+  many steps.
 - The property holds when P can do this from the initial configuration.
 
 The game graph contains configurations reachable from the initial one. A
@@ -389,11 +408,12 @@ formula false. Fairness formulas read only the post-step state (`state'` and
 primed variables).
 
 The unbounded objectives reduce to “goal infinitely often, provided every
-fairness formula holds infinitely often.” For `eventually`, goal configurations become
-absorbing, with goal and fairness true. For `always`, fairness is ignored,
-violating configurations become absorbing with goal false, and every other
-node has goal true. `infinitely often` uses the graph unchanged. If there are
-no applicable fairness formulas, one assumption true on every node is used.
+fairness formula holds infinitely often.” For `eventually`, goal
+configurations become absorbing, with goal and fairness true. For `always`,
+fairness is ignored, violating configurations become absorbing with goal
+false, and every other node has goal true. `infinitely often` uses the graph
+unchanged. If there are no applicable fairness formulas, one assumption true
+on every node is used.
 
 Two independent solvers must agree on the winning set. With
 CPre(X)(v) meaning that the property player has some successor in X at its
@@ -410,12 +430,19 @@ For `within K`, solver A uses backward induction over complete steps: W0 is
 the set of Q configurations, and each next stratum adds configurations from
 which the property player forces the next configuration into the preceding
 stratum. Solver B forms a product of the game graph and a remaining-step
-counter;
-context choices keep the counter and a completed configuration-to-
-configuration step reduces it. An ordinary reachability attractor decides
+counter; context choices keep the counter and a completed
+configuration-to-configuration step reduces it. An ordinary reachability attractor decides
 the product. The table export contains the nonrecursive `r0` through `rK`
 strata and no `stable` law. Bounded perfect-information games are determined
 by backward induction (Zermelo, 1913).
+
+For recurring multiple goals, solver A places the conjunction over goals
+inside the outer greatest fixed point:
+`νZ. ⋀ⱼ μY. ⋁ᵢ νX. (Qⱼ ∧ CPre(Z)) ∨ CPre(Y) ∨ (¬fairᵢ ∧ CPre(X))`.
+Solver B adds round-robin counters for the goals and the fairness assumptions
+to the parity product, then solves it with the same independent Zielonka
+algorithm. Their winning sets must agree on every node or the result is
+`UNKNOWN`.
 
 The table export command is:
 
@@ -428,12 +455,14 @@ solver's first stable outer and middle strata. A `stable` table compares each
 proposed stratum with its predecessor, and `law 510 stable on commit =
 stable[0];` must expand to exactly `true` before the table answers are
 accepted. For `within K`, the exporter emits nonrecursive `r0` through `rK`
-strata instead. It refuses graphs above 64 nodes. Native formula expansion
+strata instead. For multiple recurring goals, it emits one `goal0`, `goal1`,
+and further goal table per state formula and checks all per-goal strata with
+one `stable` law. It refuses graphs above 64 nodes. Native formula expansion
 has a lower practical limit: measured expansion is about 20 nodes with one
 goal and one fairness assumption, and about 12 nodes with two of each. Beyond
-the expansion limit, the ZAL check result stands. The game semantics use the “can force” operator from
-Alur, Henzinger and Kupferman, “Alternating-Time Temporal Logic,” *JACM*,
-2002. The parity construction follows Piterman, Pnueli and Sa'ar,
+the expansion limit, the ZAL check result stands. The game semantics use the
+“can force” operator from Alur, Henzinger and Kupferman,
+“Alternating-Time Temporal Logic,” *JACM*, 2002. The parity construction follows Piterman, Pnueli and Sa'ar,
 “Synthesis of Reactive(1) Designs,” *VMCAI*, 2006; the recursive solver is
 from Zielonka, “Infinite Games on Finitely Coloured Graphs,” *Theoretical
 Computer Science*, 1998.

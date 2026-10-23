@@ -23,12 +23,15 @@ REPOSITORY = HERE.parents[1]
 README = REPOSITORY / "docs" / "zal" / "README.md"
 WITHDRAWAL_PROJECT = Path("/tmp/withdrawal-game/project.zeno")
 DEADLINE_PROJECT = Path("/tmp/withdrawal-deadline/project.zeno")
+MULTI_GOAL_PROJECT = Path("/tmp/recurring-goals/project.zeno")
 PLAYER_ERROR = "Players need distinct names and disjoint declared states; at most two players"
 GAME_COVERAGE_ERROR = "Game properties need two players whose states cover every state exactly once"
 UNKNOWN_PLAYER = "Game property reaches names an undeclared player"
 POST_STATE_FAIRNESS = "Game fairness reads only the state after a step (state' and primed variables)"
 DEADLINE_ERROR = "Game deadline K must be a literal from 0 to 64"
 MIXED_OBJECTIVE_ERROR = "Game property quick_withdrawal cannot mix objectives"
+MIXED_GOALS_ERROR = "Game property both_goals cannot mix objectives"
+TOO_MANY_GOALS_ERROR = "Game properties support at most four infinitely-often goals"
 
 GAME_SOURCE = """zal 2;
 machine mini_game;
@@ -94,6 +97,37 @@ player operator moves in withdrawn;
 property quick_withdrawal: user can force within 1 (state == withdrawn);
 """
 
+MULTI_GOAL_SOURCE = """zal 2;
+# Can the user make both states recur, whatever the operator does?
+machine recurring_goals;
+states open, withdrawn;
+events tick;
+context none;
+initial open;
+step atomic; frame control_and_variables;
+default reject not_allowed unchanged;
+rule alternate_open: open + tick [true] -> accept withdrawn;
+rule alternate_withdrawn: withdrawn + tick [true] -> accept open;
+player user moves in open;
+player operator moves in withdrawn;
+property both_goals: user can force infinitely often (state == open) and infinitely often (state == withdrawn);
+"""
+
+UNREACHABLE_SECOND_GOAL_SOURCE = """zal 2;
+machine one_recurring_goal;
+states open, withdrawn;
+events tick;
+context none;
+initial open;
+step atomic; frame control_and_variables;
+default reject not_allowed unchanged;
+rule remain_open: open + tick [true] -> accept open;
+rule remain_withdrawn: withdrawn + tick [true] -> accept withdrawn;
+player user moves in open;
+player operator moves in withdrawn;
+property both_goals: user can force infinitely often (state == open) and infinitely often (state == withdrawn);
+"""
+
 # Canonical profile revisions captured before any game-language changes.
 EXAMPLE_REVISIONS = {
     "context_free2.zal": "07466304cde3923ab1b1516cdc566e578c8f98c53946d69c8422ad93d3419c07",
@@ -106,7 +140,9 @@ EXAMPLE_REVISIONS = {
     "withdrawal2.zal": "8057b15d9b23224d2e7907009f9cb47cd738f970ae3bdc7ff9487bfe1b24cab0",
 }
 GAME_EXAMPLE_REVISIONS = {
+    "withdrawal_game2.zal": "62f361bbe3dbdb74bdbfe7050626e26f4d029990be5ddc1d37f9187dd729b8e0",
     "deadline_game2.zal": "f9d5a4db71761f0ef6b9a5dff04bfec3189c617f56ff8cfe18b77facd49e9aef",
+    "recurring_goals_game2.zal": "5eb629ebc9bff7c65dc6e06613dd1126f0cf4775a080f161adabbfb7531da3af",
 }
 
 
@@ -205,6 +241,23 @@ def random_deadline_source(rng, case):
     return "\n".join(lines) + "\n"
 
 
+def random_multi_goal_source(rng, case):
+    lines = random_game_source(rng, case).splitlines()
+    match = re.fullmatch(r"property game_\d+: ([a-z][a-z0-9_]*) can force .+", lines[-1])
+    if not match:
+        raise AssertionError(lines[-1])
+    states = next(line for line in lines if line.startswith("states ")).removeprefix("states ").rstrip(";").split(", ")
+    has_variable = any(line.startswith("var x ") for line in lines)
+    goals = []
+    for _ in range(rng.randint(2, 4)):
+        formula = f"state == {rng.choice(states)}"
+        if has_variable and rng.random() < 0.5:
+            formula = f"({formula} & x == {rng.randint(0, 1)})"
+        goals.append(f"infinitely often ({formula})")
+    lines[-1] = f"property game_{case}: {match[1]} can force {' and '.join(goals)};"
+    return "\n".join(lines) + "\n"
+
+
 class GameGrammarTests(unittest.TestCase):
     def test_both_surfaces_round_trip_and_keep_legacy_data_shape(self):
         model = b.parse(GAME_SOURCE)
@@ -300,6 +353,58 @@ class GameGrammarTests(unittest.TestCase):
             b.parse(english, "english")
         self.assertEqual(str(raised.exception), MIXED_OBJECTIVE_ERROR)
 
+    def test_multi_goal_round_trips_and_runs_both_solvers(self):
+        model = b.parse(MULTI_GOAL_SOURCE)
+        self.assertEqual(b.parse(model.render()), model)
+        self.assertEqual(b.parse(model.render(True), "english"), model)
+        self.assertIn("property both_goals: user can force infinitely often (state == open) and infinitely often "
+                      "(state == withdrawn);", model.render())
+        self.assertIn("Property both_goals: user can force (state is open) and (state is withdrawn) "
+                      "to each happen infinitely often.", model.render(True))
+        payload = model.games[0][3]
+        self.assertEqual(len(payload), 2)
+        self.assertEqual(len(model.data()["games"][0][3]), 2)
+        result = b.check(model)
+        self.assertEqual(result["status"], "pass-with-scope")
+        self.assertEqual(result["properties"]["both_goals"]["objective"], "infinitely often")
+        self.assertEqual(result["properties"]["both_goals"]["english"],
+                         "Property both_goals: user can force (state is open) and (state is withdrawn) "
+                         "to each happen infinitely often.")
+        four_goals = " and ".join(
+            f"infinitely often (state == {'open' if index % 2 == 0 else 'withdrawn'})"
+            for index in range(4))
+        four = b.parse(MULTI_GOAL_SOURCE.replace(
+            "infinitely often (state == open) and infinitely often (state == withdrawn)", four_goals))
+        self.assertEqual(len(four.games[0][3]), 4)
+        self.assertEqual(b.parse(four.render(True), "english"), four)
+
+    def test_multi_goal_refusals_for_limit_and_mixed_objectives_are_exact(self):
+        five_goals = " and ".join(
+            f"infinitely often (state == {'open' if index % 2 == 0 else 'withdrawn'})"
+            for index in range(5))
+        over_limit = MULTI_GOAL_SOURCE.replace(
+            "infinitely often (state == open) and infinitely often (state == withdrawn)", five_goals)
+        with self.assertRaises(b.Refusal) as raised:
+            b.parse(over_limit)
+        self.assertEqual(str(raised.exception), TOO_MANY_GOALS_ERROR)
+        english_over_limit = b.parse(MULTI_GOAL_SOURCE).render(True).replace(
+            "(state is open) and (state is withdrawn)",
+            "(state is open) and (state is withdrawn) and (state is open) and (state is withdrawn) and "
+            "(state is open)")
+        with self.assertRaises(b.Refusal) as raised:
+            b.parse(english_over_limit, "english")
+        self.assertEqual(str(raised.exception), TOO_MANY_GOALS_ERROR)
+        mixed = MULTI_GOAL_SOURCE.replace(
+            "and infinitely often (state == withdrawn)", "and eventually (state == withdrawn)")
+        with self.assertRaises(b.Refusal) as raised:
+            b.parse(mixed)
+        self.assertEqual(str(raised.exception), MIXED_GOALS_ERROR)
+        english = b.parse(MULTI_GOAL_SOURCE).render(True).replace(
+            "to each happen infinitely often.", "to happen eventually.")
+        with self.assertRaises(b.Refusal) as raised:
+            b.parse(english, "english")
+        self.assertEqual(str(raised.exception), MIXED_GOALS_ERROR)
+
     def test_within_offsets_include_zero_ignore_fairness_and_keep_context_inside_step(self):
         model = b.parse(DEADLINE_SOURCE)
         self.assertEqual(b.check(model)["properties"]["quick_withdrawal"]["initial_wins"], True)
@@ -319,6 +424,29 @@ class GameGrammarTests(unittest.TestCase):
         result = b.check(model)
         self.assertEqual(result["status"], "pass-with-scope")
         self.assertTrue(result["properties"]["quick_withdrawal"]["initial_wins"])
+
+    def test_each_recurring_goal_is_required(self):
+        model = b.parse(UNREACHABLE_SECOND_GOAL_SOURCE)
+        _, base = game_arena_for(model)
+        game = b._reduce_game(base, model, "infinitely often", model.games[0][3])
+        fixed = b._fixed_point_winners(game)
+        parity = b._parity_winners(game)
+        self.assertEqual(fixed, parity)
+        self.assertNotIn(game.initial, fixed)
+        result = b.check(model)
+        self.assertEqual((result["status"], result["obligation"], result["property"]),
+                         ("counterexample", "game", "both_goals"))
+
+    def test_solver_agreement_2000_random_multi_goal_machines_on_every_node(self):
+        rng = random.Random(20261024)
+        for case in range(2000):
+            model = b.parse(random_multi_goal_source(rng, case))
+            base, arena = game_arena_for(model)
+            _, _, _, formula = model.games[0]
+            game = b._reduce_game(arena, model, "infinitely often", formula)
+            fixed = b._fixed_point_winners(game)
+            parity = b._parity_winners(game)
+            self.assertEqual(fixed, parity, f"multi-goal solver disagreement in random machine {case}")
 
 
     def test_context_nodes_do_not_consume_deadline_steps(self):
@@ -389,11 +517,12 @@ property t4: always(state == aa);
         self.assertIn("games", game_change["changed_objects"])
 
     def test_existing_example_revisions_are_unchanged(self):
-        new_examples = {"withdrawal_game2.zal", "deadline_game2.zal"}
+        new_examples = set(GAME_EXAMPLE_REVISIONS)
         paths = sorted(path for path in EXAMPLES.rglob("*.zal") if path.name not in new_examples)
         self.assertEqual({path.name: parse_example(path).revision for path in paths}, EXAMPLE_REVISIONS)
         self.assertEqual({path.name: b.parse(path.read_text(encoding="ascii")).revision
-                          for path in sorted(EXAMPLES.glob("deadline_game2.zal"))},
+                          for path in sorted(EXAMPLES.glob("*game2.zal"))
+                          if path.name in GAME_EXAMPLE_REVISIONS},
                          GAME_EXAMPLE_REVISIONS)
 
     def test_game_readings_have_formula_and_plain_rungs(self):
@@ -415,6 +544,11 @@ property t4: always(state == aa);
         self.assertEqual(by_id["stays"]["formula_rung"], "⟨⟨user⟩⟩ □ (state = aa)")
         self.assertEqual(by_id["returns"]["formula_rung"], "⟨⟨user⟩⟩ □◇ (state = bb)")
         self.assertNotIn("provided", by_id["stays"]["plain_rung"])
+        multi = b.parse(MULTI_GOAL_SOURCE)
+        reading, = b.game_readings(multi)
+        self.assertEqual(reading["formula_rung"],
+                         "⟨⟨user⟩⟩ (□◇ (state = open) ∧ □◇ (state = withdrawn))")
+        self.assertEqual(b.legend(multi)["readings"], [reading])
 
     def test_withdrawal_example_and_its_variants(self):
         path = EXAMPLES / "withdrawal_game2.zal"
@@ -431,6 +565,15 @@ property t4: always(state == aa);
         eventual = without_fairness.replace("can force infinitely often", "can force eventually")
         reached = b.check(b.parse(eventual))
         self.assertTrue(reached["properties"]["keep_withdrawing"]["initial_wins"])
+
+    def test_recurring_goals_example_and_unreachable_second_goal_variant(self):
+        path = EXAMPLES / "recurring_goals_game2.zal"
+        self.assertEqual(path.read_text(encoding="ascii"), MULTI_GOAL_SOURCE)
+        model = b.parse(MULTI_GOAL_SOURCE)
+        self.assertEqual(b.parse(model.render(True), "english"), model)
+        self.assertTrue(b.check(model)["properties"]["both_goals"]["initial_wins"])
+        failed = b.check(b.parse(UNREACHABLE_SECOND_GOAL_SOURCE))
+        self.assertEqual((failed["status"], failed["property"]), ("counterexample", "both_goals"))
 
 
 class GameSolverTests(unittest.TestCase):
@@ -608,6 +751,48 @@ class GameTableTests(unittest.TestCase):
             self.assertEqual(actual, {node: node in expected_winners
                                       for node in arena.configuration_nodes})
 
+        multi_project = MULTI_GOAL_PROJECT
+        multi_project.parent.mkdir(parents=True, exist_ok=True)
+        multi_commands = [
+            ["python3", "integrations/zal/run.py", "check",
+             "integrations/zal/examples/recurring_goals_game2.zal"],
+            ["python3", "integrations/zal/run.py", "export-game",
+             "integrations/zal/examples/recurring_goals_game2.zal", "--property", "both_goals",
+             "--out", str(multi_project)],
+        ]
+        multi_markers = ["multi-goal-check-output", "multi-goal-export-output"]
+        for command, marker in zip(multi_commands, multi_markers):
+            with self.subTest(command=command):
+                completed = subprocess.run(command, cwd=REPOSITORY, text=True, encoding="utf-8",
+                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertEqual(completed.stdout, documented_output(marker))
+        project_text = multi_project.read_text(encoding="ascii")
+        self.assertIn("const table", project_text)
+        self.assertIn(" goal0 ", project_text)
+        self.assertIn(" goal1 ", project_text)
+        self.assertEqual(project_text.count("law 510 stable on commit = stable[0];"), 1)
+        if binary:
+            checked = subprocess.run([binary, "check", "--expand", str(multi_project)],
+                                     cwd=REPOSITORY, text=True, stdout=subprocess.PIPE,
+                                     stderr=subprocess.STDOUT, timeout=120)
+            self.assertEqual(checked.returncode, 0, checked.stdout[-2000:])
+            native = re.search(r"<!-- multi-goal-native-output -->\s*```text\n(.*?)\n```",
+                               readme, re.DOTALL)
+            self.assertIsNotNone(native, "missing documented native multi-goal expansion")
+            self.assertEqual(checked.stdout, native.group(1) + "\n")
+            stable = re.findall(r"^law 510 stable on commit = (true|false);$",
+                                checked.stdout, flags=re.MULTILINE)
+            self.assertEqual(stable, ["true"], checked.stdout[-2000:])
+            rows = re.findall(r"^law (6\d\d) from_[a-z0-9_]+ on commit = (true|false);$",
+                              checked.stdout, flags=re.MULTILINE)
+            self.assertEqual(len(rows), 2, checked.stdout[-2000:])
+            model = b.parse((EXAMPLES / "recurring_goals_game2.zal").read_text(encoding="ascii"))
+            game = b._reduce_game(game_arena_for(model)[1], model, "infinitely often", model.games[0][3])
+            expected = b._fixed_point_winners(game)
+            actual = {int(law) - 600: value == "true" for law, value in rows}
+            self.assertEqual(actual, {node: node in expected for node in range(2)})
+
     def test_300_random_reduced_games_export_tables(self):
         rng = random.Random(20261023)
         binary = os.environ.get("ZENO_FCIS_BIN")
@@ -682,6 +867,43 @@ class GameTableTests(unittest.TestCase):
                 self.assertEqual(actual, {node: node in expected for node in range(count)},
                                  f"bounded table mismatch in random reduced game {case}")
 
+    def test_300_random_multi_goal_games_expand_natively_and_match_solver_a(self):
+        binary = os.environ.get("ZENO_FCIS_BIN")
+        if not binary:
+            self.skipTest("ZENO_FCIS_BIN is unset; native multi-goal expansion was not run")
+        rng = random.Random(20261025)
+        with tempfile.TemporaryDirectory(prefix="zal-multi-goals-") as temporary:
+            for case in range(300):
+                count = rng.randint(2, 8)
+                successor_rows = tuple(tuple(sorted(rng.sample(
+                    range(count), rng.randint(1, min(3, count))))) for _ in range(count))
+                owners = tuple(rng.randint(0, 1) for _ in range(count))
+                guarantee_count = rng.choice((2, 2, 3, 4))
+                goals = tuple(tuple(bool(rng.getrandbits(1)) for _ in range(count))
+                              for _ in range(guarantee_count))
+                fairness_count = rng.choice((1, 1, 2))
+                fairness = tuple(tuple(bool(rng.getrandbits(1)) for _ in range(count))
+                                 for _ in range(fairness_count))
+                configurations = tuple(("configuration", f"s{node}", ()) for node in range(count))
+                game = b._GameGraph(successor_rows, owners, goals[0], fairness, configurations,
+                                    tuple(range(count)), 0, False, goals)
+                project = b._game_table_project(game)
+                path = Path(temporary) / f"multi-{case:03}.zeno"
+                path.write_text(project, encoding="ascii")
+                checked = subprocess.run([binary, "check", "--expand", str(path)], text=True,
+                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
+                self.assertEqual(checked.returncode, 0, checked.stdout[-2000:])
+                stable = re.findall(r"^law 510 stable on commit = (true|false);$",
+                                    checked.stdout, flags=re.MULTILINE)
+                self.assertEqual(stable, ["true"], checked.stdout[-2000:])
+                rows = re.findall(r"^law (6\d\d) from_s(\d+) on commit = (true|false);$",
+                                  checked.stdout, flags=re.MULTILINE)
+                expected = b._fixed_point_winners(game)
+                self.assertEqual(len(rows), count, checked.stdout[-2000:])
+                actual = {int(node): value == "true" for _, node, value in rows}
+                self.assertEqual(actual, {node: node in expected for node in range(count)},
+                                 f"multi-goal table mismatch in random reduced game {case}")
+
     def test_one_fewer_outer_stratum_makes_stable_false(self):
         rng = random.Random(20261024)
         for case in range(500):
@@ -691,9 +913,12 @@ class GameTableTests(unittest.TestCase):
             if outer <= 1:
                 continue
             outer_stable = z_chain[outer] == z_chain[outer - 1]
-            middle_stable = all(middle_chains[index][levels[index]]
-                                == middle_chains[index][levels[index] - 1]
-                                for index in range(1, outer + 1))
+            middle_stable = all(
+                middle_chains[index][goal][levels[index][goal]]
+                == middle_chains[index][goal][levels[index][goal] - 1]
+                for index in range(1, outer + 1)
+                for goal in range(len(middle_chains[index]))
+            )
             self.assertTrue(outer_stable and middle_stable,
                             f"the proposed {outer} outer strata must make stable true")
             self.assertNotEqual(z_chain[outer - 1], z_chain[outer - 2],

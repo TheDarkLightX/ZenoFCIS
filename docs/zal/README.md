@@ -558,7 +558,7 @@ The first command prints this JSON:
   "status": "pass-with-scope",
   "revision": "62f361bbe3dbdb74bdbfe7050626e26f4d029990be5ddc1d37f9187dd729b8e0",
   "profile": "zal/finite-fsm/2",
-  "checker": "8d0e6890b047854f0037fa1ce9b5b8ef90e51549ebef35395e21cbdbf0167a33",
+  "checker": "d4394e9fe2cea2744eb3c6abe1265522bd7f6ff1a9bac18d74b5a15f00d0b0b2",
   "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
   "checks": {
     "initial_nonempty": "pass-with-scope",
@@ -668,7 +668,7 @@ The first command prints:
   "status": "pass-with-scope",
   "revision": "f9d5a4db71761f0ef6b9a5dff04bfec3189c617f56ff8cfe18b77facd49e9aef",
   "profile": "zal/finite-fsm/2",
-  "checker": "8d0e6890b047854f0037fa1ce9b5b8ef90e51549ebef35395e21cbdbf0167a33",
+  "checker": "d4394e9fe2cea2744eb3c6abe1265522bd7f6ff1a9bac18d74b5a15f00d0b0b2",
   "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
   "checks": {
     "initial_nonempty": "pass-with-scope",
@@ -793,7 +793,149 @@ law 601 from_n1 on commit = true;
 expanded /tmp/withdrawal-deadline/project.zeno: tables=1 entries=2 inputs=4 domain=8
 ```
 
-The README replay test compares the first two command outputs byte for byte and, when `ZENO_FCIS_BIN` is set, compares the native `from_` laws with solver A. Bounded exports contain `r0` through `rK` and have no `stable` law.
+The README replay test compares the first two command outputs byte for byte
+and, when `ZENO_FCIS_BIN` is set, compares the native `from_` laws with solver
+A. Bounded exports contain `r0` through `rK` and have no `stable` law.
+
+
+### Several recurring goals
+
+The recurring-goals example checks that every play visits both states infinitely often, even though the operator controls the withdrawn state:
+
+```sh
+python3 integrations/zal/run.py check integrations/zal/examples/recurring_goals_game2.zal
+python3 integrations/zal/run.py export-game integrations/zal/examples/recurring_goals_game2.zal --property both_goals --out /tmp/recurring-goals/project.zeno
+zeno-fcis check --expand /tmp/recurring-goals/project.zeno
+```
+
+The first command prints:
+
+<!-- multi-goal-check-output -->
+```json
+{
+  "status": "pass-with-scope",
+  "revision": "5eb629ebc9bff7c65dc6e06613dd1126f0cf4775a080f161adabbfb7531da3af",
+  "profile": "zal/finite-fsm/2",
+  "checker": "d4394e9fe2cea2744eb3c6abe1265522bd7f6ff1a9bac18d74b5a15f00d0b0b2",
+  "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
+  "checks": {
+    "initial_nonempty": "pass-with-scope",
+    "typing": "pass-with-scope",
+    "determinism": "pass-with-scope",
+    "update_ranges": "pass-with-scope",
+    "coverage_with_explicit_default": "pass-with-scope",
+    "reachable_invariants": "pass-with-scope",
+    "invariant_preservation": "pass-with-scope",
+    "transition_requirements": "pass-with-scope",
+    "temporal_properties": "pass-with-scope",
+    "game_properties": "pass-with-scope"
+  },
+  "input_tuples": 2,
+  "configurations": 2,
+  "admissible_configurations": 2,
+  "reachable_configurations": 2,
+  "reachable_states": [
+    "open",
+    "withdrawn"
+  ],
+  "unreachable_rules": [],
+  "invariant_count": 0,
+  "requirement_count": 0,
+  "property_count": 1,
+  "fairness_count": 0,
+  "properties": {
+    "both_goals": {
+      "status": "pass-with-scope",
+      "kind": "game",
+      "player": "user",
+      "objective": "infinitely often",
+      "english": "Property both_goals: user can force (state is open) and (state is withdrawn) to each happen infinitely often.",
+      "configurations": 2,
+      "winning_configurations": 2,
+      "initial_wins": true,
+      "solvers": [
+        "fixed-point",
+        "parity"
+      ]
+    }
+  },
+  "advisories": [],
+  "default_count": 0,
+  "default_witness": null,
+  "unresolved": [],
+  "factory": "not-run",
+  "authority": "none",
+  "game_property_count": 1
+}
+```
+
+The export command prints:
+
+<!-- multi-goal-export-output -->
+```json
+{
+  "status": "exported",
+  "format": "contract-tables",
+  "property": "both_goals",
+  "nodes": 2,
+  "out": "/tmp/recurring-goals/project.zeno",
+  "authority": "none"
+}
+```
+
+The native expansion prints:
+
+<!-- multi-goal-native-output -->
+```text
+zeno 1;
+project 1 constant_role_hierarchy;
+namespace 2 permissions;
+type 100 state Roles;
+type 101 command Request;
+type 102 context Session;
+type 105 int Parent in 0..=2;
+type 106 int Role in 0..=1;
+type 107 int Grant in 0..=1;
+// Who moves: 0 = the property's player, 1 = the other player.
+
+
+
+
+
+field 210 100 grants_0 107;
+field 211 100 grants_1 107;
+field 120 101 role 106;
+variant 130 102 Session none;
+reason 200 permission_required precedence 0;
+component 400 inheritance {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+// w(k,l,i)[s]: the other player can escape middle stratum (k,l) through assumption i.
+
+
+
+
+
+
+// win[s]: the property player wins from s under the fairness assumptions.
+
+
+law 500 domains on commit, genesis = (post.100.210 >= 0 && post.100.210 <= 1 && (post.100.211 >= 0 && post.100.211 <= 1));
+law 510 stable on commit = true;
+law 600 from_open on commit = true;
+law 601 from_withdrawn on commit = true;
+expanded /tmp/recurring-goals/project.zeno: tables=1 entries=2 inputs=4 domain=8
+```
+
+The README replay test compares the check and export outputs byte for byte.
+When `ZENO_FCIS_BIN` is set, it also checks the native output. One `stable`
+law checks the proposed per-goal strata; the tables name the recurring goals
+`goal0`, `goal1`, and so on.
 
 ## Types and effect signatures
 
