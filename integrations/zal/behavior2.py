@@ -669,8 +669,11 @@ class Machine:
     obligations: tuple[tuple[str, str], ...] = ()
     players: tuple[tuple[str, tuple[str, ...]], ...] = ()
     games: tuple[tuple[str, str, str, Expr | tuple[Expr, ...]], ...] = ()
+    symmetries: tuple = ()
 
     def __post_init__(self):
+        if not isinstance(self.symmetries, tuple):
+            raise Refusal("Symmetry declarations: declaration: symmetries must be owned tuples")
         validate_machine(self)
         index = {}
         for rule in self.rules:
@@ -703,6 +706,8 @@ class Machine:
                                 [formula.data() for formula in payload] if isinstance(payload, tuple)
                                 else payload.data()]
                                for name, player, objective, payload in self.games]
+        if self.symmetries:
+            result["symmetry"] = [[name, pairs] for name, pairs in self.symmetries]
         return result
 
     @property
@@ -747,6 +752,8 @@ class Machine:
                     lines.append(f"Property {name}: {player} can force "
                                  f"({_bare(payload.render(True))}) {phrases[objective]}.")
             lines += [f"Unresolved {kind}: {text}." for kind, text in self.obligations]
+            lines += [f"Symmetry {name}: swapping " + " and ".join(f"{a} with {b}" for a, b in pairs)
+                      + " changes nothing." for name, pairs in self.symmetries]
         else:
             lines = ["zal 2;", f"machine {self.name};", f"states {', '.join(self.states)};",
                      f"events {', '.join(self.events)};", f"context {', '.join(self.facts) or 'none'};"]
@@ -776,6 +783,8 @@ class Machine:
                     lines.append(f"property {name}: {player} can force {objective} "
                                  f"({_bare(payload.render())});")
             lines += [f"unresolved {kind}: {text};" for kind, text in self.obligations]
+            lines += [f"symmetry {name}: swap " + " ".join(f"({a} {b})" for a, b in pairs) + ";"
+                      for name, pairs in self.symmetries]
         return "\n".join(lines) + "\n"
 
     # Finite domains, in canonical order.
@@ -1024,6 +1033,8 @@ def validate_machine(model: Machine):
             raise Refusal("Invalid unresolved obligation")
     if tuple(sorted(model.obligations)) != model.obligations:
         raise Refusal("Unresolved obligations must be canonically sorted")
+    from symmetry2 import validate_declarations
+    validate_declarations(model)
     if any(len(model.render(english).encode("ascii")) > MAX_SOURCE for english in [False, True]):
         raise Refusal("Canonical symbolic or English model exceeds 64 KiB")
 
@@ -1055,6 +1066,7 @@ def statement_patterns(english=False):
             "require": rf"Requirement ({NAME}): (.+)\.",
             "fairness": rf"Fairness ({NAME}): assume (.+) happens infinitely often\.",
             "player": rf"Player ({NAME}) moves in (.+)\.",
+            "symmetry": rf"Symmetry ({NAME}): swapping (.+) changes nothing\.",
             "game": rf"Property ({NAME}): ({NAME}) can force (.+)\.",
             "property": rf"Property ({NAME}): (.+)\.",
             "unresolved": rf"Unresolved ({NAME}): ([a-zA-Z0-9_ ,!?()/-]{{1,200}})\.",
@@ -1067,6 +1079,7 @@ def statement_patterns(english=False):
         "require": rf"require ({NAME}): (.+);",
         "fairness": rf"fairness ({NAME}): infinitely often (.+);",
         "player": rf"player ({NAME}) moves in (.+);",
+        "symmetry": rf"symmetry ({NAME}): swap (.+);",
         "game": rf"property ({NAME}): ({NAME}) can force (.+);",
         "property": rf"property ({NAME}): (.+);",
         "unresolved": rf"unresolved ({NAME}): ([a-zA-Z0-9_ ,!?()/-]{{1,200}});",
@@ -1202,10 +1215,12 @@ def parse(text: str, syntax="symbolic") -> Machine:
             objective, payload = _parse_game_objective(name, body, declarations, english)
             games.append((name, player, objective, payload))
     try:
+        from symmetry2 import parse_declarations
+        symmetries = parse_declarations(found["symmetry"], english)
         return Machine(fields["name"], states, events, facts, inputs, variables, fields["initial"], fields["default"],
                        tuple(sorted(rules, key=lambda r: r.id)), collections["invariant"], collections["require"],
                        collections["fairness"], collections["property"], tuple(sorted(found["unresolved"])),
-                       players, tuple(sorted(games)))
+                       players, tuple(sorted(games)), symmetries)
     except Refusal as error:
         # Admission is still the single validator of ranges and the owned IR.
         # Add the declaration's physical position without changing its verdict.
@@ -2024,14 +2039,21 @@ def _check_property(graph, model, name, formula):
     return None
 
 
-def check(model: Machine, checker_identity="unbound") -> dict:
+def check(model: Machine, checker_identity="unbound", *, no_symmetry=False) -> dict:
+    if model.symmetries:
+        from symmetry2 import check as check_symmetry
+        return check_symmetry(model, checker_identity, no_symmetry)
+    return _check(model, checker_identity)
+
+
+def _check(model, checker_identity, graph=None):
     checks = {"initial_nonempty": "pass-with-scope", "typing": "pass-with-scope", "determinism": "not-run",
               "update_ranges": "not-run", "coverage_with_explicit_default": "not-run",
               "reachable_invariants": "not-run", "invariant_preservation": "not-run",
               "transition_requirements": "not-run", "temporal_properties": "not-run"}
     if model.games:
         checks["game_properties"] = "not-run"
-    graph = _Graph(model)
+    graph = graph if graph is not None else _Graph(model)
     steps, traps, defaults = [[] for _ in graph.configs], {}, []
     for ci, event, context, result in graph.raw():
         if result[0] == "overlap":
