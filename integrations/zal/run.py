@@ -18,6 +18,8 @@ def main():
     from guide_help import example_help
     parser = argparse.ArgumentParser(description=__doc__, epilog=example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
+    import loop_coverage
+    loop_coverage.add_command(sub)
     for command in ["legend", "check", "render", "export", "export-game", "qualify", "diff", "ui", "story", "why-not", "what-if",
                     "lower", "refine-check", "explain", "guide"]:
         p = sub.add_parser(command, epilog=example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -61,6 +63,8 @@ def main():
             p.add_argument("--port", type=int, default=8765)
             p.add_argument("--workspace", type=Path, help="Use an existing terminal/MCP shared workspace")
     options = parser.parse_args()
+    if options.command == "coverage":
+        return loop_coverage.main(options)
     source = ""
     try:
         with options.source.open(encoding="ascii") as stream:
