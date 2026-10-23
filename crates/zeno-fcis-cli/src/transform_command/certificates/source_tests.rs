@@ -99,6 +99,206 @@ fn root() -> PathBuf {
         .unwrap_or_else(|error| panic!("source root: {error}"))
 }
 
+/// Supplement the unchanged contract token gate with the parsed module graph.
+/// Keep this here to reuse the existing Rust parser, without adding a dependency
+/// to the pure contract crate. Data inclusions do not create module edges.
+#[test]
+fn standalone_binaries_are_not_in_the_library_module_closure() {
+    let contract = root().join("crates/zeno-fcis-contract");
+    let manifest = std::fs::read_to_string(contract.join("Cargo.toml"))
+        .unwrap_or_else(|error| panic!("contract manifest: {error}"));
+    assert!(
+        !manifest.contains("[lib]") && !manifest.contains("autoexamples"),
+        "review library entry and standalone target discovery before changing Cargo defaults"
+    );
+    let mut closure = BTreeSet::new();
+    module_graph(
+        &contract.join("src/lib.rs"),
+        &contract.join("src"),
+        &mut closure,
+    );
+    let identity = std::fs::read_to_string(contract.join("src/checked_composition/identity.rs"))
+        .unwrap_or_else(|error| panic!("identity: {error}"));
+    let identity = syn::parse_file(&identity).unwrap_or_else(|error| panic!("identity: {error}"));
+    let tokens = identity
+        .items
+        .iter()
+        .find_map(|item| match item {
+            syn::Item::Const(item) if item.ident == "CHECKER_SOURCES" => match &*item.expr {
+                syn::Expr::Macro(expression) => Some(expression.mac.tokens.clone()),
+                _ => None,
+            },
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("source-bound checker inventory"));
+    let bound = syn::punctuated::Punctuated::<syn::LitStr, syn::Token![,]>::parse_terminated
+        .parse2(tokens)
+        .unwrap_or_else(|error| panic!("checker inventory: {error}"));
+    let bound: BTreeSet<_> = bound
+        .iter()
+        .map(|path| {
+            contract
+                .join(path.value())
+                .canonicalize()
+                .unwrap_or_else(|error| panic!("bound source: {error}"))
+        })
+        .collect();
+    for path in &closure {
+        assert!(
+            path.starts_with(contract.join("src")) && bound.contains(path),
+            "library module must be a source-bound library input, never a standalone binary: {}",
+            path.display()
+        );
+        let source = std::fs::read_to_string(path).unwrap_or_else(|error| panic!("{error}"));
+        let parsed =
+            syn::parse_file(&source).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+        // A macro must not hide a module edge from the direct-module walker.
+        MacroModuleCheck.visit_file(&parsed);
+        let mut modules = StandardModules::default();
+        modules.visit_file(&parsed);
+        assert!(
+            modules.0.is_empty(),
+            "library ambient modules in {}: {:?}",
+            path.display(),
+            modules.0
+        );
+    }
+    let manifest: Value = serde_json::from_slice(
+        &std::fs::read(contract.join("tests/standalone-binaries.json"))
+            .unwrap_or_else(|error| panic!("standalone manifest: {error}")),
+    )
+    .unwrap_or_else(|error| panic!("standalone manifest: {error}"));
+    for binary in manifest["binaries"]
+        .as_array()
+        .unwrap_or_else(|| panic!("standalone binaries"))
+    {
+        let relative = binary["source"]
+            .as_str()
+            .unwrap_or_else(|| panic!("standalone source"));
+        let path = contract
+            .join(relative)
+            .canonicalize()
+            .unwrap_or_else(|error| panic!("{error}"));
+        assert!(
+            !closure.contains(&path),
+            "standalone binary is reachable from the library: {relative}"
+        );
+        assert!(
+            bound.contains(&path),
+            "standalone binary must remain source-bound: {relative}"
+        );
+        let source = std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("{error}"));
+        let parsed = syn::parse_file(&source).unwrap_or_else(|error| panic!("{error}"));
+        assert!(
+            parsed.items.iter().any(
+                |item| matches!(item, syn::Item::Fn(function) if function.sig.ident == "main")
+            ),
+            "standalone Cargo example target has a main: {relative}"
+        );
+        let mut modules = StandardModules::default();
+        modules.visit_file(&parsed);
+        let expected: BTreeSet<_> = binary["ambient_modules"]
+            .as_array()
+            .unwrap_or_else(|| panic!("ambient modules"))
+            .iter()
+            .map(|name| {
+                name.as_str()
+                    .unwrap_or_else(|| panic!("module name"))
+                    .to_owned()
+            })
+            .collect();
+        assert_eq!(
+            modules.0, expected,
+            "review every standalone ambient module: {relative}"
+        );
+    }
+}
+
+use syn::visit::Visit as _;
+
+struct MacroModuleCheck;
+
+impl syn::visit::Visit<'_> for MacroModuleCheck {
+    fn visit_macro(&mut self, node: &syn::Macro) {
+        fn check(tokens: proc_macro2::TokenStream) {
+            for token in tokens {
+                match token {
+                    proc_macro2::TokenTree::Ident(name) => assert!(
+                        name != "mod" && name != "include",
+                        "review macro-generated module edges"
+                    ),
+                    proc_macro2::TokenTree::Group(group) => check(group.stream()),
+                    _ => {}
+                }
+            }
+        }
+        assert!(
+            !node.path.is_ident("include"),
+            "review code inclusion in the library closure"
+        );
+        check(node.tokens.clone());
+    }
+}
+
+#[derive(Default)]
+struct StandardModules(BTreeSet<String>);
+
+impl StandardModules {
+    fn record(&mut self, path: &[String]) {
+        if path.len() >= 2
+            && path[0] == "std"
+            && ["fs", "process", "env", "net", "thread", "time", "io"].contains(&path[1].as_str())
+        {
+            self.0.insert(format!("std::{}", path[1]));
+        }
+    }
+
+    fn use_tree(&mut self, tree: &syn::UseTree, prefix: &mut Vec<String>) {
+        match tree {
+            syn::UseTree::Path(path) => {
+                prefix.push(path.ident.to_string());
+                self.record(prefix);
+                self.use_tree(&path.tree, prefix);
+                prefix.pop();
+            }
+            syn::UseTree::Group(group) => {
+                for item in &group.items {
+                    self.use_tree(item, prefix);
+                }
+            }
+            syn::UseTree::Name(name) => {
+                prefix.push(name.ident.to_string());
+                self.record(prefix);
+                prefix.pop();
+            }
+            syn::UseTree::Rename(name) => {
+                prefix.push(name.ident.to_string());
+                self.record(prefix);
+                prefix.pop();
+            }
+            syn::UseTree::Glob(_) => self.record(prefix),
+        }
+    }
+}
+
+impl<'ast> syn::visit::Visit<'ast> for StandardModules {
+    fn visit_path(&mut self, path: &'ast syn::Path) {
+        self.record(
+            &path
+                .segments
+                .iter()
+                .map(|segment| segment.ident.to_string())
+                .collect::<Vec<_>>(),
+        );
+        syn::visit::visit_path(self, path);
+    }
+
+    fn visit_item_use(&mut self, item: &'ast syn::ItemUse) {
+        self.use_tree(&item.tree, &mut Vec::new());
+        syn::visit::visit_item_use(self, item);
+    }
+}
+
 fn expected() -> Value {
     let root = root();
     let harness = root.join("verification/verus/scalar_node_refinement.rs");
