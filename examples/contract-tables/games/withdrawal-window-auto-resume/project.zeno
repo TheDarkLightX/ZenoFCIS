@@ -1,5 +1,5 @@
 zeno 1;
-project 1 withdrawal-window-auto-resume;
+project 1 withdrawal_window_auto_resume;
 namespace 2 permissions;
 type 100 state Roles;
 type 101 command Request;

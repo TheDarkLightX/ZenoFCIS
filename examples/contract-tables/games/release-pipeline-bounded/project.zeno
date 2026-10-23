@@ -1,5 +1,5 @@
 zeno 1;
-project 1 release-pipeline-bounded;
+project 1 release_pipeline_bounded;
 namespace 2 permissions;
 type 100 state Roles;
 type 101 command Request;

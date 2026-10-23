@@ -1,5 +1,5 @@
 zeno 1;
-project 1 withdrawal-window;
+project 1 withdrawal_window;
 namespace 2 permissions;
 type 100 state Roles;
 type 101 command Request;

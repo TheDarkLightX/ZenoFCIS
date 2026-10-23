@@ -12,7 +12,7 @@ zeno-fcis check --expand examples/contract-tables/games/release-pipeline/project
 ```
 
 Each `from_<state>` law expands to `true` where the controller wins and `false` where it does not. In the
-fairness examples, the `stable` law must also expand to `true`.
+fairness examples, read the `stable` law first: the answers count only when it expands to `true`.
 
 ## Formal model
 A game declares, for each state `i`:
@@ -39,7 +39,9 @@ The controllable predecessor of a set X holds at state i when one of these holds
   `OPre(W) = ¬CPre(¬W)` is what the environment can force. The two outer chains settle in a few steps, so a solver
   proposes how many strata each needs and the tables build exactly those. The `stable` law checks that the last
   stratum of each chain equals the one before it: an iteration that repeats has reached its fixed point, so the
-  answer is exact when `stable` expands to `true`, and is refused otherwise. The complements of the
+  answer is exact when `stable` expands to `true`. `check --expand` prints `stable` but does not refuse when it is
+  `false`: read `stable` first, and use the `from_` answers only when it is `true` (the guide test and ZAL's
+  `export-game` both enforce this). The complements of the
   outer strata are positive in the `w` tables, so no recursive table negates another. A last, non-recursive `win`
   table negates the top stratum.
 
@@ -54,27 +56,31 @@ The controllable predecessor of a set X holds at state i when one of these holds
 | `games/release-pipeline-fair` | Can changes be released infinitely often, assuming the reviewer approves infinitely often? | Yes, from every state (No without the assumption). |
 
 Each example was compared with an independent Python solver on every state. The fairness encoding was also
-compared on 1,576 games (every two-state game with one assumption and one guarantee, and 1,000 random games of 3 to
-8 states with up to two of each): the tables, a direct nested fixed point and the trace game's parity solver agreed on
+compared on 1,576 games (every two-state game in which every state has a move, with one assumption and one
+guarantee, and 1,000 random games of 3 to 8 states with up to two of each, again with a move from every state): the tables, a direct nested fixed point and the trace game's parity solver agreed on
 every state, and `stable` held. Every certificate from the parity solver was replayed by the trace game's
 independent checker. Proposing one stratum too few was refused by `stable` in all 876 games tried; ignoring the
 assumption produced disagreements.
 
 ## Difference
-A hand-written check of "the maintainer can always release" needs either a proof or a search over every behaviour
+Without this, a check of "the maintainer can always release" needs either a proof or a search over every behaviour
 of the reviewer. Here the table language computes the exact winning region. It is checked by the same expansion,
-evaluation and judges as every other table, and the table itself is the certificate. To ask the same question of a
-contract's own states, against compromised actors, use the trace game's liveness mode (see
-[TRACE_GAME.md](TRACE_GAME.md)).
+evaluation and judges as every other table, and the table itself is the certificate.
 
 ## Scope
 - The game is declared finite data. Turns follow the declared movers; an alternating honest and adversary schedule
   is a fairness assumption, and must be stated.
-- An assumption is a state the environment visits infinitely often (justice). "If asked infinitely often, eventually
-  answers" (compassion, a Streett condition) is not expressible this way.
-- Each fairness table quantifies over every state in every round, so expansion grows with the cube of the number
-  of states. In measured runs, 20 states with one guarantee and one assumption, and 12 states with two of each,
-  expanded in about a second; 24 states with one of each exceeded the expansion limit.
+- Every state has at least one move; a game with dead ends needs its own terminal convention.
+- An assumption is a set of states the environment visits infinitely often (justice). A single "if asked
+  infinitely often, answered infinitely often" is exactly this form (assumption: asked; goal: answered). Several
+  such request and answer pairs that must each hold separately (a general Streett condition) are not expressible
+  this way.
+- Each fairness table quantifies over every state in every round, so expansion grows quickly with the number of
+  states, and whether a game fits depends on its moves. In a replayable sample of five random games per size, with
+  one guarantee and one assumption every game up to 24 states expanded, two of five at 28 and none at 32; with two of
+  each, every game up to 16 states, two of five at 20 and none at 24. Each took at most about two seconds, and every
+  expanded answer agreed with both independent solvers. A game that does not fit is refused at the formula-node
+  limit; it is never answered wrongly.
 - `rounds` must equal the number of entries exactly. A table holds at most 64 entries. Constant table IDs must not
   collide with field IDs.
 - Expansion grows with the size of the game. One table over every state, with nested quantifiers, reaches the

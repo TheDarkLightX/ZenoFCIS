@@ -9,3 +9,4 @@ zeno-fcis check --expand examples/contract-tables/games/<example>/project.zeno
 ```
 
 The `from_<state>` laws print `true` where the controller (mover 0) can force the goal, and `false` where it cannot.
+In the fairness examples, read the `stable` law first: the answers count only when it prints `true`.
