@@ -61,7 +61,11 @@ The controllable predecessor of a set X holds at state i when one of these holds
 - **Recurrence:** the controller can force goals infinitely often (Büchi). This needs a greatest fixed point
   outside a least one. The outer chain shrinks and stabilizes within N steps on N states, so it is unrolled into N
   strata: `z1 .. zN`, where each `zk` is the least fixed point of `CPre(zk) ∨ (goal ∧ CPre(z(k-1)))`, and `z1`
-  starts from every state. Each stratum reads only the one below it.
+  starts from every state. Each stratum reads only the one below it. N updates reach the winning region;
+  a certificate that checks two successive values for equality may need update N+1 to see the adjacent repeat.
+  In the total chain whose last state is a non-goal absorbing state and whose other states are goals, one state
+  disappears per update. The answer is empty at update N, but its certificate is still unstable until N+1.
+  The stability regressions cover N = 1..8 and also refuse a right answer obtained before any adjacent repeat.
 - **Fairness:** the controller can force goals g1..gm infinitely often, provided the environment makes assumptions
   a1..an hold infinitely often (a GR(1) game). If the environment breaks an assumption, the controller wins. The
   winning region is `νZ. ⋀j μY. ⋁i νX. (gj ∧ CPre(Z)) ∨ CPre(Y) ∨ (¬ai ∧ CPre(X))`. Each inner greatest
