@@ -251,7 +251,7 @@ def main():
             results["toolchains"][version] = packets
     if args.report:
         args.report.write_text(json.dumps(results, indent=2, sort_keys=True) + "\n")
-    print("PASS: kernel replay, every module constant, named axiom manifest and requested controls", flush=True)
+    print("PASS: kernel-replayed, axioms audited for every module constant, named axiom manifest and requested controls", flush=True)
 
 
 if __name__ == "__main__":

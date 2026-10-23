@@ -52,6 +52,20 @@ class ProofReports(unittest.TestCase):
 
 
 class ProofTree(unittest.TestCase):
+    def test_success_text_describes_kernel_replay_and_axiom_audit(self):
+        with tempfile.TemporaryDirectory(prefix="lean-tree-test-") as tmp:
+            proofs = Path(tmp)
+            (proofs / "Good.lean").write_text("import Std\ntheorem checked : True := by trivial\n")
+            (proofs / "AXIOMS.json").write_text("{}\n")
+            output = io.StringIO()
+            with mock.patch.object(check, "PROOFS", proofs), \
+                    mock.patch.object(sys, "argv", ["check_lean_proofs.py"]), \
+                    contextlib.redirect_stdout(output):
+                check.main()
+            success = output.getvalue().splitlines()[-1]
+            self.assertTrue("kernel-replayed" in success and "axioms audited" in success,
+                            "L1_PASS_must_say_kernel_replayed_and_axioms_audited")
+
     def test_symlinked_directory_is_refused(self):
         with tempfile.TemporaryDirectory(prefix="lean-tree-test-") as tmp:
             root = Path(tmp)
