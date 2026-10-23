@@ -45,3 +45,10 @@ law 501 units_conserved on accept = (command.101.120 == 150 -> post.100.110 + po
 // Only an authorized operator moves stock, and each action moves exactly its
 // quantity between the fields it names.
 law 502 exact_movement on accept = context.102.130 == 1 && (command.101.120 == 150 -> post.100.110 + command.101.121 == pre.100.110 && post.100.111 == pre.100.111 + command.101.121) && (command.101.120 == 151 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 152 -> post.100.110 == pre.100.110 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 153 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 == pre.100.111);
+// The first failed guard supplies the only admissible rejection reason.
+// In particular an eligible Reserve, Release, Ship or Restock must accept.
+law 503 reject_only_for_first_failed_guard on reject = (context.102.130 == 0 && decision_reason == 200) || (context.102.130 == 1 && command.101.120 == 150 && command.101.121 > pre.100.110 && decision_reason == 201) || (context.102.130 == 1 && (command.101.120 == 151 || command.101.120 == 152) && command.101.121 > pre.100.111 && decision_reason == 202) || (context.102.130 == 1 && !(command.101.120 == 150 && command.101.121 > pre.100.110) && !((command.101.120 == 151 || command.101.120 == 152) && command.101.121 > pre.100.111) && ((command.101.120 == 150 && pre.100.111 + command.101.121 > 5) || ((command.101.120 == 151 || command.101.120 == 153) && pre.100.110 + command.101.121 > 5)) && decision_reason == 203);
+// Shipping removes exactly the quantity that the one warehouse request names.
+// The other actions cannot emit a shipment.
+law 510 shipped_units_have_one_exact_request on accept = (command.101.120 == 152 -> outbox.104 == 1 && outbox.104.140 == command.101.121 && outbox.104.140 + post.100.111 == pre.100.111) && (command.101.120 != 152 -> outbox.104 == 0);
+law 511 shipment_goes_to_the_warehouse on accept = command.101.120 == 152 -> outbox.104 == 1;

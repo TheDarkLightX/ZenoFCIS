@@ -2327,7 +2327,8 @@ fn original_conservation_and_required_delivery_checks_remain_independent() {
     let core = c::bind(&d).unwrap();
     let out = core.frame(c::Kind::Transition, input, &stock::FRAMING);
     assert!(matches!(out.result(), Err(c::Failure::Law(_))));
-    assert_eq!(out.diagnostics().last().unwrap().id, 991);
+    assert_eq!(out.diagnostics().last().unwrap().id, 510);
+    assert!(out.diagnostics().iter().all(|law| law.id != 991));
     d = contract.descriptor();
     d.laws = &stock::LAWS[1..];
     assert!(matches!(

@@ -122,15 +122,23 @@ Every decision is checked at run time, before it can be published:
   adds exactly the quantity;
 - law 502: only an authorized operator moves stock, and each action moves
   exactly its quantity between the fields it names;
-- in Rust, because formulas cannot see them: the rejection reason, the exact
-  shipment request, and the absence of effects.
+- law 503: only the first failed authorization, quantity or capacity guard
+  permits rejection, with its exact reason; every other request accepts;
+- law 510: `Ship` emits exactly one request on channel 300, its quantity equals
+  the reserved-unit debit, and no other action emits a shipment;
+- law 511: that request goes to `warehouse`.
+
+The delivery laws observe the actual candidate count, quantity and destination.
+They constrain independently compiled replacement policies as well as the
+shipped policy. The framework separately checks empty effects and rejects
+without publication.
 
 Two more laws have no formula, so `profile.rs` registers them instead of
 `project.zeno` carrying always-true or always-false placeholders:
 - 508: the application never commits a failure, and the law checker refuses
   one outright;
-- 509: a rejection publishes nothing, by construction. The law framework
-  records it as satisfied for every rejection.
+- 909: a rejection publishes nothing. Adding declared rejection law 503 gives
+  this structural check its separate framework identifier.
 
 As a result, this passes:
 
@@ -219,3 +227,36 @@ principal are trusted tutorial inputs, not remote authentication. Source hashes
 identify reviewed example policy, not certified binaries or release evidence.
 Changing the source, including the synthesis files, changes policy identity and
 requires a new database unless a separately reviewed migration is implemented.
+
+## Bounded recovery
+
+From every declared stock state, an available authorized operator can choose
+at most two `Ship` actions to clear all reservations: ship `min(3, reserved)`
+while the reserved count is nonzero. Each accepted action decreases that
+count by its positive quantity and emits the matching warehouse request.
+The count starts at most 5 and a quantity can be 3, so two actions suffice;
+zero reservations need zero actions. This is a chosen sequence without
+intervening stock changes, not a scheduler or warehouse-delivery guarantee.
+
+`contract lemma` checks the decreasing reserved count on accepted shipments
+over all 864 declared input tuples. A constructive recovery check replays the
+chosen sequences through the actual Authority from all 36 stock states.
+
+## Policy for the owner
+
+- Capacity remains 5 per field, allowing 5 available plus 5 reserved; it is
+  not a shared capacity of 5.
+- Reservations remain pooled. Any authorized operator may release or ship
+  them; no order ownership or expiry is introduced.
+- Rejections retain the README's guard order, including insufficient stock
+  before capacity, and do not change stock or queue requests.
+
+## Background and scope
+
+The relational obligations follow C. A. R. Hoare, "An Axiomatic Basis for
+Computer Programming," Communications of the ACM, 1969. The decreasing-count
+recovery argument follows E. W. Dijkstra, "Guarded Commands, Nondeterminacy and
+Formal Derivation of Programs," Communications of the ACM, 1975. This example
+applies those methods using the existing library interpreter. Checks are
+exhaustive over the declared finite stock domain; no new verification method,
+remote shipment, authentication or unconditional availability is claimed.

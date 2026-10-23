@@ -109,6 +109,72 @@ class TemplateRules(unittest.TestCase):
         self.assertEqual(outcome['class'], 'Refused', outcome)
         self.assertEqual(outcome['law'], 510, outcome)
 
+    def test_inventory_eligible_reservation_cannot_be_arbitrarily_rejected(self):
+        def mutate(policy):
+            policy['cases'].insert(0, {'when': 'true', 'class': 'Reject', 'reason': 200,
+                                       'post': {}, 'outbox': []})
+        outcome = self.probe('crates/zeno-fcis-cli/templates/inventory-reservation',
+                             mutate, '3 0 150 2 1')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 503, outcome)
+
+    def test_inventory_rejection_reasons_keep_the_documented_precedence(self):
+        for index, reason, values in [(0, 203, '0 5 150 2 0'),
+                                      (1, 203, '0 5 150 2 1'),
+                                      (2, 203, '5 0 151 2 1'),
+                                      (3, 201, '2 4 150 2 1')]:
+            with self.subTest(guard=index):
+                def mutate(policy):
+                    case = dict(policy['cases'][index])
+                    case['reason'] = reason
+                    policy['cases'].insert(0, case)
+                outcome = self.probe('crates/zeno-fcis-cli/templates/inventory-reservation',
+                                     mutate, values)
+                self.assertEqual(outcome['class'], 'Refused', outcome)
+                self.assertEqual(outcome['law'], 503, outcome)
+
+    def test_inventory_shipment_equals_the_reserved_debit(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                for delivery in case['outbox']:
+                    delivery['payload']['140'] = 1
+        outcome = self.probe('crates/zeno-fcis-cli/templates/inventory-reservation',
+                             mutate, '0 2 152 2 1')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 510, outcome)
+
+    def test_inventory_shipment_uses_the_warehouse_destination(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                for delivery in case['outbox']:
+                    delivery['destination'] = 'other-warehouse'
+        outcome = self.probe('crates/zeno-fcis-cli/templates/inventory-reservation',
+                             mutate, '0 2 152 2 1')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 511, outcome)
+
+    def test_inventory_ship_cannot_omit_its_request(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                case['outbox'] = []
+        outcome = self.probe('crates/zeno-fcis-cli/templates/inventory-reservation',
+                             mutate, '0 2 152 2 1')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 510, outcome)
+
+    def test_inventory_other_actions_cannot_send_shipments(self):
+        def mutate(policy):
+            shipment = next(c['outbox'] for c in policy['cases'] if c['when'] == 'action == 152')
+            for case in policy['cases']:
+                if case['class'] == 'Accept' and not case['outbox']:
+                    case['outbox'] = shipment
+        for values in ['3 0 150 2 1', '0 2 151 2 1', '0 0 153 2 1']:
+            with self.subTest(input=values):
+                outcome = self.probe('crates/zeno-fcis-cli/templates/inventory-reservation',
+                                     mutate, values)
+                self.assertEqual(outcome['class'], 'Refused', outcome)
+                self.assertEqual(outcome['law'], 510, outcome)
+
     def test_treasury_last_tick_proposal_is_refused_by_law(self):
         def mutate(policy):
             case = next(c for c in policy['cases'] if c['reason'] == 213)
