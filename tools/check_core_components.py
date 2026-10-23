@@ -128,15 +128,21 @@ def run(command, cwd, log, environment, expected_exit=0):
     with log.open("wb") as stream:
         result = subprocess.run(list(map(str, command)), cwd=cwd, env=environment,
                                 stdout=stream, stderr=subprocess.STDOUT, check=False)
-    require(result.returncode == expected_exit,
+    require(result.returncode in (expected_exit if isinstance(expected_exit, tuple) else (expected_exit,)),
             f"command exited {result.returncode}, expected {expected_exit}; see {log}")
 
 
 def review(cli, contract, packet, log, environment, mutant=False):
     # F2 returns 1 for findings; an absent/malformed packet is never a pass.
     run([cli, "contract", "review", contract, "--out", packet, "--format", "json"],
-        core.ROOT, log, environment, expected_exit=1 if mutant else 0)
+        core.ROOT, log, environment, expected_exit=1 if mutant else (0, 1))
     result = core.read_json(packet.read_text())
+    check_review_packet(result, mutant)
+    return result
+
+
+def check_review_packet(result, mutant=False):
+    """Retain semantic gates while reporting defensive excluded-state cases."""
     summary = result["summary"]
     require(result["inputs"]["construction"] == "full-domain", "F2 used boundary sampling")
     if mutant:
@@ -144,9 +150,18 @@ def review(cli, contract, packet, log, environment, mutant=False):
         require(summary["refusals"]["by_class"].get("law", 0) > 0, "mutant lacked a law refusal")
     else:
         require(summary["refusals"]["count"] == 0, "technical refusal on a raw input")
-        require(summary["findings"] == 0 and summary["examples"]["disagreements"] == 0,
-                "F2 found a semantic mismatch")
-    return result
+        # Defensive cases on excluded pre-states are now reported. Preserve
+        # the existing no-refusal/no-disagreement gate and independently
+        # reject dead cases or any other finding. These advisories do not
+        # replace the generated application's tests or family proof gates.
+        case_findings = [f for f in result["findings"]
+                         if f["kind"] == "case-only-on-excluded-pre-states"]
+        require(summary["findings"] == len(case_findings)
+                and summary["case_findings"] == len(case_findings)
+                and summary["examples"]["disagreements"] == 0
+                and all(f["decided"] > 0 and f["law_consistent"] == 0
+                        and f["first"]["unsatisfied_state_law"] is not None for f in case_findings),
+                "F2 found a semantic mismatch or dead case")
 
 
 def execute(cli, work, target, instances):

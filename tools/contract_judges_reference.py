@@ -851,6 +851,31 @@ def probes(contract: Contract, machine: Machine) -> dict:
             "explain_first_input_case": contract.case_of(first_state, first_input)}
 
 
+def case_coverage(contract: Contract) -> dict:
+    """Independent first-match counts; no runtime decision admission is inferred."""
+    rows = [dict(case=i, guard_true=0, decided=0, law_consistent=0)
+            for i in range(len(contract.cases))]
+    for state in contract.states:
+        valid = contract.valid(state)
+        for inputs in contract.inputs:
+            frame = contract.frame(state, inputs)
+            holds = [case["guard"](frame) == 1 for case in contract.cases]
+            selected = holds.index(True)
+            rows[selected]["decided"] += 1
+            rows[selected]["law_consistent"] += int(valid)
+            for row, truth in zip(rows, holds):
+                row["guard_true"] += int(truth)
+    findings = []
+    for row in rows:
+        if not row["decided"]:
+            findings.append({"case": row["case"], "kind": "case-never-decides",
+                             "cause": "guard never true" if not row["guard_true"] else "covered by earlier cases"})
+        elif not row["law_consistent"]:
+            findings.append({"case": row["case"], "kind": "case-only-on-excluded-pre-states", "cause": None})
+    return {"status": "checked", "tuples": len(contract.states)*len(contract.inputs),
+            "cases": rows, "findings": findings}
+
+
 def answers(directory: Path, lemmas: list[str], scenario_text: str | None) -> dict:
     contract = Contract((directory / "project.zeno").read_text(),
                         json.loads((directory / "v2" / "policy.json").read_text()))
@@ -858,6 +883,7 @@ def answers(directory: Path, lemmas: list[str], scenario_text: str | None) -> di
     measured_gaps = gaps(contract, machine)
     measured_gaps.pop("admissible_lines")
     result = {"profile": profile(contract, machine), "gaps": measured_gaps,
+              "case_coverage": case_coverage(contract),
               "lemmas": [lemma(contract, machine, text) for text in lemmas],
               "probes": probes(contract, machine)}
     if scenario_text is not None:

@@ -446,6 +446,8 @@ report, and the check compares exactly that part:
   the digests of its per-input decision table and per-state table;
 - the gap judge's admissible counts and freedom on both domains, law
   activation, its per-input digest and the reject-everything verdict;
+- each case's guard, first-match and state-law-consistent selection counts,
+  and its dead or excluded-only classification;
 - each lemma's verdict, initiation, state counts, per-state digest,
   counterexample to induction and trace;
 - each scenario's verdict, and whether one kills the reject-everything core;
@@ -456,8 +458,11 @@ It does not recompute mutant classifications, the measures repeated with
 proposed laws, or the probes `count`, `implies` and `reachable`; unit and
 command tests cover those. Both sides must also equal the recorded known
 answers in `tools/test_data/contract_judges/known-answers.json`. On all 77
-instances the declared laws admit the reject-everything core and one generated
-scenario kills it. The same builder wrote the judges and the reference, so a
+complete instances the declared laws refuse the reject-everything core and
+one generated scenario kills it. The failure and refusal variants retain
+partial laws that admit it; their scenarios also kill it. Coverage witnesses
+are checked by unit and native controls rather than this reference. The same
+builder wrote the judges and the reference, so a
 mistake they share would not show as a disagreement.
 
 Fault controls show that the comparisons can fail. Each compared field,

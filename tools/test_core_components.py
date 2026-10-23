@@ -1,5 +1,6 @@
 """Data-boundary controls for component instantiation; no decision evaluator."""
 import tempfile
+import copy
 import unittest
 from pathlib import Path
 
@@ -8,6 +9,29 @@ import instantiate_core as core
 
 
 class ComponentDataTests(unittest.TestCase):
+    def test_review_keeps_semantic_gates_with_excluded_only_advisories(self):
+        packet = {"inputs": {"construction": "full-domain"},
+                  "summary": {"refusals": {"count": 0}, "findings": 1, "case_findings": 1,
+                              "examples": {"disagreements": 0}},
+                  "findings": [{"kind": "case-only-on-excluded-pre-states", "decided": 8,
+                                "law_consistent": 0, "first": {"unsatisfied_state_law": 500}}]}
+        checks.check_review_packet(packet)
+        for fault in ("dead", "lawful", "no-witness", "refusal", "example"):
+            changed = copy.deepcopy(packet)
+            if fault == "dead":
+                changed["findings"][0]["kind"] = "case-never-decides"
+            elif fault == "lawful":
+                changed["findings"][0]["law_consistent"] = 1
+            elif fault == "no-witness":
+                changed["findings"][0]["first"]["unsatisfied_state_law"] = None
+            elif fault == "refusal":
+                changed["summary"]["refusals"]["count"] = 1
+            else:
+                changed["summary"]["examples"]["disagreements"] = 1
+            with self.subTest(fault=fault), self.assertRaises(RuntimeError):
+                checks.check_review_packet(changed)
+        self.assertEqual(packet["findings"][0]["law_consistent"], 0)
+
     def test_full_independent_domain_is_present(self):
         instances = checks.static_check()
         self.assertEqual(len(instances), 77)
@@ -52,10 +76,12 @@ class ComponentDataTests(unittest.TestCase):
     def test_existing_contract_is_never_overwritten(self):
         with tempfile.TemporaryDirectory(prefix='core-data-test-') as temporary:
             destination = Path(temporary) / 'instance'
-            core.instantiate('approval-queue', {'K': 1}, destination)
+            # This tests overwrite protection with an unqualified fixture;
+            # current-source certificate admission has its own controls.
+            core.instantiate('approval-queue', {'K': 1}, destination, include_proof=False)
             files = {path: path.read_bytes() for path in destination.rglob('*') if path.is_file()}
             with self.assertRaises(FileExistsError):
-                core.instantiate('approval-queue', {'K': 2}, destination)
+                core.instantiate('approval-queue', {'K': 2}, destination, include_proof=False)
             self.assertEqual(files, {path: path.read_bytes() for path in files})
 
     def test_invalid_parameters_leave_no_output(self):

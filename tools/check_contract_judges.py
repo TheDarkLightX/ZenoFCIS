@@ -43,6 +43,7 @@ import argparse
 import concurrent.futures
 import copy
 import json
+import os
 import random
 import subprocess
 import sys
@@ -214,17 +215,18 @@ def reference_answers(directory: Path) -> dict:
     findings = any(machine.refusals[(state, x)][0] == "law" and contract.valid(state)
                    for state in contract.states for x in contract.inputs
                    if machine.table[(state, x)] is None)
-    answers["review_exit"] = 1 if findings else 0
+    answers["review_exit"] = 1 if findings or answers["case_coverage"]["findings"] else 0
     return answers
 
 
 # --- the CLI's answers ---------------------------------------------------------------------------
 
-def cli(binary: Path, arguments: list[str], expected: int | None, log: Path) -> dict | None:
+def cli(binary: Path, arguments: list[str], expected: int | None, log: Path,
+        *, environment: dict[str, str] | None = None) -> dict | None:
     with log.open("ab") as stream:
         stream.write(f"$ zeno-fcis {' '.join(arguments)}\n".encode())
         result = subprocess.run([str(binary), *arguments], stdout=subprocess.PIPE,
-                                stderr=stream, check=False)
+                                stderr=stream, check=False, env=environment)
         stream.write(f"exit {result.returncode}\n".encode())
     if expected is not None:
         require(result.returncode == expected,
@@ -270,7 +272,8 @@ def synthesized(known: dict) -> dict:
     return {
         "profile": {**{key: copy.deepcopy(known["profile"][key])
                        for key in ("states", "memory_bits", "state_laws", "robustness", "tables")}},
-        "review": {"gaps": {
+        "review": {"case_coverage": copy.deepcopy(known["case_coverage"]),
+                   "findings": copy.deepcopy(known["case_coverage"]["findings"]), "gaps": {
             "admissible": copy.deepcopy(gaps["admissible"]),
             "activation": copy.deepcopy(gaps["activation"]),
             "tables": {"admissible_sha256": gaps["admissible_sha256"]},
@@ -301,6 +304,15 @@ def compare(name: str, known: dict, measured: dict) -> list[str]:
         same(f"profile {key}", known["profile"][key], profile[key])
     for key in ("decisions_sha256", "states_sha256"):
         same(f"profile {key}", known["profile"]["tables"][key], profile["tables"][key])
+    review = measured["review"]
+    coverage = review["case_coverage"]
+    same("case coverage", known["case_coverage"], {
+        "status": coverage["status"], "tuples": coverage["tuples"],
+        "cases": [{key: row[key] for key in ("case", "guard_true", "decided", "law_consistent")}
+                  for row in coverage["cases"]],
+        "findings": [{key: finding.get(key) for key in ("case", "kind", "cause")}
+                     for finding in review["findings"] if finding["kind"].startswith("case-")],
+    })
     gaps = measured["review"]["gaps"]
     for domain in ("full", "valid"):
         mine = gaps["admissible"][domain]
@@ -433,6 +445,7 @@ def field_faults(known: dict, lines: dict[str, list[str]], rng: random.Random):
     first_position = known["positions"][0]
     first_decision = sorted(known["probes"]["decisions"])[0]
     faults = [
+        ("case coverage", at("review", "case_coverage", "cases", 0, "decided")),
         ("profile states", at("profile", "states", "reachable")),
         ("profile memory_bits", at("profile", "memory_bits", "declared")),
         ("profile state_laws", at("profile", "state_laws")),
@@ -474,7 +487,7 @@ def recorded_paths(known: dict) -> list[tuple]:
             ("lemmas", 0, "verdict"), ("lemmas", 1, "holds_sha256"),
             ("scenario", "scenarios", 0, "verdict"), ("scenario", "reject_everything_killed"),
             ("probes", "decisions"), ("probes", "depends"), ("probes", "explain_first_input_case"),
-            ("lemma_formulas",), ("review_exit",)]
+            ("case_coverage",), ("lemma_formulas",), ("review_exit",)]
 
 
 def comparison_controls(work: Path, answers: dict, measured: dict, recorded: dict) -> list[dict]:
@@ -571,19 +584,30 @@ def contract_controls(binary: Path, work: Path, answers: dict) -> list[dict]:
     bad.write_text("law 65001 a on any = true; law 65002 b on any = true;\n")
     for arguments, code, status in (
             (["contract", "profile", app, "--max-tuples", "1"], 2, "inconclusive"),
-            (["contract", "lemma", app, "--lemma", "true", "--max-tuples", "1"], 2, "inconclusive"),
+            (["contract", "lemma", app, "--lemma", "true", "--max-tuples", "1"], 2, "UNKNOWN"),
             (["contract", "probe", "decisions", app, "--max-tuples", "1"], 2, "inconclusive"),
-            (["contract", "review", app, "--gaps", "--max-tuples", "1"], 2, "inconclusive"),
+            (["contract", "review", app, "--gaps", "--max-tuples", "1"], 2, "UNKNOWN"),
             (["contract", "review", app, "--gaps", "--max-work", "1"], 2, "inconclusive"),
             (["contract", "review", app, "--gaps", "--gaps-laws", str(bad)], 65, "invalid-proposals"),
             (["contract", "lemma", app, "--lemma", "pre.100.110 == 0"], 65, None),
             (["contract", "probe", "implies", app, "--if", "false", "--then", "true"], 2, "vacuous")):
-        packet = cli(binary, arguments, code, log)
-        found = None if packet is None else (packet["gaps"]["status"] if arguments[1] == "review"
+        # Above the enumeration cap, lemma uses the symbolic route. Make its
+        # missing-tool control independent of the caller's solver setup.
+        environment = None
+        if arguments[1] == "lemma" and "--max-tuples" in arguments:
+            environment = {key: value for key, value in os.environ.items()
+                           if key not in {"ZENO_FCIS_Z3", "ZENO_FCIS_CVC5"}}
+        packet = cli(binary, arguments, code, log, environment=environment)
+        found = None if packet is None else (packet["gaps"]["status"]
+                                             if arguments[1] == "review" and "gaps" in packet
                                              else packet["status"])
+        coverage_scoped = (arguments[1] != "review" or "--max-tuples" not in arguments
+                           or (packet is not None
+                               and packet["case_coverage"]["status"] == "not checked"
+                               and packet["case_coverage"]["cases"] is None))
         controls.append({"control": "a limit or a malformed input gets its own verdict",
                          "arguments": arguments[1:2] + arguments[3:], "exit": code,
-                         "caught": found == status})
+                         "caught": found == status and coverage_scoped})
     # The repeat measure with proposals has its own work: just over the declared work, it
     # is inconclusive.
     measured = cli(binary, ["contract", "review", app, "--gaps"], 0, log)

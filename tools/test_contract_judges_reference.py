@@ -57,6 +57,17 @@ class Grammar(unittest.TestCase):
 
 
 class Judges(unittest.TestCase):
+    def test_first_match_case_counts_and_excluded_only_are_independent(self):
+        counted = reference.case_coverage(instance("bounded-counter", {"C": 1}, complete=True))
+        self.assertEqual(counted["tuples"], 8)
+        self.assertEqual([r["decided"] for r in counted["cases"]], [4, 1, 1, 1, 1])
+        self.assertEqual(counted["findings"], [])
+        excluded = reference.case_coverage(instance("reservation-pool", {"C": 1, "Q": 1}, complete=True))
+        self.assertEqual(excluded["cases"][0]["decided"], 8)
+        self.assertEqual(excluded["cases"][0]["law_consistent"], 0)
+        self.assertEqual(excluded["findings"], [{"case": 0,
+                         "kind": "case-only-on-excluded-pre-states", "cause": None}])
+
     def test_determined_requires_the_unique_outcome_to_match_native_execution(self):
         files = core.source("bounded-counter", {"C": 1}, include_proof=False)
         policy = json.loads(files["v2/policy.json"])
@@ -197,7 +208,7 @@ class ReviewPackets(unittest.TestCase):
 
 @unittest.skipUnless(os.environ.get("ZENO_FCIS_CLI"), "set ZENO_FCIS_CLI for native agreement")
 class ReasonClassAgreement(unittest.TestCase):
-    def native_gaps(self, app, work, proposals=None):
+    def native_gaps(self, app, work, contract, proposals=None):
         packet = work / "review.json"
         args = [os.environ["ZENO_FCIS_CLI"], "contract", "review", str(app), "--gaps",
                 "--out", str(packet), "--format", "json"]
@@ -206,8 +217,13 @@ class ReasonClassAgreement(unittest.TestCase):
             path.write_text(proposals)
             args += ["--gaps-laws", str(path)]
         run = subprocess.run(args, capture_output=True, text=True, check=False)
-        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
-        result = json.loads(packet.read_text())["gaps"]
+        report = json.loads(packet.read_text())
+        cases = reference.case_coverage(contract)
+        self.assertEqual(run.returncode, int(bool(cases["findings"])), run.stdout + run.stderr)
+        self.assertEqual(report["summary"]["findings"], len(cases["findings"]))
+        self.assertEqual([{k: r[k] for k in ("case", "guard_true", "decided", "law_consistent")}
+                          for r in report["case_coverage"]["cases"]], cases["cases"])
+        result = report["gaps"]
         self.assertEqual(result["status"], "measured")
         return result["proposals"]["after"] if proposals is not None else result
 
@@ -225,7 +241,7 @@ class ReasonClassAgreement(unittest.TestCase):
             work = Path(raw)
             app = work / "app"
             judges.write(app, {"project.zeno": project, "v2/policy.json": json.dumps(policy)})
-            native = self.native_gaps(app, work)
+            native = self.native_gaps(app, work, contract)
             self.assertEqual(native["admissible"]["full"]["determined"], 1)
             self.assertEqual(native["tables"]["admissible_sha256"], measured["admissible_sha256"])
 
@@ -255,7 +271,7 @@ class ReasonClassAgreement(unittest.TestCase):
         # chosen input only reason 200 remains; failure-only 202 is not a Reject.
         self.assertEqual(measured["admissible"]["full"]["determined"], 1)
         with tempfile.TemporaryDirectory(prefix="approval-reason-classes-") as raw:
-            native = self.native_gaps(app, Path(raw), proposals)
+            native = self.native_gaps(app, Path(raw), contract, proposals)
             self.assertEqual(native["admissible"]["full"]["determined"], 1)
 
 
