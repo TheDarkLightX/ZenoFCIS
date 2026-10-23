@@ -399,7 +399,8 @@ property t4: always(state == aa);
     def test_game_readings_have_formula_and_plain_rungs(self):
         model = b.parse(WITHDRAWAL_SOURCE)
         reading, = b.game_readings(model)
-        self.assertEqual(reading["formula_rung"], "⟨⟨user⟩⟩ □◇ (state = withdrawn)")
+        self.assertEqual(reading["formula_rung"], "⟨⟨user⟩⟩ □◇ (state = withdrawn) "
+                         "[all fairness assumptions hold infinitely often]")
         self.assertEqual(reading["plain_rung"],
                          "The user can make sure the state is withdrawn again and again, whatever the operator does, "
                          "provided every declared fairness condition holds infinitely often.")
@@ -520,7 +521,8 @@ class GameTableTests(unittest.TestCase):
                                    stderr=subprocess.PIPE, timeout=120)
         self.assertEqual(explained.returncode, 0, explained.stderr)
         result = json.loads(explained.stdout)
-        self.assertEqual(result["readings"][0]["formula_rung"], "⟨⟨user⟩⟩ □◇ (state = withdrawn)")
+        self.assertEqual(result["readings"][0]["formula_rung"], "⟨⟨user⟩⟩ □◇ (state = withdrawn) "
+                         "[all fairness assumptions hold infinitely often]")
         self.assertEqual(result["authority"], "none")
         read = subprocess.run([sys.executable, "-B", str(REPOSITORY / "integrations/zal/run.py"),
                                "legend", str(source)], cwd=REPOSITORY, text=True,

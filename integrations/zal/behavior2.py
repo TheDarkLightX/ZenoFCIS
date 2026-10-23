@@ -2364,9 +2364,20 @@ def game_readings(model: Machine):
             fairness = (", provided every declared fairness condition holds infinitely often"
                         if objective != "always" and model.fairness else "")
             result_objective = objective
+        context_scope = bool(model.facts or model.inputs)
+        qualifiers = []
+        if context_scope:
+            qualifiers.append(f"the other player ({other}) chooses every context")
+        if objective not in {"always", "within"} and model.fairness:
+            qualifiers.append("all fairness assumptions hold infinitely often")
+        if qualifiers:
+            formula_rung += " [" + "; ".join(qualifiers) + "]"
+        opponent = f"whatever the {other} does"
+        if context_scope:
+            opponent += f", with the other player ({other}) choosing the context at every step"
         readings.append({"property": name, "player": player, "objective": result_objective,
                          "formula_rung": formula_rung,
-                         "plain_rung": f"The {player} can {outcome}, whatever the {other} does{fairness}."})
+                         "plain_rung": f"The {player} can {outcome}, {opponent}{fairness}."})
     return readings
 
 

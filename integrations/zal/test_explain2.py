@@ -291,6 +291,32 @@ class Narrative2Tests(unittest.TestCase):
         self.assertEqual((story["status"], story["check_status"], story["diagnostic"]),
                          ("unknown", "unknown", "solvers disagree"))
 
+    def test_game_reading_marks_fairness_and_opponent_context_choice(self):
+        source = """zal 2;
+machine contextual_reading;
+states aa, bb;
+events tick;
+context authorized;
+initial aa;
+step atomic; frame control_and_variables;
+default reject blocked unchanged;
+rule to_bb: aa + tick [authorized] -> accept bb;
+rule stay_aa: aa + tick [!authorized] -> accept aa;
+rule to_aa: bb + tick [true] -> accept aa;
+player operator moves in bb;
+player user moves in aa;
+fairness returns: infinitely often (state' == aa);
+property recur: user can force infinitely often (state == bb);
+"""
+        reading, = B.game_readings(B.parse(source))
+        self.assertEqual(reading["formula_rung"],
+                         "⟨⟨user⟩⟩ □◇ (state = bb) [the other player (operator) chooses every context; "
+                         "all fairness assumptions hold infinitely often]")
+        self.assertEqual(reading["plain_rung"],
+                         "The user can make sure the state is bb again and again, whatever the operator does, "
+                         "with the other player (operator) choosing the context at every step, provided every declared fairness "
+                         "condition holds infinitely often.")
+
     def test_narrative_sentences_are_backed_by_the_witness(self):
         """Independent oracle: re-derive every step, the lasso and each claim with the separate temporal oracle."""
         told = 0
