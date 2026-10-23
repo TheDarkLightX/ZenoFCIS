@@ -4,6 +4,7 @@ import copy
 import json
 from pathlib import Path
 import subprocess
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -110,6 +111,108 @@ class Admission(unittest.TestCase):
         for source in ['assume(true);', 'admit();', '#[verifier::external_body]',
                        'decreases *', '#[verifier::exec_allows_no_decreases_clause]']:
             self.assertIsNotNone(gate.FORBIDDEN.search(source))
+
+
+class NativeConfiguration(unittest.TestCase):
+    def setUp(self):
+        self.profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
+        self.exceptions = self.profile['native_configuration_exceptions']
+
+    def check(self, source, exceptions=()):
+        return gate.verifier.check_native_configuration(source, Path('kernel.rs'), exceptions)
+
+    def refused(self, source, line=2):
+        with self.assertRaisesRegex(gate.verifier.ConfigurationRefused,
+                                   f'kernel.rs:{line}: unqualified'):
+            self.check(source)
+
+    def test_allowlisted_derive_and_production_source_pass(self):
+        entry = self.exceptions[0]
+        result = self.check(entry['text'] + '\n' + entry['following'] + ' {}', self.exceptions)
+        self.assertEqual(result, [{'line': 1, **entry}])
+        source = (gate.ROOT / gate.SUBJECT).read_text()
+        self.assertEqual(len(self.check(source, self.exceptions)), 1)
+
+    def test_native_only_let_refuses(self):
+        self.refused('fn f() {\n#[cfg(not(verus_keep_ghost))] let verdict = 1;\n}')
+
+    def test_native_only_item_refuses(self):
+        self.refused('// item\n#[cfg(not(verus_keep_ghost))]\nfn hidden() {}')
+
+    def test_native_only_match_arm_refuses(self):
+        self.refused('match input {\n#[cfg(not(verus_keep_ghost))] 3 => true, _ => false }')
+
+    def test_native_only_cfg_attr_refuses(self):
+        self.refused('// attribute\n#[cfg_attr(not(verus_keep_ghost), inline)] fn f() {}')
+
+    def test_expression_inner_attribute_and_cfg_macro_refuse(self):
+        for source in (
+            'fn f() {\nlet value = #[cfg(not(verus_keep_ghost))] 1; }',
+            'mod m {\n#![cfg(not(verus_keep_ghost))]\n}',
+            'fn f() {\nif cfg!(not(verus_keep_ghost)) { hidden(); } }',
+            '// raw identifier\n#[r#cfg(not(verus_keep_ghost))] fn f() {}',
+        ):
+            with self.subTest(source=source):
+                self.refused(source)
+
+    def test_unknown_configuration_is_not_presumed_identical(self):
+        for predicate in ('test', 'feature = "native"', 'target_os = "linux"',
+                          'all()', 'any(verus_keep_ghost, feature = "native")'):
+            with self.subTest(predicate=predicate):
+                self.refused('// unknown\n#[cfg(' + predicate + ')] fn f() {}')
+
+    def test_nested_cfg_attr_cannot_remove_verus_code(self):
+        for attribute in (
+            '#[cfg_attr(verus_keep_ghost, cfg(any()))]',
+            '#[cfg_attr(verus_keep_ghost, cfg_attr(verus_keep_ghost, cfg(any())))]',
+            '#[cfg_attr(verus_keep_ghost, verus_spec(ensures true), cfg(any()))]',
+            '#[cfg_attr(verus_keep_ghost, verus_spec(cfg(any())))]',
+            '#[cfg_attr(verus_keep_ghost, verus_spec(ensures true), other())]',
+        ):
+            with self.subTest(attribute=attribute):
+                self.refused('// nested\n' + attribute + ' fn f() {}')
+
+    def test_positive_ghost_guards_and_specs_pass(self):
+        self.check('#[cfg(verus_keep_ghost)] proof! { assert(true); }\n'
+                   '#[cfg_attr(verus_keep_ghost, verus_spec(ensures true,))] fn f() {}')
+
+    def test_comments_literals_and_lifetimes_do_not_hide_configuration(self):
+        self.check('''// #[cfg(not(verus_keep_ghost))]
+/* nested /* #[cfg(test)] */ comment */
+const S: &str = r###"#[cfg(not(verus_keep_ghost))]"###;
+const B: &[u8] = br#"cfg_attr(not(verus_keep_ghost))"#;
+fn f<'a>(value: &'a str) { let c = '['; let quote = '\\''; }
+''')
+        self.refused('/* cfg(false) */\n#[ /* nested /* comment */ */ cfg (not(verus_keep_ghost)) ] fn f() {}')
+
+    def test_exceptions_are_exact_unique_and_bound_to_declaration(self):
+        entry = self.exceptions[0]
+        source = entry['text'] + '\n' + entry['following'] + ' {}'
+        for bad in (source.replace('derive(', 'derive( '), source + '\n' + source,
+                    source.replace('Verdict', 'AnotherEnum')):
+            with self.subTest(source=bad), self.assertRaises(gate.verifier.ConfigurationRefused):
+                self.check(bad, self.exceptions)
+        with self.assertRaisesRegex(ValueError, 'unused'):
+            self.check('fn f() {}', self.exceptions)
+        for reason in ('', 'two\nlines', 'two\rlines'):
+            with self.assertRaisesRegex(ValueError, 'invalid'):
+                self.check(source, [{**entry, 'reason': reason}])
+
+    def test_gate_refuses_native_only_mutant_before_verus_or_native_build(self):
+        source = (gate.ROOT / gate.SUBJECT).read_text()
+        mutant, _, _ = gate.source_controls(source)['native_only_approval']
+        line = mutant[:mutant.index('    #[cfg(not(verus_keep_ghost))] let verdict')].count('\n') + 1
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for path in (gate.SUBJECT, gate.PROFILE, gate.verifier.PIN):
+                (root / path).parent.mkdir(parents=True, exist_ok=True)
+                (root / path).write_bytes((gate.ROOT / path).read_bytes())
+            (root / gate.SUBJECT).write_text(mutant)
+            with patch.object(gate, 'ROOT', root), patch.object(gate, 'snapshot', return_value={}), \
+                    patch.object(gate.verifier, 'prepare_tools') as prepare:
+                with self.assertRaisesRegex(gate.verifier.ConfigurationRefused, f':{line}:'):
+                    gate.check(root, False, root)
+                prepare.assert_not_called()
 
 
 if __name__ == '__main__':

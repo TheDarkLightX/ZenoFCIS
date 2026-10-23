@@ -54,6 +54,141 @@ NON_SEMANTIC = re.compile(
     r'\bsignal\b|transport error|failed to (?:start|execute)', re.I)
 
 
+class ConfigurationRefused(ValueError):
+    """An unqualified Rust configuration, with its original source location."""
+
+    def __init__(self, path: Path, source: str, offset: int):
+        self.line = source.count('\n', 0, offset) + 1
+        self.source_line = source.splitlines()[self.line - 1].strip()
+        super().__init__(f'{path}:{self.line}: unqualified native/Verus configuration: '
+                         f'{self.source_line}')
+
+
+def _rust_tokens(source: str) -> list[tuple[str, int, int]]:
+    """Lex attributes at every scope, without interpreting comments or literals.
+
+    This is a source admission lexer, not a Rust parser. Unknown syntax is left
+    to the pinned compilers; configuration identifiers are checked fail closed.
+    Offsets preserve exact exception text and diagnostic line numbers.
+    """
+    tokens = []
+    at = 0
+    while at < len(source):
+        if source[at].isspace():
+            at += 1
+            continue
+        if source.startswith('//', at):
+            end = source.find('\n', at)
+            at = len(source) if end < 0 else end
+            continue
+        if source.startswith('/*', at):
+            depth, end = 1, at + 2
+            while depth and end < len(source):
+                if source.startswith('/*', end):
+                    depth, end = depth + 1, end + 2
+                elif source.startswith('*/', end):
+                    depth, end = depth - 1, end + 2
+                else:
+                    end += 1
+            if depth:
+                raise ValueError('unclosed Rust block comment')
+            at = end
+            continue
+        raw = re.match(r'(?:br|cr|r)(#*)"', source[at:])
+        if raw:
+            closing = '"' + raw[1]
+            end = source.find(closing, at + raw.end())
+            if end < 0:
+                raise ValueError('unclosed Rust raw string')
+            end += len(closing)
+        else:
+            # Character literals are distinct from lifetimes such as 'a.
+            literal = re.match(r'''(?:b|c)?"(?:\\[\s\S]|[^"\\])*"|(?:b)?'(?:\\(?:u\{[0-9A-Fa-f_]+\}|x[0-9A-Fa-f]{2}|[\s\S])|[^'\\\n])' ''',
+                               source[at:], re.X)
+            word = re.match(r'(?:r#)?[^\W\d]\w*', source[at:])
+            end = at + (literal.end() if literal else word.end() if word else 1)
+        value = source[at:end]
+        tokens.append((value.removeprefix('r#'), at, end))
+        at = end
+    return tokens
+
+
+def check_native_configuration(source: str, path: Path, allowlist=()) -> list[dict]:
+    """Refuse unreviewed configuration differences before invoking Verus.
+
+    The admitted dialect is deliberately narrower than Rust: cfg(ghost), and
+    cfg_attr(ghost, verus_spec(...)), where ghost is verus_keep_ghost. Neither
+    can introduce a native-only construct. All other cfg/cfg_attr forms, cfg!
+    expressions and uses of the ghost flag must have an exact profile exception.
+    Unknown target/feature/test predicates are refused rather than presumed equal
+    between builds. Nested conditional attributes are checked too. No macro
+    expansion or compiler correspondence theorem is claimed by this lexer.
+
+    Each exception contains full attribute text, its following declaration, and
+    a one-line reason. It must occur exactly once, at the reviewed declaration.
+    """
+    exceptions = {}
+    for entry in allowlist:
+        if (not isinstance(entry, dict) or set(entry) != {'text', 'following', 'reason'}
+                or any(not isinstance(entry[k], str) or not entry[k].strip() for k in entry)
+                or len(entry['reason'].splitlines()) != 1 or entry['text'] in exceptions):
+            raise ValueError('invalid native configuration exception profile')
+        exceptions[entry['text']] = entry
+    tokens = _rust_tokens(source)
+    values = [value for value, _, _ in tokens]
+    consumed, used, accepted = set(), set(), []
+    pairs = {'(': ')', '[': ']', '{': '}'}
+    for index, (value, start, _) in enumerate(tokens):
+        if value != '#' or index + 1 == len(tokens):
+            continue
+        opening = index + 1 + (values[index + 1] == '!')
+        if opening >= len(tokens) or values[opening] != '[':
+            continue
+        stack, matching, end = [(']', opening)], {}, opening + 1
+        while stack and end < len(tokens):
+            token = values[end]
+            if token in pairs:
+                stack.append((pairs[token], end))
+            elif token in (')', ']', '}'):
+                expected, began = stack.pop()
+                if token != expected:
+                    raise ValueError(f'{path}: unbalanced Rust attribute')
+                matching[began] = end
+            end += 1
+        if stack:
+            raise ValueError(f'{path}: unclosed Rust attribute')
+        head = opening + 1
+        if head >= end or values[head] not in ('cfg', 'cfg_attr'):
+            continue
+        text = source[start:tokens[end - 1][2]]
+        if text in exceptions:
+            entry = exceptions[text]
+            following = [t[0] for t in _rust_tokens(entry['following'])]
+            if text in used or values[end:end + len(following)] != following:
+                raise ConfigurationRefused(path, source, start)
+            used.add(text)
+            consumed.update(range(index, end))
+            accepted.append({'line': source.count('\n', 0, start) + 1, **entry})
+        elif values[head:end] == ['cfg', '(', 'verus_keep_ghost', ')', ']']:
+            consumed.update((head, head + 2))
+        elif (values[head:head + 6] ==
+              ['cfg_attr', '(', 'verus_keep_ghost', ',', 'verus_spec', '(']
+              and matching.get(head + 5) == end - 3
+              and matching.get(head + 1) == end - 2):
+            # Only consume this head/predicate. Any nested cfg, cfg_attr or
+            # ghost identifier is checked independently below, even in macros.
+            consumed.update((head, head + 2))
+        else:
+            raise ConfigurationRefused(path, source, start)
+    for index, (value, start, _) in enumerate(tokens):
+        if value in ('cfg', 'cfg_attr', 'verus_keep_ghost') and index not in consumed:
+            raise ConfigurationRefused(path, source, start)
+    if used != set(exceptions):
+        raise ValueError(f'{path}: unused native configuration exceptions: '
+                         f'{sorted(set(exceptions) - used)}')
+    return accepted
+
+
 def function_lines(source: str, name: str) -> tuple[int, int]:
     """Exact annotated function region in a retained native-source specimen."""
     functions = list(re.finditer(r'\bfn\s+([A-Za-z_][A-Za-z_0-9]*)\b', source))

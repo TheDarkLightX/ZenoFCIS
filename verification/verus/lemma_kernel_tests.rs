@@ -240,3 +240,47 @@ fn malformed_table_refusals_and_checked_product() {
     assert_eq!(usize::MAX.checked_mul(2), None);
     assert_eq!(3usize.checked_mul(4), Some(12));
 }
+
+#[test]
+fn native_only_approval_must_be_false() {
+    let d = lemma_kernel::decide(
+        3,
+        0,
+        &[1, 0, 0, 1, 1, 1],
+        &[true, false, false, false, false, false],
+        &[true, false],
+    );
+    assert!(d.is_some());
+    if let Some(d) = d {
+        assert_eq!(d.verdict, lemma_kernel::Verdict::False);
+        assert_eq!(d.search.seen, vec![true, true]);
+        assert_eq!(d.target, Some(1));
+        assert_eq!(d.trace, vec![0]);
+    }
+}
+
+#[test]
+fn option_and_sequence_models_have_native_witnesses() {
+    fn propagate(value: Option<usize>) -> Option<usize> {
+        Some(value? + 1)
+    }
+    for value in [None, Some(0), Some(7)] {
+        assert_eq!(value.is_some(), !value.is_none());
+        if let Some(expected) = value {
+            assert_eq!(value.unwrap(), expected);
+            assert_eq!(propagate(value), Some(expected + 1));
+        } else {
+            assert_eq!(propagate(value), None);
+        }
+    }
+    // Executable witnesses for the intended Seq model; no native Seq axioms.
+    let empty: Vec<usize> = Vec::new();
+    assert_eq!(empty.len(), 0);
+    let mut sequence: Vec<usize> = (0..3).map(|i| i + 5).collect();
+    sequence.push(8);
+    let view: &[usize] = &sequence;
+    assert_eq!(view.len(), 4);
+    assert_eq!(view[1], 6);
+    assert!(view.contains(&8));
+    assert_eq!(&view[1..3], &[6, 7]);
+}

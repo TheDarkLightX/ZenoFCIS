@@ -327,6 +327,13 @@
     }
   },
   "namespace": "lemma_kernel::lemma_kernel::",
+  "native_configuration_exceptions": [
+    {
+      "following": "pub(crate) enum Verdict",
+      "reason": "Native presentation/comparison derives are unsupported by pinned Verus; decision functions do not invoke them.",
+      "text": "#[cfg_attr(not(verus_keep_ghost), derive(Debug, Eq, PartialEq))]"
+    }
+  ],
   "schema": "zeno-fcis/lemma-kernel-proof-profile/1",
   "target_functions": [
     "lemma_kernel::lemma_kernel::reachable",

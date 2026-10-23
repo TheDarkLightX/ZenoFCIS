@@ -45,6 +45,9 @@ CONTROLS = {
         'search_must_process_last_frontier_state'),
     'admitted_counterexample': ('Some((before, input, state))',
         'Some((before, input, before))', 'decide', 'counterexample_successor_is_excluded'),
+    'native_only_approval': ('    Some(Decision {',
+        '    #[cfg(not(verus_keep_ghost))] let verdict = if k == 3 { Verdict::Inductive } else { verdict };\n'
+        '    Some(Decision {', 'decide', 'native_only_approval_must_be_false'),
 }
 
 
@@ -147,6 +150,8 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
         raise RuntimeError('kernel has an untrusted proof escape or unsafe code')
     pin = json.loads((ROOT / verifier.PIN).read_text())
     profile = json.loads((ROOT / PROFILE).read_text())
+    configuration = verifier.check_native_configuration(source, SUBJECT,
+        profile['native_configuration_exceptions'])
     tool_directory = verifier.prepare_tools(cache, pin, install)
     environment = {k: v for k, v in os.environ.items()
         if not k.startswith(('VERUS_', 'VARGO_')) and k not in ('RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS')}
@@ -187,10 +192,28 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
                 ROOT, environment, specimen / 'native-control')
             if not native_failed(native_control, test):
                 raise RuntimeError(f'control lacks the intended native assertion: {name}')
+            configuration_refusal = None
+            try:
+                verifier.check_native_configuration(changed, SUBJECT,
+                    profile['native_configuration_exceptions'])
+            except verifier.ConfigurationRefused as error:
+                configuration_refusal = {'line': error.line, 'source': error.source_line,
+                    'diagnostic': str(error)}
+            if name == 'native_only_approval':
+                expected_line = changed[:changed.index('    #[cfg(not(verus_keep_ghost))] let verdict')].count('\n') + 1
+                if configuration_refusal is None or configuration_refusal['line'] != expected_line:
+                    raise RuntimeError('native-only control lacks the intended configuration refusal')
+            elif configuration_refusal is not None:
+                raise RuntimeError(f'semantic control was refused by configuration guard: {name}')
             proof = run([*command, '--log-dir', str(specimen / 'proof'), str(specimen / HARNESS)],
                 ROOT, environment, specimen / 'verus')
             mutant_report = json.loads(proof.stdout)
-            if not verifier.semantic_refusal(proof, mutant_report, pin, SUBJECT, specimen,
+            if name == 'native_only_approval':
+                # This control demonstrates why translated VIR alone is insufficient.
+                if not positive_accepted(proof, mutant_report, pin, profile):
+                    raise RuntimeError('native-only control no longer reproduces the translation gap')
+                check_inventory((specimen / 'proof/crate.vir').read_text(), profile)
+            elif not verifier.semantic_refusal(proof, mutant_report, pin, SUBJECT, specimen,
                     region=function_region(changed, function),
                     target_functions=profile['target_functions']):
                 raise RuntimeError(f'control lacks the intended Verus obligation refusal: {name}')
@@ -207,6 +230,8 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
                 obligations.append({'kind': header[1], 'line': line,
                     'source': changed.splitlines()[line-1].strip()})
             control = {'name': name, 'function': NAMESPACE + function, 'native_test': test,
+                'expected_failure': 'configuration' if configuration_refusal else 'proof',
+                'configuration_refusal': configuration_refusal,
                 'native_build_exit': build.returncode, 'native_assertion_exit': native_control.returncode,
                 'verus_exit': proof.returncode, 'verification_results': mutant_report['verification-results'],
                 'failed_proof_notes': failure_notes, 'obligations': obligations, 'mutant_sha256': mutant_hash,
@@ -217,9 +242,27 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
         if not restored:
             raise RuntimeError(f'control did not restore the source bytes: {name}')
         control['restored_sha256'] = verifier.digest(target)
+        verifier.check_native_configuration(target.read_text(), SUBJECT,
+            profile['native_configuration_exceptions'])
+        restored_build = run(native_command(pin, specimen, executable), ROOT, environment,
+            specimen / 'restored-build')
+        verifier.require_success(restored_build)
+        restored_native = run([str(executable), '--exact', f'tests::{test}', '--nocapture'],
+            ROOT, environment, specimen / 'restored-native')
+        verifier.require_success(restored_native)
+        restored_proof = run([*command, '--log-dir', str(specimen / 'restored-proof'),
+            str(specimen / HARNESS)], ROOT, environment, specimen / 'restored-verus')
+        restored_report = json.loads(restored_proof.stdout)
+        if not positive_accepted(restored_proof, restored_report, pin, profile):
+            raise RuntimeError(f'restored control did not verify: {name}')
+        check_inventory((specimen / 'restored-proof/crate.vir').read_text(), profile)
+        control['restored'] = {'native_build_exit': restored_build.returncode,
+            'native_assertion_exit': restored_native.returncode, 'verus_exit': restored_proof.returncode,
+            'verified': restored_report['verification-results']['verified']}
         controls.append(control)
         (directory / 'controls.json').write_text(json.dumps(controls, indent=2) + '\n')
-        print(f'lemma kernel: {name}: native assertion and Verus obligation rejected', flush=True)
+        refusal = 'configuration guard' if configuration_refusal else 'Verus obligation'
+        print(f'lemma kernel: {name}: native assertion and {refusal} rejected; restored checks passed', flush=True)
     verifier.verify_tool_files(tool_directory, pin)
     if before != snapshot():
         raise RuntimeError('kernel proof source changed during gate')
@@ -228,6 +271,7 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
         'working_tree_dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
         'source_sha256': before, 'toolchain': pin, 'verus_report': report,
         'translated_inventory': coverage, 'controls': controls, 'native_exit': native.returncode,
+        'native_configuration_exceptions': configuration,
         'scope': 'validated finite tables; exact Reach/Cons/verdict; trace validity and witnesses',
         'trusted_base': ['specification and table abstraction', 'pinned Verus/vstd and Z3',
             'Rust compilation and erasure', 'slice/Vec/Option/checked_mul contracts',
