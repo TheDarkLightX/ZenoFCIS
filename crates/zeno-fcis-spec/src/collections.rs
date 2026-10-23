@@ -766,6 +766,11 @@ pub(crate) fn entry_predicate(formula: &RelExpr, owner: u32, entry: u32) -> RelE
                     p.segments[1] = id;
                 }
             }
+            ValueExpr::Select(condition, yes, no) => {
+                rel(condition, owner, entry);
+                value(yes, owner, entry);
+                value(no, owner, entry);
+            }
             ValueExpr::Int(_) | ValueExpr::U128(_) | ValueExpr::Var(_) => {}
             ValueExpr::ToI128(a) | ValueExpr::ToU128(a) | ValueExpr::Sum { body: a, .. } => {
                 value(a, owner, entry)
@@ -789,6 +794,9 @@ pub(crate) fn entry_predicate(formula: &RelExpr, owner: u32, entry: u32) -> RelE
     }
     fn rel(f: &mut RelExpr, owner: u32, entry: u32) {
         match f {
+            RelExpr::Circuit(c) => {
+                *c = Box::new(c.map(|child| entry_predicate(child, owner, entry)));
+            }
             RelExpr::Bool(_) => {}
             RelExpr::Not(a) | RelExpr::ForAll { body: a, .. } | RelExpr::Exists { body: a, .. } => {
                 rel(a, owner, entry)
@@ -811,4 +819,53 @@ pub(crate) fn entry_predicate(formula: &RelExpr, owner: u32, entry: u32) -> RelE
     let mut normalized = formula.clone();
     rel(&mut normalized, owner, entry);
     normalized
+}
+
+#[cfg(test)]
+mod entry_predicate_tests {
+    use super::*;
+    use crate::ast::{CompareOp, ProjectionPath};
+
+    fn projection(field: u32) -> ValueExpr {
+        let ids = [100, field].map(|id| StableId::new(id).unwrap_or_else(|| panic!("valid ID")));
+        ValueExpr::Projection(
+            ProjectionPath::try_new(ProjectionRoot::Post, ids.to_vec())
+                .unwrap_or_else(|| panic!("valid projection")),
+        )
+    }
+
+    fn circuit(entry: u32) -> RelExpr {
+        let condition = RelExpr::Compare(CompareOp::Eq, projection(entry + 1), ValueExpr::Int(0));
+        let selected = ValueExpr::Select(
+            Box::new(condition),
+            Box::new(projection(entry + 2)),
+            Box::new(projection(entry + 3)),
+        );
+        let formula = RelExpr::Compare(CompareOp::Eq, selected, ValueExpr::Int(0));
+        RelExpr::Circuit(Box::new(
+            crate::BoolCircuit::try_new(
+                alloc::vec![
+                    crate::BoolNode::Formula(formula),
+                    crate::BoolNode::Literal(true)
+                ],
+                1,
+            )
+            .unwrap_or_else(|| panic!("valid circuit")),
+        ))
+    }
+
+    #[test]
+    fn shared_circuit_entry_normalization_visits_every_conditional_operand() {
+        let first = circuit(200);
+        let second = circuit(300);
+        let before = first.clone();
+        assert_eq!(
+            entry_predicate(&first, 100, 200),
+            entry_predicate(&second, 100, 300)
+        );
+        assert_eq!(first, before);
+        assert_eq!(first, circuit(200));
+        assert_eq!(second, circuit(300));
+        assert_ne!(first, second);
+    }
 }

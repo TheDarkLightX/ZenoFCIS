@@ -3797,6 +3797,9 @@ fn formula_has_input(formula: &RelExpr) -> bool {
             ValueExpr::Projection(p) => {
                 matches!(p.root(), ProjectionRoot::Command | ProjectionRoot::Context)
             }
+            ValueExpr::Select(condition, yes, no) => {
+                formula_has_input(condition) || value(yes) || value(no)
+            }
             ValueExpr::Int(_) | ValueExpr::U128(_) | ValueExpr::Var(_) => false,
             ValueExpr::ToI128(a) | ValueExpr::ToU128(a) | ValueExpr::Sum { body: a, .. } => {
                 value(a)
@@ -3812,6 +3815,7 @@ fn formula_has_input(formula: &RelExpr) -> bool {
         }
     }
     match formula {
+        RelExpr::Circuit(c) => c.formulas().any(formula_has_input),
         RelExpr::Bool(_) => false,
         RelExpr::Not(a) | RelExpr::ForAll { body: a, .. } | RelExpr::Exists { body: a, .. } => {
             formula_has_input(a)
@@ -3821,5 +3825,58 @@ fn formula_has_input(formula: &RelExpr) -> bool {
         }
         RelExpr::Compare(_, a, b) => value(a) || value(b),
         RelExpr::Predicate { arguments, .. } => arguments.iter().any(value),
+    }
+}
+
+#[cfg(test)]
+mod collection_input_tests {
+    use super::*;
+
+    fn input() -> ValueExpr {
+        let ids = [101, 120].map(|id| StableId::new(id).unwrap_or_else(|| panic!("valid ID")));
+        ValueExpr::Projection(
+            ProjectionPath::try_new(ProjectionRoot::Command, ids.to_vec())
+                .unwrap_or_else(|| panic!("valid projection")),
+        )
+    }
+
+    #[test]
+    fn collection_input_detection_visits_all_conditional_operands() {
+        let observed = RelExpr::Compare(CompareOp::Eq, input(), ValueExpr::Int(0));
+        for (condition, yes, no) in [
+            (observed, ValueExpr::Int(0), ValueExpr::Int(0)),
+            (RelExpr::Bool(false), input(), ValueExpr::Int(0)),
+            (RelExpr::Bool(true), ValueExpr::Int(0), input()),
+        ] {
+            let selected = ValueExpr::Select(Box::new(condition), Box::new(yes), Box::new(no));
+            assert!(formula_has_input(&RelExpr::Compare(
+                CompareOp::Eq,
+                selected,
+                ValueExpr::Int(0)
+            )));
+        }
+        assert!(!formula_has_input(&RelExpr::Compare(
+            CompareOp::Eq,
+            ValueExpr::Select(
+                Box::new(RelExpr::Bool(true)),
+                Box::new(ValueExpr::Int(1)),
+                Box::new(ValueExpr::Int(0))
+            ),
+            ValueExpr::Int(0)
+        )));
+    }
+
+    #[test]
+    fn collection_input_detection_includes_nonoutput_circuit_formulas() {
+        let observed = RelExpr::Compare(CompareOp::Eq, input(), ValueExpr::Int(0));
+        let circuit = crate::BoolCircuit::try_new(
+            alloc::vec![
+                crate::BoolNode::Formula(observed),
+                crate::BoolNode::Literal(true)
+            ],
+            1,
+        )
+        .unwrap_or_else(|| panic!("valid circuit"));
+        assert!(formula_has_input(&RelExpr::Circuit(Box::new(circuit))));
     }
 }
