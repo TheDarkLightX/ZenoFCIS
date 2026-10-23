@@ -78,6 +78,19 @@ impl Files {
                 )
             })
             .collect();
+        // Current receipts stay intact and are checked by the actual generator.
+        // The conversion below is only for retained legacy i64 candidates.
+        if !adoptions.is_empty()
+            && adoptions
+                .iter()
+                .all(|(candidate, _)| import_program(candidate).is_ok())
+        {
+            return Self {
+                project: files.remove("project.zeno").unwrap_or_default(),
+                rules,
+                adoptions,
+            };
+        }
         let mut result = Self {
             project: files.remove("project.zeno").unwrap_or_default(),
             rules,

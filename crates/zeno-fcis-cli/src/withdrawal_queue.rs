@@ -161,4 +161,12 @@ pub(crate) const FILES: &[(&str, &[u8])] = &[
         "tests/lifecycle.rs",
         include_bytes!("../templates/withdrawal-queue/tests/lifecycle.rs"),
     ),
+    (
+        "tests/decision-scenarios.txt",
+        include_bytes!("../templates/withdrawal-queue/tests/decision-scenarios.txt"),
+    ),
+    (
+        "v2/run-properties.json",
+        include_bytes!("../templates/withdrawal-queue/v2/run-properties.json"),
+    ),
 ];

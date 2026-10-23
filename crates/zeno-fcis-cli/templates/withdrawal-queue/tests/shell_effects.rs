@@ -4,7 +4,7 @@ use std::{cell::Cell, path::PathBuf, rc::Rc};
 use withdrawal_queue::{
     bindings::GeneratedProject,
     create, deposit,
-    generated::{Caller, Flag, TickContext},
+    generated::{Caller, Day, Flag, TickContext},
     shell_effects::{Effects, MAX_REQUESTS, RETRIES},
     v2_contract,
 };
@@ -128,6 +128,7 @@ fn data(a: &Authority<'_>, state: &[u8]) -> PublicationData {
             &TickContext {
                 caller: Caller::Operator,
                 alarm: Flag(false),
+                now: Day(0),
             },
             ValidationLimits::default(),
         )

@@ -158,7 +158,10 @@ fn edited_2_4_adopted_contract_refuses_without_changing_its_files() {
         .unwrap_or_else(|error| panic!("fixture project UTF-8: {error}"));
     let anchor = "= post.100.120 <= 4 &&";
     assert_eq!(project.matches(anchor).count(), 1);
-    write(historical.join("project.zeno"), project.replace(anchor, "= post.100.120 <= 5 &&").as_bytes());
+    write(
+        historical.join("project.zeno"),
+        project.replace(anchor, "= post.100.120 <= 5 &&").as_bytes(),
+    );
     let before = snapshot(&historical);
     let output = zeno(&[
         "generate".as_ref(),
@@ -231,7 +234,7 @@ fn adopting_the_withdrawal_queue_candidate_reproduces_the_committed_fixture() {
     assert_eq!(report["adoption"]["usage_preserved"], false);
     assert_eq!(
         report["adoption"]["program_nodes"],
-        json!({"before": 106, "after": 100})
+        json!({"before": 132, "after": 123})
     );
     assert_eq!(
         report["artifacts"],
@@ -247,7 +250,7 @@ fn adopting_the_withdrawal_queue_candidate_reproduces_the_committed_fixture() {
         ])
     );
     assert_eq!(report["summary"]["version"], 2);
-    assert_eq!(report["summary"]["program_nodes"], 100);
+    assert_eq!(report["summary"]["program_nodes"], 123);
     // The premises of a program succession that generation checks, with the
     // Step bounds: each program's measured usage plus every law node fits
     // its version's Step limit.
@@ -257,8 +260,8 @@ fn adopting_the_withdrawal_queue_candidate_reproduces_the_committed_fixture() {
             "decision_conformance_law": true, "receipt_equivalent": true,
             "step_limits_never_bind": true,
             "steps": {
-                "program": {"before": 106, "after": 100}, "laws": 969,
-                "limit": {"before": 1080, "after": 1074}
+                "program": {"before": 132, "after": 123}, "laws": 1693,
+                "limit": {"before": 1830, "after": 1821}
             }
         })
     );
@@ -355,7 +358,7 @@ fn the_committed_fixture_is_current() {
     );
     assert_eq!(
         report["summary"]["adoptions"][0]["candidate_sha256"],
-        "467e570f1c82afe073aded99d6a7a89d7f5f9e7d5b236f82997705d7add094e0"
+        "b8b51e2b2647831cc685d38bec838090210716c0a9c3f5945479d751d857e3e2"
     );
 }
 
@@ -409,10 +412,10 @@ fn an_unreplayable_receipt_or_another_candidate_is_refused_with_no_write() {
     // An altered domain size is caught before any evaluation.
     let altered = root.path().join("altered.json");
     let text = String::from_utf8(committed.clone()).unwrap_or_else(|error| panic!("{error}"));
-    assert_eq!(text.matches("\"size\":1296000").count(), 1);
+    assert_eq!(text.matches("\"size\":1866240").count(), 1);
     write(
         &altered,
-        text.replace("\"size\":1296000", "\"size\":1295999")
+        text.replace("\"size\":1866240", "\"size\":1866239")
             .as_bytes(),
     );
     let tampered = adopt(
@@ -728,7 +731,6 @@ fn an_edit_after_adoption_is_refused_and_version_one_is_kept() {
     }
 }
 
-
 /// Retained release evidence must replay without rewriting its bindings.
 #[test]
 fn replays_released_24_receipt() {
@@ -741,8 +743,12 @@ fn replays_released_24_receipt() {
     let receipt = read(dir.join("v2/adoptions/1/receipt.json"));
     let policy = read(dir.join("v2/policy_v1.zcve"));
     let output = generate(&dir, false);
-    assert!(output.status.success(), "released 2.4 receipt refused: {} {}",
-        String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "released 2.4 receipt refused: {} {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert_eq!(read(dir.join("v2/adoptions/1/receipt.json")), receipt);
     assert_eq!(read(dir.join("v2/policy_v1.zcve")), policy);
 }

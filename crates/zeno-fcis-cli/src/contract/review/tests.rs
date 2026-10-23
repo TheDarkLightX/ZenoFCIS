@@ -977,10 +977,14 @@ fn every_template_examples_file_reads_as_it_did_before_the_shared_grammar() {
         let rendered: String = examples
             .iter()
             .map(|example| {
+                let mut inputs = example.inputs.clone();
+                if name == "withdrawal-queue" {
+                    assert_eq!(inputs.pop(), Some(0));
+                }
                 format!(
                     "{} {:?} {} {:?} {:?} {:?}\n",
                     example.line,
-                    example.inputs,
+                    inputs,
                     example.class.name(),
                     example.reason,
                     example.post,

@@ -12,7 +12,7 @@ const LANES = { 170: "A", 171: "B" };
 const STATUSES = { 180: "Empty", 181: "Arrived", 182: "Pending" };
 const CALLERS = { 190: "Operator", 191: "OwnerA", 192: "OwnerB", 193: "Keeper" };
 
-export const laws = { Accept: [500, 501, 502, 503, 991], CommittedFailure: [500, 508, 991], Reject: [509, 991] };
+export const laws = {"Accept": [500, 501, 502, 503, 504, 505, 506, 510, 511, 512, 991], "CommittedFailure": [500, 501, 502, 503, 504, 505, 506, 510, 511, 512, 508, 991], "Reject": [513, 909, 991]};
 
 // Inputs refused before any decision, with the stage that refuses them.
 export const refusals = [
@@ -46,9 +46,9 @@ function vault([balance, laneA, amountA, laneB, amountB, pause, mustServe, prior
 // which the page never sends with them.
 export function parse(text) {
   return lines(text).map(({ line, parts: [input, decision, payout] }) => {
-    const [action, lane, amount, caller, alarm] = input.slice(8);
+    const [action, lane, amount, caller, alarm, now] = input.slice(8);
     const command = named(ACTIONS, action, line);
-    const request = { command, caller: named(CALLERS, caller, line), alarm: alarm === "1" };
+    const request = { command, caller: named(CALLERS, caller, line), alarm: alarm === "1", now: integer(now, line) };
     if (command === "RequestWithdrawal") request.lane = named(LANES, lane, line);
     if (command !== "Tick") request.amount = integer(amount, line);
     return {

@@ -54,6 +54,10 @@
     "context.102.141": {
       "label": "Alarm raised",
       "unit": "unitless"
+    },
+    "context.102.142": {
+      "label": "Day (2 means the deadline is reached)",
+      "unit": "days"
     }
   },
   "variants": {
@@ -68,7 +72,8 @@
     "190": "Operator",
     "191": "Owner of lane A",
     "192": "Owner of lane B",
-    "193": "Keeper"
+    "193": "Keeper",
+    "163": "Timeout withdrawal"
   },
   "commands": {
     "160": {
@@ -82,12 +87,18 @@
     "162": {
       "label": "Advance the queue",
       "consequential": true
+    },
+    "163": {
+      "label": "Withdraw after timeout",
+      "consequential": true
     }
   },
   "reasons": {
     "200": "This caller cannot perform this command. Choose the caller responsible for it.",
     "201": "This lane already has a withdrawal. Wait until it is paid.",
     "202": "There is not enough unreserved balance. Deposit funds or choose a smaller amount.",
-    "203": "This deposit would exceed the capacity of 4 credits. Choose a smaller amount."
+    "203": "This deposit would exceed the capacity of 4 credits. Choose a smaller amount.",
+    "205": "This lane has no pending withdrawal.",
+    "206": "The withdrawal deadline has not arrived."
   }
 }

@@ -33,6 +33,20 @@ mod order_fulfillment;
 mod prepared_counter;
 #[path = "../../../../../crates/zeno-fcis-cli/templates/withdrawal-queue/src/v2_contract.rs"]
 mod withdrawal_queue;
+/// Lift a historical example at day zero into the extended clock schema.
+/// This is a test adapter, never a publication or migration authority.
+pub(crate) fn current_value(template: usize, root: u32, value: &Value) -> Value {
+    use zeno_fcis_value::{Field, ValueRef};
+    let ValueRef::Record(fields) = value.view() else {
+        return value.clone();
+    };
+    let mut lifted = fields.to_vec();
+    if template == 5 && root == 102 {
+        lifted.push(Field::new(142, Value::signed(0)));
+    }
+    Value::normalize_record(lifted).expect("unique added deadline fields")
+}
+
 static COUNTS: [AtomicUsize; 8] = [const { AtomicUsize::new(0) }; 8];
 fn authority_durable_counter() -> &'static Authority<'static> {
     static CONTRACT: OnceLock<durable_counter::Contract> = OnceLock::new();
@@ -213,13 +227,14 @@ pub(crate) fn compare<P, L, I>(
     // domain; current framing must still be checked by the new Authority.
     let revision = match template {
         4 => Some(agent_treasury_guard::FRAMING.state.schema),
+        5 => Some(withdrawal_queue::FRAMING.state.schema),
         _ => None,
     };
     let frame = |old: &zeno_fcis_codec::AdmittedEnvelope| {
         Envelope::new(
             old.type_id(),
             revision.map(Hash32::new).unwrap_or(old.schema_hash()),
-            old.value().value().clone(),
+            current_value(template, old.type_id(), old.value().value()),
         )
         .canonical_bytes()
         .unwrap()
@@ -299,7 +314,7 @@ pub(crate) fn compare<P, L, I>(
             let expected = Envelope::new(
                 root.type_id(),
                 revision.map(Hash32::new).unwrap_or(root.schema_hash()),
-                post.state().clone(),
+                current_value(template, root.type_id(), post.state()),
             )
             .canonical_bytes()
             .unwrap();

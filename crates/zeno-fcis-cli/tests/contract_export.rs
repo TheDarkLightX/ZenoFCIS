@@ -166,7 +166,7 @@ fn the_export_is_the_contracts_current_program_and_never_overwrites() {
             ))
     );
     // After an adoption, the program is the adopted candidate.
-    let adopted = crate_path("tests/fixtures/i128-contracts/withdrawal-queue-adopted");
+    let adopted = crate_path("tests/fixtures/withdrawal-queue-adopted-2.5");
     let current = root.path().join("current.zcve");
     let report = export(&adopted, &current);
     assert_eq!(report["version"], 2);

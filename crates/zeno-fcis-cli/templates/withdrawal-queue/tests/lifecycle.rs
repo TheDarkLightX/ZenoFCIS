@@ -293,3 +293,90 @@ fn a_pause_survives_a_database_reopen() {
     );
     assert_eq!(shell.snapshot().unwrap().pending(), 1);
 }
+
+#[test]
+fn each_owner_can_recover_after_the_horizon_despite_an_alarm() {
+    use withdrawal_queue::{command, invoke_at};
+    for (lane, owner) in [(Lane::A, Caller::OwnerA), (Lane::B, Caller::OwnerB)] {
+        let temp = Temp::new();
+        let contract = withdrawal_queue::v2_contract::Contract::new();
+        let descriptor = contract.descriptor();
+        let authority = authority(&descriptor).unwrap();
+        let shell = &mut create(&temp.0.join("recovery.sqlite"), &authority).unwrap();
+        assert_eq!(
+            invoke_at(
+                shell,
+                &authority,
+                deposit(2),
+                Caller::Operator,
+                false,
+                0,
+                "fund"
+            )
+            .unwrap(),
+            "Accept"
+        );
+        assert_eq!(
+            invoke_at(
+                shell,
+                &authority,
+                request(lane.clone(), 2),
+                owner.clone(),
+                false,
+                0,
+                "reserve"
+            )
+            .unwrap(),
+            "Accept"
+        );
+        let before = shell.snapshot().unwrap();
+        let timeout = || command(VaultAction::TimeoutWithdrawal, lane.clone(), 1);
+        assert!(
+            invoke_at(
+                shell,
+                &authority,
+                timeout(),
+                owner.clone(),
+                true,
+                -1,
+                "negative-time"
+            )
+            .is_err()
+        );
+        assert_eq!(shell.snapshot().unwrap(), before);
+        assert_eq!(
+            invoke_at(
+                shell,
+                &authority,
+                timeout(),
+                owner.clone(),
+                true,
+                1_000_000,
+                "late-recovery"
+            )
+            .unwrap(),
+            "Accept"
+        );
+        let recovered = shell.snapshot().unwrap();
+        let vault = state(shell);
+        assert_eq!(
+            (vault.balance.0, vault.amount_a.0, vault.amount_b.0),
+            (0, 0, 0)
+        );
+        assert_eq!(recovered.pending(), 1);
+        assert_eq!(
+            invoke_at(
+                shell,
+                &authority,
+                timeout(),
+                owner,
+                true,
+                i128::MAX,
+                "repeat-recovery"
+            )
+            .unwrap(),
+            "Reject"
+        );
+        assert_eq!(shell.snapshot().unwrap(), recovered);
+    }
+}

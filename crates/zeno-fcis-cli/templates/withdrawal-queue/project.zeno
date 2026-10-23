@@ -19,11 +19,13 @@ type 109 data LaneStatus;
 type 110 int PauseTicks;
 type 111 bool Flag;
 type 112 data Caller;
+type 113 int Day in 0..=2;
+type 114 int Reserved in 0..=2;
 field 120 100 balance 105;
 field 121 100 lane_a 109;
-field 122 100 amount_a 105;
+field 122 100 amount_a 114;
 field 123 100 lane_b 109;
-field 124 100 amount_b 105;
+field 124 100 amount_b 114;
 field 125 100 pause 110;
 field 126 100 must_serve 111;
 field 127 100 priority 108;
@@ -32,11 +34,13 @@ field 131 101 lane 108;
 field 132 101 amount 106;
 field 140 102 caller 112;
 field 141 102 alarm 111;
+field 142 102 now 113;
 field 150 104 paid_lane 108;
 field 151 104 paid_amount 106;
 variant 160 107 Deposit none;
 variant 161 107 RequestWithdrawal none;
 variant 162 107 Tick none;
+variant 163 107 TimeoutWithdrawal none;
 variant 170 108 A none;
 variant 171 108 B none;
 variant 180 109 Empty none;
@@ -50,6 +54,8 @@ reason 200 wrong_caller precedence 0;
 reason 201 lane_occupied precedence 1;
 reason 202 insufficient_balance precedence 2;
 reason 203 over_capacity precedence 3;
+reason 205 lane_empty precedence 4;
+reason 206 before_deadline precedence 5;
 channel 300 payout destination 103 payload 104;
 component 400 vault {
   owns 100;
@@ -94,5 +100,13 @@ law 503 tick_follows_the_controller on commit = command.101.130 == 162 -> post.1
 // laws 502 and 503 keep the pause within the controller's range. Each step
 // says something about this application only with tests/claims.rs, which
 // checks the observer, the exact genesis, and the law manifest.
-claim 600 vault_stays_solvent all inductive assume [501, 502, 503] = pre.100.120 <= 4 && pre.100.120 >= pre.100.122 + pre.100.124 && (pre.100.121 == 180 -> pre.100.122 == 0) && (pre.100.121 != 180 -> pre.100.122 >= 1) && (pre.100.123 == 180 -> pre.100.124 == 0) && (pre.100.123 != 180 -> pre.100.124 >= 1) && (pre.100.126 == 1 -> pre.100.125 == 0 && (pre.100.121 == 182 || pre.100.123 == 182));
-claim 601 pause_stays_in_range all inductive assume [502, 503] = pre.100.125 >= 0 && pre.100.125 <= 2;
+claim 600 vault_stays_solvent all inductive assume [501, 502, 503, 505] = pre.100.120 <= 4 && pre.100.120 >= pre.100.122 + pre.100.124 && (pre.100.121 == 180 -> pre.100.122 == 0) && (pre.100.121 != 180 -> pre.100.122 >= 1) && (pre.100.123 == 180 -> pre.100.124 == 0) && (pre.100.123 != 180 -> pre.100.124 >= 1) && (pre.100.126 == 1 -> pre.100.125 == 0 && (pre.100.121 == 182 || pre.100.123 == 182));
+claim 601 pause_stays_in_range all inductive assume [502, 503, 505] = pre.100.125 >= 0 && pre.100.125 <= 2;
+
+law 504 tick_pays_the_due_priority_lane on commit = command.101.130 == 162 -> (((pre.100.125 == 0 && (context.102.141 == 0 || pre.100.126 == 1)) && pre.100.121 != 180 && (pre.100.123 == 180 || pre.100.127 == 170)) -> post.100.121 == 180 && post.100.124 == pre.100.124 && post.100.127 == 171) && (((pre.100.125 == 0 && (context.102.141 == 0 || pre.100.126 == 1)) && pre.100.123 != 180 && (pre.100.121 == 180 || pre.100.127 == 171)) -> post.100.123 == 180 && post.100.122 == pre.100.122 && post.100.127 == 170) && (!((pre.100.125 == 0 && (context.102.141 == 0 || pre.100.126 == 1)) && pre.100.121 != 180 && (pre.100.123 == 180 || pre.100.127 == 170)) && !((pre.100.125 == 0 && (context.102.141 == 0 || pre.100.126 == 1)) && pre.100.123 != 180 && (pre.100.121 == 180 || pre.100.127 == 171)) -> post.100.122 == pre.100.122 && post.100.124 == pre.100.124 && post.100.127 == pre.100.127);
+law 505 owner_timeout_returns_reserved_funds on commit = command.101.130 == 163 -> post.100.125 == pre.100.125 && post.100.127 == pre.100.127 && (command.101.131 == 170 -> context.102.140 == 191 && pre.100.121 != 180 && context.102.142 >= 2 && post.100.120 == pre.100.120 - pre.100.122 && post.100.121 == 180 && post.100.122 == 0 && post.100.123 == pre.100.123 && post.100.124 == pre.100.124 && ((post.100.126 == 1 -> pre.100.126 == 1 && pre.100.123 == 182) && (pre.100.126 == 1 && pre.100.123 == 182 -> post.100.126 == 1))) && (command.101.131 == 171 -> context.102.140 == 192 && pre.100.123 != 180 && context.102.142 >= 2 && post.100.120 == pre.100.120 - pre.100.124 && post.100.123 == 180 && post.100.124 == 0 && post.100.121 == pre.100.121 && post.100.122 == pre.100.122 && ((post.100.126 == 1 -> pre.100.126 == 1 && pre.100.121 == 182) && (pre.100.126 == 1 && pre.100.121 == 182 -> post.100.126 == 1)));
+law 506 reservation_fits_the_payout on commit, genesis = post.100.122 <= 2 && post.100.124 <= 2;
+law 510 debited_funds_have_one_exact_payout on commit = (command.101.130 == 160 || command.101.130 == 161 -> outbox.104 == 0 && outbox.104.151 == 0) && (command.101.130 == 162 || command.101.130 == 163 -> outbox.104.151 == pre.100.120 - post.100.120 && (post.100.120 == pre.100.120 -> outbox.104 == 0) && (post.100.120 < pre.100.120 -> outbox.104 == 1));
+law 511 payout_names_the_debited_lane on commit = (post.100.122 < pre.100.122 -> outbox.104.150 == 170 && outbox.104 == 1) && (post.100.124 < pre.100.124 -> outbox.104.150 == 171 && outbox.104 == 1);
+law 512 payout_uses_the_settlement_destination on commit = post.100.120 < pre.100.120 -> outbox.104 == 1;
+law 513 reject_only_for_first_failed_guard on reject = (((command.101.130 == 160 && context.102.140 != 190) || ((command.101.130 == 161 || command.101.130 == 163) && ((command.101.131 == 170 && context.102.140 != 191) || (command.101.131 == 171 && context.102.140 != 192))) || (command.101.130 == 162 && context.102.140 != 193)) && decision_reason == 200) || (!((command.101.130 == 160 && context.102.140 != 190) || ((command.101.130 == 161 || command.101.130 == 163) && ((command.101.131 == 170 && context.102.140 != 191) || (command.101.131 == 171 && context.102.140 != 192))) || (command.101.130 == 162 && context.102.140 != 193)) && (command.101.130 == 161 && ((command.101.131 == 170 && pre.100.121 != 180) || (command.101.131 == 171 && pre.100.123 != 180))) && decision_reason == 201) || (!((command.101.130 == 160 && context.102.140 != 190) || ((command.101.130 == 161 || command.101.130 == 163) && ((command.101.131 == 170 && context.102.140 != 191) || (command.101.131 == 171 && context.102.140 != 192))) || (command.101.130 == 162 && context.102.140 != 193)) && !(command.101.130 == 161 && ((command.101.131 == 170 && pre.100.121 != 180) || (command.101.131 == 171 && pre.100.123 != 180))) && (command.101.130 == 161 && command.101.132 > pre.100.120 - pre.100.122 - pre.100.124) && decision_reason == 202) || (!((command.101.130 == 160 && context.102.140 != 190) || ((command.101.130 == 161 || command.101.130 == 163) && ((command.101.131 == 170 && context.102.140 != 191) || (command.101.131 == 171 && context.102.140 != 192))) || (command.101.130 == 162 && context.102.140 != 193)) && !(command.101.130 == 161 && ((command.101.131 == 170 && pre.100.121 != 180) || (command.101.131 == 171 && pre.100.123 != 180))) && !(command.101.130 == 161 && command.101.132 > pre.100.120 - pre.100.122 - pre.100.124) && (command.101.130 == 160 && pre.100.120 + command.101.132 > 4) && decision_reason == 203) || (!((command.101.130 == 160 && context.102.140 != 190) || ((command.101.130 == 161 || command.101.130 == 163) && ((command.101.131 == 170 && context.102.140 != 191) || (command.101.131 == 171 && context.102.140 != 192))) || (command.101.130 == 162 && context.102.140 != 193)) && !(command.101.130 == 161 && ((command.101.131 == 170 && pre.100.121 != 180) || (command.101.131 == 171 && pre.100.123 != 180))) && !(command.101.130 == 161 && command.101.132 > pre.100.120 - pre.100.122 - pre.100.124) && !(command.101.130 == 160 && pre.100.120 + command.101.132 > 4) && (command.101.130 == 163 && ((command.101.131 == 170 && pre.100.121 == 180) || (command.101.131 == 171 && pre.100.123 == 180))) && decision_reason == 205) || (!((command.101.130 == 160 && context.102.140 != 190) || ((command.101.130 == 161 || command.101.130 == 163) && ((command.101.131 == 170 && context.102.140 != 191) || (command.101.131 == 171 && context.102.140 != 192))) || (command.101.130 == 162 && context.102.140 != 193)) && !(command.101.130 == 161 && ((command.101.131 == 170 && pre.100.121 != 180) || (command.101.131 == 171 && pre.100.123 != 180))) && !(command.101.130 == 161 && command.101.132 > pre.100.120 - pre.100.122 - pre.100.124) && !(command.101.130 == 160 && pre.100.120 + command.101.132 > 4) && !(command.101.130 == 163 && ((command.101.131 == 170 && pre.100.121 == 180) || (command.101.131 == 171 && pre.100.123 == 180))) && (command.101.130 == 163 && ((command.101.131 == 170 && context.102.142 < 2) || (command.101.131 == 171 && context.102.142 < 2))) && decision_reason == 206);

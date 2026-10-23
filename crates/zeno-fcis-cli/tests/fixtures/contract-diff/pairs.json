@@ -428,7 +428,7 @@
         "base": "templates/withdrawal-queue"
       },
       "new": {
-        "base": "tests/fixtures/withdrawal-queue-adopted"
+        "base": "tests/fixtures/withdrawal-queue-adopted-2.5"
       },
       "kind": "program-successor",
       "changes": [

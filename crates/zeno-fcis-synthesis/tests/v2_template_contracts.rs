@@ -64,7 +64,7 @@ const VAULT_STATE: &[(u16, Leaf)] = &[
     (127, Sum(108)),
 ];
 const VAULT_COMMAND: &[(u16, Leaf)] = &[(130, Sum(107)), (131, Sum(108)), (132, Int)];
-const VAULT_CONTEXT: &[(u16, Leaf)] = &[(140, Sum(112)), (141, Bool)];
+const VAULT_CONTEXT: &[(u16, Leaf)] = &[(140, Sum(112)), (141, Bool), (142, Int)];
 const TREASURY_STATE: &[(u16, Leaf)] = &[
     (130, Int),
     (131, Int),
@@ -417,6 +417,10 @@ fn reference(app: usize, s: &[i128], cmd: &[i128], ctx: &[i128]) -> Expected {
             }
         }
         4 => {
+            if s[2] > 2 || s[4] > 2 {
+                out.refusal = Some("ingress");
+                return out;
+            }
             let (action, lane, amount, caller, alarm) =
                 (cmd[0], cmd[1], cmd[2], ctx[0], ctx[1] != 0);
             let sender = match action {
@@ -491,7 +495,18 @@ fn reference(app: usize, s: &[i128], cmd: &[i128], ctx: &[i128]) -> Expected {
             if out.post[0] < 0 {
                 out.refusal = Some("schema")
             }
-            if out.refusal.is_none() && !vault_invariant(&out.post) {
+            // A decrease in either reservation must publish exactly that
+            // lane's payout, including malformed raw pre-states whose empty
+            // lane incorrectly carried an amount.
+            let payment_matches = |position: usize, lane: i128| {
+                out.post[position] >= s[position]
+                    || (out.outbox.len() == 1 && out.outbox[0].1[0] == lane)
+            };
+            if out.refusal.is_none()
+                && (!vault_invariant(&out.post)
+                    || !payment_matches(2, 170)
+                    || !payment_matches(4, 171))
+            {
                 out.refusal = Some("law500")
             }
         }
@@ -1316,10 +1331,16 @@ const WITHDRAWAL_CORPUS: Corpus = Corpus {
         ("caller", &[190, 191, 192, 193]),
         ("alarm", &[0, 1]),
     ],
-    input: |d| d.to_vec(),
+    input: |d| {
+        let mut all = d.to_vec();
+        all.push(0);
+        all
+    },
     outcomes: &[
         "accept",
         "refused Core(Decision(Domain))",
+        "refused Core(Ingress(0, Record(Field(122))))",
+        "refused Core(Ingress(0, Record(Field(124))))",
         "refused Core(Law(Violated))",
         "refused Core(Schema)",
         "reject 200",
@@ -1356,13 +1377,17 @@ const WITHDRAWAL_CORPUS: Corpus = Corpus {
         }),
     ],
     profile: &[
+        &[0, 180, 0, 180, 0, 0, 0, 170, 160, 170, 1, 191, 0],
+        &[0, 180, 0, 180, 0, 0, 0, 170, 161, 170, 1, 191, 0],
         &[0, 180, 0, 180, 1, 0, 0, 170, 162, 170, 1, 193, 0],
+        &[0, 180, 0, 181, 0, 0, 0, 170, 162, 170, 1, 193, 0],
         &[0, 180, 0, 181, 1, 0, 0, 170, 162, 170, 1, 193, 0],
         &[0, 180, 4, 180, 0, 0, 0, 170, 160, 170, 1, 191, 0],
         &[1, 180, 0, 180, 0, 0, 0, 170, 161, 170, 1, 191, 0],
         &[1, 180, 0, 180, 0, 0, 1, 170, 161, 170, 1, 191, 0],
         &[1, 182, 2, 182, 2, 2, 0, 170, 161, 170, 1, 191, 0],
         &[2, 181, 1, 181, 0, 1, 1, 171, 160, 171, 2, 190, 1],
+        &[3, 180, 0, 180, 0, 0, 0, 170, 160, 170, 2, 190, 0],
         &[3, 180, 0, 180, 3, 0, 0, 170, 161, 171, 1, 192, 0],
         &[3, 180, 3, 180, 0, 0, 0, 170, 160, 170, 2, 190, 0],
         &[4, 180, 0, 181, 4, 0, 0, 170, 162, 170, 1, 193, 0],
@@ -2079,7 +2104,7 @@ fn treasury_guard_arithmetic_callbacks_and_unlawful_prestates() {
 }
 
 /// Checks one corpus's bounded profile against its pins and its pinned count.
-/// The eight profile tests below together run 93 cases: 5, 7, 11, 9, 10, 13, 22
+/// The eight profile tests below together run 97 cases: 5, 7, 11, 9, 14, 13, 22
 /// and 16. The 131 retained examples run under Miri in their exact groups; they are
 /// not drawn from these corpora and are not counted against them.
 fn check_bounded(observed: Observation<'_>, cases: usize) {
@@ -2118,7 +2143,7 @@ fn miri_bounded_profile_account_lockout() {
 fn miri_bounded_profile_withdrawal_queue() {
     check_bounded(
         with_app!(vault, |a, f| bounded(&WITHDRAWAL_CORPUS, a, f)),
-        10,
+        14,
     );
 }
 #[test]

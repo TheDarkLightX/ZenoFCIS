@@ -314,7 +314,7 @@ fn rule_precedence_and_tokens_outside_the_language_refuse() {
 // Replaces test_complete_original_definitions_and_scopes.
 #[test]
 fn templates_declare_complete_types_and_scoped_laws() {
-    for (name, count) in TEMPLATES.into_iter().zip([6, 9, 12, 10, 13, 21, 7, 15]) {
+    for (name, count) in TEMPLATES.into_iter().zip([6, 9, 12, 10, 15, 21, 7, 15]) {
         let files = template(name);
         let declarations = files.declarations();
         assert_eq!(declarations.types.len(), count, "{name}");
@@ -858,13 +858,13 @@ fn library_rules_are_refused_where_they_are_written() {
     // The withdrawal queue decides no committed failure, so its framework
     // failure law applies; it may not share the structural reject law's ID.
     let shared = template("withdrawal-queue").with_rules(|rules| {
-        rules["framework_failure_law"] = 509.into();
+        rules["framework_failure_law"] = 909.into();
     });
     assert_eq!(
         shared.refusal(),
         (
             "v2/policy.json".to_owned(),
-            "the framework CommittedFailureEffects and RejectNoAuthority laws share ID 509"
+            "the framework CommittedFailureEffects and AuthoritySubjectRecipient laws share ID 909"
                 .to_owned()
         )
     );

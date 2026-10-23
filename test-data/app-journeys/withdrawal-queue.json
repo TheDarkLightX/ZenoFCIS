@@ -10,7 +10,9 @@
         "190",
         "0"
       ],
-      "class": "Accept"
+      "class": "Accept",
+      "clock": "0",
+      "party": "operator"
     },
     {
       "command": [
@@ -22,7 +24,9 @@
         "191",
         "0"
       ],
-      "class": "Accept"
+      "class": "Accept",
+      "clock": "0",
+      "party": "owner_a"
     },
     {
       "command": [
@@ -34,7 +38,9 @@
         "191",
         "0"
       ],
-      "class": "Reject"
+      "class": "Reject",
+      "clock": "0",
+      "party": "owner_a"
     },
     {
       "command": [
@@ -46,8 +52,167 @@
         "193",
         "0"
       ],
-      "class": "Accept"
+      "class": "Accept",
+      "clock": "0",
+      "party": "keeper"
     }
   ],
-  "deliveries": 1
+  "deliveries": 1,
+  "parties": [
+    {
+      "name": "operator",
+      "context": [
+        "190",
+        "0"
+      ]
+    },
+    {
+      "name": "owner_a",
+      "context": [
+        "191",
+        "0"
+      ]
+    },
+    {
+      "name": "owner_b",
+      "context": [
+        "192",
+        "0"
+      ]
+    },
+    {
+      "name": "keeper",
+      "context": [
+        "193",
+        "0"
+      ]
+    }
+  ],
+  "terminal_time": "2",
+  "terminal_recoveries": [
+    {
+      "steps": [
+        {
+          "party": "operator",
+          "clock": "0",
+          "command": [
+            "160",
+            "170",
+            "2"
+          ],
+          "post": [
+            "2",
+            "180",
+            "0",
+            "180",
+            "0",
+            "0",
+            "0",
+            "170"
+          ]
+        },
+        {
+          "party": "owner_a",
+          "clock": "0",
+          "command": [
+            "161",
+            "170",
+            "2"
+          ],
+          "post": [
+            "2",
+            "181",
+            "2",
+            "180",
+            "0",
+            "0",
+            "0",
+            "170"
+          ]
+        },
+        {
+          "party": "owner_a",
+          "clock": "1000000",
+          "command": [
+            "163",
+            "170",
+            "1"
+          ],
+          "post": [
+            "0",
+            "180",
+            "0",
+            "180",
+            "0",
+            "0",
+            "0",
+            "170"
+          ]
+        }
+      ],
+      "deliveries": 1
+    },
+    {
+      "steps": [
+        {
+          "party": "operator",
+          "clock": "0",
+          "command": [
+            "160",
+            "170",
+            "2"
+          ],
+          "post": [
+            "2",
+            "180",
+            "0",
+            "180",
+            "0",
+            "0",
+            "0",
+            "170"
+          ]
+        },
+        {
+          "party": "owner_b",
+          "clock": "0",
+          "command": [
+            "161",
+            "171",
+            "2"
+          ],
+          "post": [
+            "2",
+            "180",
+            "0",
+            "181",
+            "2",
+            "0",
+            "0",
+            "170"
+          ]
+        },
+        {
+          "party": "owner_b",
+          "clock": "1000000",
+          "command": [
+            "163",
+            "171",
+            "1"
+          ],
+          "post": [
+            "0",
+            "180",
+            "0",
+            "180",
+            "0",
+            "0",
+            "0",
+            "170"
+          ]
+        }
+      ],
+      "deliveries": 1
+    }
+  ]
 }

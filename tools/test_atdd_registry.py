@@ -198,8 +198,8 @@ def template_profile_problems(source):
         if int(pinned.group(1)) != len(profile):
             problems.append(f"{const} bounded count must be pinned as {len(profile)}")
         cases.append(len(profile))
-    if sum(cases) != 93:
-        problems.append(f"the bounded profile must keep 93 cases, not {cases}")
+    if sum(cases) != 97:
+        problems.append(f"the bounded profile must keep 97 cases, not {cases}")
     if re.search(r"cfg!?\(\s*(?:not\(\s*)?miri|cfg_attr\(\s*(?:not\(\s*)?miri|env::var", source):
         problems.append("template tests must not branch on Miri or the environment")
     return problems
@@ -543,7 +543,7 @@ class RepairedRegistryTests(unittest.TestCase):
                                  '    boundaries: &[],\n    unnamed: &[\n        ("allowed increment reaches 3"'))
         self.assertTrue(problems("        &[0, 1, 120, 1],\n", ""))
         self.assertTrue(problems("        &[0, 1, 120, 1],\n", "        &[0, 1, 122, 1],\n"))
-        self.assertTrue(problems("bounded(&WITHDRAWAL_CORPUS, a, f)),\n        10,", "bounded(&WITHDRAWAL_CORPUS, a, f)),\n        9,"))
+        self.assertTrue(problems("bounded(&WITHDRAWAL_CORPUS, a, f)),\n        14,", "bounded(&WITHDRAWAL_CORPUS, a, f)),\n        13,"))
         self.assertTrue(problems("bounded(&ORDER_CORPUS, a, f)), 11);", "bounded(&ORDER_CORPUS, a, f)), 12);"))
         self.assertTrue(problems("with_app!(vault, |a, f| bounded(&WITHDRAWAL_CORPUS",
                                  "with_app!(account, |a, f| bounded(&WITHDRAWAL_CORPUS"))

@@ -45,7 +45,7 @@
     "amount": "command.101.132",
     "caller": "context.102.140",
     "alarm": "context.102.141",
-    "sender": "choose(action == 160, 190, choose(action == 161, choose(lane == 170, 191, 192), 193))",
+    "sender": "choose(action == 160, 190, choose(action == 161 || action == 163, choose(lane == 170, 191, 192), 193))",
     "due_a": "lane_a != 180",
     "due_b": "lane_b != 180",
     "paused": "pause > 0",
@@ -55,7 +55,8 @@
     "next_b": "choose(due_b && pay != 2, 182, 180)",
     "next_pause": "choose(paused, pause - 1, choose(honored, 2, 0))",
     "next_serve": "choose(paused, pause == 1 && (due_a || due_b), choose(honored, false, must_serve && pay == 0 && (due_a || due_b)))",
-    "next_priority": "choose(pay == 1, 171, choose(pay == 2, 170, priority))"
+    "next_priority": "choose(pay == 1, 171, choose(pay == 2, 170, priority))",
+    "now": "context.102.142"
   },
   "cases": [
     {
@@ -85,6 +86,74 @@
       "reason": 203,
       "post": {},
       "outbox": []
+    },
+    {
+      "when": "action == 163 && choose(lane == 170, lane_a == 180, lane_b == 180)",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 163 && now < 2",
+      "class": "Reject",
+      "reason": 206,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 163 && lane == 170",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": "balance - amount_a",
+        "121": 180,
+        "122": 0,
+        "123": "pre.100.123",
+        "124": "pre.100.124",
+        "125": "pre.100.125",
+        "126": "must_serve && lane_b == 182",
+        "127": "pre.100.127"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "settlement",
+          "payload": {
+            "150": 170,
+            "151": "amount_a"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "action == 163 && lane == 171",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": "balance - amount_b",
+        "121": "pre.100.121",
+        "122": "pre.100.122",
+        "123": 180,
+        "124": 0,
+        "125": "pre.100.125",
+        "126": "must_serve && lane_a == 182",
+        "127": "pre.100.127"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "settlement",
+          "payload": {
+            "150": 171,
+            "151": "amount_b"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
     },
     {
       "when": "action == 160",
@@ -219,7 +288,57 @@
     "500": "StateInvariant",
     "501": "AssetConservation",
     "502": "AuthoritySubjectRecipient",
-    "503": "DebitCreditEffectEquality"
+    "503": "DebitCreditEffectEquality",
+    "504": "DebitCreditEffectEquality",
+    "505": "AssetConservation",
+    "506": "StateInvariant",
+    "510": "DebitCreditEffectEquality",
+    "511": "AuthoritySubjectRecipient",
+    "512": "AuthoritySubjectRecipient",
+    "513": "RejectNoAuthority"
   },
-  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes."
+  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes.",
+  "framework_reject_law": 509,
+  "framework_failure_law": 508,
+  "delivery_laws": {
+    "510": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.151": {
+          "channel": 300,
+          "field": 151
+        }
+      }
+    },
+    "511": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.150": {
+          "channel": 300,
+          "field": 150
+        }
+      }
+    },
+    "512": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300,
+          "destination": "settlement"
+        }
+      }
+    }
+  },
+  "clock": {
+    "field": 142,
+    "unit": "days",
+    "epoch": "2026-11-01",
+    "after_max": "hold"
+  }
 }

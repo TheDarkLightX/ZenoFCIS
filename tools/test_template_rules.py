@@ -87,6 +87,32 @@ class TemplateRules(unittest.TestCase):
         self.assertEqual(outcome['class'], 'Refused', outcome)
         self.assertEqual(outcome['law'], 517, outcome)
 
+    def test_withdrawal_tick_cannot_stall_a_due_lane(self):
+        def mutate(policy):
+            policy['variables']['pay'] = '0'
+        outcome = self.probe('crates/zeno-fcis-cli/templates/withdrawal-queue', mutate,
+                             '2 181 2 180 0 0 0 170 162 170 1 193 0 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 504, outcome)
+
+    def test_withdrawal_debit_cannot_omit_payout(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                case['outbox'] = []
+        outcome = self.probe('crates/zeno-fcis-cli/templates/withdrawal-queue', mutate,
+                             '2 181 2 180 0 0 0 170 162 170 1 193 0 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 510, outcome)
+
+    def test_withdrawal_payout_cannot_change_the_lane(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                for delivery in case['outbox']:
+                    delivery['payload']['150'] = 171
+        outcome = self.probe('crates/zeno-fcis-cli/templates/withdrawal-queue', mutate,
+                             '2 181 2 180 0 0 0 170 162 170 1 193 0 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 511, outcome)
 
 
 
@@ -95,8 +121,13 @@ class TemplateRules(unittest.TestCase):
 
 
 
-
-
+    def test_withdrawal_pending_lane_cannot_stutter_forever(self):
+        def mutate(policy):
+            policy['variables']['pay'] = '0'
+        outcome = self.probe('crates/zeno-fcis-cli/templates/withdrawal-queue', mutate,
+                             '2 182 2 180 0 0 0 170 162 170 1 193 0 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 504, outcome)
 
 
 
