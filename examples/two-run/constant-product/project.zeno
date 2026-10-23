@@ -1,0 +1,25 @@
+zeno 1;
+project 1 constant_product;
+namespace 2 core;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 105 int ReserveX in 1..=4;
+type 106 int ReserveY in 0..=3;
+type 107 int User in 0..=1;
+type 108 int Amount in 1..=2;
+field 110 100 reserve_x 105;
+field 111 100 reserve_y 106;
+field 112 100 alice_received 106;
+field 113 100 bob_received 106;
+field 120 101 user 107;
+field 121 101 amount 108;
+component 400 decision {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 256;
+}
+merge [400];
+law 500 bounded on commit, genesis = post.100.110 >= 0;
