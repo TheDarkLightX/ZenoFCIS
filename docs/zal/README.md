@@ -558,7 +558,7 @@ The first command prints this JSON:
   "status": "pass-with-scope",
   "revision": "62f361bbe3dbdb74bdbfe7050626e26f4d029990be5ddc1d37f9187dd729b8e0",
   "profile": "zal/finite-fsm/2",
-  "checker": "d4394e9fe2cea2744eb3c6abe1265522bd7f6ff1a9bac18d74b5a15f00d0b0b2",
+  "checker": "6546f5b0528f21913187a9686ea1b5bbe1d07b74e5d2f33f69f96a1708fdd097",
   "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
   "checks": {
     "initial_nonempty": "pass-with-scope",
@@ -668,7 +668,7 @@ The first command prints:
   "status": "pass-with-scope",
   "revision": "f9d5a4db71761f0ef6b9a5dff04bfec3189c617f56ff8cfe18b77facd49e9aef",
   "profile": "zal/finite-fsm/2",
-  "checker": "d4394e9fe2cea2744eb3c6abe1265522bd7f6ff1a9bac18d74b5a15f00d0b0b2",
+  "checker": "6546f5b0528f21913187a9686ea1b5bbe1d07b74e5d2f33f69f96a1708fdd097",
   "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
   "checks": {
     "initial_nonempty": "pass-with-scope",
@@ -790,7 +790,6 @@ merge [400];
 law 600 from_n0 on commit = true;
 // n1: configuration state=withdrawn variables=
 law 601 from_n1 on commit = true;
-expanded /tmp/withdrawal-deadline/project.zeno: tables=1 entries=2 inputs=4 domain=8
 ```
 
 The README replay test compares the first two command outputs byte for byte
@@ -816,7 +815,7 @@ The first command prints:
   "status": "pass-with-scope",
   "revision": "5eb629ebc9bff7c65dc6e06613dd1126f0cf4775a080f161adabbfb7531da3af",
   "profile": "zal/finite-fsm/2",
-  "checker": "d4394e9fe2cea2744eb3c6abe1265522bd7f6ff1a9bac18d74b5a15f00d0b0b2",
+  "checker": "6546f5b0528f21913187a9686ea1b5bbe1d07b74e5d2f33f69f96a1708fdd097",
   "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
   "checks": {
     "initial_nonempty": "pass-with-scope",
@@ -929,7 +928,6 @@ law 500 domains on commit, genesis = (post.100.210 >= 0 && post.100.210 <= 1 && 
 law 510 stable on commit = true;
 law 600 from_open on commit = true;
 law 601 from_withdrawn on commit = true;
-expanded /tmp/recurring-goals/project.zeno: tables=1 entries=2 inputs=4 domain=8
 ```
 
 The README replay test compares the check and export outputs byte for byte.
