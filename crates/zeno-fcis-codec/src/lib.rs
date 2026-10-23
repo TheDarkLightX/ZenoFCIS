@@ -1702,6 +1702,7 @@ use RustCryptoSha256 as TestHasher;
 /// Empty subtrees and singleton leaves collapse; branches with two or more
 /// entries retain their key-bit split. Sibling summaries are supplied by storage,
 /// not authenticated by this utility. No database or I/O enters a path update.
+#[cfg(not(verus_keep_ghost))]
 pub mod collection_merkle {
     use crate::{CommitmentHasher, RustCryptoSha256};
     use alloc::vec::Vec;
