@@ -29,7 +29,7 @@
     "64": "Invalid command-line usage."
   },
   "verdicts": {
-    "judged": "Exit 0 even with wrong, vacuous or individually refused rules. Read every detail.rules[].verdict and summary.complete.",
+    "judged": "Exit 0 only when all rules are exact/holds; wrong or refused rules exit 1, and an empty or vacuous/incomplete rule set exits 2. Read every detail.rules[].verdict and summary.complete.",
     "exact/holds/wrong/vacuous": "Rule-level classifications; holds can miss cases, wrong provides exceptions, vacuous has no active cases.",
     "refused": "Exit 1 for an invalid input or unsupported core.",
     "inconclusive/out-of-scope": "Exit 2; required/open/forbidden analysis can also be omitted with summary.required.not_computed."
@@ -79,7 +79,7 @@
   "commands": [
     "loop teach-back"
   ],
-  "pitfalls": "Rule agreement checks the implemented finite core; it does not establish owner intent or adopt the restatement. Rule-level wrong/refused results can occur inside an exit-0 judged report."
+  "pitfalls": "Rule agreement checks the implemented finite core; it does not establish owner intent or adopt the restatement. The judged status retains each rule verdict: wrong/refused exits 1 and vacuous/incomplete exits 2."
 }
 ```
 
@@ -127,7 +127,7 @@ Expected: exit 0; {}.
 
 ## Verdicts
 
-`judged`: Exit 0 even with wrong, vacuous or individually refused rules. Read every detail.rules[].verdict and summary.complete.
+`judged`: Exit 0 only when all rules are exact/holds; wrong or refused rules exit 1, and an empty or vacuous/incomplete rule set exits 2. Read every detail.rules[].verdict and summary.complete.
 
 `exact/holds/wrong/vacuous`: Rule-level classifications; holds can miss cases, wrong provides exceptions, vacuous has no active cases.
 
@@ -151,7 +151,7 @@ Use Commons advise before a checker loop and lease the exact subject. Record the
 
 ## Pitfalls
 
-Rule agreement checks the implemented finite core; it does not establish owner intent or adopt the restatement. Rule-level wrong/refused results can occur inside an exit-0 judged report.
+Rule agreement checks the implemented finite core; it does not establish owner intent or adopt the restatement. The judged status retains each rule verdict: wrong/refused exits 1 and vacuous/incomplete exits 2.
 
 Refusals and next steps: {"admissibility budget": "Read not_computed; do not treat missing counts as zero.", "rule syntax": "Use the supported fields/formulas; preserve precedence in where."}
 
@@ -169,7 +169,7 @@ Expected: exit 0; {"detail.rules.0.verdict": "exact", "status": "judged"}.
 
 **What is new here.** This card documents the implemented interface; it adds no algorithm or priority claim.
 
-**Scope.** Rule agreement checks the implemented finite core; it does not establish owner intent or adopt the restatement. Rule-level wrong/refused results can occur inside an exit-0 judged report.
+**Scope.** Rule agreement checks the implemented finite core; it does not establish owner intent or adopt the restatement. The judged status retains each rule verdict: wrong/refused exits 1 and vacuous/incomplete exits 2.
 
 Sources: crates/zeno-fcis-cli/src/loop_doors_command.rs; crates/zeno-fcis-cli/src/loop_judges.rs
 

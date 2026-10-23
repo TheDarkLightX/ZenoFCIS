@@ -27,12 +27,12 @@
     "0": "Completed report; read the operation-specific verdict and scope.",
     "1": "Refused input or refuted proposal, except the explicitly documented aggregate cases.",
     "2": "Inconclusive, incomplete or unavailable containment; no new acceptance.",
-    "3": "An open learning question; I/O failure where propagated.",
+    "3": "I/O failure where propagated.",
     "64": "Invalid command-line usage."
   },
   "verdicts": {
     "determined": "Exit 0 without reference: one proposed meaning per output fits; candidate was checked on examples only.",
-    "question": "Exit 3 without reference: several meanings fit and an unanswered input distinguishes them.",
+    "question": "Exit 2 without reference: several meanings fit and an unanswered input distinguishes them.",
     "outside-vocabulary/ambiguous/refused": "Exit 1; no accepted program. outside-vocabulary gives a proposed minimal conflicting example subset.",
     "qualified/refuted": "With reference, exits 0/1 respectively after complete reference checks; inspect capture/check/replay.",
     "inconclusive": "Exit 2; no qualified export. Completed example-learning evidence can remain after a later qualification stop."
@@ -185,7 +185,7 @@ Expected: exit 0; {}.
 
 `determined`: Exit 0 without reference: one proposed meaning per output fits; candidate was checked on examples only.
 
-`question`: Exit 3 without reference: several meanings fit and an unanswered input distinguishes them.
+`question`: Exit 2 without reference: several meanings fit and an unanswered input distinguishes them.
 
 `outside-vocabulary/ambiguous/refused`: Exit 1; no accepted program. outside-vocabulary gives a proposed minimal conflicting example subset.
 
@@ -193,7 +193,7 @@ Expected: exit 0; {}.
 
 `inconclusive`: Exit 2; no qualified export. Completed example-learning evidence can remain after a later qualification stop.
 
-Exit codes: {"0": "Completed report; read the operation-specific verdict and scope.", "1": "Refused input or refuted proposal, except the explicitly documented aggregate cases.", "2": "Inconclusive, incomplete or unavailable containment; no new acceptance.", "3": "An open learning question; I/O failure where propagated.", "64": "Invalid command-line usage."}
+Exit codes: {"0": "Completed report; read the operation-specific verdict and scope.", "1": "Refused input or refuted proposal, except the explicitly documented aggregate cases.", "2": "Inconclusive, incomplete or unavailable containment; no new acceptance.", "3": "I/O failure where propagated.", "64": "Invalid command-line usage."}
 
 Outputs: stdout zeno-fcis/loop-doors/2, door=learn, authority=none: status, detail.counts/before/by_size/question/core/candidate, work/limits; qualified results include capture and original-bound check/replay. Example fitting alone produces no equivalence receipt.
 

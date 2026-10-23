@@ -1,0 +1,236 @@
+{
+  "schema": "zeno-fcis/guide-card-inventory/1",
+  "cards": [
+    {
+      "name": "adversarial-synthesis-duel",
+      "commands": [],
+      "sha256": "cf24a9364962c727f2505bf74ad008c934450f6e221a52e2f408cad168ffe771"
+    },
+    {
+      "name": "check",
+      "commands": [
+        "check"
+      ],
+      "sha256": "e2d00d9beb8cf0f8074a4480bc9bb136c1247bf3b6c0b85a99ea58a18fb6fa5a"
+    },
+    {
+      "name": "contract-collections",
+      "commands": [
+        "contract collections"
+      ],
+      "sha256": "738bc8c7275efa9dbaecda7a6478796c0e68a16b6b1a1afb5f924742eaebd760"
+    },
+    {
+      "name": "contract-distribution",
+      "commands": [
+        "contract distribution"
+      ],
+      "sha256": "7cebfeefe453628fd97bf1f8c4f4050267a326ddcffaf27be988f4522add6805"
+    },
+    {
+      "name": "contract-gaps",
+      "commands": [
+        "contract review"
+      ],
+      "sha256": "1abf52a975d27f09f2764ac1b7a403600df1c71322710d1d7ac0b46f5a16e206"
+    },
+    {
+      "name": "contract-lemma",
+      "commands": [
+        "contract lemma"
+      ],
+      "sha256": "57f33ad53cb5c95516704788c782f1d5342ec9951431a142dda7825a78695373"
+    },
+    {
+      "name": "contract-probe",
+      "commands": [
+        "contract probe"
+      ],
+      "sha256": "54ab27203be7bf4bacdda05a4c7037b5dee10435ee9783796d026daa9aaa10f9"
+    },
+    {
+      "name": "contract-review",
+      "commands": [
+        "contract review",
+        "contract profile"
+      ],
+      "sha256": "e5a57f747fba3ba36fb358339014c2f51c5ccbebf9a016a708185a73f80aab2e"
+    },
+    {
+      "name": "contract-risk",
+      "commands": [
+        "contract risk"
+      ],
+      "sha256": "6a3df506a07affdc3328084ef7ab1c61d7f88438fe5454243f9ef668a0c08f56"
+    },
+    {
+      "name": "contract-scenario",
+      "commands": [
+        "contract scenario"
+      ],
+      "sha256": "59c2717365c55891ebce03adabca4348156d56c6839360b044043cb696649ca7"
+    },
+    {
+      "name": "generate",
+      "commands": [
+        "generate",
+        "generate contract"
+      ],
+      "sha256": "1e59ec2c6512b11a3291256ab537b11f40697d48e3fc9bd4f4beba25bbb11791"
+    },
+    {
+      "name": "knowledge",
+      "commands": [
+        "kb",
+        "kb advise",
+        "kb plan",
+        "kb replan",
+        "kb explain",
+        "kb check",
+        "kb query",
+        "kb replay",
+        "kb assess",
+        "kb assessment-queue",
+        "kb leaderboard"
+      ],
+      "sha256": "bb63ae6bfd137b0d167387d91eacdad6acade0a3b98e083c2e4566574d590330"
+    },
+    {
+      "name": "loop-capture",
+      "commands": [
+        "loop capture",
+        "loop capture open",
+        "loop capture whole",
+        "loop capture packet",
+        "loop capture candidate",
+        "loop capture status"
+      ],
+      "sha256": "dd7fb52728a3cb0b6d32b5ef6e97140c81f03641cde6d7032d07990a034adfbe"
+    },
+    {
+      "name": "loop-family",
+      "commands": [
+        "loop family"
+      ],
+      "sha256": "c328901313d92b991a437f6dbc17a5af8d6c9ce926999a418fa85bde81c7c140"
+    },
+    {
+      "name": "loop-learn",
+      "commands": [
+        "loop learn"
+      ],
+      "sha256": "44bde5ee0a48e0780b1fc9fcab23b365470e5be18b2ba07a4e95d1cf7e6bc572"
+    },
+    {
+      "name": "loop-pipeline",
+      "commands": [
+        "loop pipeline"
+      ],
+      "sha256": "0f21bbd3860e2f72be3688feadd48531a06e5e516650b72ee12f5bc3ee8cdca4"
+    },
+    {
+      "name": "loop-question",
+      "commands": [
+        "loop question"
+      ],
+      "sha256": "3ac0e4c25e184390f7d8cada80d7b48473f973ab60970fe09d7dfe45c5a4b893"
+    },
+    {
+      "name": "loop-rules",
+      "commands": [
+        "loop rules"
+      ],
+      "sha256": "62fe4f6332a0087ce4695f9912df9c7542bf7f5379da7baf29e2d08904bfb5aa"
+    },
+    {
+      "name": "loop-strategy",
+      "commands": [
+        "loop strategy"
+      ],
+      "sha256": "c0852791d02d0910e470c9b659d2b7499511d293fa1a244cbaaeb8b0e8577450"
+    },
+    {
+      "name": "loop-teach-back",
+      "commands": [
+        "loop teach-back"
+      ],
+      "sha256": "12bafbc4351fa39243d3f8d1f24fe565dec6ad8620e845822849b4a484e108cf"
+    },
+    {
+      "name": "loop-transfer",
+      "commands": [
+        "loop transfer"
+      ],
+      "sha256": "3d99e7efa551f95e1aaa56d594aae65189540dabf1b04c9ddc6e5d012e9b4e0f"
+    },
+    {
+      "name": "loop-workspace",
+      "commands": [
+        "loop",
+        "loop open",
+        "loop candidate",
+        "loop run",
+        "loop resume",
+        "loop encode",
+        "loop print"
+      ],
+      "sha256": "128c3a744f9b00f5783ffe80e6c18c0efe8b4aaedb107b4a58665e0144727d0d"
+    },
+    {
+      "name": "new",
+      "commands": [
+        "new"
+      ],
+      "sha256": "082e880fe7c848c946871cb6ed1e4e532095b7fef74b9cdbf9d2cca0403b4d23"
+    },
+    {
+      "name": "program-search",
+      "commands": [
+        "optimize"
+      ],
+      "sha256": "c731e5dbe532997445073addea000cecc5ae328f3b53c646e05cfaa883ffdee4"
+    },
+    {
+      "name": "prove",
+      "commands": [
+        "prove",
+        "counterexample",
+        "doctor",
+        "backend inspect",
+        "backend verify"
+      ],
+      "sha256": "23380d3f76bd76699e412dd577f23decea135cd21a35aff8aa29352aa754ad46"
+    },
+    {
+      "name": "synth",
+      "commands": [
+        "synth",
+        "synth discover",
+        "synth run",
+        "synth verify"
+      ],
+      "sha256": "0eae7d010196e6d0ff07b9ba2710a60efe07bb2dd1662d76587bd7266e293e35"
+    },
+    {
+      "name": "trace-game",
+      "commands": [],
+      "sha256": "a04d8c3c69d4174555a1a8914304425591a7b3473b46023e50429f77c41c3aaa"
+    },
+    {
+      "name": "transform",
+      "commands": [
+        "transform",
+        "transform check",
+        "transform replay",
+        "transform check-certificates",
+        "transform replay-certificates"
+      ],
+      "sha256": "51cf3549b74eb7413e70bf724b582b09d1a3d57334db46a9610e252cd5581199"
+    },
+    {
+      "name": "zal",
+      "commands": [],
+      "sha256": "32a1c9bf80d716b6b14031d83cfd4b80069d9a2e2c2dc1079a1919b91b6e161d"
+    }
+  ]
+}

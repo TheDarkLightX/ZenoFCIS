@@ -30,9 +30,9 @@
     "64": "Invalid command-line usage."
   },
   "verdicts": {
-    "open/determined": "Contract completed reports exit 0, including disagreeing answers; inspect every detail.answers[].status. Determination includes reason and delivery constraints.",
+    "open/determined": "Contract open/determined reports exit 0 when answers agree; a disagreeing answer exits 1. Inspect every detail.answers[].status. Determination includes reason and delivery constraints.",
     "conflict/inconsistent/refused": "Contract exit 1; retain the conflicting input or fix the input.",
-    "question/no-completion/determined": "Requirements mode exits 0 for all three: question/count alone is advisory, singleton acceptance needs its explicit law/check/replay evidence.",
+    "question/no-completion/determined": "Requirements determined exits 0, no-completion exits 1 and question exits 2. Question/count alone is advisory; singleton acceptance needs its explicit law/check/replay evidence.",
     "inconclusive/out-of-scope": "Exit 2; no claim beyond the retained completed evidence."
   },
   "limits": {
@@ -196,11 +196,11 @@ Expected: exit 0; {"schema": "zeno-fcis/loop-version-space/2", "status": "determ
 
 ## Verdicts
 
-`open/determined`: Contract completed reports exit 0, including disagreeing answers; inspect every detail.answers[].status. Determination includes reason and delivery constraints.
+`open/determined`: Contract open/determined reports exit 0 when answers agree; a disagreeing answer exits 1. Inspect every detail.answers[].status. Determination includes reason and delivery constraints.
 
 `conflict/inconsistent/refused`: Contract exit 1; retain the conflicting input or fix the input.
 
-`question/no-completion/determined`: Requirements mode exits 0 for all three: question/count alone is advisory, singleton acceptance needs its explicit law/check/replay evidence.
+`question/no-completion/determined`: Requirements determined exits 0, no-completion exits 1 and question exits 2. Question/count alone is advisory; singleton acceptance needs its explicit law/check/replay evidence.
 
 `inconclusive/out-of-scope`: Exit 2; no claim beyond the retained completed evidence.
 
