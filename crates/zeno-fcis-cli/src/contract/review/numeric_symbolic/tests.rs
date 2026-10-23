@@ -397,3 +397,61 @@ fn pinned_numeric_review_checks_unlawful_declared_pre_states() {
     assert_eq!(failed["counterexample"]["values"][0]["value"], "0");
     assert_eq!(failed["counterexample"]["authority"]["law"], 500);
 }
+
+const ALERT_PROJECT: &str = include_str!("../../../../templates/account-lockout/project.zeno");
+const ALERT_RULES: &str = include_str!("../../../../templates/account-lockout/v2/policy.json");
+
+/// Account-lockout laws observe an alert's text destination and sum-typed kind
+/// under a guard whose default has another kind; both must encode.
+#[test]
+fn mixed_kind_guarded_observations_encode() {
+    with_contract(ALERT_PROJECT, ALERT_RULES, |c, _| {
+        Encoding::new(c, "p", Script::default(), None).unwrap_or_else(|error| panic!("{error:?}"));
+    });
+}
+
+fn alert_policy(change: impl Fn(&mut Json)) -> String {
+    let mut r: Json = serde_json::from_str(ALERT_RULES).unwrap_or_else(|error| panic!("{error:?}"));
+    let case = r["cases"]
+        .as_array_mut()
+        .unwrap_or_else(|| panic!("expected cases"))
+        .iter_mut()
+        .find(|case| case["class"] == "CommittedFailure" && case["outbox"][0].is_object())
+        .unwrap_or_else(|| panic!("expected the lock alert case"));
+    change(&mut case["outbox"][0]);
+    r.to_string()
+}
+
+#[test]
+#[ignore = "requires both qualification solver binaries"]
+fn pinned_numeric_mixed_kind_alert_laws() {
+    let solvers = pinned();
+    let mut run = |rules: &str| {
+        review(
+            ReviewSources {
+                project: ALERT_PROJECT,
+                rules,
+                examples: None,
+            },
+            &mut |q| solvers.solve(q),
+            false,
+        )
+        .unwrap_or_else(|error| panic!("{error:?}"))
+    };
+    let result = run(ALERT_RULES);
+    assert_eq!(result["status"], "solver-checked", "{result}");
+    for (law, rules) in [
+        (511, alert_policy(|o| o["destination"] = json!("ops-team"))),
+        (510, alert_policy(|o| o["payload"]["140"] = json!(151))),
+    ] {
+        let result = run(&rules);
+        assert_eq!(result["status"], "refuted", "{result}");
+        let broken = result["obligations"]
+            .as_array()
+            .unwrap_or_else(|| panic!("expected array"))
+            .iter()
+            .find(|o| o["law"] == law && o["status"] == "refuted")
+            .unwrap_or_else(|| panic!("expected refuted law {law}: {result}"));
+        assert_eq!(broken["counterexample"]["authority"]["law"], law);
+    }
+}

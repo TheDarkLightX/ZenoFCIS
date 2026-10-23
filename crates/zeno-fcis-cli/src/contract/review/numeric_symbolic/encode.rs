@@ -158,6 +158,10 @@ fn products(a: [Value; 3], b: [Value; 3], guards: &mut Vec<Term>) -> Result<Valu
     };
     Ok(boolean(Term::le(product(b), product(a))))
 }
+/// Split points per law for guarded observations with mixed kinds. Each split
+/// encodes the rest of the law twice, so the total is capped (63 allows six
+/// nested splits) and a law beyond it stays UNKNOWN.
+const MIXED_OBSERVATION_SPLITS: usize = 63;
 fn select(c: Value, a: Value, b: Value) -> Result<Value, ContractError> {
     if c.kind != Kind::Bool || a.kind != b.kind {
         return Err(error("ill-typed selection"));
@@ -623,16 +627,33 @@ impl Encoding {
         case: Option<usize>,
         prefix: &str,
     ) -> Result<Term, ContractError> {
-        let mut nodes: Vec<Value> = Vec::new();
         // A transition law can read computed outputs only after successful
         // eager execution/reification. Disable its auxiliary relations when
         // that prefix failed, so later laws cannot erase an earlier trap.
-        let mut guards = if case.is_some() {
+        let guards = if case.is_some() {
             vec![self.program_ok.clone()]
         } else {
             Vec::new()
         };
-        for (i, op) in law.nodes.iter().enumerate() {
+        let mut splits = 0;
+        self.law_from(c, law, case, prefix, 0, Vec::new(), guards, &mut splits)
+    }
+    /// Encode law nodes from `start` onward. A guarded observation whose value
+    /// and default differ in kind has no single sort, so the rest of the law is
+    /// encoded once per guard outcome, each branch holding one exact value.
+    #[allow(clippy::too_many_arguments)]
+    fn law_from(
+        &mut self,
+        c: &Contract<'_>,
+        law: &crate::contract::model::Law,
+        case: Option<usize>,
+        prefix: &str,
+        start: usize,
+        mut nodes: Vec<Value>,
+        mut guards: Vec<Term>,
+        splits: &mut usize,
+    ) -> Result<Term, ContractError> {
+        for (i, op) in law.nodes.iter().enumerate().skip(start) {
             let at = |i: usize| {
                 nodes
                     .get(i)
@@ -651,6 +672,39 @@ impl Encoding {
                     let guard = at(*g)?;
                     let default = literal(default);
                     match self.observe(c, *o, case)? {
+                        Some(v) if guard.kind == Kind::Bool && v.kind != default.kind => {
+                            *splits += 1;
+                            if *splits > MIXED_OBSERVATION_SPLITS {
+                                return Err(error("too many mixed-kind guarded observations"));
+                            }
+                            let mut branches = Vec::new();
+                            for (tag, value, condition) in [
+                                ("t", v, guard.term.clone()),
+                                ("f", default, Term::not(guard.term.clone())),
+                            ] {
+                                let name = format!("{prefix}{i}{tag}");
+                                let mut taken = nodes.clone();
+                                taken.push(save(&mut self.script, &name, value));
+                                let rest = self.law_from(
+                                    c,
+                                    law,
+                                    case,
+                                    &format!("{name}_"),
+                                    i + 1,
+                                    taken,
+                                    Vec::new(),
+                                    splits,
+                                )?;
+                                branches.push(Term::and(vec![condition, rest]));
+                            }
+                            for edge in arithmetic_edges(&guards) {
+                                if !self.edges.contains(&edge) {
+                                    self.edges.push(edge);
+                                }
+                            }
+                            guards.push(Term::or(branches));
+                            return Ok(Term::and(guards));
+                        }
                         Some(v) => select(guard, v, default)?,
                         None => {
                             guards.push(Term::not(guard.term));
