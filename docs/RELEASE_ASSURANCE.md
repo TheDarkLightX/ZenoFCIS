@@ -255,10 +255,13 @@ These are the finite corpora the tests enumerate, not every value a production
 descriptor admits. Account covers nine selected clock and deadline values, not
 the timestamp range. Treasury covers three partitions, not the full Cartesian
 domain. In the hosted Miri run of 916b28e none of the target's tests finished
-within its 180-minute budget. The tests still run natively, unchanged in bounds
-and independent comparisons, in the `ci` workflow's `rust` job.
+within its 180-minute budget. The tests still run natively with the same raw corpus bounds in the `ci`
+workflow's `rust` job. Order and withdrawal add day zero to historical inputs.
+Withdrawal keeps oversized historical reservation inputs as explicit ingress
+refusal controls; treasury checks the last-tick proposal refusal. Independent
+expectations and bounded witnesses track those strengthened rules.
 
-Under Miri, eight `miri_bounded_profile_*` tests, one per corpus, run 92
+Under Miri, eight `miri_bounded_profile_*` tests, one per corpus, run 97
 pinned cases from the eight corpora through the same checked path and
 independent comparison. The same cases run natively. For each corpus, the cases come in a fixed ascending order
 with a pinned count, and each is an actual native case. The test fails unless

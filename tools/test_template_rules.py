@@ -151,8 +151,33 @@ class TemplateRules(unittest.TestCase):
         self.assertEqual(outcome['class'], 'Refused', outcome)
         self.assertEqual(outcome['law'], 511, outcome)
 
+    def test_order_checkout_cannot_omit_capture_request(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                case['outbox'] = []
+        outcome = self.probe('crates/zeno-fcis-cli/templates/order-fulfillment', mutate,
+                             '160 0 150 0 170 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 512, outcome)
 
+    def test_order_valid_checkout_cannot_be_rejected(self):
+        def mutate(policy):
+            policy['cases'].insert(0, {'when':'action == 150','class':'Reject','reason':200,'post':{},'outbox':[]})
+        outcome = self.probe('crates/zeno-fcis-cli/templates/order-fulfillment', mutate,
+                             '160 0 150 0 170 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 510, outcome)
 
+    def test_order_timeout_cannot_replace_refund_with_capture(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                for delivery in case['outbox']:
+                    if delivery['channel'] == 300 and delivery['payload']['141'] == 177:
+                        delivery['payload']['141'] = 175
+        outcome = self.probe('crates/zeno-fcis-cli/templates/order-fulfillment', mutate,
+                             '162 1 156 0 170 4')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 512, outcome)
 
     def test_withdrawal_pending_lane_cannot_stutter_forever(self):
         def mutate(policy):
@@ -162,6 +187,18 @@ class TemplateRules(unittest.TestCase):
         self.assertEqual(outcome['class'], 'Refused', outcome)
         self.assertEqual(outcome['law'], 504, outcome)
 
+    def test_compliance_and_order_refuse_the_original_deny_all_counterpolicy(self):
+        def mutate(policy):
+            # The remaining cases are unreachable but retain every declared reason.
+            policy['cases'].insert(0, {'when': 'true', 'class': 'Reject', 'reason': 200, 'post': {}, 'outbox': []})
+        for application, values, law in [
+            ('compliance-gateway', '0 150 160 1 165 2 0', 506),
+            ('order-fulfillment', '160 0 150 0 170 0', 510),
+        ]:
+            with self.subTest(application=application):
+                outcome = self.probe('crates/zeno-fcis-cli/templates/' + application, mutate, values)
+                self.assertEqual(outcome['class'], 'Refused', outcome)
+                self.assertEqual(outcome['law'], law, outcome)
 
 
 if __name__ == '__main__':

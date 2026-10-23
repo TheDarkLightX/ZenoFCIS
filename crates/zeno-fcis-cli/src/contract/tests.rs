@@ -314,7 +314,7 @@ fn rule_precedence_and_tokens_outside_the_language_refuse() {
 // Replaces test_complete_original_definitions_and_scopes.
 #[test]
 fn templates_declare_complete_types_and_scoped_laws() {
-    for (name, count) in TEMPLATES.into_iter().zip([6, 9, 12, 10, 15, 21, 7, 15]) {
+    for (name, count) in TEMPLATES.into_iter().zip([6, 9, 13, 10, 15, 21, 7, 15]) {
         let files = template(name);
         let declarations = files.declarations();
         assert_eq!(declarations.types.len(), count, "{name}");

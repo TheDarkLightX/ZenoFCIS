@@ -1,0 +1,34 @@
+# scenario payment_timeout
+160 0 150 0 170 0 | accept - 161 1 | 300 1 175
+161 1 156 0 170 1 | reject 206 161 1 | -
+161 1 156 0 170 2 | accept - 165 1 | 300 1 176
+165 1 151 1 171 2 | reject 201 165 1 | -
+# scenario paid_carrier_silence
+160 0 150 0 170 0 | accept - 161 1 | 300 1 175
+161 1 151 1 171 1 | accept - 162 1 | 301 1
+162 1 156 0 170 3 | reject 206 162 1 | -
+162 1 156 0 170 4 | accept - 165 1 | 300 1 177
+165 1 156 0 170 4 | reject 201 165 1 | -
+# scenario shipped_without_delivery
+160 0 150 0 170 0 | accept - 161 1 | 300 1 175
+161 1 151 1 171 1 | accept - 162 1 | 301 1
+162 1 153 0 172 3 | accept - 163 1 | -
+163 1 154 0 172 6 | reject 205 163 1 | -
+163 1 156 0 170 6 | accept - 165 1 | 300 1 177
+# scenario confirmed_then_release
+160 0 150 0 170 0 | accept - 161 1 | 300 1 175
+161 1 151 1 171 1 | accept - 162 1 | 301 1
+162 1 153 0 172 3 | accept - 163 1 | -
+163 1 154 0 172 5 | accept - 164 1 | -
+164 1 157 0 170 7 | reject 206 164 1 | -
+164 1 157 0 170 8 | accept - 166 1 | 300 1 178
+166 1 158 0 170 8 | reject 201 166 1 | -
+# scenario confirmed_then_disputed
+160 0 150 0 170 0 | accept - 161 1 | 300 1 175
+161 1 151 1 171 1 | accept - 162 1 | 301 1
+162 1 153 0 172 3 | accept - 163 1 | -
+163 1 154 0 172 5 | accept - 164 1 | -
+164 1 158 0 170 7 | accept - 165 1 | 300 1 177
+# scenario final_day_checkout_has_exit
+160 0 150 0 170 8 | accept - 161 1 | 300 1 175
+161 1 156 0 170 8 | accept - 165 1 | 300 1 176

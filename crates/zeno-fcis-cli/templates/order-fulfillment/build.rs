@@ -62,7 +62,7 @@ fn main() {
         .iter()
         .map(|reason| {
             let disposition = match reason.id().get() {
-                200..=203 => ReasonDisposition::Reject,
+                200..=203 | 205 | 206 => ReasonDisposition::Reject,
                 204 => ReasonDisposition::CommittedFailure,
                 _ => panic!("new reason needs a reviewed disposition"),
             };
@@ -84,7 +84,7 @@ fn main() {
             // in the provider's system, not in this state: the provider's
             // answer comes back as a command.
             let meaning: &[u8] = match channel.id().get() {
-                300 => b"Payment capture or void request; no value moves in this state",
+                300 => b"Payment capture, void, refund or release request; no value moves in this state",
                 301 => b"Shipping label request; no value transfer",
                 _ => panic!("new channel requires reviewed semantics"),
             };

@@ -41,7 +41,9 @@ pub(crate) fn current_value(template: usize, root: u32, value: &Value) -> Value 
         return value.clone();
     };
     let mut lifted = fields.to_vec();
-    if template == 5 && root == 102 {
+    if template == 3 && root == 102 {
+        lifted.push(Field::new(131, Value::signed(0)));
+    } else if template == 5 && root == 102 {
         lifted.push(Field::new(142, Value::signed(0)));
     }
     Value::normalize_record(lifted).expect("unique added deadline fields")
@@ -226,6 +228,7 @@ pub(crate) fn compare<P, L, I>(
     // Schema revisions retain historical payload semantics on the common
     // domain; current framing must still be checked by the new Authority.
     let revision = match template {
+        3 => Some(order_fulfillment::FRAMING.state.schema),
         4 => Some(agent_treasury_guard::FRAMING.state.schema),
         5 => Some(withdrawal_queue::FRAMING.state.schema),
         _ => None,

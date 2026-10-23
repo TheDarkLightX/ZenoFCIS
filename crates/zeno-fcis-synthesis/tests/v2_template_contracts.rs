@@ -50,7 +50,7 @@ const STOCK_COMMAND: &[(u16, Leaf)] = &[(120, Sum(107)), (121, Int)];
 const STOCK_CONTEXT: &[(u16, Leaf)] = &[(130, Bool)];
 const ORDER_STATE: &[(u16, Leaf)] = &[(120, Sum(105)), (121, Int)];
 const ORDER_COMMAND: &[(u16, Leaf)] = &[(125, Sum(111)), (126, Int)];
-const ORDER_CONTEXT: &[(u16, Leaf)] = &[(130, Sum(107))];
+const ORDER_CONTEXT: &[(u16, Leaf)] = &[(130, Sum(107)), (131, Int)];
 const ACCOUNT_STATE: &[(u16, Leaf)] = &[(110, Int), (111, Int), (112, Int)];
 const ACCOUNT_CONTEXT: &[(u16, Leaf)] = &[(130, Int), (131, Bool)];
 const VAULT_STATE: &[(u16, Leaf)] = &[
@@ -1210,7 +1210,11 @@ const ORDER_CORPUS: Corpus = Corpus {
         ("callback", &[0, 1, 2, 3]),
         ("caller", &[170, 171, 172]),
     ],
-    input: |d| d.to_vec(),
+    input: |d| {
+        let mut all = d.to_vec();
+        all.push(0);
+        all
+    },
     outcomes: &[
         "accept",
         "failure 204",

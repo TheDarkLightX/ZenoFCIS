@@ -1106,7 +1106,7 @@ fn shipped_order_status_is_consumed_by_a_split_and_generation_rechecks_it() {
     application_from(&app, &template);
     let report = admitted(&evolve(&app, &target, &[&target.join("migration.json")]));
     assert_eq!(report["kind"], "layout-change");
-    simulation_counts(&report, (24, 20, 1, 1_440));
+    simulation_counts(&report, (28, 23, 1, 22_356));
     assert!(report["evolution"]["migration"].get("dropped").is_none());
     admitted(&check(&app));
 

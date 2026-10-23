@@ -18,6 +18,7 @@ export const template = {
   fields: ["status", "payment_attempts"],
   help: "Choose the caller, then send a message: an action from the customer, a payment provider's answer naming the attempt it is about, or a carrier's report.",
   context: [
+    { name: "now", label: "Current day (0 to 8)", kind: "integer", min: 0, max: 8, initial: 0 },
     { name: "caller", label: "Caller", kind: "choice", options: [["Customer", "Customer"], ["PaymentProvider", "Payment provider"], ["Carrier", "Carrier"]], initial: "Customer" },
   ],
   commands: [
@@ -27,6 +28,9 @@ export const template = {
     { name: "ParcelDispatched", label: "Parcel dispatched", fields: [] },
     { name: "ParcelDelivered", label: "Parcel delivered", fields: [] },
     { name: "CancelOrder", label: "Cancel order", fields: [] },
+    { name: "TimeoutOrder", label: "Recover after timeout", fields: [] },
+    { name: "DisputeDelivery", label: "Dispute delivery before day 8", fields: [] },
+    { name: "ReleaseDelivered", label: "Release delivered payment at day 8", fields: [] },
   ],
   genesis: "Placed, with no payment attempt, nothing queued",
   outbox: "Payment requests to payment-provider on channel 300 (payment_request), numbered with the attempt, and shipping requests to carrier on channel 301 (shipping_request). Nothing delivers in this page, so each stays pending with its delivery identity.",

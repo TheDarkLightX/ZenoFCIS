@@ -30,12 +30,13 @@
     "callback": "command.101.126",
     "caller": "context.102.130",
     "payment": "action == 151 || action == 152",
-    "sender": "choose(action == 150 || action == 155, 170, choose(payment, 171, 172))",
-    "legal": "(action == 150 && status == 160) || (payment && status == 161) || (action == 153 && status == 162) || (action == 154 && status == 163) || (action == 155 && (status == 160 || status == 161))"
+    "sender": "choose(action == 150 || action == 155 || action == 156 || action == 158, 170, choose(payment, 171, 172))",
+    "legal": "(action == 150 && status == 160) || (payment && status == 161) || (action == 153 && status == 162) || (action == 154 && status == 163) || (action == 155 && (status == 160 || status == 161)) || (action == 156 && (status == 161 || status == 162 || status == 163)) || ((action == 157 || action == 158) && status == 164)",
+    "now": "context.102.131"
   },
   "cases": [
     {
-      "when": "caller != sender",
+      "when": "action != 157 && caller != sender",
       "class": "Reject",
       "reason": 200,
       "post": {},
@@ -61,6 +62,83 @@
       "reason": 203,
       "post": {},
       "outbox": []
+    },
+    {
+      "when": "(action == 151 && now >= 2) || (action == 153 && now >= 4) || (action == 154 && now >= 6) || (action == 158 && now >= 8)",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "(action == 156 && ((status == 161 && now < 2) || (status == 162 && now < 4) || (status == 163 && now < 6))) || (action == 157 && now < 8)",
+      "class": "Reject",
+      "reason": 206,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 156 && status == 161",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": 165,
+        "121": "attempts"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "payment-provider",
+          "payload": {
+            "140": "attempts",
+            "141": 176
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "action == 156 || action == 158",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": 165,
+        "121": "attempts"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "payment-provider",
+          "payload": {
+            "140": "attempts",
+            "141": 177
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "action == 157",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": 166,
+        "121": "attempts"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "payment-provider",
+          "payload": {
+            "140": "attempts",
+            "141": 178
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
     },
     {
       "when": "action == 150",
@@ -176,7 +254,71 @@
     "503": "AuthoritySubjectRecipient",
     "504": "AuthoritySubjectRecipient",
     "505": "AuthoritySubjectRecipient",
-    "506": "CommittedFailureEffects"
+    "506": "CommittedFailureEffects",
+    "507": "AuthoritySubjectRecipient",
+    "508": "StateInvariant",
+    "510": "RejectNoAuthority",
+    "511": "AuthoritySubjectRecipient",
+    "512": "AuthoritySubjectRecipient",
+    "513": "AuthoritySubjectRecipient",
+    "514": "AuthoritySubjectRecipient",
+    "515": "AuthoritySubjectRecipient",
+    "516": "CommittedFailureEffects"
   },
-  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes."
+  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes.",
+  "framework_reject_law": 509,
+  "delivery_laws": {
+    "512": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.140": {
+          "channel": 300,
+          "field": 140
+        },
+        "outbox.104.141": {
+          "channel": 300,
+          "field": 141
+        }
+      }
+    },
+    "513": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.110": {
+          "channel": 301
+        },
+        "outbox.110.145": {
+          "channel": 301,
+          "field": 145
+        }
+      }
+    },
+    "514": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300,
+          "destination": "payment-provider"
+        }
+      }
+    },
+    "515": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.110": {
+          "channel": 301,
+          "destination": "carrier"
+        }
+      }
+    }
+  },
+  "clock": {
+    "field": 131,
+    "unit": "days",
+    "epoch": "2026-11-01",
+    "after_max": "hold"
+  }
 }

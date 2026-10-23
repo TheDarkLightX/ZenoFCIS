@@ -675,17 +675,17 @@ fn refusals_on_pre_states_the_state_laws_exclude_are_reported_apart() {
     assert!(review.law_refusal_lines().is_empty());
     let packet = packet(&review);
     let refusals = &packet["refusals"];
-    assert_eq!(refusals["state_laws"], json!([500]));
+    assert_eq!(refusals["state_laws"], json!([500, 508]));
     assert_eq!(
         refusals["counts"],
         json!({
-            "count": 9,
-            "by_class": {"law": 9},
+            "count": 54,
+            "by_class": {"law": 54},
             "on_law_consistent_states": {"count": 0, "by_class": {}},
-            "on_states_the_laws_exclude": {"count": 9, "by_class": {"law": 9}},
+            "on_states_the_laws_exclude": {"count": 54, "by_class": {"law": 54}},
         })
     );
-    assert_eq!(refusals["by_unsatisfied_state_law"], json!({"500": 9}));
+    assert_eq!(refusals["by_unsatisfied_state_law"], json!({"500": 54}));
     // Law 500 asks an order awaiting payment for at least one payment
     // attempt; these pre-states have none, so no committed state is one.
     let group = &refusals["groups"][0];
@@ -702,12 +702,8 @@ fn refusals_on_pre_states_the_state_laws_exclude_are_reported_apart() {
         .filter_map(Value::as_str)
         .filter(|row| row.contains("| refused"))
         .collect();
-    assert_eq!(refused.len(), 9);
-    assert!(
-        refused
-            .iter()
-            .all(|row| row.ends_with("| refused 0 unsatisfied 500"))
-    );
+    assert_eq!(refused.len(), 54);
+    assert!(refused.iter().all(|row| row.ends_with("unsatisfied 500")));
 }
 
 #[test]
@@ -716,7 +712,7 @@ fn the_decision_table_agrees_with_every_owner_example() {
         ("durable-counter", 12, 64),
         ("prepared-counter", 0, 216),
         ("inventory-reservation", 20, 864),
-        ("order-fulfillment", 23, 1728),
+        ("order-fulfillment", 23, 27216),
     ] {
         let review = App::template(name).review();
         let summary = review.summary();
@@ -977,8 +973,10 @@ fn every_template_examples_file_reads_as_it_did_before_the_shared_grammar() {
         let rendered: String = examples
             .iter()
             .map(|example| {
+                // The added clock is zero in every shipped sequence. Preserve
+                // the original grammar fingerprint after projecting it away.
                 let mut inputs = example.inputs.clone();
-                if name == "withdrawal-queue" {
+                if matches!(name, "order-fulfillment" | "withdrawal-queue") {
                     assert_eq!(inputs.pop(), Some(0));
                 }
                 format!(
