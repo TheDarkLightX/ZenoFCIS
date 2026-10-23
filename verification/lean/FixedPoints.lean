@@ -101,20 +101,23 @@ theorem weight_order {a b : Bits n} (h : Below a b) :
     cases ha : a 0 <;> cases hb : b 0 <;>
       simp only [weight, ha, hb, Bool.false_eq_true, if_false, if_true]
     · exact ⟨by omega, fun he => join (ha.trans hb.symm) (heq (by omega))⟩
-    · exact ⟨by omega, fun he => by omega⟩
+    · exact ⟨by omega, fun he => False.elim (by omega)⟩
     · have bad : false = true := hb.symm.trans (h0 ha)
       cases bad
     · exact ⟨by omega, fun he => join (ha.trans hb.symm) (heq (by omega))⟩
 
 theorem ascending_repeats (f : Bits n → Bits n) (hm : Monotone f) :
     ∃ k, k ≤ n ∧ iter f bottom k = iter f bottom (k + 1) := by
-  classical
-  apply Classical.byContradiction
+  suffices boundedRepeat : ∃ k : Fin (n + 1), ∀ i : Fin n,
+      iter f bottom k i = iter f bottom (k + 1) i by
+    obtain ⟨k, hk⟩ := boundedRepeat
+    exact ⟨k, Nat.le_of_lt_succ k.isLt, funext hk⟩
+  apply Decidable.byContradiction
   intro hn
   have strict : ∀ k, k ≤ n → weight (iter f bottom k) < weight (iter f bottom (k + 1)) := by
     intro k hk
     have ⟨hle, heq⟩ := weight_order (ascending f hm k)
-    have ne : iter f bottom k ≠ iter f bottom (k + 1) := fun e => hn ⟨k, hk, e⟩
+    have ne : iter f bottom k ≠ iter f bottom (k + 1) := fun e => hn ⟨⟨k, Nat.lt_succ_of_le hk⟩, fun i => congrFun e i⟩
     have : weight (iter f bottom k) ≠ weight (iter f bottom (k + 1)) := fun e => ne (heq e)
     omega
   have grows : ∀ k, k ≤ n + 1 → k ≤ weight (iter f bottom k) := by
@@ -132,13 +135,16 @@ theorem ascending_repeats (f : Bits n → Bits n) (hm : Monotone f) :
 
 theorem descending_repeats (f : Bits n → Bits n) (hm : Monotone f) :
     ∃ k, k ≤ n ∧ iter f top k = iter f top (k + 1) := by
-  classical
-  apply Classical.byContradiction
+  suffices boundedRepeat : ∃ k : Fin (n + 1), ∀ i : Fin n,
+      iter f top k i = iter f top (k + 1) i by
+    obtain ⟨k, hk⟩ := boundedRepeat
+    exact ⟨k, Nat.le_of_lt_succ k.isLt, funext hk⟩
+  apply Decidable.byContradiction
   intro hn
   have strict : ∀ k, k ≤ n → weight (iter f top (k + 1)) < weight (iter f top k) := by
     intro k hk
     have ⟨hle, heq⟩ := weight_order (descending f hm k)
-    have ne : iter f top (k + 1) ≠ iter f top k := fun e => hn ⟨k, hk, e.symm⟩
+    have ne : iter f top (k + 1) ≠ iter f top k := fun e => hn ⟨⟨k, Nat.lt_succ_of_le hk⟩, fun i => congrFun e.symm i⟩
     have : weight (iter f top (k + 1)) ≠ weight (iter f top k) := fun e => ne (heq e)
     omega
   have shrinks : ∀ k, k ≤ n + 1 → weight (iter f top k) + k ≤ n := by

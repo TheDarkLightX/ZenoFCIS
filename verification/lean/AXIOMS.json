@@ -33,7 +33,6 @@
   ],
   "FixedPoints.ascending": [],
   "FixedPoints.ascending_repeats": [
-    "Classical.choice",
     "Quot.sound",
     "propext"
   ],
@@ -47,12 +46,10 @@
   "FixedPoints.bottom_below": [],
   "FixedPoints.descending": [],
   "FixedPoints.descending_repeats": [
-    "Classical.choice",
     "Quot.sound",
     "propext"
   ],
   "FixedPoints.gfp_greatest": [
-    "Classical.choice",
     "Quot.sound",
     "propext"
   ],
@@ -69,12 +66,10 @@
     "propext"
   ],
   "FixedPoints.lfp_least": [
-    "Classical.choice",
     "Quot.sound",
     "propext"
   ],
   "FixedPoints.nested_stable": [
-    "Classical.choice",
     "Quot.sound",
     "propext"
   ],
@@ -91,12 +86,10 @@
     "propext"
   ],
   "FixedPoints.weight_order": [
-    "Classical.choice",
     "Quot.sound",
     "propext"
   ],
   "IndexedFixedPoints.bounded_certificate": [
-    "Classical.choice",
     "Quot.sound",
     "propext"
   ],
@@ -124,7 +117,6 @@
     "propext"
   ],
   "IndexedFixedPoints.concrete_certificate": [
-    "Classical.choice",
     "Quot.sound",
     "propext"
   ],
@@ -136,17 +128,14 @@
     "propext"
   ],
   "IndexedFixedPoints.full_middle_repeat": [
-    "Classical.choice",
     "Quot.sound",
     "propext"
   ],
   "IndexedFixedPoints.full_strata_iterations": [
-    "Classical.choice",
     "Quot.sound",
     "propext"
   ],
   "IndexedFixedPoints.generator_stable": [
-    "Classical.choice",
     "Quot.sound",
     "propext"
   ],
@@ -198,7 +187,6 @@
     "propext"
   ],
   "IndexedFixedPoints.nested_extremal": [
-    "Classical.choice",
     "Quot.sound",
     "propext"
   ],

@@ -8,6 +8,8 @@ compiled module through Lean's kernel with `leanchecker`, then asks Lean to
 enumerate every constant owned by each proof module and collect its transitive
 axioms. Private, protected, instance, definition and auxiliary declarations are
 included. Only `propext`, `Quot.sound`, and `Classical.choice` are allowed.
+The gate refuses every symlink in the proof tree before invoking Lean,
+including directory, file, non-source and broken links.
 Use `--controls` to check deliberately false assertions in temporary copies.
 
 ## Collections
@@ -127,8 +129,10 @@ source-text patterns do not select declarations. In addition, each named
 theorem in [AXIOMS.json](AXIOMS.json) must have exactly one `#print axioms`
 report matching both the manifest and its imported kernel declaration on each
 toolchain. `least_of_stable` and `greatest_of_stable` are axiom-free;
-`run_preserves` and `nested_stable` use exactly `propext`, `Quot.sound`, and
-`Classical.choice`. Other theorem reports are printed in full by the script.
+`run_preserves` uses exactly `propext`, `Quot.sound`, and `Classical.choice`;
+`nested_stable` uses exactly `propext` and `Quot.sound`. The finite Boolean
+repeat proofs use decidable, bounded pointwise comparisons. Other theorem
+reports are printed in full by the script.
 Defect controls first compile the unmodified model, then add a named false
 assertion in an isolated copy. Only rejection by `decide` proving that
 assertion false counts as a killed control; build or transport failures do
