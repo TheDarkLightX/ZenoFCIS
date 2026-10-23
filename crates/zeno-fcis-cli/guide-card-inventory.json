@@ -105,63 +105,63 @@
         "loop capture candidate",
         "loop capture status"
       ],
-      "sha256": "dd7fb52728a3cb0b6d32b5ef6e97140c81f03641cde6d7032d07990a034adfbe"
+      "sha256": "4fcad2f774eb69023759a4173e6c7f0f47a6f5568ddf1111de6ce2ae26b61543"
     },
     {
       "name": "loop-family",
       "commands": [
         "loop family"
       ],
-      "sha256": "c328901313d92b991a437f6dbc17a5af8d6c9ce926999a418fa85bde81c7c140"
+      "sha256": "f1a816d64d008b509722933809b4629b8e2aa26bcfe140919fc916ed1b0e23a6"
     },
     {
       "name": "loop-learn",
       "commands": [
         "loop learn"
       ],
-      "sha256": "44bde5ee0a48e0780b1fc9fcab23b365470e5be18b2ba07a4e95d1cf7e6bc572"
+      "sha256": "792931aa1fcbd1b280139a6adeebe8cb2860646f506dce96914fdc727d486989"
     },
     {
       "name": "loop-pipeline",
       "commands": [
         "loop pipeline"
       ],
-      "sha256": "0f21bbd3860e2f72be3688feadd48531a06e5e516650b72ee12f5bc3ee8cdca4"
+      "sha256": "8c42cf57d5c9f2554ea3bdb857ad2ee5a92bcfefe28768beac23b4f9e9e0f268"
     },
     {
       "name": "loop-question",
       "commands": [
         "loop question"
       ],
-      "sha256": "3ac0e4c25e184390f7d8cada80d7b48473f973ab60970fe09d7dfe45c5a4b893"
+      "sha256": "5f4acd7bbeb84519728d4767eebd086d15b9956c3a08aa5be1c0aae3226fa1ec"
     },
     {
       "name": "loop-rules",
       "commands": [
         "loop rules"
       ],
-      "sha256": "62fe4f6332a0087ce4695f9912df9c7542bf7f5379da7baf29e2d08904bfb5aa"
+      "sha256": "a23865117cb36c76fe9842a8d7030b836bfb138caa0d4fde9b289deebbb658b3"
     },
     {
       "name": "loop-strategy",
       "commands": [
         "loop strategy"
       ],
-      "sha256": "c0852791d02d0910e470c9b659d2b7499511d293fa1a244cbaaeb8b0e8577450"
+      "sha256": "2c277c15816f8a3c6c1bb0807093f0b2cdabb4598053f93107d7bcedab88c5b2"
     },
     {
       "name": "loop-teach-back",
       "commands": [
         "loop teach-back"
       ],
-      "sha256": "12bafbc4351fa39243d3f8d1f24fe565dec6ad8620e845822849b4a484e108cf"
+      "sha256": "86706f9bd3cfde988791f5d42c2502caeec5efb7fb93d3eea823bee212bb6c04"
     },
     {
       "name": "loop-transfer",
       "commands": [
         "loop transfer"
       ],
-      "sha256": "3d99e7efa551f95e1aaa56d594aae65189540dabf1b04c9ddc6e5d012e9b4e0f"
+      "sha256": "da80bc520ad31c30addd637ff767e9d713a0575f88206fb540fa3d0b9af14d1c"
     },
     {
       "name": "loop-workspace",

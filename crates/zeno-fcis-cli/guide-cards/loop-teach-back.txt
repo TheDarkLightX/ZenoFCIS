@@ -147,7 +147,7 @@ Limits: {"admissibility_checks": 4000000, "core_tuples": 131072, "document_bytes
 
 ## Coordinate
 
-Use Commons advise before a checker loop and lease the exact subject. Record the command, exit, verdict, scope and retained evidence, then release the lease. Coordination records and telemetry grant no checker or publication authority.
+Retain the command, exit status, verdict, declared scope and supporting receipt when passing a result to another workflow. Reports and suggestions do not grant adoption or publication authority.
 
 ## Pitfalls
 
