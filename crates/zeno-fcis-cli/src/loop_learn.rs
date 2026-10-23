@@ -368,7 +368,7 @@ pub(super) fn run(
             "smallest": "proposal under declared vocabulary cost"})).collect();
     let (learning_status, exit) = match analysis.status {
         Status::Determined => ("determined", 0),
-        Status::Question => ("question", 3),
+        Status::Question => ("question", crate::BLOCKED),
         Status::OutsideVocabulary => ("outside-vocabulary", 1),
         Status::Ambiguous => ("ambiguous", 1),
     };

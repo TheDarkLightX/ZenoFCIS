@@ -99,7 +99,7 @@ class Workspace(unittest.TestCase):
             self.assertEqual(args[:3], ["loop", "learn", "--spec"])
             report = copy.deepcopy(self.responses.pop(0))
             report["detail"]["specification_sha256"] = hashlib.sha256(Path(args[3]).read_bytes()).hexdigest()
-            code = {"question": 3, "determined": 0, "outside-vocabulary": 1, "inconclusive": 2}[report["status"]]
+            code = {"question": 2, "determined": 0, "outside-vocabulary": 1, "inconclusive": 2}[report["status"]]
             return code, report
 
         self.runner = patch.object(L.doors, "run", side_effect=run)

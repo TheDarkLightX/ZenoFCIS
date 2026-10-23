@@ -52,7 +52,7 @@ def run(cli, work):
         path = write(folder / "declaration.json", spec)
         code, report = call(cli, ["loop", "learn", "--spec", path])
         write(folder / "report.json", report)
-        expected_code = {"determined": 0, "question": 3, "outside-vocabulary": 1}[case["status"]]
+        expected_code = {"determined": 0, "question": 2, "outside-vocabulary": 1}[case["status"]]
         passed = code == expected_code and report.get("status") == case["status"] and R.check_report(spec, report)
         rows.append({"case": case["id"], "control": "independent-reference", "passed": passed})
         if not passed:

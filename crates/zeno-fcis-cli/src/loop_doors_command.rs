@@ -213,7 +213,7 @@ No session or attempts. JSON: zeno-fcis/loop-doors/2. Exit 0 qualified; 1 refuse
 
 Default caps may only be reduced: 2,000,000 work, 4,096 tuples/meanings, 1,000,000 cells, 10,000 conflict subsets. With --original (canonical bytes, at most 65,536 bytes and the same ABI), every reference input must evaluate successfully within the 4,096-tuple cap. A fitting candidate must pass complete observed-table capture plus original-bound transform check and receipt replay; --out requires that reference and exports candidate bytes only when qualified. No session or attempts.
 
-JSON: zeno-fcis/loop-doors/2. Without qualification: determined=0, question=3, outside-vocabulary/ambiguous/refused=1, inconclusive=2. With a reference: qualified=0, refuted/refused=1, inconclusive=2; I/O errors can be 3. Example fit alone issues no equivalence receipt."#
+JSON: zeno-fcis/loop-doors/2. Without qualification: determined=0, question=2, outside-vocabulary/ambiguous/refused=1, inconclusive=2. With a reference: qualified=0, refuted/refused=1, inconclusive=2; I/O errors can be 3. Example fit alone issues no equivalence receipt."#
     )]
     Learn {
         /// Declaration and examples (zeno-fcis/loop-learn/1), at most 64 KiB.
