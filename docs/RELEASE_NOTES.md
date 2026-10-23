@@ -1,5 +1,25 @@
 # ZenoFCIS release notes
 
+## 2.6 draft: verdict exit codes
+
+Verdict commands now follow the [shared exit contract](CLI_REFERENCE.md#exit-codes).
+Negative yes/no `contract probe` answers, question disagreements, wrong or
+refused teach-back rules, unequal `loop meaning` results, requirements-only
+`no-completion`, trace-game counterexamples and exhausted controller classes,
+ZAL `diff` differences and `why-not` failures now exit 1. `counterexample`
+also exits 1 when its replay refutes the claim. Vacuous teach-back rules,
+unresolved requirements-only and learning questions, incomparable ZAL diffs,
+unfinished or unsupported ZAL checks, and replayed UNKNOWN game diagnostics
+exit 2. Existing usage and input-error codes are retained.
+
+Scripts relying on exit 0 for a refutation must change. Read the packet for
+its declared domain and evidence scope; the underlying decisions, witnesses
+and verification obligations are unchanged. Loop source fingerprints refresh
+when their exit adapters change; older source-bound reports need regeneration.
+Background: IEEE and The Open Group, *POSIX.1-2024*, Shell Command Language,
+2024, defines shell exit status conventions; this release consistently maps
+the existing finite verdicts into that interface.
+
 ## 2.6 draft: the app factory
 
 `zeno-fcis new DIR --contract project.zeno --app` combines the checked core,

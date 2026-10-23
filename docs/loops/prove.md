@@ -21,8 +21,8 @@
     "human scope/status lines; process/evidence records under .zeno-fcis/evidence. Read scope and backend status; no stdout JSON schema."
   ],
   "exit_codes": {
-    "0": "requested result completed",
-    "1": "invalid specification or refutation",
+    "0": "positive checked verdict",
+    "1": "invalid specification or refutation, including counterexample mode",
     "2": "blocked or inconclusive; no acceptance",
     "3": "filesystem or execution failure",
     "64": "invalid command-line usage"
@@ -116,6 +116,8 @@ Expected: exit 0; {"status": "valid"}.
 
 ## Verdicts
 
+A replayed counterexample exits 1 under both `prove` and `counterexample`. The public solver routes still return UNKNOWN for unchecked UNSAT; this exit mapping adds no proof route.
+
 `ProposedUnsat`: Unchecked CVC5 output retained; exit 2; seek independent evidence.
 
 `Refuted`: Replayed model refutes the claim; inspect and revise assumptions.
@@ -126,7 +128,7 @@ Expected: exit 0; {"status": "valid"}.
 
 `KernelChecked`: Historical retained evidence type; current public Lean exporter refuses; do not claim this result here.
 
-Exit codes: {"0": "requested result completed", "1": "invalid specification or refutation", "2": "blocked or inconclusive; no acceptance", "3": "filesystem or execution failure", "64": "invalid command-line usage"}
+Exit codes: {"0": "positive checked verdict", "1": "invalid specification or refutation, including counterexample mode", "2": "blocked or inconclusive; no acceptance", "3": "filesystem or execution failure", "64": "invalid command-line usage"}
 
 Outputs: ["human scope/status lines; process/evidence records under .zeno-fcis/evidence. Read scope and backend status; no stdout JSON schema."]
 
@@ -159,3 +161,7 @@ Expected: exit 2; ["tools manifest blocked"].
 Sources: {"engine": "docs/CLI_REFERENCE.md:311-351; docs/INDUCTIVE_CLAIMS.md:1-26", "exit_codes": "docs/CLI_REFERENCE.md:311-351; docs/INDUCTIVE_CLAIMS.md:1-26", "inputs": "docs/CLI_REFERENCE.md:311-351; docs/INDUCTIVE_CLAIMS.md:1-26", "limits": "docs/CLI_REFERENCE.md:311-351; docs/INDUCTIVE_CLAIMS.md:1-26", "outputs": "docs/CLI_REFERENCE.md:311-351; docs/INDUCTIVE_CLAIMS.md:1-26", "refusals": "docs/CLI_REFERENCE.md:311-351; docs/INDUCTIVE_CLAIMS.md:1-26", "synopsis": "docs/CLI_REFERENCE.md:311-351; docs/INDUCTIVE_CLAIMS.md:1-26", "verdicts": "docs/CLI_REFERENCE.md:311-351; docs/INDUCTIVE_CLAIMS.md:1-26"}
 
 Run `zeno-fcis guide find "run an SMT claim"` for related cards.
+
+Background: IEEE and The Open Group, *POSIX.1-2024*, Shell Command Language, 2024,
+defines shell exit status conventions. See the [shared exit contract](../CLI_REFERENCE.md#exit-codes)
+for this interface; the packet defines the finite scope of each verdict.

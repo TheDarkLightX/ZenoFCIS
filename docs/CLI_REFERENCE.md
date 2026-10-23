@@ -321,7 +321,9 @@ uses schema `zeno-fcis/purity-report/1`. A clean result is checked against the
 rule table; it is not a proof of determinism. See
 [determinism](DETERMINISM.md).
 
-## Exit classes
+<a id="exit-classes"></a>
+
+## Exit codes
 
 `describe` reports the compiled package's `cli_version` and a
 `source_identity` fingerprint of the compiled loop-program source set, the
@@ -332,12 +334,22 @@ filename does not change the compiled package version.
 
 | Code | Meaning |
 | ---: | --- |
-| 0 | requested positive result completed |
-| 1 | invalid specification or refuted claim |
-| 2 | blocked, indeterminate, missing evidence, or unavailable tool |
+| 0 | positive verdict: checked, holds, agrees; or a completed query/operation |
+| 1 | negative verdict: refuted, counterexample, disagreement, implication fails; or invalid specification |
+| 2 | UNKNOWN: limit, incomplete, budget, blocked prerequisite, missing evidence, or unavailable tool |
 | 3 | tool, filesystem, or bounded execution failure |
 | 64 | invalid command-line usage |
 | 65 | a contract judge's input has no contract form: a formula, scenario file or proposed law, or for `profile`, `lemma`, `scenario` and `probe` the contract itself |
+
+The pure core decides the verdict; the command shell only maps its result to
+an exit status. Existing usage, malformed-input, filesystem and tool-error
+codes are unchanged. Counts, rendered traces and lifecycle reports are
+completed queries or operations; diagnostic outcomes inside them are not
+additional verdicts. Read each command's packet and stated scope.
+
+Background: IEEE and The Open Group, *POSIX.1-2024*, Shell Command Language,
+2024, defines shell exit status conventions. The verdict classes here are
+this library's existing interface convention, now applied consistently.
 
 An exit code does not create formal evidence or authority. In particular, a
 successful graph or generation command says only that the requested derived
@@ -349,7 +361,7 @@ Formal commands apply the exit classes to each backend result:
 | --- | ---: | ---: | --- |
 | CVC5 returns UNSAT with proof-shaped output | 2 | 2 | The proposal and output are retained. The current path does not independently check the proof. |
 | Z3 returns UNSAT | 2 | 2 | The result remains blocked because the current path has no Z3 proof checker. |
-| CVC5 or Z3 returns SAT and the built-in evaluator replays the model | 1 | 0 | A normalized counterexample is retained. |
+| CVC5 or Z3 returns SAT and the built-in evaluator replays the model | 1 | 1 | A normalized counterexample is retained. |
 | `--backend lean` | 2 | 2 | The current public exporter refuses this unsupported mode. The historical exporter is test-only. |
 | Tool is missing, reports `unknown`, or supplies unsupported evidence | 2 | 2 | The requested result remains blocked. |
 | Tool crashes, times out, exceeds a bound, or encounters a filesystem failure | 3 | 3 | The bounded execution failed. |
@@ -1282,8 +1294,8 @@ guide is
 | `loop sketch --session DIR --sketch FILE [--provenance FILE]` | Spends one attempt. Solves the holes (several holes in an output: holes alone on their route derived exactly, the rest branched over effect classes; `detail.door.searched[].search` is `meanings`); a completion goes through an in-process `transform check` with replay and then the session's check. If that confirming check does not complete, the result is `inconclusive` (exit 2) with `detail.door.status` `completion-not-confirmed`, and no attempt is spent; a search that stops on its budget is `inconclusive` (exit 2, `door-search-not-completed`) and spends no attempt either. An unrealizable search returns top-level `proposal-failed:empty` (exit 1), consumes an attempt, and records `detail.door.status: unrealizable`. Otherwise `detail.door.status` is `completed`, `unrealizable` (with a witness input, or after a listed complete candidate space was exhausted), `not-found` (claims nothing), `inconclusive` (a budget ran out) or `refused`. |
 | `loop family --instances MANIFEST --program FILE [--fit]` | No session. Judges a program over family parameters on every instance of a `zeno-fcis/loop-family-manifest/1` manifest (at most 10) with `transform check` and `transform replay`; reports nodes against each instance's optimize result when listed, and the smallest failing instance. Only a checker counterexample makes a row `refuted`; a row whose sketch the doors find unrealizable is labelled `unrealizable`. `--fit` fits each hole to `a * $P + b` on the instances not marked `"fit": false` and checks the lifted program on every instance, including those. The top-level verdict/exit summarizes the initial per-instance checks; `detail.lifted_check` reports the fitted template separately and does not change that exit. Manifest parameter values are signed-64-bit JSON integers. Coverage is stated as "checked on these N instances". |
 | `loop transfer --from FILE --to-instances MANIFEST` | No session. Moves a program written for one instance (whose parameters the document gives) to each listed instance: directly, then with the constants near a changed parameter opened as choice holes, then by repair. Each result is checked as above. Source expressions use literal constants with signed-64-bit JSON parameter metadata; `$PARAMETERS` are refused in source expressions. If no target transfers, `failed` exits 1, including per-target budget stops; partial transfer exits 2. |
-| `loop meaning --original FILE (--expressions FILE \| --candidate FILE)` | No session. Keys a complete program by its observation on every declared input (every output, or the evaluator's exact failure), computed by the library evaluator as `transform check` observes it, and reports whether it means what the original means. The key includes the domains and the complete observations used by `transform check`; digest equality is subject to hash collisions and is not a checker verdict or receipt. Exit 0 (`keyed`) also covers unequal keys. The loop workspace uses it to answer a refuted program written another way from memory. |
-| `loop question --contract DIR [--answers FILE]` | No session. Groups the inputs where the declared laws and the recorded answers (`zeno-fcis/loop-answers/1`) admit more than one decision, by the case that fires there, and asks about the largest group: a formula checked to hold on exactly its inputs, an example, the decisions still admitted and the core's own. Each answer's class and successor constraints become laws over exactly its inputs (`detail.answers[].laws`), checked by the gaps judge against the core (a text with no exact law form, such as a truth value compared with a number, is refused); an answer that differs from the core in class, reason or, for a committing answer that gives one, successor is a `disagreement`, never adopted. An answer that leaves some input with no admissible decision is refused (`conflict`, exit 1). Reject reasons have law forms: the door excludes other case-used reasons with `on reject:ID`; `decision_reason` is also available in `on reject` and `on failure` laws. Both doors use the same full-outcome and native-agreement test for determination. Literal delivery requirements remain separate from exported law-only constraints; reports name their basis and uncovered delivery components. Committing answers must give deliveries (`[]` or `"case"`). A completed report can contain disagreeing answers and still exit 0; inspect every answer status. In practice, on the 5-second stage deadline, a question with answers can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples, and admissibility is refused as inconclusive above 4,000,000 law checks. |
+| `loop meaning --original FILE (--expressions FILE \| --candidate FILE)` | No session. Keys a complete program by its observation on every declared input (every output, or the evaluator's exact failure), computed by the library evaluator as `transform check` observes it, and reports whether it means what the original means. The key includes the domains and the complete observations used by `transform check`; digest equality is subject to hash collisions and is not a checker verdict or receipt. Exit 0 (`keyed`) means equal keys; unequal keys exit 1. The loop workspace uses it to answer a refuted program written another way from memory. |
+| `loop question --contract DIR [--answers FILE]` | No session. Groups the inputs where the declared laws and the recorded answers (`zeno-fcis/loop-answers/1`) admit more than one decision, by the case that fires there, and asks about the largest group: a formula checked to hold on exactly its inputs, an example, the decisions still admitted and the core's own. Each answer's class and successor constraints become laws over exactly its inputs (`detail.answers[].laws`), checked by the gaps judge against the core (a text with no exact law form, such as a truth value compared with a number, is refused); an answer that differs from the core in class, reason or, for a committing answer that gives one, successor is a `disagreement`, never adopted. An answer that leaves some input with no admissible decision is refused (`conflict`, exit 1). Reject reasons have law forms: the door excludes other case-used reasons with `on reject:ID`; `decision_reason` is also available in `on reject` and `on failure` laws. Both doors use the same full-outcome and native-agreement test for determination. Literal delivery requirements remain separate from exported law-only constraints; reports name their basis and uncovered delivery components. Committing answers must give deliveries (`[]` or `"case"`). A completed report with disagreeing answers exits 1; inspect every answer status. In practice, on the 5-second stage deadline, a question with answers can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples, and admissibility is refused as inconclusive above 4,000,000 law checks. |
 
 | `loop teach-back --contract DIR --rule FILE [--answers FILE]` | No session. Judges each rule (`zeno-fcis/loop-rules/1`) on every declared input and on the reachable states: `exact`, `holds` (with the missing region), `wrong` (exceptions grouped by the core's decision, with regions and examples) or `vacuous`; whether the requirements already force it (`required`: on the inputs where it holds, how many the requirements force it on, leave `open`, or `forbidden` it on, with an admitted decision as the witness; left out with `summary.required.not_computed` when the admissibility table is over its budget); a meaning key (equal keys give equal verdicts); and a summary of the exact and holding rules. In practice, on the 5-second stage deadline, it can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples. |
 | `loop decompose --contract DIR --architecture FILE [--compose [--export DIR]]` | No session. Steps 1 to 3 for components in merge order (`zeno-fcis/loop-architecture/1`): required behaviour per component, interface counterexamples with suggested reads (and reads owned by a later component), unowned reasons, failures that must change a later-owned field, case tables projected from the core or tabulated for components without cases, and blame with regions for components with cases. Verdicts: `refused`, `unrealizable` (also whenever a structure problem or interface counterexample is found), `realizable`, `completed`, `meets-requirements`, `refuted`. Steps 1 to 3 are the door's own evaluation of the tables (`decided_by: door-simulation`), not a checker's, and do not claim that the composed architecture behaves as the core. With `--compose`, a realizable architecture whose components all have case tables becomes a `zeno-fcis/checked-composition/3` composition of generated contracts, every submitted guard kept (a catch-all reject with its own reason is appended where a last guard is not `true`); the composition checker's joint step is compared with the core on every declared input and its obligation check runs (`detail.compose`, `decided_by: composition-checker`). The verdict is the weaker of steps 1 to 3 and the composed check: `accepted` only when step 3 blames nothing, the joint step equals the core and the obligations are proved; `refuted` when either differs. `--export DIR` writes the manifest and contracts to a new directory (an existing one is refused), whatever the verdict. |
@@ -1330,6 +1342,13 @@ retain the complete-universe guard. Outcome counts for unrestricted families are
 explicit lower bounds; whether there are zero, one or multiple outcomes is exact
 within this profile. Unsupported payload or destination domains remain out of
 scope.
+
+`loop teach-back` exits 1 if any rule is `wrong` or `refused`, 2 if any
+remaining rule is `vacuous` (or no rules were judged), and 0 when every
+rule is `exact` or `holds`. Coverage and `required` remain separate
+annotations; exit 0 does not mean the rules cover every contract decision.
+`loop meaning` exits 1 when `same_as_original` is false and 2 when its
+enumeration budget is exceeded.
 
 Results carry `authority: none`. Session doors use schema
 `zeno-fcis/transform-loop/1` with a `door` section; `family` and `transfer`
@@ -1411,7 +1430,7 @@ Statuses:
 | Status | Exit | Scope |
 |---|---|---|
 | `determined` | 0 | One meaning per output fits; the lowered candidate reproduced every example through the existing library evaluator. Uniqueness is an enumeration proposal |
-| `question` | 3 | Several meanings fit; `detail.question` minimizes the largest joint bucket, then the sum of squared buckets, then the unasked input ordinal. The candidate reproduces the examples but the question remains open |
+| `question` | 2 | Several meanings fit; `detail.question` minimizes the largest joint bucket, then the sum of squared buckets, then the unasked input ordinal. The candidate reproduces the examples but the question remains open |
 | `outside-vocabulary` | 1 | No expression in this vocabulary and size bound fits; `detail.core` is a minimum-cardinality set of example indices, ordered and tied by input ordinal. This is a proposal |
 | `ambiguous` | 1 | Several meanings remain without a distinguishing unanswered input; a proposal, not a final program |
 | `inconclusive` | 2 | An enumeration budget/deadline clears counts, question, core and candidate. A later capture/check stop retains the completed example-learning result and exports no qualified candidate |
@@ -2696,6 +2715,10 @@ interaction or correct automatic translation of prose.
 
 
 ### Requirements-only version-space questions (2.5.0)
+
+For `loop question --specification`, `determined` exits 0,
+`no-completion` exits 1, and a remaining `question` exits 2. The latter
+retains its complete distinguishing-question packet; it is not an input error.
 
 ```sh
 zeno-fcis loop question --specification FILE [--max-work N] [--max-domain N] \

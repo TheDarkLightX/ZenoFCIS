@@ -9,7 +9,7 @@ Input/usage/IO errors retain their existing codes (including 3, 64 and 65).
 | Command(s) | Baseline verdict -> exit | Mapping location |
 | --- | --- | --- |
 | check; explain | valid 0; invalid/vacuous 1 | main.rs:1006,1393 |
-| check --expand | expanded 0; invalid 1; incomplete 2 | table_expansion.rs |
+| check --expand | expanded 0; invalid 1; read/expansion failure 3 | table_expansion.rs:25 |
 | prove | checked 0; refuted/undefined 1; unknown 2; execution failure 3 | main.rs:1942 |
 | counterexample | refuted/undefined 0; checked/unknown 2; failure 3 | main.rs:1942 |
 | transform check; replay | equivalent/replayed 0; counterexample/refused 1; inconclusive 2 | transform_command.rs:595,644 |
@@ -28,13 +28,14 @@ Input/usage/IO errors retain their existing codes (including 3, 64 and 65).
 | contract diff | classified 0 for every change kind; invalid 1 (classification query) | contract_diff.rs:56 |
 | contract draft check; finalize | ready 0; not ready 1 | draft_command.rs:224,239 |
 | contract draft start/propose/questions/label | workflow completed/assessment returned 0; refused 1 (not a readiness verdict) | draft_command.rs:144 |
-| contract adopt; evolve; refresh-receipts; export-program; import; export | completed 0; refused 1; IO 3 (artifact operations) | contract_adopt.rs; contract_evolve.rs; contract_files.rs; tau_command.rs:313 |
+| contract adopt; evolve; refresh-receipts; export-program; import; export | completed 0; refused 1; IO 3 (artifact operations) | contract_adopt.rs:225; contract_evolve.rs:387; contract_files.rs:538; tau_command.rs:313 |
 | loop candidate; sketch | checked equivalent 0; different/refused 1; limits/inconclusive 2 | loop_command.rs:900; loop_doors_command.rs:1423 |
 | loop open; encode; resume; run | workflow/replay completed 0; refused 1; incomplete 2 (attempts remain in report) | loop_command.rs:500,605,752,952 |
 | loop pipeline; rules; strategy | qualified/evaluated/packet 0; refuted/refused 1; inconclusive 2 | loop_pipeline.rs:981 |
-| loop strategy --kb-op; kb * | query/check/plan completed 0; invalid 1; incomplete 2 | loop_strategy_knowledge.rs:124; knowledge_command.rs:354 |
+| loop strategy --kb-op; kb * | query/plan completed or consistent 0; inconsistent/invalid 1; incomplete 2 | loop_strategy_knowledge.rs:124; knowledge_command.rs:354 |
 | loop family; transfer | accepted/transferred 0; refuted/failed 1; partial 2 | loop_doors_command.rs:2043,2668 |
-| loop meaning; evaluate | meaning/evaluation returned 0; refused 1; incomplete 2 (query, no equivalence verdict) | loop_doors_command.rs:2065,2195 |
+| loop meaning | keyed 0 even when same_as_original=false; domain budget refusal 1; stage stop 2 | loop_doors_command.rs:2195 |
+| loop evaluate | evaluated 0; refused 1; stage stop 2 (single-input query) | loop_doors_command.rs:2065 |
 | loop question --contract | open/determined 0, including answer disagreement; inconsistent/conflict 1; incomplete 2 | loop_doors_command.rs:2334,2415 |
 | loop question --specification | determined/question/no-completion 0; refused 1; inconclusive 2 | loop_version_space.rs:581,663 |
 | loop teach-back | judged 0, including wrong/vacuous/refused rules and incomplete coverage; inconclusive 2 | loop_doors_command.rs:2458 |
