@@ -288,6 +288,7 @@ symmetry rivals: swap (aa bb);
         self.assertEqual(parse_example(here / 'withdrawal_game2.zal').revision,
                          '62f361bbe3dbdb74bdbfe7050626e26f4d029990be5ddc1d37f9187dd729b8e0')
         model = b.parse((here / 'ladder_symmetry2.zal').read_text())
+        self.assertEqual(model.revision, 'b1b48530761bc7f80abfa78269e04dd04c08b6624a77e8c660f3f329f8c7e049')
         self.assertEqual(b.check(model)['properties'], b.check(model, no_symmetry=True)['properties'])
         self.assertEqual(b.check(model)['symmetry'], {'generators': 1, 'configurations': 54, 'orbits': 36})
 

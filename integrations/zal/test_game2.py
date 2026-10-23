@@ -517,7 +517,8 @@ property t4: always(state == aa);
         self.assertIn("games", game_change["changed_objects"])
 
     def test_existing_example_revisions_are_unchanged(self):
-        new_examples = set(GAME_EXAMPLE_REVISIONS)
+        # Later examples have their own exact revision pins in their feature suites.
+        new_examples = set(GAME_EXAMPLE_REVISIONS) | {"ladder_symmetry2.zal"}
         paths = sorted(path for path in EXAMPLES.rglob("*.zal") if path.name not in new_examples)
         self.assertEqual({path.name: parse_example(path).revision for path in paths}, EXAMPLE_REVISIONS)
         self.assertEqual({path.name: b.parse(path.read_text(encoding="ascii")).revision
