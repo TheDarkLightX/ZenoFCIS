@@ -790,6 +790,7 @@ merge [400];
 law 600 from_n0 on commit = true;
 // n1: configuration state=withdrawn variables=
 law 601 from_n1 on commit = true;
+expanded /tmp/withdrawal-deadline/project.zeno: tables=1 entries=2 inputs=4 domain=8
 ```
 
 The README replay test compares the first two command outputs byte for byte
@@ -928,6 +929,7 @@ law 500 domains on commit, genesis = (post.100.210 >= 0 && post.100.210 <= 1 && 
 law 510 stable on commit = true;
 law 600 from_open on commit = true;
 law 601 from_withdrawn on commit = true;
+expanded /tmp/recurring-goals/project.zeno: tables=1 entries=2 inputs=4 domain=8
 ```
 
 The README replay test compares the check and export outputs byte for byte.
