@@ -110,8 +110,8 @@
       "outbox": []
     },
     {
-      "rule": "only the holder returns a copy, against a loan on record",
-      "when": "on_loan == 0 || !holder_is_member || loans == 0",
+      "rule": "only the holder returns a copy",
+      "when": "on_loan == 0 || !holder_is_member",
       "class": "Reject",
       "reason": 206,
       "post": {},

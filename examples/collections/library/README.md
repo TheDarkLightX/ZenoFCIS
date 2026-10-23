@@ -22,13 +22,29 @@ record and check the holder.
 
 ## Difference
 
-The copy's holder is a stored key: in the view it is a key class, equal or
-not to the member's. The checker found that a return with a loan count of 0
-would fail, because no per-entry law links a member's count to the copies it
-holds; the return rule now refuses it.
+The copy's holder is a stored key. `tally 510 loans_match_copies 110.140 =
+count 115 by 146 where 145;` states that, for every member key, its count
+equals the number of on-loan copies held by that member. Both maps' changes
+are checked together, including a holder changed to or from an unnamed key.
+An on-loan copy implies a positive count for its holder, so Return needs no
+additional zero-count defense. The holder check remains.
 
 ## Scope
 
-Exhaustively checked over 160 admissible views, given the collections
-premises. Cross-map invariants, such as a count equal to the copies held, are
-not expressible per entry.
+Exhaustively checked over the declared admissible view domain, subject to the
+[collections premises](../../../docs/COLLECTIONS.md). The grouped tally is an
+inductive all-size claim from empty genesis, conditional on runtime framing;
+it does not admit arbitrary joins or qualify inconsistent imported maps.
+
+## Lineage
+
+**Background.** P. Wolper, *Expressing Interesting Properties of Programs in
+Propositional Temporal Logic*, POPL, 1986, supplies data-independence background.
+A. Gupta, I. S. Mumick and V. S. Subrahmanian, *Maintaining Views Incrementally*,
+SIGMOD, 1993, studies incremental maintenance of database views.
+
+**What is new here.** The example uses grouped per-key delta obligations across
+two maps. Prior-art search pending; no novelty claim is made.
+
+**Scope.** The mathematical argument and its runtime premises are stated in
+the collections reference. Small replay checks alone do not prove all sizes.

@@ -1467,7 +1467,9 @@ impl ProjectSpec {
     /// Appends this protocol type's exact canonical encoding.
     pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-PROJECT-SPEC\0");
-        let format = if self.collections.has_ordered_keys() {
+        let format = if !self.collections.tallies().is_empty() {
+            7u16
+        } else if self.collections.has_ordered_keys() {
             6u16
         } else if !self.collections.is_empty() {
             5u16

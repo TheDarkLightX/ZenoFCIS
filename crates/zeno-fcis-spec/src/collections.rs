@@ -236,6 +236,54 @@ impl OrderReadDecl {
     }
 }
 
+/// A per-key nonnegative tally equal to grouped source contributions.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TallyDecl {
+    pub(crate) id: StableId,
+    pub(crate) name: Identifier,
+    pub(crate) target: StableId,
+    pub(crate) field: StableId,
+    pub(crate) source: StableId,
+    pub(crate) group: StableId,
+    pub(crate) weight: Option<StableId>,
+    pub(crate) selector: Option<StableId>,
+}
+
+impl TallyDecl {
+    /// Stable declaration identity.
+    pub const fn id(&self) -> StableId {
+        self.id
+    }
+    /// Declaration name.
+    pub const fn name(&self) -> &Identifier {
+        &self.name
+    }
+    /// Map containing each per-key tally.
+    pub const fn target(&self) -> StableId {
+        self.target
+    }
+    /// Nonnegative integer tally field.
+    pub const fn field(&self) -> StableId {
+        self.field
+    }
+    /// Map whose entries contribute.
+    pub const fn source(&self) -> StableId {
+        self.source
+    }
+    /// Stored key field grouping source entries by target key.
+    pub const fn group(&self) -> StableId {
+        self.group
+    }
+    /// Nonnegative integer weight, or one per selected entry.
+    pub const fn weight(&self) -> Option<StableId> {
+        self.weight
+    }
+    /// Optional integer 0..=1 field; only value one contributes.
+    pub const fn selector(&self) -> Option<StableId> {
+        self.selector
+    }
+}
+
 /// Every collection declaration of a project, in stable-ID order.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CollectionsSpec {
@@ -244,9 +292,14 @@ pub struct CollectionsSpec {
     pub(crate) entries: Box<[EntryDecl]>,
     pub(crate) summaries: Box<[SummaryDecl]>,
     pub(crate) order_reads: Box<[OrderReadDecl]>,
+    pub(crate) tallies: Box<[TallyDecl]>,
 }
 
 impl CollectionsSpec {
+    /// Cross-map grouped tally invariants.
+    pub const fn tallies(&self) -> &[TallyDecl] {
+        &self.tallies
+    }
     /// Key types.
     pub const fn keys(&self) -> &[KeyTypeDecl] {
         &self.keys
@@ -273,7 +326,10 @@ impl CollectionsSpec {
     }
     /// True when the project declares no collection.
     pub fn is_empty(&self) -> bool {
-        self.keys.is_empty() && self.maps.is_empty() && self.summaries.is_empty()
+        self.keys.is_empty()
+            && self.maps.is_empty()
+            && self.summaries.is_empty()
+            && self.tallies.is_empty()
     }
     /// The map with this ID.
     pub fn map(&self, id: StableId) -> Option<&MapDecl> {
@@ -592,6 +648,24 @@ pub(crate) fn encode(
             }
             encode_path(&read.result, output)?;
             encode_path(&read.found, output)?;
+        }
+    }
+    if !spec.tallies.is_empty() {
+        output.extend_from_slice(b"KEYED-TALLIES\0");
+        put_length(output, spec.tallies.len())?;
+        for tally in &spec.tallies {
+            tally.id.encode_to(output)?;
+            tally.name.encode_to(output)?;
+            tally.target.encode_to(output)?;
+            tally.field.encode_to(output)?;
+            tally.source.encode_to(output)?;
+            tally.group.encode_to(output)?;
+            for field in [tally.weight, tally.selector] {
+                output.push(u8::from(field.is_some()));
+                if let Some(field) = field {
+                    field.encode_to(output)?;
+                }
+            }
         }
     }
     Ok(())

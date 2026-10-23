@@ -20,7 +20,7 @@ pub use table_lookup::{TableReadExpression, parse_table_read, table_index_sets};
 use crate::ast::*;
 use crate::collections::{
     CollectionsSpec, EntryDecl, KeyPaths, KeyTypeDecl, MapDecl, OrderReadDecl, OrderReadKind, Scan,
-    SummaryDecl, SummaryKind,
+    SummaryDecl, SummaryKind, TallyDecl,
 };
 use crate::diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan, text,
@@ -260,6 +260,7 @@ struct Drafts {
     maps: Vec<(MapDecl, SourceSpan, u32)>,
     entries: Vec<(EntryDecl, SourceSpan, u32)>,
     summaries: Vec<(SummaryDecl, SourceSpan)>,
+    tallies: Vec<(TallyDecl, SourceSpan, u32)>,
 }
 
 struct Parser {
@@ -372,6 +373,9 @@ impl Parser {
                 None
             } else if self.take_keyword("summary") {
                 self.parse_summary().map(Declaration::Field)
+            } else if self.take_keyword("tally") {
+                self.parse_tally();
+                None
             } else if self.take_keyword("variant") {
                 self.parse_variant().map(Declaration::Variant)
             } else if self.take_keyword("reason") {
@@ -773,6 +777,7 @@ impl Parser {
             && drafts.entries.is_empty()
             && drafts.summaries.is_empty()
             && drafts.order_reads.is_empty()
+            && drafts.tallies.is_empty()
         {
             return CollectionsSpec::default();
         }
@@ -1152,6 +1157,66 @@ impl Parser {
             }
         }
 
+        // A tally is a grouped nonnegative sum with a fixed stored-key grouping.
+        let mut tallies = Vec::new();
+        let mut tally_ids = BTreeSet::new();
+        for (tally, span, end) in drafts.tallies {
+            let target = maps.iter().find(|m| m.id == tally.target);
+            let source = maps.iter().find(|m| m.id == tally.source);
+            let nonnegative = |map: &MapDecl, field: StableId| {
+                map.value_fields
+                    .iter()
+                    .find(|(id, _)| *id == field)
+                    .and_then(|(_, t)| kinds.get(&t.get()).map(|v| (*t, v)))
+                    .is_some_and(|(t, (k, r))| {
+                        !key_types.contains(&t.get())
+                            && *k == TypeKind::Int
+                            && r.is_some_and(|r| r.min() >= 0)
+                    })
+            };
+            let valid = target.zip(source).is_some_and(|(a, b)| {
+                a.id != b.id
+                    && nonnegative(a, tally.field)
+                    && b.value_fields
+                        .iter()
+                        .any(|(f, t)| *f == tally.group && *t == a.key_type)
+                    && tally.weight.is_none_or(|f| nonnegative(b, f))
+                    && tally.selector.is_none_or(|f| {
+                        b.value_fields
+                            .iter()
+                            .find(|(id, _)| *id == f)
+                            .and_then(|(_, t)| kinds.get(&t.get()))
+                            .is_some_and(|(k, r)| {
+                                *k == TypeKind::Int
+                                    && r.is_some_and(|r| r.min() == 0 && r.max() == 1)
+                            })
+                    })
+            });
+            let occupied = tally.id == project_id
+                || !tally_ids.insert(tally.id)
+                || self.declarations.iter().any(|s| {
+                    declaration_ids(&s.declaration)
+                        .iter()
+                        .any(|(id, _)| *id == tally.id.get())
+                })
+                || emitted.iter().any(|(d, _)| {
+                    declaration_ids(d)
+                        .iter()
+                        .any(|(id, _)| *id == tally.id.get())
+                })
+                || order_reads.iter().any(|r| r.id == tally.id);
+            if !valid || occupied {
+                problems.push((span, "tally.fragment", "a unique tally ID, two distinct maps, nonnegative integer target/weight, stored target-key grouping and optional 0..=1 selector", text(tally.id.get()).into()));
+            } else {
+                self.rewrites.push(Rewrite {
+                    start: span.start(),
+                    end,
+                    text: String::new(),
+                });
+                tallies.push(tally);
+            }
+        }
+
         // A state law, which the checker assumes on every pre-view, must stay
         // true while unnamed entries keep their values: each conjunct reads
         // one named entry, or only scalar state.
@@ -1261,11 +1326,13 @@ impl Parser {
         maps.sort_by_key(|map| map.id);
         entries.sort_by_key(|entry| entry.id);
         summaries.sort_by_key(|summary| summary.id);
+        tallies.sort_by_key(|tally| tally.id);
         CollectionsSpec {
             keys: keys.into_boxed_slice(),
             maps: maps.into_boxed_slice(),
             entries: entries.into_boxed_slice(),
             summaries: summaries.into_boxed_slice(),
+            tallies: tallies.into_boxed_slice(),
             order_reads: {
                 order_reads.sort_by_key(|r| r.id);
                 order_reads.into_boxed_slice()
@@ -1363,6 +1430,53 @@ impl Parser {
         };
         self.expect_symbol(TokenKind::Semicolon, "entry");
         Some(EntryDecl { id, name, map, key })
+    }
+    /// Parses a fixed grouped tally; arbitrary cross-map formulas stay refused.
+    fn parse_tally(&mut self) {
+        let start = self.declaration_start;
+        let Some(tally) = self.parse_tally_header() else {
+            self.recover_top();
+            return;
+        };
+        let end = self.last_end();
+        self.drafts.tallies.push((tally, start, end));
+    }
+    fn parse_tally_header(&mut self) -> Option<TallyDecl> {
+        let id = self.take_id("tally.id")?;
+        let name = self.take_identifier("tally.name")?;
+        let target = self.take_id("tally.target")?;
+        self.expect_symbol(TokenKind::Dot, "tally.field");
+        let field = self.take_id("tally.field")?;
+        self.expect_symbol(TokenKind::Equal, "tally.equals");
+        let count = self.take_keyword("count");
+        if !count {
+            self.expect_keyword("sum", "tally.aggregate");
+        }
+        let source = self.take_id("tally.source")?;
+        let weight = if count {
+            None
+        } else {
+            self.expect_symbol(TokenKind::Dot, "tally.weight");
+            Some(self.take_id("tally.weight")?)
+        };
+        self.expect_keyword("by", "tally.group");
+        let group = self.take_id("tally.group")?;
+        let selector = if self.take_keyword("where") {
+            Some(self.take_id("tally.selector")?)
+        } else {
+            None
+        };
+        self.expect_symbol(TokenKind::Semicolon, "tally");
+        Some(TallyDecl {
+            id,
+            name,
+            target,
+            field,
+            source,
+            group,
+            weight,
+            selector,
+        })
     }
     /// Parses one fixed pre-state order observation.
     fn parse_order_read(&mut self) {

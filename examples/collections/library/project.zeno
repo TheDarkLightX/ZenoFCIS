@@ -33,6 +33,8 @@ variant 181 102 Visitor none;
 // 171 says whether it is on loan and 172 is its holder's key class.
 entry 160 member of 110 at command.101.131;
 entry 170 copy of 115 at command.101.132;
+// For every member key, its count equals all on-loan copies with that holder.
+tally 510 loans_match_copies 110.140 = count 115 by 146 where 145;
 reason 200 librarian_required precedence 0;
 reason 201 already_registered precedence 1;
 reason 202 not_a_member precedence 2;

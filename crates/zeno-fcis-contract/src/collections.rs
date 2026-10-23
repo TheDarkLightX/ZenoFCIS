@@ -142,6 +142,16 @@ struct SummaryView {
     nonnegative: bool,
 }
 
+struct TallyView {
+    id: u32,
+    target: u32,
+    field: usize,
+    source: u32,
+    group: usize,
+    weight: Option<usize>,
+    selector: Option<usize>,
+}
+
 /// Checks a collections contract. Invalid declarations, rules that use a
 /// key outside same-type permitted comparisons, and a genesis with entries are errors.
 pub fn check(
@@ -290,6 +300,30 @@ pub fn check(
             found: at(path_name(read.found()))?,
         });
     }
+    let mut tallies = Vec::new();
+    for tally in collections.tallies() {
+        let field_index = |map, field| {
+            collections
+                .map(map)
+                .and_then(|m| m.value_fields().iter().position(|(id, _)| *id == field))
+                .ok_or_else(|| invalid("tally field is not in its map".to_owned()))
+        };
+        tallies.push(TallyView {
+            id: tally.id().get(),
+            target: tally.target().get(),
+            field: field_index(tally.target(), tally.field())?,
+            source: tally.source().get(),
+            group: field_index(tally.source(), tally.group())?,
+            weight: tally
+                .weight()
+                .map(|f| field_index(tally.source(), f))
+                .transpose()?,
+            selector: tally
+                .selector()
+                .map(|f| field_index(tally.source(), f))
+                .transpose()?,
+        });
+    }
     refuse_key_values(&rules, &key_names, &ordered)?;
     let genesis = |position: usize| {
         positions[position]
@@ -344,6 +378,7 @@ pub fn check(
             "ordered": key.is_ordered(),
         })).collect::<Vec<_>>(),
         "summaries": summaries.iter().map(|s| s.id).collect::<Vec<_>>(),
+        "tallies": tallies.iter().map(|t| t.id).collect::<Vec<_>>(),
         "view_domain": size.map(|n| n.to_string()),
         "limits": {"max_tuples": limits.max_tuples.min(MAX_TUPLES)},
     });
@@ -376,6 +411,7 @@ pub fn check(
         keys: &keys,
         entries: &entries,
         summaries: &summaries,
+        tallies: &tallies,
         ordered: &ordered,
         order_reads: &order_reads,
     };
@@ -509,6 +545,7 @@ struct Shape<'a> {
     keys: &'a BTreeMap<usize, u32>,
     entries: &'a [EntryView],
     summaries: &'a [SummaryView],
+    tallies: &'a [TallyView],
     ordered: &'a BTreeSet<u32>,
     order_reads: &'a [OrderView],
 }
@@ -517,6 +554,21 @@ impl Shape<'_> {
     /// One assignment per equality pattern; absent entries hold defaults;
     /// aliased entries agree; summaries cover their present entries.
     fn admissible(&self, tuple: &[i128]) -> bool {
+        for tally in self.tallies {
+            let Some(contributions) = self.grouped(tally, tuple) else {
+                return false;
+            };
+            for entry in self.classes(tally.target, tuple) {
+                let count = if tuple[entry.presence] == 1 {
+                    tuple[entry.values[tally.field]]
+                } else {
+                    0
+                };
+                if count < contributions.get(&tuple[entry.key]).copied().unwrap_or(0) {
+                    return false;
+                }
+            }
+        }
         let present = |entry: &EntryView| tuple[entry.presence] == 1;
         // Absent entries hold the least value of each field.
         for entry in self.entries {
@@ -615,6 +667,54 @@ impl Shape<'_> {
         summary.field.map_or(1, |j| view[entry.values[j]])
     }
 
+    fn grouped(&self, tally: &TallyView, view: &[i128]) -> Option<BTreeMap<i128, i128>> {
+        let mut sums = BTreeMap::new();
+        for entry in self.classes(tally.source, view) {
+            if view[entry.presence] != 1
+                || tally.selector.is_some_and(|j| view[entry.values[j]] != 1)
+            {
+                continue;
+            }
+            let weight = tally.weight.map_or(1, |j| view[entry.values[j]]);
+            let sum = sums.entry(view[entry.values[tally.group]]).or_insert(0i128);
+            *sum = sum.checked_add(weight)?;
+        }
+        Some(sums)
+    }
+
+    fn tally_delta(&self, tally: &TallyView, before: &[i128], after: &[i128]) -> Option<bool> {
+        let pre = self.grouped(tally, before)?;
+        let post = self.grouped(tally, after)?;
+        let mut target = BTreeMap::new();
+        for entry in self.classes(tally.target, before) {
+            let count = |v: &[i128]| {
+                if v[entry.presence] == 1 {
+                    v[entry.values[tally.field]]
+                } else {
+                    0
+                }
+            };
+            target.insert(before[entry.key], count(after).checked_sub(count(before))?);
+        }
+        let keys: BTreeSet<i128> = pre
+            .keys()
+            .chain(post.keys())
+            .chain(target.keys())
+            .copied()
+            .collect();
+        for key in keys {
+            let delta = post
+                .get(&key)
+                .copied()
+                .unwrap_or(0)
+                .checked_sub(pre.get(&key).copied().unwrap_or(0))?;
+            if delta != target.get(&key).copied().unwrap_or(0) {
+                return Some(false);
+            }
+        }
+        Some(true)
+    }
+
     /// The alias-merge and summary-delta obligations on a committed post.
     fn obligations(
         &self,
@@ -706,6 +806,17 @@ impl Shape<'_> {
                     format!(
                         "summary {} changes by {summary_delta}, its named entries by {entries_delta}",
                         summary.id
+                    ),
+                ));
+            }
+        }
+        for tally in self.tallies {
+            if self.tally_delta(tally, tuple, &merged) != Some(true) {
+                return Some((
+                    "cross-map delta",
+                    format!(
+                        "tally {}: per-key target and grouped source deltas differ or overflow",
+                        tally.id
                     ),
                 ));
             }

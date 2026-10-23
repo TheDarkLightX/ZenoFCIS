@@ -112,7 +112,7 @@ on all data with the same equality pattern.
 |---|---|
 | P1. Keys are compared only for equality, with keys of the same type, and copied only into stored key fields. | The parser refuses any other key use in a law; the checker refuses it in a rule. |
 | P2. A decision reads only scalar state, named entries, and command and context scalars and key classes. | Structure: a map has no view field, and the parser refuses any formula that reads one. |
-| P3. Entry invariants use the same scalar-independent predicate at every entry, including absence, and every named post-entry satisfies it. Scalar invariants read only scalars; aggregates are summaries. | Parser restrictions establish read locality. Uniform closure across all named writes is an additional obligation, explicit in the Lean model's `Checked` premise; this proof does not establish executable enforcement. |
+| P3. Entry invariants use the same scalar-independent predicate at every entry, including absence, independently of command/context, and every named post-entry satisfies it. Scalar invariants read only scalars; aggregates are summaries. | Parser checks read locality, input independence and uniform entry predicates; `forall e in entries MAP` supplies the uniform form. The Lean model makes uniform closure explicit in `Checked`; it does not prove the executable parser establishes that premise. |
 | P4. The runtime frames each decision from the stored entries at the named keys and writes back only the merged writes of named entries. | The runtime, outside this check. |
 
 1. *Abstraction.* For a real state and input, build the view: scalars as
@@ -157,13 +157,56 @@ writes an unlawful value at distinct role `b`, and violates the law when that
 key is later selected as `a`. The model makes this closure an explicit
 `Checked` premise; it does not prove that the executable checker enforces it.
 
-For the state-law induction, two further obligations are required: entry-local
-state predicates must be uniform across a map and independent of invocation
-inputs, and declared laws must hold on the alias-merged successor. The legacy
-equality-only branch does not establish these additional obligations. Its view
-verdict alone therefore does not establish the all-size state-law claim without
-separate evidence for them. Ordered projects enforce both obligations as
-specified below; this does not upgrade the legacy branch's assurance.
+Both equality-only and ordered projects enforce P3 and recheck declared laws
+on the alias-merged successor. Checking only the raw decision would miss a
+law whose read-only alias changes when another alias writes the same key.
+
+### Grouped invariants across maps
+
+The library declares that each member's loan count equals the number of
+on-loan copies with that member as their holder:
+
+```text
+tally 510 loans_match_copies 110.140 = count 115 by 146 where 145;
+```
+
+The general forms are `tally ID NAME TARGET.FIELD = count SOURCE by KEY;`
+and `... = sum SOURCE.WEIGHT by KEY;`, each optionally followed by
+`where SELECTOR` before the semicolon. These are invariant declarations.
+For every target key k:
+
+`target_amount(k) = sum(weight(r) for r in SOURCE if r.KEY == k and selected(r))`.
+
+An absent target contributes zero; an absent source or selector zero contributes
+zero; count uses weight one. The source grouping field has the target key type;
+the source map itself may have a different key type, as in members and copies.
+The checker assumes the necessary precondition that each named target amount
+covers all distinct named source contributions for that key. It requires equal
+deltas on both sides for every affected key class, including old and new stored
+group keys that no target entry names. Aliases contribute once.
+
+| Premise | Enforcement or remaining obligation |
+|---|---|
+| T1. Two distinct maps; fixed target amount field and stored source grouping key of the target key type. | Parser checks identities; full project format 7 binds all tally fields. Projects without tallies retain format 5 or 6. |
+| T2. Target and optional weights are nonnegative ranged integers; optional selector is an integer in 0..=1. | Parser refuses negative weights, key weights and other selectors. |
+| T3. Maps start empty; a step changes only merged named entries. | Empty genesis is checked; actual framing and publication remain P4. |
+| T4. For every key, target delta equals grouped source delta, using old and new records. | Checker compares all affected classes with checked integer arithmetic; an unrepresented target has delta zero. |
+
+At genesis both sides are zero. Only keys of changed targets and old/new group
+keys of changed source entries can change either side. T4 checks each of these;
+every other key has zero delta by T3. Induction establishes equality at every key
+for every map size within capacity. This is exact preservation over the checked
+view domain. The abstraction may include unreachable or unrealizable views, so
+a refutation need not describe a reachable run. No maximal decidable fragment
+is claimed. Arbitrary joins, products, negative weights and relational state
+laws across entries remain refused with a diagnostic naming the fragment.
+
+An on-loan copy held by the named member contributes one, so that member's count
+is positive. The library return rule can omit its extra zero-count guard. The
+holder check, range checks, rejection precedence and per-key delta check remain
+necessary. Decisions on runs from empty genesis are preserved; behavior on
+inconsistent stored maps intentionally differs. Tally declarations are static
+checking obligations, not a new invocation or publication authority.
 
 ## Difference
 
@@ -202,10 +245,8 @@ combination is **prior-art search pending**.
 - Rules may not read an unnamed entry or iterate a map. Ordered key types
   and at most four fixed order reads are supported by the collections
   checker as described below; opaque keys remain equality-only.
-- Cross-entry invariants that relate two maps, such as a member's loan
-  count and the copies that member holds, are not expressible; rules must
-  then defend against every admissible view, as the library's return rule
-  does.
+- Cross-map invariants use the grouped tally fragment above; arbitrary
+  cross-entry state formulas remain unsupported.
 - Generated applications (`new --contract`, `--app`) do not yet run a
   collections contract: their HTTP preview, command wire and interface carry
   scalars only. The runtime below is the library such an application would
@@ -297,7 +338,7 @@ extended to comparisons of ordered keys, and the following premises:
 | O1. Each ordered key domain is a fixed integer interval with its total order. Decisions observe only equality/order of same-type keys and copy keys. | The parser requires inclusive bounds, rejects mixed types, arithmetic, constants and casts in laws; the collections checker applies the same restrictions to policy expressions and stored-key writes. Concrete input bounds are a framing obligation. |
 | O2. All reads are a fixed, simultaneous observation of one immutable pre-state map snapshot. | The parser accepts at most four reads, distinct context outputs, same-type input endpoints and no output-to-endpoint dependencies. The runtime must obtain these observations from that snapshot. |
 | O3. A successful read names a present key. Every extremal/neighbour read and every failed range read supplies its empty interval. | The checker constructs present/absent point sets and explicit open/closed empty intervals, and refuses inconsistent views. |
-| O4. Entry-local state predicates apply uniformly across each map's named entries, and do not depend on invocation observations. | Existing `law.entries` and summary checks remain. Ordered projects reject input-dependent state invariants and require structurally identical predicates, modulo entry field IDs, on every named entry of that map. `forall e in entries MAP` supplies this form. |
+| O4. Entry-local state predicates apply uniformly across each map's named entries, and do not depend on invocation observations. | Existing `law.entries` and summary checks remain. Collection projects reject input-dependent state invariants and require structurally identical predicates, modulo entry field IDs, on every named entry of that map. `forall e in entries MAP` supplies this form. |
 | O5. Only named-entry writes are merged and published; query facts are pre-state observations, never retained state. | This is a runtime obligation. The current `Layout` refuses ordered projects rather than frame unsupported observations. The pure query helper supplies no decision or publication authority. |
 
 1. *Abstraction.* Collect all command/context keys, all read-result keys
@@ -367,8 +408,13 @@ verification). The ordered argument above stands on its stated premises;
 these candidate references are not invoked as a theorem proving it.
 
 **What is new here.** This integration combines bounded observations,
-weak-order views and explicit absence intervals. Prior-art search pending;
+weak-order views, explicit absence intervals and grouped tally deltas. Prior-art search pending;
 no novelty claim is made.
+
+**Background for tally maintenance.** A. Gupta, I. S. Mumick and V. S. Subrahmanian,
+*Maintaining Views Incrementally*, SIGMOD, 1993, studies incremental maintenance
+of database views. The per-key delta identity here is stated and justified above;
+this citation does not establish the implementation.
 
 **Scope.** The checker exhaustively checks the declared view domains when
 within its tuple limit. Independent small-map comparisons and planted

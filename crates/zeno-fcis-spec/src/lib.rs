@@ -31,7 +31,7 @@ pub use bool_circuit::{BoolCircuit, BoolNode};
 pub use builder::{CompositionAstBuilder, ProjectSpecBuilder};
 pub use collections::{
     CollectionsSpec, EntryDecl, KeyTypeDecl, MapDecl, OrderReadDecl, OrderReadKind, SummaryDecl,
-    SummaryKind,
+    SummaryKind, TallyDecl,
 };
 pub use diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan,
