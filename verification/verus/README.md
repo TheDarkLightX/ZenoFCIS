@@ -708,7 +708,12 @@ little-endian blob length, plus an encoder that appends an extra byte and a deco
 that refuses a valid empty vector. Each must produce a semantic proof failure in its
 named production function. Normal and restored runs must both pass, and the
 original source hashes must remain unchanged. A compiler error, solver resource
-limit or timeout never counts as a successful control.
+limit or timeout never counts as a successful control. Three further controls
+compile different code natively than Verus checks: an early return under
+`cfg(not(verus_keep_ghost))`, a replacement `Cursor::take_u8` in a native-only
+`impl`, and a `cfg!(verus_keep_ghost)` expression that hands the decoder other
+bytes. Each such copy still verifies; the source audit, which maps every
+verified function to its declaration, must then refuse it at its named function.
 
 ```sh
 python3 tools/test_check_value_decoder.py

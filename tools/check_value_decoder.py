@@ -57,6 +57,7 @@ SEMANTIC_TARGETS = {
 NATIVE_TARGETS = {
     "native_early_return": "value_decoder::codec::decode_complete_value",
     "native_replacement_reader": "value_decoder::codec::Cursor::take_u8",
+    "native_cfg_expression": "value_decoder::codec::decode_value",
 }
 
 
@@ -443,6 +444,10 @@ def mutation_sources(source: str) -> dict[str, str]:
         ) + "\n#[cfg(not(verus_keep_ghost))]\nimpl Cursor<'_> {\n"
             "    fn take_u8(&mut self) -> Result<u8, DecodeError> {\n"
             "        self.take(1)?;\n        Ok(0)\n    }\n}\n",
+        # An expression-level cfg! keeps the item but decodes other bytes natively.
+        "native_cfg_expression": replace_once(source,
+            "    match decode_value_with_metrics(bytes, limits) {",
+            "    match decode_value_with_metrics(if cfg!(verus_keep_ghost) { bytes } else { &[0] }, limits) {"),
         "encoder_extra_byte": replace_once(source,
             "    value\n        .encode_zcve_to_with_limits(output, limits)\n"
             "        .map_err(map_value_encode_error)\n}",

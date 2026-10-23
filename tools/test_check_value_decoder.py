@@ -68,12 +68,12 @@ class DecoderGateTests(unittest.TestCase):
             proc = subprocess.CompletedProcess([], 1, text, "")
             self.assertEqual(gate.parse_report(proc), {})
 
-    def test_eight_unique_mutations_preserve_original_source(self):
+    def test_nine_unique_mutations_preserve_original_source(self):
         original = (gate.ROOT / gate.SUBJECT).read_bytes()
         source = original.decode()
         mutants = gate.mutation_sources(source)
         self.assertEqual(set(mutants), set(gate.SEMANTIC_TARGETS) | set(gate.NATIVE_TARGETS))
-        self.assertEqual(len(mutants), 8)
+        self.assertEqual(len(mutants), 9)
         for name, changed in mutants.items():
             self.assertNotEqual(source, changed, name)
             if name in gate.SEMANTIC_TARGETS:
@@ -286,7 +286,7 @@ fn outside() {}
             with self.subTest(source=source), self.assertRaises((ValueError, RuntimeError)):
                 self.audit(source)
 
-    def test_real_production_inventory_and_two_native_controls(self):
+    def test_real_production_inventory_and_three_native_controls(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
         report = {"func-details": dict.fromkeys(profile["target_functions"])}
         normal = gate.audit_native_binding(gate.ROOT, report)
