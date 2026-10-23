@@ -22,13 +22,15 @@
     "propext"
   ],
   "Collections.run_preserves": [
-    "Classical.choice",
     "Quot.sound",
     "propext"
   ],
   "Collections.step_preserves": [
-    "Classical.choice",
     "Quot.sound",
+    "propext"
+  ],
+  "CollectionsRequiresEM.checked": [],
+  "CollectionsRequiresEM.specialized_implies_em": [
     "propext"
   ],
   "FixedPoints.ascending": [],

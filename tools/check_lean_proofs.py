@@ -13,7 +13,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 PROOFS = ROOT / "verification" / "lean"
 VERSIONS = ("4.28.0", "4.32.0")
-ALLOWED = frozenset({"propext", "Quot.sound", "Classical.choice"})
+ALLOWED = frozenset({"propext", "Quot.sound"})
 AUDITOR = ROOT / "tools" / "lean" / "AuditModule.lean"
 FORBIDDEN = re.compile(r"\b(?:sorry|admit|axiom|native_decide|implemented_by|extern|unsafe|csimp"
                        r"|skipKernelTC|set_option|run_cmd|run_elab|run_meta|addDecl)\b|#eval\b")
@@ -160,6 +160,12 @@ theorem role_uniformity_control :
     Collections.zeroEntry
       (Collections.roleStep (fun _ : Bool => none) false true true) := by
   change (some true : Option Bool) ≠ some true
+  decide
+"""}
+    elif path.name == "CollectionsRequiresEM.lean":
+        cases = {"entry_law_false_control": """
+theorem entry_law_false_control : CollectionsRequiresEM.entryLaw (some False) := by
+  change False
   decide
 """}
     elif path.name == "FixedPoints.lean":

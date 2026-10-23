@@ -4,6 +4,11 @@ import Std
 Model-level collections reduction. The checker supplies `checked`; the shell
 supplies `MergedWrite`. Neither premise asserts that a Rust implementation
 satisfies this model. Entry laws are uniform and independent of scalar state.
+Preservation requires decidable key equality, already a premise of run_preserves.
+This covers the checker's integer, enumeration and record key types; the added
+step_preserves premise excludes only key types the checker cannot use.
+Without it, an unrestricted one-role step principle implies excluded middle;
+see [CollectionsRequiresEM.lean](CollectionsRequiresEM.lean).
 -/
 namespace Collections
 
@@ -80,13 +85,12 @@ def MergedWrite (before after : State K S R) (keys : Fin m → K)
   after.scalar = u.scalar ∧ (∀ i, after.entry (keys i) = u.entry i) ∧
     (∀ k, (∀ i, keys i ≠ k) → after.entry k = before.entry k)
 
-theorem step_preserves (p : S → Prop) (q : Option R → Prop)
+theorem step_preserves [DecidableEq K] (p : S → Prop) (q : Option R → Prop)
     (lawful : View S R m → Update S R m → Prop)
     (decide : View S R m → Update S R m) (checked : Checked p q lawful decide)
     (before after : State K S R) (keys : Fin m → K)
     (h : Laws p q before) (write : MergedWrite before after keys (decide (frame before keys))) :
     lawful (frame before keys) (decide (frame before keys)) ∧ Laws p q after := by
-  classical
   obtain ⟨hl, hs, he, _⟩ := checked _ (frame_admissible p q before keys h)
   refine ⟨hl, write.1 ▸ hs, ?_⟩
   intro k
@@ -98,7 +102,8 @@ theorem step_preserves (p : S → Prop) (q : Option R → Prop)
     exact h.2 k
 
 /-- Every step of every supplied run from empty genesis preserves all laws
-at every key selection. No bound on key type, support size or run length. -/
+at every key selection. Key equality is decidable; key cardinality, support
+size and run length are unbounded. -/
 theorem run_preserves [DecidableEq K] (p : S → Prop) (q : Option R → Prop)
     (arity : Nat → Nat)
     (lawful : (n : Nat) → View S R (arity n) → Update S R (arity n) → Prop)

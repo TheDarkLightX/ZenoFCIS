@@ -12,7 +12,7 @@ instance : MonadEnv (StateM Environment) where
   getEnv := get
   modifyEnv := modify
 
-def allowedAxioms : Array Name := #[`propext, `Quot.sound, `Classical.choice]
+def allowedAxioms : Array Name := #[`propext, `Quot.sound]
 
 def constantKind : ConstantInfo → String
   | .axiomInfo _ => "axiom"

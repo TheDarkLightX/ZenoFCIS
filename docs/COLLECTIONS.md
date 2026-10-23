@@ -41,6 +41,16 @@ the ordinary fields every other check sees.
 
 ## Formal model
 
+The Lean preservation theorems `step_preserves` and `run_preserves` require
+decidable key equality (`[DecidableEq K]`). The run theorem already had this
+premise. All checker-supported key types—integers, enumerations and records
+of these—have decidable equality; the added step premise narrows the theorem
+only for key types the checker cannot use. The
+[checked reduction](../verification/lean/CollectionsRequiresEM.lean) gives
+the reason: an unrestricted one-role step-preservation principle implies
+excluded middle for arbitrary propositions. The amended proof uses the
+equality decision supplied by the premise.
+
 ### Declarations
 
 - `type ID key Name;` is an opaque identifier of 32 bytes. Keys are compared

@@ -17,9 +17,10 @@ class ProofReports(unittest.TestCase):
     good = "'N.example_proof' does not depend on any axioms"
 
     def test_accepts_permitted_axioms_and_axiom_free_reports(self):
+        self.assertEqual(check.ALLOWED, frozenset({"propext", "Quot.sound"}))
         check.check_output(self.good, self.expected)
-        check.check_output("'N.example_proof' depends on axioms: [propext, Quot.sound, Classical.choice]",
-                           {"N.example_proof": sorted(check.ALLOWED)})
+        check.check_output("'N.example_proof' depends on axioms: [propext, Quot.sound]",
+                           {"N.example_proof": ["propext", "Quot.sound"]})
 
     def test_refuses_missing_duplicate_or_wrong_theorem_reports(self):
         for report in ("", self.good + "\n" + self.good, self.good.replace("N.", "Other.")):
@@ -126,6 +127,47 @@ class ModuleCoverage(unittest.TestCase):
     """
     prefix = "import Std\nnamespace GateGap\ntheorem covered : True := by trivial\n#print axioms covered\n"
     named = {"GateGap.covered": []}
+
+    def test_classical_choice_is_refused(self):
+        normal = "import Std\ntheorem selected {α : Type} (h : Nonempty α) : Nonempty α := h\n"
+        candidate = normal.replace(":= h", ":= ⟨Classical.choice h⟩")
+        for version in check.VERSIONS:
+            with self.subTest(version=version), tempfile.TemporaryDirectory(prefix="lean-choice-test-") as tmp:
+                root = Path(tmp)
+                build = root / "build"
+                build.mkdir()
+                path = root / "Choice.lean"
+                path.write_text(normal)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    packet, _ = check.check_module(version, path, root, build, {})
+                self.assertTrue(packet["accepted"])
+                path.write_text(candidate)
+                check.check_source(candidate)  # The semantic rule must decide.
+                module, _ = check.compile_module(version, path, root, build)
+                check.replay_module(version, module, build)
+                code, rejected = check.audit_module(version, module, build)
+                self.assertEqual(code, 1, "lean_axiom_ceiling_must_reject_classical_choice")
+                self.assertFalse(rejected["accepted"])
+                target = next(r for r in rejected["constants"] if r["name"] == "selected")
+                self.assertIn("Classical.choice", target["axioms"])
+                self.assertIn("Classical.choice", target["forbidden"])
+                # Model an auditor claiming success despite the real dependency.
+                # The Python acceptance rule independently retains the ceiling.
+                claimed = dict(rejected, accepted=True, rejected_count=0,
+                               constants=[dict(r, forbidden=[]) for r in rejected["constants"]])
+                with self.assertRaisesRegex(ValueError, "forbidden declaration",
+                                            msg="python_axiom_ceiling_must_reject_classical_choice"):
+                    check.require_audit(0, claimed)
+                with self.assertRaisesRegex(ValueError, "unexpected axioms",
+                                            msg="named_report_must_reject_classical_choice"):
+                    check.check_output("'selected' depends on axioms: [Classical.choice]",
+                                       {"selected": ["Classical.choice"]})
+                with contextlib.redirect_stdout(io.StringIO()), \
+                        self.assertRaisesRegex(ValueError, "module axiom audit rejected"):
+                    check.check_module(version, path, root, build, {})
+                print("GATE_CONTROL " + json.dumps({"name": "classical_choice", "version": version,
+                    "normal": 0, "mutant_compile": 0, "mutant_replay": 0, "mutant_audit": code,
+                    "python_acceptance_refused": True, "witness": target}), flush=True)
 
     def run_control(self, name, declaration, *, forbidden=True):
         for version in check.VERSIONS:

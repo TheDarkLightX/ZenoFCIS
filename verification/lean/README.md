@@ -7,7 +7,8 @@ download dependencies. It compiles fresh module snapshots, replays every
 compiled module through Lean's kernel with `leanchecker`, then asks Lean to
 enumerate every constant owned by each proof module and collect its transitive
 axioms. Private, protected, instance, definition and auxiliary declarations are
-included. Only `propext`, `Quot.sound`, and `Classical.choice` are allowed.
+included. Only `propext` and `Quot.sound` are allowed. `Classical.choice` is
+refused by both the module auditor and its Python acceptance check.
 The gate refuses every symlink in the proof tree before invoking Lean,
 including directory, file, non-source and broken links.
 Use `--controls` to check deliberately false assertions in temporary copies.
@@ -21,6 +22,14 @@ establish invariance when these observations and patterns agree. Decisions
 receive only the view (P1/P2). `Checked` is the finite checker's result as an
 explicit hypothesis, including agreement of writes through aliased roles.
 `MergedWrite` states the runtime's named-write and frame obligations (P4).
+
+`step_preserves` and `run_preserves` require `[DecidableEq K]`. The latter
+already had this premise. Integers, enumerations and records of these have
+decidable equality, so the added step premise excludes only key types the
+checker cannot use. The [checked reduction](CollectionsRequiresEM.lean)
+shows why it is needed: an unrestricted one-role preservation principle
+implies excluded middle for arbitrary propositions. The amended step proof
+uses the supplied equality decision rather than classical choice.
 
 `run_preserves` proves that every supplied run from an empty map with lawful
 scalar genesis preserves the laws and makes lawful decisions at every step,
@@ -129,8 +138,8 @@ source-text patterns do not select declarations. In addition, each named
 theorem in [AXIOMS.json](AXIOMS.json) must have exactly one `#print axioms`
 report matching both the manifest and its imported kernel declaration on each
 toolchain. `least_of_stable` and `greatest_of_stable` are axiom-free;
-`run_preserves` uses exactly `propext`, `Quot.sound`, and `Classical.choice`;
-`nested_stable` uses exactly `propext` and `Quot.sound`. The finite Boolean
+`run_preserves` and `nested_stable` use exactly `propext` and `Quot.sound`.
+No owned declaration depends on `Classical.choice`. The finite Boolean
 repeat proofs use decidable, bounded pointwise comparisons. Other theorem
 reports are printed in full by the script.
 Defect controls first compile the unmodified model, then add a named false
