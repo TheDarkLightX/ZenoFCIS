@@ -50,7 +50,7 @@ fn requirements_only_counts_and_questions_are_proposals() {
     let d = Directory::new();
     let p = d.json("spec.json", &spec(json!(["x ? ?c : ?c"]), json!([])));
     let (code, r) = run(&["loop", "question", "--specification", &p]);
-    assert_eq!(code, Some(0), "{r}");
+    assert_eq!(code, Some(2), "{r}");
     assert_eq!(r["status"], "question");
     assert_eq!(r["detail"]["count"], 4);
     assert_eq!(r["detail"]["claims"], "proposal");
@@ -145,7 +145,7 @@ fn conflicts_are_minimum_relative_to_the_sketch_and_unknown_fields_refuse() {
         ),
     );
     let (code, r) = run(&["loop", "question", "--specification", &p]);
-    assert_eq!(code, Some(0), "{r}");
+    assert_eq!(code, Some(1), "{r}");
     assert_eq!(r["status"], "no-completion");
     assert_eq!(r["detail"]["conflict"]["requirements"], json!(["a", "b"]));
     let (code, r) = run(&[
@@ -222,7 +222,11 @@ fn version_space_cpmm_rounding_answers_reach_checked_singletons() {
             for round in 0..=1 {
                 let p = d.json("cpmm.json", &specification);
                 let (code, r) = run(&["loop", "question", "--specification", &p]);
-                assert_eq!(code, Some(0), "{r}");
+                assert_eq!(
+                    code,
+                    Some(if r["status"] == "determined" { 0 } else { 2 }),
+                    "{r}"
+                );
                 if r["status"] == "determined" {
                     assert_eq!(r["detail"]["candidate"]["status"], "checked");
                     assert!(

@@ -48,7 +48,7 @@ def controls(cli, directory):
             rounds = 0
             while True:
                 code, report = execute(cli, s, directory)
-                ok = code == 0 and report.get("status") in ("question", "determined", "no-completion") and O.compare(s, report)
+                ok = code == {"determined": 0, "question": 2, "no-completion": 1}.get(report.get("status"), -1) and O.compare(s, report)
                 rows.append({"case": name, "owner": owner_n, "round": rounds, "matches_reference": ok, "status": report.get("status")})
                 if not ok:
                     failures.append(rows[-1])
@@ -87,7 +87,7 @@ def controls(cli, directory):
     extra.append(("eager-dead-branch-trap", trap))
     for label, s in extra:
         code, report = execute(cli, s, directory)
-        ok = code == 0 and report.get("status") in ("determined", "no-completion") and O.compare(s, report)
+        ok = code == {"determined": 0, "no-completion": 1}.get(report.get("status"), -1) and O.compare(s, report)
         row = {"case": label, "passed": ok, "status": report.get("status")}
         rows.append(row)
         if not ok: failures.append(row)

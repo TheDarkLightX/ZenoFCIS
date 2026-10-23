@@ -666,7 +666,11 @@ pub(super) fn run(path: &Path, arguments: Arguments) -> (u8, Value) {
     detail["budget"] = usage(&budget);
     super::search_limits::annotate("version-space", status, &mut detail);
     (
-        0,
+        match status {
+            "determined" => crate::OK,
+            "no-completion" => crate::INVALID,
+            _ => crate::BLOCKED,
+        },
         json!({"schema":RESULT_SCHEMA,"integer_encoding":crate::report_numbers::ENCODING,"door":"version-space","status":status,"authority":"none","detail":detail}),
     )
 }

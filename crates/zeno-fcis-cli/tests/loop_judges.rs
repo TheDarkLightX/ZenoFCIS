@@ -356,7 +356,7 @@ fn arithmetic_teach_back_cli_rejects_wrong_rounding_and_undefined_successors() {
             "--rule",
             &rules,
         ]);
-        assert_eq!(exit, Some(0), "{report}");
+        assert_eq!(exit, Some(1), "{report}");
         assert_eq!(report["authority"], "none");
         let judged = &report["detail"]["rules"];
         assert_eq!(judged[0]["verdict"], "exact", "{report}");
@@ -395,7 +395,7 @@ fn arithmetic_teach_back_cli_checks_both_product_conditions() {
             "--rule",
             &rules,
         ]);
-        assert_eq!(exit, Some(0), "{report}");
+        assert_eq!(exit, Some(1), "{report}");
         let judged = &report["detail"]["rules"];
         assert_eq!(judged[0]["verdict"], "exact", "{report}");
         assert_eq!(judged[1]["verdict"], "wrong", "{report}");
@@ -460,7 +460,7 @@ fn the_largest_open_region_becomes_an_exact_question_and_answers_pin_it() {
     let other = json!({"where": "!authorized", "class": "Reject", "reason": "at_zero", "case": 0});
     let path = directory.json("other.json", &answers(&[other]));
     let (exit, report) = run(&["loop", "question", "--contract", &c8, "--answers", &path]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     let answer = &report["detail"]["answers"][0];
     assert_eq!(answer["status"], "disagreement");
     assert_eq!(answer["disagreement"]["inputs"], 18);
@@ -469,7 +469,7 @@ fn the_largest_open_region_becomes_an_exact_question_and_answers_pin_it() {
     let reject = json!({"where": "authorized && action == Inc && value == 3", "class": "Reject", "reason": "at_capacity"});
     let path = directory.json("reject.json", &answers(std::slice::from_ref(&reject)));
     let (exit, report) = run(&["loop", "question", "--contract", &c8, "--answers", &path]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     let answer = &report["detail"]["answers"][0];
     assert_eq!(answer["status"], "disagreement");
     assert!(answer["false_alarm"]["law"].is_u64(), "{report}");
@@ -496,6 +496,35 @@ fn the_largest_open_region_becomes_an_exact_question_and_answers_pin_it() {
 }
 
 #[test]
+fn teach_back_verdict_exits_distinguish_holds_wrong_and_vacuous() {
+    let directory = Directory::new();
+    let app = directory.incomplete_contract("bounded-counter", &[("C", 1)]);
+    for (name, condition, class, reason, exit, verdict) in [
+        (
+            "positive",
+            "!authorized",
+            "Reject",
+            json!("not_authorized"),
+            0,
+            "exact",
+        ),
+        ("negative", "!authorized", "Accept", Value::Null, 1, "wrong"),
+        ("unknown", "false", "Accept", Value::Null, 2, "vacuous"),
+    ] {
+        let rules = directory.json(
+            &format!("{name}.json"),
+            &json!({
+                "schema": "zeno-fcis/loop-rules/1",
+                "rules": [{"id": name, "where": condition, "class": class, "reason": reason}]
+            }),
+        );
+        let (code, report) = run(&["loop", "teach-back", "--contract", &app, "--rule", &rules]);
+        assert_eq!(code, Some(exit), "{report}");
+        assert_eq!(report["detail"]["rules"][0]["verdict"], verdict, "{report}");
+    }
+}
+
+#[test]
 fn rules_are_judged_exactly_with_regions_and_a_summary() {
     let directory = Directory::new();
     let c3 = directory.incomplete_contract("bounded-counter", &[("C", 3)]);
@@ -514,7 +543,7 @@ fn rules_are_judged_exactly_with_regions_and_a_summary() {
     ]});
     let path = directory.json("rules.json", &rules);
     let (exit, report) = run(&["loop", "teach-back", "--contract", &c3, "--rule", &path]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     let judged = &report["detail"]["rules"];
     assert_eq!(judged[0]["verdict"], "exact");
     assert_eq!(judged[1]["verdict"], "wrong");
@@ -819,7 +848,7 @@ fn a_negated_number_is_pinned_with_its_loop_meaning_and_a_mixed_comparison_is_re
     let negated = json!({"where": "!value", "class": "Reject", "reason": "at_zero"});
     let path = directory.json("negated.json", &answers(&[negated]));
     let (exit, report) = run(&["loop", "question", "--contract", &c3, "--answers", &path]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     let answer = &report["detail"]["answers"][0];
     assert_eq!(answer["inputs"], 4, "{report}");
     let laws: Vec<String> = answer["laws"]
@@ -896,7 +925,7 @@ fn an_answer_whose_successor_differs_from_the_core_is_a_disagreement() {
     ];
     let path = directory.json("successor.json", &answers(&items));
     let (exit, report) = run(&["loop", "question", "--contract", &c8, "--answers", &path]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     let answer = &report["detail"]["answers"][1];
     assert_eq!(answer["status"], "disagreement", "{report}");
     assert_eq!(answer["disagreement"]["inputs"], 1);
@@ -951,7 +980,7 @@ fn a_rule_the_confirmed_answers_contradict_is_forbidden_never_required() {
         &answers(&[json!({"where": "!authorized", "class": "Reject", "reason": "at_capacity"})]),
     );
     let (exit, report) = run(&["loop", "question", "--contract", &c3, "--answers", &other]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     assert_eq!(report["detail"]["answers"][0]["status"], "disagreement");
     let (exit, report) = run(&[
         "loop",

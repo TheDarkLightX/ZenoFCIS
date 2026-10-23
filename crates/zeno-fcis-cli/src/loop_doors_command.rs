@@ -299,7 +299,7 @@ JSON: zeno-fcis/loop-doors/2. Exit 0 transferred to all; 1 failed (none) or refu
         about = "Hash complete finite observations and compare them with the reference program.",
         long_about = r#"Read --original and either canonical --candidate or --expressions (zeno-fcis/loop-expressions/1); each file is at most 65,536 bytes. Require identical input/output domains and at most 131,072 input tuples. The library evaluator computes every output or exact evaluation failure in enumeration order; hash these observations and domains under zeno-fcis/loop-meaning/1.
 
-Returns both digests and same_as_original. Digest equality is a meaning key, subject to hash collisions; it is not an independent transform verdict or receipt. No session or attempts. JSON: zeno-fcis/loop-doors/2. Exit 0 keyed even when the keys differ; 1 refused; 2 inconclusive; 3 I/O error."#
+Returns both digests and same_as_original. Digest equality is a meaning key, subject to hash collisions; it is not an independent transform verdict or receipt. No session or attempts. JSON: zeno-fcis/loop-doors/2. Exit 0 same meaning, 1 different or refused, 2 inconclusive, 3 I/O error."#
     )]
     Meaning {
         /// Canonical original program (program.zcve encoding).
@@ -339,9 +339,9 @@ Lower the expression and use the library evaluator with a full signed-i128 or Bo
 
 Requirements-only mode enumerates finite sketch completions under laws/examples and proposes a distinguishing input or conflict. A singleton is checked using the library law evaluator, transform check and receipt replay. Default ceilings: 2,000,000 work, 4,096 tuples/meanings, 1,000,000 cells, 10,000 subsets. The five --max-* flags apply only to --specification; contract mode accepts but ignores them and uses its own limits above.
 
-Contract determination includes the door's reason and delivery constraints; it need not equal a separate gaps-judge result on exported answer laws. Completed reports can include disagreeing answers and exit 0; inspect detail.answers as well as status.
+Contract determination includes the door's reason and delivery constraints; it need not equal a separate gaps-judge result on exported answer laws. Disagreeing answers exit 1; inspect detail.answers as well as status.
 
-No session or attempts. Contract JSON: zeno-fcis/loop-doors/2; exit 0 completed question report, 1 conflict/inconsistent/refused, 2 incomplete/inconclusive/out-of-scope, 3 I/O error. Requirements JSON: zeno-fcis/loop-version-space/2 (early input errors can use transform-loop/1); question/no-completion/determined=0, refused=1, inconclusive=2. A question or count is not a program acceptance."#
+No session or attempts. Contract JSON: zeno-fcis/loop-doors/2; exit 0 completed report, 1 disagreement/conflict/inconsistent/refused, 2 incomplete/inconclusive/out-of-scope, 3 I/O error. Requirements JSON: zeno-fcis/loop-version-space/2 (early input errors can use transform-loop/1); determined=0, no-completion/refused=1, question/inconclusive=2. A question or count is not a program acceptance."#
     )]
     Question {
         /// Existing application contract (original question mode).
@@ -364,7 +364,7 @@ No session or attempts. Contract JSON: zeno-fcis/loop-doors/2; exit 0 completed 
         about = "Compare restated rules with the core on all declared inputs and reachable states.",
         long_about = r#"Read --contract (project.zeno and v2/policy.json), --rule (zeno-fcis/loop-rules/1), and optional --answers (zeno-fcis/loop-answers/1). Documents are at most 65,536 bytes; the supported finite core is limited to 131,072 tuples. The door evaluator classifies rules as exact, holds, wrong or vacuous, gives regions/witnesses, and computes required/open/forbidden where its admissibility budget permits.
 
-JSON: zeno-fcis/loop-doors/2. Exit 0 judged even if a rule is wrong; 1 refused; 2 inconclusive/out-of-scope; 3 I/O error. No session, attempts or equivalence receipt, and no rule or owner answer is adopted."#
+JSON: zeno-fcis/loop-doors/2. Exit 0 exact/holds, 1 wrong/refused, 2 vacuous/inconclusive/out-of-scope, 3 I/O error. No session, attempts or equivalence receipt, and no rule or owner answer is adopted."#
     )]
     TeachBack {
         /// Application directory holding project.zeno and v2/policy.json.
@@ -2319,7 +2319,12 @@ fn meaning_command(
     };
     let size = tuples(original_program.inputs());
     if size > u128::from(DOOR_MAX_TUPLES) {
-        return refused("domain over the door's budget");
+        return doors_result(
+            crate::BLOCKED,
+            "meaning",
+            "inconclusive",
+            json!({"reason": "domain over the door's budget"}),
+        );
     }
     let program = match (expressions, candidate) {
         (Some(path), _) => {
@@ -2361,7 +2366,11 @@ fn meaning_command(
             json!({"reason": reason}),
         ),
         Ok((original_key, key)) => doors_result(
-            crate::OK,
+            if key == original_key {
+                crate::OK
+            } else {
+                crate::INVALID
+            },
             "meaning",
             "keyed",
             json!({
@@ -2525,7 +2534,13 @@ fn question_command(dir: &Path, answers: Option<&Path>) -> (u8, Value) {
     }
     let status = detail["status"].as_str().unwrap_or("open").to_owned();
     (
-        if status == "inconsistent" {
+        if status == "inconsistent"
+            || detail["answers"].as_array().is_some_and(|answers| {
+                answers
+                    .iter()
+                    .any(|answer| answer["status"] == "disagreement")
+            })
+        {
             crate::INVALID
         } else if status == "incomplete" {
             crate::BLOCKED
@@ -2569,10 +2584,30 @@ fn teach_back_command(dir: &Path, rules: &Path, answers: Option<&Path>) -> (u8, 
     match judged {
         Err(reason) => super::result(crate::BLOCKED, "inconclusive", json!({"reason": reason})),
         Ok(Err(stop)) => stop_result(stop),
-        Ok(Ok(detail)) => (
-            crate::OK,
-            json!({"status": "judged", "authority": "none", "detail": detail}),
-        ),
+        Ok(Ok(detail)) => {
+            let rules = detail["rules"]
+                .as_array()
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            let exit = if rules
+                .iter()
+                .any(|rule| matches!(rule["verdict"].as_str(), Some("wrong" | "refused")))
+            {
+                crate::INVALID
+            } else if rules.is_empty()
+                || rules
+                    .iter()
+                    .any(|rule| !matches!(rule["verdict"].as_str(), Some("exact" | "holds")))
+            {
+                crate::BLOCKED
+            } else {
+                crate::OK
+            };
+            (
+                exit,
+                json!({"status": "judged", "authority": "none", "detail": detail}),
+            )
+        }
     }
 }
 
