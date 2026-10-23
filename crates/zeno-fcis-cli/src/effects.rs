@@ -826,6 +826,7 @@ effects! { crate::loop_command::doors::capture::Command {
 
 effects! { crate::judge_command::Command {
     leaves {
+        "two-run" => Self::TwoRun { .. } => declared((&["application-contract"], &["optional-judge-packet"], false, None));
         "collections" => Self::Collections { .. } => declared((
                 &["application-contract"],
                 &["optional-judge-packet"],

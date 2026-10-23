@@ -28,6 +28,7 @@ const REVIEWED_FILES: &[&str] = &[
     "src/checked_composition/term_tests.rs",
     "src/checked_composition/tests.rs",
     "src/priority_construction_controls.rs",
+    "src/two_run/tests.rs",
 ];
 /// Integration tests and their fixtures.
 const REVIEWED_PREFIXES: &[&str] = &["tests/"];
