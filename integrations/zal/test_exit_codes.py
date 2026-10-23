@@ -68,6 +68,8 @@ class VerdictExits(unittest.TestCase):
         self.assertEqual(verdict_exit({'status': 'unfinished'}), 2)
         self.assertEqual(verdict_exit({'status': 'fail'}), 1)
         self.assertEqual(verdict_exit({'status': 'unsupported'}), 2)
+        self.assertEqual(verdict_exit({'status': 'unknown'}), 2)
+        self.assertEqual(verdict_exit({'status': 'UNKNOWN'}), 2)
 
 
 if __name__ == '__main__':

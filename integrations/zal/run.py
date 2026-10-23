@@ -19,7 +19,7 @@ def verdict_exit(result):
         return {"same-functional-observations-on-declared-domain": 0, "different": 1}.get(result["comparison"], 2)
     if result.get("status") in {"counterexample", "fail", "none-in-scope"}:
         return 1
-    if result.get("status") in {"unfinished", "unsupported", "UNKNOWN", "inconclusive"}:
+    if result.get("status") in {"unfinished", "unsupported", "UNKNOWN", "unknown", "inconclusive"}:
         return 2
     return 0
 
