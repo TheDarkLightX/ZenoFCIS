@@ -3,7 +3,8 @@
 These synthesized proofs use only the standard Lean distribution. Run
 `python3 tools/check_lean_proofs.py` from the repository root. The script
 requires the already installed Lean 4.28.0 and 4.32.0 toolchains; it does not
-download dependencies. It compiles fresh module snapshots, then asks Lean to
+download dependencies. It compiles fresh module snapshots, replays every
+compiled module through Lean's kernel with `leanchecker`, then asks Lean to
 enumerate every constant owned by each proof module and collect its transitive
 axioms. Private, protected, instance, definition and auxiliary declarations are
 included. Only `propext`, `Quot.sound`, and `Classical.choice` are allowed.
@@ -132,8 +133,15 @@ Defect controls first compile the unmodified model, then add a named false
 assertion in an isolated copy. Only rejection by `decide` proving that
 assertion false counts as a killed control; build or transport failures do
 not count. Temporary copies are removed, and the proof sources are unchanged.
+Compilation alone does not show that the kernel checked a declaration: an
+elaborator option can add one the kernel never saw, and the axiom audit reads
+the same environment. The kernel replay re-checks every declaration of the
+compiled module and refuses such a module; a gate test compiles one and
+requires the replay to reject it.
 The proof sources also refuse `sorry`, `admit`, `axiom`, `native_decide`,
-`implemented_by`, `extern`, `unsafe`, and `csimp` tokens, even in comments.
+`implemented_by`, `extern`, `unsafe`, `csimp`, `skipKernelTC`, `set_option`,
+`run_cmd`, `run_elab`, `run_meta`, `addDecl` and `#eval` tokens, even in
+comments, and any import other than `Std` or another proof module.
 This conservative textual guard is defence in depth, not declaration coverage.
 The gate tests compile five declaration forms containing a native decision
 proof, bypass the textual guard, and require rejection by the module audit.

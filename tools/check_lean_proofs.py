@@ -15,15 +15,17 @@ PROOFS = ROOT / "verification" / "lean"
 VERSIONS = ("4.28.0", "4.32.0")
 ALLOWED = frozenset({"propext", "Quot.sound", "Classical.choice"})
 AUDITOR = ROOT / "tools" / "lean" / "AuditModule.lean"
-FORBIDDEN = re.compile(r"\b(?:sorry|admit|axiom|native_decide|implemented_by|extern|unsafe|csimp)\b")
+FORBIDDEN = re.compile(r"\b(?:sorry|admit|axiom|native_decide|implemented_by|extern|unsafe|csimp"
+                       r"|skipKernelTC|set_option|run_cmd|run_elab|run_meta|addDecl)\b|#eval\b")
+IMPORT = re.compile(r"\bimport\s+(?:all\s+)?([^\s]+)")
 AXIOMS = re.compile(
     r"'([^']+)' (?:does not depend on any axioms|depends on axioms: \[([^\]]*)\])"
 )
 
 
-def lean(version, *args, search_path=None):
+def lean(version, *args, search_path=None, tool="lean"):
     command = ["nice", "-n", "19", "ionice", "-c3", "elan", "run",
-               f"leanprover/lean4:v{version}", "lean", *map(str, args)]
+               f"leanprover/lean4:v{version}", tool, *map(str, args)]
     env = os.environ.copy()
     # Only this invocation's freshly compiled modules precede the standard library.
     env["LEAN_PATH"] = str(search_path) if search_path is not None else ""
@@ -32,14 +34,19 @@ def lean(version, *args, search_path=None):
     return result.returncode, result.stdout + result.stderr
 
 
-def check_source(source):
+def check_source(source, modules=frozenset()):
     """Defence in depth; this does not discover declarations or prove safety.
 
     Deliberately conservative: reserved tokens are refused even in comments.
-    The semantic audit is independent of this textual refusal.
+    Only Std and other proof modules may be imported: the elaborator commands
+    that can add declarations without the kernel need Lean itself.
+    The kernel replay and the semantic audit are independent of this refusal.
     """
     if match := FORBIDDEN.search(source):
         raise ValueError(f"forbidden proof-source token: {match.group()}")
+    for name in IMPORT.findall(source):
+        if name != "Std" and name not in modules:
+            raise ValueError(f"forbidden proof-source import: {name}")
 
 
 def check_output(output, expected):
@@ -72,6 +79,18 @@ def compile_module(version, path, source_root, build):
     return module, text
 
 
+def replay_module(version, module, build):
+    """Re-check every declaration of the compiled module in Lean's kernel.
+
+    Compilation alone is not enough: elaborator options can add a declaration
+    the kernel never saw, and the axiom audit reads the same environment.
+    """
+    code, text = lean(version, module, search_path=build, tool="leanchecker")
+    if code:
+        raise ValueError(f"Lean kernel replay rejected {module}: exit {code}\n{text}")
+    return text
+
+
 def audit_module(version, module, build, auditor=AUDITOR):
     """Lean owns the module-wide verdict; return its packet and actual exit."""
     code, text = lean(version, "--run", auditor, module, search_path=build)
@@ -96,10 +115,12 @@ def require_audit(code, packet):
             raise ValueError(f"module axiom audit contains forbidden declaration: {record}")
 
 
-def check_module(version, path, source_root, build, named, auditor=AUDITOR):
-    check_source(path.read_text())
+def check_module(version, path, source_root, build, named, auditor=AUDITOR, modules=frozenset()):
+    check_source(path.read_text(), modules)
     module, text = compile_module(version, path, source_root, build)
     print(f"CHECK {version} {module}: exit 0\n{text}", flush=True)
+    replay_module(version, module, build)
+    print(f"REPLAY {version} {module}: exit 0", flush=True)
     code, packet = audit_module(version, module, build, auditor)
     print(f"AUDIT {version} {module}: exit {code}\n{json.dumps(packet, sort_keys=True)}", flush=True)
     require_audit(code, packet)
@@ -197,9 +218,10 @@ def main():
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(content)
             packets, seen = [], set()
+            modules = frozenset(".".join(p.with_suffix("").parts) for p in snapshots)
             for relative, content in snapshots.items():
                 path = source_root / relative
-                packet, reports = check_module(version, path, source_root, build, named, auditor)
+                packet, reports = check_module(version, path, source_root, build, named, auditor, modules)
                 if seen & reports:
                     raise ValueError("named theorem reported by multiple proof modules")
                 seen |= reports
@@ -211,7 +233,7 @@ def main():
             results["toolchains"][version] = packets
     if args.report:
         args.report.write_text(json.dumps(results, indent=2, sort_keys=True) + "\n")
-    print("PASS: every module constant, named axiom manifest and requested controls", flush=True)
+    print("PASS: kernel replay, every module constant, named axiom manifest and requested controls", flush=True)
 
 
 if __name__ == "__main__":

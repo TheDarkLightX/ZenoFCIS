@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 import check_lean_proofs as check
 
@@ -36,9 +37,17 @@ class ProofReports(unittest.TestCase):
 
     def test_refuses_each_textual_escape(self):
         for token in ("sorry", "admit", "axiom", "native_decide", "implemented_by",
-                      "extern", "unsafe", "@[csimp]", "attribute [csimp]"):
+                      "extern", "unsafe", "@[csimp]", "attribute [csimp]",
+                      "set_option debug.skipKernelTC true in", "run_cmd pure ()", "run_elab pure ()",
+                      "run_meta pure ()", "addDecl", "#eval 1"):
             with self.subTest(token=token), self.assertRaises(ValueError):
                 check.check_source(token)
+
+    def test_refuses_imports_other_than_std_and_proof_modules(self):
+        check.check_source("import Std\nimport FixedPoints\n", frozenset({"FixedPoints"}))
+        for source in ("import Lean", "import Lean.Elab.Command", "import all Lean", "import FixedPoints"):
+            with self.subTest(source=source), self.assertRaisesRegex(ValueError, "forbidden proof-source import"):
+                check.check_source(source)
 
 
 class ModuleCoverage(unittest.TestCase):
@@ -122,6 +131,43 @@ class ModuleCoverage(unittest.TestCase):
     def test_allowed_private_theorem_passes_and_is_counted(self):
         self.run_control("allowed_private_theorem",
                          "private theorem unreported : (1 : Nat) + 1 = 2 := by decide", forbidden=False)
+
+
+class KernelReplay(unittest.TestCase):
+    """A declaration added with the kernel check switched off compiles, and the
+    axiom audit sees no axioms in it; only the kernel replay rejects it."""
+    bypass = """import Lean
+open Lean
+
+set_option debug.skipKernelTC true in
+run_cmd Lean.Elab.Command.liftCoreM <| addDecl <| .thmDecl {
+  name := `Bypass.unchecked, levelParams := [], type := mkConst ``False, value := mkConst ``True.intro }
+
+theorem Bypass.false_proved : False := Bypass.unchecked
+"""
+
+    def test_kernel_bypass_is_rejected_by_replay(self):
+        for version in check.VERSIONS:
+            with self.subTest(version=version), tempfile.TemporaryDirectory(prefix="lean-gate-test-") as tmp:
+                root = Path(tmp)
+                build = root / "build"
+                build.mkdir()
+                path = root / "Bypass.lean"
+                path.write_text(self.bypass)
+                with self.assertRaisesRegex(ValueError, "forbidden proof-source"):
+                    check.check_module(version, path, root, build, {})
+                module, _ = check.compile_module(version, path, root, build)
+                code, packet = check.audit_module(version, module, build)
+                self.assertEqual(code, 0, packet)
+                self.assertTrue(packet["accepted"])
+                with self.assertRaisesRegex(ValueError, "Lean kernel replay rejected Bypass"):
+                    check.replay_module(version, module, build)
+                # The complete module check replays even when the textual guard is bypassed.
+                with mock.patch.object(check, "check_source"), contextlib.redirect_stdout(io.StringIO()), \
+                        self.assertRaisesRegex(ValueError, "Lean kernel replay rejected Bypass"):
+                    check.check_module(version, path, root, build, {})
+                print("GATE_CONTROL " + json.dumps({"name": "kernel_bypass", "version": version,
+                    "compile": 0, "audit": code, "audit_accepted": True, "replay_rejected": True}), flush=True)
 
 
 if __name__ == "__main__":
