@@ -53,8 +53,8 @@ use serde_json::{Value, json};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_formal_tools::{
     CVC5_VERSION, LEAN_VERSION, ToolBackend, ToolFailure, ToolRunStatus, Z3_VERSION, doctor,
-    execute_tool, export_inductive_smt, export_smt, inspect_lean_toolchain, load_tools_manifest,
-    retain_run, verify_tool,
+    execute_tool, export_inductive_lean, export_inductive_smt, export_smt, inspect_lean_toolchain,
+    load_tools_manifest, retain_run, verify_tool,
 };
 pub(crate) use zeno_fcis_shell_sqlite::v2::equivalence::finite_checker;
 use zeno_fcis_spec::{
@@ -1376,7 +1376,8 @@ fn prove(
         for tool_backend in requested.iter().copied() {
             let compatible = match claim.mode() {
                 ClaimMode::UnboundedProof => tool_backend == ToolBackend::Lean,
-                ClaimMode::Relational | ClaimMode::Finite { .. } | ClaimMode::Inductive => {
+                ClaimMode::Inductive => true,
+                ClaimMode::Relational | ClaimMode::Finite { .. } => {
                     tool_backend != ToolBackend::Lean
                 }
             } && claim.backends().contains(&tool_backend.spec_backend());
@@ -1404,6 +1405,7 @@ fn prove(
                 (ToolBackend::Cvc5 | ToolBackend::Z3, ClaimMode::Inductive) => {
                     export_inductive_smt(claim, &spec, tool_backend)
                 }
+                (ToolBackend::Lean, ClaimMode::Inductive) => export_inductive_lean(claim, &spec),
                 (ToolBackend::Cvc5 | ToolBackend::Z3, _) => export_smt(claim, tool_backend),
                 (ToolBackend::Lean, _) => Err(zeno_fcis_formal_tools::ExportError::UnsupportedMode),
             };

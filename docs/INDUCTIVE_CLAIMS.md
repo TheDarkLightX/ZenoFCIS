@@ -41,8 +41,8 @@ claim ID name BACKEND inductive [assume [LAW, ...]] [accept [LAW, ...]] [failure
   - `assume` lists laws enforced on every committing decision;
   - `accept` lists laws enforced on accepts;
   - `failure` lists laws enforced on committed failures.
-- `BACKEND` is `cvc5`, `z3`, or `all`. There is no Lean export for inductive
-  claims yet, so `prove --backend lean` reports that the mode is unsupported.
+- `BACKEND` is `cvc5`, `z3`, `lean`, or `all`. Lean supports the restricted
+  linear fragment described below.
 
 The groups follow the decision scopes in the law manifest. A state invariant
 is usually scoped to every committing decision, an action law to accepts, and
@@ -59,8 +59,8 @@ claim 600 counters_never_negative all inductive accept [501] failure [502] = pre
 
 ## What is checked, and where
 
-The argument has three parts. `prove` checks only the first, through normal
-SMT export and private data-only replay. Parts two and three describe the
+The argument has three parts. The SMT route checks only the first, through
+normal export and private data-only replay. Parts two and three describe the
 original reference contract preserved privately; their callback APIs are no
 longer normal application interfaces.
 
@@ -173,6 +173,7 @@ a larger implication.
 | --- | --- |
 | `ProposedUnsat` (CVC5) | The step holds, attested by the solver's `unsat`. Its proof text is not checked. As for every solver result, `prove` exits 2. |
 | `Blocked(UnsupportedEvidence)` (Z3) | Z3 answered `unsat`. Z3 gives no proof object, so it is not retained as evidence. |
+| `KernelChecked` (Lean) | The restricted fragment's step and conditional finite-history theorem passed the pinned kernel and exact axiom admission. `prove` exits 0. Runtime premises still apply. |
 | `Refuted` | A replayed transition satisfies the assumed laws and leaves the invariant. |
 | `Undefined(reason)` | A replayed transition satisfies the assumed laws, and the invariant over `post.` has no value there. |
 
@@ -245,6 +246,50 @@ and Z3 4.16.0, all run on 2026-09-24:
   `0 <= pause <= 2`, was attested from the tick law on the first run. The
   template ships both as claims 600 and 601, with `tests/claims.rs`.
 
+## Lean induction for the linear fragment
+
+`prove --backend lean` exports a relational inductive claim and every assumed
+law when they use integer or Boolean projections, integer constants,
+addition, subtraction, unary minus, multiplication by a constant, comparisons,
+and Boolean connectives. The export preserves i128 ranges, declared domains,
+strict checked-arithmetic definedness, and the law groups for each decision
+kind. The standalone source uses only Lean's core library.
+
+The generated `Inv` describes the invariant. `Admitted` describes the model's
+committing steps, and `step_preserves` proves that each keeps `Inv`.
+`Step` also permits an unchanged state for rejection or technical refusal.
+`history_holds` proves the invariant for every finite `Chain Step g h`,
+**conditional on `Inv g`**. The project has no concrete genesis value, so
+the exporter emits no `genesis_holds` theorem and invents no initial state.
+
+The application's exact-genesis checks remain premises:
+`the_invariant_holds_on_the_exact_genesis_state` for the durable counter and
+`the_invariant_holds_on_the_exact_genesis_account` for account lockout, in
+the retained original reference regressions. Normal template conformance also
+checks `genuine_genesis_requires_the_complete_original_initial_state`.
+The history theorem additionally assumes that the runtime refuses a post-state
+outside its declared domains, a rejection or refusal changes no state and
+commits nothing, and the exporter's projections match the runtime's law
+checker. The retained `the_declared_ranges_are_the_schemas_bounds`,
+`schema_admission_enforces_the_declared_bounds`, and
+`the_law_checker_observes_every_field_the_invariant_reads` regressions check
+the original domain and observer bindings. The normal durable-counter
+`both_capacity_boundaries_reject_without_publication` checks unchanged state
+and publication counts for its two capacity rejections. No single regression
+establishes all three premises for every possible runtime invocation.
+Every assumed law must also be enforced on the decisions its group names.
+
+The evidence level is **kernel checked, for this fragment, under these
+premises**, only when the pinned runtime and exact configured axiom report
+are admitted. The generated source, project identity, resolved-law identity,
+runtime inventory, and run record bind that evidence to its inputs.
+The CLI's ignored `pinned_lean_kernel_checks_both_inductive_pilots_through_prove`
+test exercises both pilots; running ordinary tests alone does not run it.
+
+Division, remainder, products of two nonconstant terms, sums, quantifiers,
+host predicates, text, bytes, and temporal claims remain refused by this
+exporter. A proof does not give external evidence runtime publication authority.
+
 ## Limits
 
 - **Only declared ranges.** The step assumes the ranges `project.zeno`
@@ -254,7 +299,8 @@ and Z3 4.16.0, all run on 2026-09-24:
   itself with it.
 - **Scopes are not in `.zeno`.** The claim states which decisions each law is
   assumed on, and the application confirms it against its manifest.
-- **No Lean export yet.** Solver results are Attested at most.
+- **Restricted Lean fragment.** Only the fragment above has Lean export;
+  SMT solver results remain Attested at most.
 - **Named predicates** make replay impossible, and are refused at replay, as
   for other claims.
 
@@ -325,7 +371,7 @@ The test runs in the formal-tools workflow and in `tools/record_gate_evidence.py
 - A result for the step alone says nothing about the application. The base
   case, the observer check, and the assumption check must also pass in the
   application's own tests.
-- The result rests on the solver's unchecked `unsat` and on the SMT encoding.
+- An SMT result rests on the solver's unchecked `unsat` and on the SMT encoding.
   The pinned differential test checks the encoding only on its collection.
 - An invariant with an attested step is only as meaningful as the laws it
   assumes. Laws that

@@ -13,6 +13,7 @@ on:
       - "tools/record_gate_evidence.py"
       - "tools/symbolic_certificate_checker/**"
       - "tools/check_symbolic_certificates.py"
+      - "tools/check_lean_inductive_mutations.py"
       - "tools/atdd.py"
       - "acceptance/features/symbolic_checks.feature"
       - "crates/zeno-fcis-formal-tools/**"
@@ -92,6 +93,25 @@ jobs:
           ACTUAL_TREE="$(cargo +1.97.1 run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
             -p zeno-fcis-cli --locked -- backend inventory-lean "$LEAN_ROOT" | awk '/^lean tree_sha256 / { print $3 }')"
           test "$ACTUAL_TREE" = "$EXPECTED_TREE"
+      - name: Kernel-check linear induction and its exporter controls
+        env:
+          ZENO_FCIS_LEAN: ${{ runner.temp }}/lean/lean-4.30.0-linux/bin/lean
+          ZENO_FCIS_LEAN_ROOT: ${{ runner.temp }}/lean/lean-4.30.0-linux
+          ZENO_FCIS_LEAN_EVIDENCE: ${{ runner.temp }}/lean-inductive-evidence
+          CARGO_PROFILE_DEV_DEBUG: "0"
+        run: |
+          cargo +1.97.1 test -p zeno-fcis-formal-tools --locked -j 2 \
+            lean_inductive::tests::pinned_lean_ -- --ignored --nocapture --test-threads=1
+          cargo +1.97.1 test -p zeno-fcis-cli --locked -j 2 --test lean_inductive_cli \
+            pinned_lean_kernel_checks_both_inductive_pilots_through_prove -- --ignored --exact --nocapture
+          python3 tools/check_lean_inductive_mutations.py
+      - name: Retain public induction fixture source and kernel output
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: lean-inductive-evidence
+          path: ${{ runner.temp }}/lean-inductive-evidence
+          if-no-files-found: warn
       - name: Kernel-check the private original shallow Lean reference
         working-directory: ${{ runner.temp }}
         run: |
