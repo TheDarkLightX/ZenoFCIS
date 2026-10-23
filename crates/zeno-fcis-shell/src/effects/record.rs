@@ -383,10 +383,10 @@ pub fn replay<P: Program>(
                 entry: Entry::Response(recorded, response),
                 ..
             }) if *recorded == binding => {
-                if let Some(code) = check.rejection() {
-                    if *response != Response::Send(super::port::Sent::Refused(code)) {
-                        return Err(ReplayError::Mismatch(at));
-                    }
+                if let Some(code) = check.rejection()
+                    && *response != Response::Send(super::port::Sent::Refused(code))
+                {
+                    return Err(ReplayError::Mismatch(at));
                 }
                 driver
                     .reply(Reply {

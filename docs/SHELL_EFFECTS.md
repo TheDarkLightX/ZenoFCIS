@@ -365,7 +365,8 @@ publication through Authority. Each run allows two retries and at most 4,096
 requests; exhaustion can leave an unresolved outcome and pending payouts.
 Delivery waits ten adapter ticks before retrying, with zero jitter.
 
-Recording starts off. `record_private(true)` enables the Record handler;
+For an unmonitored `Effects::open`, recording starts off.
+`record_private(true)` enables the Record handler;
 `transcript()` borrows the last run's private in-memory evidence. The next run
 replaces it, and disabling recording discards it. Capture never writes a file,
 prints a transcript, changes relay export or supplies authority to a decision.
@@ -416,7 +417,11 @@ with `PolicyDuplicate`, `PolicyRecipient`, `PolicyFields` or `PolicyCapacity`;
 the delivery program stops immediately, retaining the pending record. Its
 outcome is Refused before any possible send, or Unknown after earlier send
 uncertainty or progress. The record layer captures that response and the final
-outcome.
+outcome. The transcript also carries the initial monitor snapshots and an
+ordered admission record for every request. Handler-free replay evaluates the
+same immutable policy configuration and state, compares every verdict and
+proposed successor, and enforces the corresponding refusal before resuming.
+Changing or omitting a policy record fails even if its hash chain is rebuilt.
 Success, refusal, Unknown, NotApplied and crash are explicit transcript events;
 the latter three classify as incomplete actions. Exploration closure and
 individual action completion are separate results.
@@ -434,7 +439,8 @@ not forwarded and consumes nothing. Transport duplication can still produce
 multiple copies from that single send.
 
 The versioned policy identity binds the canonical allowlist, capacity, field
-declarations, and source of `policy.rs` and `handler.rs`. Projection exposes
+declarations, and source of `policy.rs`, `handler.rs`, `policy_record.rs`,
+`record.rs` and `codec.rs`. Projection exposes
 only declared fields to the decision body; an absent field access refuses.
 Stack order, policy identities and initial reservation states are bound into
 the explorer's manifest start bytes. Policy state and the independent send
@@ -457,11 +463,16 @@ private bound configuration permits caching its identity without invalidation.
 The source digest above pins this review to the implementation being checked.
 A closed two-case policy enum and projected fields avoid a callback runtime,
 extra operation language and response-dependent rollback bookkeeping.
-Existing port tags, failure codes and canonical bytes retain their numbering;
-new codes and the transport Refused branch are appended. The program source
-pin changes intentionally. The existing regression checks remain; the expanded
-fault alphabet and sticky send uncertainty intentionally change the qualified
-execution states and counts.
+The shared `policy_record::admit` evaluates immutable snapshots and returns
+owned candidate monitors and evidence. Both the stack and replay use it;
+independent payment acceptance uses actual commit occurrences, never this
+helper's verdict as evidence of authorization.
+Existing port tags, failure codes, request and response encodings stay unchanged.
+The policy transcript event appends tag 4; monitored manifests append a
+versioned policy-snapshot section. Unmonitored event and manifest field encodings
+retain their shape. Source-bound policy and record identities intentionally
+refresh, changing dependent transcript digests. The program source, SQL order
+and schema stay unchanged. Existing independent regression checks remain.
 
 Provider idempotency is an environment assumption. A timeout can hide success.
 The claim is "no second send of the same key by this protocol", never
@@ -476,3 +487,43 @@ recipient rewrite, duplicate send admission, missing allowlist, silent record
 drop, undeclared field access, and skipping policies on retry. Each must fail
 its named behavioral check and pass again after restoration. The ignored
 `policy_frozen_profile` test runs the complete frozen policy product.
+
+### Generated payment sender and independent product
+
+The generated `withdrawal-queue` shell offers `Effects::open_with_policies`.
+It binds a policy lifetime at open and retains the stack on the handle before
+calling a transport, including if that transport unwinds. Every run shares
+those reservations. A monitored handle requires private capture and adapter
+provenance. It has no live policy-reset operation. Opening another handle
+starts another lifetime; durable reservation storage and restoration remain
+an application obligation before sending after real process loss.
+
+The [payment sender journey](../examples/effect-policies/payment-sender/README.md)
+shows the hidden-success case and its exact finite domain. `policy_product`
+runs the real delivery program, driver and policy stack against a separate
+finite payment environment. The Python reference independently implements the
+controller, monitor, environment and canonical encoding. It compares every
+prefix through a declared request bound K, keeping exact traces. Counterexamples
+include a policy bypass followed by two payments of one key, and duplicate
+transport copies without the declared provider-idempotency assumption.
+Request-bound leaves classify as incomplete actions, even when the finite
+prefix tree has been explored completely.
+
+### Background, contribution and scope
+
+Background: Matija Pretnar, *An Introduction to Algebraic Effects and Handlers.
+Invited Tutorial Paper*, Electronic Notes in Theoretical Computer Science,
+2015, describes effect requests and handlers. Fred B. Schneider, *Enforceable
+Security Policies*, ACM Transactions on Information and System Security,
+2000, studies execution monitors. Edmund M. Clarke, Orna Grumberg and Doron A.
+Peled, *Model Checking*, MIT Press, 1999, describes transition-system products
+and counterexamples.
+
+What is new here: these mechanisms are integrated with the shell's source-bound
+transcripts and bounded product evidence. Comparative prior-art search pending.
+No novelty claim is made.
+
+Scope: finite checks cover the declared domains and environment assumptions.
+Runtime and SQLite tests establish the stated tested behavior; they supply no
+decision authority, authenticated delivery, guaranteed progress or exactly-once
+external-execution claim.

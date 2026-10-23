@@ -261,20 +261,20 @@ impl Stack {
     fn install(&mut self, monitors: Vec<Monitor>) {
         let mut values = monitors.into_iter();
         for layer in &mut self.layers {
-            if let Layer::Policy(monitor) = layer {
-                if let Some(value) = values.next() {
-                    *monitor = value;
-                }
+            if let Layer::Policy(monitor) = layer
+                && let Some(value) = values.next()
+            {
+                *monitor = value;
             }
         }
     }
 
     fn bind_recording(&mut self, monitors: &[Monitor]) {
         for layer in &mut self.layers {
-            if let Layer::Record(transcript) = layer {
-                if transcript.links.is_empty() {
-                    transcript.manifest.policies = monitors.to_vec();
-                }
+            if let Layer::Record(transcript) = layer
+                && transcript.links.is_empty()
+            {
+                transcript.manifest.policies = monitors.to_vec();
             }
         }
     }

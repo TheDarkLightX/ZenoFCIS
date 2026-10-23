@@ -447,12 +447,11 @@ pub fn run(profile: Profile, schedule: &[u8]) -> Result<Run, Refusal> {
                     .collect()
             })
             .unwrap_or_default();
-        if let Operation::Send(_, delivery) = operation {
-            if matches!(handled, Handled::Answer(Response::Send(Sent::Refused(_)))) {
-                if let Some(index) = environment.index(delivery.id) {
-                    environment.refused[index] = true;
-                }
-            }
+        if let Operation::Send(_, delivery) = operation
+            && matches!(handled, Handled::Answer(Response::Send(Sent::Refused(_))))
+            && let Some(index) = environment.index(delivery.id)
+        {
+            environment.refused[index] = true;
         }
         trace.push(Event {
             operation: codec::operation(operation),

@@ -41,8 +41,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 provider_idempotent: false,
                 duplicate_copies: false,
             };
-            print_run(
-                policy_product::run(profile, &[0, 3, 0, 0, 0]).map_err(|e| format!("{e:?}"))?,
+            let run =
+                policy_product::run(profile, &[0, 3, 0, 0, 0]).map_err(|e| format!("{e:?}"))?;
+            println!("Invoice 1: provider accepted payment, then its reply was lost.");
+            println!("Retry: policy refused the second send before transport invocation.");
+            println!(
+                "Payments per invoice: {:?}; pending: {:?}.",
+                run.commits, run.pending
+            );
+            println!(
+                "Program outcome: Unknown; verdict transcript replayed: {}.",
+                run.replayed
+            );
+            println!(
+                "Scope: one retained relay lifetime, at most one payment per invocation; no provider idempotency assumed."
             );
             return Ok(());
         }
