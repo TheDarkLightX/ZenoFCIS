@@ -1,6 +1,6 @@
 //! Concrete maps survive changes in command roles; finite reachability is scoped.
 use serde_json::{Value, json};
-use zeno_fcis_contract::collections::{Limits, Verdict, judges};
+use zeno_fcis_contract::collections::{Limits, Verdict, check, judges};
 const TOKENS: &str = include_str!("../../../examples/collections/token-balances/project.zeno");
 const RULES: &str = include_str!("../../../examples/collections/token-balances/v2/policy.json");
 const LIBRARY: &str = include_str!("../../../examples/collections/library/project.zeno");
@@ -125,5 +125,76 @@ fn map_transition_relation_is_checked_on_merged_map_steps() -> Result<(), Box<dy
     )?;
     assert_eq!(result.verdict(), Verdict::Checked, "{}", result.packet());
     assert_eq!(result.packet()["verdict"], "checked");
+    Ok(())
+}
+
+const GENESIS_PROJECT: &str = r#"
+zeno 1; project 1 amounts; namespace 2 amounts;
+type 100 state Store; type 101 command Command; type 102 context Desk;
+type 103 key Id; type 105 data Record; type 106 int Amount in 0..=2;
+field 140 105 amount 106; map 110 100 amounts 103 105 capacity 4;
+field 130 101 id 103; entry 160 amount of 110 at command.101.130;
+variant 180 102 Librarian none;
+component 400 core { owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 128; }
+merge [400]; law 500 marker on commit, genesis = true;
+"#;
+fn genesis_rules() -> Value {
+    json!({"schema":"zeno-fcis/template-declarative-policy/2","template":"amounts",
+        "roots":{"state":100,"command":101,"context":102},"leaf_bindings":{},"variables":{},
+        "cases":[{"rule":"insert","when":"true","class":"Accept","reason":null,
+            "post":{"160":"1","161":"1"},"outbox":[]}],
+        "genesis":{"160":0,"161":0},"law_kinds":{"500":"StateInvariant"}})
+}
+fn genesis_scenario() -> String {
+    json!({"schema":"zeno-fcis/collection-scenarios/1","scenarios":[{"name":"insert","steps":[
+        {"command":{"130":key(0)},"context":{"0":180},"expect":{"class":"Accept",
+         "entries":[{"map":110,"key":key(0),"record":{"140":1}}]}}
+    ]}]})
+    .to_string()
+}
+#[test]
+fn empty_map_genesis_requires_canonical_absent_defaults() -> Result<(), Box<dyn std::error::Error>>
+{
+    let mut rules = genesis_rules();
+    rules["genesis"]["161"] = 2.into();
+    assert!(check(GENESIS_PROJECT, &rules.to_string(), Limits::default()).is_err());
+    assert!(judges::scenarios(GENESIS_PROJECT, &rules.to_string(), &genesis_scenario()).is_err());
+    assert!(judges::profile(GENESIS_PROJECT, &rules.to_string(), 1, Limits::default()).is_err());
+    // Defaults come from the type, including a nonzero lower bound.
+    let project = GENESIS_PROJECT.replace("0..=2", "1..=2");
+    assert!(check(&project, &genesis_rules().to_string(), Limits::default()).is_err());
+    rules["genesis"]["161"] = 1.into();
+    assert_eq!(
+        check(&project, &rules.to_string(), Limits::default())?.verdict(),
+        Verdict::Checked
+    );
+    Ok(())
+}
+#[test]
+fn initial_conditions_are_checked_only_at_empty_map_genesis()
+-> Result<(), Box<dyn std::error::Error>> {
+    let project =
+        format!("{GENESIS_PROJECT}\nlaw 501 initial_zero on any, genesis = post.100.161 == 0;");
+    let mut rules = genesis_rules();
+    rules["law_kinds"]["501"] = "InitialCondition".into();
+    let good = rules.to_string();
+    assert_eq!(
+        check(&project, &good, Limits::default())?.verdict(),
+        Verdict::Checked
+    );
+    assert_eq!(
+        judges::scenarios(&project, &good, &genesis_scenario())?.verdict(),
+        Verdict::Checked
+    );
+    assert_eq!(
+        judges::profile(&project, &good, 1, Limits::default())?.packet()["states"]["reachable"],
+        2
+    );
+    let bad = project.replace("post.100.161 == 0", "post.100.161 == 2");
+    let result = check(&bad, &good, Limits::default())?;
+    assert_eq!(result.verdict(), Verdict::Refuted, "{}", result.packet());
+    assert_eq!(result.packet()["result"]["obligation"], "genesis laws");
+    assert!(judges::scenarios(&bad, &good, &genesis_scenario()).is_err());
+    assert!(judges::profile(&bad, &good, 1, Limits::default()).is_err());
     Ok(())
 }

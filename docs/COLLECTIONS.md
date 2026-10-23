@@ -96,7 +96,9 @@ For each admissible view the library Authority decides, and the checker
 requires that it does not refuse; that the entries naming one key write at
 most one new value (alias merge); and that each summary changes by exactly
 the change of its distinct named entries (summary delta). The genesis state
-must have every entry absent and every summary 0.
+must have every entry absent, its fields at their declared defaults, and every
+summary 0. Every genesis-applicable law, including an `InitialCondition`, is
+checked there. Initial conditions are not assumed on later pre-views.
 Every stored key in a present successor entry must resolve to a concrete key
 bound by a command/context field or a present pre-entry's stored key of that
 type. An absent field's default class alone supplies no concrete key. The
@@ -129,7 +131,8 @@ on all data with the same equality pattern.
    view: conditions 1 to 3 hold by construction, 4 holds because the summary
    equals its aggregate (step 4 below), and 5 holds by step 3.
 3. *State laws.* Genesis has every map empty, so every view at every choice
-   of keys has all entries absent; generation checks the state laws there.
+   of keys has all entries absent with canonical defaults; the checker evaluates
+   every genesis-applicable law there, including the state laws.
    A step changes only the entries its decision writes, which the Authority
    checks on the post-view, and P3 makes every other conjunct depend only on
    one unwritten entry or on scalars the Authority also checked. So each

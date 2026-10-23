@@ -343,6 +343,15 @@ pub fn check(
                 entry.id
             )));
         }
+        for position in &entry.values {
+            let default = positions[*position].domain.least();
+            if genesis(*position).or(default) != default {
+                return Err(invalid(format!(
+                    "genesis: absent entry {} must hold the default value of {}",
+                    entry.id, positions[*position].name
+                )));
+            }
+        }
     }
     for summary in &summaries {
         if genesis(summary.position) != Some(0) {
@@ -419,11 +428,19 @@ pub fn check(
     let outcome = policy::with_authority(&contract, &schema, |authority| {
         let state_laws = evaluate::state_laws(authority.descriptor());
         let laws = LawSet::new(authority.descriptor(), &state_laws);
+        let genesis_ids: Vec<u32> = authority
+            .descriptor()
+            .laws
+            .iter()
+            .filter(|law| law.genesis)
+            .map(|law| law.id)
+            .collect();
+        let genesis_laws = LawSet::new(authority.descriptor(), &genesis_ids);
         let all_ids: Vec<u32> = declarations.laws.iter().map(|l| l.id).collect();
         let transition_laws = LawSet::new(authority.descriptor(), &all_ids);
         let mut measured = Measured::default();
         // Genesis: every map empty, so every view at every choice of keys is
-        // this one, and every state law must hold on it.
+        // this one, and every genesis-applicable law must hold on it.
         let start: Vec<i128> = positions
             .iter()
             .enumerate()
@@ -444,12 +461,12 @@ pub fn check(
                 })),
             );
         }
-        if !laws.on_state(&framer, &start) {
+        if !genesis_laws.on_state(&framer, &start) {
             return (
                 measured,
                 Some(json!({
-                    "obligation": "state laws at genesis",
-                    "detail": "the genesis state breaks a state law",
+                    "obligation": "genesis laws",
+                    "detail": "the canonical empty-map genesis breaks a genesis law",
                     "view": shape.view_json(&start),
                 })),
             );

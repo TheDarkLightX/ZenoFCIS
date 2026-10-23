@@ -240,9 +240,15 @@ impl Model {
                 .layout
                 .frame(&start.scalars, &command, &context, &start)?
                 .tuple;
-            let ids = evaluate::state_laws(a.descriptor());
+            let ids: Vec<u32> = a
+                .descriptor()
+                .laws
+                .iter()
+                .filter(|law| law.genesis)
+                .map(|law| law.id)
+                .collect();
             if !LawSet::new(a.descriptor(), &ids).on_state(&framer, &tuple) {
-                return Err(invalid("empty-map genesis violates a state law"));
+                return Err(invalid("empty-map genesis violates a genesis law"));
             }
             run(a, &framer)
         })?
