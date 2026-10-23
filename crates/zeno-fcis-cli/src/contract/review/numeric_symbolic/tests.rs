@@ -426,7 +426,7 @@ fn alert_policy(change: impl Fn(&mut Json)) -> String {
 #[ignore = "requires both qualification solver binaries"]
 fn pinned_numeric_mixed_kind_alert_laws() {
     let solvers = pinned();
-    let mut run = |rules: &str| {
+    let run = |rules: &str| {
         review(
             ReviewSources {
                 project: ALERT_PROJECT,
@@ -454,4 +454,75 @@ fn pinned_numeric_mixed_kind_alert_laws() {
             .unwrap_or_else(|| panic!("expected refuted law {law}: {result}"));
         assert_eq!(broken["counterexample"]["authority"]["law"], law);
     }
+}
+
+/// Seven nested mixed-kind observations exceed the split cap. Both lemma and
+/// review must leave the question UNKNOWN before any solver is asked.
+#[test]
+fn split_cap_leaves_lemma_and_review_unknown() {
+    let fields: String = (142..=147)
+        .map(|f| format!("field {f} 104 cap_kind_{f} 109;\n"))
+        .collect();
+    let checks: String = (142..=147)
+        .map(|f| format!(" && outbox.104.{f} == 150"))
+        .collect();
+    let anchor = "field 141 104 alert_until 107;\n";
+    let project = ALERT_PROJECT.replacen(anchor, &format!("{anchor}{fields}"), 1);
+    let start = project
+        .find("law 510 ")
+        .unwrap_or_else(|| panic!("expected law 510"));
+    let end = start
+        + project[start..]
+            .find('\n')
+            .unwrap_or_else(|| panic!("expected end of law 510"));
+    let project = format!(
+        "{}law 510 seven_mixed_observations on commit = command.101 == 121 -> outbox.104 == 1 && outbox.104.140 == 150{checks};{}",
+        &project[..start],
+        &project[end..]
+    );
+    let mut rules: Json =
+        serde_json::from_str(ALERT_RULES).unwrap_or_else(|error| panic!("{error:?}"));
+    for case in rules["cases"]
+        .as_array_mut()
+        .unwrap_or_else(|| panic!("expected cases"))
+    {
+        for entry in case["outbox"]
+            .as_array_mut()
+            .unwrap_or_else(|| panic!("expected outbox"))
+        {
+            for f in 142..=147 {
+                entry["payload"][f.to_string()] = json!(150);
+            }
+        }
+    }
+    let observations = &mut rules["delivery_laws"]["510"]["observations"];
+    observations
+        .as_object_mut()
+        .unwrap_or_else(|| panic!("expected observations"))
+        .remove("outbox.104.141");
+    for f in 142..=147 {
+        observations[format!("outbox.104.{f}")] = json!({"channel": 300, "field": f});
+    }
+    let rules = rules.to_string();
+    let mut no_solver = |_: &Query<'_>| -> Answers { panic!("no solver question is expected") };
+    let lemma = super::lemma::check(&project, &rules, &["true".to_owned()], true, &mut no_solver)
+        .unwrap_or_else(|error| panic!("{error:?}"));
+    assert_eq!(lemma["status"], "UNKNOWN", "{lemma}");
+    let entry = &lemma["lemmas"][0];
+    assert_eq!(entry["status"], "UNKNOWN", "{lemma}");
+    assert_eq!(
+        entry["reason"], "too many mixed-kind guarded observations",
+        "{lemma}"
+    );
+    let review = review(
+        ReviewSources {
+            project: &project,
+            rules: &rules,
+            examples: None,
+        },
+        &mut no_solver,
+        false,
+    )
+    .unwrap_or_else(|error| panic!("{error:?}"));
+    assert_eq!(review["status"], "UNKNOWN", "{review}");
 }

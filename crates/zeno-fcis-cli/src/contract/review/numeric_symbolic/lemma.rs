@@ -200,18 +200,30 @@ pub(crate) fn check(
         if law.nodes.iter().any(|node|matches!(node,crate::contract::graph::LawOp::Observe(o)|crate::contract::graph::LawOp::ObserveWhen(_,o,_) if !matches!(o,crate::contract::graph::Observation::Pre(_)|crate::contract::graph::Observation::Post(_)|crate::contract::graph::Observation::Initial(_)|crate::contract::graph::Observation::Command(_)|crate::contract::graph::Observation::Context(_)|crate::contract::graph::Observation::CommandRoot|crate::contract::graph::Observation::ContextRoot))) {
             results.push(json!({"formula":formula,"status":"UNKNOWN","reason":"lemma encoding supports scalar input and state observations"}));continue;
         }
-        let mut e = Encoding::new(&c, &format!("lemma{index}"), Script::default(), None)?;
+        let encoded = (|| {
+            let mut e = Encoding::new(&c, &format!("lemma{index}"), Script::default(), None)?;
+            let pre = e.law(&c, &law, None, "lemma_pre")?;
+            let mut post = Vec::new();
+            for i in 0..c.branches.len() {
+                post.push(e.law(&c, &law, Some(i), &format!("lemma_b{i}"))?);
+            }
+            Ok::<_, ContractError>((e, pre, post))
+        })();
+        // An encoder limit leaves this formula UNKNOWN, as contract review
+        // reports it; it is not an invalid input.
+        let (e, pre, post) = match encoded {
+            Ok(encoded) => encoded,
+            Err(err) => {
+                results.push(json!({"formula":formula,"mode":"symbolic","status":"UNKNOWN","reason":err.reason()}));
+                continue;
+            }
+        };
         let pre_states = if transition {
             PreStates::TRANSITION
         } else {
             PreStates::Lawful
         };
         let pre_state = pre_states.predicate(Term::Bool(true), || e.lawful.clone());
-        let pre = e.law(&c, &law, None, "lemma_pre")?;
-        let mut post = Vec::new();
-        for i in 0..c.branches.len() {
-            post.push(e.law(&c, &law, Some(i), &format!("lemma_b{i}"))?);
-        }
         let mut result = json!({"formula":formula,"mode":"symbolic","status":"UNKNOWN","scope":if transition{"all native admitted committed decisions"}else{"initiation and induction from lawful pre-states; no reachability enumeration"}});
         let base_guard = guard(&c, &schema, &e, solve)?;
         if base_guard["status"] != "holds" {
