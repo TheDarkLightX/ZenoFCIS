@@ -23,4 +23,7 @@ pub mod execution_v2;
 // Preserve the production module paths; no algorithm or specification adapter.
 pub mod finite {
     #[cfg(test)]
-    pub use crate::execution_v2::order_fixture_transition as v2_order_fixture_transition; pub use crate::{canonical_v2, evaluation, execution_v2}; }
+    pub use crate::execution_v2::order_fixture_transition as v2_order_fixture_transition; pub use crate::{canonical_v2, evaluation, execution_v2};
+    // The native oracle (excluded under Verus) reaches the wide values by their production path.
+    #[cfg(not(verus_keep_ghost))]
+    pub(crate) use crate::value; }

@@ -17,7 +17,8 @@ from verus_coverage import inventory, require_coverage
 # guarded-laws-evidence/changed-order-rlimit-40): exhausted inside
 # evaluate_into. It stays an inconclusive refusal, never a kill; this original
 # specimen is now declared native and is never proof-run here.
-LEGACY_LAW_ORDER_SHA256 = '55021af79009d390af1935f979047fd591c938ac0e3f238c33f3045f07647702'
+# Recomputed for the 2.6 laws.rs (reason-scoped reject laws); the mutation still equals the legacy control.
+LEGACY_LAW_ORDER_SHA256 = '2c19c5ebb113233f75f793b1738ebc2762c7dffdab193635713aa1efb3e73622'
 # Withdrawn inconclusive symbolic retargets, never kills: laws[0].id (7ce5b1d5…a11d)
 # mixed a postcondition error with loop exhaustion at rlimit 10 and 40; laws[i].id ^ 1
 # (guarded-laws-evidence/withdrawn-xor-identity) only exhausted at rlimit 10.
