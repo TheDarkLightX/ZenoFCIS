@@ -4,7 +4,8 @@
 The existing independent payment reference first compares the production runner.
 This differential then interprets every event using effect_protocol_runtime.rs,
 whose admission is proved equal to the two-handler abstract specialization.
-Physical-copy E1's environment premise is evaluated separately from admissions.
+Receiver effects and the conditional physical-copy bound are compared separately
+from admissions. Atomic receiver deduplication is an environment contract.
 """
 from __future__ import annotations
 

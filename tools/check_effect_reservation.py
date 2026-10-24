@@ -30,7 +30,8 @@ RUNNER = Path('verification/verus/effect_protocol_runner.rs')
 MODEL_SOURCES = (HARNESS, RUNTIME, RUNNER,
                  Path('verification/verus/effect_protocol.rs'),
                  Path('verification/verus/effect_protocol_examples.rs'),
-                 Path('verification/verus/effect_protocol_replay.rs'))
+                 Path('verification/verus/effect_protocol_replay.rs'),
+                 Path('verification/verus/effect_protocol_effects.rs'))
 PRODUCTION_SOURCES = tuple(Path('crates/zeno-fcis-shell/src/effects') / f'{name}.rs'
                            for name in ('handler', 'policy', 'policy_record', 'record',
                                         'policy_product', 'codec', 'driver', 'port',
@@ -331,8 +332,11 @@ def check(out, work, payment_binary):
                    controls=controls, trace_differential=json.loads((work / 'traces/differential.json').read_text()),
                    payment_binary_sha256=sha256(payment_binary), production_source_identity=identity.stdout.strip(),
                    native_test_output=native.stdout,
-                   scope='Abstract protocol only; source hashes and finite differential do not prove production refinement.',
-                   trusted_base=['pinned Verus/vstd/Z3', 'Rust erasure/compiler', 'standard library and host'])
+                   scope='Abstract protocol only. E1 bounds receiver effects under atomic retained deduplication; '
+                         'physical-copy uniqueness is a separate conditional theorem. Source hashes and the '
+                         'finite differential do not prove production refinement.',
+                   trusted_base=['pinned Verus/vstd/Z3', 'Rust erasure/compiler', 'standard library and host',
+                                 'environment: atomic retained receiver deduplication for effect E1'])
     out.write_text(json.dumps(receipt, indent=2, sort_keys=True)+'\n')
     return receipt
 

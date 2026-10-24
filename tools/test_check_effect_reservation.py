@@ -59,6 +59,18 @@ class EffectProofAdmission(unittest.TestCase):
             self.assertFalse(gate.accepted(subprocess.CompletedProcess([], 0, '', ''),
                                           report, self.pin, self.profile), name)
 
+    def test_effect_e1_and_unrestricted_copy_proofs_are_required(self):
+        names = ('e1_at_most_one_effect', 'every_finite_history_keeps_reservations',
+                 'suspended_retry_is_refused_without_copy_bound',
+                 'duplicated_transport_is_not_vacuous', 'non_atomic_dedup_counterexample',
+                 'receiver_reset_counterexample',
+                 'historical_witness_violates_e2_with_one_receiver_effect')
+        for name in names:
+            full = 'effect_reservation::effects::' + name
+            self.assertIn(full, self.profile['target_functions'])
+            self.assertEqual(self.profile['functions'][full]['mode'], 'Proof')
+            self.assertGreater(self.profile['functions'][full]['ensures'], 0)
+
     def test_nonsemantic_output_and_process_failure_cannot_pass(self):
         for status, stderr in ((1, ''), (124, ''), (-9, ''), (0, 'error: assertion failed'),
                                (0, 'solver timeout'), (0, 'resource limit reached'),

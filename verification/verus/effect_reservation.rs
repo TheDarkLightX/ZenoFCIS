@@ -14,5 +14,9 @@ pub mod replay;
 #[path = "effect_protocol_examples.rs"]
 pub mod examples;
 
+#[cfg(verus_keep_ghost)]
+#[path = "effect_protocol_effects.rs"]
+pub mod effects;
+
 #[path = "effect_protocol_runtime.rs"]
 pub mod runtime;
