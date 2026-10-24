@@ -27,6 +27,8 @@ use crate::logic::{
 #[must_use]
 pub fn invariant_at(invariant: &RelExpr, root: ProjectionRoot) -> Option<RelExpr> {
     Some(match invariant {
+        // Shared circuits are outside the retained shallow evaluator's domain.
+        RelExpr::Circuit(_) => return None,
         RelExpr::Bool(value) => RelExpr::Bool(*value),
         RelExpr::Not(value) => RelExpr::Not(Box::new(invariant_at(value, root)?)),
         RelExpr::And(left, right) => RelExpr::And(
@@ -79,7 +81,8 @@ pub fn invariant_at(invariant: &RelExpr, root: ProjectionRoot) -> Option<RelExpr
 
 fn value_at(value: &ValueExpr, root: ProjectionRoot) -> Option<ValueExpr> {
     Some(match value {
-        ValueExpr::U128(_)
+        ValueExpr::Select(..)
+        | ValueExpr::U128(_)
         | ValueExpr::ToI128(_)
         | ValueExpr::ToU128(_)
         | ValueExpr::MulDiv(..)
@@ -104,36 +107,10 @@ fn value_at(value: &ValueExpr, root: ProjectionRoot) -> Option<ValueExpr> {
             Box::new(value_at(left, root)?),
             Box::new(value_at(right, root)?),
         ),
-        ValueExpr::ScaledMulDiv(mode, signed, a, b, d, scale) => ValueExpr::ScaledMulDiv(
-            *mode,
-            *signed,
-            Box::new(value_at(a, root)?),
-            Box::new(value_at(b, root)?),
-            Box::new(value_at(d, root)?),
-            *scale,
-        ),
-        ValueExpr::RepeatMulDiv(signed, a, b, d, count) => ValueExpr::RepeatMulDiv(
-            *signed,
-            Box::new(value_at(a, root)?),
-            Box::new(value_at(b, root)?),
-            Box::new(value_at(d, root)?),
-            *count,
-        ),
-        ValueExpr::SignedMulDivFloor(a, b, d) => ValueExpr::SignedMulDivFloor(
-            Box::new(value_at(a, root)?),
-            Box::new(value_at(b, root)?),
-            Box::new(value_at(d, root)?),
-        ),
         ValueExpr::Div(mode, left, right) => ValueExpr::Div(
             *mode,
             Box::new(value_at(left, root)?),
             Box::new(value_at(right, root)?),
-        ),
-        ValueExpr::MulDiv(mode, a, b, d) => ValueExpr::MulDiv(
-            *mode,
-            Box::new(value_at(a, root)?),
-            Box::new(value_at(b, root)?),
-            Box::new(value_at(d, root)?),
         ),
         ValueExpr::Sum {
             variable,
@@ -407,6 +384,34 @@ mod tests {
             ))
         );
         assert_eq!(evaluate_invariant(claim(502), &state(3), limits), None);
+    }
+
+    #[test]
+    fn retained_induction_refuses_nodes_without_reference_semantics() {
+        let circuit = crate::BoolCircuit::try_new(vec![crate::BoolNode::Literal(true)], 0)
+            .unwrap_or_else(|| unreachable!());
+        let unsupported = [
+            RelExpr::Circuit(Box::new(circuit)),
+            RelExpr::Compare(
+                crate::ast::CompareOp::Eq,
+                ValueExpr::Select(
+                    Box::new(RelExpr::Bool(true)),
+                    Box::new(ValueExpr::Projection(count(ProjectionRoot::Pre))),
+                    Box::new(ValueExpr::Int(0)),
+                ),
+                ValueExpr::Int(0),
+            ),
+        ];
+        for invariant in unsupported {
+            assert_eq!(invariant_at(&invariant, ProjectionRoot::Post), None);
+            assert!(matches!(
+                evaluate_relational(
+                    &invariant,
+                    EvaluationContext::new(&state(0), &NoPredicates, EvalLimits::default()),
+                ),
+                EvalOutcome::Indeterminate(_)
+            ));
+        }
     }
 
     #[test]
