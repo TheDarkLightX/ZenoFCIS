@@ -138,15 +138,28 @@ on it is a check on an instance it was not fitted on.
 
 ## The workspace and the terminal
 
+Choose one initializer for each new workspace. These contract and family examples are alternatives.
+
+Contract-backed workspace:
+
 ```sh
-python3 integrations/zal/terminal.py loop init --contract DIR --workspace W.json
-python3 integrations/zal/terminal.py loop init --family bounded-counter --workspace W.json
-python3 integrations/zal/terminal.py loop show --workspace W.json            # latest events
-python3 integrations/zal/terminal.py loop show --workspace W.json --packet   # the subject card
-python3 integrations/zal/terminal.py loop next --workspace W.json           # next contract question
-python3 integrations/zal/terminal.py loop answer q1 2 --workspace W.json     # or any / none
-python3 integrations/zal/terminal.py loop say "rule t1: where value == 0 -> reject at_zero;" --workspace W.json
+python3 integrations/zal/terminal.py loop init --contract DIR --workspace contract-W.json
+python3 integrations/zal/terminal.py loop show --workspace contract-W.json            # latest events
+python3 integrations/zal/terminal.py loop show --workspace contract-W.json --packet   # the subject card
+python3 integrations/zal/terminal.py loop next --workspace contract-W.json           # next contract question
+python3 integrations/zal/terminal.py loop answer q1 2 --workspace contract-W.json     # answer only if q1 is open
 ```
+
+Family-backed workspace:
+
+```sh
+python3 integrations/zal/terminal.py loop init --family bounded-counter --workspace family-W.json
+python3 integrations/zal/terminal.py loop show --workspace family-W.json
+python3 integrations/zal/terminal.py loop say "rule t1: where value == 0 -> reject at_zero;" --workspace family-W.json
+```
+
+Run `loop answer q1` only when the contract-backed workspace reports an open q1. A family can have every case
+determined already, so there may be no question to answer.
 
 The workspace binds its subject by revision: the SHA-256 of the contract
 text, its policy and the exported program's digest. At initialization it

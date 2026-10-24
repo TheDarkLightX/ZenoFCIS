@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import shlex
 import sys
 
 import behavior
@@ -22,6 +23,37 @@ def verdict_exit(result):
     if result.get("status") in {"unfinished", "unsupported", "UNKNOWN", "unknown", "inconclusive"}:
         return 2
     return 0
+
+
+def ladder_json_refusal(source, path):
+    """Route ladder JSON to its own tool without changing ZAL source parsing."""
+    if not source.lstrip().startswith("{"):
+        return None
+    try:
+        data = json.loads(source)
+    except ValueError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    from ladder import PROFILE as LADDER_PROFILE, REGISTRY as LADDER_REGISTRY, TEMPORAL_PROFILE, TEMPORAL_THEORY
+
+    schema = data.get("profile")
+    theory = data.get("theory")
+    if schema is None and isinstance(theory, str) and theory in LADDER_REGISTRY["theories"]:
+        schema = TEMPORAL_PROFILE if theory == TEMPORAL_THEORY else LADDER_PROFILE
+    if not isinstance(schema, str):
+        return None
+    if schema not in {LADDER_PROFILE, TEMPORAL_PROFILE}:
+        return None
+    command = "python3 -I integrations/zal/ladder.py render " + shlex.quote(str(path))
+    return {
+        "status": "refused",
+        "reason": "wrong-input-format",
+        "schema": schema,
+        "command": command,
+        "message": f"This is a {schema} ladder JSON file, not ZAL source. To render it, run this command from the repository root: {command}",
+        "authority": "none",
+    }
 
 
 def main():
@@ -79,8 +111,24 @@ def main():
         return loop_coverage.main(options)
     source = ""
     try:
-        with options.source.open(encoding="ascii") as stream:
-            source = stream.read(MAX_SOURCE + 1)
+        try:
+            with options.source.open(encoding="ascii") as stream:
+                source = stream.read(MAX_SOURCE + 1)
+        except UnicodeDecodeError as ascii_error:
+            try:
+                with options.source.open("rb") as stream:
+                    json_source = stream.read(MAX_SOURCE + 1).decode("utf-8")
+            except UnicodeDecodeError:
+                raise ascii_error
+            format_refusal = ladder_json_refusal(json_source, options.source)
+            if format_refusal is None:
+                raise ascii_error
+            print(json.dumps(format_refusal, indent=2), file=sys.stderr)
+            return 2
+        format_refusal = ladder_json_refusal(source, options.source)
+        if format_refusal is not None:
+            print(json.dumps(format_refusal, indent=2), file=sys.stderr)
+            return 2
         first = next((line.strip() for line in source.splitlines() if line.strip() and not line.lstrip().startswith("#")), "")
         if first in {"zal effects 1;", "ZAL effects version 1.", "zal typed 1;", "ZAL typed version 1."}:
             return typed_or_effects(options, source, first)

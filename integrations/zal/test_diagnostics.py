@@ -1,6 +1,7 @@
 """Ten recurring source mistakes, physical positions and advisory repair text."""
 
 import json
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -101,6 +102,35 @@ class DiagnosticTests(unittest.TestCase):
             self.assertEqual(detail["location"]["file"], str(source))
             self.assertTrue(detail["suggested_fix"])
             self.assertEqual(source.read_text(), text)
+
+    def test_cli_routes_ladder_json_to_the_ladder_tool(self):
+        root = HERE.parents[1]
+        examples = [
+            (HERE / "examples/ladders/dex_k.json", "zal/ladder/0"),
+            (HERE / "examples/temporal/ui_discovery.json", "zal/ladder-temporal/1"),
+        ]
+        for source, schema in examples:
+            with self.subTest(schema=schema):
+                run = subprocess.run([sys.executable, "-B", str(HERE / "run.py"), "check", str(source)],
+                                     cwd=root, capture_output=True, text=True, check=False)
+                self.assertEqual(run.returncode, 2, run.stderr)
+                self.assertEqual(run.stdout, "")
+                result = json.loads(run.stderr)
+                self.assertEqual(result["status"], "refused")
+                self.assertEqual(result["schema"], schema)
+                self.assertIn("To render it", result["message"])
+                self.assertEqual(result["command"],
+                                 "python3 -I integrations/zal/ladder.py render " + shlex.quote(str(source)))
+                rendered = subprocess.run(shlex.split(result["command"]), cwd=root,
+                                          capture_output=True, text=True, check=False)
+                self.assertEqual(rendered.returncode, 0, rendered.stderr)
+
+    def test_cli_still_checks_valid_zal_source(self):
+        run = subprocess.run([sys.executable, "-B", str(HERE / "run.py"), "check",
+                              str(HERE / "examples/order.zal")],
+                             cwd=HERE.parents[1], capture_output=True, text=True, check=False)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(json.loads(run.stdout)["status"], "pass-with-scope")
 
 
 if __name__ == "__main__":

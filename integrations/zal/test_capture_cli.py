@@ -1,4 +1,7 @@
 """Heavy real-CLI capture grammar regression; invoked by the Rust integration gate."""
+from contextlib import redirect_stdout
+import io
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -23,6 +26,26 @@ class CaptureCliGrammarTests(unittest.TestCase):
         selection = patch.object(W.D, "run", selected_run)
         selection.start()
         self.addCleanup(selection.stop)
+
+    def test_terminal_refusal_keeps_native_reason_and_next_step(self):
+        native = {"schema": "zeno-fcis/black-box-capture/1", "status": "refused",
+                  "detail": {"reason": "capture-containment-unavailable"}}
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            output = io.StringIO()
+            argv = ["init", "--workspace", str(folder / "capture.json"),
+                    "--spec", str(folder / "spec.json"), "--reference", str(folder / "reference.py"),
+                    "--session", str(folder / "session"), "--cli", str(folder / "zeno-fcis")]
+            with patch.object(W.D, "resolve_cli", return_value=folder / "zeno-fcis"), \
+                    patch.object(W.D, "run", return_value=(1, native)), \
+                    redirect_stdout(output):
+                code = W.terminal(argv)
+        self.assertEqual(code, 1)
+        result = json.loads(output.getvalue())
+        self.assertEqual(result["reason"], "capture-workspace-operation")
+        self.assertEqual(result["detail_reason"], "capture-containment-unavailable")
+        self.assertIn("POSIX containment", result["message"])
+        self.assertIn("then retry", result["message"])
 
     def test_real_cli_accepts_paired_int_bool_equality_and_conditionals(self):
         cli = os.environ.get('ZENO_CAPTURE_TEST_CLI')
