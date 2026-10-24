@@ -502,7 +502,7 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/oracle/lifecycle_schema.rs",
-        "73678e9b10b0de37fdfa0ed083923977f0df2f06ccd35b51c2d45166d68815d0",
+        "1d5570c7275eb661b45b65a187fe5703c1e4436541a796ee595b15edbb1ff7fa",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/oracle/mod.rs",
