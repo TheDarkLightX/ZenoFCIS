@@ -259,7 +259,7 @@ def check(out, work, payment_binary):
                    and k not in ('RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS')}
     environment.update(RUSTUP_TOOLCHAIN=pin['rust_toolchain'], VERUS_Z3_PATH=str(tools / 'z3'),
                        CARGO_PROFILE_DEV_DEBUG='0', CARGO_PROFILE_TEST_DEBUG='0',
-                       CARGO_BUILD_JOBS='4', CARGO_INCREMENTAL='0')
+                       CARGO_BUILD_JOBS=str(min(3, int(os.environ.get('CARGO_BUILD_JOBS', '3')))), CARGO_INCREMENTAL='0')
     command = [str(tools / 'verus'), '--crate-type=lib', '--edition=2024',
                '--no-cheating', '--no-external-by-default', '--num-threads', '2',
                '--output-json', '--log', 'vir', '--log', 'vir-option=no_span+no_type+no_fn_details']
