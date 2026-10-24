@@ -250,7 +250,7 @@ def claims_journey(directory: Path, packages: dict[str, Path], version: str) -> 
     upgraded = upgrades.report(upgrades.run_app(second, ["--upgrade", str(store)]), "upgrade")
     upgrades.expect(upgraded, {
         "kind": "behaviour-change", "at_commit": 3, "contract_version": 2, "pending": 1,
-        "behaviour": {"state_laws_held": [500], "claims_held": [600, 601],
+        "behaviour": {"state_laws_held": [500, 506], "claims_held": [600, 601],
                       "not_evaluated": [990],
                       "reviews": [evolved["evolution"]["review_sha256"]]},
     }, "upgrade with claims")
