@@ -326,6 +326,11 @@ impl CollectionStore {
         if requests != commits {
             return Err(Error::Corrupt("application request cardinality".into()));
         }
+        // Together with visiting every position 1..=version, this excludes
+        // surplus nonpositive rows that an indexed positive walk cannot see.
+        if u64::try_from(commits).ok() != Some(self.version()?) {
+            return Err(Error::Corrupt("application journal positions".into()));
+        }
         let mut statement = self
             .connection
             .prepare("SELECT map,capacity,entries FROM collection_limits")?;

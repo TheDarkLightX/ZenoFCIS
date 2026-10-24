@@ -234,6 +234,45 @@ fn temporary_replay_store_pages_and_refuses_oversized_rows()
 }
 
 #[test]
+fn application_audit_refuses_nonpositive_journal_positions()
+-> Result<(), Box<dyn std::error::Error>> {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_nanos();
+    let directory = std::env::temp_dir().join(format!(
+        "collection-position-{}-{stamp}",
+        std::process::id()
+    ));
+    std::fs::create_dir(&directory)?;
+    let path = directory.join("store.sqlite");
+    let mut store = CollectionStore::open(&path)?;
+    store.bind(&[1; 32], b"genesis", &BTreeMap::new())?;
+    store.commit_request(
+        0,
+        &BTreeMap::new(),
+        &[],
+        b"decision",
+        b"genesis",
+        zeno_fcis_shell_sqlite::collections::RequestBinding {
+            key: [2; 32],
+            request: [3; 32],
+        },
+    )?;
+    store.audit_application()?;
+    let db = rusqlite::Connection::open(&path)?;
+    db.execute("UPDATE collection_commits SET sequence=0", [])?;
+    db.execute("UPDATE collection_requests SET sequence=0", [])?;
+    assert!(
+        store.audit_application().is_err(),
+        "audit skipped a nonpositive journal row"
+    );
+    drop(db);
+    drop(store);
+    std::fs::remove_dir_all(directory)?;
+    Ok(())
+}
+
+#[test]
 fn collection_writes_rehash_only_the_shared_prefix() {
     let mut store = CollectionStore::in_memory()
         .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
