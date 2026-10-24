@@ -38,7 +38,7 @@ class ProofReports(unittest.TestCase):
                 check.check_output(report, self.expected)
 
     def test_refuses_each_textual_escape(self):
-        for token in ("sorry", "admit", "axiom", "native_decide", "implemented_by",
+        for token in ("sorry", "admit", "axiom", "opaque", "native_decide", "implemented_by",
                       "extern", "unsafe", "@[csimp]", "attribute [csimp]",
                       "set_option debug.skipKernelTC true in", "run_cmd pure ()", "run_elab pure ()",
                       "run_meta pure ()", "addDecl", "#eval 1"):
@@ -50,6 +50,11 @@ class ProofReports(unittest.TestCase):
         for source in ("import Lean", "import Lean.Elab.Command", "import all Lean", "import FixedPoints"):
             with self.subTest(source=source), self.assertRaisesRegex(ValueError, "forbidden proof-source import"):
                 check.check_source(source)
+
+    def test_constructive_reports_refuse_classical_choice(self):
+        with self.assertRaisesRegex(ValueError, "unexpected axioms"):
+            check.check_output("'N.example_proof' depends on axioms: [Classical.choice]",
+                               {"N.example_proof": ["Classical.choice"]}, check.CONSTRUCTIVE)
 
 
 class ProofTree(unittest.TestCase):
@@ -240,6 +245,23 @@ class ModuleCoverage(unittest.TestCase):
     def test_allowed_private_theorem_passes_and_is_counted(self):
         self.run_control("allowed_private_theorem",
                          "private theorem unreported : (1 : Nat) + 1 = 2 := by decide", forbidden=False)
+
+    def test_classical_dependency_refused_in_new_module(self):
+        for version in check.VERSIONS:
+            with self.subTest(version=version), tempfile.TemporaryDirectory(prefix="lean-classical-control-") as tmp:
+                root = Path(tmp)
+                build = root / "build"
+                build.mkdir()
+                path = root / "NewCollectionsProof.lean"
+                path.write_text("import Std\ntheorem unreported (p : Prop) : p ∨ ¬p := Classical.em p\n")
+                module, _ = check.compile_module(version, path, root, build)
+                code, packet = check.audit_module(version, module, build)
+                self.assertEqual(code, 1, packet)
+                self.assertFalse(packet["accepted"])
+                target = next(r for r in packet["constants"] if r["name"] == "unreported")
+                self.assertIn("Classical.choice", target["forbidden"])
+                with self.assertRaisesRegex(ValueError, "module axiom audit rejected"):
+                    check.require_audit(code, packet)
 
 
 class KernelReplay(unittest.TestCase):

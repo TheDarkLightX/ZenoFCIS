@@ -25,6 +25,10 @@
 pub mod judges;
 pub mod runtime;
 
+#[cfg(test)]
+#[path = "collections/reduction_differential.rs"]
+mod reduction_differential;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};

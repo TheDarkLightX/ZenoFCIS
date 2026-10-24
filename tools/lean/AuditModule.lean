@@ -46,7 +46,10 @@ def main (args : List String) : IO UInt32 := do
     let dependencies := ((collectAxioms name : StateM Environment (Array Name)).run env).1
     let axioms := dependencies.qsort (fun a b => a.toString < b.toString)
     let forbidden := axioms.filter (!allowedAxioms.contains ·)
-    if !forbidden.isEmpty || info.isUnsafe then
+    let unprovedKind := match info with
+      | .axiomInfo _ | .opaqueInfo _ => true
+      | _ => false
+    if !forbidden.isEmpty || info.isUnsafe || unprovedKind then
       failures := failures + 1
     records := records.push (Json.mkObj [
       ("name", toJson name.toString), ("kind", toJson (constantKind info)),

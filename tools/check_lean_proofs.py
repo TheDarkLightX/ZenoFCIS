@@ -15,12 +15,19 @@ PROOFS = ROOT / "verification" / "lean"
 VERSIONS = ("4.28.0", "4.32.0")
 ALLOWED = frozenset({"propext", "Quot.sound"})
 AUDITOR = ROOT / "tools" / "lean" / "AuditModule.lean"
-FORBIDDEN = re.compile(r"\b(?:sorry|admit|axiom|native_decide|implemented_by|extern|unsafe|csimp"
+FORBIDDEN = re.compile(r"\b(?:sorry|admit|axiom|opaque|native_decide|implemented_by|extern|unsafe|csimp"
                        r"|skipKernelTC|set_option|run_cmd|run_elab|run_meta|addDecl)\b|#eval\b")
 IMPORT = re.compile(r"\bimport\s+(?:all\s+)?([^\s]+)")
 AXIOMS = re.compile(
     r"'([^']+)' (?:does not depend on any axioms|depends on axioms: \[([^\]]*)\])"
 )
+TRANSCRIPT = []
+
+
+def emit(message):
+    """Retain the complete transcript independently of a caller's stdout sink."""
+    TRANSCRIPT.append(message)
+    print(message, flush=True)
 
 
 def proof_files(root):
@@ -67,7 +74,7 @@ def check_source(source, modules=frozenset()):
             raise ValueError(f"forbidden proof-source import: {name}")
 
 
-def check_output(output, expected):
+def check_output(output, expected, allowed=ALLOWED):
     """Compare named reports with the explicit manifest, never source patterns."""
     if re.search(r"\b(?:error|warning):", output):
         raise ValueError("Lean emitted an error or warning")
@@ -78,8 +85,8 @@ def check_output(output, expected):
         raise ValueError("theorem names and axiom reports differ")
     for name, axioms in found:
         used = {a.strip() for a in axioms.split(",") if a.strip()}
-        if used - ALLOWED:
-            raise ValueError(f"unexpected axioms for {name}: {sorted(used - ALLOWED)}")
+        if used - allowed:
+            raise ValueError(f"unexpected axioms for {name}: {sorted(used - allowed)}")
         if sorted(used) != sorted(expected[name]):
             raise ValueError(f"axiom manifest differs for {name}")
 
@@ -128,23 +135,26 @@ def require_audit(code, packet):
             or not records or packet["constant_count"] != len(records)
             or len({r["name"] for r in records}) != len(records)):
         raise ValueError(f"module axiom audit rejected: exit {code}\n{json.dumps(packet)}")
+    allowed = ALLOWED
     for record in records:
-        if record["unsafe"] or record["forbidden"] or set(record["axioms"]) - ALLOWED:
+        if (record["unsafe"] or record["forbidden"] or set(record["axioms"]) - allowed
+                or record["kind"] in {"axiom", "opaque"}):
             raise ValueError(f"module axiom audit contains forbidden declaration: {record}")
 
 
 def check_module(version, path, source_root, build, named, auditor=AUDITOR, modules=frozenset()):
     check_source(path.read_text(), modules)
     module, text = compile_module(version, path, source_root, build)
-    print(f"CHECK {version} {module}: exit 0\n{text}", flush=True)
+    emit(f"CHECK {version} {module}: exit 0\n{text}")
     replay_module(version, module, build)
-    print(f"REPLAY {version} {module}: exit 0", flush=True)
+    emit(f"REPLAY {version} {module}: exit 0")
     code, packet = audit_module(version, module, build, auditor)
-    print(f"AUDIT {version} {module}: exit {code}\n{json.dumps(packet, sort_keys=True)}", flush=True)
+    emit(f"AUDIT {version} {module}: exit {code}\n{json.dumps(packet, sort_keys=True)}")
     require_audit(code, packet)
     actual = {r["name"]: r for r in packet["constants"]}
     expected = {name: axioms for name, axioms in named.items() if name in actual}
-    check_output(text, expected)
+    allowed = ALLOWED
+    check_output(text, expected, allowed)
     for name, axioms in expected.items():
         if actual[name]["kind"] != "theorem" or sorted(actual[name]["axioms"]) != sorted(axioms):
             raise ValueError(f"named theorem differs from imported kernel declaration: {name}")
@@ -154,6 +164,40 @@ def check_module(version, path, source_root, build, named, auditor=AUDITOR, modu
 def controls(version, path, source, search_path=None):
     # First the unmodified model is compiled by main. Each added assertion
     # states a concrete false claim, so rejection must be a proof failure.
+    if path.name == "CollectionsAggregate.lean":
+        anchor = "    (delta : after + namedTotal amount rows writes = before + writtenTotal amount writes) :"
+        if source.count(anchor) != 1:
+            raise ValueError("summary-delta control anchor is not unique")
+        mutant_source = source.replace(anchor, "    :")
+        digest = lambda text: hashlib.sha256(text.encode()).hexdigest()
+        with tempfile.TemporaryDirectory(prefix="lean-summary-control-") as directory:
+            mutant = Path(directory) / path.name
+            mutant.write_text(mutant_source)
+            code, output = lean(version, "--root", directory, mutant, search_path=search_path)
+            emit(f"CONTROL {version} summary_delta_dropped: exit {code}\n{output}")
+            if code != 1 or "error: omega could not prove the goal" not in output:
+                raise ValueError("summary-delta deletion did not fail on the proof obligation")
+            mutant.write_text(source)
+            restored_code, restored_output = lean(version, "--root", directory, mutant, search_path=search_path)
+            if restored_code or re.search(r"\b(?:error|warning):", restored_output):
+                raise ValueError("restored summary proof did not compile")
+            restored_hash = hashlib.sha256(mutant.read_bytes()).hexdigest()
+        result = {"control": "summary_delta_dropped", "version": version,
+                  "normal": 0, "mutated": code, "restored": restored_code,
+                  "normal_sha256": digest(source), "mutated_sha256": digest(mutant_source),
+                  "restored_sha256": restored_hash}
+        if result["normal_sha256"] != restored_hash:
+            raise ValueError("summary proof restoration differs bytewise")
+        emit("CONTROL_RESTORED " + json.dumps(result, sort_keys=True))
+        return [result]
+    if path.name in {
+        "CollectionsPatterns.lean", "CollectionsPatternsExecutable.lean", "CollectionsReduction.lean", "CollectionsReductionGenesis.lean",
+        "CollectionsReductionTallies.lean", "CollectionsReductionValidation.lean",
+        "CollectionsSignedTallies.lean", "CollectionsValidationWitnesses.lean",
+    }:
+        # The reduction modules share the deleted-premise control above. The
+        # enumeration implementation has a separate exhaustive differential control.
+        return []
     if path.name == "Collections.lean":
         cases = {"role_uniformity_control": """
 theorem role_uniformity_control :
@@ -205,15 +249,17 @@ theorem indexed_middle_seed_control :
             mutant = Path(directory) / path.name
             mutant.write_text(source + assertion)
             code, output = lean(version, "--root", directory, mutant, search_path=search_path)
-        print(f"CONTROL {version} {name}: exit {code}\n{output}", flush=True)
+        emit(f"CONTROL {version} {name}: exit {code}\n{output}")
         if code != 1 or not re.search(r"error: Tactic `decide` proved that the proposition\n[\s\S]*?\nis false", output):
             raise ValueError(f"{name} did not fail on the expected false assertion")
+    return []
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--controls", action="store_true")
     parser.add_argument("--report", type=Path, help="retain all module audits as JSON")
+    parser.add_argument("--transcript", type=Path, help="retain the complete compilation and control transcript")
     args = parser.parse_args()
     files = proof_files(PROOFS)
     if not files:
@@ -223,12 +269,12 @@ def main():
     auditor_bytes = AUDITOR.read_bytes()
     results = {"schema": "zeno-fcis/lean-proof-check/2", "source_sha256": {
         str(p): hashlib.sha256(b).hexdigest() for p, b in snapshots.items()},
-        "auditor_sha256": hashlib.sha256(auditor_bytes).hexdigest(), "toolchains": {}}
+        "auditor_sha256": hashlib.sha256(auditor_bytes).hexdigest(), "toolchains": {}, "controls": []}
     for version in VERSIONS:
         code, output = lean(version, "--version")
         if code or f"version {version}," not in output:
             raise ValueError(f"wrong or unavailable Lean {version}: {output}")
-        print(output.strip(), flush=True)
+        emit(output.strip())
         # Nothing is imported from an old build. Compilation and auditing consume
         # immutable byte snapshots in invocation-owned temporary directories.
         with tempfile.TemporaryDirectory(prefix="lean-proof-check-") as directory:
@@ -251,13 +297,15 @@ def main():
                 seen |= reports
                 packets.append(packet)
                 if args.controls:
-                    controls(version, path, content.decode(), search_path=build)
+                    results["controls"].extend(controls(version, path, content.decode(), search_path=build))
             if seen != set(named):
                 raise ValueError(f"named axiom manifest coverage differs: {sorted(set(named) - seen)}")
             results["toolchains"][version] = packets
     if args.report:
         args.report.write_text(json.dumps(results, indent=2, sort_keys=True) + "\n")
-    print("PASS: kernel-replayed, axioms audited for every module constant, named axiom manifest and requested controls", flush=True)
+    emit("PASS: kernel replay, every module constant, named axiom manifest and requested controls")
+    if args.transcript:
+        args.transcript.write_text("\n".join(TRANSCRIPT) + "\n")
 
 
 if __name__ == "__main__":
