@@ -117,7 +117,7 @@
           <li><strong>Shell effects.</strong> The same shell runs against real storage, a deterministic world that injects faults, or a recorded run. The reservation protocol behind at-most-once delivery is proved in Verus, given a store that removes duplicates atomically; the production handlers are tested, not proved.</li>
           <li><strong>New questions for contracts.</strong> Whether swapping two requests, or changing a private value, changes what others see; exact reward distributions over random bits; risk counts; contract tables and table games; and building a component from frozen requirements.</li>
           <li><strong>Arithmetic to rely on.</strong> Unsigned 128-bit multiply and divide, with checked casts. The six shipped synthesized Rust controllers are proved, by translation validation, to compute what the verified evaluator computes, and generated applications run the verified evaluator.</li>
-          <li><strong>ZenoDEX Spot linked to its code.</strong> A Verus proof shows that Spot's compiled decision program meets the step contract its Lean value theorem uses, for every input in the declared ranges.</li>
+          <li><strong>ZenoDEX Spot linked to its code.</strong> A Verus proof shows that Spot's compiled decision program meets the step contract its Lean value theorem uses, for every input in the declared ranges. That proof has not yet had an independent review.</li>
         </ul>
         <p class="limits"><strong>Limits:</strong> collection checks use small value ranges; the effect handlers, and the collection checker's match to its proof, are tested, not proved; the zUSD vault and the oracle are not included.</p>
       </div>

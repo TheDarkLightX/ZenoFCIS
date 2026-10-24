@@ -65,7 +65,7 @@ section, and each claim below is stated at the strength its evidence supports.
   contract used by its Lean round-trip theorems, for every input in the
   declared domains. The proof runs on the library's evaluator specification;
   the executable evaluator's conformance rests on the library's own Verus
-  gates.
+  gates. This proof has not had an independent review grade.
 - **ZAL.** Behaviour written in ZAL now covers integer transitions, effects
   signatures, lowering and refinement checks, coverage, and why-not and
   what-if explanations. The temporal ladder is an experimental presentation and
