@@ -4,7 +4,42 @@ All notable Rust API and packaging changes are recorded here. Canonical
 protocol compatibility is governed separately by the identifiers and versions
 embedded in ZenoFCIS values.
 
-## 2.6 - unreleased
+## 2.6.0 - 2026-10-24
+
+- All workspace packages are version 2.6.0. The planned 2.5.1 work is
+  included; there is no separate 2.5.1 release.
+- **Breaking change:** a 2.6.0 build refuses a store created by a 2.5.0
+  build of the same contract, because the store records the evaluator
+  identity and 2.6.0 changes the evaluator; nothing is written. Keep such a
+  store on its 2.5.0 build or start a new store. Stores created by 2.4.0
+  applications remain upgradable.
+- Admit unsigned 128-bit multiplication and floor or ceiling division, checked
+  casts between `U128` and `I128`, payload-free sum types as typed numeric
+  decision inputs, and laws scoped `on reject:REASON_ID`. These change the
+  meaning of verified specifications, and the evaluator identity is
+  regenerated: transform receipts recorded by 2.5.0 no longer replay until
+  `zeno-fcis contract refresh-receipts DIR` checks each adoption again.
+- Add keyed collections: key types, maps, named entries and summaries in
+  `.zeno` (project-spec format 5), `contract collections DIR`, and paged
+  replay that restores a long history with bounded memory. See
+  [keyed collections](docs/COLLECTIONS.md).
+- Add the `shell-effects` feature of the generated withdrawal-queue
+  application: `shell_effects::Effects` commits, recovers after a lost reply
+  and delivers outbox records against real storage, a deterministic world
+  that injects faults, or a recorded run. See
+  [shell effects](docs/SHELL_EFFECTS.md).
+- Add `contract two-run`, `contract distribution` and `contract risk`,
+  contract tables expanded while the file is parsed (`check --expand`), and
+  table games with fairness.
+- Symbolic review encodes guarded observations whose values have different
+  kinds. Unsupported encodings and exhaustion of the 63-split limit leave
+  review and lemma questions UNKNOWN, exit 2.
+- **Breaking change for scripts:** verdict commands follow the shared
+  [exit contract](docs/CLI_REFERENCE.md#exit-codes): a refutation exits 1 and
+  an undecided result exits 2. Scripts relying on exit 0 for a refutation must
+  change.
+- Add `zeno-fcis guide list` and `zeno-fcis guide show NAME`: 29 cards with
+  exact commands, outputs and limits.
 
 - Add `zeno-fcis new --contract project.zeno --app`: an explicit pinned UI
   build, checked core, SQLite shell effects and authenticated ingress server

@@ -1,8 +1,114 @@
 # ZenoFCIS release notes
 
-## 2.6 draft: symbolic review scope
+## 2.6.0
 
-The planned 2.5.1 work is included in 2.6; there is no separate 2.5.1 release.
+ZenoFCIS 2.6.0 turns a checked contract into a running application and widens
+what the contract judges can ask. The planned 2.5.1 work is included; there is
+no separate 2.5.1 release. Code in this release is LLM-generated or
+synthesized, and is checked by the judges, tests and proofs named in each
+section; each claim below is stated at the strength its evidence supports.
+
+### Highlights
+
+- **Applications from contracts.** `zeno-fcis new DIR --contract project.zeno --app`
+  builds the checked core, SQLite shell effects, an authenticated ingress
+  server and a synthesized ZenoUI front end, with a source-bound app manifest.
+  A generated application serves, commits, delivers outbox records, refuses
+  unauthenticated requests and keeps its state across restarts. See
+  [Build an app with ZenoFCIS](BUILD_AN_APP.md).
+- **Keyed collections.** Contracts can hold maps with summaries, for example
+  token balances and supply, checked by data independence over every
+  admissible view of the named entries. Long histories restore by paged replay
+  with bounded memory, and tampered, truncated, reordered or rolled-back
+  exports are refused. The abstract reduction is proved in Lean for any map
+  size and run length, conditional on premises the checker is designed to
+  establish; the pure framing and write-back functions are proved in Verus;
+  the production checker's correspondence to the Lean premises is tested, not
+  proved. See [keyed collections](COLLECTIONS.md).
+- **Shell effects.** A shell that commits publications, recovers from a lost
+  reply and delivers outbox records runs unchanged against real storage, a
+  deterministic faulty world or a recorded run. The abstract
+  effect-reservation protocol is proved in Verus: at most one receiver effect
+  per key under atomic deduplication, reservation coverage, retry refusal,
+  first-veto rollback and replayed admission evidence. The production
+  handlers' conformance is tested, not proved. See
+  [shell effects](SHELL_EFFECTS.md) and [shell simulation](SHELL_SIMULATION.md).
+- **New questions for contracts.** Two-run properties (does swapping two
+  requests, or changing a private value, change what others see), exact
+  distribution laws over uniform random bits, quantitative risk counts and
+  reward extremes, recursive contract tables and table games with fairness,
+  construction of a component from frozen requirements, and representation
+  refinement. See [two-run properties](TWO_RUN_PROPERTIES.md),
+  [distribution laws](DISTRIBUTION_LAWS.md),
+  [quantitative risk](QUANTITATIVE_RISK.md),
+  [contract tables](CONTRACT_TABLES.md), [table games](TABLE_GAMES.md) and
+  [construction](CONSTRUCTION.md).
+- **Arithmetic.** Unsigned 128-bit multiplication and division and checked
+  casts are admitted. The scalar arithmetic is proved in Verus to meet an
+  integer specification. The six shipped synthesized Rust controllers are
+  proved, by translation validation with a trusted grammar decoder, to compute
+  what the verified evaluator computes (metered refusals excluded); later
+  `synth` output is covered only when it passes the same validation.
+  Applications generated with `new --contract` run the verified evaluator.
+  Python and JavaScript emission is tested, not proved.
+- **ZenoDEX Spot linked to its program.** A Verus proof shows that each
+  accepting branch of Spot's compiled decision program meets the integer step
+  contract used by its Lean round-trip theorems, for every input in the
+  declared domains. The proof runs on the library's evaluator specification;
+  the executable evaluator's conformance rests on the library's own Verus
+  gates.
+- **ZAL.** Behaviour written in ZAL now covers integer transitions, effects
+  signatures, lowering and refinement checks, coverage, and why-not and
+  what-if explanations. The temporal ladder is an experimental presentation and
+  lowering profile. The withdrawal pilot's bounded claim is checked
+  exhaustively over finite histories, and its unbounded claim is
+  kernel-checked in Lean under the stated fairness. See [ZAL](zal/README.md).
+- **Symbolic review.** Above the exhaustive cap, law checking needs two
+  agreeing pinned solvers and replays every counterexample natively; it now
+  covers guarded observations whose values have different kinds, for laws
+  produced by the compiler.
+- **Agent-facing contracts.** Every verdict command follows one
+  [exit contract](CLI_REFERENCE.md#exit-codes), and 29 guide cards state exact
+  commands, outputs and limits (`zeno-fcis guide list`).
+- **Laws found by mutation testing.** Release testing used evolutionary
+  mutation testing to search for edits that change documented behaviour yet
+  pass review. The order-book example and seven demonstration examples gained
+  laws for the gaps it found; each example's own documented results are
+  unchanged.
+
+### Verified specification changes
+
+Three intended extensions change the meaning of verified specifications:
+unsigned 128-bit multiplication and division with checked casts; enum values
+without payloads as decision inputs; and laws scoped to one rejection reason.
+Every literal requires and ensures clause is unchanged. The evaluator identity
+is regenerated by its producer accordingly.
+
+### Upgrading from 2.5.0
+
+**Breaking change for stores.** A store records the evaluator identity, and
+2.6.0 changes the evaluator. A 2.6.0 build therefore refuses a store created
+by a 2.5.0 build of the same contract ("belongs to a different contract"),
+for `--audit` and `--upgrade` alike, and writes nothing. Keep such a store on
+the 2.5.0 build that created it, or start a new store under 2.6.0. Upgrading
+2.5.0 stores is planned for a later release. Stores created by 2.4.0
+applications remain upgradable, as described below.
+
+Contracts adopted under 2.5.0 refuse to generate until
+`zeno-fcis contract refresh-receipts DIR` runs once. It checks every adoption
+again with the current checker and refuses, writing nothing, if anything but
+the checker identity in a receipt would change. Scripts that relied on exit 0
+for a refutation must follow the [exit contract](CLI_REFERENCE.md#exit-codes).
+
+### Not in 2.6
+
+Production refinement of the effect handlers, collection checking at
+realistic widths, one atomic transaction across the pool, the zUSD vault and
+the oracle, and the judges' economic mount of native zUSD (256-bit and ordered
+state) are planned for 2.7. Plans change; a planned item is a direction, not a
+promise. The sections below give each feature's exact scope and evidence.
+
+## Symbolic review scope
 
 Symbolic contract review supports guarded observations whose active and
 default values have different kinds. Its scope is compiler-produced laws,
@@ -17,7 +123,7 @@ lemma questions UNKNOWN, exit 2. An invalid lemma formula still exits 65.
 The account-lockout app-factory route remains unqualified pending performance
 validation. See [symbolic checks](SYMBOLIC_CHECKS.md) for evidence boundaries.
 
-## 2.6 draft: verdict exit codes
+## Verdict exit codes
 
 Verdict commands now follow the [shared exit contract](CLI_REFERENCE.md#exit-codes).
 Negative yes/no `contract probe` answers, question disagreements, wrong or
@@ -37,11 +143,11 @@ Background: IEEE and The Open Group, *POSIX.1-2024*, Shell Command Language,
 2024, defines shell exit status conventions; this release consistently maps
 the existing finite verdicts into that interface.
 
-## 2.6 draft: the app factory
+## The app factory
 
 `zeno-fcis new DIR --contract project.zeno --app` combines the checked core,
-SQLite shell effects, authenticated Rust ingress and a descriptor-generated
-ZenoUI front end. The explicit offline Python build checks the finite UI
+SQLite shell effects, authenticated Rust ingress and a ZenoUI front end
+synthesized from its descriptor. The explicit offline Python build checks the finite UI
 domain and binds tools and output assets into an app manifest. The browser
 retains an unresolved request's original bytes and key for recovery after
 restart. See [Build an app with ZenoFCIS](BUILD_AN_APP.md) for the journey,
@@ -66,13 +172,6 @@ search and retains the better checked result. It proposes; the exact check
 accepts. Index memory and work consume the existing budgets; a budget stop
 provides no candidate. The bounded fragment is not a program optimality claim.
 
-## 2.5.0
-
-Code is LLM-generated or synthesized;
-acceptance depends on the stated check, domain and assumptions. The
-[installation guide](INSTALLATION.md) describes how to verify published assets
-once they are available.
-
 ## Restored 2.4.0 adoption upgrades
 
 Upgrades of contracts adopted with the released ZenoFCIS 2.4.0 CLI are
@@ -86,6 +185,13 @@ evaluator.
 This compatibility route covers the 2.4.0 release only. Keep its retained
 policies, receipts and digests unchanged; an edited superseded version still
 refuses. See [contract adoption and store upgrades](CLI_REFERENCE.md#contract-adoption-and-store-upgrades).
+
+## 2.5.0
+
+Code is LLM-generated or synthesized;
+acceptance depends on the stated check, domain and assumptions. The
+[installation guide](INSTALLATION.md) describes how to verify published assets
+once they are available.
 
 ## The 2.5 breaking change
 
