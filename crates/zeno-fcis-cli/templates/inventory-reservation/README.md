@@ -24,7 +24,7 @@ catalog meanings, then checks and generates the schema and project bindings.
 `profile.rs` binds the exact source, including the synthesis files, and the
 runtime-only law manifest.
 
-The closed plan is authored in `profile.rs`; the library checks its complete
+The closed plan is declared in `profile.rs`; the library checks its complete
 field projection against the schema, binds it to the catalog identity, and
 interprets it without application staging code. The independent application
 model checks all 864 admitted inputs. These checks establish this bounded
