@@ -2,7 +2,7 @@
 
 The withdrawal statements are bound to the withdrawal-queue contract; the
 [withdrawal pilot](WITHDRAWAL_PILOT.md) states their evidence. The vault and
-interface statements use proposed definitions awaiting owner confirmation.
+interface statements use definitions the owner confirmed on 2026-10-24.
 The following blocks are CLI render output; their statements, scopes and
 fixtures carry authority none.
 
@@ -102,17 +102,17 @@ For example eight_ticks_unpaid: Not a contract history (the pilot checks that th
 ```text
 ui_discovery — zal/ladder-temporal/1 (experimental; authority: none)
 Law (holds over the declared domains)
-Authority: OPEN — Proposed, awaiting owner confirmation. Definitions are recovered from the generated-interface design and its first milestone checks; no claim reaches users until the owner confirms them.
-Scope (theory: ordered-events-over-integers/1; ordered logical events over checked integers): Proposed definitions, awaiting owner confirmation: recorded interface commits of the generated inventory-reservation interface.
+Authority: DECIDED — Owner decision 2026-10-24: the definitions are confirmed as written. They were recovered from the generated-interface design and its first milestone checks; no source is bound to the model yet.
+Scope (theory: ordered-events-over-integers/1; ordered logical events over checked integers): Owner-confirmed definitions: recorded interface commits of the generated inventory-reservation interface.
 Trace source: proposed generated-interface model; no source is bound yet; schema: interface-commit/1: presentation state, focus, open dialog and route exposure before and after each commit; order: authoritative order of recorded interface commits, including opening a dialog and changing focus; projection: retain each recorded event without sorting, merging or deduplication
 Mode: finite 4 (all lengths 1 through horizon)
 Assumptions: true := Unconditional finite-word requirement; provided true. [version 1]
 Model: proposed: the generated presentation core of the inventory-reservation interface; execution membership is unproved until that model is bound; environment: proposed: any user navigation, inferred hints and preference changes (width, theme, motion); hints may change emphasis only
 Execution obligations: initialization the initial view is checked separately: every declared region has data, empty or loading status; transition membership requires exact membership in the generated presentation core; continuity requires post/pre correspondence of focus, dialog and exposure at every retained commit
 Evidence: obligation; authority: none; arithmetic: checked i128; scope identity: 306cbf4d025f7284cf6ab55751b91d85f319c2c5f1e517d5378b3c2318a1db1e
-Observation Required [event; version proposed/1]: Proposed, awaiting owner confirmation. The action is a command route of the contract (reserve, release, ship or restock): every command variant is a required task at every event, independently of what the interface shows. Busy or uncertain states may prevent invocation, not inspection.
-Observation VisualRoute [event; version proposed/1]: Proposed, awaiting owner confirmation. A named control for the action is visible and reachable from the current focus within h=2 navigation actions by pointer or keyboard, honouring the open dialog: leave the dialog, then choose the task in the persistent task navigation. Moving focus inside one region is not counted.
-Observation AssistiveRoute [event; version proposed/1]: Proposed, awaiting owner confirmation. The same control is in the accessibility tree with its accessible name and reachable within h=2 keyboard navigation actions; hidden or inert elements cannot receive focus. Actual browser and screen-reader exposure is separate browser evidence.
+Observation Required [event; version proposed/1]: Owner-confirmed. The action is a command route of the contract (reserve, release, ship or restock): every command variant is a required task at every event, independently of what the interface shows. Busy or uncertain states may prevent invocation, not inspection.
+Observation VisualRoute [event; version proposed/1]: Owner-confirmed. A named control for the action is visible and reachable from the current focus within h=2 navigation actions by pointer or keyboard, honouring the open dialog: leave the dialog, then choose the task in the persistent task navigation. Moving focus inside one region is not counted.
+Observation AssistiveRoute [event; version proposed/1]: Owner-confirmed. The same control is in the accessibility tree with its accessible name and reachable within h=2 keyboard navigation actions; hidden or inert elements cannot receive focus. Actual browser and screen-reader exposure is separate browser evidence.
 Registered reading [proposed/1; finite]: forall sigma in Traces: forall a in Actions: always(Required(a) => Discoverable(a))
 Formula: ∀sigma ∈ Traces : ∀a ∈ Actions : □(Required(a) ⇒ Discoverable(a))
 Theory: ordered logical events over checked integers. sigma is the declared trace, i its zero-based active position. A prime reads after this event; it is neither negation nor a derivative. Boolean algebra uses a different prime convention outside this theory. Next advances one recorded event. Empty event traces are refused. Initialization is checked separately. Trace quantifiers can be vacuous over an empty execution domain; machine initialization must establish nonemptiness.
@@ -145,18 +145,18 @@ For example not_required: Vacuous implication; under the proposed Required every
 ```text
 vault_drain — zal/ladder-temporal/1 (experimental; authority: none)
 Law (holds over the declared domains)
-Authority: OPEN — Proposed, awaiting owner confirmation. Definitions are recovered from the existing vault, stablecoin and oracle relations; no claim reaches users until the owner confirms them.
-Scope (theory: ordered-events-over-integers/1; ordered logical events over checked integers): Proposed definitions, awaiting owner confirmation: every event of the composed vault, oracle, collateral and governance machine.
+Authority: DECIDED — Owner decision 2026-10-24: the definitions are confirmed as written. They were recovered from the existing vault, stablecoin and oracle relations; no source is bound to the model yet.
+Scope (theory: ordered-events-over-integers/1; ordered logical events over checked integers): Owner-confirmed definitions: every event of the composed vault, oracle, collateral and governance machine.
 Trace source: proposed composed vault model; no source is bound yet; schema: pre-input-outcome-post/1; order: authoritative recorded event order, including rejections and retries; projection: retain each recorded event without sorting, merging or deduplication
 Mode: finite 4 (all lengths 1 through horizon)
 Assumptions: true := Unconditional finite-word requirement; provided true. [version 1]
 Model: proposed: the composed vault, oracle, collateral and governance machine; execution membership is unproved until that model exists; environment: proposed: the declared attacker capabilities (compromised signer keys up to a declared count, stale pre-signed approvals, many accounts, atomic batches, flash liquidity and price-setting power on thin markets); a capability left out is a stated blind spot
 Execution obligations: initialization initial custody v0 of each asset is fixed at genesis and checked separately, including executions with no operation; transition membership requires exact membership in the composed model; continuity requires post/pre correspondence of custody, credits and discharges at every retained boundary
 Evidence: obligation; authority: none; arithmetic: checked i128; scope identity: 2cf90258c78ab6b4f3d21930fe10fb5a17ccbeedf112a6e87bd1c620a4ade7e0
-Observation v [event; version proposed/1]: Proposed, awaiting owner confirmation. Units of the asset held in every reserved custody account of the machine (pools, deposits, stakes, surplus and claim custody), in that asset's own units; no price converts one asset into another.
-Observation c [event; version proposed/1]: Proposed, awaiting owner confirmation. Cumulative authenticated external funding of the asset into custody since genesis. Internal reward or claim moves are reclassifications, neither credit nor discharge.
-Observation p [event; version proposed/1]: Proposed, awaiting owner confirmation. Cumulative exact external payouts and burns of the asset, each bound to an entitlement the relation computes from independently evaluated inputs and consumed once; an approval alone, including a compromised signer's, never discharges.
-Observation v0 [event; version proposed/1]: Proposed, awaiting owner confirmation. Custody of the asset at genesis, a constant of the trace.
+Observation v [event; version proposed/1]: Owner-confirmed. Units of the asset held in every reserved custody account of the machine (pools, deposits, stakes, surplus and claim custody), in that asset's own units; no price converts one asset into another.
+Observation c [event; version proposed/1]: Owner-confirmed. Cumulative authenticated external funding of the asset into custody since genesis. Internal reward or claim moves are reclassifications, neither credit nor discharge.
+Observation p [event; version proposed/1]: Owner-confirmed. Cumulative exact external payouts and burns of the asset, each bound to an entitlement the relation computes from independently evaluated inputs and consumed once; an approval alone, including a compromised signer's, never discharges.
+Observation v0 [event; version proposed/1]: Owner-confirmed. Custody of the asset at genesis, a constant of the trace.
 Registered reading [proposed/1; finite]: forall sigma in Traces: forall a in Assets: always(not Loss(a))
 Formula: ∀sigma ∈ Traces : ∀a ∈ Assets : □(¬Loss(a))
 Theory: ordered logical events over checked integers. sigma is the declared trace, i its zero-based active position. A prime reads after this event; it is neither negation nor a derivative. Boolean algebra uses a different prime convention outside this theory. Next advances one recorded event. Empty event traces are refused. Initialization is checked separately. Trace quantifiers can be vacuous over an empty execution domain; machine initialization must establish nonemptiness.

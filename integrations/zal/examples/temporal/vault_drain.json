@@ -4,10 +4,10 @@
   "id": "vault_drain",
   "kind": "law",
   "authority": {
-    "status": "OPEN",
-    "source": "Proposed, awaiting owner confirmation. Definitions are recovered from the existing vault, stablecoin and oracle relations; no claim reaches users until the owner confirms them."
+    "status": "DECIDED",
+    "source": "Owner decision 2026-10-24: the definitions are confirmed as written. They were recovered from the existing vault, stablecoin and oracle relations; no source is bound to the model yet."
   },
-  "scope": "Proposed definitions, awaiting owner confirmation: every event of the composed vault, oracle, collateral and governance machine.",
+  "scope": "Owner-confirmed definitions: every event of the composed vault, oracle, collateral and governance machine.",
   "trace": {
     "domain": "Traces",
     "mode": "finite",
@@ -58,7 +58,7 @@
       "state": true,
       "observation": "event",
       "version": "proposed/1",
-      "definition": "Proposed, awaiting owner confirmation. Units of the asset held in every reserved custody account of the machine (pools, deposits, stakes, surplus and claim custody), in that asset's own units; no price converts one asset into another.",
+      "definition": "Owner-confirmed. Units of the asset held in every reserved custody account of the machine (pools, deposits, stakes, surplus and claim custody), in that asset's own units; no price converts one asset into another.",
       "native": [
         {
           "args": [
@@ -93,7 +93,7 @@
       "state": true,
       "observation": "event",
       "version": "proposed/1",
-      "definition": "Proposed, awaiting owner confirmation. Cumulative authenticated external funding of the asset into custody since genesis. Internal reward or claim moves are reclassifications, neither credit nor discharge.",
+      "definition": "Owner-confirmed. Cumulative authenticated external funding of the asset into custody since genesis. Internal reward or claim moves are reclassifications, neither credit nor discharge.",
       "native": [
         {
           "args": [
@@ -128,7 +128,7 @@
       "state": true,
       "observation": "event",
       "version": "proposed/1",
-      "definition": "Proposed, awaiting owner confirmation. Cumulative exact external payouts and burns of the asset, each bound to an entitlement the relation computes from independently evaluated inputs and consumed once; an approval alone, including a compromised signer's, never discharges.",
+      "definition": "Owner-confirmed. Cumulative exact external payouts and burns of the asset, each bound to an entitlement the relation computes from independently evaluated inputs and consumed once; an approval alone, including a compromised signer's, never discharges.",
       "native": [
         {
           "args": [
@@ -163,7 +163,7 @@
       "state": false,
       "observation": "event",
       "version": "proposed/1",
-      "definition": "Proposed, awaiting owner confirmation. Custody of the asset at genesis, a constant of the trace.",
+      "definition": "Owner-confirmed. Custody of the asset at genesis, a constant of the trace.",
       "native": [
         {
           "args": [

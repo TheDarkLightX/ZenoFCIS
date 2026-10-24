@@ -4,10 +4,10 @@
   "id": "ui_discovery",
   "kind": "law",
   "authority": {
-    "status": "OPEN",
-    "source": "Proposed, awaiting owner confirmation. Definitions are recovered from the generated-interface design and its first milestone checks; no claim reaches users until the owner confirms them."
+    "status": "DECIDED",
+    "source": "Owner decision 2026-10-24: the definitions are confirmed as written. They were recovered from the generated-interface design and its first milestone checks; no source is bound to the model yet."
   },
-  "scope": "Proposed definitions, awaiting owner confirmation: recorded interface commits of the generated inventory-reservation interface.",
+  "scope": "Owner-confirmed definitions: recorded interface commits of the generated inventory-reservation interface.",
   "trace": {
     "domain": "Traces",
     "mode": "finite",
@@ -58,7 +58,7 @@
       "clause": "{0} is required",
       "observation": "event",
       "version": "proposed/1",
-      "definition": "Proposed, awaiting owner confirmation. The action is a command route of the contract (reserve, release, ship or restock): every command variant is a required task at every event, independently of what the interface shows. Busy or uncertain states may prevent invocation, not inspection.",
+      "definition": "Owner-confirmed. The action is a command route of the contract (reserve, release, ship or restock): every command variant is a required task at every event, independently of what the interface shows. Busy or uncertain states may prevent invocation, not inspection.",
       "native": [
         {
           "args": [
@@ -95,7 +95,7 @@
       "clause": "{0} has a visual route",
       "observation": "event",
       "version": "proposed/1",
-      "definition": "Proposed, awaiting owner confirmation. A named control for the action is visible and reachable from the current focus within h=2 navigation actions by pointer or keyboard, honouring the open dialog: leave the dialog, then choose the task in the persistent task navigation. Moving focus inside one region is not counted.",
+      "definition": "Owner-confirmed. A named control for the action is visible and reachable from the current focus within h=2 navigation actions by pointer or keyboard, honouring the open dialog: leave the dialog, then choose the task in the persistent task navigation. Moving focus inside one region is not counted.",
       "native": [
         {
           "args": [
@@ -132,7 +132,7 @@
       "clause": "{0} has an assistive route",
       "observation": "event",
       "version": "proposed/1",
-      "definition": "Proposed, awaiting owner confirmation. The same control is in the accessibility tree with its accessible name and reachable within h=2 keyboard navigation actions; hidden or inert elements cannot receive focus. Actual browser and screen-reader exposure is separate browser evidence.",
+      "definition": "Owner-confirmed. The same control is in the accessibility tree with its accessible name and reachable within h=2 keyboard navigation actions; hidden or inert elements cannot receive focus. Actual browser and screen-reader exposure is separate browser evidence.",
       "native": [
         {
           "args": [
