@@ -289,10 +289,13 @@ no payout follows a refund. The escrow example declares these questions in
 ```
 
 ```text
-zeno-fcis contract runs examples/apps/escrow-deal
+zeno-fcis contract runs examples/apps/escrow-deal --max-tuples 2000000
 ```
 
-All three receive `inductive`. This means proved inductively over reachable
+The payout count's observer product declares 1,244,160 tuples, above the
+default limit of 1,048,576, so the command raises the limit. Without it that
+property is `inconclusive` and the command exits 2. With it, all three
+receive `inductive`. This means proved inductively over reachable
 states of this contract paired with its observer, exhaustive over the declared
 finite domains. It holds for runs of any length in that finite model. It does
 not claim a property over unbounded domains, other parameter choices, shell
