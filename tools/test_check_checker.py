@@ -31,6 +31,39 @@ class SharedCheckerGate(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'independent evaluator'):
                 gate.check_routes(root)
 
+    def test_released_24_route_is_admitted_only_as_the_closed_replay(self):
+        source = (gate.ROOT / gate.CLI).read_text()
+        start = source.index(gate.RELEASED_24_ROUTE)
+        route = source[start:source.index('\n}\n', start) + 3]
+        current = source.split('pub(crate) fn check(', 1)[1].split('fn admit(', 1)[0]
+        widened = current.replace('{', '{\n    let _ = check_released_24(original, candidate, limits);', 1)
+        for name, edited, reason in (
+            ('called from the current check', source.replace(current, widened, 1), 'reachable outside'),
+            ('current constructor claims release', source.replace('released_24: false,', 'released_24: true,', 1),
+             'claims released'),
+            ('current import', source.replace(route, route.replace(
+                'import_i64_program(original)', 'import_program(original)', 1), 1), 'closed historical replay'),
+            ('second evaluation', source.replace(route, route.replace(
+                'let (original, candidate) = (observe(&left), observe(&right));',
+                'let (original, candidate) = (observe(&left), observe(&right));\n'
+                '        let _ = left.execute_v2(&input, zeno_fcis_synthesis::finite::v2_zero_limits());', 1), 1),
+             'closed historical replay'),
+            ('duplicated route', source + '\n' + route, 'missing or duplicated'),
+            ('missing route', source.replace(route, '', 1), 'missing or duplicated'),
+        ):
+            with self.subTest(name):
+                self.assertNotEqual(edited, source)
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    for relative in gate.ROUTE_INPUTS:
+                        target = root / relative
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_bytes((gate.ROOT / relative).read_bytes())
+                    gate.check_routes(root)
+                    (root / gate.CLI).write_text(edited)
+                    with self.assertRaisesRegex(ValueError, reason):
+                        gate.check_routes(root)
+
     def test_library_route_rejects_missing_proof_and_wrong_package_order(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

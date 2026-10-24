@@ -184,7 +184,9 @@ evaluator.
 
 This compatibility route covers the 2.4.0 release only. Keep its retained
 policies, receipts and digests unchanged; an edited superseded version still
-refuses. See [contract adoption and store upgrades](CLI_REFERENCE.md#contract-adoption-and-store-upgrades).
+refuses. The replay of retained 2.4.0 receipts runs outside the shared
+equivalence checker and its Verus proof; it is tested, not proved, and a
+source guard pins it to released-receipt replay. See [contract adoption and store upgrades](CLI_REFERENCE.md#contract-adoption-and-store-upgrades).
 
 ## 2.5.0
 

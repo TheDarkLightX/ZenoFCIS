@@ -134,10 +134,52 @@ def snapshot(root: Path = ROOT, *, profile: bool = True) -> dict[str, str]:
     return {str(p): verifier.digest(root / p) for p in paths}
 
 
+RELEASED_24_ROUTE = ('fn check_released_24(original: &[u8], candidate: &[u8], limits: Limits) '
+                     '-> Result<Equivalence, Rejection> {')
+
+
+def released_route(cli: str) -> str:
+    """Split off the closed released-2.4.0 receipt route and return the rest of the CLI source.
+
+    That route replays retained 2.4.0 evidence with the copied released evaluator, so it is an
+    enumeration outside the shared checker and its proof; it is tested, not proved. It is pinned
+    narrowly: one definition, the historical i64 import only, the shared pair validation, one
+    evaluation call on the legacy program, the only constructor marked released_24: true, and
+    called only from receipt replay behind is_released_24_receipt. Every other check then
+    applies to the rest of the source unchanged.
+    """
+    if cli.count(RELEASED_24_ROUTE) != 1:
+        raise ValueError('released 2.4.0 route missing or duplicated')
+    start = cli.index(RELEASED_24_ROUTE)
+    end = cli.index('\n}\n', start) + len('\n}\n')
+    route, rest = cli[start:end], cli[:start] + cli[end:]
+    compact = re.sub(r'\s+', '', route)
+    if (route.count('execute_v2(') != 1
+            or '|p:&zeno_fcis_synthesis::finite_runtime::LegacyProgram|' not in compact
+            or 'p.execute_v2(' not in compact
+            or 'import_i64_program_data(original)' not in compact
+            or 'import_i64_program_data(candidate)' not in compact
+            or 'import_i64_program(original)' not in compact
+            or 'import_i64_program(candidate)' not in compact
+            or re.search(r'\bimport_program\(', route)
+            or 'crate::finite_checker::validate_pair(' not in compact
+            or compact.count('Ok(Equivalence{') != 1
+            or not compact.endswith('released_24:true})}')):
+        raise ValueError('released 2.4.0 route is not the closed historical replay')
+    if 'released_24:true' in re.sub(r'\s+', '', rest):
+        raise ValueError('a current route claims released 2.4.0 provenance')
+    replay = rest.split('\nfn rerun(', 1)[1].split('\n}\n', 1)[0] if '\nfn rerun(' in rest else ''
+    if (len(re.findall(r'\bcheck_released_24\(', rest)) != 2
+            or replay.count('check_released_24(') != 2
+            or 'let released_24 = is_released_24_receipt(&recorded.value);\n    if released_24 {' not in replay):
+        raise ValueError('released 2.4.0 route is reachable outside released receipt replay')
+    return rest
+
+
 def check_routes(root: Path = ROOT) -> None:
     """Guard the required construction path; semantic mapping has native tests."""
     main = (root / 'crates/zeno-fcis-cli/src/main.rs').read_text()
-    cli, shell = (root / CLI).read_text(), (root / SHELL).read_text()
+    cli, shell = released_route((root / CLI).read_text()), (root / SHELL).read_text()
     api = (root / API).read_text()
     harness = (root / HARNESS).read_text()
     manifest = tomllib.loads((root / 'crates/zeno-fcis-cli/Cargo.toml').read_text())
