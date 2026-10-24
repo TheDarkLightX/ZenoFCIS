@@ -194,6 +194,7 @@ def controls(version, path, source, search_path=None):
         "CollectionsPatterns.lean", "CollectionsPatternsExecutable.lean", "CollectionsReduction.lean", "CollectionsReductionGenesis.lean",
         "CollectionsReductionTallies.lean", "CollectionsReductionValidation.lean",
         "CollectionsSignedTallies.lean", "CollectionsValidationWitnesses.lean",
+        "CollectionsValidationPremises.lean",
     }:
         # The reduction modules share the deleted-premise control above. The
         # enumeration implementation has a separate exhaustive differential control.
@@ -264,12 +265,16 @@ def main():
     files = proof_files(PROOFS)
     if not files:
         raise ValueError("no proof files")
-    named = json.loads((PROOFS / "AXIOMS.json").read_text())
+    manifest_bytes = (PROOFS / "AXIOMS.json").read_bytes()
+    named = json.loads(manifest_bytes)
     snapshots = {path.relative_to(PROOFS): path.read_bytes() for path in files}
     auditor_bytes = AUDITOR.read_bytes()
     results = {"schema": "zeno-fcis/lean-proof-check/2", "source_sha256": {
         str(p): hashlib.sha256(b).hexdigest() for p, b in snapshots.items()},
-        "auditor_sha256": hashlib.sha256(auditor_bytes).hexdigest(), "toolchains": {}, "controls": []}
+        "auditor_sha256": hashlib.sha256(auditor_bytes).hexdigest(),
+        "gate_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "toolchains": {}, "controls": []}
     for version in VERSIONS:
         code, output = lean(version, "--version")
         if code or f"version {version}," not in output:

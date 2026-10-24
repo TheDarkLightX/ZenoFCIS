@@ -169,6 +169,29 @@
     "Quot.sound",
     "propext"
   ],
+  "CollectionsValidationPremises.Tallies.t1_joint_countermodel": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsValidationPremises.Tallies.t3_joint_countermodel": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsValidationPremises.Tallies.t4_joint_countermodel": [
+    "propext"
+  ],
+  "CollectionsValidationPremises.p2_joint_countermodel": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsValidationPremises.p3_joint_countermodel": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsValidationPremises.p4_joint_countermodel": [
+    "Quot.sound",
+    "propext"
+  ],
   "CollectionsValidationWitnesses.absent_default_does_not_bind_stored_key": [],
   "CollectionsValidationWitnesses.aliased_readonly_law_rechecked": [],
   "CollectionsValidationWitnesses.bad_initial_condition_rejected": [],
