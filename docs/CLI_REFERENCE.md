@@ -4,7 +4,7 @@ This guide documents the `2.6.0` source. Its retained V1
 protocol guidance is historical; see [the release notes](RELEASE_NOTES.md)
 for the current checked API and assurance boundaries.
 
-The `zeno-fcis-cli` package in `1.1.0` publishes the `zeno-fcis` binary.
+The `zeno-fcis-cli` package in `2.6.0` publishes the `zeno-fcis` binary.
 It pins `clap = 4.6.1` without environment parsing or color output.
 
 ```text
@@ -243,7 +243,7 @@ may still reject a value. Descriptive help text is not an executable instruction
 commands that can be invoked on their own.
 Unknown command paths return versioned JSON and exit `64`. Discovery reads no
 project or tool input and grants no authority. These interfaces are available
-in the 1.1.0 CLI.
+in the 2.6.0 CLI.
 
 `generate --format json` returns `status: "generated"`; with `--check` it
 returns `current` (exit `0`) or `drift` (exit `1`). Results include `path`,

@@ -283,6 +283,7 @@ function releaseCopy(html,{source,library}=releaseFacts()){
  const covered=claims.flatMap(claim=>[...words.matchAll(new RegExp(claim,'g'))].map(m=>[m.index,m.index+m[0].length]));
  const stale=[...words.matchAll(/[0-9]+(?:\.[0-9]+)+/g)].filter(m=>!covered.some(([a,b])=>a<=m.index&&m.index+m[0].length<=b)).map(m=>words.slice(Math.max(0,m.index-40),m.index+m[0].length+20));
  assert.deepEqual(stale,[],'every version named in the page copy is explained by its source');
+ assert.match(words,new RegExp(`ZenoFCIS ${e(source.replace(/\.[0-9]+$/,''))} source`),'the brand lockup names the current release source');
  assert.match(words,new RegExp(status),'the page states the release source and its separate gates');
  assert.match(words,new RegExp(factory),'the factory section names the library it runs');
  for(const [,version] of html.matchAll(/releases\/(?:tag|download)\/v([^"/$]+)/g))assert.equal(version,published,'release links name the published release');
@@ -357,7 +358,7 @@ test('review_new_policy_and_preference_controls_are_killed',async()=>{
  const changed=lostEdit.step(search,{type:'DraftChanged',act:'money',draft:{...money,amount:'3000000001'}}).state;
  const done=lostEdit.step(changed,{type:'Result',identity:changed.identity,result:native.search,elapsed:1});
  assert.throws(()=>assert.equal(done.view.actions.find(a=>a.act==='money').enabled,false),assert.AssertionError,'lost-edit control recreates the live enablement defect');
- assert.throws(()=>releaseCopy(page.replace('2.5.0 is the current release source','Coming in 2.5')),assert.AssertionError);
+ assert.throws(()=>releaseCopy(page.replace('2.6.0 is the current release source','Coming in 2.6')),assert.AssertionError);
 });
 
 // Each re-review check is killed by its own witness, and the drawing fence by a planted failure.
@@ -392,7 +393,8 @@ test('rereview_residual_controls_are_killed',async()=>{
  for(const [from,to] of [
   [`the library built from the ${release} release source`,`the ${published} library`],
   [`built from the ${release} release source`,`built from the ${published} release source`],
-  [`${release} is the current release source`,'Coming in 2.5'],
+  [`${release} is the current release source`,'Coming in 2.6'],
+  [`${release.replace(/\.[0-9]+$/,'')} source`,'2.5 source'],
   [`<span class="ver">${release}</span><span class="chip dev">RELEASE SOURCE`,`<span class="ver">${release.replace(/\.[0-9]+$/,'')}</span><span class="chip dev">IN DEVELOPMENT`],
   [`Install ${published} on Linux`,'Install 2.3.0 on Linux'],
   [`releases/tag/v${published}`,'releases/tag/v2.3.0'],

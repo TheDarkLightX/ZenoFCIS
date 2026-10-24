@@ -10,7 +10,7 @@
 <body>
 <header class="banner hero">
   <div class="topbar">
-    <a class="mark" href="#top" id="top">ZenoFCIS<span>2.5 source</span></a>
+    <a class="mark" href="#top" id="top">ZenoFCIS<span>2.6 source</span></a>
     <nav aria-label="Sections">
       <a href="#how">How it works</a>
       <a href="#evidence">Evidence</a>
@@ -33,7 +33,7 @@
       </p>
       <div class="actions">
         <a class="button primary" href="#factory">Watch the checkers work</a>
-        <a class="button" href="https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.4.0">Get 2.4.0</a>
+        <a class="button" href="https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.5.0">Get 2.5.0</a>
       </div>
       <p class="facts"><span>Linux x86_64</span><span>Apple silicon macOS</span><span>Signed checksums</span></p>
     </div>
@@ -87,7 +87,7 @@
     <div><h3>Attested</h3><p class="means">An SMT solver's result, recorded with its inputs. The solver itself is trusted.</p>
       <p class="example">CVC5 attests that the withdrawal queue's action laws alone keep the vault solvent, over the declared integer ranges.</p></div>
     <div><h3>Kernel-checked</h3><p class="means">A proof checked by the Lean 4 kernel.</p>
-      <p class="example">The 2.5.0 source includes an exact-value theorem for the ZenoDEX Spot pool's algebraic contract; linking it to executable code remains open.</p></div>
+      <p class="example">The 2.6.0 source includes an exact-value theorem for the ZenoDEX Spot pool; a Verus proof links it to Spot's compiled decision program over the declared input ranges.</p></div>
     <div><h3>Proved</h3><p class="means">Verus proofs that library code meets its mathematical contract.</p>
       <p class="example">Admission, original-byte interpretation, scalar execution, complete decisions, laws and genesis, authority and replay.</p></div>
   </div>
@@ -96,24 +96,11 @@
   <div class="section-head">
     <p class="eyebrow">Releases</p>
     <h2 id="releases-title">Current release source and plans</h2>
-    <p>2.5.0 is the current release source. Final qualification and publication remain separate release gates. Plans change; a planned item is a direction, not a promise.</p>
+    <p>2.6.0 is the current release source. Final qualification and publication remain separate release gates. Plans change; a planned item is a direction, not a promise.</p>
   </div>
   <div class="releases">
     <article class="release">
-      <div class="when"><span class="ver">2.4.0</span><span class="chip released">RELEASED</span><span class="date">October 2026</span></div>
-      <div>
-        <ul>
-          <li><strong>Money math in checked rules.</strong> Exact multiply-then-divide with declared floor or ceiling, a full-width intermediate, and a refusal when the result does not fit. Values never wrap or saturate. Two- and three-factor product comparisons cover fees, swap outputs, liquidity mint and burn, and quorum.</li>
-          <li><strong>AI proposes, the checker decides.</strong> Repair from exact failing inputs, sketch completion, families and transfer, program search for smaller equivalent programs, capture of a Python function as a checked core, and learning from examples.</li>
-          <li><strong>Help with the specification.</strong> A gap finder, focused questions, teach-back, invariant checks with counterexamples, scenarios and probes, state profiles, and decomposition with blame.</li>
-          <li><strong>Private knowledge.</strong> A Datalog reasoning engine over your own knowledge bases, with provenance. Your knowledge stays out of source and release packages.</li>
-          <li><strong>Two platforms.</strong> Linux x86_64 and Apple silicon macOS, each with its own build and installed-binary checks.</li>
-        </ul>
-        <p class="limits"><strong>Limits in 2.4.0:</strong> amounts in rules are 64-bit; contained AI loops need Linux with a systemd user session; the component catalog's laws do not fully determine its decisions.</p>
-      </div>
-    </article>
-    <article class="release">
-      <div class="when"><span class="ver">2.5.0</span><span class="chip dev">RELEASE SOURCE</span></div>
+      <div class="when"><span class="ver">2.5.0</span><span class="chip released">RELEASED</span><span class="date">October 2026</span></div>
       <ul>
         <li><strong>Wider, safer arithmetic.</strong> 128-bit amounts and signed floor division, with existing 64-bit programs keeping their meaning. Declared units and scales such as e8 prices and basis points, with unit mistakes refused. Chains of up to 16 rounded steps, each matched against a big-integer reference.</li>
         <li><strong>Loops on more machines.</strong> The loops work on money math. Their finite checks run contained without systemd, so they work on macOS, in CI and in containers. Capturing a Python function still needs Linux.</li>
@@ -122,9 +109,24 @@
       </ul>
     </article>
     <article class="release">
-      <div class="when"><span class="ver">2.5.1</span><span class="chip planned">PLANNED</span></div>
+      <div class="when"><span class="ver">2.6.0</span><span class="chip dev">RELEASE SOURCE</span></div>
+      <div>
+        <ul>
+          <li><strong>Applications from contracts.</strong> One command turns a checked contract into an application: the checked core, SQLite storage, a server that refuses requests without a credential, and a synthesized user interface. The application keeps its state across restarts.</li>
+          <li><strong>Keyed collections.</strong> Contracts can hold maps, such as token balances with a total supply. The reduction behind the check is proved in Lean for any map size and history length, under premises the checker is designed to establish; that the checker meets them is tested, not proved. Long histories restore with bounded memory, and tampered or rolled-back exports are refused.</li>
+          <li><strong>Shell effects.</strong> The same shell runs against real storage, a deterministic world that injects faults, or a recorded run. The reservation protocol behind at-most-once delivery is proved in Verus, given a store that removes duplicates atomically; the production handlers are tested, not proved.</li>
+          <li><strong>New questions for contracts.</strong> Whether swapping two requests, or changing a private value, changes what others see; exact reward distributions over random bits; risk counts; contract tables and table games; and building a component from frozen requirements.</li>
+          <li><strong>Arithmetic to rely on.</strong> Unsigned 128-bit multiply and divide, with checked casts. The six shipped synthesized Rust controllers are proved, by translation validation, to compute what the verified evaluator computes, and generated applications run the verified evaluator.</li>
+          <li><strong>ZenoDEX Spot linked to its code.</strong> A Verus proof shows that Spot's compiled decision program meets the step contract its Lean value theorem uses, for every input in the declared ranges.</li>
+        </ul>
+        <p class="limits"><strong>Limits:</strong> collection checks use small value ranges; the effect handlers, and the collection checker's match to its proof, are tested, not proved; the zUSD vault and the oracle are not included.</p>
+      </div>
+    </article>
+    <article class="release">
+      <div class="when"><span class="ver">2.7.0</span><span class="chip planned">PLANNED</span></div>
       <ul>
         <li><strong>ZenoDEX stablecoin vault and oracle.</strong> A zUSD vault and a price oracle with three independent reporters; stale or replayed reports are refused.</li>
+        <li><strong>Proofs for the effect handlers</strong>, and collection checks over realistic value ranges.</li>
         <li><strong>Governance as checked rules.</strong> Signer thresholds, timelocks from announcement, outflow caps, and an exit that always stays open.</li>
         <li><strong>Search for loss paths before release.</strong> The loops search for operation sequences, including chains across components, that could lose user funds. Each one found becomes a law the system must keep.</li>
         <li><strong>Rules over time.</strong> Rules about sequences of events, and knowledge that spans several domains.</li>
@@ -154,10 +156,10 @@
 <section class="section landing" id="start" aria-labelledby="start-title">
   <div class="section-head">
     <p class="eyebrow">Get started</p>
-    <h2 id="start-title">Install 2.4.0 on Linux</h2>
+    <h2 id="start-title">Install 2.5.0 on Linux</h2>
   </div>
   <div class="code"><pre><span class="c"># Download the archive and the signed checksum list, then verify</span>
-VERSION=2.4.0
+VERSION=2.5.0
 ARCHIVE="zeno-fcis-$VERSION-x86_64-unknown-linux-gnu"
 BASE=https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v$VERSION
 curl -fLO "$BASE/$ARCHIVE.tar.gz"
@@ -171,7 +173,7 @@ tar -xzf "$ARCHIVE.tar.gz"
   <div class="section-head">
     <p class="eyebrow">The factory, live</p>
     <h2 id="factory-title">Watch the checkers work</h2>
-    <p>Each act runs the library built from the 2.5.0 release source, compiled to WebAssembly, in a background worker on this page. Nothing here is a recording: every result is computed when you press the button, and nothing is sent to a server.</p>
+    <p>Each act runs the library built from the 2.6.0 release source, compiled to WebAssembly, in a background worker on this page. Nothing here is a recording: every result is computed when you press the button, and nothing is sent to a server.</p>
   </div>
   <div class="acts">
   <article class="act factory-act" data-factory-act="synthesis" aria-labelledby="act-synthesis-title">
