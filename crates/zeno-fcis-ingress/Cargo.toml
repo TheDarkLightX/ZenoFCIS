@@ -15,16 +15,16 @@ hyper = { version = "=1.12.0", default-features = false, features = ["http1", "s
 hyper-util = { version = "=0.1.21", default-features = false, features = ["tokio"] }
 http-body-util = "=0.1.5"
 tokio = { version = "=1.53.2", default-features = false, features = ["rt", "net", "time"] }
-zeno-fcis-codec = { version = "=2.5.0", path = "../zeno-fcis-codec" }
-zeno-fcis-shell = { version = "=2.5.0", path = "../zeno-fcis-shell" }
-zeno-fcis-shell-sqlite = { version = "=2.5.0", path = "../zeno-fcis-shell-sqlite" }
-zeno-fcis-synthesis = { version = "=2.5.0", path = "../zeno-fcis-synthesis" }
+zeno-fcis-codec = { version = "=2.6.0", path = "../zeno-fcis-codec" }
+zeno-fcis-shell = { version = "=2.6.0", path = "../zeno-fcis-shell" }
+zeno-fcis-shell-sqlite = { version = "=2.6.0", path = "../zeno-fcis-shell-sqlite" }
+zeno-fcis-synthesis = { version = "=2.6.0", path = "../zeno-fcis-synthesis" }
 
 [dev-dependencies]
-zeno-fcis-crypto = { version = "=2.5.0", path = "../zeno-fcis-crypto" }
+zeno-fcis-crypto = { version = "=2.6.0", path = "../zeno-fcis-crypto" }
 rusqlite = { version = "=0.40.1", features = ["hooks"] }
-zeno-fcis-shell-sqlite = { version = "=2.5.0", path = "../zeno-fcis-shell-sqlite", features = ["crash-injection"] }
-zeno-fcis-value = { version = "=2.5.0", path = "../zeno-fcis-value" }
+zeno-fcis-shell-sqlite = { version = "=2.6.0", path = "../zeno-fcis-shell-sqlite", features = ["crash-injection"] }
+zeno-fcis-value = { version = "=2.6.0", path = "../zeno-fcis-value" }
 
 [lints]
 workspace = true

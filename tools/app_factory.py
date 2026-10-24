@@ -202,7 +202,7 @@ def build(args, contract, out, policy, reviewed, work):
     manifest = manifest.replace('default = ["sqlite"]', 'default = ["app"]\n' +
         'shell-effects = ["sqlite"]\napp = ["shell-effects", "dep:zeno-fcis-ingress", "dep:serde_json", "dep:tokio"]')
     manifest = manifest.replace('[dependencies]', '[dependencies]\n' +
-        'zeno-fcis-ingress = { version = "=2.5.0", optional = true }\n' +
+        'zeno-fcis-ingress = { version = "=2.6.0", optional = true }\n' +
         'serde_json = { version = "=1.0.151", optional = true }\n' +
         'tokio = { version = "=1.53.2", default-features = false, features = ["rt", "net", "time"], optional = true }')
     manifest = manifest.replace('publish = false', 'publish = false\ndefault-run = "app-server"', 1)

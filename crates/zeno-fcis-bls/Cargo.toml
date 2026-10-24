@@ -9,13 +9,13 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-zeno-fcis-synthesis = { version = "=2.5.0", path = "../zeno-fcis-synthesis", default-features = false }
+zeno-fcis-synthesis = { version = "=2.6.0", path = "../zeno-fcis-synthesis", default-features = false }
 blst = { version = "=0.3.17", default-features = false, features = ["portable", "no-threads"] }
 zenofcis-zusd-v1 = { path = "../../core-apps/zusd-v1" }
 
 [dev-dependencies]
 zenofcis-zusd-v1 = { path = "../../core-apps/zusd-v1", features = ["std"] }
-zeno-fcis-codec = { version = "=2.5.0", path = "../zeno-fcis-codec" }
+zeno-fcis-codec = { version = "=2.6.0", path = "../zeno-fcis-codec" }
 
 [lints]
 workspace = true
