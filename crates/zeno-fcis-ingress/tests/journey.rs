@@ -727,10 +727,14 @@ fn ingress_child() {
             panic!("child did not abort");
         }
         let listener = ok(rt.block_on(tokio::net::TcpListener::bind("127.0.0.1:0")));
+        // The parent reads the address as soon as the file exists, so publish it whole.
+        let ready = ok(std::env::var("INGRESS_READY"));
+        let staged = format!("{ready}.tmp");
         ok(std::fs::write(
-            ok(std::env::var("INGRESS_READY")),
+            &staged,
             ok(listener.local_addr()).to_string(),
         ));
+        ok(std::fs::rename(&staged, &ready));
         let _ = rt.block_on(server.serve_one(&listener));
         panic!("child did not abort");
     });
