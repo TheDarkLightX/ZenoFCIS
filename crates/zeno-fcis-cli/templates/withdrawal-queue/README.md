@@ -31,6 +31,9 @@ changes no state and emits no delivery. This application has no committed failur
 
 Context carries caller, alarm and day. Generated app servers supply the day from
 the declared clock, in days since 2026-11-01; context files omit the clock field.
+Before 2026-11-01 that day is negative, so a server without `ZENO_APP_CLOCK_FILE`
+refuses every command with a clock refusal. To run it earlier, point
+`ZENO_APP_CLOCK_FILE` at a file holding the day: 0, 1 or 2.
 The original typed `invoke` helper uses day zero for historical demonstrations;
 `invoke_at` accepts the host-authenticated day. The browser demo can simulate it.
 

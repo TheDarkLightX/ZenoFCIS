@@ -48,6 +48,13 @@ def main():
         context=out/f'{name}-context.json';context.write_text(json.dumps(fixture['steps'][0]['context'])+'\n')
         address=f'127.0.0.1:{18260+index}';url=f'http://{address}'
         env=os.environ.copy();env.update(ZENO_APP_ADDRESS=address,ZENO_APP_SECRET_FILE=str(secret),ZENO_APP_CONTEXT=str(context),ZENO_APP_STORE=str(out/f'{name}.sqlite'),ZENO_APP_RECEIVER=str(out/f'{name}-deliveries'))
+        # A contract with a declared clock reads the day from a file, never the wall clock, in a host run.
+        clocks={step.get('clock') for step in fixture['steps']}
+        if clocks!={None}:
+            if None in clocks or len(clocks)!=1:
+                raise RuntimeError(f'{name}: the browser journey needs one fixed clock value')
+            clock=out/f'{name}-clock';clock.write_text(clocks.pop()+'\n')
+            env['ZENO_APP_CLOCK_FILE']=str(clock)
         with (out/f'{name}-server.log').open('w') as log:
             process=subprocess.Popen(['nice','-n','19','ionice','-c3','cargo','+1.97.1','run','--locked','--offline','--bin','app-server'],cwd=app,env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
             try:
