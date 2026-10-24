@@ -21,8 +21,10 @@ import check_knowledge_files as knowledge_files
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_FILE_BYTES = 128 * 1024 * 1024
-MAX_TOTAL_BYTES = 256 * 1024 * 1024
-MAX_FILES = 20_000
+# Resource bounds on one release-set scan. The 2.6.0 Linux set holds about 24,000 files and 331 MiB of unique
+# bytes (its bundle repeats the set); these keep about twice that headroom and still bound an archive bomb.
+MAX_TOTAL_BYTES = 768 * 1024 * 1024
+MAX_FILES = 50_000
 MAX_DEPTH = 4
 MATCH_CONTEXT_BYTES = 32
 ALLOWLIST = ROOT / "release/privacy-allowlist.json"
