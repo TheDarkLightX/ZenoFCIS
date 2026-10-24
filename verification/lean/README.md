@@ -1,6 +1,6 @@
 # Checker argument proofs
 
-These synthesized proofs use only the standard Lean distribution. Run
+These proofs use only the standard Lean distribution. Run
 `python3 tools/check_lean_proofs.py` from the repository root. The script
 requires the already installed Lean 4.28.0 and 4.32.0 toolchains; it does not
 download dependencies. It compiles fresh module snapshots, replays every
@@ -11,7 +11,9 @@ included. Only `propext` and `Quot.sound` are allowed. `Classical.choice` is
 refused by both the module auditor and its Python acceptance check.
 The gate refuses every symlink in the proof tree before invoking Lean,
 including directory, file, non-source and broken links.
-Use `--controls` to check deliberately false assertions in temporary copies.
+Use `--controls` to check deliberately false assertions and the removed
+summary-delta premise in temporary copies. Use `--report FILE --transcript FILE`
+to retain the complete audit and output.
 
 ## Collections
 
@@ -54,8 +56,107 @@ This is a model-level theorem about the reduction argument, not a proof that
 the Rust checker, parser, authority or runtime implements it. Enumeration of
 canonical equality patterns, record/key-field encoding, finite value-domain
 coverage, summaries and their aggregate identities, capacity refusal,
-serialization and runtime ownership remain outside this model. No production
+serialization and runtime ownership remain outside this original module.
+The extensions below cover some of those separate obligations. No production
 or release authority follows from these proofs.
+
+## Several maps, summaries, genesis and tallies
+
+[CollectionsAggregate.lean](CollectionsAggregate.lean) defines finite unique-key
+partial maps, extensional lookup, insertion/removal, distinct write batches and
+nonnegative totals. `total_ext` makes totals independent of row order;
+`namedTotal_le` gives coverage by the whole total; `summary_step` proves the
+exact aggregate update equation.
+
+[CollectionsReduction.lean](CollectionsReduction.lean) has a finite dependent
+family of key and record types. `binding` constructs a representative for every
+distinct named key. `frame_admissible`, `step_preserves`, `run_preserves` and
+`collections_reduction` preserve lawful decisions, uniform laws, alias agreement
+and any finite family of whole-map summaries. There is no bound on map sizes,
+keys or the number of steps. The entry predicate is scalar-independent and
+includes absence. The semantic P2 factorization, P3 identification of the state
+laws and P4 exact merged write are explicit hypotheses. The P1 renaming
+consequence follows from P2 when the inputs, scalar/summary/record observations
+and key-equality patterns agree; this does not prove a syntactic key-use
+restriction unnecessary in the production language. A production checked packet is not itself a proof of the
+module's `Checked` predicate.
+
+[CollectionsReductionGenesis.lean](CollectionsReductionGenesis.lean) represents
+absence with a presence bit and the supplied least field values.
+`genesis_check_iff` equates the single canonical state-view check with all laws
+in the supplied genesis-law list at every named-key/input selection.
+It does not translate the production `LawSet` selector or formula interpreter.
+
+[CollectionsReductionTallies.lean](CollectionsReductionTallies.lean) fixes the
+target amount, source grouping, nonnegative weight and Boolean selector.
+`affected_covers_all_deltas` covers all keys by target writes and old/new source
+groups. `tally_step` and `tally_run` preserve grouped count/sum invariants under
+empty genesis, unique source maps and writes, exact extensional publication,
+and the finite affected-key delta check. [CollectionsSignedTallies.lean](CollectionsSignedTallies.lean)
+proves conservation also for integer weights. This redundancy of nonnegativity
+does not apply to the separate named-contribution coverage inequality.
+
+## Equality patterns and executable binding
+
+[CollectionsPatterns.lean](CollectionsPatterns.lean) constructively normalizes
+any list with decidable equality by first occurrence. `enumerate_iff` and
+`enumerate_nodup` characterize the restricted-growth enumeration;
+`equality_pattern_coverage` gives exactly one representative of each concrete
+equality pattern for every list length. Apply it separately per key type.
+
+[CollectionsPatternsExecutable.lean](CollectionsPatternsExecutable.lean)
+specifies active input/present-stored key positions, canonical absence, alias
+agreement, distinct named sums and grouped tally coverage. The executable driver
+[CollectionsListing.lean](../../tools/lean/CollectionsListing.lean) is outside
+the trusted proof-module inventory and exports the full admitted listing.
+`python3 -B tools/check_collections_reduction.py --out EVIDENCE --controls`
+compares it with the native production `Shape::admissible` harness under both
+Lean versions. The bounded grammar covers up to four key positions, two key
+types and two maps; the remaining bounds are printed by the driver and retained in its receipt.
+The grammar has at most two entry roles and two input positions, one numeric
+and one stored-key field per map, one summary and one grouped tally. Numeric
+record intervals are `[0,0]`, `[0,1]` or `[1,1]`; summary upper bounds are 0, 1
+or 2. It has no ordinary scalar fields, ordered keys or order reads. This is an exhaustive finite
+differential, not a kernel proof of the Rust parser or of all contract shapes.
+`law_filter_ext` lifts equal structural admission through an identical Boolean
+state-law filter; it does not establish interpreter equivalence.
+
+## Specification validation and runtime boundary
+
+[CollectionsReductionValidation.lean](CollectionsReductionValidation.lean)
+discharges the token transition obligations by `decide`, applies C1 to arbitrary
+token input streams, checks token and library genesis, and instantiates every
+C3 premise on a concrete join/add/borrow/return journey. The library run theorem
+also covers arbitrary input streams in its concrete finite fixture. These are
+executable specifications derived from the shipped examples, not parsed policy
+translations.
+
+[CollectionsValidationWitnesses.lean](CollectionsValidationWitnesses.lean)
+contains the premise witnesses and explicit refusals for canonical deletion,
+conflicting and read-only aliases, supply deltas, malformed genesis, initial
+conditions, unbound stored keys, arithmetic boundaries and inconclusive
+transition relations. Their exact native regression correspondences and limits
+are the separate obligations described in the
+[collections guide](../../docs/COLLECTIONS.md#why-the-check-covers-every-size).
+
+[CollectionsValidationPremises.lean](CollectionsValidationPremises.lean)
+strengthens the premise validation with joint countermodels for semantic P2,
+P3 and P4 and for T1, T3 and T4. Each establishes the other explicit hypotheses
+and a failed invariant. The semantic P3 witness checks the need to identify the
+declared law with the checked uniform predicate; syntactic role uniformity has
+the separate witness above. The T1 witness changes the grouping interpretation
+after a lawful first insertion while later writes remain empty. These results
+validate the model premises without proving the parser-to-model translation.
+
+The separate [Verus harness](../verus/collections_runtime.rs) includes production
+runtime functions by `#[path]`. `python3 -B tools/check_collections_runtime.py
+--out EVIDENCE --controls` proves their conditional framing/write-back contracts,
+checks the complete owned proof inventory, exercises native standard-library
+samples and rejects the two required runtime defects. A well-formed layout,
+standard comparison laws and a stable storage-read adapter are explicit
+premises. Capacity admission, SQLite publication and durability remain outside
+this pure-function proof. No theorem composes all of these layers into a proof
+of every production checked packet.
 
 ## Solver-proposed strata
 

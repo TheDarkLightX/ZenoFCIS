@@ -133,7 +133,7 @@ on all data with the same equality pattern.
 | P1. Keys are compared only for equality, with keys of the same type, and copied only into stored key fields. | The parser refuses any other key use in a law; the checker refuses it in a rule. |
 | P2. A decision reads only scalar state, named entries, and command and context scalars and key classes. | Structure: a map has no view field, and the parser refuses any formula that reads one. |
 | P3. Entry invariants use the same scalar-independent predicate at every entry, including absence, independently of command/context, and every named post-entry satisfies it. Scalar invariants read only scalars; aggregates are summaries. | Parser checks read locality, input independence and uniform entry predicates; `forall e in entries MAP` supplies the uniform form. The Lean model makes uniform closure explicit in `Checked`; it does not prove the executable parser establishes that premise. |
-| P4. The runtime binds the declared capacities, frames stored named entries, and atomically commits only their merged writes within those capacities. | The runtime, outside this check. |
+| P4. The runtime binds the declared capacities, frames stored named entries, and atomically commits only their merged writes within those capacities. | The pure `Layout::frame` and `Layout::writes` functions have the conditional Verus contracts described below. Capacity binding, snapshot consistency, atomic publication and durability remain storage obligations. |
 
 1. *Abstraction.* For a real state and input, build the view: scalars as
    they are, each named entry from the map at its key or absent with
@@ -164,8 +164,9 @@ on all data with the same equality pattern.
 5. *Obligations.* By coverage, every step of every run is one of the
    checked admissible views, so its decision is lawful and its writes merge.
 
-The check does not establish P4. The runtime must establish it with its own
-tests and planted controls. Before contract execution, bind the empty store
+The finite check does not establish P4. The pure runtime proof below discharges
+its framing and write-set construction part under explicit layout and snapshot
+premises; it does not prove the storage transaction. Before contract execution, bind the empty store
 with `CollectionStore::bind`, passing the declared `Layout::capacities()`;
 the emitted applications do this at startup. An unbound `CollectionStore`
 is a schema-free storage utility and has no declared-capacity guarantee.
@@ -183,22 +184,54 @@ the bound store refuses its commit for capacity. A checked view result does
 not guarantee storage admission. No capacity decision is re-derived from
 business rules in the shell.
 
-The scoped renaming part of step 1 is proved by `frame_renaming` and
-`decision_renaming` in
-[Collections.lean](../verification/lean/Collections.lean): equal scalar and
-named-record observations, together with the same key equality pattern, give
-equal views and decisions, even across key types. The proof does not establish
-the parser or runtime encoding, canonical enumeration of equality patterns,
-stored key-field translation, summary identities, capacity refusals, or
-serialization and ownership; see the [proof scope](../verification/lean/README.md).
+The abstract induction is now proved for any finite family of maps with
+possibly different key and record types in
+[CollectionsReduction.lean](../verification/lean/CollectionsReduction.lean).
+`CollectionsReduction.collections_reduction` assumes a checked abstract core,
+actual decisions that factor through its view (P2), declared laws equivalent
+to a scalar predicate and a uniform, scalar-independent predicate per map
+(P3), lawful empty genesis, zero summaries, and exact merged publication (P4).
+It concludes lawful decisions, alias agreement, the state laws at every key,
+and every nonnegative summary's whole-map aggregate identity at every step.
+Map cardinality, key values and run length have no fixed bound. Partial maps
+are finite unique-key lists; publication is specified by lookup equality, so
+row order is irrelevant. `frame_renaming` and `decision_renaming` establish
+the renaming consequence when inputs, scalar/summary/record observations and
+key-equality patterns agree. That consequence follows from semantic P2 at this
+abstract boundary; this does not remove the parser's key-use checks.
 
-The model's `run_preserves` additionally requires a uniform, scalar-independent
-entry predicate at every stored entry and every named post-entry, including
-absence, plus lawful empty genesis and merged-write framing. Read locality
-alone is insufficient: `role_only_counterexample` preserves a law at role `a`,
-writes an unlawful value at distinct role `b`, and violates the law when that
-key is later selected as `a`. The model makes this closure an explicit
-`Checked` premise; it does not prove that the executable checker enforces it.
+`CollectionsReductionGenesis.genesis_check_iff` proves the single canonical
+genesis-view equivalence for a supplied list of genesis-applicable Boolean
+laws. `CollectionsPatterns.equality_pattern_coverage` proves existence and
+uniqueness of restricted-growth representatives for lists of any length,
+with decidable equality, separately applicable to each key type. The executable
+structural view specification is compared exhaustively with production
+`Shape::admissible` over the stated grammar of up to four key positions,
+two key types and two maps: 217,919 shapes, 127,299,587 candidate tuples and
+4,128,519 admitted views. The two canonical listings are byte-identical on
+each pinned Lean version. This bound does not cover arbitrary field counts,
+integer ranges, ordered keys or formula interpretation.
+
+The production functions `Layout::frame` and `Layout::writes`, included by
+`#[path]` in the Verus harness, prove named snapshot framing, least-value
+absence, first-occurrence key classes, and an exact, duplicate-free merged
+write set. The proof requires a well-formed layout, the standard-library key
+comparison laws and an `Entries` implementation that returns the specified
+stable snapshot. `frame_is_valid` establishes the invariant required by
+`writes`; the caller must retain the returned framing unchanged. Parser
+construction of every well-formed layout, the Authority invocation, capacity
+admission and SQLite publication are outside this proof.
+
+The [proof scope](../verification/lean/README.md) describes concrete token and
+library witnesses, joint semantic-premise countermodels and remaining composition
+obligations. No theorem connects every production checked packet to the abstract
+`Checked` predicate, or composes stored-key translation through the complete parser
+and policy evaluator. The bounded differential
+and regression checks provide evidence at those boundaries. They are not an
+unbounded implementation-refinement theorem. The original
+[Collections.lean](../verification/lean/Collections.lean) is unchanged; all
+new proof-module declarations pass both pinned kernels with transitive
+axioms limited to `propext` and `Quot.sound`.
 
 Both equality-only and ordered projects enforce P3 and recheck declared laws
 on the alias-merged successor. Checking only the raw decision would miss a
@@ -243,6 +276,16 @@ view domain. The abstraction may include unreachable or unrealizable views, so
 a refutation need not describe a reachable run. No maximal decidable fragment
 is claimed. Arbitrary joins, products, negative weights and relational state
 laws across entries remain refused with a diagnostic naming the fragment.
+
+`CollectionsReductionTallies.affected_covers_all_deltas`, `tally_step` and
+`tally_run` prove this abstract argument for arbitrary target and source sizes.
+The affected set includes old and new grouping keys even when no target role
+names them. The separate `CollectionsSignedTallies.tally_run` proves that
+nonnegativity is unnecessary for conservation once exact per-key deltas and
+the initial invariant are given. Nonnegativity remains necessary for the
+checker's named-contribution coverage inequality: an unnamed negative amount
+can otherwise cancel a named positive amount. This does not extend the parser's
+accepted tally fragment to negative weights.
 
 An on-loan copy held by the named member contributes one, so that member's count
 is positive. The library return rule can omit its extra zero-count guard. The
@@ -632,6 +675,8 @@ values for validation by the JSON decoder; paging changes memory use, not the
 Authority, receipt or root checks. Comparative prior-art search pending.
 
 **Scope.** The checker exhaustively checks the declared view domains when
-within its tuple limit. Independent small-map comparisons and planted
-controls test the implementation; they do not establish the reduction for
-all maps, storage framing, publication authority or release readiness.
+within its tuple limit. The abstract Lean theorems and pure runtime Verus
+contracts above have the explicit premises and configuration in the
+[proof scope](../verification/lean/README.md). The ordered argument, complete
+parser/evaluator refinement, storage publication, durability and release
+readiness are not established by those results or by the finite comparisons.
