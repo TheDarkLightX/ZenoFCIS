@@ -18,6 +18,13 @@ class RuntimeSourceGuardTests(unittest.TestCase):
     def test_cfg_expression_and_ghost_exec_are_refused(self):
         for body in ['if cfg!(not(verus_keep_ghost)) { write(); }', '#[cfg(verus_keep_ghost)] write();']:
             with self.subTest(body=body),self.assertRaises(ValueError): guard_text('fn writes() { '+body+' }')
+    def test_array_signatures_do_not_hide_native_execution(self):
+        for signature in ['fn encode() -> [u8; 16]', 'fn decode(bytes: [u8; 16]) -> i128']:
+            with self.subTest(signature=signature):
+                self.assertEqual(len(guard_text(signature+' { 0 }')), 1)
+                with self.assertRaises(ValueError):
+                    guard_text(signature+' { #[cfg(not(verus_keep_ghost))] hidden(); 0 }')
+        self.assertEqual(guard_text('trait Port { fn read(&self) -> [u8; 16]; }'), [])
     def test_owned_trust_and_nontermination_exemptions_are_refused(self):
         for body in ['assume(false);','admit();','#[verifier::external_body] fn bypass() {}',
                      '#[verifier::exec_allows_no_decreases_clause] loop {}','unsafe { access(); }']:

@@ -1812,6 +1812,8 @@
       "read_post",
       "entry_view",
       "key_index",
+      "encode_number",
+      "decode_number",
       "framed_valid",
       "group",
       "candidate",

@@ -100,10 +100,25 @@ def masked(source: str) -> str:
 def bodies(source: str):
     code = masked(source)
     for match in re.finditer(r"\bfn\s+([A-Za-z_][A-Za-z_0-9]*)\b", code):
-        start = match.end()
-        brace = code.find("{", start)
-        semicolon = code.find(";", start)
-        if brace < 0 or (0 <= semicolon < brace): continue
+        # An array type contains a semicolon, including in return position.
+        # Only a delimiter at the signature's outer level ends a declaration.
+        cursor, parens, brackets = match.end(), 0, 0
+        brace = -1
+        while cursor < len(code):
+            char = code[cursor]
+            if char == "(": parens += 1
+            elif char == ")": parens -= 1
+            elif char == "[": brackets += 1
+            elif char == "]": brackets -= 1
+            elif not parens and not brackets:
+                if char == ";": break
+                if char == "{":
+                    brace = cursor
+                    break
+            if parens < 0 or brackets < 0:
+                raise ValueError(f"unbalanced function signature: {match[1]}")
+            cursor += 1
+        if brace < 0: continue
         depth, end = 1, brace + 1
         while end < len(code) and depth:
             depth += (code[end] == "{") - (code[end] == "}")
