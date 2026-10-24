@@ -149,6 +149,10 @@
     "Quot.sound",
     "propext"
   ],
+  "CollectionsReductionValidation.token_supply_growth_needs_issuer": [
+    "Quot.sound",
+    "propext"
+  ],
   "CollectionsRequiresEM.checked": [],
   "CollectionsRequiresEM.specialized_implies_em": [
     "propext"

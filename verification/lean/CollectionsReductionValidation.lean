@@ -89,7 +89,18 @@ def tokenCore (v : TokenView) : TokenUpdate :=
 
 def tokenP (supply : Fin 7) (summary : Fin 1 → Nat) : Prop := summary 0 = supply.val
 def tokenQ (_ : Fin 1) (_ : Option (Fin 4)) : Prop := True
-def tokenLawful (v : TokenView) (_ : TokenUpdate) : Prop :=
+/-- Supply grows only through a mint the issuer requested. -/
+theorem token_supply_growth_needs_issuer :
+    ∀ supply : Fin 7, ∀ sender receiver : Option (Fin 4),
+    ∀ alias mint issuer : Bool, ∀ amount : Fin 4,
+      supply.val < (tokenCase supply sender receiver alias mint issuer amount).supply.val →
+        mint = true ∧ issuer = true := by
+  decide
+
+/-- The first conjunct constrains the supplied update itself, so a core that raises
+supply for a request the issuer did not make is not lawful. -/
+def tokenLawful (v : TokenView) (u : TokenUpdate) : Prop :=
+  (v.scalar.val < u.scalar.val → v.input.mint = true ∧ v.input.issuer = true) ∧
   (v.input.mint = true → (tokenResult v).committed = true → v.input.issuer = true) ∧
   (v.input.mint = false → (tokenResult v).committed = true → (v.entry 0 0).isSome = true)
 
@@ -115,7 +126,8 @@ theorem token_checked : Checked tokenP tokenQ (fun _ => 0) (fun _ => Fin.val)
       exact (cases.2.2.1 (hsymm 0 1 0 h)).symm
   have after := two_representative_sum (v.same 0) ((tokenCore v).entry 0) Fin.val (reps 0)
     (hrefl 0) (hsymm 0) (hr.1 0) (hr.2 0) post_agree
-  refine ⟨⟨cases.1, cases.2.1⟩, rfl, fun _ _ => True.intro, ?_, ?_⟩
+  refine ⟨⟨token_supply_growth_needs_issuer v.scalar (v.entry 0 0) (v.entry 0 1) (v.same 0 0 1)
+      v.input.mint v.input.issuer v.input.amount, cases.1, cases.2.1⟩, rfl, fun _ _ => True.intro, ?_, ?_⟩
   · simpa only [Fin.forall_fin_one] using post_agree
   · simp only [Fin.forall_fin_one]
     rw [before, after]
@@ -380,6 +392,7 @@ example (b : Binding LibraryKeys (fun _ => 1)) :
   exact (genesis_check_iff libraryGenesisLaws libraryLeast () b ()).mp (by decide)
 
 #print axioms token_cases_checked
+#print axioms token_supply_growth_needs_issuer
 #print axioms token_checked
 #print axioms library_cases_checked
 #print axioms library_delta
