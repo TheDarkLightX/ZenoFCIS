@@ -24,7 +24,7 @@ class DependencyBinding(unittest.TestCase):
         self.rows = []
         self.target = self.root/'target'
         self.target.mkdir()
-        for package in ('value', 'codec', 'collections'):
+        for package in ('value', 'codec', 'collections', 'crypto'):
             base = self.root/'crates'/('zeno-fcis-'+package)
             (base/'src').mkdir(parents=True)
             (base/'Cargo.toml').write_text('fixture manifest')
@@ -64,14 +64,15 @@ class DependencyBinding(unittest.TestCase):
             self.assertEqual(rows[0]['args'], rows[1]['args'])
             self.assertEqual(rows[0]['args'], list(prepared.arguments))
         self.assertEqual(mtimes, {p:p.stat().st_mtime_ns for p in mtimes})
-        self.assertEqual(len(prepared.artifacts), 4)
+        # Codec, value, collections and crypto, plus one transitive artifact.
+        self.assertEqual(len(prepared.artifacts), 5)
         self.assertTrue(all(path.stat().st_mode & 0o222 == 0 for path, _ in prepared.artifacts))
         receipt = json.loads(prepared.receipt.read_text())
         self.assertTrue(all(row['fresh'] is False for row in receipt['libraries'].values()))
-        self.assertEqual(len(receipt['artifacts']), 4)
+        self.assertEqual(len(receipt['artifacts']), 5)
 
     def test_fresh_true_oracle_witness_remains_refused(self):
-        for i in (0, 1, 2):
+        for i in (0, 1, 2, 3):
             with self.subTest(package=i):
                 self.rows[i]['fresh'] = True
                 result = subprocess.CompletedProcess([], 0, '\n'.join(map(json.dumps, self.rows)), '')
