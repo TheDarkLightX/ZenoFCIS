@@ -79,7 +79,7 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "zeno-fcis-codec"
-version = "2.5.0"
+version = "2.6.0"
 dependencies = [
  "sha2",
  "zeno-fcis-value",
@@ -87,7 +87,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-collections"
-version = "2.5.0"
+version = "2.6.0"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-value",
@@ -95,18 +95,18 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-core"
-version = "2.5.0"
+version = "2.6.0"
 
 [[package]]
 name = "zeno-fcis-crypto"
-version = "2.5.0"
+version = "2.6.0"
 dependencies = [
  "zeno-fcis-codec",
 ]
 
 [[package]]
 name = "zeno-fcis-schema"
-version = "2.5.0"
+version = "2.6.0"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-value",
@@ -114,7 +114,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-synthesis"
-version = "2.5.0"
+version = "2.6.0"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-core",
@@ -124,7 +124,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-value"
-version = "2.5.0"
+version = "2.6.0"
 
 [[package]]
 name = "zenofcis-zusd-v1"
