@@ -21,7 +21,7 @@ fn remove_order_book_transition_kinds(
     let kinds = rules["law_kinds"]
         .as_object_mut()
         .ok_or("policy law_kinds object")?;
-    for id in ["502", "503", "504"] {
+    for id in ["502", "503", "504", "505", "506"] {
         kinds.remove(id);
     }
     Ok(())

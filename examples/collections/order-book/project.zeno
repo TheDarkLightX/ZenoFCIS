@@ -44,3 +44,8 @@ law 504 filling_best_level_consumes_it on commit =
   command.101.130 == 152 && context.102.133 == 1 && pre.100.160 == 1 &&
   command.101.131 == context.102.132 ->
   post.100.160 == 0;
+law 505 accepted_action_matches_level on accept =
+  (command.101.130 == 150 -> post.100.160 == 1 && post.100.160.140 == 1) &&
+  (command.101.130 == 151 -> post.100.160 == 0 && post.100.160.140 == 0) &&
+  (command.101.130 == 152 -> post.100.160 == 0 && post.100.160.140 == 0);
+law 506 reject_requires_fill on reject = command.101.130 == 152;
