@@ -157,7 +157,18 @@ impl CollectionStore {
         Self::with(Connection::open_in_memory()?)
     }
 
+    /// An automatically deleted, disk-backed replay store. Unlike `in_memory`,
+    /// its journal does not occupy resident memory proportional to history.
+    pub fn temporary() -> Result<Self, Error> {
+        Self::with(Connection::open("")?)
+    }
+
     fn with(connection: Connection) -> Result<Self, Error> {
+        // Recovery may read arbitrarily long histories. Bound SQLite's page
+        // cache too; temporary replay tables spill to disk, never a RAM journal.
+        connection.execute_batch(
+            "PRAGMA cache_size=-2048; PRAGMA mmap_size=0; PRAGMA temp_store=FILE;",
+        )?;
         connection.execute_batch(SCHEMA)?;
         let snapshot = connection.unchecked_transaction()?;
         let checked_roots = audit_hashes(&snapshot)?;
@@ -543,6 +554,7 @@ impl CollectionStore {
     }
 
     /// The journal, oldest first.
+    /// This convenience API materializes history; use `commit_at` for recovery.
     pub fn commits(&self) -> Result<Vec<Commit>, Error> {
         let mut statement = self.connection.prepare(
             "SELECT sequence, decision, scalars, pre_roots, post_roots, chain
@@ -572,6 +584,41 @@ impl CollectionStore {
             });
         }
         Ok(out)
+    }
+
+    /// One indexed journal record, without retaining earlier records.
+    /// Refuses oversized stored values before copying their blobs into Rust.
+    /// Callers must visit every position through a captured `version` and
+    /// refuse missing rows; this storage read grants no replay authority.
+    pub fn commit_at(&self, sequence: u64) -> Result<Option<Commit>, Error> {
+        let sequence = i64::try_from(sequence).map_err(|_| Error::Corrupt("sequence".into()))?;
+        let snapshot = self.connection.unchecked_transaction()?;
+        let size: Option<i64> = snapshot.query_row(
+            "SELECT length(decision)+length(scalars)+length(pre_roots)+length(post_roots)+length(chain)
+             FROM collection_commits WHERE sequence=?1", [sequence], |r| r.get(0),
+        ).optional()?;
+        let Some(size) = size else {
+            return Ok(None);
+        };
+        if !(0..=64 * 1024 * 1024).contains(&size) {
+            return Err(Error::Corrupt("journal record exceeds 64 MiB".into()));
+        }
+        let (decision, scalars, pre, post, chain) = snapshot.query_row(
+            "SELECT decision,scalars,pre_roots,post_roots,chain FROM collection_commits WHERE sequence=?1",
+            [sequence], |r| Ok((r.get::<_, Vec<u8>>(0)?, r.get::<_, Vec<u8>>(1)?,
+                r.get::<_, Vec<u8>>(2)?, r.get::<_, Vec<u8>>(3)?, r.get::<_, Vec<u8>>(4)?)),
+        )?;
+        let commit = Commit {
+            sequence: u64::try_from(sequence).map_err(|_| Error::Corrupt("sequence".into()))?,
+            decision,
+            scalars,
+            pre_roots: roots_of(&pre)?,
+            post_roots: roots_of(&post)?,
+            chain: key_of(&chain)?,
+            rehashed: 0,
+        };
+        snapshot.commit()?;
+        Ok(Some(commit))
     }
 }
 

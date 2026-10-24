@@ -161,6 +161,14 @@ fn collection_journal_chains_and_replays_exactly() {
         .commits()
         .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
     assert_eq!(journal.len(), 60);
+    for row in &journal {
+        assert_eq!(
+            store.commit_at(row.sequence).ok().flatten().as_ref(),
+            Some(row)
+        );
+    }
+    assert!(store.commit_at(0).ok().flatten().is_none());
+    assert!(store.commit_at(61).ok().flatten().is_none());
     // Replaying the decisions into a fresh store gives the same journal.
     let mut replay = CollectionStore::in_memory()
         .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
@@ -192,6 +200,37 @@ fn collection_journal_chains_and_replays_exactly() {
             .root(3)
             .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"))
     );
+}
+
+#[test]
+fn temporary_replay_store_pages_and_refuses_oversized_rows()
+-> Result<(), Box<dyn std::error::Error>> {
+    let mut store = CollectionStore::temporary()?;
+    store.commit(&BTreeMap::new(), &[], b"decision", b"scalar")?;
+    assert_eq!(
+        store.commit_at(1)?.as_ref().map(|row| row.sequence),
+        Some(1)
+    );
+    assert!(store.commit_at(u64::MAX).is_err());
+    let (store, path) = cache_fixture(false)?;
+    let db = rusqlite::Connection::open(&path)?;
+    db.execute("DELETE FROM collection_commits WHERE sequence=2", [])?;
+    assert!(
+        store.commit_at(2)?.is_none(),
+        "a missing position skipped to the next row"
+    );
+    db.execute(
+        "UPDATE collection_commits SET decision=zeroblob(67108865) WHERE sequence=1",
+        [],
+    )?;
+    assert!(
+        matches!(store.commit_at(1), Err(Error::Corrupt(_))),
+        "oversized stored journal record was copied"
+    );
+    drop(db);
+    drop(store);
+    std::fs::remove_dir_all(path.parent().ok_or("parent")?)?;
+    Ok(())
 }
 
 #[test]
