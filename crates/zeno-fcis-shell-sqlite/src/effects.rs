@@ -1,11 +1,13 @@
 //! Trusted adapter between shell-effects port data and the V2 Authority.
 //!
-//! A shell program carries [`PublicationData`]: the original inputs, the
+//! A shell program carries
+//! [`PublicationData`](zeno_fcis_shell::effects::port::PublicationData): the original inputs, the
 //! Authority identity and the publication subject. That data grants nothing.
 //! Before a commit, the trusted driver rebuilds the genuine publication from
 //! the inputs through Authority and refuses data that names another
 //! Authority or another subject, so replay and simulation can never mint a
-//! publication. The V2 shell's own APIs are unchanged; [`production`]
+//! publication. The V2 shell's own APIs are unchanged;
+//! [`production`](crate::effects::production)
 //! mounts them behind the ports.
 
 use zeno_fcis_codec::{CommitmentHasher, Hash32, RustCryptoSha256};

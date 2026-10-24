@@ -9,8 +9,10 @@
 //!   publication data rebuilt through the Authority that published it;
 //! - ReadOutbox is `export_pending`; Acknowledge is the relay's
 //!   `pending_by_id`, `relayed` and `acknowledge`;
-//! - Send goes to the caller's [`Transport`]; Clock, Random and Wait go to an
-//!   opt-in [`Time`], and without one those ports are not covered.
+//! - Send goes to the caller's
+//!   [`Transport`](crate::effects::production::Transport); Clock, Random and
+//!   Wait go to an opt-in [`Time`](crate::effects::production::Time), and
+//!   without one those ports are not covered.
 //!
 //! A V2 refusal keeps its code. SQLite busy or full is NotApplied: the
 //! transaction rolled back. Any other SQLite failure of a commit or an

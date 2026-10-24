@@ -13,7 +13,7 @@
 //! order, about log2 of the entries for unrelated keys and at most 256. The
 //! work does not grow with the map's size beyond that.
 //!
-//! [`CollectionStore::commit`] applies one decision's entry writes in a
+//! [`CollectionStore::commit`](crate::collections::CollectionStore::commit) applies one decision's entry writes in a
 //! transaction, after refusing any write to a key the decision did not
 //! name, and appends a journal row that chains the decision, the scalar
 //! state and every map's root before and after.

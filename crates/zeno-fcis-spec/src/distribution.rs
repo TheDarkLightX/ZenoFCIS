@@ -228,9 +228,9 @@ impl PartialOrd for Rational {
 /// One finite reward functional.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum RewardKind {
-    /// E[R].
+    /// `E[R]`.
     Expectation,
-    /// E[R^2] - E[R]^2.
+    /// `E[R^2] - E[R]^2`.
     Variance,
     /// P(R >= t), including equality at the threshold.
     Threshold(i128),
