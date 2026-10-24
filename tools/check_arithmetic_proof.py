@@ -51,7 +51,7 @@ def audit_native_binding(source: str) -> None:
     words even in comments/strings; it cannot hide native code through a Rust
     lexer disagreement. Hashes retain the full reviewed input for replay.
     """
-    if re.search(r"\b(?:assume|assume_specification|admit|external_body|unsafe)\b|"
+    if re.search(r"\b(?:assume|assume_specification|admit|external|external_body|unsafe)\b|"
                  r"verifier\s*::\s*(?:external|axiom)|\bcfg\s*!", source):
         raise ValueError("unreviewed trust escape or cfg! in arithmetic closure")
     for match in re.finditer(r"#\s*!?\s*\[", source):

@@ -17,7 +17,7 @@ checks the authority and synthesis crates without default features.
 | --- | --- | --- |
 | `shared-runtime` | `check_verus.py` | [Finite-domain arithmetic](#arithmetic-unit) in the shared runtime source |
 | `scalar-query` | `check_scalar_query_refinement.py` | Scalar runtime/query correspondence |
-| `scalar-arithmetic` | `check_scalar_arithmetic.py` | Independently graded native emitted arithmetic; not a Verus theorem |
+| `scalar-arithmetic` | `check_scalar_arithmetic.py` | Native emitted arithmetic conformance; separate [source proofs and Rust AST translation validation](#arithmetic-correspondence) |
 | `finite-execution` | `check_finite_execution.py` | [Finite admission and eager evaluation](#v2-finite-admission-and-eager-execution) |
 | `metered-execution` | `check_metered_execution.py` | [Owned V2 instruction metering](#owned-v2-instruction-metering); not transition authorization |
 | `shared-finite-checker` | `check_checker.py` | The [shared finite checker](#shared-finite-checker) against its real metered evaluator |
@@ -727,3 +727,72 @@ unverified configurations are outside this proof. The contract review/lemma/
 probe loops used for project contracts do not apply to this Rust decoder proof.
 See [canonical bytes](../../docs/CANONICAL_BYTES.md#verified-value-decoder) for
 the user-facing guarantee and the seL4 and Verus references.
+
+## Arithmetic correspondence
+
+The following separate checks assess arithmetic in generated Rust. They do not
+change the twenty workflow profiles or their qualification status above.
+
+| Check | Proof subject and boundary |
+| --- | --- |
+| [check_arithmetic_proof.py](../../tools/check_arithmetic_proof.py) | Production scalar and wide bodies included by path; abstract integer rounding, quotient/remainder, monotonicity and 128-bit reference expectations |
+| [check_arithmetic_typed_proof.py](../../tools/check_arithmetic_typed_proof.py) | Complete production evaluator closure; legacy-node correspondence, checked unsigned operations, casts and signed-width projection |
+| [check_arithmetic_emission.py](../../tools/check_arithmetic_emission.py) | Per-program emitted-AST translation validation of six shipped Rust templates and eighteen operation probes; byte-identical verified helpers and 64-bit reference expectations |
+
+[arithmetic_spec.rs](arithmetic_spec.rs) states mathematical floor and ceiling
+for either divisor sign, checked final representability, positive-divisor fused
+operations and exact product comparison. Its rounding lemmas cover both directions
+without selecting a financial policy. [arithmetic_typed_spec.rs](arithmetic_typed_spec.rs)
+relates these meanings to the source evaluator, including unsigned arithmetic
+and checked conversions. The production bodies and these lemmas verify together.
+
+[arithmetic_emitted_spec.rs](arithmetic_emitted_spec.rs) gives independent eager
+AST semantics and proves `emitted_program_correspondence` with the production
+evaluator specification. The companion emission gate decodes the complete
+generated Rust subset and emits a Verus check for every captured program and
+every input vector. The pinned [inventory](arithmetic-emission-inventory.json)
+covers all shipped scalar Rust programs found under examples and templates;
+the eighteen additional probes cover every legacy operation and eager refusal.
+The existing emitter and shipped bytes remain unchanged.
+The six shipped programs are the templates' standalone `synthesized/transition.rs`
+controllers. Applications from `new --contract` run the library evaluator and
+are outside this emitter result. Python and JavaScript emission have native
+conformance checks, but no E1 correspondence proof is claimed for those targets.
+
+This is per-program translation validation under a **trusted grammar decoder
+and Program data printer**. Their source is pinned and tested; their correctness
+is not proved. It is not a universal formatter theorem or a direct Verus proof
+of native emitted bodies. The gate checks every instruction, input/output guard,
+root and helper byte, rejects unrecognized executable text, and requires the
+complete pinned whole-crate function inventory and obligation count.
+The E2 check also resolves the emitter's two `include_str!` paths and the proof
+harness's two `#[path]` declarations to the same scalar and wide source files.
+Copied helper text must match raw bytes, including line endings.
+
+The typed arithmetic and emission profiles expect 1,257 and 1,288 whole-crate obligations
+respectively; these overlap and must not be added. Concrete specification checks
+cover all 1,165 reference vectors at each of 64 and 128 bits. Native conformance
+over bounded vectors remains distinct from universal mathematical correspondence.
+Controls include ceiling error, wrapped fused arithmetic, truncating cast,
+lost refusal propagation, lazy untaken computation and native-only helper code.
+Each semantic control compiles, fails its named assertion, and restores exact bytes.
+
+Run each script's unit tests and then its default gate with fresh `--out` and
+`--work` directories. The gates require an owned `CARGO_TARGET_DIR`, cached locked
+dependencies, Rust 1.97.1, and the verifier cache selected by
+`ZENO_FCIS_VERUS_CACHE`. They do not install dependencies or access the network.
+Profiles and source receipts bind exact files; changing them requires review
+and replay rather than automatic pin replacement.
+
+Scope is Linux x86-64, native Rust 1.97.1 and the verifier identified by
+[toolchain.json](toolchain.json). Rust code generation/erasure, standard-library
+checked integer contracts, Verus/vstd/Z3, the grammar/printer bridge, orchestration
+and platform remain trusted. This establishes no shell, resource-metering,
+application-policy, source-to-binary or release result.
+
+Method lineage: Klein et al., *seL4: Formal Verification of an OS Kernel*, SOSP
+2009; Klein et al., *Comprehensive Formal Verification of an OS Microkernel*,
+TOCS 2014; Pnueli, Siegel and Singerman, *Translation Validation*, TACAS 1998;
+Necula, *Translation Validation for an Optimizing Compiler*, PLDI 2000; and the
+pinned Verus implementation. These supply the layered correspondence and
+translation-validation methods, not inherited proofs of this code.
