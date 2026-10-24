@@ -42,12 +42,12 @@ class Diagnostics(unittest.TestCase):
                 self.assertIn(message, result.stderr)
                 self.assertEqual(result.stdout, "")
 
-    def test_unavailable_assessment_names_supported_discovery(self):
+    def test_assessment_without_a_suite_is_a_usage_error(self):
+        # This build includes kb assess, so the unavailable-command hint must not appear.
         result = self.cli("kb", "assess")
         self.assertEqual(result.returncode, 64)
-        self.assertIn("kb assess is unavailable in this build", result.stderr)
-        self.assertIn("zeno-fcis kb --help", result.stderr)
-        self.assertIn("zeno-fcis guide show knowledge", result.stderr)
+        self.assertIn("--suite <SUITE>", result.stderr)
+        self.assertNotIn("kb assess is unavailable in this build", result.stderr)
 
     def encode(self, value, out=None):
         source = self.work / "program.json"

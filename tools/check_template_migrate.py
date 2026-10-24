@@ -85,7 +85,7 @@ def operation(binary: Path, command: str, store: Path, *words: str) -> dict:
 def order_commit(binary: Path, store: Path, action: str, callback: int, caller: str,
                  commit: int, decision: str = "Accept", reason: int | None = None) -> dict:
     result = operation(binary, "submit", store, f"action={action}",
-                       f"callback_attempt={callback}", f"caller={caller}", "day=0")
+                       f"callback_attempt={callback}", f"caller={caller}", "now=0")
     upgrades.expect(result, {"status": "committed", "class": decision,
                             "reason": reason, "commit": commit}, action)
     return result
