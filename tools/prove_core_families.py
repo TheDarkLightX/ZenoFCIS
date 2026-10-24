@@ -160,7 +160,8 @@ def run(cli, directory, label, args, expected_exit=0):
     (directory / f'{label}.stdout').write_bytes(result.stdout)
     (directory / f'{label}.stderr').write_bytes(result.stderr)
     (directory / f'{label}.exit').write_text(f'{result.returncode}\n')
-    require(result.returncode == expected_exit,
+    allowed = expected_exit if isinstance(expected_exit, tuple) else (expected_exit,)
+    require(result.returncode in allowed,
             f'{label}: exit{result.returncode}, expected{expected_exit}; see {directory}')
     return result.stdout
 
@@ -210,8 +211,14 @@ def collect(family, cli, work, snapshot):
         manifest = core.instantiate(family, parameters, directory / 'contract', include_proof=False)
         generated = core.read_json(run(cli, directory, 'generate', ['generate', 'contract', directory / 'contract', '--format', 'json']).decode())
         run(cli, directory, 'regenerate', ['generate', 'contract', directory / 'contract', '--check'])
-        run(cli, directory, 'review', ['contract', 'review', directory / 'contract', '--out', directory / 'review.json', '--format', 'json', '--gaps', '--max-work', '500000000'])
+        # A 2.6 review exits 1 on a case-coverage finding. Admit only the families' defensive cases on pre-states
+        # the state laws exclude, through the seed check's own gate; any other finding, disagreement or refusal
+        # refuses the certificate.
+        run(cli, directory, 'review', ['contract', 'review', directory / 'contract', '--out', directory / 'review.json', '--format', 'json', '--gaps', '--max-work', '500000000'], (0, 1))
         packet = core.read_json((directory / 'review.json').read_text())
+        checks.check_review_packet(packet)
+        require((directory / 'review.exit').read_text().strip() == ('1' if packet['summary']['findings'] else '0'),
+                'review exit disagrees with its findings')
         expected = [row for row in reference if row['family'] == family.replace('-', '_') and row['parameters'] == parameters]
         observations = observed_rows(packet, expected, manifest, family)
         policy = core.read_json((directory / 'contract/v2/policy.json').read_text())
