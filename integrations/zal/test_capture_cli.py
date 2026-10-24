@@ -28,8 +28,9 @@ class CaptureCliGrammarTests(unittest.TestCase):
         self.addCleanup(selection.stop)
 
     def test_terminal_refusal_keeps_native_reason_and_next_step(self):
-        native = {"schema": "zeno-fcis/black-box-capture/1", "status": "refused",
-                  "detail": {"reason": "capture-containment-unavailable"}}
+        native = {"schema": "zeno-fcis/black-box-capture/1", "status": "refused", "backend": "systemd",
+                  "detail": {"reason": "capture-containment-unavailable",
+                             "prerequisite": "systemd-user-manager"}}
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory)
             output = io.StringIO()
@@ -44,7 +45,7 @@ class CaptureCliGrammarTests(unittest.TestCase):
         result = json.loads(output.getvalue())
         self.assertEqual(result["reason"], "capture-workspace-operation")
         self.assertEqual(result["detail_reason"], "capture-containment-unavailable")
-        self.assertIn("POSIX containment", result["message"])
+        self.assertIn("systemd user manager", result["message"])
         self.assertIn("then retry", result["message"])
 
     def test_real_cli_accepts_paired_int_bool_equality_and_conditionals(self):

@@ -222,7 +222,7 @@ def terminal(argv):
         if re.fullmatch(r"[a-z][a-z0-9-]{0,95}", detail_reason) is None:
             detail_reason = "capture-setup-input-error"
         if detail_reason == "capture-containment-unavailable":
-            message = "Capture cannot start because POSIX containment is unavailable. Run it where POSIX containment is enabled, then retry."
+            message = "Capture cannot start because reference containment is unavailable. Use the systemd backend on a supported Linux host with a running systemd user manager, then retry."
         elif detail_reason == "capture-workspace-exists":
             message = "This capture workspace already exists. Choose another --workspace path before starting a new capture."
         elif detail_reason == "capture-reference-refused":
