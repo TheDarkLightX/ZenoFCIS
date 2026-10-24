@@ -6,8 +6,6 @@
 
 use super::*;
 use clap::Args;
-use serde::de::{MapAccess, SeqAccess, Visitor};
-use serde::{Deserialize, Deserializer};
 use zeno_fcis_loop_doors::strategy_algebra as algebra;
 use zeno_fcis_program_search::concrete;
 
@@ -333,69 +331,13 @@ pub(crate) fn implementation() -> String {
     sha256_hex(&bytes)
 }
 
-// Strict JSON also refuses duplicate keys in nested documents. Value parsing
-// alone would silently use the last duplicate. Deserializer limits nesting.
-struct Unique(Value);
-impl<'de> Deserialize<'de> for Unique {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        struct Read;
-        impl<'de> Visitor<'de> for Read {
-            type Value = Unique;
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("JSON without duplicate fields")
-            }
-            fn visit_bool<E: serde::de::Error>(self, v: bool) -> Result<Unique, E> {
-                Ok(Unique(json!(v)))
-            }
-            fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Unique, E> {
-                Ok(Unique(json!(v)))
-            }
-            fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Unique, E> {
-                Ok(Unique(json!(v)))
-            }
-            fn visit_f64<E: serde::de::Error>(self, _v: f64) -> Result<Unique, E> {
-                Err(E::custom("fractional-json-number"))
-            }
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Unique, E> {
-                Ok(Unique(json!(v)))
-            }
-            fn visit_none<E: serde::de::Error>(self) -> Result<Unique, E> {
-                Ok(Unique(Value::Null))
-            }
-            fn visit_unit<E: serde::de::Error>(self) -> Result<Unique, E> {
-                Ok(Unique(Value::Null))
-            }
-            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Unique, A::Error> {
-                let mut out = Vec::new();
-                while let Some(Unique(value)) = seq.next_element()? {
-                    out.push(value);
-                }
-                Ok(Unique(Value::Array(out)))
-            }
-            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Unique, A::Error> {
-                let mut out = Map::new();
-                while let Some(key) = map.next_key::<String>()? {
-                    if out.contains_key(&key) {
-                        return Err(serde::de::Error::custom("duplicate-json-field"));
-                    }
-                    let Unique(value) = map.next_value()?;
-                    out.insert(key, value);
-                }
-                Ok(Unique(Value::Object(out)))
-            }
-        }
-        d.deserialize_any(Read)
-    }
-}
-
+// Strict JSON refuses duplicate keys and nonintegral numbers in nested documents.
 pub(super) fn read_json(path: &Path) -> Result<Value, (u8, Value)> {
     let bytes = read_bytes(path)?;
     if !bytes.is_ascii() {
         return Err(refused("document-not-ascii"));
     }
-    serde_json::from_slice::<Unique>(&bytes)
-        .map(|v| v.0)
-        .map_err(|_| refused("document-json-or-duplicate"))
+    crate::integral_json::parse(&bytes).map_err(|_| refused("document-json-or-duplicate"))
 }
 
 pub(super) fn read_program(path: &Path) -> Result<Vec<u8>, (u8, Value)> {
@@ -1107,8 +1049,8 @@ mod tests {
     fn pipeline_grammar_and_duplicate_json_fields_refuse() {
         assert!(stages(&json!(["skip-check"])).is_err());
         assert!(stages(&json!(vec!["repair"; 6])).is_err());
-        assert!(serde_json::from_slice::<Unique>(br#"{"stages":[],"stages":["repair"]}"#).is_err());
-        assert!(serde_json::from_slice::<Unique>(br#"{"inner":{"x":1,"x":2}}"#).is_err());
+        assert!(crate::integral_json::parse(br#"{"stages":[],"stages":["repair"]}"#).is_err());
+        assert!(crate::integral_json::parse(br#"{"inner":{"x":1,"x":2}}"#).is_err());
     }
 
     #[test]

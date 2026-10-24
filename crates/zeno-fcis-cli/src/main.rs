@@ -21,6 +21,7 @@ mod draft_command;
 mod durable_counter;
 mod effects;
 mod guide;
+mod integral_json;
 mod inventory_reservation;
 mod judge_command;
 mod knowledge_assessment;

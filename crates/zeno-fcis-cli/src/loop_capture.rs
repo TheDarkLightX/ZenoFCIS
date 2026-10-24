@@ -213,63 +213,7 @@ fn inconclusive(reason: &str) -> (u8, Value) {
 
 /// JSON with no duplicate keys, nonintegral numbers, trailing bytes or deep recursion.
 pub(crate) fn strict_json(bytes: &[u8]) -> Result<Value, String> {
-    struct Strict(Value);
-    impl<'de> Deserialize<'de> for Strict {
-        fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-            struct Visitor;
-            impl<'de> serde::de::Visitor<'de> for Visitor {
-                type Value = Strict;
-                fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    f.write_str("integral JSON without duplicate fields")
-                }
-                fn visit_bool<E: serde::de::Error>(self, v: bool) -> Result<Strict, E> {
-                    Ok(Strict(json!(v)))
-                }
-                fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Strict, E> {
-                    Ok(Strict(json!(v)))
-                }
-                fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Strict, E> {
-                    Ok(Strict(json!(v)))
-                }
-                fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Strict, E> {
-                    Ok(Strict(json!(v)))
-                }
-                fn visit_none<E: serde::de::Error>(self) -> Result<Strict, E> {
-                    Ok(Strict(Value::Null))
-                }
-                fn visit_unit<E: serde::de::Error>(self) -> Result<Strict, E> {
-                    Ok(Strict(Value::Null))
-                }
-                fn visit_seq<A: serde::de::SeqAccess<'de>>(
-                    self,
-                    mut a: A,
-                ) -> Result<Strict, A::Error> {
-                    let mut out = Vec::new();
-                    while let Some(Strict(v)) = a.next_element()? {
-                        out.push(v);
-                    }
-                    Ok(Strict(Value::Array(out)))
-                }
-                fn visit_map<A: serde::de::MapAccess<'de>>(
-                    self,
-                    mut a: A,
-                ) -> Result<Strict, A::Error> {
-                    let mut out = serde_json::Map::new();
-                    while let Some((key, Strict(v))) = a.next_entry::<String, Strict>()? {
-                        if out.insert(key, v).is_some() {
-                            return Err(serde::de::Error::custom("duplicate field"));
-                        }
-                    }
-                    Ok(Strict(Value::Object(out)))
-                }
-            }
-            d.deserialize_any(Visitor)
-        }
-    }
-    let mut decoder = serde_json::Deserializer::from_slice(bytes);
-    let Strict(v) = Strict::deserialize(&mut decoder).map_err(|_| "capture-json")?;
-    decoder.end().map_err(|_| "capture-json")?;
-    Ok(v)
+    crate::integral_json::parse(bytes).map_err(|_| "capture-json".into())
 }
 
 fn read(path: &Path, limit: usize) -> Result<Vec<u8>, String> {

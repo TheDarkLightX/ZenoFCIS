@@ -6,7 +6,6 @@ use super::{STATELESS_DEADLINE, Stages};
 use crate::neural_loop::program_json::{encode, program_to_json};
 use crate::transform::{self, sha256_hex};
 use clap::Args;
-use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -57,56 +56,6 @@ impl Arguments {
     }
 }
 
-// Reject duplicate properties and nonintegral numbers at every nesting level.
-struct Strict(Value);
-impl<'de> Deserialize<'de> for Strict {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        struct Read;
-        impl<'de> Visitor<'de> for Read {
-            type Value = Strict;
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("bounded integral JSON with unique keys")
-            }
-            fn visit_bool<E: de::Error>(self, v: bool) -> Result<Strict, E> {
-                Ok(Strict(json!(v)))
-            }
-            fn visit_i64<E: de::Error>(self, v: i64) -> Result<Strict, E> {
-                Ok(Strict(json!(v)))
-            }
-            fn visit_u64<E: de::Error>(self, v: u64) -> Result<Strict, E> {
-                Ok(Strict(json!(v)))
-            }
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<Strict, E> {
-                Ok(Strict(json!(v)))
-            }
-            fn visit_string<E: de::Error>(self, v: String) -> Result<Strict, E> {
-                Ok(Strict(json!(v)))
-            }
-            fn visit_unit<E: de::Error>(self) -> Result<Strict, E> {
-                Ok(Strict(Value::Null))
-            }
-            fn visit_seq<A: SeqAccess<'de>>(self, mut a: A) -> Result<Strict, A::Error> {
-                let mut values = Vec::new();
-                while let Some(Strict(v)) = a.next_element()? {
-                    values.push(v);
-                }
-                Ok(Strict(Value::Array(values)))
-            }
-            fn visit_map<A: MapAccess<'de>>(self, mut a: A) -> Result<Strict, A::Error> {
-                let mut values = serde_json::Map::new();
-                while let Some(k) = a.next_key::<String>()? {
-                    if values.contains_key(&k) {
-                        return Err(de::Error::custom("duplicate JSON property"));
-                    }
-                    let Strict(v) = a.next_value()?;
-                    values.insert(k, v);
-                }
-                Ok(Strict(Value::Object(values)))
-            }
-        }
-        d.deserialize_any(Read)
-    }
-}
 fn bad(reason: impl Into<String>) -> Stop {
     Stop::Refused(reason.into())
 }
@@ -174,8 +123,9 @@ fn specification(data: &[u8]) -> Result<Specification, Stop> {
     if !data.is_ascii() {
         return Err(bad("version-space-ascii-json"));
     }
-    let Strict(v) =
-        serde_json::from_slice(data).map_err(|e| bad(format!("version-space-json:{e}")))?;
+    // Duplicate properties and nonintegral numbers are refused at every nesting level.
+    let v =
+        crate::integral_json::parse(data).map_err(|e| bad(format!("version-space-json:{e}")))?;
     fields(
         &v,
         &["schema", "inputs", "outputs", "sketch", "requirements"],
