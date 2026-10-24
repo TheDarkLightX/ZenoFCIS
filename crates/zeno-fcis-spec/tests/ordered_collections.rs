@@ -107,7 +107,7 @@ fn order_reads_reject_bad_outputs_chains_duplicates_and_unbounded_counts() {
         BOOK.replace("order 180", "order 400"),
         BOOK.replace("0..=1000000", "9..=8"),
         format!(
-            "{BOOK}\nlaw 502 observation_is_not_state on commit, genesis = context.102.133 == 0;"
+            "{BOOK}\nlaw 505 observation_is_not_state on commit, genesis = context.102.133 == 0;"
         ),
     ] {
         assert!(

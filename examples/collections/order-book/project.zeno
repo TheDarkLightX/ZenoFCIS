@@ -34,3 +34,13 @@ law 500 fill_at_best on commit = command.101.130 == 152 ->
   context.102.133 == 1 && pre.100.160 == 1 && command.101.131 >= context.102.132;
 law 501 absent_levels_hold_nothing on commit, genesis =
   forall e in entries 110 { post.100.e == 1 || post.100.e.140 == 0 };
+law 502 placing_existing_price_keeps_one_unit on commit =
+  command.101.130 == 150 && pre.100.160 == 1 ->
+  post.100.160 == 1 && post.100.160.140 == 1;
+law 503 cancelling_existing_price_removes_level on commit =
+  command.101.130 == 151 && pre.100.160 == 1 ->
+  post.100.160 == 0;
+law 504 filling_best_level_consumes_it on commit =
+  command.101.130 == 152 && context.102.133 == 1 && pre.100.160 == 1 &&
+  command.101.131 == context.102.132 ->
+  post.100.160 == 0;

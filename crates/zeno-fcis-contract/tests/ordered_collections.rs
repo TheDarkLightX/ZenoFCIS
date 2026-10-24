@@ -15,6 +15,32 @@ fn checked(
     Ok(check(project, rules, Limits::default())?)
 }
 
+fn remove_order_book_transition_kinds(
+    rules: &mut serde_json::Value,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let kinds = rules["law_kinds"]
+        .as_object_mut()
+        .ok_or("policy law_kinds object")?;
+    for id in ["502", "503", "504"] {
+        kinds.remove(id);
+    }
+    Ok(())
+}
+
+fn remove_order_book_transition_laws(
+    project: &str,
+    rules: &mut serde_json::Value,
+) -> Result<String, Box<dyn std::error::Error>> {
+    // These tests synthesize a different law set from the example. Keep its
+    // project declarations and policy classifications aligned as they evolve.
+    remove_order_book_transition_kinds(rules)?;
+    Ok(project
+        .split("law 502")
+        .next()
+        .unwrap_or(project)
+        .to_owned())
+}
+
 #[test]
 fn order_book_checks_and_runtime_refuses_unsupported_framing()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -139,6 +165,7 @@ fn every_order_read_checks_presence_extremality_and_empty_intervals()
             .replace("field 131 101 price 103;", "field 131 101 price 103;\nfield 134 101 middle 103;\nentry 175 middle of 110 at command.101.134;")
             .replace("context.102.133 == 1 && pre.100.160 == 1 && command.101.131 >= context.102.132",&format!("({law}) && (context.102.133 == 0 || pre.100.170 == 1)"));
         let mut rules: serde_json::Value = serde_json::from_str(RULES)?;
+        let project = remove_order_book_transition_laws(&project, &mut rules)?;
         rules["genesis"]["175"] = 0.into();
         rules["genesis"]["176"] = 0.into();
         rules["cases"] = serde_json::json!([{"rule":"observe", "when":"true", "class":"Accept", "reason":null,"post":{},"outbox":[]}]);
@@ -161,6 +188,7 @@ fn simultaneous_reads_share_presence_and_gap_facts() -> Result<(), Box<dyn std::
     let project = BOOK.replace("field 133 102 best_found 106;", "field 133 102 best_found 106;\nfield 134 102 least_price 103;\nfield 135 102 least_found 106;\norder 181 least of 110 min into context.102.134 found context.102.135;")
         .replace("context.102.133 == 1 && pre.100.160 == 1 && command.101.131 >= context.102.132", "context.102.133 == context.102.135 && (context.102.133 == 0 || context.102.134 <= context.102.132)");
     let mut rules: serde_json::Value = serde_json::from_str(RULES)?;
+    let project = remove_order_book_transition_laws(&project, &mut rules)?;
     rules["cases"] = serde_json::json!([{"rule":"observe", "when":"true", "class":"Accept", "reason":null,"post":{},"outbox":[]}]);
     let result = checked(
         &project.replace("reason 200 no_fill precedence 0;", ""),
@@ -175,6 +203,7 @@ fn ordered_laws_are_rechecked_after_alias_merge() -> Result<(), Box<dyn std::err
     let project = BOOK[..BOOK.find("law 501").ok_or("law501")?].to_owned()
         + "law 501 merged_fill on commit = command.101.130 != 150 || post.100.171 == 0;\nlaw 502 marker on commit, genesis = true;\n";
     let mut rules: serde_json::Value = serde_json::from_str(RULES)?;
+    remove_order_book_transition_kinds(&mut rules)?;
     rules["law_kinds"]["501"] = "AuthoritySubjectRecipient".into();
     rules["law_kinds"]["502"] = "StateInvariant".into();
     rules["cases"].as_array_mut().ok_or("cases")?.insert(
@@ -199,6 +228,7 @@ fn deletion_cannot_check_laws_on_noncanonical_absent_payloads()
         .replace("reason 200 no_fill precedence 0;", "")
         + "law 500 deletion on commit = command.101.130 == 151 && pre.100.160 == 1 && pre.100.161 == 1 -> post.100.161 == 1;\nlaw 501 marker on commit, genesis = true;\n";
     let mut rules: serde_json::Value = serde_json::from_str(RULES)?;
+    let project = remove_order_book_transition_laws(&project, &mut rules)?;
     rules["cases"] = serde_json::json!([
         {"rule":"place one", "when":"action == 150", "class":"Accept", "reason":null, "post":{"160":"1","161":"1"}, "outbox":[]},
         {"rule":"delete existing one", "when":"action == 151 && pre.100.160 == 1 && pre.100.161 == 1", "class":"Accept", "reason":null, "post":{"160":"0"}, "outbox":[]},

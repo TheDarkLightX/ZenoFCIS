@@ -19,5 +19,5 @@
       "post": {"160": "0", "161": "0"}, "outbox": []}
   ],
   "genesis": {"160": 0, "161": 0, "170": 0, "171": 0},
-  "law_kinds": {"500": "AuthoritySubjectRecipient", "501": "StateInvariant"}
+  "law_kinds": {"500": "AuthoritySubjectRecipient", "501": "StateInvariant", "502": "AuthoritySubjectRecipient", "503": "AuthoritySubjectRecipient", "504": "AuthoritySubjectRecipient"}
 }
