@@ -11,8 +11,8 @@
     },
     {
       "path": "crates/zeno-fcis-value/src/lib.rs",
-      "bytes": 47085,
-      "sha256": "5b2801acecb3abdf971a75855fa2742049ba590f15fad6e0b13bd02f883c7232"
+      "bytes": 86585,
+      "sha256": "6ea5e1ff27abf83524c13c4ebab0fd45c540683920ce22842d050410a1e1af97"
     },
     {
       "path": "crates/zeno-fcis-core/src/lib.rs",
@@ -21,8 +21,8 @@
     },
     {
       "path": "crates/zeno-fcis-codec/src/lib.rs",
-      "bytes": 64333,
-      "sha256": "ec35b1b4eb20bc0932ca64de9311563afe476e3b90ce17d3835cf8577e6448af"
+      "bytes": 100605,
+      "sha256": "adad2a8d651a15f85fe8430e7a394ac852e0bf177b6f6c6140ede16840839643"
     },
     {
       "path": "crates/zeno-fcis-crypto/src/lib.rs",

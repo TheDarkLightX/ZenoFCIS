@@ -34,6 +34,11 @@ embedded in ZenoFCIS values.
 - Symbolic review encodes guarded observations whose values have different
   kinds. Unsupported encodings and exhaustion of the 63-split limit leave
   review and lemma questions UNKNOWN, exit 2.
+- Value decoding caps nesting at 1,024 levels, the catalog's value-depth
+  ceiling, even when `ValueLimits::max_depth` is larger
+  (`ValueLimits::effective_max_depth`). Each collection's initial reservation
+  is bounded by the remaining wire bytes and the remaining node budget. The
+  default depth limit stays 64 and the canonical encoding is unchanged.
 - **Breaking change for scripts:** verdict commands follow the shared
   [exit contract](docs/CLI_REFERENCE.md#exit-codes): a refutation exits 1 and
   an undecided result exits 2. Scripts relying on exit 0 for a refutation must
