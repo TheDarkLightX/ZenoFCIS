@@ -79,6 +79,14 @@ const COLLECTION_APPLICATION: &[(&str, &str)] = &[
         include_str!("../collection-app/app/operations.rs"),
     ),
     (
+        "src/app/journal.rs",
+        include_str!("../collection-app/app/journal.rs"),
+    ),
+    (
+        "src/app/previous.rs",
+        include_str!("../collection-app/app/previous.rs"),
+    ),
+    (
         "www/index.html",
         include_str!("../collection-app/index.html"),
     ),
@@ -90,6 +98,10 @@ const COLLECTION_APPLICATION: &[(&str, &str)] = &[
     (
         "tests/collection_journey.rs",
         include_str!("../collection-app/journey.rs"),
+    ),
+    (
+        "tests/collection_history.rs",
+        include_str!("../collection-app/history.rs"),
     ),
     (
         "tests/support/mod.rs",

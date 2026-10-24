@@ -770,6 +770,14 @@ fn collection_receipts_replay_and_restart() {
         String::from_utf8_lossy(&exported.stderr)
     );
     let document: Value = ok(serde_json::from_slice(&exported.stdout));
+    assert_eq!(
+        document["entries"],
+        serde_json::json!(journal),
+        "streamed export changed journal rows"
+    );
+    let mut canonical = ok(serde_json::to_vec(&document));
+    canonical.push(b'\n');
+    assert_eq!(exported.stdout, canonical, "small export encoding changed");
     let journal_path = directory.join("journal.json");
     ok(std::fs::write(&journal_path, &exported.stdout));
     let restored_path = directory.join("restored.sqlite");

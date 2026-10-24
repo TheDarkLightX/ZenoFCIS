@@ -1,5 +1,7 @@
 //! Collection application shell. Only the bound Authority decides.
+mod journal;
 mod operations;
+mod previous;
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
@@ -55,6 +57,8 @@ pub fn identity(authority: &Authority<'_>) -> Hash32 {
     let source = RustCryptoSha256::hash_parts(&[
         include_bytes!("app.rs"),
         include_bytes!("app/operations.rs"),
+        include_bytes!("app/journal.rs"),
+        include_bytes!("app/previous.rs"),
         include_bytes!("lib.rs"),
     ]);
     let layout = zeno_fcis_contract::collections::runtime::source_digest();
@@ -306,6 +310,7 @@ impl<'a, 'p> Application<'a, 'p> {
         Ok(report)
     }
     /// Export original submissions and complete receipts in committed order.
+    /// This convenience API materializes history; CLI recovery uses `journal_entry`.
     pub fn journal(&self) -> Result<Vec<Value>, Refusal> {
         self.store
             .commits()
@@ -325,71 +330,85 @@ impl<'a, 'p> Application<'a, 'p> {
         if self.store.version().map_err(unavailable)? != 0 {
             return Err(Refusal::Conflict);
         }
-        for (index, row) in journal.iter().enumerate() {
-            let submission = &row["submission"];
-            if row.as_object().map(|o| o.len()) != Some(2) {
-                return Err(Refusal::Binding);
-            }
-            if submission["format"] != "zeno-fcis/collection-submission/2" {
-                return Err(Refusal::Binding);
-            }
-            let expected = u64::try_from(index).map_err(unavailable)?;
-            let expected_text = expected.to_string();
-            if submission["expected"].as_str() != Some(expected_text.as_str()) {
-                return Err(Refusal::Binding);
-            }
-            let owner = Hash32::new(key_field(submission, "principal")?);
-            let binding = RequestBinding {
-                key: key_field(submission, "key")?,
-                request: key_field(submission, "request")?,
-            };
-            let wire = unhex(submission["wire"].as_str().ok_or(Refusal::Binding)?)?;
-            let command: Vec<String> =
-                serde_json::from_slice(&wire).map_err(|_| Refusal::Binding)?;
-            if serde_json::to_value(&command).map_err(unavailable)? != submission["command"] {
-                return Err(Refusal::Binding);
-            }
-            let context_values: Vec<String> = serde_json::from_value(submission["context"].clone())
-                .map_err(|_| Refusal::Binding)?;
-            let context = self
-                .layout
-                .decode_input(Source::Context, &context_values)
-                .map_err(|_| Refusal::Binding)?;
-            let decoded = self
-                .layout
-                .decode_input(Source::Command, &command)
-                .map_err(|_| Refusal::Binding)?;
-            let named = self
-                .layout
-                .named(&decoded, &context)
-                .map_err(|_| Refusal::Binding)?;
-            let pre = self.store.scalar_state().map_err(unavailable)?;
-            if row["receipt"]["pre_scalars"] != hex(&pre) || submission["pre_scalars"] != hex(&pre)
-            {
-                return Err(Refusal::Binding);
-            }
-            self.check_roots(&row["receipt"]["pre_roots"], &named)?;
-            let result = self.apply(owner, expected, &command, &context, Some(binding), &wire)?;
-            if result["reply"]["class"] == "Reject" {
-                return Err(Refusal::Binding);
-            }
-            // This acceptance check is independent of the receipt producer.
-            // Missing or additional roots must fail even if both encoders omit them.
-            self.check_roots(&row["receipt"]["post_roots"], &named)?;
-            if row["receipt"]["post_scalars"]
-                != hex(&self.store.scalar_state().map_err(unavailable)?)
-            {
-                return Err(Refusal::Binding);
-            }
-            let (_, commit) = self
-                .store
-                .request(&binding.key)
-                .map_err(unavailable)?
-                .ok_or(Refusal::Binding)?;
-            let actual: Value = serde_json::from_slice(&commit.decision).map_err(unavailable)?;
-            if actual != *submission || result["receipt"] != row["receipt"] {
-                return Err(Refusal::Binding);
-            }
+        for row in journal {
+            self.replay_entry(row)?;
+        }
+        Ok(())
+    }
+
+    /// One indexed export page, owned by the caller. A missing position refuses.
+    pub fn journal_entry(&self, sequence: u64) -> Result<Value, Refusal> {
+        let commit = self
+            .store
+            .commit_at(sequence)
+            .map_err(unavailable)?
+            .ok_or(Refusal::Binding)?;
+        let submission: Value = serde_json::from_slice(&commit.decision).map_err(unavailable)?;
+        Ok(json!({"submission":submission,"receipt":receipt(&commit)}))
+    }
+
+    /// Replay one owned page at the current position. Discard this target on error.
+    /// This shell utility recomputes Authority's decision; it grants no authority.
+    pub fn replay_entry(&mut self, row: &Value) -> Result<(), Refusal> {
+        let submission = &row["submission"];
+        if row.as_object().map(|o| o.len()) != Some(2) {
+            return Err(Refusal::Binding);
+        }
+        if submission["format"] != "zeno-fcis/collection-submission/2" {
+            return Err(Refusal::Binding);
+        }
+        let expected = self.store.version().map_err(unavailable)?;
+        let expected_text = expected.to_string();
+        if submission["expected"].as_str() != Some(expected_text.as_str()) {
+            return Err(Refusal::Binding);
+        }
+        let owner = Hash32::new(key_field(submission, "principal")?);
+        let binding = RequestBinding {
+            key: key_field(submission, "key")?,
+            request: key_field(submission, "request")?,
+        };
+        let wire = unhex(submission["wire"].as_str().ok_or(Refusal::Binding)?)?;
+        let command: Vec<String> = serde_json::from_slice(&wire).map_err(|_| Refusal::Binding)?;
+        if serde_json::to_value(&command).map_err(unavailable)? != submission["command"] {
+            return Err(Refusal::Binding);
+        }
+        let context_values: Vec<String> =
+            serde_json::from_value(submission["context"].clone()).map_err(|_| Refusal::Binding)?;
+        let context = self
+            .layout
+            .decode_input(Source::Context, &context_values)
+            .map_err(|_| Refusal::Binding)?;
+        let decoded = self
+            .layout
+            .decode_input(Source::Command, &command)
+            .map_err(|_| Refusal::Binding)?;
+        let named = self
+            .layout
+            .named(&decoded, &context)
+            .map_err(|_| Refusal::Binding)?;
+        let pre = self.store.scalar_state().map_err(unavailable)?;
+        if row["receipt"]["pre_scalars"] != hex(&pre) || submission["pre_scalars"] != hex(&pre) {
+            return Err(Refusal::Binding);
+        }
+        self.check_roots(&row["receipt"]["pre_roots"], &named)?;
+        let result = self.apply(owner, expected, &command, &context, Some(binding), &wire)?;
+        if result["reply"]["class"] == "Reject" {
+            return Err(Refusal::Binding);
+        }
+        // This acceptance check is independent of the receipt producer.
+        // Missing or additional roots must fail even if both encoders omit them.
+        self.check_roots(&row["receipt"]["post_roots"], &named)?;
+        if row["receipt"]["post_scalars"] != hex(&self.store.scalar_state().map_err(unavailable)?) {
+            return Err(Refusal::Binding);
+        }
+        let (_, commit) = self
+            .store
+            .request(&binding.key)
+            .map_err(unavailable)?
+            .ok_or(Refusal::Binding)?;
+        let actual: Value = serde_json::from_slice(&commit.decision).map_err(unavailable)?;
+        if actual != *submission || result["receipt"] != row["receipt"] {
+            return Err(Refusal::Binding);
         }
         Ok(())
     }
@@ -429,11 +448,24 @@ impl<'a, 'p> Application<'a, 'p> {
             .collect::<Result<Vec<_>, Refusal>>()?;
         let mut replay = Self::with_store(
             self.authority,
-            CollectionStore::in_memory().map_err(unavailable)?,
+            CollectionStore::temporary().map_err(unavailable)?,
             parties,
         )?;
-        let journal = self.journal()?;
-        replay.replay(&journal)?;
+        let version = self.store.version().map_err(unavailable)?;
+        for sequence in 1..=version {
+            let row = self.journal_entry(sequence)?;
+            replay.replay_entry(&row)?;
+            let submission = &row["submission"];
+            let binding = key_field(submission, "key")?;
+            let (request, commit) = self
+                .store
+                .request(&binding)
+                .map_err(unavailable)?
+                .ok_or(Refusal::Binding)?;
+            if request != key_field(submission, "request")? || receipt(&commit) != row["receipt"] {
+                return Err(Refusal::Binding);
+            }
+        }
         if self.store.scalar_state().map_err(unavailable)?
             != replay.store.scalar_state().map_err(unavailable)?
         {
@@ -449,17 +481,8 @@ impl<'a, 'p> Application<'a, 'p> {
             }
         }
         self.store.audit_application().map_err(unavailable)?;
-        for row in journal {
-            let submission = &row["submission"];
-            let binding = key_field(submission, "key")?;
-            let (request, commit) = self
-                .store
-                .request(&binding)
-                .map_err(unavailable)?
-                .ok_or(Refusal::Binding)?;
-            if request != key_field(submission, "request")? || receipt(&commit) != row["receipt"] {
-                return Err(Refusal::Binding);
-            }
+        if self.store.version().map_err(unavailable)? != version {
+            return Err(Refusal::Conflict);
         }
         Ok(())
     }
