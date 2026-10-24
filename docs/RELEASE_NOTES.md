@@ -7,7 +7,7 @@ what the contract judges can ask. The planned 2.5.1 work is included; there is
 no separate 2.5.1 release.
 
 Much of this release's code and documentation is LLM-generated, from designs
-and specifications that people authored or reviewed. Parts called synthesized
+and specifications that people authored and reviewed. Parts called synthesized
 are produced by ZenoFCIS's own program synthesis, such as the shipped Rust
 controllers from `synth` and the ZenoUI front ends. Other files are generated
 by tools, such as contract sources, evaluator identities, lockfiles and
