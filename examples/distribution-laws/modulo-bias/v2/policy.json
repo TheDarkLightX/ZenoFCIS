@@ -29,6 +29,7 @@
     "110": 0
   },
   "law_kinds": {
-    "500": "StateInvariant"
+    "500": "StateInvariant",
+    "501": "DecisionConformance"
   }
 }

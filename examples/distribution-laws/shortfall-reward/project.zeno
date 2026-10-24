@@ -15,6 +15,9 @@ component 400 selection {
 }
 merge [400];
 law 500 range on commit, genesis = post.100.110 >= 0;
+// Scenario losses of 1, 2, 3 and 5 against reserve 2 produce shortfalls
+// R = max(0, loss - 2) of 0, 0, 1 and 3.
+law 501 shortfall_matches_scenario on any = ((context.102.130 <= 1 && post.100.110 == 0) || (context.102.130 == 2 && post.100.110 == 1) || (context.102.130 == 3 && post.100.110 == 3));
 random 600 entropy on context.102.130 bits 2 independent uniform;
 reward 610 shortfall random {600} on post.100.110 {
  threshold 1 <= 1/2;

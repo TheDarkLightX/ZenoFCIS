@@ -140,12 +140,24 @@ fn refused_genesis_is_unknown_even_at_zero_steps() -> Result<(), Box<dyn std::er
 }
 #[test]
 fn negative_rewards_use_min_plus_and_keep_empty_run() -> Result<(), Box<dyn std::error::Error>> {
-    let project = PROJECT.replace("Fee in 0..=2", "Fee in -2..=2");
-    let policy = POLICY.replace(
+    // This alternate reward experiment changes the documented fee model, so
+    // its temporary contract omits the example's fee-conformance law.
+    let documented_fee_law = "// Amount above reserve commits a failure with no reserve change and zero reward; otherwise reserve\n// falls by amount and the fee is 1 for amount 0 or 2 for a positive amount.\nlaw 501 documented_success_outputs on commit = command.101.120 <= pre.100.110 -> post.100.110 == pre.100.110 - command.101.120 && post.100.111 == choose(command.101.120 == 0, 1, 2);\n";
+    let project = PROJECT.replace(documented_fee_law, "");
+    assert_ne!(project, PROJECT);
+    let mut policy: Value = serde_json::from_str(POLICY)?;
+    policy["law_kinds"]
+        .as_object_mut()
+        .ok_or("law_kinds must be an object")?
+        .remove("501")
+        .ok_or("documented fee law kind")?;
+    let policy = serde_json::to_string(&policy)?;
+    let reward_model = policy.replace(
         "choose(command.101.120 == 0, 1, 2)",
         "0 - choose(command.101.120 == 0, 1, 2)",
     );
-    let r = check(&project, &policy, &extremes(3), Limits::default())?;
+    let project = project.replace("Fee in 0..=2", "Fee in -2..=2");
+    let r = check(&project, &reward_model, &extremes(3), Limits::default())?;
     assert!(r.complete(), "{}", r.packet());
     assert_eq!(r.packet()["result"]["best"]["value"]["numerator"], "-6");
     assert_eq!(r.packet()["result"]["worst"]["value"]["numerator"], "0");

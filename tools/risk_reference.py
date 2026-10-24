@@ -93,6 +93,18 @@ def main():
         policy = json.loads((EXAMPLE / 'v2/policy.json').read_text())
         policy['genesis']['110'] = capacity
         if sign < 0:
+            # This scratch model deliberately reverses the documented fee
+            # rule, so omit that example-specific conformance law as well.
+            documented_fee_law = (
+                '// Amount above reserve commits a failure with no reserve change and zero reward; otherwise reserve\n'
+                '// falls by amount and the fee is 1 for amount 0 or 2 for a positive amount.\n'
+                'law 501 documented_success_outputs on commit = command.101.120 <= pre.100.110 -> '
+                'post.100.110 == pre.100.110 - command.101.120 && '
+                'post.100.111 == choose(command.101.120 == 0, 1, 2);\n'
+            )
+            assert documented_fee_law in project
+            project = project.replace(documented_fee_law, '')
+            assert policy['law_kinds'].pop('501') == 'FeeAndRounding'
             policy['cases'][1]['post']['111'] = '0 - choose(command.101.120 == 0, 1, 2)'
         with tempfile.TemporaryDirectory(prefix='risk-oracle-', dir=args.scratch) as temporary:
             app = Path(temporary)

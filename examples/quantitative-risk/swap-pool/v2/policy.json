@@ -48,6 +48,7 @@
   },
   "law_kinds": {
     "500": "StateInvariant",
+    "501": "FeeAndRounding",
     "502": "CommittedFailureEffects"
   }
 }

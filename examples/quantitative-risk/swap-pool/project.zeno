@@ -19,6 +19,9 @@ component 400 pool {
 }
 merge [400];
 law 500 range on commit, genesis = post.100.110 >= 0;
+// Amount above reserve commits a failure with no reserve change and zero reward; otherwise reserve
+// falls by amount and the fee is 1 for amount 0 or 2 for a positive amount.
+law 501 documented_success_outputs on commit = command.101.120 <= pre.100.110 -> post.100.110 == pre.100.110 - command.101.120 && post.100.111 == choose(command.101.120 == 0, 1, 2);
 law 502 failure on failure = post.100.110 == pre.100.110;
 random 600 amount on command.101.120 bits 2 independent uniform;
 reward 610 fees random {600} on post.100.111 failure 0 {

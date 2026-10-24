@@ -15,5 +15,8 @@ component 400 selection {
 }
 merge [400];
 law 500 range on commit, genesis = post.100.110 >= 0;
+// The decision computes r mod 3 as
+// `r - 3 * div_floor(r, 3)`.
+law 501 reporter_matches_modulo on any = post.100.110 == context.102.130 - 3 * div_floor(context.102.130, 3);
 random 600 entropy on context.102.130 bits 2 independent uniform;
 distribution 601 reporters on post.100.110 = uniform over {0, 1, 2};

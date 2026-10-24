@@ -20,3 +20,5 @@ component 400 decision {
 }
 merge [400];
 law 500 bounded on commit, genesis = post.100.110 >= 0;
+// This synthesized ledger increments a bounded public balance and toggles a public sequence without reading the flag.
+law 501 public_balance_increments on any = pre.100.110 + command.101.120 > 2 || post.100.110 == pre.100.110 + command.101.120;

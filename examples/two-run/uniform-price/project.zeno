@@ -23,3 +23,5 @@ component 400 decision {
 }
 merge [400];
 law 500 bounded on commit, genesis = post.100.110 >= 0;
+// This synthesized batch settlement uses a fixed price and separate user settlement slots.
+law 501 batch_settlement_matches_price on any = post.100.111 == choose(command.101.120 == 0, command.101.121 * pre.100.110, pre.100.111) && post.100.112 == choose(command.101.120 == 1, command.101.121 * pre.100.110, pre.100.112) && post.100.113 == choose(command.101.120 == 0, command.101.121, pre.100.113) && post.100.114 == choose(command.101.120 == 1, command.101.121, pre.100.114);
