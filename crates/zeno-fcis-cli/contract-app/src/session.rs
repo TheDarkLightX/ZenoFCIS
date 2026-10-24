@@ -440,12 +440,17 @@ fn record_targets<'a>(
 /// step that made each later version: an adoption's receipt digest, a
 /// behaviour change with its review and claims, a data migration, or a
 /// rename, for `f`.
-fn with_released_contexts<R>(f: impl FnOnce(&[Option<&zeno_fcis_synthesis::finite::historical::HistoricalContext<'_>>]) -> AppResult<R>) -> AppResult<R> {
+fn with_released_contexts<R>(
+    f: impl FnOnce(
+        &[Option<&zeno_fcis_synthesis::finite::historical::HistoricalContext<'_>>],
+    ) -> AppResult<R>,
+) -> AppResult<R> {
     f(&[]) // released predecessor contexts
 }
 
 pub(crate) fn with_lineage<R>(f: impl FnOnce(&Lineage<'_, '_>) -> AppResult<R>) -> AppResult<R> {
-    with_released_contexts(|historical| v2_contract::with_lineage(|generated| {
+    with_released_contexts(|historical| {
+        v2_contract::with_lineage(|generated| {
         let (catalogs, receipts, evolutions, state_steps, record_steps) = generated.parts();
         let mut receipts = receipts
             .iter()
@@ -541,7 +546,8 @@ pub(crate) fn with_lineage<R>(f: impl FnOnce(&Lineage<'_, '_>) -> AppResult<R>) 
         let lineage = Lineage::bind_steps_with_history(catalogs, &steps, historical).map_err(store)?;
         f(&lineage)
     })
-    .map_err(|error| format!("catalog: {error:?}"))?)
+    .map_err(|error| format!("catalog: {error:?}"))?
+    })
 }
 
 /// Replays every history segment of the store at `path` under the contract
