@@ -57,6 +57,15 @@ def digest(path: Path) -> str:
     return result.hexdigest()
 
 
+
+def source_snapshot():
+    paths = set(SOURCES)
+    paths.update(path.relative_to(ROOT) for path in
+                 (ROOT / "crates/zeno-fcis-contract/src").rglob("*.rs"))
+    if any((ROOT / path).is_symlink() for path in paths):
+        raise ValueError("differential source is a symbolic link")
+    return {str(path): digest(ROOT / path) for path in sorted(paths)}
+
 def layout_options():
     amounts = [None, *(tuple(interval) for interval in BOUNDS["numeric_intervals"])]
     return list(product(amounts, (None, 0, 1)))
@@ -229,7 +238,7 @@ def main():
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     out = args.out.resolve()
-    source_hashes = {str(path): digest(ROOT / path) for path in SOURCES}
+    source_hashes = source_snapshot()
     lines, declarations = all_shapes()
     counts = validate_shapes(lines)
     print("GRAMMAR " + json.dumps({**counts, "declarations_before_dedup": declarations}), flush=True)
@@ -316,7 +325,7 @@ def main():
                     "mutated_sha256": hashlib.sha256(mutant).hexdigest(),
                     "restored_sha256": digest(driver), "witness": mismatch})
                 save()
-    if {str(path): digest(ROOT / path) for path in SOURCES} != source_hashes:
+    if source_snapshot() != source_hashes:
         raise ValueError("differential sources changed during the run")
     result["source_stable"] = True
     result["accepted"] = True

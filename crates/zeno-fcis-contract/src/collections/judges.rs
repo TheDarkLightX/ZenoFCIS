@@ -482,7 +482,7 @@ impl Model {
                 super::canonical_absent_view(
                     self.layout.positions(),
                     entry.presence,
-                    entry.values.iter().map(|(i, _)| *i),
+                    &entry.values.iter().map(|(i, _)| *i).collect::<Vec<_>>(),
                     &mut merged,
                 );
                 continue;

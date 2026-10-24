@@ -7,14 +7,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(args.next().ok_or("missing output directory")?);
     fs::create_dir_all(&output)?;
     let examples = root.join("examples/collections");
-    let mut projects: Vec<_> = fs::read_dir(examples)?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.join("project.zeno").is_file())
-        .collect();
+    let mut projects = Vec::new();
+    for entry in fs::read_dir(examples)? {
+        let path = entry?.path();
+        if path.join("project.zeno").is_file() {
+            projects.push(path);
+        }
+    }
     projects.sort();
+    let names: Vec<_> = projects
+        .iter()
+        .filter_map(|path| path.file_name())
+        .collect();
+    if names != ["escrow", "library", "order-book", "token-balances"] {
+        return Err("shipped collection example inventory changed".into());
+    }
     for project in projects {
-        let name = project.file_name().ok_or("example has no name")?.to_string_lossy();
+        let name = project
+            .file_name()
+            .ok_or("example has no name")?
+            .to_string_lossy();
         let checked = zeno_fcis_contract::collections::check(
             &fs::read_to_string(project.join("project.zeno"))?,
             &fs::read_to_string(project.join("v2/policy.json"))?,

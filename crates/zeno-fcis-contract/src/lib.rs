@@ -44,39 +44,5 @@ pub mod two_run;
 #[cfg(test)]
 mod priority_construction_controls;
 
-use std::fmt;
-
-/// Why no contract was generated: the file and entry, and the reason.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ContractError {
-    place: String,
-    reason: String,
-}
-
-impl ContractError {
-    /// The error about `place`, a file and an entry within it.
-    pub fn new(place: impl Into<String>, reason: impl Into<String>) -> Self {
-        Self {
-            place: place.into(),
-            reason: reason.into(),
-        }
-    }
-
-    /// The file, and entry within it, that the reason is about.
-    pub fn place(&self) -> &str {
-        &self.place
-    }
-
-    /// What is wrong there.
-    pub fn reason(&self) -> &str {
-        &self.reason
-    }
-}
-
-impl fmt::Display for ContractError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}: {}", self.place, self.reason)
-    }
-}
-
-impl std::error::Error for ContractError {}
+mod contract_error;
+pub use contract_error::ContractError;

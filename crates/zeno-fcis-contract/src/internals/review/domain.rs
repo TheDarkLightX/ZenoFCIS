@@ -20,13 +20,10 @@ use super::super::declarations::{Declarations, Kind as TypeKind, Source};
 use super::super::expr::{self, Ast, Binary};
 use super::super::rules::{Constant, Rules};
 
-/// An admitted leaf domain, as the schema declares it.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum LeafDomain {
-    Bool,
-    Int { min: i128, max: i128 },
-    Sum { type_id: u32, variants: Vec<u16> },
-}
+mod leaf;
+pub use leaf::{LeafDomain, Position};
+#[cfg(verus_keep_ghost)]
+pub use leaf::{least_or_zero, least_spec};
 
 impl LeafDomain {
     /// Values in the domain; `None` when the count exceeds `u128`.
@@ -39,17 +36,6 @@ impl LeafDomain {
             }
             .cardinality(),
             Self::Sum { variants, .. } => Some(variants.len() as u128),
-        }
-    }
-
-    /// The first value in enumeration order, in constant time and space for
-    /// every domain; `None` for an empty domain. It equals the first element
-    /// of [`Self::values_within`] whenever that returns a list.
-    pub fn least(&self) -> Option<i128> {
-        match self {
-            Self::Bool => Some(0),
-            Self::Int { min, max } => (min <= max).then_some(*min),
-            Self::Sum { variants, .. } => variants.first().map(|id| i128::from(*id)),
         }
     }
 
@@ -100,17 +86,6 @@ pub fn leaf_domain(declarations: &Declarations, type_id: u32) -> Result<LeafDoma
             ));
         }
     })
-}
-
-/// One program input position: a root field, or a whole scalar root.
-#[derive(Clone, Debug)]
-pub struct Position {
-    /// The rules name: `pre.100.110`, `command.101`, `context.102.130`.
-    pub name: String,
-    pub source: Source,
-    pub field: Option<u16>,
-    pub type_id: u32,
-    pub domain: LeafDomain,
 }
 
 impl Position {

@@ -70,13 +70,8 @@ pub struct Law {
     pub formula: Ast,
 }
 
-/// The original input a scalar program position reads.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum Source {
-    State,
-    Command,
-    Context,
-}
+mod source;
+pub use source::Source;
 
 impl Source {
     /// The name prefix rules and laws use: `pre`, `command` or `context`.
