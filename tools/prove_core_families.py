@@ -172,7 +172,10 @@ def observed_rows(packet, expected, manifest, family):
     count = manifest['input_tuples']
     require(inputs['construction'] == 'full-domain' and inputs['count'] == count and inputs['domain_size'] == str(count),
             'not the complete admitted product')
-    require(summary['refusals']['count'] == 0 and summary['findings'] == 0, 'a raw input caused a technical refusal or finding')
+    # The only admitted findings are defensive cases on excluded pre-states (checked by check_review_packet).
+    excluded_only = [f for f in packet.get('findings', []) if f['kind'] == 'case-only-on-excluded-pre-states']
+    require(summary['refusals']['count'] == 0 and summary['findings'] == len(excluded_only),
+            'a raw input caused a technical refusal or finding')
     require(summary['examples'] == {'compared': count, 'disagreements': 0}, 'independent examples differ')
     rows = table['rows']
     require(rows is not None and len(rows) == count, 'missing actual decision rows')
