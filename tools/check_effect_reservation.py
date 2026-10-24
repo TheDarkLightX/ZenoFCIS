@@ -9,6 +9,7 @@ production refinement theorem. No network installation is performed.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -40,6 +41,8 @@ SOURCES = (*MODEL_SOURCES, *PRODUCTION_SOURCES, PROFILE, verifier.PIN,
            Path('tools/check_verus.py'), Path('tools/verus_coverage.py'), Path('tools/verus_ids.py'),
            Path('Cargo.toml'), Path('Cargo.lock'), Path('rust-toolchain.toml'))
 EXECUTABLES = ('prepare', 'finish')
+PRODUCT_FILES = ('policy_product', 'program', 'driver', 'registry', 'port',
+                 'policy', 'handler', 'policy_record', 'record', 'codec')
 FORBIDDEN = re.compile(r'\b(?:assume|admit)\s*[!(]|\bexternal_body\b|'
                        r'verifier\s*::\s*external\b|\bexec_allows_no_decreases_clause\b|'
                        r'\b(?:assume_specification|external_fn_specification)\b')
@@ -118,6 +121,30 @@ def function_body(source, name):
 def source_guard(root=ROOT):
     for relative in MODEL_SOURCES:
         configuration_guard((root / relative).read_text(), runtime=relative == RUNTIME)
+
+
+@contextmanager
+def changed_source(path, changed):
+    """Restore specimens even after inconclusive or unrelated failures."""
+    original = path.read_bytes()
+    try:
+        path.write_text(changed)
+        yield
+    finally:
+        path.write_bytes(original)
+
+
+def product_identity(root=ROOT):
+    """Independent framing of registry::source_digest for the product closure."""
+    def count(n): return n.to_bytes(8, 'big')
+    def text(s):
+        raw = s.encode()
+        return count(len(raw)) + raw
+    data = bytearray(text('zeno-fcis/shell-effects/1') + count(len(PRODUCT_FILES)))
+    for name in PRODUCT_FILES:
+        content = (root / 'crates/zeno-fcis-shell/src/effects' / f'{name}.rs').read_bytes()
+        data.extend(text(f'{name}.rs') + count(len(content)) + content)
+    return hashlib.sha256(data).hexdigest()
 
 
 def accepted(proc, report, pin, profile):
@@ -215,9 +242,13 @@ def native_build(root, environment, directory, output, *, runner=False):
 
 
 def check(out, work, payment_binary):
+    if work.exists():
+        raise RuntimeError('use a fresh work directory; retained evidence is not overwritten')
+    work.mkdir(parents=True)
     pin = json.loads((ROOT / verifier.PIN).read_text())
     profile = json.loads((ROOT / PROFILE).read_text())
     before = snapshot()
+    (work / 'source_sha256.json').write_text(json.dumps(before, indent=2, sort_keys=True)+'\n')
     source_guard()
     tools = verifier.prepare_tools(verifier.cache_directory(), pin, False)
     environment = {k: v for k, v in os.environ.items()
@@ -229,7 +260,10 @@ def check(out, work, payment_binary):
     command = [str(tools / 'verus'), '--crate-type=lib', '--edition=2024',
                '--no-cheating', '--no-external-by-default', '--num-threads', '2',
                '--output-json', '--log', 'vir', '--log', 'vir-option=no_span+no_type+no_fn_details']
-    work.mkdir(parents=True, exist_ok=True)
+    identity = process([payment_binary, '--identity'], ROOT, environment, work / 'payment-identity')
+    require_success(identity)
+    if identity.stdout.strip() != product_identity():
+        raise RuntimeError('payment binary source identity differs from the current production closure')
     report, coverage = proof(command, ROOT, environment, work / 'positive', pin, profile)
     binary = work / 'native-tests'
     native_build(ROOT, environment, work / 'native-build', binary)
@@ -245,25 +279,26 @@ def check(out, work, payment_binary):
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / relative, target)
         path = specimen / RUNTIME
-        path.write_text(changed)
-        source_guard(specimen)
-        executable = directory / 'native-test'
-        native_build(specimen, environment, directory / 'build', executable)
-        failed = process([executable, f'runtime::tests::{test}', '--exact', '--nocapture'],
-                         specimen, environment, directory / 'native-failure')
-        text = failed.stdout + failed.stderr
-        if not (failed.returncode == 101 and 'assertion' in text and test in text
-                and 'test result: FAILED' in text):
-            raise RuntimeError(f'control lacks intended native assertion failure: {name}')
-        mutated = process([*command, '--log-dir', directory / 'verus/vir', HARNESS],
-                          specimen, environment, directory / 'verus')
-        parsed = json_report(mutated)
-        region = verifier.function_lines(changed, function)
-        if not verifier.semantic_refusal(mutated, parsed, pin, RUNTIME, specimen,
-                region=region, target_functions=profile['target_functions']):
-            raise RuntimeError(f'control lacks intended complete semantic refusal: {name}')
-        changed_hash = sha256(path)
-        path.write_bytes(original)
+        (directory / 'mutated-runtime.rs').write_text(changed)
+        (directory / 'original-runtime.rs').write_bytes(original)
+        with changed_source(path, changed):
+            source_guard(specimen)
+            executable = directory / 'native-test'
+            native_build(specimen, environment, directory / 'build', executable)
+            failed = process([executable, f'runtime::tests::{test}', '--exact', '--nocapture'],
+                             specimen, environment, directory / 'native-failure')
+            text = failed.stdout + failed.stderr
+            if not (failed.returncode == 101 and 'assertion' in text and test in text
+                    and 'test result: FAILED' in text):
+                raise RuntimeError(f'control lacks intended native assertion failure: {name}')
+            mutated = process([*command, '--log-dir', directory / 'verus/vir', HARNESS],
+                              specimen, environment, directory / 'verus')
+            parsed = json_report(mutated)
+            region = verifier.function_lines(changed, function)
+            if not verifier.semantic_refusal(mutated, parsed, pin, RUNTIME, specimen,
+                    region=region, target_functions=profile['target_functions']):
+                raise RuntimeError(f'control lacks intended complete semantic refusal: {name}')
+            changed_hash = sha256(path)
         if path.read_bytes() != original:
             raise RuntimeError(f'control not restored byte-identically: {name}')
         restored_binary = directory / 'restored-test'
@@ -294,6 +329,7 @@ def check(out, work, payment_binary):
                    base_revision=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                    verus_report=final_report, translated_function_coverage=coverage,
                    controls=controls, trace_differential=json.loads((work / 'traces/differential.json').read_text()),
+                   payment_binary_sha256=sha256(payment_binary), production_source_identity=identity.stdout.strip(),
                    native_test_output=native.stdout,
                    scope='Abstract protocol only; source hashes and finite differential do not prove production refinement.',
                    trusted_base=['pinned Verus/vstd/Z3', 'Rust erasure/compiler', 'standard library and host'])

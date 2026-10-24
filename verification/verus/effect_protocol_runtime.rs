@@ -245,6 +245,10 @@ pub proof fn payment_admission_correspondence(keys: Seq<u64>, capacity: usize, k
 mod tests {
     use super::*;
 
+    fn cloned<T: Clone>(value: &T) -> T {
+        value.clone()
+    }
+
     #[test]
     fn retry_consults_every_policy() {
         let got = prepare(&vec![1], 2, 1, true, true, true, true);
@@ -274,7 +278,14 @@ mod tests {
 
     #[test]
     fn standard_library_contract_samples() {
+        assert_eq!(cloned(&usize::MAX), usize::MAX);
+        assert_eq!(cloned(&u8::MAX), u8::MAX);
+        assert_eq!(cloned(&u64::MAX), u64::MAX);
+        assert!(cloned(&true));
+        assert_eq!(cloned(&[1u8, 2]), [1u8, 2]);
+        assert_eq!(*cloned(&Box::new([1u8, 2])), [1u8, 2]);
         let original = vec![3u64, 5];
+        assert_eq!(cloned(&&original), &original);
         assert_eq!(original.as_slice().to_vec(), original);
         let mut copied = original.clone();
         assert_eq!(copied.len(), 2);

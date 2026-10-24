@@ -130,6 +130,34 @@ class EffectProofAdmission(unittest.TestCase):
             with patch.object(gate, 'SOURCES', (Path('alias'),)):
                 with self.assertRaises(ValueError): gate.snapshot(root)
 
+    def test_specimen_restoration_survives_an_unrelated_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'subject.rs'
+            original = b'original\r\nbytes\r\n'
+            path.write_bytes(original)
+            with self.assertRaisesRegex(RuntimeError, 'unrelated'):
+                with gate.changed_source(path, 'mutant\n'):
+                    self.assertEqual(path.read_text(), 'mutant\n')
+                    raise RuntimeError('unrelated')
+            self.assertEqual(path.read_bytes(), original)
+            with gate.changed_source(path, 'mutant\n'):
+                self.assertEqual(path.read_text(), 'mutant\n')
+            self.assertEqual(path.read_bytes(), original)
+
+    def test_product_identity_binds_every_ordered_source_byte(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            directory = root / 'crates/zeno-fcis-shell/src/effects'
+            directory.mkdir(parents=True)
+            for name in gate.PRODUCT_FILES: (directory / f'{name}.rs').write_text(name)
+            expected = gate.product_identity(root)
+            for name in gate.PRODUCT_FILES:
+                path = directory / f'{name}.rs'
+                path.write_text(name + ' changed')
+                self.assertNotEqual(gate.product_identity(root), expected)
+                path.write_text(name)
+            self.assertEqual(gate.product_identity(root), expected)
+
     def test_semantic_refusal_must_point_to_the_intended_function(self):
         report = self.positive()
         report['verification-results'].update(success=False, verified=1, errors=1,
