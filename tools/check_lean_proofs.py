@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PROOFS = ROOT / "verification" / "lean"
 VERSIONS = ("4.28.0", "4.32.0")
 ALLOWED = frozenset({"propext", "Quot.sound"})
+CONSTRUCTIVE = ALLOWED
 AUDITOR = ROOT / "tools" / "lean" / "AuditModule.lean"
 FORBIDDEN = re.compile(r"\b(?:sorry|admit|axiom|opaque|native_decide|implemented_by|extern|unsafe|csimp"
                        r"|skipKernelTC|set_option|run_cmd|run_elab|run_meta|addDecl)\b|#eval\b")
@@ -308,7 +309,7 @@ def main():
             results["toolchains"][version] = packets
     if args.report:
         args.report.write_text(json.dumps(results, indent=2, sort_keys=True) + "\n")
-    emit("PASS: kernel replay, every module constant, named axiom manifest and requested controls")
+    emit("PASS: kernel-replayed, axioms audited for every module constant, named axiom manifest and requested controls")
     if args.transcript:
         args.transcript.write_text("\n".join(TRANSCRIPT) + "\n")
 
