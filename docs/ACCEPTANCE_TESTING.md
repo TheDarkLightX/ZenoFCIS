@@ -46,6 +46,20 @@ python3 tools/atdd.py run --all
 The runner uses fixed argument arrays and does not execute command text from a
 feature file. This keeps Gherkin prose outside execution authority.
 
+Build tests with optimization when they run contained loops:
+
+```bash
+export CARGO_PROFILE_DEV_OPT_LEVEL=1 CARGO_PROFILE_TEST_OPT_LEVEL=1
+cargo +1.97.1 test --locked --offline --workspace
+python3 tools/atdd.py run --all
+```
+
+A contained loop starts a caller and a guardian process, and the worker must
+acknowledge startup within 10 seconds. In an unoptimized build, each of those
+processes spent about 5 seconds on startup work on the 2.6.0 qualification host,
+so loop tests reported `containment-unavailable:posix:startup` (exit 2). The
+same command in the release build started in under a second.
+
 `tools/test_atdd_registry.py`, which runs before every scenario run, also
 requires every `test_*.py` in the repository that git does not ignore to be
 named by a whole-file command in a scenario or workflow step (triggers and step

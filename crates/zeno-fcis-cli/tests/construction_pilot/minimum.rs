@@ -137,6 +137,7 @@ fn completions(sketch: &Expr) -> Vec<Expr> {
         .collect()
 }
 #[test]
+#[ignore = "needs the retained construction evidence (E and ZENO_FCIS_CONSTRUCTION_*); run with --include-ignored"]
 fn every_finite_output_choice_preserves_scalar_results_and_expanded_bounds() {
     let mut reports = Vec::new();
     super::super::files::verify(&old_bundle())
@@ -279,6 +280,7 @@ fn every_finite_output_choice_preserves_scalar_results_and_expanded_bounds() {
     println!("minimum-finite-choices: {}", json!(reports));
 }
 #[test]
+#[ignore = "needs the retained construction evidence (E and ZENO_FCIS_CONSTRUCTION_*); run with --include-ignored"]
 fn historical_first_t_attempt_is_only_a_root_lowering_regression_fixture() {
     let root = evidence().join("T/attempts/0000");
     super::super::files::verify(&root)

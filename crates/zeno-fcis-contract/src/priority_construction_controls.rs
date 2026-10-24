@@ -374,6 +374,7 @@ fn run(root: &Path, work: &mut Work) -> Result<(), String> {
 }
 
 #[test]
+#[ignore = "needs the retained construction evidence (E and ZENO_FCIS_CONSTRUCTION_*); run with --include-ignored"]
 fn all_eight_controls_and_predicate_stubs() {
     let mut work = Work::default();
     let outcome = std::env::var_os("ZENO_FCIS_CONSTRUCTION_EVIDENCE")

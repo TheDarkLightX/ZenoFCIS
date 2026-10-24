@@ -112,6 +112,7 @@ fn atom(value: c::Atom<'_>) -> Vec<u8> {
         .unwrap_or_else(|error| panic!("required test result: {error:?}"))
 }
 #[test]
+#[ignore = "needs the retained construction evidence (E and ZENO_FCIS_CONSTRUCTION_*); run with --include-ignored"]
 fn frozen_reference_matches_every_native_transition_and_genesis() {
     let root = bundle();
     let relation = value(&root.join("reference/relation.json"));
@@ -284,6 +285,7 @@ fn decoded(r: &[i128], is_t: bool) -> Option<Value> {
     Some(json!({"n":r[0],"entries":entries}))
 }
 #[test]
+#[ignore = "needs the retained construction evidence (E and ZENO_FCIS_CONSTRUCTION_*); run with --include-ignored"]
 fn both_decoders_are_total_and_round_trip_the_whole_carrier() {
     let root = bundle();
     let relation = value(&root.join("reference/relation.json"));
@@ -418,6 +420,7 @@ fn expected_features(r: &[i128], q: i128, is_t: bool) -> Vec<i128> {
     expected
 }
 #[test]
+#[ignore = "needs the retained construction evidence (E and ZENO_FCIS_CONSTRUCTION_*); run with --include-ignored"]
 fn correlated_columns_compile_over_five_and_six_native_fields() {
     let root = bundle();
     let (_, rules) = abstract_parts(&root);
@@ -542,6 +545,7 @@ fn correlated_columns_compile_over_five_and_six_native_fields() {
     }
 }
 #[test]
+#[ignore = "needs the retained construction evidence (E and ZENO_FCIS_CONSTRUCTION_*); run with --include-ignored"]
 fn literal_reference_root_metadata_preserves_ordinary_compiler_bytes() {
     let root = bundle();
     let (declarations, rules) = abstract_parts(&root);

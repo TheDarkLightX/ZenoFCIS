@@ -112,3 +112,14 @@ source substitution. Each comparison also has a test-only suppression control.
 At capacity two, a non-strict interior-insertion fault has no witness; the
 strict-priority control makes no claim to detect that fault. Production exposes
 no comparator bypass. Review and release qualification remain separate gates.
+
+The construction driver's scenario tests, its frozen-reference tests and the
+planted-control meta check need the retained construction evidence: the frozen
+bundle and its previous version, the evidence directory, and the driver built
+from the same source (`cargo +1.97.1 build -p zeno-fcis-cli --example
+construction_pilot`). They are ignored by default. Set `E`,
+`ZENO_FCIS_CONSTRUCTION_DRIVER`, `ZENO_FCIS_CONSTRUCTION_BUNDLE`,
+`ZENO_FCIS_CONSTRUCTION_PREVIOUS_BUNDLE` and `ZENO_FCIS_CONSTRUCTION_EVIDENCE`,
+then run them with `-- --include-ignored`; without that evidence each fails
+instead of skipping. The meta check also requires an F51 qualification of the
+current source, so it refuses a bundle qualified on an earlier source.
