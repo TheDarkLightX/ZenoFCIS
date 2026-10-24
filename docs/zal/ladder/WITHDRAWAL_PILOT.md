@@ -52,7 +52,7 @@ cycles of four ticks: three paused ticks, then one must-serve tick.
 ### Observation adapter
 
 `integrations/zal/withdrawal_pilot.py` reads the contract's decision graph. The
-`withdrawal_queue_decisions` example of `zeno-fcis-synthesis` builds that graph
+`withdrawal_queue_decisions` example of the unpublished `zeno-fcis-generated-code-tests` crate builds that graph
 through the generated contract's checked Authority. It covers every vault
 reachable from the genesis within the pilot domain: actions 160, 161 and 162,
 lanes 170 and 171, amounts 1 and 2, callers 190 through 193, either alarm value,

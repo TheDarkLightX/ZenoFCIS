@@ -92,11 +92,18 @@ two compilations with all features and `--locked --offline`:
    `docs/benchmarks/`, and those nine individually named arithmetic files;
    other files under `examples/` or `tools/` remain refused.
 
-The CLI embeds dependency source text from its own `source-snapshots/` folder.
+A published crate that embeds text from a sibling crate or from the
+repository compiles it from its own `source-snapshots/` folder: the CLI, the
+SQLite shell and the synthesis library do. Each lists those files in its
+`source-snapshots.json`, under `sources` for files in `crates/` and under
+`repository_sources` for repository files.
 `python3 tools/check_cli_source_snapshots.py --write` refreshes those copies;
 the workspace test and packaging preflight require exact equality with their
 originals. This keeps dependency source identities unchanged while allowing
-the CLI to build from its own archive.
+each crate to build from its own archive. Examples that read repository
+fixtures stay out of the published archives: the CLI excludes its trace-game
+harness, and the withdrawal-queue decision graph is an example of the
+unpublished `zeno-fcis-generated-code-tests` crate.
 
 After a reviewed source change, derive a test-input candidate with
 `python3 tools/rc_package.py propose-test-inputs --output <new JSON file>

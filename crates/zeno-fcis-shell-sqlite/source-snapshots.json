@@ -1,0 +1,6 @@
+{
+  "format": "zeno-fcis/cli-source-snapshots/1",
+  "sources": [
+    "zeno-fcis-shell/src/lib.rs"
+  ]
+}

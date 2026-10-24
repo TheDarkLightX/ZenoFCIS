@@ -175,7 +175,7 @@ pub(super) fn profile_value(p: &LifecycleProfile) -> Result<Value, Failure> {
         )?,
         wire::blob(
             zeno_fcis_crypto::RustCryptoSha256::hash(include_bytes!(
-                "../../../../../../verification/oracle_crypto_profile.json"
+                "../../../../source-snapshots/repository/verification/oracle_crypto_profile.json.txt"
             ))
             .as_bytes(),
         )?,

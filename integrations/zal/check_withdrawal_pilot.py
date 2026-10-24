@@ -39,7 +39,7 @@ def cargo(arguments,env,extra=()):
 
 def native_build(env,release=False):
     profile=['--release'] if release else []
-    cargo(['build','-p','zeno-fcis-synthesis','--example','withdrawal_queue_decisions'],env)
+    cargo(['build','-p','zeno-fcis-generated-code-tests','--example','withdrawal_queue_decisions'],env)
     cargo(['build',*profile,'-p','zeno-fcis-formal-tools','--example','withdrawal_temporal_pilot'],env)
 
 

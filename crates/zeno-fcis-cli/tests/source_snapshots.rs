@@ -34,4 +34,27 @@ fn compiled_source_snapshots_equal_the_workspace_originals_byte_for_byte() {
             "source snapshot differs: {name}",
         );
     }
+    let repository = manifest["repository_sources"]
+        .as_array()
+        .unwrap_or_else(|| panic!("repository source snapshot list"));
+    for source in repository {
+        let name = source.as_str().unwrap_or_else(|| panic!("snapshot name"));
+        assert!(seen.insert(name));
+        assert!(
+            Path::new(name)
+                .components()
+                .all(|part| matches!(part, Component::Normal(_)))
+        );
+        let original = cli.join("../..").join(name);
+        let snapshot = cli
+            .join("source-snapshots/repository")
+            .join(format!("{name}.txt"));
+        assert_eq!(
+            std::fs::read(&snapshot)
+                .unwrap_or_else(|error| panic!("{}: {error}", snapshot.display())),
+            std::fs::read(&original)
+                .unwrap_or_else(|error| panic!("{}: {error}", original.display())),
+            "repository source snapshot differs: {name}",
+        );
+    }
 }

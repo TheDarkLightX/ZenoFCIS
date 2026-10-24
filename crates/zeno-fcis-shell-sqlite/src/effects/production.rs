@@ -616,7 +616,7 @@ pub fn implementation_source() -> Hash32 {
         ("lib.rs", include_bytes!("../lib.rs")),
         (
             "shell/lib.rs",
-            include_bytes!("../../../zeno-fcis-shell/src/lib.rs"),
+            include_bytes!("../../source-snapshots/zeno-fcis-shell/src/lib.rs.txt"),
         ),
         ("effects.rs", include_bytes!("../effects.rs")),
         ("v2.rs", include_bytes!("../v2.rs")),

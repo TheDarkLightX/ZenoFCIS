@@ -105,7 +105,7 @@ const COLLECTION_APPLICATION: &[(&str, &str)] = &[
     ),
     (
         "tests/support/mod.rs",
-        include_str!("../../zeno-fcis-ingress/tests/support/mod.rs"),
+        include_str!("../source-snapshots/zeno-fcis-ingress/tests/support/mod.rs.txt"),
     ),
 ];
 const COLLECTION_MANIFEST: &str = include_str!("../collection-app/Cargo.toml.in");

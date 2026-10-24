@@ -32,9 +32,12 @@ pub(crate) fn scaffold(
     for (relative, compiled) in [
         (
             "tools/app_factory.py",
-            include_str!("../../../tools/app_factory.py"),
+            include_str!("../source-snapshots/repository/tools/app_factory.py.txt"),
         ),
-        ("tools/zenoui.py", include_str!("../../../tools/zenoui.py")),
+        (
+            "tools/zenoui.py",
+            include_str!("../source-snapshots/repository/tools/zenoui.py.txt"),
+        ),
     ] {
         let Ok(actual) = std::fs::read(binding.tree.join(relative)) else {
             eprintln!("missing pinned build tool: {relative}");
