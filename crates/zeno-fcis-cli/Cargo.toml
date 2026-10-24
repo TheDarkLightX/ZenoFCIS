@@ -9,8 +9,6 @@ repository.workspace = true
 homepage.workspace = true
 authors.workspace = true
 readme.workspace = true
-# The trace-game harness reads repository fixtures; it is a workspace example only.
-exclude = ["examples/trace_game.rs", "examples/trace_game/"]
 
 [[bin]]
 name = "zeno-fcis"

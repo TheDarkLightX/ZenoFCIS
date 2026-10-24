@@ -13,27 +13,39 @@ pub(crate) struct Control {
 }
 
 pub(crate) fn fixture(fault: &str, disabled: Option<&str>) -> Result<Control, String> {
-    macro_rules! source {
-        ($folder:literal) => {
-            LeafSources {
-                project: include_str!(concat!(
-                    env!("CARGO_MANIFEST_DIR"),
-                    "/../zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/",
-                    $folder,
-                    "/project.zeno"
-                ))
-                .into(),
-                rules: include_str!(concat!(
-                    env!("CARGO_MANIFEST_DIR"),
-                    "/../zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/",
-                    $folder,
-                    "/v2/policy.json"
-                ))
-                .into(),
-            }
-        };
-    }
-    let sources = vec![source!("counter"), source!("tripwire"), source!("budget")];
+    // The composition fault fixtures, compiled from the CLI's exact source snapshots.
+    let sources = vec![
+        LeafSources {
+            project: include_str!(
+                "../../source-snapshots/zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/counter/project.zeno.txt"
+            )
+            .into(),
+            rules: include_str!(
+                "../../source-snapshots/zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/counter/v2/policy.json.txt"
+            )
+            .into(),
+        },
+        LeafSources {
+            project: include_str!(
+                "../../source-snapshots/zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/tripwire/project.zeno.txt"
+            )
+            .into(),
+            rules: include_str!(
+                "../../source-snapshots/zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/tripwire/v2/policy.json.txt"
+            )
+            .into(),
+        },
+        LeafSources {
+            project: include_str!(
+                "../../source-snapshots/zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/budget/project.zeno.txt"
+            )
+            .into(),
+            rules: include_str!(
+                "../../source-snapshots/zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/budget/v2/policy.json.txt"
+            )
+            .into(),
+        },
+    ];
     let names = ["counter", "wire", "budget"];
     let binds = [
         json!({"action":"150","authorized":"authorized"}),

@@ -58,7 +58,7 @@ def check_crate(root: Path, crate: Path, *, write: bool) -> tuple[int, int]:
         size += len(data)
     retained = {p.relative_to(directory).as_posix() for p in directory.rglob('*') if p.is_file()}
     used = set()
-    for path in (root / crate / 'src').rglob('*.rs'):
+    for path in [*(root / crate / 'src').rglob('*.rs'), *(root / crate / 'examples').rglob('*.rs')]:
         for reference in REFERENCE.findall(path.read_text()):
             resolved = Path(os.path.normpath(path.parent / reference))
             if directory not in resolved.parents:
