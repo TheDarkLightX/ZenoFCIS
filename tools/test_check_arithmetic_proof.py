@@ -21,6 +21,11 @@ class BindingTests(unittest.TestCase):
             '#[verifier::external_body] fn f() {}',
             'proof! { assume(false); }',
             'include!("unreviewed.rs");',
+            '#[cfg(verus_keep_ghost)] return Some(1);',
+            '#[cfg(verus_keep_ghost)] let value=0;',
+            '#[cfg(verus_keep_ghost)] use wrong::multiply;',
+            '#[cfg(verus_keep_ghost)] verus! { value=0; }',
+            '#[cfg(verus_keep_ghost)] verus! { fn native() -> i128 { 0 } }',
         )
         for source in snippets:
             with self.subTest(source=source), self.assertRaises(ValueError):

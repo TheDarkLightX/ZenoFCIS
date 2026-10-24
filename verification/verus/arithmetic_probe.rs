@@ -1,9 +1,9 @@
 //! Native observations of the exact production arithmetic; the oracle is Python.
 #![allow(dead_code)]
-#[path = "../../crates/zeno-fcis-synthesis/src/finite/value/wide.rs"]
-mod wide;
 #[path = "../../crates/zeno-fcis-synthesis/src/finite/value/scalar.rs"]
 mod scalar;
+#[path = "../../crates/zeno-fcis-synthesis/src/finite/value/wide.rs"]
+mod wide;
 use std::io::{self, Read};
 
 fn main() {
@@ -22,12 +22,18 @@ fn main() {
             }
             "signed_mul_div_floor" => scalar::signed_mul_div_floor(a[0], a[1], a[2]),
             "products_ge" => {
-                let (b, c) = if a.len() == 4 { ([a[0], a[1], 1], [a[2], a[3], 1]) }
-                    else { ([a[0], a[1], a[2]], [a[3], a[4], a[5]]) };
+                let (b, c) = if a.len() == 4 {
+                    ([a[0], a[1], 1], [a[2], a[3], 1])
+                } else {
+                    ([a[0], a[1], a[2]], [a[3], a[4], a[5]])
+                };
                 scalar::products_ge(b[0], b[1], b[2], c[0], c[1], c[2]).map(i128::from)
             }
             _ => panic!("unrecognized probe operation"),
         };
-        match value { Some(n) => println!("{n}"), None => println!("null") }
+        match value {
+            Some(n) => println!("{n}"),
+            None => println!("null"),
+        }
     }
 }

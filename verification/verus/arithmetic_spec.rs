@@ -110,7 +110,7 @@ pub proof fn numerator_monotone(n:int,m:int,d:int)
 
 /// Each multiplicative argument is monotone when the other is nonnegative.
 pub proof fn factors_monotone(a:int,b:int,c:int,d:int)
-    requires d>0, 0<=a<=b, 0<=c,
+    requires d>0, a<=b, 0<=c,
     ensures floor(a*c,d)<=floor(b*c,d), ceiling(a*c,d)<=ceiling(b*c,d),
         floor(c*a,d)<=floor(c*b,d), ceiling(c*a,d)<=ceiling(c*b,d),
 {
@@ -162,12 +162,46 @@ pub proof fn witnesses()
         signed_fused(true,5,1,2)==Some(3i128),
         signed_full_fused(-5,1,2)==Some(-3i128),
         unsigned_fused(false,u128::MAX as int,u128::MAX as int,u128::MAX as int)==Some(u128::MAX),
+        unsigned_fused(false,u128::MAX as int-1,u128::MAX as int-1,u128::MAX as int-2)==Some(u128::MAX),
+        unsigned_fused(true,u128::MAX as int-1,u128::MAX as int-1,u128::MAX as int-2)==None::<u128>,
 {
     assert(signed_division(false,-1,2)==Some(-1i128)) by(compute);
     assert(signed_division(true,-1,2)==Some(0i128)) by(compute);
     assert(signed_division(false,1,-2)==Some(-1i128)) by(compute);
     assert(signed_division(true,1,2)==Some(1i128)) by(compute);
     assert(unsigned_fused(false,u128::MAX as int,u128::MAX as int,u128::MAX as int)==Some(u128::MAX)) by(compute);
+    assert(unsigned_fused(false,u128::MAX as int-1,u128::MAX as int-1,u128::MAX as int-2)==Some(u128::MAX)) by(compute);
+    assert(unsigned_fused(true,u128::MAX as int-1,u128::MAX as int-1,u128::MAX as int-2)==None::<u128>) by(compute);
+}
+
+pub open spec fn signed_products(a:int,b:int,c:int,d:int,e:int,f:int)->Option<i128>{
+    if !signed_fit(a) || !signed_fit(b) || !signed_fit(c) || !signed_fit(d)
+        || !signed_fit(e) || !signed_fit(f) || a<0 || b<0 || c<0 || d<0 || e<0 || f<0 {None}
+    else {Some(if a*b*c>=d*e*f {1i128}else{0i128})}
+}
+
+pub proof fn fused_exactness(a:int,b:int,d:int)
+    requires d>0,
+    ensures a*b==floor(a*b,d)*d+(a*b)%d, 0<=(a*b)%d<d,
+        floor(a*b,d)*d<=a*b<=ceiling(a*b,d)*d,
+        0<=ceiling(a*b,d)-floor(a*b,d)<=1,
+{ rounding_interval(a*b,d); }
+
+pub proof fn premise_counterexamples()
+    ensures
+        floor(1,-1)>floor(2,-1),
+        floor(2,1)>floor(1,1),
+        floor(1*(-1),1)>floor(2*(-1),1),
+        floor(4,2)>floor(4,4),
+        floor(-4,1)<floor(-4,2),
+        !(0<=0int<0int),
+        !signed_fit(i128::MAX as int*2),
+        !signed_fit((i128::MIN as int)/(-1int)),
+        !unsigned_fit(u128::MAX as int*u128::MAX as int),
+{
+    assert(floor(1,-1)>floor(2,-1)) by(compute);
+    assert(floor(4,2)>floor(4,4)) by(compute);
+    assert(floor(-4,1)<floor(-4,2)) by(compute);
 }
 
 }

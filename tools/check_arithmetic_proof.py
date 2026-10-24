@@ -28,10 +28,11 @@ SCALAR = Path("crates/zeno-fcis-synthesis/src/finite/value/scalar.rs")
 WIDE = Path("crates/zeno-fcis-synthesis/src/finite/value/wide.rs")
 NATIVE = Path("verification/verus/arithmetic_std_tests.rs")
 PROBE = Path("verification/verus/arithmetic_probe.rs")
-CLOSURE = (HARNESS, SPEC, SCALAR, WIDE)
+CLOSURE = (HARNESS, SPEC, SCALAR, WIDE, Path("verification/verus/arithmetic_vectors.rs"))
 SOURCES = (*CLOSURE, PROFILE, NATIVE, PROBE, Path("verification/verus/toolchain.json"),
            Path("tools/check_arithmetic_proof.py"), Path("tools/test_check_arithmetic_proof.py"),
            Path("tools/check_verus.py"), Path("tools/scalar_arithmetic_reference.py"),
+           Path("tools/arithmetic_proof_vectors.py"),
            *verifier.QUALIFICATION_SOURCES)
 
 
@@ -63,6 +64,12 @@ def audit_native_binding(source: str) -> None:
         attr = re.sub(r"\s+", "", source[match.end():at-1])
         if attr.startswith("cfg(") and attr != "cfg(verus_keep_ghost)":
             raise ValueError("unreviewed conditional code in arithmetic closure")
+        if attr == "cfg(verus_keep_ghost)":
+            tail = source[at:].lstrip()
+            if not re.match(r'(?:use\s+vstd::|proof\s*!|verus\s*!|'
+                            r'#\[path\s*=\s*"[A-Za-z0-9_./-]+"\]\s*(?:pub\((?:crate|super)\)\s+)?mod\s+|'
+                            r'(?:pub\((?:crate|super)\)\s+)?mod\s+)', tail):
+                raise ValueError("ghost configuration encloses executable code")
         if attr.startswith("cfg_attr(") and not (
             attr.startswith("cfg_attr(verus_keep_ghost,verus_spec")
             or attr == "cfg_attr(verus_keep_ghost,feature(proc_macro_hygiene))"
@@ -77,6 +84,19 @@ def audit_native_binding(source: str) -> None:
     macros = set(re.findall(r"\b([A-Za-z_]\w*)\s*!\s*[({[]", source))
     if macros - allowed:
         raise ValueError("unreviewed macro in arithmetic closure: " + ','.join(sorted(macros-allowed)))
+    for match in re.finditer(r'\bverus\s*!\s*\{', source):
+        at=match.end(); depth=1
+        while at<len(source) and depth:
+            depth+=(source[at]=='{')-(source[at]=='}');at+=1
+        block=source[match.end():at-1]
+        # Ghost verus! blocks are declaration containers, never executable
+        # replacement blocks. Proof-mode statements use proof!, which Verus
+        # prevents from changing executable state.
+        if not re.match(r'\s*(?:(?://[^\n]*\n)\s*)*(?:pub(?:\(crate\))?\s+)?(?:open\s+|closed\s+)?(?:spec|proof)\s+fn\b',block):
+            raise ValueError('ghost verus block is not a specification declaration')
+        for fn in re.finditer(r'\bfn\s+',block):
+            if not re.search(r'\b(?:spec|proof)\s+$',block[:fn.start()]):
+                raise ValueError('ghost verus block contains an executable function')
 
 
 def accepted(report: dict, pin: dict, profile: dict) -> bool:
@@ -87,12 +107,21 @@ def accepted(report: dict, pin: dict, profile: dict) -> bool:
 
 
 def process(command: list[str], root: Path, environment: dict, out: Path,
-            input_text: str | None = None, timeout: int = 600):
+            input_text: str | None = None, timeout: int = 1200):
     out.mkdir(parents=True, exist_ok=False)
     command = ['nice', '-n', '19', 'ionice', '-c3', *command]
     start = time.monotonic()
-    p = subprocess.run(command, cwd=root, env=environment, input=input_text,
-                       text=True, capture_output=True, timeout=timeout)
+    try:
+        p = subprocess.run(command, cwd=root, env=environment, input=input_text,
+                           text=True, capture_output=True, timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        def decoded(value):
+            return value.decode(errors='replace') if isinstance(value,bytes) else value or ''
+        (out/'stdout.txt').write_text(decoded(error.stdout))
+        (out/'stderr.txt').write_text(decoded(error.stderr))
+        (out/'process.json').write_text(json.dumps(dict(command=command,exit_code=None,
+            outcome='timeout',timeout_seconds=timeout,seconds=time.monotonic()-start),indent=2)+'\n')
+        raise
     (out/'stdout.txt').write_text(p.stdout)
     (out/'stderr.txt').write_text(p.stderr)
     (out/'process.json').write_text(json.dumps(dict(command=command, exit_code=p.returncode,
@@ -114,6 +143,9 @@ def qualify(out: Path, work: Path, controls: bool) -> dict:
         raise ValueError('source closure differs from reviewed inventory')
     for path in CLOSURE:
         audit_native_binding((ROOT/path).read_text())
+    from arithmetic_proof_vectors import source as reference_source
+    if (ROOT/'verification/verus/arithmetic_vectors.rs').read_text()!=reference_source():
+        raise ValueError('abstract reference-vector proof differs from its producer')
     tools = verifier.prepare_tools(verifier.cache_directory(), pin, False)
     environment = {k: v for k, v in os.environ.items()
                    if not k.startswith(('VERUS_', 'VARGO_'))

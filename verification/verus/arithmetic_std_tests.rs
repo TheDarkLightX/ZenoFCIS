@@ -1,9 +1,9 @@
 //! Native samples for the checked-integer standard-library contracts we trust.
 #![allow(dead_code)]
-#[path = "../../crates/zeno-fcis-synthesis/src/finite/value/wide.rs"]
-mod wide;
 #[path = "../../crates/zeno-fcis-synthesis/src/finite/value/scalar.rs"]
 mod scalar;
+#[path = "../../crates/zeno-fcis-synthesis/src/finite/value/wide.rs"]
+mod wide;
 
 #[test]
 fn checked_integer_contract_samples() {
@@ -31,5 +31,8 @@ fn ceiling_division_witness() {
 fn full_product_refuses_overflow() {
     assert_eq!(scalar::mul_div(false, i128::MAX, i128::MAX, 1), None);
     assert_eq!(wide::mul_div_floor(u128::MAX, u128::MAX, 1), None);
-    assert_eq!(wide::mul_div_floor(u128::MAX, u128::MAX, u128::MAX), Some(u128::MAX));
+    assert_eq!(
+        wide::mul_div_floor(u128::MAX, u128::MAX, u128::MAX),
+        Some(u128::MAX)
+    );
 }
