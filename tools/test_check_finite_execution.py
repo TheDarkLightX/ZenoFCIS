@@ -84,7 +84,8 @@ class TranslatedCoverage(unittest.TestCase):
     def test_runtime_inventory_and_mutation_anchors_are_explicit(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
         runtime = [record for record in profile["functions"].values() if record["mode"] == "Exec"]
-        self.assertEqual(len(runtime), 647)
+        # Six checked helpers for payload-free sums and reason-scoped laws joined in 2.6.
+        self.assertEqual(len(runtime), 653)
         executable_names = {n for n, r in profile['functions'].items() if r['mode'] == 'Exec'}
         self.assertEqual(executable_names, set(profile['body_covered_functions']))
         self.assertTrue(all('body_sha256' in profile['functions'][n] for n in executable_names))
