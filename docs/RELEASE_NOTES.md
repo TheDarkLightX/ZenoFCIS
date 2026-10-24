@@ -9,7 +9,8 @@ no separate 2.5.1 release.
 People author the semantic layer: the requirements, design decisions and
 semantic contracts, in plain language or ZAL, chosen from proposals and
 reviewed. Much of the formal specification, code and documentation below that
-layer is LLM-generated. Parts called synthesized
+layer is LLM-generated; the specification's meaning comes from the people who
+review it, in a loop they oversee. Parts called synthesized
 are produced by ZenoFCIS's own program synthesis, such as the shipped Rust
 controllers from `synth` and the ZenoUI front ends. Other files are generated
 by tools, such as contract sources, evaluator identities, lockfiles and
