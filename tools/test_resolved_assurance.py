@@ -80,6 +80,20 @@ class RetainedGuardrails(unittest.TestCase):
             "Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 1)?)", requirement), [])
         self.assertTrue(assurance.check_decoder_region_text("mutant", "Vec::with_capacity(count)", requirement))
 
+    def test_value_decoder_reservation_keeps_its_wire_and_node_bound(self):
+        region = assurance.DECODER_ALLOCATION_REGIONS[0]
+        self.assertEqual(region.path, "crates/zeno-fcis-codec/src/lib.rs")
+        source = (assurance.ROOT / region.path).read_text(encoding="utf-8")
+        start = source.index(region.start_marker)
+        text = source[start:source.index(region.end_marker, start)]
+        self.assertEqual(assurance.check_decoder_region_text(
+            "codec", text, region.required_patterns, region.route_patterns), [])
+        for mutant in (text.replace("?\n                .min(nodes)", "?"),
+                       text.replace("state.reservation(count, cursor.remaining(), 3)?", "count as usize")):
+            self.assertNotEqual(mutant, text)
+            self.assertTrue(assurance.check_decoder_region_text(
+                "codec-mutant", mutant, region.required_patterns, region.route_patterns))
+
     def test_workflow_guard_rejects_tag_and_excess_permissions(self):
         self.assertTrue(assurance.check_workflow_text(assurance.PAGES_WORKFLOW,
             "  uses: actions/deploy-pages@v5\n"))

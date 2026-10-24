@@ -109,17 +109,23 @@ class DecoderAllocationRegion:
     start_marker: str
     end_marker: str
     required_patterns: tuple[str, ...]
+    # Non-allocation patterns that must also occur exactly once, such as a reservation helper's bounded route.
+    route_patterns: tuple[str, ...] = ()
 
 
 DECODER_ALLOCATION_REGIONS = (
+    # The value decoder reserves through its state, which bounds the wire-derived capacity by the node limit.
     DecoderAllocationRegion(
         "crates/zeno-fcis-codec/src/lib.rs",
-        "fn decode_value_inner(",
+        "fn reservation(",
         "fn initial_collection_capacity(",
         (
-            r"Vec::with_capacity\(initial_collection_capacity\(count,cursor\.remaining\(\),1,?\)\?\)",
-            r"Vec::with_capacity\(initial_collection_capacity\(count,cursor\.remaining\(\),3,?\)\?\)",
-            r"Vec::with_capacity\(initial_collection_capacity\(count,cursor\.remaining\(\),10,?\)\?\)",
+            r"Vec::with_capacity\(state\.reservation\(count,cursor\.remaining\(\),1,?\)\?\)",
+            r"Vec::with_capacity\(state\.reservation\(count,cursor\.remaining\(\),3,?\)\?\)",
+            r"Vec::with_capacity\(state\.reservation\(count,cursor\.remaining\(\),10,?\)\?\)",
+        ),
+        (
+            r"initial_collection_capacity\(count,remaining_wire_bytes,minimum_wire_bytes_per_item,?\)\?\.min\(nodes\)",
         ),
     ),
     DecoderAllocationRegion(
@@ -293,6 +299,7 @@ def check_decoder_region_text(
     label: str,
     text: str,
     required_patterns: tuple[str, ...],
+    route_patterns: tuple[str, ...] = (),
 ) -> list[str]:
     failures: list[str] = []
     compact = re.sub(r"\s+", "", text)
@@ -308,6 +315,10 @@ def check_decoder_region_text(
             failures.append(
                 f"{label}: required wire-bounded allocation pattern occurs {count} time(s): {pattern}"
             )
+    for pattern in route_patterns:
+        count = len(re.findall(pattern, compact))
+        if count != 1:
+            failures.append(f"{label}: required bounded reservation route occurs {count} time(s): {pattern}")
     return failures
 
 
@@ -330,7 +341,8 @@ def check_decoder_allocation_guards() -> list[str]:
             continue
         label = f"{requirement.path}:{line_number(text, start)}"
         failures.extend(
-            check_decoder_region_text(label, text[start:end], requirement.required_patterns)
+            check_decoder_region_text(label, text[start:end], requirement.required_patterns,
+                                      requirement.route_patterns)
         )
     return failures
 
@@ -717,6 +729,12 @@ def run_self_test(checker: ResolvedChecker | None = None) -> list[str]:
     mutant = "Vec::with_capacity(count)"
     if not check_decoder_region_text("self-test-mutant", mutant, requirement):
         failures.append("decoder allocation self-test accepted a raw-count mutant")
+    route = DECODER_ALLOCATION_REGIONS[0].route_patterns
+    bounded = "Ok(initial_collection_capacity(count, remaining_wire_bytes, minimum_wire_bytes_per_item)?.min(nodes))"
+    if check_decoder_region_text("self-test-route", bounded, (), route):
+        failures.append("decoder allocation self-test rejected its bounded reservation witness")
+    if not check_decoder_region_text("self-test-route-mutant", "Ok(count as usize)", (), route):
+        failures.append("decoder allocation self-test accepted an unbounded reservation")
 
     deploy_scopes = "permissions:\n  pages: write\n  id-token: write\n"
     if check_workflow_text(PAGES_WORKFLOW, deploy_scopes):
