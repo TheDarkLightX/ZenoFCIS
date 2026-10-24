@@ -390,9 +390,38 @@ and after. Its submission journal records the real keys, context, exact
 command bytes and Authority publication subject. Local `app-server --journal
 STORE`, `--replay JOURNAL NEW_STORE` and `--audit STORE` operations reproduce
 and compare each receipt and the final head. Restore publishes a new destination
-only after replay; startup performs the same audit before serving. Receipt,
-submission and journal profile identifiers end in `/2`; earlier collection-app
-profiles require an explicit migration that this implementation does not supply.
+only after replay; startup performs the same audit before serving. The
+LLM-generated shell pages one journal entry at a time during export, restore
+and startup audit. The `collection-journal/2` JSON format and canonical small
+exports are retained. The old 64 MiB whole-file restore limit becomes a 64 MiB
+limit on each JSON value, so total history can exceed it. Each submission is
+still checked through Authority; scalar state, independently checked named
+roots, complete receipts and the journal chain must agree with replay. No state
+checkpoint is accepted, and failure never publishes a prefix or starts a
+partial-replay fallback.
+
+Audit replay uses an automatically deleted disk-backed SQLite database. Each
+connection has a 2 MiB page cache, memory mapping is disabled, and temporary
+tables use disk. Memory for history is bounded by one encoded value at a time,
+a parsed page, bounded head metadata and a replay invocation, independently
+of total journal length.
+Live-state cache rebuilding and final entry comparison still use memory
+bounded by the declared map capacities and record widths (at most 256 branch
+positions per key). This is a bound on the storage algorithm's allocations,
+not a fixed process RSS guarantee. Recovery time and temporary disk grow with
+history; available disk and SQLite's file and sequence limits still apply.
+Set `SQLITE_TMPDIR` to a suitable local volume when its default is too small.
+The convenience `Application::journal()` and `CollectionStore::commits()` APIs
+still materialize history and are outside the bounded recovery paths.
+
+Receipt, submission and journal profile identifiers retain `/2`. Application
+source identities intentionally change with implementation changes. The
+importer also recognizes the exact preceding application's source fingerprint,
+with matching contract and compiled checker/Authority identities. Every old
+row is replayed, and the destination binds the current executable. Export an
+old store with its matching executable before importing; opening it directly
+with a changed source binding still refuses. Other implementation bindings
+and earlier collection-app profiles require an explicit migration.
 
 
 ## Runtime
@@ -594,6 +623,13 @@ this implementation.
 *Maintaining Views Incrementally*, SIGMOD, 1993, studies incremental maintenance
 of database views. The per-key delta identity here is stated and justified above;
 this citation does not establish the implementation.
+
+**Background for paged recovery.** J. Gray and A. Reuter, *Transaction
+Processing: Concepts and Techniques*, Morgan Kaufmann, 1993, describes database
+recovery. T. Bray, *The JavaScript Object Notation (JSON) Data Interchange
+Format*, RFC 8259, 2017, specifies JSON. Bounded framing here splits complete
+values for validation by the JSON decoder; paging changes memory use, not the
+Authority, receipt or root checks. Comparative prior-art search pending.
 
 **Scope.** The checker exhaustively checks the declared view domains when
 within its tuple limit. Independent small-map comparisons and planted

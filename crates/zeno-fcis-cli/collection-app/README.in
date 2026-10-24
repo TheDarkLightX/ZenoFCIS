@@ -1,6 +1,7 @@
 # Collection application
 
 This application runs its checked contract over named collection entries.
+The application shell is LLM-generated and checked by regression tests.
 The synthesized interface is a plain form. Keys in command and context arrays
 are exactly 64 lowercase hexadecimal digits; scalar values are canonical number
 strings in interface field order. Review `context.json` before serving.
@@ -56,9 +57,26 @@ app-server --audit restored.sqlite
 ```
 
 Restore requires a new destination and publishes it only after complete replay
-and head comparison. The journal profile is `zeno-fcis/collection-journal/2`,
-with a 64 MiB input limit. This profile intentionally refuses stores from an
-earlier collection-application profile; it supplies no automatic migration.
+and head comparison. The journal profile remains `zeno-fcis/collection-journal/2`.
+Export, restore and startup audit page one journal entry at a time. Each JSON
+value is limited to 64 MiB; total history has no 64 MiB limit. Every submission
+is replayed through Authority, with independent scalar and named-root checks.
+There is no state checkpoint or partial-replay fallback.
+
+Startup rebuilds and checks every Merkle cache row. Replay uses automatically
+deleted disk-backed SQLite with a 2 MiB page cache per connection and memory
+mapping disabled. Recovery memory depends on bounded head metadata, one journal
+page and the declared live map capacities, rather than total journal length. Recovery
+time and temporary disk grow with history. Choose a sufficiently large local
+temporary volume (SQLite respects `SQLITE_TMPDIR`); insufficient disk refuses
+recovery. The convenience `journal()` API still materializes history.
+
+Source-bound application identities change with implementation changes.
+Import accepts the exact preceding implementation's journal binding when its
+contract and compiled checker/Authority match, fully replays its records and
+binds the new store to the current implementation. Export the old store with
+its matching executable before importing. Other source bindings and earlier
+collection-application profiles require an explicit migration.
 
 The form retains an uncertain command for exact retry while the page remains
 open. Resolve that command before reloading. The credential is never saved in
@@ -69,8 +87,12 @@ not itself supply a library publication capability.
 
 ## Background
 
-prior-art search pending. Bibliographic verification of equality-only view
-framing, Merkle commitments and transactional replay is pending.
+J. Gray and A. Reuter, *Transaction Processing: Concepts and Techniques*,
+Morgan Kaufmann, 1993, describes database recovery. T. Bray, *The JavaScript
+Object Notation (JSON) Data Interchange Format*, RFC 8259, 2017, specifies the
+JSON format. R. C. Merkle, *Protocols for Public Key Cryptosystems*, IEEE
+Symposium on Security and Privacy, 1980, supplies hash-tree background.
+These sources do not establish this implementation's correctness.
 
 ## What is new here
 
