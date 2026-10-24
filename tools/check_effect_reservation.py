@@ -153,6 +153,8 @@ def accepted(proc, report, pin, profile):
                 'target_functions': profile['target_functions']}
     return (proc.returncode == 0 and verifier.accepted(report, expected)
             and verifier.proof_succeeded(report, pin)
+            and {name for name in report.get('func-details', {})
+                 if name.startswith(profile['namespace'])} == set(profile['target_functions'])
             and not verifier.ERROR_HEADER.search(proc.stderr)
             and not verifier.NON_SEMANTIC.search(proc.stderr))
 

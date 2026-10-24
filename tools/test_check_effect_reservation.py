@@ -71,6 +71,12 @@ class EffectProofAdmission(unittest.TestCase):
             self.assertEqual(self.profile['functions'][full]['mode'], 'Proof')
             self.assertGreater(self.profile['functions'][full]['ensures'], 0)
 
+    def test_unexpected_local_report_function_refuses(self):
+        report = self.positive()
+        report['func-details']['effect_reservation::unreviewed'] = {}
+        self.assertFalse(gate.accepted(subprocess.CompletedProcess([], 0, '', ''),
+                                      report, self.pin, self.profile))
+
     def test_nonsemantic_output_and_process_failure_cannot_pass(self):
         for status, stderr in ((1, ''), (124, ''), (-9, ''), (0, 'error: assertion failed'),
                                (0, 'solver timeout'), (0, 'resource limit reached'),
