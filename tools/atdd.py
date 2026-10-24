@@ -695,7 +695,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Review a contract with distinguishing examples before it is trusted",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
           "contract::review::tests::"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_review", "--locked")),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_review", "--locked"),
+         ("python3", "tools/numeric_symbolic_solver_tests.py")),
     ),
     "contract-refinement": AcceptanceScenario(
         "Check all raw reservation pairs and detect refinement faults",
@@ -1022,7 +1023,12 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "tools/test_verus_ids.py"),
          ("python3", "tools/test_qualification_controls.py"),
          ("python3", "tools/test_qualification_sources.py"),
-         ("python3", "tools/test_v2_native_dependencies.py")),
+         ("python3", "tools/test_v2_native_dependencies.py"),
+         ("python3", "tools/test_check_arithmetic_proof.py"),
+         ("python3", "tools/test_check_arithmetic_typed_proof.py"),
+         ("python3", "tools/test_arithmetic_emitted_ast.py"),
+         ("python3", "tools/test_check_collections_runtime.py"),
+         ("python3", "tools/test_check_effect_reservation.py")),
     ),
     "finite-execution-proof": AcceptanceScenario(
         "Preserve complete finite execution and reject missing proof contracts",

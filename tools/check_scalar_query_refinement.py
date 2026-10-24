@@ -34,8 +34,13 @@ OWNERS = (NAMESPACE + "library::impl&%0::of",) + tuple(
 
 # Native Rust corpora with their exact expected test counts; a changed count fails.
 NATIVE_CORPUS = (
+    # The crate's symbolic module only. The filter also matches contract::symbolic:: (the
+    # contract-runtime entry below) and the review's numeric_symbolic:: tests, which the
+    # contract-review acceptance scenario runs, with the pinned solvers through
+    # tools/numeric_symbolic_solver_tests.py.
     ("symbolic", ["-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "symbolic::",
-                  "--", "--skip", "contract::symbolic::", "--test-threads=1"], 37),
+                  "--", "--skip", "contract::symbolic::", "--skip", "numeric_symbolic::",
+                  "--test-threads=1"], 37),
     ("contract-runtime", ["-p", "zeno-fcis-cli", "--bin", "zeno-fcis",
         "contract::symbolic::tests::the_contract_encoding_agrees_with_the_library_on_sampled_tuples",
         "--", "--exact", "--test-threads=1"], 1),

@@ -457,7 +457,16 @@ pinned tests when both variables are set; otherwise it prints
 atdd: SKIP pinned symbolic solver tests: ZENO_FCIS_CVC5 and ZENO_FCIS_Z3 are not both set (docs/SYMBOLIC_CHECKS.md)
 ```
 
-That message skips only the optional legacy solver tests. The overall ATDD
+The numeric review's two-solver tests, which check full-width unsigned laws,
+overflow boundaries and mixed-kind guarded observations, run in the
+`contract-review` scenario through `tools/numeric_symbolic_solver_tests.py`.
+With both variables set, every one of them must pass; otherwise it prints
+
+```text
+atdd: SKIP pinned numeric review solver tests: ZENO_FCIS_CVC5 and ZENO_FCIS_Z3 are not both set (docs/SYMBOLIC_CHECKS.md)
+```
+
+Those messages skip only solver-dependent tests. The overall ATDD
 scenario also runs the mandatory certificate journey and fails unless
 `ZENO_FCIS_CVC5` and `ZENO_FCIS_CERTIFICATE_CHECKER` are supplied. The
 `formal-tools` workflow supplies the pinned tools and runs both paths.
