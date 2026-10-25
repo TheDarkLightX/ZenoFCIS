@@ -2032,14 +2032,14 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 1885,
+      "production_lines": 1900,
       "rank": 16,
       "score": 93,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            608
+            622
           ]
         },
         {
@@ -2051,46 +2051,46 @@
         {
           "id": "external-verifier-result",
           "lines": [
-            1838
+            1858
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            852,
-            2014
+            872,
+            2034
           ]
         },
         {
           "id": "generated-source",
           "lines": [
             82,
-            1288
+            1308
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            656
+            676
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            1954
+            1974
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
             273,
-            582,
-            609,
-            640,
-            808,
-            809,
-            1038,
-            1142
+            596,
+            623,
+            654,
+            828,
+            829,
+            1058,
+            1162
           ]
         }
       ],
@@ -5992,16 +5992,16 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 18760927,
-    "admitted_files": 1234,
-    "inventory_sha256": "ca4cc71732e3971408f065d51c344af4afacb3a2210c9d5de78a342f74fb2e6a",
-    "ranked_above_minimum": 1049,
+    "admitted_bytes": 18819193,
+    "admitted_files": 1238,
+    "inventory_sha256": "98bd01b9a9d394068f39b43305ef577880274c1154cb450f9492f118289952b2",
+    "ranked_above_minimum": 1053,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 72,
-      "priority-2": 343,
-      "priority-3": 384,
+      "priority-2": 346,
+      "priority-3": 385,
       "priority-4": 151,
       "priority-5": 284
     }

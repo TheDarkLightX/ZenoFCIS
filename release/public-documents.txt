@@ -449,3 +449,5 @@ crates/zeno-fcis-cli/tests/fixtures/run-properties-escrow/README.md
 examples/effect-policies/payment-sender/README.md
 docs/loops/contract-probe.md
 EXIT_CODES_AUDIT.md
+docs/RUNTIME_ASSEMBLY.md
+examples/apps/task-status/README.md

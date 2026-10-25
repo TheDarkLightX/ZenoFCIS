@@ -1174,7 +1174,14 @@ fn public_origin_is_the_only_origin() {
     let fixture: Value = ok(serde_json::from_slice(include_bytes!(
         "../app-checks/journey.json"
     )));
-    let step = &fixture["steps"][0];
+    // Leading refusal examples do not publish. Use the first accepting step
+    // to exercise an actual genesis commit, without weakening the 200 check.
+    let step = fixture["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|step| step["class"] == "Accept")
+        .expect("the journey must contain an accepting genesis step");
     let contract = v2_contract::Contract::new();
     let descriptor = contract.descriptor();
     let authority = ok(application::authority(&descriptor));
@@ -1822,7 +1829,14 @@ fn preview_uses_the_latest_committed_head() {
     let fixture: Value = ok(serde_json::from_slice(include_bytes!(
         "../app-checks/journey.json"
     )));
-    let step = &fixture["steps"][0];
+    // Leading refusal examples do not publish. Use the first accepting step
+    // to exercise an actual genesis commit, without weakening the 200 check.
+    let step = fixture["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|step| step["class"] == "Accept")
+        .expect("the journey must contain an accepting genesis step");
     ok(std::fs::write(
         root.join("clock"),
         step["clock"].as_str().unwrap_or("0"),
@@ -1954,6 +1968,8 @@ fn committed_reply_marks_pending_delivery() {
             journey.set_clock(time);
         }
         let party = step["party"].as_str().unwrap();
+        let (_, before) = snapshot(&mut server, &journey.credential(party));
+        let pending_before: u64 = before["pending"].as_str().unwrap().parse().unwrap();
         let (status, _, original, bytes) = send(
             &mut server,
             &journey,
@@ -1968,13 +1984,33 @@ fn committed_reply_marks_pending_delivery() {
         assert_eq!(status, 200, "delivery failure changed committed reply");
         let reply: Value = ok(serde_json::from_slice(&bytes));
         let (_, state) = snapshot(&mut server, &journey.credential(party));
-        if state["pending"] != "0" {
+        let pending_after: u64 = state["pending"].as_str().unwrap().parse().unwrap();
+        assert!(
+            pending_after >= pending_before,
+            "unavailable transport lost pending work"
+        );
+        // The reply describes this commit's deliveries, not all earlier backlog.
+        // With no successful sends, an increase identifies this commit's outbox.
+        if pending_after > pending_before {
             assert_eq!(
                 reply["delivery"], "pending",
-                "pending delivery not reported"
+                "this commit's pending delivery not reported"
             );
             pending = Some((party.to_owned(), original, reply));
+        } else {
+            assert!(
+                reply["delivery"].is_null(),
+                "earlier backlog attributed to this commit"
+            );
         }
+    }
+    if let Some(expected) = journey.fixture["deliveries"].as_u64() {
+        let (_, state) = snapshot(&mut server, &journey.credential(&journey.parties[0].name));
+        let actual: u64 = state["pending"].as_str().unwrap().parse().unwrap();
+        assert_eq!(
+            actual, expected,
+            "declared deliveries must all remain pending"
+        );
     }
     if journey.fixture["deliveries"].as_u64().unwrap_or(0) > 0 {
         let (party, original, committed) = pending.expect("a committed delivery remains pending");

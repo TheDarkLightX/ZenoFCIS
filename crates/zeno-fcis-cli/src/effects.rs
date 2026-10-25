@@ -83,6 +83,7 @@ effects! { crate::Command {
                 false,
                 None,
             ));
+        "assemble" => Self::Assemble { .. } => declared((&["assembly-description", "source-tree", "source-lock", "cargo-cache"], &["staged-application", "build-evidence"], true, None));
         "new" => Self::New { .. } => declared((&["target-directory", "application-contract", "source-tree", "source-lock", "optional-cargo-cache"], &["project-files", "temporary-lock-workspace"], true, None));
         "check" => Self::Check { .. } => declared((&["project"], &[], false, None));
         "graph" => Self::Graph { .. } => declared((&["project"], &[], false, None));
