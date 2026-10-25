@@ -208,15 +208,25 @@ class Scan:
         file_hash = None
         for code, pattern in self.patterns.items():
             for match in pattern.finditer(data):
-                if code == "model-api-token" and source == "content" and self.allowlist:
+                evidence = {}
+                if code == "model-api-token" and source == "content":
                     if file_hash is None:
                         file_hash = hashlib.sha256(data).hexdigest()
-                    if (location, file_hash, match_fingerprint(data, match)) in self.allowlist:
+                    fingerprint = match_fingerprint(data, match)
+                    if (location, file_hash, fingerprint) in self.allowlist:
                         self.allowlisted_matches += 1
                         continue
+                    # Review compiled public literals without printing a possible credential.
+                    # These hashes describe a refusal; they do not approve an exception.
+                    evidence = {
+                        "file_sha256": file_hash, "fingerprint_sha256": fingerprint,
+                        "match_sha256": hashlib.sha256(match.group()).hexdigest(),
+                        "offset": match.start(), "length": match.end() - match.start(),
+                    }
                 self.findings.append({
                     "location": safe_location(location, self.patterns), "code": code,
                     "source": source, "line": data.count(b"\n", 0, match.start()) + 1,
+                    **evidence,
                 })
 
     def file(self, path: Path, location: str) -> None:

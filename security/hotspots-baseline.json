@@ -3583,7 +3583,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 803,
+      "production_lines": 804,
       "rank": 30,
       "score": 89,
       "signals": [
@@ -3595,7 +3595,7 @@
             152,
             285,
             302,
-            304
+            307
           ]
         },
         {
@@ -3603,10 +3603,10 @@
           "lines": [
             38,
             77,
-            303,
-            540,
-            828,
-            865
+            306,
+            543,
+            831,
+            868
           ]
         },
         {
@@ -3631,11 +3631,11 @@
         {
           "id": "replay-outbox-commit",
           "lines": [
-            646,
-            661,
-            674,
-            698,
-            723
+            649,
+            664,
+            677,
+            701,
+            726
           ]
         },
         {
@@ -3643,10 +3643,10 @@
           "lines": [
             38,
             77,
-            303,
-            540,
-            828,
-            865
+            306,
+            543,
+            831,
+            868
           ]
         }
       ],
@@ -5992,9 +5992,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 18758425,
+    "admitted_bytes": 18760927,
     "admitted_files": 1234,
-    "inventory_sha256": "c55c810d4767c6af2fff25fc2be880c2ed9b05cec92381f3a33fa7d9e881cde2",
+    "inventory_sha256": "37f23ba4dfd6b015ec24702c31b15e2f0c36e917c6449fd3255db57becbc6b4f",
     "ranked_above_minimum": 1049,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

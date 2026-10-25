@@ -300,6 +300,9 @@ fn dual_approval_reason_classes_allow_the_cancel_decision_to_be_determined() {
     let app = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval");
     let mut project =
         fs::read_to_string(app.join("project.zeno")).unwrap_or_else(|error| panic!("{error}"));
+    // This control isolates reason classes. A declared delivery channel would
+    // also leave delivery choices open, independently of the empty case outboxes.
+    project = project.replace("channel 300 release destination 103 payload 104;\n", "");
     let mut rules: Value = serde_json::from_str(
         &fs::read_to_string(app.join("v2/policy.json")).unwrap_or_else(|error| panic!("{error}")),
     )

@@ -1180,6 +1180,11 @@ fn check_proposals(
                     Some(Verdict::Satisfied) => applies[index] += 1,
                     Some(Verdict::Skipped) => {}
                     _ => {
+                        // A refusing law still applies to this transition.
+                        // Count activation separately from whether it is satisfied.
+                        if matches!(verdict, Some(Verdict::Refused(_))) {
+                            applies[index] += 1;
+                        }
                         false_alarm.get_or_insert_with(|| {
                             json!({
                                 "law": ids[index],
