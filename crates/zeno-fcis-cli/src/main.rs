@@ -279,6 +279,20 @@ All commands are bounded. The contained loop worker has a 64 MiB memory limit an
         #[command(subcommand)]
         command: ContractCommand,
     },
+    /// Build a closed experimental scalar runtime assembly profile.
+    Assemble {
+        /// Reviewed zeno-fcis/app-assembly/1 description.
+        assembly: PathBuf,
+        /// Fresh output directory, outside the source tree.
+        #[arg(long)]
+        out: PathBuf,
+        /// Source tree used by the pinned assembler and generated application.
+        #[arg(long)]
+        source: Option<PathBuf>,
+        /// Writable build scratch outside the source tree.
+        #[arg(long)]
+        scratch: PathBuf,
+    },
     /// Create a bounded project without overwriting a nonempty directory.
     New {
         dir: PathBuf,
@@ -653,6 +667,12 @@ fn run(command: Command) -> u8 {
                 contract_files::export_program(&dir, &out, format)
             }
         },
+        Command::Assemble {
+            assembly,
+            out,
+            source,
+            scratch,
+        } => app_factory::assemble(&assembly, &out, source.as_deref(), &scratch),
         Command::New {
             dir,
             template,

@@ -1,0 +1,124 @@
+{
+  "parties": [
+    {
+      "name": "operator",
+      "context": [
+        "170"
+      ]
+    },
+    {
+      "name": "adapter",
+      "context": [
+        "171"
+      ]
+    },
+    {
+      "name": "observer",
+      "context": [
+        "172"
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "party": "observer",
+      "command": [
+        "160",
+        "0",
+        "1"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "operator",
+      "command": [
+        "160",
+        "0",
+        "1"
+      ],
+      "class": "Accept"
+    },
+    {
+      "party": "operator",
+      "command": [
+        "161",
+        "1",
+        "1"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "adapter",
+      "command": [
+        "161",
+        "1",
+        "1"
+      ],
+      "class": "Accept"
+    },
+    {
+      "party": "adapter",
+      "command": [
+        "162",
+        "0",
+        "1"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "adapter",
+      "command": [
+        "162",
+        "1",
+        "2"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "adapter",
+      "command": [
+        "164",
+        "1",
+        "1"
+      ],
+      "class": "Accept"
+    },
+    {
+      "party": "operator",
+      "command": [
+        "166",
+        "1",
+        "1"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "operator",
+      "command": [
+        "165",
+        "1",
+        "1"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "adapter",
+      "command": [
+        "162",
+        "1",
+        "1"
+      ],
+      "class": "Accept"
+    },
+    {
+      "party": "adapter",
+      "command": [
+        "162",
+        "1",
+        "1"
+      ],
+      "class": "Reject"
+    }
+  ],
+  "deliveries": 1
+}

@@ -1,0 +1,87 @@
+{
+  "format": "zenoui/metadata/1",
+  "title": "Local task status",
+  "action": "command.101.120",
+  "fields": {
+    "pre.100.110": {
+      "label": "Task outcome",
+      "unit": "unitless"
+    },
+    "pre.100.111": {
+      "label": "Current attempt",
+      "unit": "unitless"
+    },
+    "command.101.120": {
+      "label": "Command",
+      "unit": "unitless"
+    },
+    "command.101.121": {
+      "label": "Observed attempt",
+      "unit": "unitless"
+    },
+    "command.101.122": {
+      "label": "Artifact profile",
+      "unit": "unitless"
+    },
+    "context.102": {
+      "label": "Authenticated role",
+      "unit": "unitless"
+    }
+  },
+  "variants": {
+    "150": "Idle",
+    "151": "Pending",
+    "152": "Running",
+    "153": "Succeeded",
+    "154": "Failed",
+    "155": "Unknown",
+    "156": "Cancelled",
+    "160": "Request",
+    "161": "Start",
+    "162": "Succeed",
+    "163": "Fail",
+    "164": "Timeout",
+    "165": "Cancel",
+    "166": "Retry",
+    "170": "Operator",
+    "171": "Adapter",
+    "172": "Observer"
+  },
+  "commands": {
+    "160": {
+      "label": "Request",
+      "consequential": true
+    },
+    "161": {
+      "label": "Start",
+      "consequential": true
+    },
+    "162": {
+      "label": "Succeed",
+      "consequential": true
+    },
+    "163": {
+      "label": "Fail",
+      "consequential": true
+    },
+    "164": {
+      "label": "Timeout",
+      "consequential": true
+    },
+    "165": {
+      "label": "Cancel",
+      "consequential": true
+    },
+    "166": {
+      "label": "Retry",
+      "consequential": true
+    }
+  },
+  "reasons": {
+    "200": "Your configured role cannot perform this command.",
+    "201": "This observation names a different artifact profile.",
+    "202": "This command names a stale attempt. Refresh before acting.",
+    "203": "This command is not allowed in the current task stage. Unknown is not failure.",
+    "204": "The two-attempt budget is exhausted."
+  }
+}

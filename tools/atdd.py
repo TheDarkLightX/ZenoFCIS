@@ -58,6 +58,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "tools/test_zenoui_text.py"),
          ("python3", "tools/test_zenoui_refusal.py"),
          ("python3", "tools/test_app_factory.py"),
+         ("python3", "tools/test_runtime_assembler.py"),
+         ("python3", "-O", "tools/test_runtime_assembler.py"),
          ("python3", "tools/test_check_app_factory.py"),
          ("python3", "tools/check_app_factory.py")),
     ),
