@@ -19,7 +19,7 @@ SOURCES = tuple(f"crates/zeno-fcis-ingress/src/{name}.rs" for name in ("lib", "h
 APPROVED = {
     "atomic-waker": "1.1.2", "bytes": "1.12.1", "http": "1.5.0", "http-body": "1.1.0",
     "http-body-util": "0.1.5", "httparse": "1.10.1", "httpdate": "1.0.3", "hyper": "1.12.0",
-    "hyper-util": "0.1.21", "mio": "1.2.4", "socket2": "0.6.5", "tokio": "1.53.2",
+    "hyper-util": "0.1.21", "mio": "1.2.4", "socket2": "0.6.5", "tokio": "1.53.3",
     "wasi": "0.11.1+wasi-snapshot-preview1",
 }
 COMPARE = '''fn credential_matches(candidate: &[u8; 32], configured: &[u8; 32]) -> bool {
@@ -66,7 +66,7 @@ def source_failures(root: Path) -> list[str]:
             "hyper": {"version": "=1.12.0", "default-features": False, "features": ["http1", "server"]},
             "hyper-util": {"version": "=0.1.21", "default-features": False, "features": ["tokio"]},
             "http-body-util": "=0.1.5",
-            "tokio": {"version": "=1.53.2", "default-features": False, "features": ["rt", "net", "time"]},
+            "tokio": {"version": "=1.53.3", "default-features": False, "features": ["rt", "net", "time"]},
         }
         external = {name: value for name, value in deps.items() if not isinstance(value, dict) or "path" not in value}
         if external != expected:

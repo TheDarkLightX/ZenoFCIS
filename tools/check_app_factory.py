@@ -46,12 +46,14 @@ def main():
     for template,source in [('wide-counter','site/zenoui/test-projects/wide-counter'),('inventory-reservation','crates/zeno-fcis-cli/templates/inventory-reservation'),('withdrawal-queue','crates/zeno-fcis-cli/templates/withdrawal-queue'),('clock-counter','site/zenoui/test-projects/clock-counter')]:
         app=out/template
         run([cli,'new',app,'--contract',ROOT/source/'project.zeno','--app'])
+        # Copied packages must not reuse another app's absolute Cargo dep-info.
+        app_environment={**environment,'CARGO_TARGET_DIR':str(app/'target')}
         receipt=json.loads((app/'app-manifest.json').read_text())
         for name,digest in receipt['files'].items():
             if hashlib.sha256((app/name).read_bytes()).hexdigest()!=digest:
                 raise RuntimeError(f'manifest drift: {template}/{name}')
-        run([*cargo,'test','--locked','--offline','--no-default-features'],cwd=app)
-        local=environment.copy();local['APP_JOURNEY_OUT']=str(out/f'{template}.json')
+        run([*cargo,'test','--locked','--offline','--no-default-features'],cwd=app,env=app_environment)
+        local=app_environment.copy();local['APP_JOURNEY_OUT']=str(out/f'{template}.json')
         run([*cargo,'test','--locked','--offline','--all-features'],cwd=app,env=local)
         journey_log = (out/checks[-1]['log']).read_text()
         fixture = json.loads((app/'app-checks/journey.json').read_text())
@@ -59,7 +61,7 @@ def main():
             assert fixture['steps'][0]['clock'] == '7'
             assert fixture['steps'][0]['context'] == ['130']
             assert 'test public_origin_is_the_only_origin ... ok' in journey_log
-        run([*cargo,'clippy','--locked','--offline','--all-features','--all-targets','--','-D','warnings'],cwd=app)
+        run([*cargo,'clippy','--locked','--offline','--all-features','--all-targets','--','-D','warnings'],cwd=app,env=app_environment)
         if isinstance(fixture.get('parties'), list):
             # A parties journey replaces the single-party one, which then writes no report.
             if 'test parties_journey ... ok' not in journey_log or 'test app_factory_journey ... ok' not in journey_log:
@@ -71,16 +73,17 @@ def main():
     # One server for three parties: buyer, seller and operator each act with their own credential.
     app = out/'escrow-deal'
     run([cli,'new',app,'--contract',ROOT/'examples/apps/escrow-deal/project.zeno','--app'])
+    app_environment={**environment,'CARGO_TARGET_DIR':str(app/'target')}
     receipt = json.loads((app/'app-manifest.json').read_text())
     for name,digest in receipt['files'].items():
         if hashlib.sha256((app/name).read_bytes()).hexdigest()!=digest:
             raise RuntimeError(f'manifest drift: escrow-deal/{name}')
-    run([*cargo,'test','--locked','--offline','--all-features','--test','app_journey'],cwd=app)
+    run([*cargo,'test','--locked','--offline','--all-features','--test','app_journey'],cwd=app,env=app_environment)
     if 'test parties_journey ... ok' not in (out/checks[-1]['log']).read_text():
         raise SystemExit('parties journey did not run')
     if args.tcp:
         # Hostile raw HTTP against the escrow server itself, on loopback only.
-        built=subprocess.run([*cargo,'build','--locked','--offline','--bin','app-server','--message-format','json'],cwd=app,env=environment,capture_output=True,text=True,check=True)
+        built=subprocess.run([*cargo,'build','--locked','--offline','--bin','app-server','--message-format','json'],cwd=app,env=app_environment,capture_output=True,text=True,check=True)
         server=[m['executable'] for m in map(json.loads,built.stdout.splitlines()) if m.get('reason')=='compiler-artifact' and m['target']['name']=='app-server'][0]
         run(['python3','tools/check_http_wire.py','--app',app,'--server',server,'--out',out/'http-wire.json'])
         # The admission rules as a contract: every input reviewed, then sent to this server.

@@ -1386,13 +1386,26 @@ fn mutated_requests_refuse_or_decide() {
     ];
     let principal = Hash32::new([7; 32]);
     let serve = |configured: &[u8]| {
-        let production = ok(Production::open_exclusive(
-            &path,
-            &lineage,
-            1,
-            ok(FileReceiver::new(&root.join("received"))),
-            Some(Clock::default()),
-        ));
+        // Another test's child can inherit this file lock until exec closes it.
+        // Retry only that setup refusal; persistent contention still fails.
+        let start = std::time::Instant::now();
+        let production = loop {
+            match Production::open_exclusive(
+                &path,
+                &lineage,
+                1,
+                ok(FileReceiver::new(&root.join("received"))),
+                Some(Clock::default()),
+            ) {
+                Ok(production) => break production,
+                Err(zeno_fcis_shell_sqlite::v2::Error::Concurrent)
+                    if start.elapsed() < Duration::from_secs(2) =>
+                {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                Err(error) => panic!("{error:?}"),
+            }
+        };
         let store = production.store();
         let mut endpoint = ok(Application::new(
             &lineage, production, store, &path, principal, configured,

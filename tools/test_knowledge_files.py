@@ -100,8 +100,11 @@ class KnowledgeFiles(unittest.TestCase):
         paths = [snapshots.MANIFEST]
         for name in manifest["sources"]:
             paths += [Path("crates") / name, snapshots.DIRECTORY / (name + ".txt")]
+        for name in manifest.get("repository_sources", []):
+            paths += [Path(name), snapshots.DIRECTORY / "repository" / (name + ".txt")]
         paths += [path.relative_to(K.ROOT)
-                  for path in (K.ROOT / snapshots.CLI / "src").rglob("*.rs")
+                  for path in [*(K.ROOT / snapshots.CLI / "src").rglob("*.rs"),
+                               *(K.ROOT / snapshots.CLI / "examples").rglob("*.rs")]
                   if "source-snapshots/" in path.read_text()]
         for relative in paths:
             destination = root / relative

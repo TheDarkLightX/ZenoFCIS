@@ -225,7 +225,10 @@ def check(cache,install,evidence):
             target.write_text(changed) if unit==path else target.write_bytes((ROOT/unit).read_bytes())
         adjust_specimen_source_lengths(specimen)
         budget_args=['--rlimit','80'] if name=='shrink_delivery_ordinals' else []
-        result=verifier.run([*command,*budget_args,'--log-dir',str(specimen/'logs'),str(HARNESS)],specimen,env)
+        # The first counterexample is sufficient; avoid further failing-loop
+        # diagnostics exhausting the solver after the intended refusal.
+        diagnostic_args=['--multiple-errors','0'] if name=='change_declared_law_order' else []
+        result=verifier.run([*command,*budget_args,*diagnostic_args,'--log-dir',str(specimen/'logs'),str(HARNESS)],specimen,env)
         (specimen/'stdout.json').write_text(result.stdout);(specimen/'stderr').write_text(result.stderr)
         parsed=json.loads(result.stdout);actual=parsed.get('verification-results',{});coverage_error=None
         if expected=='proof':

@@ -48,6 +48,7 @@ def main():
         context=out/f'{name}-context.json';context.write_text(json.dumps(fixture['steps'][0]['context'])+'\n')
         address=f'127.0.0.1:{18260+index}';url=f'http://{address}'
         env=os.environ.copy();env.update(ZENO_APP_ADDRESS=address,ZENO_APP_SECRET_FILE=str(secret),ZENO_APP_CONTEXT=str(context),ZENO_APP_STORE=str(out/f'{name}.sqlite'),ZENO_APP_RECEIVER=str(out/f'{name}-deliveries'))
+        env['CARGO_TARGET_DIR']=str(app/'target')
         # A contract with a declared clock reads the day from a file, never the wall clock, in a host run.
         clocks={step.get('clock') for step in fixture['steps']}
         if clocks!={None}:

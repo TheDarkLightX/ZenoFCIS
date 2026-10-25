@@ -14,7 +14,7 @@ readme.workspace = true
 hyper = { version = "=1.12.0", default-features = false, features = ["http1", "server"] }
 hyper-util = { version = "=0.1.21", default-features = false, features = ["tokio"] }
 http-body-util = "=0.1.5"
-tokio = { version = "=1.53.2", default-features = false, features = ["rt", "net", "time"] }
+tokio = { version = "=1.53.3", default-features = false, features = ["rt", "net", "time"] }
 zeno-fcis-codec = { version = "=2.6.0", path = "../zeno-fcis-codec" }
 zeno-fcis-shell = { version = "=2.6.0", path = "../zeno-fcis-shell" }
 zeno-fcis-shell-sqlite = { version = "=2.6.0", path = "../zeno-fcis-shell-sqlite" }

@@ -204,7 +204,7 @@ def build(args, contract, out, policy, reviewed, work):
     manifest = manifest.replace('[dependencies]', '[dependencies]\n' +
         'zeno-fcis-ingress = { version = "=2.6.0", optional = true }\n' +
         'serde_json = { version = "=1.0.151", optional = true }\n' +
-        'tokio = { version = "=1.53.2", default-features = false, features = ["rt", "net", "time"], optional = true }')
+        'tokio = { version = "=1.53.3", default-features = false, features = ["rt", "net", "time"], optional = true }')
     manifest = manifest.replace('publish = false', 'publish = false\ndefault-run = "app-server"', 1)
     manifest += '\nzeno-fcis-ingress = { path = ' + json.dumps(str(ROOT / "crates/zeno-fcis-ingress")) + ' }\n'
     manifest += '\n[[bin]]\nname = "app-server"\npath = "src/app_main.rs"\nrequired-features = ["app"]\n'
