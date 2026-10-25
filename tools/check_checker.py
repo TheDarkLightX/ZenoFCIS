@@ -538,8 +538,10 @@ def native(directory: Path, pin: dict, environment: dict) -> dict:
         ('shell_core', ['cargo', '+1.97.1', 'test', '--locked', '--offline', '-p', 'zeno-fcis-shell-sqlite', '--lib', 'equivalence::']),
         ('shell_upgrade', ['cargo', '+1.97.1', 'test', '--locked', '--offline', '-p', 'zeno-fcis-shell-sqlite', '--test', 'upgrade']),
     ):
+        # The first CLI test command also builds the CLI in a fresh isolated
+        # target; a cold build can exceed 600s before any test starts.
         # Default upgrades exceeded 600s; the all-feature smoke took 1,618s.
-        timeout = 3600 if name == 'shell_upgrade' else 600
+        timeout = 3600 if name in ('cli_f3', 'shell_upgrade') else 600
         run, _ = run_logged(command, ROOT, environment, directory / name, timeout=timeout)
         verifier.require_success(run)
         runs[name] = {'command': command, 'exit_code': run.returncode, 'stdout': run.stdout}

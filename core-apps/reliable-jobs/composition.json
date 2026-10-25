@@ -5,7 +5,7 @@
     {
       "family": "retry-budget",
       "instance": "components/retry/core-instance.json",
-      "instance_sha256": "5344f90a8cc86179b65c05b9c5bd6ecb352b8b767b3996ea036a00e6ba2f6d52",
+      "instance_sha256": "87f635703259593b8318b4f89574f6744e3da832462c3eaf0d658cf9c975755c",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "retry",
       "owns_fields": [
@@ -31,7 +31,7 @@
     {
       "family": "idempotency-slot",
       "instance": "components/memo/core-instance.json",
-      "instance_sha256": "043e94ff2f1ccaea4a21579965ab3ed63bee3fc7e985ebd0e8d2f78e467a2ef3",
+      "instance_sha256": "18a35aababb15f3b2b904c055c9e517162929c1b3adc7c977a33b5cc77c222b0",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "memo",
       "owns_fields": [],
@@ -57,7 +57,7 @@
     {
       "family": "logical-deadline",
       "instance": "components/deadline/core-instance.json",
-      "instance_sha256": "d2710bca9b16af292ab678c1b0acf9696624565e124b073cf2d136ffd738ccbe",
+      "instance_sha256": "321fea1acf7fd4a5329fe2a9aa02a3171c9640464fd463a9a44c4dbe3e54e6e8",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "deadline",
       "owns_fields": [

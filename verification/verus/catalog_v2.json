@@ -4014,7 +4014,7 @@
       "signature_sha256": "ab36553cdfff611ffb03269678156f2448285909704ec223c558916838a81e78"
     },
     "catalog_v2::execution_v2::authority::evaluator::EVALUATOR": {
-      "body_sha256": "7d4dc5a31a808be817a0f2ed9ae3086e201958e030c0867b5918dfe626576045",
+      "body_sha256": "d8e3c4022187a60777821270045dc0c568786e29253bc167dc8ef3b880d0fb88",
       "ensures": 0,
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "mode": "Spec",

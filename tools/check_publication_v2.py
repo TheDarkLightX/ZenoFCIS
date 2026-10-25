@@ -140,10 +140,11 @@ def native_command(source: Path, binary: Path, dependency_args: list[str]) -> li
     return [*command,str(source / HARNESS),'-o',str(binary)]
 
 
-def custody(directory: Path, source: Path, env: dict) -> list[dict]:
+def custody(directory: Path, source: Path, env: dict, *, prepared=None) -> list[dict]:
+    dependencies = native_dependency_args(ROOT, directory/'binding', env, prepared=prepared)
     lib = directory / 'libpublication_v2.rlib'
     verifier.require_success(run(['rustc','+1.97.1','--edition=2024','--crate-type=rlib',
-        '--check-cfg','cfg(verus_keep_ghost)','--check-cfg','cfg(test)',str(source / HARNESS),'-o',str(lib)],source,env,directory,'library'))
+        '--check-cfg','cfg(verus_keep_ghost)','--check-cfg','cfg(test)',str(source / HARNESS),'-o',str(lib),*dependencies],source,env,directory,'library'))
     prefix = 'extern crate publication_v2 as api;\nuse api::execution_v2::{authority as a,composition as c};\n'
     cases = [
         ('usable_client',"pub fn run<'a>(authority:&'a a::Authority<'_>,raw:c::Raw<'a>)->a::PublicationOutcome<'a>{authority.publish(raw)}\npub fn inspect(p:&a::Publication<'_>)->usize{p.identity().len()+p.poststate().len()+p.subject().len()+p.effects().len()+p.outbox().len()}\npub fn genesis<'a>(authority:&'a a::Authority<'_>,raw:&'a[u8])->a::PublicationOutcome<'a>{authority.publish_genesis(raw)}",'',()),
@@ -166,7 +167,7 @@ def custody(directory: Path, source: Path, env: dict) -> list[dict]:
         path = directory / (name + '.rs')
         path.write_text(prefix + body + '\n')
         command = ['rustc','+1.97.1','--edition=2024','--crate-type=rlib','--error-format=json',
-                   '--extern','publication_v2=' + str(lib),str(path),'-o',str(directory / (name + '.rlib'))]
+                   '--extern','publication_v2=' + str(lib),str(path),'-o',str(directory / (name + '.rlib')),*dependencies]
         proc = run(command,source,env,directory,name)
         diagnostics = [json.loads(line) for line in proc.stderr.splitlines() if line.startswith('{')]
         matched = [e for e in diagnostics if (e.get('code') or {}).get('code') == code and all(t in e.get('message','') for t in terms)]
@@ -211,9 +212,9 @@ def check(directory: Path, positive_only: bool = False) -> dict:
     verifier.require_success(native)
     if '6 passed; 0 failed' not in native.stdout:
         raise ValueError('complete public native oracle corpus did not run')
-    custody_results = custody(directory/'custody',source,env)
+    custody_results = custody(directory/'custody',source,env,prepared=dependencies)
     no_std = run(['rustc','+1.97.1','--edition=2024','--crate-type=lib','--emit=metadata',
-        '--check-cfg','cfg(verus_keep_ghost)','--check-cfg','cfg(test)',str(source/HARNESS),'-o',str(directory/'native/no-std.rmeta')],source,env,directory/'native','no-std')
+        '--check-cfg','cfg(verus_keep_ghost)','--check-cfg','cfg(test)',str(source/HARNESS),'-o',str(directory/'native/no-std.rmeta'),*arguments],source,env,directory/'native','no-std')
     verifier.require_success(no_std)
     public = run(['cargo','+1.97.1','test','--locked','--offline','-vv','-p','zeno-fcis-synthesis','--test','v2_publication','--','--test-threads=1'],ROOT,env,directory/'native','public-test')
     verifier.require_success(public)

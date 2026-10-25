@@ -751,7 +751,7 @@ class LoggedDeadlines(unittest.TestCase):
             self.assertEqual((root / 'run/stdout.json').read_text(), 'partial')
             self.assertEqual((root / 'run/stderr.log').read_text(), 'deadline')
 
-    def test_only_default_upgrade_suite_gets_extended_native_deadline(self):
+    def test_cold_cli_build_and_default_upgrade_suite_get_extended_native_deadlines(self):
         calls = []
         def logged(command, cwd, environment, output, *, timeout=600):
             calls.append((output.name, command, timeout))
@@ -764,7 +764,7 @@ class LoggedDeadlines(unittest.TestCase):
                 gate.native(Path(temporary), {'runtime_rust': '1.97.1'}, {})
         self.assertEqual({name: timeout for name, _, timeout in calls},
                          {'compiler': 600, 'native-compile': 600, 'direct_source': 600,
-                          'cli_f3': 600, 'cli_process': 600, 'shell_core': 600, 'shell_upgrade': 3600})
+                          'cli_f3': 3600, 'cli_process': 600, 'shell_core': 600, 'shell_upgrade': 3600})
         upgrade = next(command for name, command, _ in calls if name == 'shell_upgrade')
         self.assertEqual(upgrade, ['cargo', '+1.97.1', 'test', '--locked', '--offline', '-p',
                                    'zeno-fcis-shell-sqlite', '--test', 'upgrade'])

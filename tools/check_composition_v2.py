@@ -209,11 +209,12 @@ def native(root, env, directory, filtered=False, *, prepared=None):
     return recorded(command, root, env, directory, 'native')
 
 
-def opacity(root, env, directory):
+def opacity(root, env, directory, *, prepared=None):
+    dependencies = native_dependency_args(ROOT, directory/'opaque-binding', env, prepared=prepared)
     library = directory/'libcomposition.rlib'
     build = recorded(['rustc', '+1.97.1', '--edition=2024', '--crate-type=rlib', '--crate-name=composition',
                       '--check-cfg', 'cfg(verus_keep_ghost)', '--check-cfg', 'cfg(test)', str(HARNESS),
-                      '-o', str(library)], root, env, directory, 'opaque-library')
+                      '-o', str(library), *dependencies], root, env, directory, 'opaque-library')
     verifier.require_success(build)
     cases = {
         'public_read': ('pub fn inspect(o: &c::Outcome) { let _ = (o.raw(), o.usage(), o.result()); }', None),
@@ -228,7 +229,7 @@ def opacity(root, env, directory):
         path = directory/f'{name}.rs'
         path.write_text('extern crate composition as z;\nuse z::execution_v2::composition as c;\n'+source+'\n')
         result = recorded(['rustc', '+1.97.1', '--edition=2024', '--crate-type=lib', '--error-format=json',
-                           '--extern', f'composition={library}', str(path), '-o', str(directory/f'{name}.rlib')],
+                           '--extern', f'composition={library}', str(path), '-o', str(directory/f'{name}.rlib'), *dependencies],
                           root, env, directory, name)
         codes = [item.get('code', {}).get('code') for line in result.stderr.splitlines()
                  if (item := json.loads(line)).get('code') is not None]
@@ -264,7 +265,7 @@ def check(out: Path, positive_only=False):
     (directory/'coverage.json').write_text(json.dumps(observed, sort_keys=True, indent=2)+'\n')
     dependencies = prepare_native_dependencies(ROOT, directory/'common-native', env)
     verifier.require_success(native(ROOT, env, directory, prepared=dependencies))
-    opacity_results = opacity(ROOT, env, directory)
+    opacity_results = opacity(ROOT, env, directory, prepared=dependencies)
     (directory/'opacity.json').write_text(json.dumps(opacity_results, indent=2)+'\n')
     for name, args in (
         ('integration', ['test', '-p', 'zeno-fcis-synthesis', '--test', 'v2_composition']),
