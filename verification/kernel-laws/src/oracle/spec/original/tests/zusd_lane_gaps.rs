@@ -243,8 +243,9 @@ fn zeno_integer_literals_cover_i128_and_keep_unsigned_metadata_bounded() {
 }
 
 #[test]
-fn zeno_v1_comparisons_cannot_start_with_a_parenthesized_scalar() {
-    assert!(!parse_codes(&with_law("(post.100.110 + 1) * 2 == 4")).is_empty());
+fn zeno_v1_comparisons_accept_parenthesized_scalars() {
+    // These authoring controls use the current parser; this former gap is closed.
+    assert!(parse_codes(&with_law("(post.100.110 + 1) * 2 == 4")).is_empty());
     assert!(parse_codes(&with_law("2 * (post.100.110 + 1) == 4")).is_empty());
 }
 
