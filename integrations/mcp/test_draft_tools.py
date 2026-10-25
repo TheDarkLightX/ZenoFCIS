@@ -44,7 +44,7 @@ class DraftToolsTest(unittest.TestCase):
 
     def test_new_paths_preserve_real_dangling_final_links(self):
         with tempfile.TemporaryDirectory(prefix="zeno-draft-wrapper-path-") as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             destination = root / "absent"
             link = root / "requested"
             link.symlink_to(destination, target_is_directory=True)

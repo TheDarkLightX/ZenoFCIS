@@ -1220,7 +1220,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 3763,
+      "production_lines": 3813,
       "rank": 9,
       "score": 95,
       "signals": [
@@ -1230,16 +1230,16 @@
             865,
             915,
             3086,
-            3145,
-            3354
+            3158,
+            3414
           ]
         },
         {
           "id": "concurrency-primitive",
           "lines": [
             169,
-            3225,
-            3239
+            3285,
+            3299
           ]
         },
         {
@@ -1287,7 +1287,8 @@
         {
           "id": "host-process-execution",
           "lines": [
-            3088
+            3088,
+            3187
           ]
         },
         {
@@ -1304,8 +1305,8 @@
         {
           "id": "panic-or-unchecked-result",
           "lines": [
-            4084,
-            4086
+            4144,
+            4146
           ]
         },
         {
@@ -6094,15 +6095,15 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 12908601,
-    "admitted_files": 798,
-    "inventory_sha256": "b8cb37ff15650890ba42d4f4a3f42b0962ef8932f7b866fd4bf32b51c0d759d8",
-    "ranked_above_minimum": 694,
+    "admitted_bytes": 12940531,
+    "admitted_files": 799,
+    "inventory_sha256": "2cd15c9fae2b273d507a7357f62f8ddf0609a68bdb21ee7bef0bae9565c8787b",
+    "ranked_above_minimum": 695,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 51,
-      "priority-2": 234,
+      "priority-2": 235,
       "priority-3": 255,
       "priority-4": 93,
       "priority-5": 165
