@@ -85,7 +85,8 @@ class Surfaces(unittest.TestCase):
 class Workspace(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="zal-learn-test-")
-        self.root = Path(self.tmp.name)
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name).resolve()
         self.cli = self.root / "zeno-fcis"
         self.cli.write_text("recorded only\n")
         self.cli.chmod(0o755)
@@ -104,11 +105,8 @@ class Workspace(unittest.TestCase):
 
         self.runner = patch.object(L.doors, "run", side_effect=run)
         self.runner.start()
+        self.addCleanup(self.runner.stop)
         self.workspace.init_learn(self.spec)
-
-    def tearDown(self):
-        self.runner.stop()
-        self.tmp.cleanup()
 
     def doc(self, acts, author="model"):
         ctx = Z.Context(self.workspace.load()["subject"])

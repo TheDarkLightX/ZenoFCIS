@@ -11,7 +11,7 @@ class SourceBundleTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name) / 'source'
+        self.root = Path(self.temporary.name).resolve() / 'source'
         self.originals = {
             'Cargo.lock': b'qualified original resolver\n',
             'crates/zeno-fcis-codec/Cargo.toml': b'name = "codec"\nversion = "2.0.0"\n',
@@ -32,7 +32,7 @@ class SourceBundleTests(unittest.TestCase):
         self.generate()
         packages = {}
         for crate in ['zeno-fcis-codec', 'zeno-fcis-synthesis']:
-            target = Path(self.temporary.name) / 'archives' / crate
+            target = self.root.parent / 'archives' / crate
             shutil.copytree(self.root / 'crates' / crate, target)
             (target / 'Cargo.toml').rename(target / 'Cargo.toml.orig')
             (target / 'Cargo.toml').write_bytes(b'name = "normalized"\n')

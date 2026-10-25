@@ -115,7 +115,9 @@ class CompiledInventoryChecks(unittest.TestCase):
     """Mocked binary listings exercise actual compiler-closure file handling."""
 
     def fixture(self, directory, sources, dependencies=None):
-        root = Path(directory)
+        # Match the production recorder's canonical ROOT on hosts with aliased
+        # temporary directories, without relaxing source-containment checks.
+        root = Path(directory).resolve()
         (root / "Cargo.toml").write_text("[package]\nname = 'inventory-fixture'\n")
         executable = root / "target" / "fixture-123"
         executable.parent.mkdir()

@@ -17,7 +17,9 @@ class EvaluatorIdentityTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='evaluator-identity-')
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        # macOS's default temporary directory has a /var -> /private/var alias.
+        # Start from its real directory; admitted source symlinks stay refused.
+        self.root = Path(self.temp.name).resolve()
         self.raw = gate.source_manifest(gate.ROOT / gate.SOURCE_MANIFEST)
         for name in [*self.raw['paths'], str(gate.SOURCE_MANIFEST), str(gate.EVALUATOR),
                      'verification/verus/toolchain.json']:

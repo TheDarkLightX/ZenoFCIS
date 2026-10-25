@@ -138,6 +138,54 @@ class DownloadsTest(unittest.TestCase):
                          ["SBOM.cdx.json", f"zeno-fcis-9.9.9-{LINUX}.tar.gz", "zeno-fcis-rustdoc-9.9.9.tar.gz"])
 
 
+class HostFactsTest(unittest.TestCase):
+    def facts(self, developer, fail=None):
+        journey = object.__new__(installed.Journey)
+        journey.host, journey.work = MAC, Path("work")
+        calls = []
+
+        def run(name, command, *, cwd):
+            calls.append((name, command))
+            self.assertEqual(cwd, journey.work)
+            if name == fail:
+                raise installed.JourneyError(f"{name}: failed probe")
+            output = developer + "\n" if name == "host-developer-directory" else name + "\n"
+            return subprocess.CompletedProcess(command, 0, output.encode(), b"")
+
+        journey.run = run
+        return journey.host_facts(), calls
+
+    def test_command_line_tools_record_package_compiler_and_sdk_without_claiming_xcode(self):
+        facts, calls = self.facts("/Library/Developer/CommandLineTools")
+        self.assertEqual(facts["developer_directory"], "/Library/Developer/CommandLineTools")
+        self.assertEqual(facts["command_line_tools"], "host-command-line-tools\n")
+        self.assertNotIn("xcode", facts)
+        self.assertIn(("host-command-line-tools", ["pkgutil", "--pkg-info", "com.apple.pkg.CLTools_Executables"]), calls)
+        self.assertIn(("host-clang", ["xcrun", "--sdk", "macosx", "clang", "--version"]), calls)
+        self.assertIn(("host-sdk", ["xcrun", "--sdk", "macosx", "--show-sdk-version"]), calls)
+        self.assertIn(("host-rustc", ["rustc", "+1.97.1", "-vV"]), calls)
+        self.assertNotIn("host-xcode", [name for name, _ in calls])
+
+    def test_other_developer_directories_still_require_xcode_version(self):
+        for developer in ("/Applications/Xcode.app/Contents/Developer", "/custom/developer", ""):
+            with self.subTest(developer=developer):
+                facts, calls = self.facts(developer)
+                self.assertEqual(facts["xcode"], "host-xcode\n")
+                self.assertNotIn("command_line_tools", facts)
+                self.assertIn(("host-xcode", ["xcodebuild", "-version"]), calls)
+
+    def test_failed_prerequisite_probes_are_not_ignored(self):
+        for developer, names in (
+            ("/Library/Developer/CommandLineTools",
+             ("developer-directory", "command-line-tools", "clang", "sdk", "rustc")),
+            ("/Applications/Xcode.app/Contents/Developer", ("xcode",)),
+        ):
+            for name in names:
+                with self.subTest(developer=developer, probe=name), \
+                        self.assertRaisesRegex(installed.JourneyError, f"host-{name}: failed probe"):
+                    self.facts(developer, fail=f"host-{name}")
+
+
 class PlatformRoutesTest(unittest.TestCase):
     def reports(self):
         # The current public containment protocol, independently specified here.

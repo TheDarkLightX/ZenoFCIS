@@ -195,7 +195,19 @@ class Journey:
     def host_facts(self) -> dict:
         facts = {"uname": platform.uname()._asdict(), "python": sys.version}
         if self.host == MAC:
-            for name, command in (("sw_vers", ["sw_vers"]), ("xcode", ["xcodebuild", "-version"]),
+            developer = self.run("host-developer-directory", ["xcode-select", "-p"],
+                                 cwd=self.work).stdout.decode().strip()
+            facts["developer_directory"] = developer
+            if developer == "/Library/Developer/CommandLineTools":
+                # The documented compiler prerequisite is CLT, whose xcodebuild
+                # intentionally refuses -version. Record its actual package instead.
+                facts["command_line_tools"] = self.run(
+                    "host-command-line-tools", ["pkgutil", "--pkg-info", "com.apple.pkg.CLTools_Executables"],
+                    cwd=self.work).stdout.decode()
+            else:
+                facts["xcode"] = self.run("host-xcode", ["xcodebuild", "-version"], cwd=self.work).stdout.decode()
+            for name, command in (("sw_vers", ["sw_vers"]),
+                                  ("clang", ["xcrun", "--sdk", "macosx", "clang", "--version"]),
                                   ("sdk", ["xcrun", "--sdk", "macosx", "--show-sdk-version"])):
                 facts[name] = self.run(f"host-{name}", command, cwd=self.work).stdout.decode()
         else:

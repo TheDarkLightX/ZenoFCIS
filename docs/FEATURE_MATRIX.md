@@ -36,12 +36,18 @@ bound to the release source and artifact qualifies a host executable.
 | Installed-binary journey | yes | yes |
 | Clippy and tests | yes | portable tests; validation pending |
 | Contained checker runtime | yes | unavailable (exit 2) |
-| `synth verify` execution | yes | blocked (exit 2) |
+| `synth verify` execution | yes | native bounded process supervision; host qualification pending |
 | ATDD, packaged-workspace verification, Verus, Miri, formal tools, Tau kit, OCaml profile | yes | no |
 
 Linux evidence is not claimed for macOS. Intel Macs, Windows and other hosts
 have no executable and are not qualified. See
 [supported hosts](INSTALLATION.md#supported-hosts).
+
+Native synthesis conformance replays the emitted program over its admitted
+finite inputs and writes a separately bound receipt with no application
+authority. Its process supervision is not a security sandbox and does not
+qualify the Linux-only contained checker or loop routes. See the
+[runtime limits](INSTALLATION.md#runtime-conformance-and-linux-only-features-on-macos).
 
 ## Environment labels
 
