@@ -300,7 +300,12 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
             # The skip-last fault needs more prover work to finish its body check.
             # Keep resource failures unqualified; runtime budgets/specs are unchanged.
             control_budget = ["--rlimit", "100"] if name == "skip_unused_instruction" else []
-            mutant_command = [*command, *control_budget, "--log-dir", str(specimen / "logs"), str(HARNESS)]
+            # The wrong-resource fault already fails an evaluate precondition.
+            # Extra counterexample queries exhaust the solver after that failure;
+            # request one diagnostic per function without changing proof coverage.
+            control_diagnostics = ["--multiple-errors", "0"] if name == "charge_wrong_resource" else []
+            mutant_command = [*command, *control_budget, *control_diagnostics,
+                              "--log-dir", str(specimen / "logs"), str(HARNESS)]
             mutant = verifier.run(mutant_command, specimen, environment)
             (specimen / "verus.json").write_text(mutant.stdout)
             (specimen / "verus.stderr").write_text(mutant.stderr)

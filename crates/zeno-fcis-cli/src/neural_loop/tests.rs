@@ -2002,6 +2002,15 @@ fn resume_replays_the_replacement_charges_the_replay_and_continues_the_session()
         session.ledger().entries().len() + 1
     );
     assert_eq!(resumed.attempts().len(), 2);
+    let historical = &resumed.report()["attempts"][0]["feedback"];
+    assert_eq!(historical["kind"], "recorded-outcome");
+    assert_eq!(historical["replayed"], false);
+    assert_eq!(historical["outcome"], session.attempts()[0].outcome);
+    assert!(
+        session.attempts()[0]
+            .outcome
+            .starts_with("equivalent-without-improvement:")
+    );
     assert!(matches!(
         resumed.attempts()[1].feedback,
         Feedback::Equivalent {
@@ -2405,9 +2414,13 @@ fn stored_witnesses_are_replayed_before_reuse_and_dropped_when_they_do_not_repro
     let resumed = resumed_session(&persisted);
     assert!(matches!(
         &resumed.attempts()[0].feedback,
-        Feedback::Incomplete { .. }
+        Feedback::Recorded { outcome, .. } if outcome == "different"
     ));
     assert_eq!(resumed.report()["witnesses_dropped_on_resume"], json!([0]));
+    assert_eq!(
+        resumed.report()["attempts"][0]["feedback"]["replayed"],
+        false
+    );
     // A witness stored against other candidate bytes is dropped too.
     let mut persisted = Persisted::of(&session);
     persisted.witnesses.push((

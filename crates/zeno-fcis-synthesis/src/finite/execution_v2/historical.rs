@@ -5,6 +5,8 @@ use released::v2_authority as authority;
 use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher};
 use zeno_fcis_crypto::RustCryptoSha256;
 
+// Preserve the reviewed historical source bytes during workspace formatting.
+#[rustfmt::skip]
 #[path = "../historical_24_sources.rs"]
 mod sources;
 

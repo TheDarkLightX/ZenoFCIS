@@ -273,6 +273,8 @@ pub(crate) fn check(
 
 /// Closed released-receipt route. It only verifies retained evidence and never
 /// participates in the current transform command's authoring/parallel routes.
+// Keep the closed historical replay spelling checked by its source-route guard.
+#[rustfmt::skip]
 fn check_released_24(original: &[u8], candidate: &[u8], limits: Limits) -> Result<Equivalence, Rejection> {
     use zeno_fcis_synthesis::finite_runtime::{import_i64_program, import_i64_program_data};
     let a = import_i64_program_data(original).map_err(|e| not_admitted(Side::Original, &e))?;
@@ -595,13 +597,24 @@ fn rerun(
     // The verifier's cap bounds the work; the receipt cannot raise it.
     let released_24 = is_released_24_receipt(&recorded.value);
     if released_24 {
-        let equivalence = check_released_24(original, candidate, Limits { input_tuples: max_input_tuples, ..recorded.limits })
-            .map_err(Replay::NotEquivalent)?;
+        let equivalence = check_released_24(
+            original,
+            candidate,
+            Limits {
+                input_tuples: max_input_tuples,
+                ..recorded.limits
+            },
+        )
+        .map_err(Replay::NotEquivalent)?;
         if equivalence.inputs_checked != recorded.domain_size {
             return Err(Replay::Differs(vec![String::from("domain")]));
         }
-        let equivalence = if recorded.limits.input_tuples == max_input_tuples { equivalence }
-            else { check_released_24(original, candidate, recorded.limits).map_err(Replay::NotEquivalent)? };
+        let equivalence = if recorded.limits.input_tuples == max_input_tuples {
+            equivalence
+        } else {
+            check_released_24(original, candidate, recorded.limits)
+                .map_err(Replay::NotEquivalent)?
+        };
         return Ok((recorded, equivalence));
     }
     match admit(original, candidate, max_input_tuples) {
@@ -620,7 +633,8 @@ fn rerun(
 
 /// The exact released checker binding is provenance selection, not a verdict.
 pub(crate) fn is_released_24_receipt(value: &Value) -> bool {
-    value.get("checker") == Some(&json!({"semantics": "zeno-fcis/transform-check/3",
+    value.get("checker")
+        == Some(&json!({"semantics": "zeno-fcis/transform-check/3",
         "evaluator_identity": hex(&zeno_fcis_synthesis::finite::historical::RELEASED_EVALUATOR)}))
 }
 

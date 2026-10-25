@@ -214,7 +214,7 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/evaluator.rs",
-        "3c4005995932ae176406bcc3f29b4fe1e0436fbc7e904e6033719f27725fff9d",
+        "d041cb617a04309be55700639a689827a3a56acc798a18b96a30af3310dd3c3f",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/family_spec.rs",
@@ -622,7 +622,7 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "verification/verus/scalar_node_refinement.rs",
-        "6602aaecbc8230a0565e0c4401154561dc67f6b851f6958c7b4a18b6bdfd51ae",
+        "38463ce7a8d66d97614f65c4ee302c8cf094a4ffe1ba62fd762a52cfa7bfa81a",
     ),
     (
         "verification/verus/scalar_owned_ir.rs",
@@ -1528,7 +1528,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/historical.rs",
-        "9a9cc41cda9184f9c6bb56a39ec17afd5fb3dcf28ab5662e1b09d19d766530ee",
+        "e5c9aabda6acb9909b5dfa3a33b8d6ec33090731bbd0592b3443d70f0837f815",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view.rs",
@@ -1640,7 +1640,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/historical_24_sources.rs",
-        "26743edea413e34732a126f5c607436780997e9cf47d0128e5b409cf408abf5e",
+        "09cc446d02c4074e0ada4c888452850d8ee2daa2482e46d45e83e8f40c8733fa",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/ir.rs",
@@ -1652,7 +1652,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/mod.rs",
-        "ea8d7f41c139bfc26b2c252d7b7d5b9e5cd35bb8f3c281f8b58c5f414fea9ac9",
+        "b78fefaeb1629cc8ee0d62b157266005e6ac3a6ec9962b9fce7f90f5d5bf0ccc",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/preparation.rs",
@@ -1676,7 +1676,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite_runtime.rs",
-        "1871d00ad710599a4c46dcabe95bb148bead03bb4690331aa80b251ec8ad6812",
+        "6235946f54174cf0da2776f3a743d72965a64e1979c605a02b3f359e4630039b",
     ),
     (
         "crates/zeno-fcis-synthesis/src/lib.rs",
@@ -1708,7 +1708,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "release/historical-24-copy.json",
-        "0064f3cb45ac42d1e3f2cbf95d9f9bec49960731382cf458d38480e7d4abf4ea",
+        "fecc0586fc539aab9730e4fa4c8a12eb376601db25298732f58671ae4b3a4f73",
     ),
     (
         "rust-toolchain.toml",

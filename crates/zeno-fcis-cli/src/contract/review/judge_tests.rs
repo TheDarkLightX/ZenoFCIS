@@ -294,6 +294,45 @@ fn a_delivery_contract_is_measured_when_its_universe_is_complete() {
 }
 
 #[test]
+fn dual_approval_reason_classes_allow_the_cancel_decision_to_be_determined() {
+    // 2.5 deliberately does not judge deliveries. Keep that boundary above;
+    // this projection removes deliveries to exercise its decision universe.
+    let app = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval");
+    let mut project =
+        fs::read_to_string(app.join("project.zeno")).unwrap_or_else(|error| panic!("{error}"));
+    let mut rules: Value = serde_json::from_str(
+        &fs::read_to_string(app.join("v2/policy.json")).unwrap_or_else(|error| panic!("{error}")),
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    for case in rules["cases"]
+        .as_array_mut()
+        .unwrap_or_else(|| panic!("cases array"))
+    {
+        case["outbox"] = json!([]);
+    }
+    // These constrain classes and successors, without mentioning reason IDs.
+    project.push_str("\nlaw 9100 approvals_only on accept = command.101 == 140;\n");
+    project.push_str("law 9101 rejection_cases on reject = pre.100.110 != 150 || context.102.120 == 160 || (command.101 == 140 && context.102.120 == pre.100.111);\n");
+    rules["law_kinds"]["9100"] = json!("AuthoritySubjectRecipient");
+    rules["law_kinds"]["9101"] = json!("RejectNoAuthority");
+    let result = gaps::judge(
+        &project,
+        &rules.to_string(),
+        gaps::Options {
+            mutants: false,
+            ..Core::options(None)
+        },
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let report = measured(&result);
+    assert_eq!(report["frame_check"]["mismatches"], 0);
+    assert_eq!(report["admissible"]["full"]["tuples"], 384);
+    // 16 pending state encodings, three officers, one cancellation command.
+    // The old shared-reason list admitted four failures and determined none.
+    assert_eq!(report["admissible"]["full"]["determined"], 48);
+}
+
+#[test]
 fn over_a_limit_the_gap_judge_is_inconclusive() {
     let counter = Core::new("bounded-counter", &[("C", 2)]);
     for (max_tuples, max_work, reason) in [
@@ -322,6 +361,7 @@ fn a_proposed_law_is_checked_against_the_contract_before_it_is_measured() {
     assert_eq!(alarm.status(), "proposal-false-alarm");
     assert_eq!(alarm.json()["false_alarm"]["law"], 9000);
     assert_eq!(alarm.json()["false_alarm"]["input"], json!([0, 150, 0]));
+    assert_eq!(alarm.json()["proposals"][0]["applies_on"], 12);
     let held = counter.gaps(Some(
         "law 9000 kept on reject = context.102.130 == 0 || context.102.130 == 1;\nlaw 9001 harmless on any = true;\n",
     ));

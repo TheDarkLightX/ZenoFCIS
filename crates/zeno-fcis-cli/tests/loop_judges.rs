@@ -406,6 +406,100 @@ fn arithmetic_teach_back_cli_checks_both_product_conditions() {
 }
 
 #[test]
+fn an_offered_answer_does_not_inherit_another_decisions_successor() {
+    let directory = Directory::new();
+    let app = directory.0.join("toggle");
+    fs::create_dir_all(app.join("v2")).unwrap_or_else(|e| panic!("{e}"));
+    let project = r#"zeno 1;
+project 1 toggle;
+namespace 2 core;
+type 100 state Counter;
+type 101 command Change;
+type 102 context Authorized;
+type 105 int Count;
+field 110 100 count 105;
+variant 120 101 Toggle none;
+reason 200 denied precedence 0;
+component 400 counter {
+ owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 32;
+}
+merge [400];
+law 500 bounded on commit, genesis = post.100.110 >= 0 && post.100.110 <= 1;
+law 501 toggle on accept = post.100.110 == 1 - pre.100.110;
+"#;
+    let mut policy = json!({
+        "schema": "zeno-fcis/template-declarative-policy/2", "template": "minimal",
+        "roots": {"state":100,"command":101,"context":102},
+        "leaf_bindings": {"102":["Bool"],"105":["I128",0,1]},
+        "variables": {"count":"pre.100.110","allowed":"context.102"},
+        "cases": [
+            {"when":"!allowed","class":"Reject","reason":200,"post":{},"outbox":[]},
+            {"when":"true","class":"Accept","reason":null,"post":{"110":"1 - count"},"outbox":[]}
+        ],
+        "genesis":{"110":0},
+        "law_kinds":{"500":"StateInvariant","501":"AuthoritySubjectRecipient"}
+    });
+    fs::write(app.join("project.zeno"), project).unwrap_or_else(|e| panic!("{e}"));
+    fs::write(app.join("v2/policy.json"), policy.to_string()).unwrap_or_else(|e| panic!("{e}"));
+    let path = app.to_string_lossy();
+    let (exit, report) = run(&["loop", "question", "--contract", &path]);
+    assert_eq!(exit, Some(0), "{report}");
+    let question = &report["detail"]["question"];
+    let options = question["options"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{report}"));
+    let mut accept = options
+        .iter()
+        .find(|o| o["class"] == "Accept")
+        .unwrap_or_else(|| panic!("Accept alternative: {report}"))
+        .clone();
+    // Omission leaves the successor open. An empty object would pin identity,
+    // contradicting the toggle law on every input in this region.
+    assert!(accept.get("sets").is_none(), "{accept}");
+    assert_eq!(accept["answer_supported"], true);
+    accept["where"] = question["where"].clone();
+    let answer = directory.json("answer.json", &answers(&[accept]));
+    let (exit, report) = run(&[
+        "loop",
+        "question",
+        "--contract",
+        &path,
+        "--answers",
+        &answer,
+    ]);
+    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(report["detail"]["answers"][0]["status"], "disagreement");
+    assert_eq!(report["detail"]["stats"]["inconsistent"], 0);
+    assert_eq!(report["detail"]["stats"]["determined"], 2);
+
+    // Keep unanswerable but admissible classes visible with an explicit limit.
+    policy["cases"][0]["class"] = json!("CommittedFailure");
+    policy["law_kinds"]["502"] = json!("CommittedFailureEffects");
+    fs::write(
+        app.join("project.zeno"),
+        format!(
+            "{project}\nlaw 502 failure_keeps_state on failure = post.100.110 == pre.100.110;\n"
+        ),
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    fs::write(app.join("v2/policy.json"), policy.to_string()).unwrap_or_else(|e| panic!("{e}"));
+    let (exit, report) = run(&["loop", "question", "--contract", &path]);
+    assert_eq!(exit, Some(0), "{report}");
+    let options = report["detail"]["question"]["options"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{report}"));
+    let failure = options
+        .iter()
+        .find(|o| o["class"] == "CommittedFailure")
+        .unwrap_or_else(|| panic!("failure alternative: {report}"));
+    assert_eq!(failure["answer_supported"], false);
+    assert_eq!(
+        failure["answer_refusal"],
+        "question-choice-unsupported:CommittedFailure"
+    );
+}
+
+#[test]
 fn the_largest_open_region_becomes_an_exact_question_and_answers_pin_it() {
     let directory = Directory::new();
     let c8 = directory.incomplete_contract("bounded-counter", &[("C", 8)]);

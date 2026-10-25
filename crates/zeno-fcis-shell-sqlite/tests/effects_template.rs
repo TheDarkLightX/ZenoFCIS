@@ -96,7 +96,10 @@ fn mounted_roundtrip(lineage: &Lineage<'_, '_>, seed: u64) {
     let mut shell = ok(app::Effects::open(
         &files.store,
         lineage,
-        Wire(database::Receiver::open(&files.receiver), seed.is_multiple_of(2)),
+        Wire(
+            database::Receiver::open(&files.receiver),
+            seed.is_multiple_of(2),
+        ),
         Ticks::default(),
     ));
     shell.record_private(seed.is_multiple_of(2));

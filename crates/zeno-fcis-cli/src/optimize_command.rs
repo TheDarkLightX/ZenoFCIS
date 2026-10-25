@@ -58,7 +58,10 @@ pub(super) fn run(arguments: Arguments) -> u8 {
     let (exit, report) = optimize_files(&arguments);
     crate::print_json(&report);
     if report["status"] == "unsupported-original" {
-        eprintln!(
+        // Diagnostics must not turn a broken stderr pipe into a panic.
+        use std::io::Write;
+        let _ = writeln!(
+            std::io::stderr(),
             "optimize refused: original node {} ({}) is outside the e-graph instruction set; next: {}",
             report["detail"]["unsupported_node"]["index"],
             report["detail"]["unsupported_node"]["opcode"]

@@ -212,10 +212,25 @@ fn v2_elaboration_rejects_the_original_unresolved_path_witness() {
 }
 
 #[test]
-fn zeno_v1_integer_literals_stop_at_the_u64_range() {
+fn zeno_integer_literals_cover_i128_and_keep_unsigned_metadata_bounded() {
     assert!(parse_codes(&with_law("post.100.110 <= 18446744073709551615")).is_empty());
     assert!(
-        parse_codes(&with_law("post.100.110 <= 18446744073709551616"))
+        parse_codes(&with_law(
+            "post.100.110 <= 170141183460469231731687303715884105728"
+        ))
+        .contains(&DiagnosticCode::InvalidNumber)
+    );
+    for value in [i128::MIN, i128::MAX, 1i128 << 100] {
+        assert!(parse_codes(&with_law(&format!("post.100.110 <= {value}"))).is_empty());
+    }
+    let full_range = format!(
+        "zeno 1; project 1 wide; type 100 int Wide in {}..={};",
+        i128::MIN,
+        i128::MAX
+    );
+    assert!(parse_codes(&full_range).is_empty());
+    assert!(
+        parse_codes("zeno 1; project 18446744073709551616 wide;")
             .contains(&DiagnosticCode::InvalidNumber)
     );
     // 10^30 is written as a product instead.

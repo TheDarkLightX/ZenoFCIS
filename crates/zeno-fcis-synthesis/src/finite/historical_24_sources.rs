@@ -120,6 +120,6 @@ pub(super) const SOURCES: &[(&str, &[u8], &str)] = &[
     ("crates/zeno-fcis-synthesis/src/finite/evaluation/historical_i64/value/wide.rs", include_bytes!("evaluation/historical_i64/value/wide.rs"), "7ba3833708ab33c9267283799277c534af21ac1edec90722a6c0852cc0e2beff"),
     ("crates/zeno-fcis-synthesis/src/finite/execution_v2/meter.rs", include_bytes!("execution_v2/meter.rs"), "0332adcf5bc57e8cfd72773c0c44f762a38590151dff6f630f90fb50c98824e6"),
     ("crates/zeno-fcis-synthesis/src/finite/evaluation/historical_i64.rs", include_bytes!("evaluation/historical_i64.rs"), "0cf9030f006888c4919ea407b7bc0e09db4b15005c3e871d6618023bd0dc0348"),
-    ("crates/zeno-fcis-synthesis/src/finite/execution_v2/historical.rs", include_bytes!("execution_v2/historical.rs"), "9a9cc41cda9184f9c6bb56a39ec17afd5fb3dcf28ab5662e1b09d19d766530ee"),
-    ("crates/zeno-fcis-synthesis/src/finite_runtime.rs", include_bytes!("../finite_runtime.rs"), "1871d00ad710599a4c46dcabe95bb148bead03bb4690331aa80b251ec8ad6812"),
+    ("crates/zeno-fcis-synthesis/src/finite/execution_v2/historical.rs", include_bytes!("execution_v2/historical.rs"), "e5c9aabda6acb9909b5dfa3a33b8d6ec33090731bbd0592b3443d70f0837f815"),
+    ("crates/zeno-fcis-synthesis/src/finite_runtime.rs", include_bytes!("../finite_runtime.rs"), "6235946f54174cf0da2776f3a743d72965a64e1979c605a02b3f359e4630039b"),
 ];

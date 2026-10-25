@@ -53,8 +53,8 @@ use super::upgrade::{
 use super::{
     Anchor, AuditedHistory, Checkpoint, CrashPoint, Error, Members, Segments, Snapshot,
     UpgradeReceipt, V2SqliteShell, audit_tail, audit_tail_with_inputs, check_schema,
-    check_schema_v9, compact_publication, configure, data_version, genesis_anchor_retained, hash, inject,
-    load_upgrades, migration_v9_to_v10, open_existing, prepare, provider, settle, sha256,
+    check_schema_v9, compact_publication, configure, data_version, genesis_anchor_retained, hash,
+    inject, load_upgrades, migration_v9_to_v10, open_existing, prepare, provider, settle, sha256,
 };
 
 /// The complete outcome of establishing the premises for one pair of
@@ -275,21 +275,31 @@ impl<'c, 'p> Lineage<'c, 'p> {
 
     /// Attach only source-checked released predecessor verifiers. The current
     /// version must remain current; complete schema and policy bytes must match.
-    pub fn bind_steps_with_history(catalogs: &[&'c BoundCatalog<'p>], steps: &[Step<'c>],
-        contexts: &[Option<&'c zeno_fcis_synthesis::finite::historical::HistoricalContext<'p>>]) -> Result<Self, Error> {
+    pub fn bind_steps_with_history(
+        catalogs: &[&'c BoundCatalog<'p>],
+        steps: &[Step<'c>],
+        contexts: &[Option<&'c zeno_fcis_synthesis::finite::historical::HistoricalContext<'p>>],
+    ) -> Result<Self, Error> {
         let mut bound = Self::bind_steps(catalogs, steps)?;
         bound.attach_historical(contexts)?;
         Ok(bound)
     }
 
-    fn attach_historical(&mut self, contexts: &[Option<&'c zeno_fcis_synthesis::finite::historical::HistoricalContext<'p>>]) -> Result<(), Error> {
-        if contexts.is_empty() { return Ok(()); }
+    fn attach_historical(
+        &mut self,
+        contexts: &[Option<&'c zeno_fcis_synthesis::finite::historical::HistoricalContext<'p>>],
+    ) -> Result<(), Error> {
+        if contexts.is_empty() {
+            return Ok(());
+        }
         if contexts.len() != self.catalogs.len() || contexts.last().is_some_and(Option::is_some) {
             return Err(Error::Lineage);
         }
         for (context, catalog) in contexts.iter().zip(&self.catalogs) {
             if let Some(context) = context
-                && (context.policy() != catalog.original_contract() || context.schema() != catalog.original_schema()) {
+                && (context.policy() != catalog.original_contract()
+                    || context.schema() != catalog.original_schema())
+            {
                 return Err(Error::Identity);
             }
         }
@@ -297,12 +307,18 @@ impl<'c, 'p> Lineage<'c, 'p> {
         Ok(())
     }
 
-    pub(super) fn historical(&self, position: usize) -> Option<&zeno_fcis_synthesis::finite::historical::HistoricalContext<'p>> {
+    pub(super) fn historical(
+        &self,
+        position: usize,
+    ) -> Option<&zeno_fcis_synthesis::finite::historical::HistoricalContext<'p>> {
         self.historical.get(position).copied().flatten()
     }
 
     pub(super) fn identity(&self, position: usize) -> &[u8] {
-        self.historical(position).map_or_else(|| self.authorities[position].identity(), |context| context.identity())
+        self.historical(position).map_or_else(
+            || self.authorities[position].identity(),
+            |context| context.identity(),
+        )
     }
 
     /// How many times this lineage value ran a migration's forward
@@ -399,8 +415,10 @@ impl<'c, 'p> Lineage<'c, 'p> {
         while start < to {
             let mut end = start + 1;
             if !self.moves_state(start) {
-                while end < to && !self.moves_state(end)
-                    && !(self.historical(start).is_some() && self.historical(end).is_none()) {
+                while end < to
+                    && !self.moves_state(end)
+                    && !(self.historical(start).is_some() && self.historical(end).is_none())
+                {
                     end += 1;
                 }
             }
@@ -449,9 +467,20 @@ impl<'c, 'p> Lineage<'c, 'p> {
             return settled.result();
         }
         let checked = if let Some(context) = self.historical(from) {
-            upgrade::released_24_premises(self.catalogs[from], self.catalogs[to], context,
-                self.max_input_tuples, self.historical(to).is_none())
-        } else { upgrade::premises(self.catalogs[from], self.catalogs[to], self.max_input_tuples) };
+            upgrade::released_24_premises(
+                self.catalogs[from],
+                self.catalogs[to],
+                context,
+                self.max_input_tuples,
+                self.historical(to).is_none(),
+            )
+        } else {
+            upgrade::premises(
+                self.catalogs[from],
+                self.catalogs[to],
+                self.max_input_tuples,
+            )
+        };
         let settled = match checked {
             Ok((established, enumerated)) => {
                 if enumerated {
@@ -634,7 +663,11 @@ impl<'c, 'p> Lineage<'c, 'p> {
             check_schema(&tx)?;
             let authorities = members.authorities();
             let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
-            let (_, initial) = genesis_anchor_retained(&tx, segments.authority(authorities, 0), self.historical(segments.position(0)))?;
+            let (_, initial) = genesis_anchor_retained(
+                &tx,
+                segments.authority(authorities, 0),
+                self.historical(segments.position(0)),
+            )?;
             let genesis = initial.state.clone();
             let mut commits = Vec::new();
             let anchor = audit_tail_with_inputs(
@@ -882,7 +915,11 @@ fn upgrade_once(
     check_schema(&tx)?;
     let authorities = lineage.authorities();
     let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
-    let (genesis, initial) = genesis_anchor_retained(&tx, segments.authority(authorities, 0), lineage.historical(segments.position(0)))?;
+    let (genesis, initial) = genesis_anchor_retained(
+        &tx,
+        segments.authority(authorities, 0),
+        lineage.historical(segments.position(0)),
+    )?;
     let declared = lineage.members(lineage.versions()).declared(missing);
     let anchor = audit_tail(&tx, authorities, declared, &segments, initial, 0)?;
     let (current, last) = (
@@ -1193,12 +1230,17 @@ impl<'a, 'p> V9Store<'a, 'p> {
         let position = lineage
             .authorities()
             .iter()
-            .enumerate().position(|(position, _)| lineage.identity(position) == identity)
+            .enumerate()
+            .position(|(position, _)| lineage.identity(position) == identity)
             .ok_or(Error::Identity)?;
         let members = lineage.members(position + 1);
         let authorities = members.authorities();
         let segments = Segments::load(&tx, authorities, Vec::new())?;
-        let (genesis, initial) = genesis_anchor_retained(&tx, segments.authority(authorities, 0), lineage.historical(segments.position(0)))?;
+        let (genesis, initial) = genesis_anchor_retained(
+            &tx,
+            segments.authority(authorities, 0),
+            lineage.historical(segments.position(0)),
+        )?;
         // A v9 store holds no upgrade, so its audit compares no programs.
         let none = Cell::new(None);
         let anchor = audit_tail(

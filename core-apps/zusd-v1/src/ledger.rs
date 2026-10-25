@@ -157,8 +157,8 @@ fn change(
         return Err(Failure::Reject(1033));
     }
     w.charge(1, 0, 0)?;
-    let value = crate::accounting::balance_change(old, q.atoms(), credit)
-        .ok_or(Failure::Arithmetic)?;
+    let value =
+        crate::accounting::balance_change(old, q.atoms(), credit).ok_or(Failure::Arithmetic)?;
     let quantity = match q {
         Quantity::Zusd(_) => Quantity::Zusd(value),
         Quantity::Agrs(_) => Quantity::Agrs(value),

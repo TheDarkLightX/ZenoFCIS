@@ -14,7 +14,7 @@
       "participates": "true",
       "path": "guard",
       "policy_sha256": "f1f852e9cef9eab5b93df08960f6a513d5600827bc3b1aeb2c3055b4263857ba",
-      "program_sha256": "d25ff04b254fdd30e622bb7f1c2683d71b115bfd12633958d994632409da8fa0",
+      "program_sha256": "b66fd65b6e593c2b67ac925dfe1cce25ba520ea29bdaf888299fa39dd745e8f6",
       "project_sha256": "e0b22b648a977c4168b6fcb46521fcfbb1786f33016a94735e6515697e9b001a"
     },
     {
@@ -31,7 +31,7 @@
       "participates": "true",
       "path": "budget",
       "policy_sha256": "3f710a93baf55aaa601a4d0e56faca200713318fac7cf3eb00e144e6d053ad60",
-      "program_sha256": "2e4a288ba86182673f0db9b6065f86952afb0c5fbb8fa7893a2e1bbea1ad22bd",
+      "program_sha256": "2dbc848a9533cec91611a280402a81f9ff79e9dbea7902b87b30ce4443718d8d",
       "project_sha256": "b8240ddc2996fd238ee71c86f87bccd9d17db1d7b2bcd573f2aec73a6b5453a7"
     }
   ],

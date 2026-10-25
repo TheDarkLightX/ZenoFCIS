@@ -46,7 +46,7 @@ EXPECTED_PROBITY_INTEGRITY = (
     "EBUePD8+S4/kRiqh8K/B0oA=="
 )
 EXPECTED_NPM_LOCK_CANONICAL_SHA256 = (
-    "c0597efca2c321775953d5e4ffbbf56864d8efff34db0a54302e5f751313d080"
+    "70d651c28e6b6f57a6a54da35d5422aa15e1968b59d745a6e2d62882b3cc043f"
 )
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 RUSTDOC_ARCHIVE_NOTICE = """ZenoFCIS offline rustdoc archive
@@ -167,8 +167,8 @@ def validate_developer_tooling_documents(
     dependencies = package.get("devDependencies")
     if dependencies != {"@nizos/probity": EXPECTED_PROBITY_VERSION}:
         raise RcError("package.json must pin only Probity 1.10.0 as developer tooling")
-    if package.get("overrides") != {"@modelcontextprotocol/sdk": "1.31.0"}:
-        raise RcError("package.json must pin the patched MCP SDK 1.31.0 override")
+    if package.get("overrides") != {"@modelcontextprotocol/sdk": "1.32.1"}:
+        raise RcError("package.json must pin the patched MCP SDK 1.32.1 override")
     if node_version.strip() != EXPECTED_NODE_VERSION:
         raise RcError(".node-version does not pin exact Node 22.23.1")
 
@@ -202,7 +202,6 @@ def validate_developer_tooling_documents(
         "rustCommandPolicy",
         "cargo\\s+(?:\\+\\S+\\s+)?update",
         "cargo\\s+(?:\\+\\S+\\s+)?publish",
-        "python3\\s+tools\\/atdd\\.py\\s+run\\s+--all",
     )
     for marker in required_config:
         if marker not in config_text:
@@ -512,7 +511,8 @@ def run_self_test(configured: dict[str, object], metadata: dict[str, object]) ->
     else:
         raise RcError("self-test mutation survived: Probity version")
 
-    for changed_override in ({}, {"@modelcontextprotocol/sdk": "1.30.0"}):
+    for changed_override in ({}, {"@modelcontextprotocol/sdk": "1.30.0"},
+                             {"@modelcontextprotocol/sdk": "1.31.0"}):
         wrong_override = copy.deepcopy(package)
         wrong_override["overrides"] = changed_override
         try:

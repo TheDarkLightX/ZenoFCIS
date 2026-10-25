@@ -344,34 +344,7 @@ pub const EVOLUTION_KEYS: [&str; 5] = [
 /// The keys of one entry of an evolution's `shortcuts`.
 pub const SHORTCUT_KEYS: [&str; 2] = ["from_version", "sha256"];
 
-/// Decision class of a case.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Class {
-    Accept,
-    Reject,
-    CommittedFailure,
-}
-
-impl Class {
-    pub const ALL: [Self; 3] = [Self::Accept, Self::Reject, Self::CommittedFailure];
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Accept => "Accept",
-            Self::Reject => "Reject",
-            Self::CommittedFailure => "CommittedFailure",
-        }
-    }
-
-    /// The value the `Class` law observation reads.
-    pub fn code(self) -> i128 {
-        match self {
-            Self::Accept => 0,
-            Self::Reject => 1,
-            Self::CommittedFailure => 2,
-        }
-    }
-}
+pub use super::decision_class::Class;
 
 /// Law kinds the library defines.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

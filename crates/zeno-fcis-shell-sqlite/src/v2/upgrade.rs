@@ -343,7 +343,9 @@ impl Premises {
     }
 
     /// The equality premise was checked under the released 2.4.0 evaluator.
-    pub fn released_24(self) -> bool { self.released_24 }
+    pub fn released_24(self) -> bool {
+        self.released_24
+    }
 
     /// The record's premises byte: bits 0 to 4 are premises 1 to 5, and all
     /// are set, because a record exists only when all five held.
@@ -397,18 +399,36 @@ fn requires_decision_law(descriptor: &Descriptor<'_>) -> bool {
 /// `Error::Range` when a policy cannot be encoded.
 /// Closed released adoption check. Both scalar programs run on the frozen
 /// evaluator; current state laws are a separate per-head upgrade obligation.
-pub(super) fn released_24_premises(from: &BoundCatalog<'_>, to: &BoundCatalog<'_>,
+pub(super) fn released_24_premises(
+    from: &BoundCatalog<'_>,
+    to: &BoundCatalog<'_>,
     context: &zeno_fcis_synthesis::finite::historical::HistoricalContext<'_>,
-    cap: u64, current_target: bool) -> Result<(Result<Premises, Premise>, bool), Error> {
+    cap: u64,
+    current_target: bool,
+) -> Result<(Result<Premises, Premise>, bool), Error> {
     let (old, new) = (from.descriptor(), to.descriptor());
-    let missing = if !program_successor(from, to)? { Some(Premise::Policy) }
-        else if !requires_decision_law(old) || !requires_decision_law(new) { Some(Premise::DecisionLaw) }
-        else if !steps_covered(old) || !steps_covered(new) { Some(Premise::StepLimits) }
-        else if observes_step_usage(old) || observes_step_usage(new) { Some(Premise::StepUsage) }
-        else { None };
-    if let Some(missing) = missing { return Ok((Err(missing), false)); }
+    let missing = if !program_successor(from, to)? {
+        Some(Premise::Policy)
+    } else if !requires_decision_law(old) || !requires_decision_law(new) {
+        Some(Premise::DecisionLaw)
+    } else if !steps_covered(old) || !steps_covered(new) {
+        Some(Premise::StepLimits)
+    } else if observes_step_usage(old) || observes_step_usage(new) {
+        Some(Premise::StepUsage)
+    } else {
+        None
+    };
+    if let Some(missing) = missing {
+        return Ok((Err(missing), false));
+    }
     match context.equivalent_released_candidate(&new.program, cap) {
-        Ok(tuples) => Ok((Ok(Premises { tuples, released_24: current_target }), true)),
+        Ok(tuples) => Ok((
+            Ok(Premises {
+                tuples,
+                released_24: current_target,
+            }),
+            true,
+        )),
         Err(_) => Ok((Err(Premise::Equivalence(Unestablished::Released24)), true)),
     }
 }
@@ -914,7 +934,11 @@ pub fn decide(facts: &Facts<'_>) -> Result<Plan, Error> {
         Admission::Successor(successor) => {
             let evidence = evidence_bytes(successor.receipts);
             (
-                if successor.premises.released_24 { Kind::Released24Adoption } else { Kind::ProgramSuccessor },
+                if successor.premises.released_24 {
+                    Kind::Released24Adoption
+                } else {
+                    Kind::ProgramSuccessor
+                },
                 successor_admission(successor.premises, &evidence),
                 Some(successor.premises),
                 evidence,
@@ -1069,7 +1093,10 @@ mod tests {
     use super::*;
 
     const RECEIPTS: [Hash32; 2] = [Hash32::new([7; 32]), Hash32::new([8; 32])];
-    const HELD: Premises = Premises { tuples: 1_296_000, released_24: false };
+    const HELD: Premises = Premises {
+        tuples: 1_296_000,
+        released_24: false,
+    };
 
     fn facts<'a>(admission: Admission<'a>) -> Facts<'a> {
         Facts {
@@ -1182,7 +1209,10 @@ mod tests {
         assert_ne!(swapped.chain(), plan.chain());
         let fewer = decide(&facts(Admission::Successor(Successor {
             receipts: &RECEIPTS,
-            premises: Premises { tuples: 1, released_24: false },
+            premises: Premises {
+                tuples: 1,
+                released_24: false,
+            },
         })))
         .unwrap_or_else(|error| panic!("{error}"));
         assert_ne!(fewer.chain(), plan.chain());

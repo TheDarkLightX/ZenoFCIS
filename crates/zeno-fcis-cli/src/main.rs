@@ -255,6 +255,9 @@ enum Command {
         command: transform_command::Command,
     },
     /// E-graph equality saturation with exact per-class tables and a default portfolio of three strategies; transform checking alone accepts results. Supplied candidates can be fused with --with-candidate. See also: guide show program-search.
+    #[command(
+        after_help = "Workflow:\n  contract export-program APP --out original.zcve\n  optimize --program original.zcve --candidate-out smaller.zcve --receipt receipt.json\n  transform replay --original original.zcve --candidate smaller.zcve --receipt receipt.json\n\nEvery accepted candidate passes the full-domain transform check. Optimization does not adopt the result; contract adopt is a separate step. Unsupported instructions are reported explicitly; increasing search limits does not add instruction support."
+    )]
     Optimize {
         #[command(flatten)]
         arguments: optimize_command::Arguments,
@@ -764,13 +767,13 @@ fn describe(path: &[String]) -> u8 {
             "sha256":loop_command::implementation_identity()},
         "authority": "diagnostic-only",
         "normal_program": {
-            "declaration_api": "zeno_fcis::program", "authority": "none",
+            "declaration_api": "generated v2_contract.rs", "authority": "none",
             "runtime_admission": "not-run",
             "templates": ["durable-counter", "account-lockout", "order-fulfillment",
                 "inventory-reservation", "withdrawal-queue", "agent-treasury-guard",
                 "prepared-counter", "compliance-gateway"],
-            "binding": ["complete original schema and policy", "complete ProgramDefinition",
-                "original frame and channel links", "bind_catalog", "bind_program"],
+            "binding": ["complete original schema and policy", "complete composition::Descriptor",
+                "original frame and channel links", "catalog::bind_original", "authority::bind"],
             "execution": "Original envelopes, private meter, complete decision, required transition/genesis laws, then private Publication",
             "unsupported": "Named library refusal; no native callback authority fallback",
             "shell": "Context authentication, durable replay/state comparison and physical effects require the trusted host"
@@ -818,6 +821,7 @@ fn describe_tree(command: &clap::Command, path: &[String]) -> Value {
         .collect();
     json!({
         "name": command.get_name(), "path": path, "about": command.get_about().map(ToString::to_string),
+        "guidance": command.get_after_help().map(ToString::to_string),
         "subcommand_required": command.is_subcommand_required_set(),
         "arguments": arguments, "subcommands": commands, "effects": describe_effects(path)
     })

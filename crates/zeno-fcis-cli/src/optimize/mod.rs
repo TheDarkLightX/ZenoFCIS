@@ -14,6 +14,7 @@ pub(crate) mod extract;
 pub(crate) mod rules;
 pub(crate) mod semantics;
 pub(crate) mod signature;
+mod status;
 pub(crate) mod strategy;
 
 use serde_json::{Value, json};
@@ -247,23 +248,33 @@ impl Search {
     /// Classify the checked search result without consulting files or output
     /// paths. A checked candidate survives an incomplete proposal search.
     pub(crate) fn status_and_exit(&self) -> (&'static str, u8) {
-        if self.best.is_some() {
-            ("improved", crate::OK)
-        } else if self
-            .runs
-            .iter()
-            .any(|run| run.unsupported_original.is_some())
-        {
-            ("unsupported-original", crate::BLOCKED)
-        } else if self.runs.iter().any(|run| run.stopped.is_some()) {
-            ("inconclusive", crate::BLOCKED)
-        } else {
-            ("no-checked-improvement", crate::BLOCKED)
-        }
+        let status = status::classify(
+            self.best.as_ref().is_some_and(|best| {
+                best.nodes <= self.original_nodes
+                    && best.bytes.len() <= self.original_bytes
+                    && (best.nodes < self.original_nodes || best.bytes.len() < self.original_bytes)
+            }),
+            self.runs
+                .iter()
+                .any(|run| run.stopped == Some("original-not-typable")),
+            self.phases.len(),
+            self.runs.iter().any(|run| run.stopped.is_some()) || self.any_limit_hit(),
+        );
+        (status.name(), status.exit_code())
     }
 
     pub(crate) fn any_limit_hit(&self) -> bool {
-        self.phases.iter().any(|phase| phase.limit_hit.is_some())
+        self.runs.iter().any(|run| {
+            matches!(
+                run.stopped,
+                Some(
+                    "original-exceeds-max-enodes"
+                        | "original-exceeds-max-classes"
+                        | "original-exceeds-limits"
+                        | "supplied-exceeds-limits"
+                )
+            )
+        }) || self.phases.iter().any(|phase| phase.limit_hit.is_some())
             || self
                 .candidates
                 .iter()

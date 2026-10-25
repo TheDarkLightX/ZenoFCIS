@@ -321,14 +321,16 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
 /// i128 evaluator, checker-work/4 and loop-acquisition/1. The complete journey
 /// was replayed through every existing status assertion before these three
 /// source/profile-bound digests were refreshed; no field is filtered.
+/// The transcript includes recorded, explicitly unreplayed historical feedback;
+/// that diagnostic change leaves the ledger, head and checker identity intact.
 const METERED_EVALUATOR_IDENTITY: &str =
-    "2e4ab69ac1522220c271ee167354fa344028722ddd412e7aa2b4dac0f2cd3355";
+    "982a57f48a10b358da6bb097e454734c0d5030ebf403b499aec0a460fc407c03";
 const METERED_LEDGER_SHA256: &str =
-    "f6a4def9ffa5a15ec93260492361a0f740baadc33d03e2bf1ccf7b8e0505991a";
+    "6b3f5137e5180b80c24e544e21b7076d18a59816c1c485fef60ec346bc633476";
 const METERED_HEAD_SHA256: &str =
-    "54412ecdd559a335d29cb53bc1930e1851f2d08a04146152b056d75b236218df";
+    "5fa0cfb38818ff9951b96ad5cf39f577263699bede9fb156e0d398a87e55433b";
 const METERED_DIRECT_OUTPUTS_SHA256: &str =
-    "1d76c8586ad44c1721bb6908012742f2d358d841b8e03d51b280e5292aad4dd4";
+    "f9d51f9768a8ff2d2daade8acb087c964bb6025cf97d8421382c0fb9f40e74b1";
 
 fn metered_journey_bytes() -> [Vec<u8>; 3] {
     let scratch = Scratch::new();

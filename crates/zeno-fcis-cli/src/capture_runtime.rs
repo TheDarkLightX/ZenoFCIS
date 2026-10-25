@@ -81,37 +81,6 @@ fn encode_request(source: &str, points: &[Vec<i128>]) -> Result<Vec<u8>, String>
     serde_json::to_vec(&Request { source, points }).map_err(|_| "capture-request-json".into())
 }
 
-#[cfg(test)]
-mod request_tests {
-    #[test]
-    fn worker_input_keeps_exact_raw_integer_tokens_without_value_overflow() {
-        #[derive(serde::Deserialize)]
-        struct Received {
-            source: String,
-            points: Vec<Vec<i128>>,
-        }
-        let points = vec![vec![
-            i128::MIN,
-            i128::MAX,
-            -(1 << 100),
-            1 << 100,
-            1 << 64,
-            0,
-            5,
-        ]];
-        let bytes = super::encode_request("source", &points).unwrap_or_else(|e| panic!("{e:?}"));
-        let received: Received = serde_json::from_slice(&bytes).unwrap_or_else(|e| panic!("{e:?}"));
-        assert_eq!(received.source, "source");
-        assert_eq!(received.points, points);
-        let small =
-            super::encode_request("source", &[vec![0, 5]]).unwrap_or_else(|e| panic!("{e:?}"));
-        assert_eq!(
-            serde_json::from_slice::<serde_json::Value>(&small).unwrap_or_else(|e| panic!("{e:?}")),
-            serde_json::json!({"source":"source", "points":[[0,5]]})
-        );
-    }
-}
-
 /// Fresh process per observation schedule; its only input is source and points.
 pub(super) fn invoke(source: &str, points: &[Vec<i128>]) -> Result<Value, String> {
     if !crate::checker_process::contained() {
@@ -277,6 +246,37 @@ mod tests {
                 .err()
                 .as_deref(),
             Some("capture-worker-malformed-output")
+        );
+    }
+}
+
+#[cfg(test)]
+mod request_tests {
+    #[test]
+    fn worker_input_keeps_exact_raw_integer_tokens_without_value_overflow() {
+        #[derive(serde::Deserialize)]
+        struct Received {
+            source: String,
+            points: Vec<Vec<i128>>,
+        }
+        let points = vec![vec![
+            i128::MIN,
+            i128::MAX,
+            -(1 << 100),
+            1 << 100,
+            1 << 64,
+            0,
+            5,
+        ]];
+        let bytes = super::encode_request("source", &points).unwrap_or_else(|e| panic!("{e:?}"));
+        let received: Received = serde_json::from_slice(&bytes).unwrap_or_else(|e| panic!("{e:?}"));
+        assert_eq!(received.source, "source");
+        assert_eq!(received.points, points);
+        let small =
+            super::encode_request("source", &[vec![0, 5]]).unwrap_or_else(|e| panic!("{e:?}"));
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&small).unwrap_or_else(|e| panic!("{e:?}")),
+            serde_json::json!({"source":"source", "points":[[0,5]]})
         );
     }
 }

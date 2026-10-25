@@ -812,6 +812,14 @@ written; 64 for usage.
 
 ## Checked optimizer
 
+Use `optimize` when you already have a finite program and want a smaller
+implementation with the same behavior. It searches for redundant computations
+and equivalent expressions, then checks the proposed replacement on every
+declared input. It minimizes stored instructions and encoded size; it does not
+promise the fastest program or the smallest possible program. Use
+`transform check` when you already have a replacement to check, or
+[`loop`](#bounded-optimization-loop) when you want a resumable series of proposals.
+
 `optimize` searches for a smaller program equivalent to a canonical finite
 scalar program and hands every candidate to the transform checker. The
 optimizer is an untrusted proposer: nothing it believes about a candidate
@@ -963,9 +971,9 @@ refused. With a portfolio, the top-level `enodes` and
 | Status | Exit | Meaning |
 | --- | ---: | --- |
 | `improved` | 0 | An accepted candidate is smaller than the original. `--candidate-out` and `--receipt` were created when given. |
-| `unsupported-original` | 2 | The e-graph cannot represent an original instruction and no supplied or indexed candidate was accepted. `detail.unsupported_node` names its index and opcode; `next_step` gives a checked-candidate route. A one-line diagnostic is also printed on stderr. No candidate or receipt is written. |
-| `no-checked-improvement` | 2 | The search ended within its bounds without an accepted smaller candidate; the original stands. Nothing is written. |
-| `inconclusive` | 2 | The domain exceeds `--max-input-tuples` (default 100,000,000), or a run stopped before completion without an accepted candidate. Read the cause or stop reason and next step; no completed-search or equivalence claim. |
+| `unsupported-original` | 2 | An instruction in the original is outside the optimizer's e-graph instruction set, no search phase ran, and no supplied or indexed improvement was accepted. `detail.unsupported_node` names its index and opcode; `next_step` gives a checked-candidate route. A one-line diagnostic is also printed on stderr. Nothing is written. |
+| `no-checked-improvement` | 2 | At least one search phase ran and the search completed without an accepted smaller candidate; the original stands. Nothing is written. |
+| `inconclusive` | 2 | No improvement was accepted and the search could not finish: for example, a search limit was reached, or the domain exceeds `--max-input-tuples` (default 100,000,000). Read the reported reason and next step; there is no completed-search or equivalence claim. |
 | `refused` | 1 | The original failed the library importer, exceeds 64 KiB, has an empty input domain, or has an ABI or domain size the requested profile cannot hold; or more than 8 programs, or one larger than 64 KiB, were supplied. |
 | `invalid-strategy` | 1 | The strategy is not a document of the closed grammar, exceeds 64 KiB, or names a profile other than `--profile`. |
 | `output-exists` | 1 | A `--candidate-out` or `--receipt` path already exists, as a file or a link; nothing was searched. |
@@ -983,6 +991,13 @@ A published candidate remains when receipt creation fails. A failed write tries
 to remove its incomplete file; inspect that path if cleanup also failed.
 Keep published artifacts, correct the write error, and retry with unused output
 paths. Existing destinations are never overwritten.
+
+For `unsupported-original`, increasing limits cannot add instruction support.
+For example, `MulDivCeil` can be checked by `transform` but is not in this
+optimizer's e-graph instruction set. Supply a replacement to `transform check`,
+or request support for the instruction. A strictly smaller `--with-candidate`
+that passes the independent transform check can still yield `improved` even
+when the optimizer cannot search the original.
 
 On the recorded withdrawal-queue artifacts the default portfolio reaches the
 7-node Boolean kernel (from 16), a 35-node retained controller (from 69; the
@@ -1082,6 +1097,25 @@ suggested questions retain their stated advisory status.
 
 ### Bounded optimization loop
 
+Choose a loop when a task needs repeated proposals and feedback. For example,
+submit a replacement, inspect the counterexample when it differs, revise it,
+and check again. The optimization session retains the checked incumbent and
+charges each attempt against explicit limits. Other `loop` commands help with
+examples, incomplete expressions and unresolved requirements:
+
+| Your task | Start here |
+| --- | --- |
+| Check a replacement you already have | `transform check` |
+| Find a smaller program in one run | `optimize` |
+| Keep a resumable history of checked proposals | `loop open`, then `loop candidate` or `loop run`, then `loop resume` |
+| Find a program matching finite examples | `loop learn`; example fit alone is not full-domain equivalence |
+| Fill holes in a partial expression | `loop sketch` |
+| Find decisions the contract laws leave open | `loop question --contract DIR`; a person reviews the policy choice |
+
+Use `zeno-fcis describe loop <command>` or that command's `--help` for its
+inputs and limits. The session workflow below compares candidates with an
+existing original; it does not infer intended behavior from prose.
+
 `zeno-fcis loop` runs a bounded adaptive loop: a proposer suggests
 complete candidate programs and `transform check` judges every one against the
 admitted original on its whole declared input domain. The loop keeps an
@@ -1136,6 +1170,15 @@ receipt status, every attempt's outcome and cost, the accounting (attempts,
 checks, model calls, tokens, work, unresolved reservations) and the claims the
 result does not make: global optimality, convergence, success probability,
 model learning, application authority, wall-time speedup.
+
+For a repair, inspect the witness input and both output vectors after
+`candidate` exits 1, revise the candidate, and submit it again. An equivalent
+but larger repair leaves the incumbent unchanged; it can still be useful
+feedback for the next proposal. On resume, non-improvement historical
+settlements and differences without a replayed witness use `recorded-outcome`
+with `replayed: false`. The retained replacement is checked again. Earlier
+`checked-improvement` entries retain their historical `equivalent` display;
+that display does not mean each earlier candidate was rechecked.
 
 Selection is strictly lexicographic on (stored nodes, canonical bytes): a
 candidate replaces the incumbent only if neither component exceeds the
@@ -1379,6 +1422,12 @@ rule is `exact` or `holds`. Coverage and `required` remain separate
 annotations; exit 0 does not mean the rules cover every contract decision.
 `loop meaning` exits 1 when `same_as_original` is false and 2 when its
 enumeration budget is exceeded.
+
+`"sets": {}` explicitly requires unchanged state. The original case's updates
+are shown only for its own decision, never copied onto a different option.
+`answer_supported: false` marks an admissible class the answer format cannot
+currently pin; CommittedFailure answers are refused with the displayed reason.
+Keep such alternatives visible when reviewing requirements.
 
 Results carry `authority: none`. Session doors use schema
 `zeno-fcis/transform-loop/1` with a `door` section; `family` and `transfer`

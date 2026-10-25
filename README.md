@@ -1,6 +1,6 @@
 # ZenoFCIS
 
-**Toward a neurosymbolic software factory for high-assurance FCIS applications.**
+**A neurosymbolic software factory for high-assurance FCIS applications.**
 
 ZenoFCIS is a Rust library family for functional-core / imperative-shell
 (FCIS) systems. It combines LLM-assisted generation with symbolic checking: LLMs
@@ -77,10 +77,12 @@ the imperative shell. A passing stage check is not a release receipt.
 **2.6.0** is the current release source. It builds on the first stable V2
 line, 2.3.0; the [2.6.0 release notes](docs/RELEASE_NOTES.md) describe the
 new arithmetic, search, loop and contract-judge features. Final qualification
-and publication remain separate release gates. Its release set has two host executables: the
-**Linux x86_64 GNU CLI** (glibc 2.39 or later) and **macOS on Apple silicon**
-(`aarch64-apple-darwin`). The release process requires both archives to pass
-their host build, custody and installed-binary checks before publication. See
+and publication remain separate release gates. The previous release,
+[2.5.0](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.5.0), is
+published. The release set provides the **Linux x86_64 GNU CLI** (glibc 2.39
+or later). A **macOS on Apple silicon** (`aarch64-apple-darwin`) binary will
+follow native platform validation. Every published archive must pass its
+build, custody and installed-binary checks. See
 [installation](docs/INSTALLATION.md) and the
 [workflow qualification scope](docs/FEATURE_MATRIX.md#host-platforms).
 
@@ -406,6 +408,21 @@ large one; whether that agrees with `tests/decision-examples.txt`; which law
 refusals fall on states the contract's state laws allow; and which rule
 mutants those inputs distinguish, each with a proposed example.
 
+To improve an existing finite program, use `zeno-fcis optimize`: it searches
+for fewer instructions and smaller encoded programs, checking each accepted
+replacement against the original on every declared input. Use `transform
+check` for a replacement you already have. Neither command adopts the result
+or promises a globally optimal program.
+
+For repeated proposals, use `zeno-fcis loop`: open a bounded session, submit
+candidates, inspect counterexamples, revise, and resume from checked evidence.
+The other loop commands help learn from examples, complete expression holes,
+and ask about decisions left open by contract laws. Each has its own checked
+scope; fitting examples alone does not prove behavior on unseen inputs. The
+[agent guide](docs/LLM_USAGE.md#choose-the-tool-for-the-problem) maps tasks to
+commands, and the [CLI reference](docs/CLI_REFERENCE.md#bounded-optimization-loop)
+gives the complete workflows.
+
 `zeno-fcis contract export-program DIR --out P` writes the contract's
 decision program in the encoding that `optimize` and `transform` read.
 `zeno-fcis contract adopt DIR --candidate C --receipt R --usage
@@ -639,8 +656,8 @@ python3 tools/rc_package.py build --output /tmp/zeno-fcis-v1
 `rc_package.py build` writes a full local release package: all public `.crate`
 packages, Rustdoc, source and diagnostic binary archives, checksums, a
 CycloneDX SBOM, and provenance inputs. This is local packaging output. The
-release process requires both host CLI archives and their installed-use
-records before publication, and the signed release checksum list identifies
+release process requires each published host archive and its installed-use
+record to pass custody checks, and the signed release checksum list identifies
 the assets actually published. See the [packaging reference](docs/PACKAGING.md).
 
 ## License

@@ -536,6 +536,11 @@ fn describe_declares_optimize_effects() {
     assert_eq!(exit, Some(0));
     let command = &report["command"];
     assert_eq!(command["name"], "optimize");
+    assert!(
+        command["guidance"]
+            .as_str()
+            .is_some_and(|text| !text.is_empty())
+    );
     assert_eq!(
         command["effects"],
         json!({
@@ -646,10 +651,11 @@ fn an_unsupported_original_names_its_node_instead_of_claiming_search() {
         .nodes()
         .iter()
         .position(|op| matches!(op, zeno_fcis_synthesis::finite::Op::MulDivCeil(..)))
-        .unwrap_or_else(|| panic!("expected MulDivCeil instruction"));
+        .unwrap_or_else(|| panic!("exported MulDivCeil instruction"));
     assert_eq!(report["detail"]["unsupported_node"]["index"], index);
     assert_eq!(report["detail"]["unsupported_node"]["opcode"], "MulDivCeil");
     assert_eq!(report["detail"]["search"]["phases_run"], 0);
+    assert_eq!(report["detail"]["search"]["any_limit_hit"], false);
     assert!(report["detail"]["best"].is_null());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert_eq!(stderr.lines().count(), 1);

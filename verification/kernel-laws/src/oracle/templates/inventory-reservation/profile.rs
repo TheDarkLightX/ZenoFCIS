@@ -117,7 +117,8 @@ pub fn decision_contract() -> FiniteDecisionContract {
     ];
     FiniteDecisionContract::try_new(
         source_hash(),
-        include_bytes!("original/synthesized/program.zcve"),
+        // Width-explicit derivative; checked against the frozen i64 original on every input.
+        include_bytes!("generated/program-current.zcve"),
         inputs,
         outputs,
         vec![

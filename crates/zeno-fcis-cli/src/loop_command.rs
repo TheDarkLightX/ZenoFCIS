@@ -542,7 +542,7 @@ fn acquisition_entries(
     Ok(paths)
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 fn open(original: &Path, session: &Path, profile: Profile, limits: Limits) -> (u8, Value) {
     open_work(
         original,

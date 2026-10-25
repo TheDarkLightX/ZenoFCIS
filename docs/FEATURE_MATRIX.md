@@ -17,21 +17,24 @@ native callback API.
 
 ## Host platforms
 
-The 2.6.0 release workflow builds two required host executables:
+The 2.6.0 release publishes Linux; the macOS binary follows native platform
+validation. The workflow supports these host builds:
 
 - Linux x86_64 GNU, on Ubuntu 24.04;
 - macOS on Apple silicon (`aarch64-apple-darwin`, minimum-version field
   macOS 11.0), on GitHub's macOS 15 arm64 image.
 
-Its release-set job requires both host jobs and their installed-binary
-records. The table lists the configured workflow checks. Only a completed run
+Its release-set job requires the Linux build and installed-binary record.
+The optional macOS build and full native test suite run on manual request;
+when that host is requested, its build and installed-binary record must pass too.
+The table lists the available checks, not a claim that every check has passed. Only a completed run
 bound to the release source and artifact qualifies a host executable.
 
 | Workflow check | Linux x86_64 | macOS arm64 |
 |---|---|---|
 | Build, archive and custody check | yes | yes |
 | Installed-binary journey | yes | yes |
-| Clippy and tests | yes | portable tests only |
+| Clippy and tests | yes | portable tests; validation pending |
 | Contained checker runtime | yes | unavailable (exit 2) |
 | `synth verify` execution | yes | blocked (exit 2) |
 | ATDD, packaged-workspace verification, Verus, Miri, formal tools, Tau kit, OCaml profile | yes | no |

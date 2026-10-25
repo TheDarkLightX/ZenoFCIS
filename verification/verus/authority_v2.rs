@@ -23,6 +23,7 @@ mod value;
 #[cfg(test)]
 extern crate self as zeno_fcis_synthesis;
 pub mod finite {
+    pub(crate) use crate::value;
     pub use crate::evaluation::admission::AdmissionFailure as V2NumericAdmissionFailure;
     pub use crate::evaluation::typed::NumericOp as V2NumericOp;
     pub use crate::evaluation::{Domain, Op};

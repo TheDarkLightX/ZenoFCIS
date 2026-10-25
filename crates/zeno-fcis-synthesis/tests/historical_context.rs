@@ -6,6 +6,8 @@ use zeno_fcis_synthesis::finite::{
 #[path = "../../zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract_v1.rs"]
 /// Current metadata for the same original policy.
 pub mod current;
+// Preserve the reviewed historical source bytes during workspace formatting.
+#[rustfmt::skip]
 #[path = "test-data/released_24_contract.rs"]
 /// Original released declaration data for the retained policy.
 pub mod declarations;

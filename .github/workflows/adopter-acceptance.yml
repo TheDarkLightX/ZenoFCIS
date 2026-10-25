@@ -1,6 +1,8 @@
 name: adopter-acceptance
 
 on:
+  # Manual reruns cover the component evidence refresh without repeating ATDD.
+  workflow_dispatch:
   pull_request:
   push:
     branches:
@@ -45,12 +47,14 @@ jobs:
         uses: ./.github/actions/fetch-locked-crates
 
       - name: Install pinned Node
+        if: github.event_name != 'workflow_dispatch'
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version-file: .node-version
           cache: npm
 
       - name: Install locked guardrail tooling without lifecycle scripts
+        if: github.event_name != 'workflow_dispatch'
         run: npm ci --ignore-scripts
 
       - name: Prove hostile acceptance bindings fail closed
@@ -60,6 +64,7 @@ jobs:
         run: python3 tools/atdd.py check
 
       - name: Prepare genuine tools for mandatory certificate acceptance
+        if: github.event_name != 'workflow_dispatch'
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/certificate-checker-target
         working-directory: ${{ runner.temp }}
@@ -89,6 +94,7 @@ jobs:
           PY
 
       - name: Install pinned OCaml for the scalar consumer profile
+        if: github.event_name != 'workflow_dispatch'
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
@@ -101,4 +107,17 @@ jobs:
           ld --version | head -n 1
 
       - name: Run complete adopter acceptance portfolio
+        if: github.event_name != 'workflow_dispatch'
         run: python3 tools/atdd.py run --all
+
+      - name: Replay current component certificates
+        if: github.event_name == 'workflow_dispatch'
+        run: python3 tools/atdd.py run --scenario core-component-families
+
+      - name: Retain component-check diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: component-check-diagnostics-${{ github.sha }}
+          path: /tmp/zeno-fcis-core-families-*/qualification/*.log
+          if-no-files-found: ignore

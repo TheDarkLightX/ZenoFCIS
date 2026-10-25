@@ -16,6 +16,8 @@ mod value;
 pub use evaluation::admission::AdmissionFailure as V2NumericAdmissionFailure;
 pub use evaluation::typed::NumericOp as V2NumericOp;
 #[doc(hidden)]
+// Preserve the reviewed historical source bytes during workspace formatting.
+#[rustfmt::skip]
 #[path = "evaluation/historical_i64.rs"]
 pub mod historical_i64;
 /// Closed released-evidence verification, separate from current invocation authority.
@@ -1182,8 +1184,10 @@ mod semantic_source_tests {
         }
         let prefix = "crates/zeno-fcis-synthesis/src/finite/";
         for path in super::historical::source_paths().filter_map(|path| path.strip_prefix(prefix)) {
-            assert!(reviewed.insert(path.to_owned()) || path == "execution_v2/meter.rs",
-                "{path} is listed twice");
+            assert!(
+                reviewed.insert(path.to_owned()) || path == "execution_v2/meter.rs",
+                "{path} is listed twice"
+            );
         }
         let unreviewed: Vec<_> = tree.difference(&reviewed).collect();
         let missing: Vec<_> = reviewed.difference(&tree).collect();

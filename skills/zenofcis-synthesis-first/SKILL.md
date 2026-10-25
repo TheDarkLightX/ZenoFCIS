@@ -1,44 +1,38 @@
 ---
 name: zenofcis-synthesis-first
-description: Propose complete ZenoFCIS checked program declarations, use supported library execution and finite synthesis, and keep evidence separate from runtime publication and trusted shell effects.
+description: Build ZenoFCIS applications from checked declarations, choose an optimization or synthesis loop for finite programs, and use counterexamples to repair proposals without weakening their contracts.
 ---
 
 # ZenoFCIS synthesis first
 
-Specify the complete pure transition before implementation: every legal original
-pre-state, command and explicit context, decision class/reason, successor state,
-ordered effects/deliveries, required transition laws and genuine genesis laws.
-Review intent independently and retain separately authored acceptance examples or
-a reference model. An LLM proposal does not establish requirements adequacy.
+Use the installed CLI's `zeno-fcis describe` or MCP
+`discover_program_authoring` to discover supported commands and their task
+guidance. Check each command's domain and resource limits before a search.
 
-Use `discover_program_authoring` or `zeno-fcis describe` to inspect the actual CLI.
-Use `create_program_project` or `zeno-fcis new --template durable-counter` for a
-complete checked declaration example. The other supported normal examples are
-account-lockout, order-fulfillment, inventory-reservation, withdrawal-queue and
-agent-treasury-guard. `check_project_spec` or `zeno-fcis check --format json`
-checks `.zeno` specification diagnostics; it does not admit a runtime program.
+## Choose by the missing result
 
-The normal Rust API is `zeno_fcis::prelude` and `zeno_fcis::program`. Propose the
-complete original schema description/bytes, `ProgramDefinition`, original policy
-bytes and original state/command/context frame and channel links. Preserve every
-legal input and intended successful outcome. `policy_bytes` only serializes a
-proposal. Call the actual library `bind_catalog` and `bind_program`; never supply
-an evaluator, observer, law verdict, claimed usage or candidate sealer.
-Generated adapters are declaration data and retain complete original envelopes.
+| Task | Start here | What to do with the result |
+|---|---|---|
+| Build a durable application | `new --template durable-counter`, then edit the declarations and `generate contract` | Review complete decisions, reasons, successors, effects and laws |
+| Find behavior the laws leave open | `contract review APP --gaps` | Inspect admitted alternatives; propose laws and recheck them against the contract |
+| Resolve competing intended behaviors | `loop question --contract APP` | Show the concrete input and alternatives to the user; do not choose policy silently |
+| Check a proposed replacement | `transform check` | Repair a refuted candidate using the reported input and differing outcomes |
+| Find a smaller equivalent program | `contract export-program`, then `optimize` | Replay the receipt with `transform replay`; adoption is separate |
+| Keep a resumable improvement search | `loop open`, then `candidate` or `run`, then `resume` | Use counterexamples and admission refusals to guide the next bounded proposal |
+| Infer a rule from finite examples | `loop learn` | Resolve distinguishing questions; example agreement alone is not whole-domain correctness |
+| Complete an expression with holes | `loop sketch` | Check the completed program against the full intended contract |
 
-Use the library's supported closed finite/control IR or full-width account
-producer. Unsupported schemas/profiles return named refusals; explain the missing
-support without granting an alternative commit capability. The Account producer
-owns its raw-input abstraction; a newly proposed small fact projection needs its
-own independent correspondence proof. Never replace the full domain with a
-smaller set or an all-Reject policy to make a checker pass.
+Read `--help` for the selected command's arguments. A loop is propose, check,
+inspect feedback, revise. State a bounded objective before running it; keep the
+exact inputs and checker outputs so another agent can replay the result.
 
-`Program::publish` and `publish_genesis` execute actual original envelope
-admission, declared footprints/private resource meter, complete decision and
-required laws before a private Publication can exist. Rejections and technical
-refusals grant no committing publication. Context authentication, trusted version
-selection, durable replay/state comparison and physical effects belong to the
-host. A tool report or passing source test is not that runtime capability.
+## Construct the core from declarations
+
+Specify every legal state, command and explicit context, each decision class
+and reason, successor, ordered effects, transition laws and genesis laws.
+Keep separately authored examples or a reference model to challenge the
+requirements. Do not narrow the domain or replace success with rejection to
+make a check pass.
 
 Standalone finite synthesis remains useful. Assess the Cartesian spaces with
 `assess_finite_problem` or the CLI. `zeno-fcis/finite-i128/1` has 16 fields per side, 256 nodes
@@ -49,12 +43,13 @@ Retain independent full-decision/state/reason/delivery comparisons over every
 admitted input. Finite target evidence does not authorize arbitrary generated Rust
 or replace checked Program binding, laws or complete raw-input correspondence.
 
-Report specification proposals, finite exhaustive results, source-bound proof
-qualification, genuine runtime Publications and trusted shell effects separately.
-Timeouts, incomplete searches, unchecked solver answers and passing samples are
-not proof acceptance. Preserve artifact drift refusals and exact source/tool
-identities. A Wasm compilation does not establish native/Wasm execution parity or
-a universal Rust code-generation theorem.
+The generated V2 path uses `v2/policy.json`, schema declarations and generated
+`v2_contract.rs`. Its descriptor binds through `catalog::bind_original` and
+`authority::bind`. The library's `v2_authority::Authority` evaluates decisions,
+laws and resource usage and issues publication capabilities. The generated
+`v2::V2SqliteShell` accepts those capabilities for durable commits. Follow the
+generated template's imports and ownership; do not supply a decision callback,
+law verdict, claimed usage or publication constructor.
 
 To shrink an admitted finite program, use `transform_request`,
 `transform_candidate` and `transform_replay` (or `zeno-fcis loop`). Propose
@@ -87,7 +82,35 @@ need complete-reference capture and original-bound check/replay. `loop duel`
 does not exist; the duel guide describes a protocol and a small-model solver
 example, not an executable alternating driver.
 
-Use the local [MCP server](https://github.com/TheDarkLightX/ZenoFCIS/blob/main/integrations/mcp/zeno_fcis_synthesis.py) or the same
-CLI directly. Installation and tool usage are documented in
-[docs/LLM_SYNTHESIS.md](https://github.com/TheDarkLightX/ZenoFCIS/blob/main/docs/LLM_SYNTHESIS.md). Neither the skill nor MCP
-substitutes for independent intent/specification review.
+`check --format json` diagnoses the specification; it does not admit a runtime
+program. `publish` and `publish_genesis` perform the checked execution. Supplied
+authorization and time remain data: caller authentication and physical effects
+belong to the host.
+
+## Interpret checker feedback precisely
+
+For optimization, export the original program and retain it unchanged. Supply
+complete candidates with the same declared inputs and outputs. A checked
+improvement is equivalent over that finite domain and smaller under the
+reported cost; it is not a global optimum. An unsupported original names an
+instruction the optimizer cannot handle; increasing a budget cannot add support.
+An incomplete search is inconclusive, not evidence that no improvement exists.
+
+Arithmetic refusal is observable behavior. For example, removing an overflowing
+instruction can turn refusal into success even if its value was not selected.
+Use the exact transform checker instead of assuming ordinary algebra preserves
+checked execution. Replay each accepted receipt with its original and candidate
+bytes before using it; `contract adopt` is a separate, checked operation.
+
+For standalone relation synthesis, first use `assess_finite_problem` or CLI
+validation to assess the declared domain and work budget. `synth run --check`
+and `synth verify` check the supported target and profile. Keep that claim
+separate from arbitrary Rust code, application integration and shell effects.
+
+Report incomplete searches, example agreement, exhaustive finite results,
+source proof qualification and runtime publication separately. Neither the LLM
+nor a tool report supplies release or application authority.
+
+Use the [MCP setup and synthesis guide](https://github.com/TheDarkLightX/ZenoFCIS/blob/main/docs/LLM_SYNTHESIS.md)
+and [CLI reference](https://github.com/TheDarkLightX/ZenoFCIS/blob/main/docs/CLI_REFERENCE.md)
+for installation, artifact formats and command-specific limits.

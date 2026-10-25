@@ -14,8 +14,9 @@ use zeno_fcis_value::{Value, ValueLimits, ValueRef};
 
 mod legacy {
     //! Owned historical data evaluated by the frozen released interpreter.
-    use crate::finite::{Domain, Error, Op, Program, V2Limits, V2Usage,
-        historical_i64 as released};
+    use crate::finite::{
+        Domain, Error, Op, Program, V2Limits, V2Usage, historical_i64 as released,
+    };
     use alloc::vec::Vec;
     use zeno_fcis_codec::EncodeError;
     use zeno_fcis_value::Value;
@@ -36,7 +37,9 @@ mod legacy {
     impl LegacyOutcome {
         /// Actual measured usage, also retained on refusal.
         #[must_use]
-        pub fn usage(&self) -> V2Usage { self.usage }
+        pub fn usage(&self) -> V2Usage {
+            self.usage
+        }
 
         /// Consumes the immutable report; this supplies no invocation authority.
         pub fn into_parts(self) -> (Result<Vec<i64>, crate::finite::V2ExecutionFailure>, V2Usage) {
@@ -47,47 +50,75 @@ mod legacy {
     impl LegacyProgram {
         pub(super) fn try_from_program(program: Program) -> Result<Self, Error> {
             let invalid = || Error::Invalid("program-encoding");
-            let domain = |d: &Domain| Ok(match *d {
-                Domain::Bool => released::Domain::Bool,
-                Domain::Int { min, max } => released::Domain::Int {
-                    min: i64::try_from(min).map_err(|_| invalid())?,
-                    max: i64::try_from(max).map_err(|_| invalid())?,
-                },
-            });
-            let inputs = program.inputs().iter().map(domain).collect::<Result<Vec<_>, Error>>()?;
-            let outputs = program.outputs().iter().map(domain).collect::<Result<Vec<_>, Error>>()?;
-            let nodes = program.nodes().iter().map(|op| Ok(match *op {
-                Op::Input(a) => released::Op::Input(a),
-                Op::Int(a) => released::Op::Int(i64::try_from(a).map_err(|_| invalid())?),
-                Op::Bool(a) => released::Op::Bool(a),
-                Op::Add(a,b) => released::Op::Add(a,b),
-                Op::Sub(a,b) => released::Op::Sub(a,b),
-                Op::Eq(a,b) => released::Op::Eq(a,b),
-                Op::Lt(a,b) => released::Op::Lt(a,b),
-                Op::And(a,b) => released::Op::And(a,b),
-                Op::Not(a) => released::Op::Not(a),
-                Op::Select(a,b,c) => released::Op::Select(a,b,c),
-                Op::Mul(a,b) => released::Op::Mul(a,b),
-                Op::DivFloor(a,b) => released::Op::DivFloor(a,b),
-                Op::DivCeil(a,b) => released::Op::DivCeil(a,b),
-                Op::MulDivFloor(a,b,c) => released::Op::MulDivFloor(a,b,c),
-                Op::MulDivCeil(a,b,c) => released::Op::MulDivCeil(a,b,c),
-                Op::ProductsGe(a,b) => released::Op::ProductsGe(a,b),
-                Op::SignedMulDivFloor(..) => return Err(invalid()),
-            })).collect::<Result<Vec<_>, Error>>()?;
-            Ok(Self { program: released::Program::try_new_extended(inputs, outputs, nodes,
-                program.roots().to_vec())? })
+            let domain = |d: &Domain| {
+                Ok(match *d {
+                    Domain::Bool => released::Domain::Bool,
+                    Domain::Int { min, max } => released::Domain::Int {
+                        min: i64::try_from(min).map_err(|_| invalid())?,
+                        max: i64::try_from(max).map_err(|_| invalid())?,
+                    },
+                })
+            };
+            let inputs = program
+                .inputs()
+                .iter()
+                .map(domain)
+                .collect::<Result<Vec<_>, Error>>()?;
+            let outputs = program
+                .outputs()
+                .iter()
+                .map(domain)
+                .collect::<Result<Vec<_>, Error>>()?;
+            let nodes = program
+                .nodes()
+                .iter()
+                .map(|op| {
+                    Ok(match *op {
+                        Op::Input(a) => released::Op::Input(a),
+                        Op::Int(a) => released::Op::Int(i64::try_from(a).map_err(|_| invalid())?),
+                        Op::Bool(a) => released::Op::Bool(a),
+                        Op::Add(a, b) => released::Op::Add(a, b),
+                        Op::Sub(a, b) => released::Op::Sub(a, b),
+                        Op::Eq(a, b) => released::Op::Eq(a, b),
+                        Op::Lt(a, b) => released::Op::Lt(a, b),
+                        Op::And(a, b) => released::Op::And(a, b),
+                        Op::Not(a) => released::Op::Not(a),
+                        Op::Select(a, b, c) => released::Op::Select(a, b, c),
+                        Op::Mul(a, b) => released::Op::Mul(a, b),
+                        Op::DivFloor(a, b) => released::Op::DivFloor(a, b),
+                        Op::DivCeil(a, b) => released::Op::DivCeil(a, b),
+                        Op::MulDivFloor(a, b, c) => released::Op::MulDivFloor(a, b, c),
+                        Op::MulDivCeil(a, b, c) => released::Op::MulDivCeil(a, b, c),
+                        Op::ProductsGe(a, b) => released::Op::ProductsGe(a, b),
+                        Op::SignedMulDivFloor(..) => return Err(invalid()),
+                    })
+                })
+                .collect::<Result<Vec<_>, Error>>()?;
+            Ok(Self {
+                program: released::Program::try_new_extended(
+                    inputs,
+                    outputs,
+                    nodes,
+                    program.roots().to_vec(),
+                )?,
+            })
         }
 
         #[cfg(test)]
-        pub(super) fn into_released_for_test(self) -> released::Program { self.program }
+        pub(super) fn into_released_for_test(self) -> released::Program {
+            self.program
+        }
 
         /// The original shape-selected i64 profile.
         #[must_use]
-        pub fn profile(&self) -> &'static str { self.program.profile() }
+        pub fn profile(&self) -> &'static str {
+            self.program.profile()
+        }
 
         /// Canonical bytes retain the released profile and signed atom encoding.
-        pub fn value(&self) -> Result<Value, EncodeError> { self.program.value() }
+        pub fn value(&self) -> Result<Value, EncodeError> {
+            self.program.value()
+        }
 
         /// Released eager evaluation, including unused nodes and both Select arms.
         pub fn evaluate(&self, input: &[i64]) -> Result<Vec<i64>, Error> {

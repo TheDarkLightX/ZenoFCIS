@@ -649,6 +649,11 @@ fn describe_declares_loop_effects() {
     assert_eq!(exit, Some(0));
     let group = &report["command"];
     assert_eq!(group["effects"]["classification"], "command-group");
+    assert!(
+        group["guidance"]
+            .as_str()
+            .is_some_and(|text| !text.is_empty())
+    );
     let names: Vec<_> = group["subcommands"]
         .as_array()
         .unwrap_or_else(|| panic!("subcommands"))

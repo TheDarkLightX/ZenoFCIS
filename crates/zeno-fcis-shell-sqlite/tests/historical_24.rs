@@ -12,6 +12,8 @@ use zeno_fcis_synthesis::finite::{
 #[path = "../../zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract.rs"]
 /// Current metadata for the retained adopted contract.
 pub mod adopted;
+// Preserve the reviewed historical source bytes during workspace formatting.
+#[rustfmt::skip]
 #[path = "../../zeno-fcis-synthesis/tests/test-data/released_24_contract.rs"]
 /// Original released declaration data for the retained predecessor.
 pub mod released;

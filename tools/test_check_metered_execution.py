@@ -113,12 +113,14 @@ class MeteredRefusal(unittest.TestCase):
             Path("/private-specimen"), self.pin, self.profile, expected=expected, vir=vir)[0]
 
     def test_complete_intended_refusal_and_mixed_errors(self):
-        self.assertTrue(self.classify())
-        for extra in ("note: Resource limit (rlimit) exceeded\n", "note: UNKNOWN\n", "note: timed out\n",
-                      "error[E0308]: mismatched types\n --> unrelated.rs:2:1\n",
-                      "error: assertion failed\n --> unrelated.rs:2:1\n"):
-            with self.subTest(extra=extra):
-                self.assertFalse(self.classify(self.stderr + extra))
+        for name in ("omit_step_charge", "charge_wrong_resource"):
+            with self.subTest(name=name):
+                self.assertTrue(self.classify(name=name))
+            for extra in ("note: Resource limit (rlimit) exceeded\n", "note: UNKNOWN\n", "note: timed out\n",
+                          "error[E0308]: mismatched types\n --> unrelated.rs:2:1\n",
+                          "error: assertion failed\n --> unrelated.rs:2:1\n"):
+                with self.subTest(name=name, extra=extra):
+                    self.assertFalse(self.classify(self.stderr + extra, name=name))
         for stderr in (self.stderr.replace(str(self.path), "unrelated.rs"),
                        self.stderr.replace(":2:1", ":9:1"), self.stderr.replace("1 previous", "2 previous")):
             self.assertFalse(self.classify(stderr))

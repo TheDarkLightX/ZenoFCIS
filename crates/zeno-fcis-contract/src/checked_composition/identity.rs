@@ -73,6 +73,8 @@ pub(crate) const CHECKER_SOURCES: &[(&str, &[u8])] = checker_sources![
     "src/contract_error.rs",
     "src/distribution.rs",
     "src/internals.rs",
+    "src/internals/decision_class.rs",
+    "src/internals/decision_space.rs",
     "src/internals/declarations.rs",
     "src/internals/declarations/source.rs",
     "src/internals/delivery.rs",

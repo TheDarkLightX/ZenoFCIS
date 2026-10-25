@@ -238,23 +238,28 @@ a build or home path.
 and records only this host's executable, with the same remapped compiler
 environment and an empty `ZENO_FCIS_BUILD_TREE`, then runs the privacy scan.
 
-### Two-host release set
+### Host release sets
 
-The read-only release-candidate workflow builds two host executables:
-`x86_64-unknown-linux-gnu`, in the complete Linux set on `ubuntu-24.04`, and
-`aarch64-apple-darwin`, on GitHub's `macos-15` arm64 image with
+The read-only release-candidate workflow builds the complete
+`x86_64-unknown-linux-gnu` set on `ubuntu-24.04`. After native macOS platform
+validation, a manual run with `include_macos` adds
+`aarch64-apple-darwin`, built on GitHub's `macos-15` arm64 image with
 `MACOSX_DEPLOYMENT_TARGET=11.0`. There is no Intel macOS executable and no
 universal binary. The workflow has three jobs:
 
 1. **`assemble`** builds the complete Linux set and reports the hashes of its
    `SHA256SUMS`, archive, host record and compiled-inputs record as job outputs.
-2. **`macos-host-binary`** runs `build-host-binary`, then installs and uses the
+2. **`macos-host-binary`**, when requested, runs `build-host-binary`, then installs and uses the
    executable with `tools/check_installed_cli.py` (below), and reports the
    hashes of its archive, records and journey report.
-3. **`release-set`** downloads both artifacts and checks each file against the
+3. **`release-set`** downloads the requested artifacts and checks each file against the
    hash its producing job reported. It runs the Linux installed-binary journey,
-   merges the macOS host into the set, writes `DOWNLOADS.sha256` and runs the
+   adds the macOS host when requested, writes `DOWNLOADS.sha256` and runs the
    custody check.
+
+A failed requested host blocks the set. The initial Linux publication does not
+wait for the deferred Mac binary. Mac test failures remain unresolved until a
+native run passes; a skipped job is not qualification.
 
 `tools/rc_package.py merge-hosts --release <directory> --host <host folder>...
 --journey <target>=<report>` first checks the set's index, and changes nothing

@@ -86,13 +86,7 @@ impl Expression {
         };
         let program = Program::try_new_extended(
             used.iter()
-                .map(|n| {
-                    if names[n] {
-                        Domain::Bool
-                    } else {
-                        integer
-                    }
-                })
+                .map(|n| if names[n] { Domain::Bool } else { integer })
                 .collect(),
             vec![if boolean { Domain::Bool } else { integer }],
             graph

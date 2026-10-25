@@ -201,8 +201,8 @@ source guard pins it to released-receipt replay. See [contract adoption and stor
 
 Code is LLM-generated or synthesized;
 acceptance depends on the stated check, domain and assumptions. The
-[installation guide](INSTALLATION.md) describes how to verify published assets
-once they are available.
+[installation guide](INSTALLATION.md) describes how to verify the
+[published Linux assets](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.5.0).
 
 ## The 2.5 breaking change
 
@@ -217,6 +217,32 @@ declarations and rules, check the candidate with the 2.5 CLI, and use
 re-adoption does not migrate a 2.4 store. Keep the retained policies,
 digests and receipts unchanged. The 2.4.0 compatibility route above restores
 upgrades in 2.6.
+
+## Optimizer, contract review and templates
+
+The optimizer now distinguishes an unsupported instruction from a completed
+search that found no improvement. It names the instruction and suggests the
+next step. A search stopped by its limits reports `inconclusive` unless a
+checked improvement was already found. CLI help and the agent guide explain
+when to optimize, check a supplied replacement, or use a resumable loop.
+Structured command discovery exposes the same workflow guidance to MCP agents.
+The limit flag includes runs stopped before their first phase. Resumed sessions
+label completed historical settlements separately from incomplete checks;
+retaining a settlement does not mean it was freshly replayed. A dropped
+historical counterexample is marked unreplayed. Requirement questions no longer
+copy a rejecting branch's state updates onto an Accept alternative, and mark
+unsupported answer classes explicitly. False proposed laws count toward their
+applicability totals, so a false law is not mistaken for an inactive one.
+
+`contract review --gaps` now considers each reason only in its declared
+Reject or CommittedFailure class. The durable-counter and prepared-counter
+templates replace an always-true rejection law with their actual rejection
+conditions, so new projects pass `check --require-substantive`.
+
+Two small Verus harness obligations cover the production status classifier
+and class-specific decision enumeration. They do not prove the whole search,
+compiler or review command. Template behavior is checked over the complete
+finite input domains, separately from those proofs.
 
 ## Arithmetic loops
 
@@ -251,7 +277,7 @@ evidence directory, `/tmp/zeno-fcis-containment-<uid>`, first; contained
 commands are then refused until it is removed, which fails closed. If the
 caller is killed during a contained POSIX run, the guardian can exit with
 code 101 instead of its refusal code after cleanup; only the exit code
-differs. Both are planned for 2.5.1.
+differs. Both remain known issues.
 
 ## Arithmetic and specifications
 
@@ -276,7 +302,7 @@ queries, and do not prove the whole compiler, runtime or application shell.
 
 ## Spot pool
 
-ZenoDEX Spot: for any group of accounts and any number of operations, rounding gains stay below one atom per asset per account. This is kernel-checked in Lean for the pool's contract model. The Rust implementation is checked against that contract exhaustively on bounded domains and by replay. A machine-checked refinement from the Rust code to the model, and a no-profitable-round-trip theorem, are planned for 2.5.1.
+ZenoDEX Spot: for any group of accounts and any number of operations, rounding gains stay below one atom per asset per account. This is kernel-checked in Lean for the pool's contract model. The Rust implementation is checked against that contract exhaustively on bounded domains and by replay. A machine-checked refinement from the Rust code to the model, and a no-profitable-round-trip theorem, remain future work.
 
 The Lean Spot theorems for the rational contract model are classical because core `Rat` operations in Lean 4.30 depend on `Classical.choice`.
 
@@ -578,6 +604,11 @@ examples capture human intent. Supplied principals, authorization, time and
 context are application inputs; ZenoFCIS does not authenticate them.
 
 ### Platforms and upgrading
+
+The initial 2.5.0 publication is Linux-only. The Mac binary is deferred until
+native platform validation is complete; its full portable test suite has not
+passed. The optional Mac build and installed-binary journey do not replace
+that outstanding validation.
 
 The release process publishes a binary for each of these targets only after
 its platform qualification, installation and release-custody checks pass:

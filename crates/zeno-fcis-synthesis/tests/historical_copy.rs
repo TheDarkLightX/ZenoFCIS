@@ -2,6 +2,8 @@
 use zeno_fcis_codec::CommitmentHasher;
 use zeno_fcis_crypto::RustCryptoSha256;
 
+// Preserve the reviewed historical source bytes during workspace formatting.
+#[rustfmt::skip]
 #[path = "test-data/historical_24_copy.rs"]
 mod expected;
 
