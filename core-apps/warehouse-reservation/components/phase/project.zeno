@@ -33,5 +33,5 @@ law 541 acceptance_eligibility on accept = (((true) && !(context.102.130 == 0)) 
 law 542 no_committed_failure on failure = false;
 // Core seed finite-phase-machine/1; parameters {"C": 2}.
 // Instance source-set SHA256 ee88afe2b3175493773681c20a324e19a1b3690e821b6c90091fbdea3b659783.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/finite-phase-machine.json SHA256 ed384663338c1f5b43028477a75874714516a35f49991baf3c641c738fa7b6f9; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/finite-phase-machine.json SHA256 e282913ac7e842195389acd2bca29bde9d35a70a68eea2b3378271ad522759b3; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.
