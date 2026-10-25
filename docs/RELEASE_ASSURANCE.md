@@ -122,7 +122,7 @@ Optional developer guardrails use a private npm package with exact Probity
 digest for the complete canonical lock graph. CI installs that graph with
 lifecycle scripts disabled and runs `npm audit`. It is excluded from Rust
 runtime and protocol authority.
-The development graph also pins MCP SDK `1.31.0`, the patched 1.x version for
+The development graph also pins MCP SDK `1.32.1`, which includes the 1.x fix for
 [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h).
 The package override and complete canonical lock digest are checked together.
 

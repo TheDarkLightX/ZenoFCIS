@@ -28,8 +28,8 @@ tool or an unexpected result fails the journey, and nothing is skipped:
    with a receipt, its replay, and the same receipt path again refused with its bytes kept.
 7. Platform routes. macOS: `--offline-parallel` and `loop open` print the exact
    inconclusive result, exit 2 and write nothing; the durable counter's README
-   `synth verify` exits 2 with `conformance-unknown` (`unsupported-runtime-platform`) and
-   writes no receipt. Linux, inside the contained runtime: the `--offline-parallel`
+   `synth verify` passes with a separately bound finite-conformance receipt.
+   Linux, inside the contained runtime: the `--offline-parallel`
    receipt equals the serial one and replays, and `synth verify` passes.
 """
 
@@ -195,7 +195,19 @@ class Journey:
     def host_facts(self) -> dict:
         facts = {"uname": platform.uname()._asdict(), "python": sys.version}
         if self.host == MAC:
-            for name, command in (("sw_vers", ["sw_vers"]), ("xcode", ["xcodebuild", "-version"]),
+            developer = self.run("host-developer-directory", ["xcode-select", "-p"],
+                                 cwd=self.work).stdout.decode().strip()
+            facts["developer_directory"] = developer
+            if developer == "/Library/Developer/CommandLineTools":
+                # The documented compiler prerequisite is CLT, whose xcodebuild
+                # intentionally refuses -version. Record its actual package instead.
+                facts["command_line_tools"] = self.run(
+                    "host-command-line-tools", ["pkgutil", "--pkg-info", "com.apple.pkg.CLTools_Executables"],
+                    cwd=self.work).stdout.decode()
+            else:
+                facts["xcode"] = self.run("host-xcode", ["xcodebuild", "-version"], cwd=self.work).stdout.decode()
+            for name, command in (("sw_vers", ["sw_vers"]),
+                                  ("clang", ["xcrun", "--sdk", "macosx", "clang", "--version"]),
                                   ("sdk", ["xcrun", "--sdk", "macosx", "--show-sdk-version"])):
                 facts[name] = self.run(f"host-{name}", command, cwd=self.work).stdout.decode()
         else:
@@ -440,14 +452,12 @@ class Journey:
                 raise JourneyError(f"loop open on macOS: {loop}, acquisition {acquisition}")
             if files_under(root) or session.exists():
                 raise JourneyError(f"an unavailable contained route wrote {files_under(root)}")
-            blocked = self.run("synth-verify", verify, cwd=counter, expected=2)
-            text = (blocked.stdout + blocked.stderr).decode(errors="replace")
-            if "conformance-unknown" not in text or "unsupported-runtime-platform" not in text:
-                raise JourneyError("synth verify on macOS did not report the unsupported runtime platform")
-            if conformance.exists():
-                raise JourneyError("a blocked synth verify wrote a receipt")
+            self.expect(self.report_of("synth-verify", verify, cwd=counter),
+                        {"status": "passed", "authority": "none", "runtime_platform": "macos"}, "synth verify")
+            if not conformance.is_file():
+                raise JourneyError("synth verify wrote no receipt")
             return {"offline_parallel": result, "loop_open": {**loop, "acquisition": acquisition},
-                    "synth_verify": "conformance-unknown: unsupported-runtime-platform"}
+                    "synth_verify": "passed"}
         self.expect(self.report_of("offline-parallel", command, cwd=root), {"status": "equivalent", "backend": "systemd"},
                     "offline-parallel")
         if parallel.read_bytes() != serial["receipt"].read_bytes():

@@ -83,6 +83,19 @@ class ControlPool(unittest.TestCase):
 
 
 class GateReceipts(unittest.TestCase):
+    def test_non_linux_profiles_refuse_before_tool_setup_or_evidence_writes(self):
+        for checker in (gate, verifier):
+            for system, machine in (('Darwin', 'arm64'), ('Linux', 'aarch64'), ('Windows', 'AMD64')):
+                with self.subTest(checker=checker.__name__, system=system, machine=machine), \
+                        tempfile.TemporaryDirectory() as temporary, \
+                        patch.object(checker.platform, 'system', return_value=system), \
+                        patch.object(checker.platform, 'machine', return_value=machine), \
+                        patch.object(verifier, 'prepare_tools', side_effect=AssertionError('tool setup ran')):
+                    cache = Path(temporary) / 'cache'
+                    with self.assertRaisesRegex(RuntimeError, 'requires .*Linux x86-64'):
+                        checker.check(cache, False)
+                    self.assertEqual(list(Path(temporary).iterdir()), [])
+
     def test_real_gate_serial_and_parallel_acceptance_receipts_are_identical(self):
         import copy
         pin = json.loads((verifier.ROOT / verifier.PIN).read_text())
@@ -116,7 +129,11 @@ class GateReceipts(unittest.TestCase):
                                       'error: aborting due to 1 previous error\n')
                 return subprocess.CompletedProcess(command,
                     int(not report['verification-results']['success']), json.dumps(report), stderr)
+            # Only the synthetic protocol pipeline runs; do not claim a proof
+            # profile for the machine executing this unit test.
             with patch.dict(os.environ, {'ZENO_FCIS_CONTROL_JOBS': str(jobs)}), \
+                 patch.object(verifier.platform, 'system', return_value='Linux'), \
+                 patch.object(verifier.platform, 'machine', return_value='x86_64'), \
                  patch.object(verifier, 'prepare_tools', return_value=Path('/tmp/cx-q25/pinned-tools')), \
                  patch.object(verifier, 'verify_tool_files'), patch.object(verifier, 'snapshot', return_value={}), \
                  patch.object(verifier, 'run', side_effect=fake), \

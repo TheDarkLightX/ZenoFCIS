@@ -77,6 +77,7 @@ fn kb_usage_public_advice_has_exact_answers_and_native_recipe_traces() {
     }
 }
 #[test]
+#[cfg(target_os = "linux")]
 fn kb_usage_configured_session_skips_blocked_step_writes_one_proposal_and_no_fact_logs() {
     let d = Directory::new();
     let source = d.0.join("team.kb");
@@ -117,6 +118,56 @@ fn kb_usage_configured_session_skips_blocked_step_writes_one_proposal_and_no_fac
         fs::read_to_string(&source).unwrap_or_default(),
         format!("custom(\"{canary}\").")
     );
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn kb_usage_unqualified_loop_refuses_before_acquisition_or_knowledge_writes() {
+    let d = Directory::new();
+    let source = d.0.join("team.kb");
+    let canary = "synthetic-private-canary-9a83";
+    let original_source = format!("custom(\"{canary}\").");
+    fs::write(&source, &original_source).unwrap_or_else(|e| panic!("{e}"));
+    let original = d.0.join("not-acquired.zcve");
+    let session = d.0.join("not-opened");
+    let out = cli(&[
+        "loop",
+        "--kb",
+        source.to_str().unwrap_or(""),
+        "--kb-task",
+        "task(tool,zeno-fcis).task(version,v241).task(environment,sandbox).",
+        "open",
+        "--original",
+        original.to_str().unwrap_or(""),
+        "--session",
+        session.to_str().unwrap_or(""),
+    ]);
+    assert_eq!(out.status.code(), Some(2));
+    let report = json(&out);
+    assert_eq!(report["status"], "inconclusive");
+    assert_eq!(report["authority"], "none");
+    assert_eq!(
+        report["reason"],
+        "containment-unavailable:posix:platform-unqualified"
+    );
+    assert_eq!(report["containment"]["startup"]["admitted"], false);
+    assert_eq!(
+        report["containment"]["final"]["application_work_started"],
+        false
+    );
+    assert!(!session.exists());
+    assert!(!original.exists());
+    assert!(!d.0.join("inbox").exists());
+    assert_eq!(
+        fs::read_dir(&d.0).unwrap_or_else(|e| panic!("{e}")).count(),
+        1
+    );
+    assert_eq!(
+        fs::read_to_string(&source).unwrap_or_default(),
+        original_source
+    );
+    assert!(!String::from_utf8_lossy(&out.stdout).contains(canary));
+    assert!(!String::from_utf8_lossy(&out.stderr).contains(canary));
 }
 #[test]
 fn kb_usage_layer_conflict_and_empty_evidence_are_not_advice() {
