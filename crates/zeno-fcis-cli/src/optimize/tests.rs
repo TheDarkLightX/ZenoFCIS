@@ -2579,10 +2579,14 @@ fn search_status_is_pure_for_every_run_stop_and_preserves_checked_candidates() {
                 index: 4,
                 opcode: "MulDivCeil",
             });
+            assert_eq!(search.status_and_exit(), ("inconclusive", crate::BLOCKED));
+            // Unsupported originals prevent every phase from running.
+            let phases = std::mem::take(&mut search.phases);
             assert_eq!(
                 search.status_and_exit(),
                 ("unsupported-original", crate::BLOCKED)
             );
+            search.phases = phases;
         }
         search.best = checked.take();
         assert_eq!(
