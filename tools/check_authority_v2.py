@@ -36,9 +36,9 @@ EVALUATOR=SUBJECT.parent/'authority/evaluator.rs'
 SOURCE_MANIFEST=Path('verification/verus/authority_v2_sources.json')
 PUBLIC_TEST=Path('crates/zeno-fcis-synthesis/tests/v2_authority.rs')
 APPROVED_SOURCE_CLOSURE_SHA256='3c42a44638e78b8a8d3bb88374b79900a0a961fb28cf3a494ece661c2626b167'
-# This unchanged command-substitution control needs more than the default
+# These command-substitution controls need more than the default
 # solver budget. Exhaustion still refuses qualification; it is not a kill.
-CONTROL_RLIMITS={'sealed_command':80,'stage_usage':80}
+CONTROL_RLIMITS={'sealed_command':80,'stage_usage':80,'replay_original':80}
 
 SEMANTIC_TARGETS = {
     'word_byte_order': 'word', 'length_header': 'encoded_size',
