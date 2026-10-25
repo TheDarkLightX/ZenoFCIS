@@ -31,10 +31,18 @@ pub fn parse_table_read(
     let (parsed, mut parser) = parse_with_tables(source, limits)?;
     parser.declarations = parsed.declarations.clone();
     let project = crate::elaborate_project(parsed, crate::ProjectLimits::default())?;
-    let (tokens, diagnostics) = lex(read, limits);
-    parser.tokens = tokens;
+    let checked = checked_tokens(
+        read,
+        limits,
+        Root::TableRead,
+        false,
+        Some(&parser.scan.entries),
+        &parser.derived_heights(),
+        Some(&parser.tables),
+    )?;
+    parser.tokens = checked.tokens;
     parser.index = 0;
-    parser.diagnostics = diagnostics;
+    parser.diagnostics.clear();
     parser.rewrites.clear();
     let starts_read = matches!(&parser.current().kind, TokenKind::Ident(name)
         if parser.constants.contains_key(name.as_ref()) || parser.derived.contains_key(name.as_ref()) || projection_root(name).is_some());
