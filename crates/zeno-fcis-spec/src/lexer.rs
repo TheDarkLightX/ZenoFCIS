@@ -147,8 +147,9 @@ pub(crate) fn lex(source: &str, limits: SourceLimits) -> (Vec<Token<'_>>, Vec<Di
             });
         }
         // An invalid byte does not consume a token, so the token budget cannot
-        // bound diagnostic allocation. Keep this independent refusal bound.
-        if diagnostics.len() >= limits.max_diagnostics() {
+        // bound diagnostic allocation. Keep one overflow diagnostic so the
+        // returned DiagnosticSet can accurately report truncated diagnostics.
+        if diagnostics.len() > limits.max_diagnostics() {
             break;
         }
     }
@@ -245,9 +246,12 @@ mod tests {
             panic!("valid test limits");
         };
         let (tokens, errors) = lex(&source, limits);
-        assert_eq!(errors.len(), 2);
+        assert_eq!(errors.len(), 3); // two retained, one proves truncation
         assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].kind, TokenKind::End);
-        assert_eq!(tokens[0].span.start(), 2);
+        assert_eq!(tokens[0].span.start(), 3);
+        let retained = crate::DiagnosticSet::from_vec(errors, limits.max_diagnostics());
+        assert_eq!(retained.len(), 2);
+        assert!(retained.is_truncated());
     }
 }
