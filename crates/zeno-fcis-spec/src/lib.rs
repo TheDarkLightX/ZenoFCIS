@@ -11,19 +11,28 @@ extern crate alloc;
 
 mod ast;
 mod builder;
+mod checked_parser;
 mod diagnostic;
 mod elaborate;
 mod induction;
 mod lexer;
+mod lexical_core;
 mod mini_determinator;
+#[cfg(test)]
 mod parser;
 mod paths;
+mod semantic_readers;
 mod source;
 mod substance;
+mod syntax;
+pub mod syntax_certificate;
+mod syntax_grammar;
+mod syntax_lowering;
 mod views;
 
 pub use ast::*;
 pub use builder::{CompositionAstBuilder, ProjectSpecBuilder};
+pub use checked_parser::parse_project;
 pub use diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan,
 };
@@ -33,7 +42,6 @@ pub use mini_determinator::{
     MergeConflict, MiniBlocker, MiniBudget, MiniCommand, MiniDecision, MiniDeterminator, MiniRun,
     MiniState, PrivateWork, WorkerInstruction, WorkerProgram, WorkerTrace, WorkspaceCell,
 };
-pub use parser::parse_project;
 pub use paths::{
     DeclaredDomain, PathResolution, claim_paths, declared_domain, law_paths, resolve_path,
 };
@@ -49,6 +57,8 @@ pub use views::{
 
 /// Version of the `.zeno` grammar and lexer contract.
 pub const ZENO_DSL_VERSION: u16 = 1;
+/// Reviewable ordered surface grammar used by the checked parser.
+pub const ZENO_GRAMMAR_JSON: &str = syntax_grammar::GRAMMAR_JSON;
 /// Version of [`ProjectSpec`] canonical bytes.
 pub const PROJECT_SPEC_FORMAT_VERSION: u16 = 1;
 /// Version of relational and temporal formula canonical bytes.
@@ -62,6 +72,9 @@ pub const MAX_SOURCE_TOKENS: usize = 262_144;
 pub const MAX_RETAINED_DIAGNOSTICS: usize = 256;
 /// Maximum recursive expression nesting admitted by the language parser.
 pub const MAX_FORMULA_DEPTH: usize = 256;
+/// Maximum constructed expression height accepted by parsing, including the
+/// comparison and temporal-atom wrappers around bounded source nesting.
+pub const MAX_PARSED_EXPRESSION_HEIGHT: usize = MAX_FORMULA_DEPTH + 2;
 /// Maximum total formula nodes admitted by elaboration.
 pub const MAX_FORMULA_NODES: usize = 1_000_000;
 /// Maximum finite logical-trace horizon admitted by language version 1.

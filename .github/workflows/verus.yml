@@ -9,6 +9,7 @@ on:
       - "crates/zeno-fcis-codec/**"
       - "crates/zeno-fcis-crypto/**"
       - "crates/zeno-fcis-value/**"
+      - "crates/zeno-fcis-spec/**"
       - "crates/zeno-fcis-cli/templates/**"
       - "crates/zeno-fcis-cli/src/**"
       - "crates/zeno-fcis-contract/**"
@@ -17,6 +18,7 @@ on:
       - "crates/zeno-fcis-cli/tests/fixtures/transform-check/**"
       - "verification/verus/**"
       - "tools/check_*.py"
+      - "tools/generate_spec_grammar.py"
       - "tools/test_check_*.py"
       - "tools/test_negative_retention.py"
       - "tools/test_verus_contract_controls.py"
@@ -79,6 +81,7 @@ jobs:
       max-parallel: 3
       matrix:
         include:
+          - {gate: spec-parser, script: check_spec_parser.py, output: run}
           - {gate: shared-runtime, script: check_verus.py, output: receipt.json}
           - {gate: scalar-query, script: check_scalar_query_refinement.py, output: receipt.json}
           - {gate: scalar-arithmetic, script: check_scalar_arithmetic.py, output: run}

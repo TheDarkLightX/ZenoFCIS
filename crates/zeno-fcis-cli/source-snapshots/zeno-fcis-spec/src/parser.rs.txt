@@ -13,12 +13,16 @@ use crate::lexer::{Token, TokenKind, lex};
 use crate::{MAX_FORMULA_DEPTH, SourceLimits, ZENO_DSL_VERSION};
 
 /// Parses one bounded `.zeno` source file and accumulates deterministic diagnostics.
-pub fn parse_project(source: &str, limits: SourceLimits) -> Result<ParsedProject, DiagnosticSet> {
+pub(crate) fn parse_project_recovering(
+    source: &str,
+    limits: SourceLimits,
+) -> Result<ParsedProject, DiagnosticSet> {
     let (tokens, diagnostics) = lex(source, limits);
     let mut parser = Parser {
         tokens,
         index: 0,
         diagnostics,
+        diagnostic_limit: limits.max_diagnostics(),
         declarations: Vec::new(),
         merge_order: Vec::new(),
         nesting: 0,
@@ -34,16 +38,17 @@ pub fn parse_project(source: &str, limits: SourceLimits) -> Result<ParsedProject
     }
 }
 
-struct Parser {
-    tokens: Vec<Token>,
+struct Parser<'a> {
+    tokens: Vec<Token<'a>>,
     index: usize,
     diagnostics: Vec<Diagnostic>,
+    diagnostic_limit: usize,
     declarations: Vec<SpannedDeclaration>,
     merge_order: Vec<StableId>,
     nesting: usize,
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     fn parse(&mut self, diagnostic_limit: usize) -> ParsedProject {
         let version = if self.take_keyword("zeno") {
             self.take_u16("header.version").unwrap_or(0)
@@ -84,7 +89,9 @@ impl Parser {
             );
             (one_id(), fallback_identifier())
         };
-        while !matches!(self.current().kind, TokenKind::Eof) {
+        while !matches!(self.current().kind, TokenKind::End)
+            && self.diagnostics.len() < self.diagnostic_limit
+        {
             let start = self.current().span;
             let result = if self.take_keyword("namespace") {
                 self.parse_namespace().map(Declaration::Namespace)
@@ -345,7 +352,7 @@ impl Parser {
             Vec::new(),
             Vec::new(),
         );
-        while !matches!(self.current().kind, TokenKind::RBrace | TokenKind::Eof) {
+        while !matches!(self.current().kind, TokenKind::RBrace | TokenKind::End) {
             if self.take_keyword("owns") {
                 if let Some(value) = self.take_id("component.owns") {
                     owned.push(value);
@@ -513,7 +520,7 @@ impl Parser {
     fn parse_merge(&mut self) {
         self.expect_symbol(TokenKind::LBracket, "merge");
         let mut values = Vec::new();
-        while !matches!(self.current().kind, TokenKind::RBracket | TokenKind::Eof) {
+        while !matches!(self.current().kind, TokenKind::RBracket | TokenKind::End) {
             if let Some(id) = self.take_id("merge.component") {
                 values.push(id)
             }
@@ -571,7 +578,7 @@ impl Parser {
                 self.describe_current(),
                 "write `, genesis` for a law that also constrains the genesis state",
             );
-            if matches!(self.current().kind, TokenKind::Ident(_)) {
+            if matches!(self.current().kind, TokenKind::Ident) {
                 self.advance();
             }
             return None;
@@ -676,7 +683,7 @@ impl Parser {
         let context = alloc::format!("claim.{keyword}");
         self.expect_symbol(TokenKind::LBracket, &context);
         let mut laws = Vec::new();
-        while !matches!(self.current().kind, TokenKind::RBracket | TokenKind::Eof) {
+        while !matches!(self.current().kind, TokenKind::RBracket | TokenKind::End) {
             if let Some(law) = self.take_id("claim.law") {
                 laws.push(law)
             }
@@ -787,9 +794,9 @@ impl Parser {
         }
         let named_predicate = matches!(
             (&self.current().kind, self.tokens.get(self.index + 1)),
-            (TokenKind::Ident(name), Some(next))
+            (TokenKind::Ident, Some(next))
                 if matches!(next.kind, TokenKind::LParen)
-                    && !matches!(name.as_ref(), "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil" | "signed_mul_div_floor" | "repeat_mul_div_floor" | "repeat_signed_mul_div_floor")
+                    && !matches!(self.current().spelling, "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil" | "signed_mul_div_floor" | "repeat_mul_div_floor" | "repeat_signed_mul_div_floor")
         );
         if named_predicate {
             let name = self
@@ -797,7 +804,7 @@ impl Parser {
                 .unwrap_or_else(fallback_identifier);
             self.expect_symbol(TokenKind::LParen, "predicate");
             let mut arguments = Vec::new();
-            while !matches!(self.current().kind, TokenKind::RParen | TokenKind::Eof) {
+            while !matches!(self.current().kind, TokenKind::RParen | TokenKind::End) {
                 arguments.push(self.parse_value());
                 if !self.take_symbol(&TokenKind::Comma) {
                     break;
@@ -883,7 +890,7 @@ impl Parser {
             });
             return ValueExpr::Sub(Box::new(ValueExpr::Int(0)), Box::new(value));
         }
-        if let TokenKind::Number(value) = self.current().kind.clone() {
+        if let TokenKind::Number(value) = self.current().kind {
             self.advance();
             return match i128::try_from(value) {
                 Ok(value) => ValueExpr::Int(value),
@@ -1134,7 +1141,7 @@ impl Parser {
         false
     }
 
-    fn current(&self) -> &Token {
+    fn current(&self) -> &Token<'a> {
         &self.tokens[self.index.min(self.tokens.len().saturating_sub(1))]
     }
     fn advance(&mut self) {
@@ -1143,7 +1150,7 @@ impl Parser {
         }
     }
     fn peek_keyword(&self, word: &str) -> bool {
-        matches!(&self.current().kind,TokenKind::Ident(value) if value.as_ref()==word)
+        self.current().kind == TokenKind::Ident && self.current().spelling == word
     }
     fn take_keyword(&mut self, word: &str) -> bool {
         if self.peek_keyword(word) {
@@ -1184,7 +1191,7 @@ impl Parser {
         }
     }
     fn take_number(&mut self, path: &str) -> Option<u64> {
-        if let TokenKind::Number(value) = self.current().kind.clone() {
+        if let TokenKind::Number(value) = self.current().kind {
             self.advance();
             match u64::try_from(value) {
                 Ok(value) => Some(value),
@@ -1244,7 +1251,7 @@ impl Parser {
     }
     fn take_i128(&mut self, path: &str) -> Option<i128> {
         let negative = self.take_symbol(&TokenKind::Minus);
-        let TokenKind::Number(magnitude) = self.current().kind.clone() else {
+        let TokenKind::Number(magnitude) = self.current().kind else {
             self.error(
                 DiagnosticCode::ExpectedToken,
                 path,
@@ -1290,13 +1297,16 @@ impl Parser {
         }
     }
     fn take_identifier(&mut self, path: &str) -> Option<Identifier> {
-        if let TokenKind::Ident(value) = self.current().kind.clone() {
+        if self.current().kind == TokenKind::Ident {
+            let value = self.current().spelling;
             let span = self.current().span;
             self.advance();
             match Identifier::try_new(value) {
                 Some(value) => Some(value),
                 None => {
-                    self.diagnostics.push(Diagnostic::new(DiagnosticCode::InvalidDeclaration,DiagnosticStage::Parse,AstPath::new(path),span,"ASCII identifier up to 128 bytes","invalid identifier","use letters, digits, underscore, and hyphen with a letter or underscore first"));
+                    if self.diagnostics.len() < self.diagnostic_limit {
+                        self.diagnostics.push(Diagnostic::new(DiagnosticCode::InvalidDeclaration,DiagnosticStage::Parse,AstPath::new(path),span,"ASCII identifier up to 128 bytes","invalid identifier","use letters, digits, underscore, and hyphen with a letter or underscore first"));
+                    }
                     None
                 }
             }
@@ -1313,9 +1323,9 @@ impl Parser {
     }
     fn describe_current(&self) -> Box<str> {
         match &self.current().kind {
-            TokenKind::Ident(value) => value.clone(),
+            TokenKind::Ident => Box::from(self.current().spelling),
             TokenKind::Number(value) => text(value),
-            TokenKind::Hex(value) => value.clone(),
+            TokenKind::Hex => Box::from(self.current().spelling),
             kind => Box::from(describe_kind(kind)),
         }
     }
@@ -1327,6 +1337,9 @@ impl Parser {
         actual: impl Into<Box<str>>,
         remediation: impl Into<Box<str>>,
     ) {
+        if self.diagnostics.len() >= self.diagnostic_limit {
+            return;
+        }
         self.diagnostics.push(Diagnostic::new(
             code,
             DiagnosticStage::Parse,
@@ -1340,7 +1353,7 @@ impl Parser {
     fn recover_top(&mut self) {
         while !matches!(
             self.current().kind,
-            TokenKind::Semicolon | TokenKind::RBrace | TokenKind::Eof
+            TokenKind::Semicolon | TokenKind::RBrace | TokenKind::End
         ) {
             self.advance();
         }
@@ -1354,7 +1367,7 @@ impl Parser {
     fn recover_member(&mut self) {
         while !matches!(
             self.current().kind,
-            TokenKind::Semicolon | TokenKind::RBrace | TokenKind::Eof
+            TokenKind::Semicolon | TokenKind::RBrace | TokenKind::End
         ) {
             self.advance();
         }
@@ -1413,14 +1426,14 @@ fn same_symbol(left: &TokenKind, right: &TokenKind) -> bool {
             | (TokenKind::OrOr, TokenKind::OrOr)
             | (TokenKind::Bang, TokenKind::Bang)
             | (TokenKind::Arrow, TokenKind::Arrow)
-            | (TokenKind::Eof, TokenKind::Eof)
+            | (TokenKind::End, TokenKind::End)
     )
 }
 fn describe_kind(kind: &TokenKind) -> &'static str {
     match kind {
-        TokenKind::Ident(_) => "identifier",
+        TokenKind::Ident => "identifier",
         TokenKind::Number(_) => "number",
-        TokenKind::Hex(_) => "commitment",
+        TokenKind::Hex => "commitment",
         TokenKind::LBrace => "{",
         TokenKind::RBrace => "}",
         TokenKind::LParen => "(",
@@ -1447,6 +1460,7 @@ fn describe_kind(kind: &TokenKind) -> &'static str {
         TokenKind::OrOr => "||",
         TokenKind::Bang => "!",
         TokenKind::Arrow => "->",
-        TokenKind::Eof => "end of file",
+        TokenKind::End => "end of file",
+        _ => "invalid lexical token",
     }
 }

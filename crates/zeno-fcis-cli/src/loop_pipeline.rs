@@ -310,6 +310,11 @@ pub(crate) fn implementation() -> String {
         );
         bytes.extend_from_slice(source.as_bytes());
     }
+    // The accepted specification path includes generated grammar, lexical and
+    // derivation validators, and typed lowering beyond the recovering parser.
+    // Bind the complete compiled spec crate, including future source additions.
+    bytes.extend_from_slice(b"zeno-fcis-spec-source-digest\0");
+    bytes.extend_from_slice(&zeno_fcis_spec::source_digest());
     bytes.extend_from_slice(&zeno_fcis_synthesis::finite::v2_authority::EVALUATOR);
     sha256_hex(&bytes)
 }
