@@ -1,0 +1,379 @@
+{
+  "schema": "zeno-fcis/spec-parser-profile/1",
+  "scope": [
+    "Exact source-byte lexical stepping and whole-token-stream validation, including payload spelling.",
+    "Complete postorder ordered-grammar derivation and indexed terminal frontier.",
+    "Exact signed-magnitude conversion iff representable, and complete projection-tail conversion iff valid with every payload in order and no omitted suffix."
+  ],
+  "unproved": [
+    "Grammar JSON to generated-table equivalence is reproducibility-checked, not formally proved.",
+    "Parser-producer completeness and useful resource-envelope completeness.",
+    "The entire typed AST fold, declaration lowering, and elaboration/evaluator composition.",
+    "Rust compiler, Verus/SMT toolchain, allocation failures, and human intent.",
+    "Correspondence of the numeric AST-height preflight to every typed AST constructor, and strict diagnostic collection."
+  ],
+  "bindings": [
+    ".github/workflows/verus.yml",
+    "Cargo.lock",
+    "Cargo.toml",
+    "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-spec/src/parser.rs.txt",
+    "crates/zeno-fcis-cli/src/loop_pipeline.rs",
+    "crates/zeno-fcis-spec/Cargo.toml",
+    "crates/zeno-fcis-spec/grammar/zeno-v1.json",
+    "crates/zeno-fcis-spec/src/ast.rs",
+    "crates/zeno-fcis-spec/src/builder.rs",
+    "crates/zeno-fcis-spec/src/checked_parser.rs",
+    "crates/zeno-fcis-spec/src/diagnostic.rs",
+    "crates/zeno-fcis-spec/src/elaborate.rs",
+    "crates/zeno-fcis-spec/src/induction.rs",
+    "crates/zeno-fcis-spec/src/lexer.rs",
+    "crates/zeno-fcis-spec/src/lexical_core.rs",
+    "crates/zeno-fcis-spec/src/lib.rs",
+    "crates/zeno-fcis-spec/src/mini_determinator.rs",
+    "crates/zeno-fcis-spec/src/parser.rs",
+    "crates/zeno-fcis-spec/src/paths.rs",
+    "crates/zeno-fcis-spec/src/semantic_readers.rs",
+    "crates/zeno-fcis-spec/src/source.rs",
+    "crates/zeno-fcis-spec/src/substance.rs",
+    "crates/zeno-fcis-spec/src/syntax.rs",
+    "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+    "crates/zeno-fcis-spec/src/syntax_grammar.rs",
+    "crates/zeno-fcis-spec/src/syntax_lowering.rs",
+    "crates/zeno-fcis-spec/src/views.rs",
+    "rust-toolchain.toml",
+    "tools/check_spec_parser.py",
+    "tools/check_verus.py",
+    "tools/generate_spec_grammar.py",
+    "tools/qualification_controls.py",
+    "tools/qualification_sources.py",
+    "tools/test_check_spec_parser.py",
+    "tools/verus_ids.py",
+    "verification/verus/spec_parser_profile.json",
+    "verification/verus/toolchain.json"
+  ],
+  "kernels": [
+    {
+      "name": "lexer",
+      "harness": "verification/verus/spec_lexer.rs",
+      "files": [
+        "crates/zeno-fcis-spec/src/lexical_core.rs",
+        "verification/verus/spec_lexer.rs",
+        "verification/verus/spec_lexer_tests.rs"
+      ],
+      "expected_verified": 28,
+      "expected_native_tests": 15,
+      "target_functions": [
+        "spec_lexer::lexical_core::next_lexeme",
+        "spec_lexer::lexical_core::check_tokenization",
+        "spec_lexer::lexical_core::check_spelling",
+        "spec_lexer::lexical_core::lexeme_unique",
+        "spec_lexer::lexical_core::decimal_push",
+        "spec_lexer::lexical_core::scan_decimal",
+        "spec_lexer::lexical_core::read_symbol",
+        "spec_lexer::lexical_core::is_member"
+      ],
+      "mutations": [
+        {
+          "name": "stream-budget-bypass",
+          "function": "check_tokenization",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "if tokens.len() > max_tokens {\n        return false;",
+          "new": "if tokens.len() > max_tokens {\n        return true;",
+          "target_functions": [
+            "spec_lexer::lexical_core::check_tokenization"
+          ]
+        },
+        {
+          "name": "stream-error-or-omission-bypass",
+          "function": "check_tokenization",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "if !is_token(found.kind) || used >= tokens.len() {\n                return false;",
+          "new": "if !is_token(found.kind) || used >= tokens.len() {\n                return true;",
+          "target_functions": [
+            "spec_lexer::lexical_core::check_tokenization"
+          ]
+        },
+        {
+          "name": "stream-mismatch-bypass",
+          "function": "check_tokenization",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "if !same_lexeme(found, tokens[used]) {\n                return false;",
+          "new": "if !same_lexeme(found, tokens[used]) {\n                return true;",
+          "target_functions": [
+            "spec_lexer::lexical_core::check_tokenization"
+          ]
+        },
+        {
+          "name": "stream-extra-bypass",
+          "function": "check_tokenization",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "if used != tokens.len() {\n        return false;",
+          "new": "if used != tokens.len() {\n        return true;",
+          "target_functions": [
+            "spec_lexer::lexical_core::check_tokenization"
+          ]
+        },
+        {
+          "name": "spelling-mismatch-bypass",
+          "function": "check_spelling",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "if bytes[start + cursor] != spelling[cursor] {\n            return false;",
+          "new": "if bytes[start + cursor] != spelling[cursor] {\n            return true;",
+          "target_functions": [
+            "spec_lexer::lexical_core::check_spelling"
+          ]
+        },
+        {
+          "name": "spelling-length-bypass",
+          "function": "check_spelling",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "if spelling.len() != end - start {\n        return false;",
+          "new": "if spelling.len() != end - start {\n        return true;",
+          "target_functions": [
+            "spec_lexer::lexical_core::check_spelling"
+          ]
+        },
+        {
+          "name": "decimal-base-nine",
+          "function": "decimal_push",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "Some(prefix * 10 + digit as u128)",
+          "new": "Some(prefix * 9 + digit as u128)",
+          "target_functions": [
+            "spec_lexer::lexical_core::decimal_push"
+          ]
+        },
+        {
+          "name": "nonmaximal-scan",
+          "function": "scan",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "end += 1;",
+          "new": "break;",
+          "target_functions": [
+            "spec_lexer::lexical_core::scan"
+          ]
+        },
+        {
+          "name": "identifier-loses-dash",
+          "function": "is_member",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "is_ident_start(byte) || (byte >= b'0' && byte <= b'9') || byte == b'-'",
+          "new": "is_ident_start(byte) || (byte >= b'0' && byte <= b'9')",
+          "target_functions": [
+            "spec_lexer::lexical_core::is_member"
+          ]
+        },
+        {
+          "name": "equality-prefix-changed",
+          "function": "read_symbol",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "(b'=', Some(b'=')) => (LexemeKind::EqEq, 2)",
+          "new": "(b'=', Some(b'=')) => (LexemeKind::Equal, 2)",
+          "target_functions": [
+            "spec_lexer::lexical_core::read_symbol"
+          ]
+        },
+        {
+          "name": "source-cursor-disconnected",
+          "function": "next_lexeme",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "let byte = bytes[start];",
+          "new": "let byte = bytes[0];",
+          "target_functions": [
+            "spec_lexer::lexical_core::next_lexeme"
+          ]
+        },
+        {
+          "name": "hex-width-65",
+          "function": "next_lexeme",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "let valid = end - start == 66",
+          "new": "let valid = end - start == 65",
+          "target_functions": [
+            "spec_lexer::lexical_core::next_lexeme"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "syntax",
+      "harness": "verification/verus/spec_syntax.rs",
+      "files": [
+        "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+        "verification/verus/spec_syntax.rs",
+        "verification/verus/spec_syntax_tests.rs"
+      ],
+      "expected_verified": 22,
+      "expected_native_tests": 22,
+      "target_functions": [
+        "spec_syntax::syntax_certificate::select_production",
+        "spec_syntax::syntax_certificate::check_node",
+        "spec_syntax::syntax_certificate::check_derivation",
+        "spec_syntax::syntax_certificate::model::prefix_sound",
+        "spec_syntax::syntax_certificate::decisions_are_sorted",
+        "spec_syntax::syntax_certificate::first_decision_for",
+        "spec_syntax::syntax_certificate::select_production_sorted"
+      ],
+      "mutations": [
+        {
+          "name": "rhs-symbol-omitted",
+          "function": "check_node",
+          "subject": "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+          "old": "if !same_symbol(child.symbol, rhs[production.rhs_start + child_offset])",
+          "new": "if false",
+          "target_functions": [
+            "spec_syntax::syntax_certificate::check_node"
+          ]
+        },
+        {
+          "name": "trailing-input-allowed",
+          "function": "check_derivation",
+          "subject": "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+          "old": "        || root.end != token_tags.len()\n",
+          "new": "",
+          "target_functions": [
+            "spec_syntax::syntax_certificate::check_derivation"
+          ]
+        },
+        {
+          "name": "wrong-decision-result",
+          "function": "select_production",
+          "subject": "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+          "old": "return Some(row.production);",
+          "new": "return Some(0);",
+          "target_functions": [
+            "spec_syntax::syntax_certificate::select_production"
+          ]
+        },
+        {
+          "name": "unordered-table-trusted",
+          "function": "decisions_are_sorted",
+          "subject": "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+          "old": "if decisions[index - 1].lhs > decisions[index].lhs {\n            return false;",
+          "new": "if decisions[index - 1].lhs > decisions[index].lhs {\n            return true;",
+          "target_functions": [
+            "spec_syntax::syntax_certificate::decisions_are_sorted"
+          ]
+        },
+        {
+          "name": "lower-bound-skipped",
+          "function": "first_decision_for",
+          "subject": "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+          "old": "low = middle + 1;",
+          "new": "low = high;",
+          "target_functions": [
+            "spec_syntax::syntax_certificate::first_decision_for"
+          ]
+        },
+        {
+          "name": "wrong-sorted-result",
+          "function": "select_production_sorted",
+          "subject": "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+          "old": "return Some(row.production);",
+          "new": "return Some(0);",
+          "target_functions": [
+            "spec_syntax::syntax_certificate::select_production_sorted"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "semantic-readers",
+      "harness": "verification/verus/spec_semantic_readers.rs",
+      "files": [
+        "crates/zeno-fcis-spec/src/semantic_readers.rs",
+        "crates/zeno-fcis-spec/src/lexical_core.rs",
+        "verification/verus/spec_semantic_readers.rs",
+        "verification/verus/spec_semantic_readers_tests.rs"
+      ],
+      "expected_verified": 31,
+      "expected_native_tests": 12,
+      "target_functions": [
+        "spec_semantic_readers::semantic_readers::signed_magnitude",
+        "spec_semantic_readers::semantic_readers::read_projection_tail"
+      ],
+      "mutations": [
+        {
+          "name": "signed-sign-reversed",
+          "function": "signed_magnitude",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "Some(if negative { -value } else { value })",
+          "new": "Some(if negative { value } else { -value })",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::signed_magnitude"
+          ]
+        },
+        {
+          "name": "signed-minimum-shifted",
+          "function": "signed_magnitude",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "Some(i128::MIN)",
+          "new": "Some(i128::MIN + 1)",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::signed_magnitude"
+          ]
+        },
+        {
+          "name": "signed-valid-maximum-refused",
+          "function": "signed_magnitude",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "if magnitude <= i128::MAX as u128 {",
+          "new": "if magnitude < i128::MAX as u128 {",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::signed_magnitude"
+          ]
+        },
+        {
+          "name": "projection-budget-tail-discarded",
+          "function": "read_projection_tail",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "if kinds.len() % 2 != 0 || kinds.len() / 2 > max_segments {\n        return None;",
+          "new": "if kinds.len() % 2 != 0 || kinds.len() / 2 > max_segments {\n        return Some(Vec::new());",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::read_projection_tail"
+          ]
+        },
+        {
+          "name": "projection-separator-changed",
+          "function": "read_projection_tail",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "LexemeKind::Dot => (),",
+          "new": "LexemeKind::Comma => (),",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::read_projection_tail"
+          ]
+        },
+        {
+          "name": "projection-payload-replaced",
+          "function": "read_projection_tail",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "values.push(magnitude as u32);",
+          "new": "values.push(1);",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::read_projection_tail"
+          ]
+        },
+        {
+          "name": "projection-source-index-disconnected",
+          "function": "read_projection_tail",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "let magnitude = match kinds[offset + 1] {",
+          "new": "let magnitude = match kinds[1] {",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::read_projection_tail"
+          ]
+        },
+        {
+          "name": "projection-valid-maximum-refused",
+          "function": "read_projection_tail",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "if magnitude == 0 || magnitude > u32::MAX as u128 {",
+          "new": "if magnitude == 0 || magnitude >= u32::MAX as u128 {",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::read_projection_tail"
+          ]
+        }
+      ]
+    }
+  ]
+}
