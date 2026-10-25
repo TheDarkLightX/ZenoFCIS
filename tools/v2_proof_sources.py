@@ -14,7 +14,10 @@ SOURCE_MANIFEST = Path("verification/verus/authority_v2_sources.json")
 TEST_MANIFEST = Path("verification/verus/authority_v2_test_sources.json")
 GETTER = Path("crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/evaluator.rs")
 NATIVE_TEST_DATA = (Path("tools/test-data/scalar-arithmetic/i128-vectors.tsv"),
-                    Path("tools/test-data/signed-arithmetic/vectors.tsv"))
+                    Path("tools/test-data/signed-arithmetic/vectors.tsv"),
+                    Path("crates/zeno-fcis-synthesis/tests/test-data/u128-tables/sums.tsv"),
+                    Path("crates/zeno-fcis-synthesis/tests/test-data/u128-tables/nicr.tsv"),
+                    Path("crates/zeno-fcis-synthesis/source-snapshots/repository/verification/oracle_crypto_profile.json.txt"))
 
 
 def execution_sources(root: Path) -> tuple[Path, ...]:
