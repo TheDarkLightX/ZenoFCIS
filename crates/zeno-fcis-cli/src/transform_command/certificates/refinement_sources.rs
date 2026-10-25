@@ -214,7 +214,7 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/evaluator.rs",
-        "d041cb617a04309be55700639a689827a3a56acc798a18b96a30af3310dd3c3f",
+        "5db95f02924f3fd52975848678f24bd47c6a8bc5e84a89485a65527bf76fb2eb",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/family_spec.rs",
@@ -636,7 +636,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "Cargo.lock",
-        "2a01e60e759a319bf7e12314d3e349ace881fa4e2fba12ae59d20eb039c0a4e0",
+        "ebdae23dea679a4a817d4e668ac8b68c1dd7560b4f1b6b87d9bfdf51bf909c88",
     ),
     (
         "Cargo.toml",

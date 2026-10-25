@@ -324,13 +324,13 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
 /// The transcript includes recorded, explicitly unreplayed historical feedback;
 /// that diagnostic change leaves the ledger, head and checker identity intact.
 const METERED_EVALUATOR_IDENTITY: &str =
-    "982a57f48a10b358da6bb097e454734c0d5030ebf403b499aec0a460fc407c03";
+    "f213221ee84c4b996860ef4ae73f93d94c296a85d8267ca551b56e5d7f2344e1";
 const METERED_LEDGER_SHA256: &str =
-    "6b3f5137e5180b80c24e544e21b7076d18a59816c1c485fef60ec346bc633476";
+    "cf690a5a134a32bfa35a92e8d98133a5d7843d28a03df283463238b7bca9fda9";
 const METERED_HEAD_SHA256: &str =
-    "5fa0cfb38818ff9951b96ad5cf39f577263699bede9fb156e0d398a87e55433b";
+    "19cd0900bdf9ed3e8adf6a35fba229e7a6f55a943598c83e27ab50e745809afb";
 const METERED_DIRECT_OUTPUTS_SHA256: &str =
-    "f9d51f9768a8ff2d2daade8acb087c964bb6025cf97d8421382c0fb9f40e74b1";
+    "a39e3bfc119d93430a5daba7a4975baa3a1301b743a2ac50a81a3afeab0cace1";
 
 fn metered_journey_bytes() -> [Vec<u8>; 3] {
     let scratch = Scratch::new();
