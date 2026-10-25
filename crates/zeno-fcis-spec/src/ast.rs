@@ -853,65 +853,9 @@ impl CompositionAst {
     }
 }
 
-/// Checked integer division policy.
-#[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum DivisionMode {
-    Exact,
-    Floor,
-    Ceil,
-}
+pub use crate::value_expr::{DivisionMode, ValueExpr};
 
-/// Scalar expression used by relational predicates.
-#[allow(missing_docs)]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ValueExpr {
-    Int(i128),
-    U128(u128),
-    ToI128(Box<ValueExpr>),
-    ToU128(Box<ValueExpr>),
-    Var(Identifier),
-    Projection(ProjectionPath),
-    /// Eager condition and both arms, lowered to the library Select operation.
-    Select(Box<RelExpr>, Box<ValueExpr>, Box<ValueExpr>),
-    Add(Box<ValueExpr>, Box<ValueExpr>),
-    Sub(Box<ValueExpr>, Box<ValueExpr>),
-    Mul(Box<ValueExpr>, Box<ValueExpr>),
-    Div(DivisionMode, Box<ValueExpr>, Box<ValueExpr>),
-    /// Nonnegative full-product division, distinct from a possibly trapping
-    /// intermediate multiplication. Authored calls use Floor or Ceil.
-    MulDiv(DivisionMode, Box<ValueExpr>, Box<ValueExpr>, Box<ValueExpr>),
-    SignedMulDivFloor(Box<ValueExpr>, Box<ValueExpr>, Box<ValueExpr>),
-    /// Explicit target scale, rounding, and signed-factor domain.
-    ScaledMulDiv(
-        DivisionMode,
-        bool,
-        Box<ValueExpr>,
-        Box<ValueExpr>,
-        Box<ValueExpr>,
-        u8,
-    ),
-    /// Eager operands followed by a literal number of ordered floor steps.
-    RepeatMulDiv(bool, Box<ValueExpr>, Box<ValueExpr>, Box<ValueExpr>, u8),
-    Sum {
-        variable: Identifier,
-        start: i128,
-        end: i128,
-        body: Box<ValueExpr>,
-    },
-}
-
-/// Relational comparison operation.
-#[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CompareOp {
-    Eq,
-    NotEq,
-    Less,
-    LessEq,
-    Greater,
-    GreaterEq,
-}
+pub use crate::comparison_ops::CompareOp;
 
 /// Bounded relational formula.
 #[allow(missing_docs)]

@@ -1,4 +1,8 @@
-//! Recovering parser for language version 1.
+//! Language-version-1 semantic expansion after complete checked syntax.
+//!
+//! Every public source entry passes the exact lexical and complete derivation
+//! check before this 2.6 semantic mapping constructs its AST. Its recovering
+//! internals accumulate bounded diagnostics; no rejected certificate enters it.
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
@@ -18,6 +22,7 @@ mod table_lookup;
 pub use table_lookup::{TableReadExpression, parse_table_read, table_index_sets};
 
 use crate::ast::*;
+use crate::checked_parser::{CoreValue, checked_tokens};
 use crate::collections::{
     CollectionsSpec, EntryDecl, KeyPaths, KeyTypeDecl, MapDecl, OrderReadDecl, OrderReadKind, Scan,
     SummaryDecl, SummaryKind, TallyDecl,
@@ -25,7 +30,8 @@ use crate::collections::{
 use crate::diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan, text,
 };
-use crate::lexer::{Token, TokenKind, lex};
+use crate::lexer::{Token, TokenKind, lexeme_kind};
+use crate::syntax::Root;
 use crate::tables::{self, CountInfo, MAX_TABLE_ENTRIES, Rewrite, TableExpansion, TableInfo};
 use crate::{MAX_FORMULA_DEPTH, MAX_FORMULA_NODES, SourceLimits, ZENO_DSL_VERSION};
 
@@ -65,15 +71,29 @@ fn parse_formula_in(
     let (parsed, mut parser) = parse_with_tables(project_source, limits)?;
     parser.declarations = parsed.declarations.clone();
     let project = crate::elaborate_project(parsed, crate::ProjectLimits::default())?;
-    let (tokens, diagnostics) = lex(formula_source, limits);
-    parser.tokens = tokens;
-    parser.diagnostics = diagnostics;
+    let checked = checked_tokens(
+        formula_source,
+        limits,
+        Root::Rel,
+        parser.core_environment(),
+        Some(&parser.scan.entries),
+        &parser.derived_heights(),
+        Some(&parser.tables),
+    )?;
+    parser.tokens = checked.tokens;
+    parser.diagnostics.clear();
     parser.index = 0;
     parser.nesting = 0;
     parser.table_values = 0;
     parser.rewrites.clear();
     parser.counts.clear();
-    let formula = parser.parse_rel();
+    let formula = match checked.core {
+        Some(CoreValue::Rel(formula)) => {
+            parser.index = parser.tokens.len().saturating_sub(1);
+            formula
+        }
+        _ => parser.parse_rel(),
+    };
     if !matches!(parser.current().kind, TokenKind::Eof) {
         parser.error(
             DiagnosticCode::ExpectedToken,
@@ -152,12 +172,26 @@ pub fn parse_table_expression(
     let (parsed, mut parser) = parse_with_tables(source, limits)?;
     parser.declarations = parsed.declarations.clone();
     crate::elaborate_project(parsed, crate::ProjectLimits::default())?;
-    let (tokens, diagnostics) = lex(expression, limits);
-    parser.tokens = tokens;
+    let checked = checked_tokens(
+        expression,
+        limits,
+        Root::Rel,
+        parser.core_environment(),
+        Some(&parser.scan.entries),
+        &parser.derived_heights(),
+        Some(&parser.tables),
+    )?;
+    parser.tokens = checked.tokens;
     parser.index = 0;
-    parser.diagnostics = diagnostics;
+    parser.diagnostics.clear();
     parser.rewrites.clear();
-    let formula = parser.parse_rel();
+    let formula = match checked.core {
+        Some(CoreValue::Rel(formula)) => {
+            parser.index = parser.tokens.len().saturating_sub(1);
+            formula
+        }
+        _ => parser.parse_rel(),
+    };
     if !matches!(parser.current().kind, TokenKind::Eof) {
         parser.error(
             DiagnosticCode::UnexpectedToken,
@@ -210,7 +244,16 @@ fn parse_with_tables(
     source: &str,
     limits: SourceLimits,
 ) -> Result<(ParsedProject, Parser), DiagnosticSet> {
-    let (tokens, diagnostics) = lex(source, limits);
+    let checked = checked_tokens(
+        source,
+        limits,
+        Root::Project,
+        true,
+        None,
+        &BTreeMap::new(),
+        None,
+    )?;
+    let tokens = checked.tokens;
     let mut table_sizes = tables::prescan(&tokens);
     table_sizes.extend(constant_tables::prescan(&tokens));
     let mut parser = Parser {
@@ -221,7 +264,8 @@ fn parse_with_tables(
         key_paths: KeyPaths::default(),
         tokens,
         index: 0,
-        diagnostics,
+        diagnostics: Vec::new(),
+        diagnostic_limit: limits.max_diagnostics(),
         declarations: Vec::new(),
         merge_order: Vec::new(),
         nesting: 0,
@@ -240,7 +284,13 @@ fn parse_with_tables(
         self_refusal: None,
         defining_bits: None,
     };
-    let parsed = parser.parse(limits.max_diagnostics());
+    let parsed = match checked.core {
+        Some(CoreValue::Project(parsed)) => {
+            parser.index = parser.tokens.len().saturating_sub(1);
+            parsed
+        }
+        _ => parser.parse(limits.max_diagnostics()),
+    };
     if parser.diagnostics.is_empty() {
         Ok((parsed, parser))
     } else {
@@ -263,10 +313,29 @@ struct Drafts {
     tallies: Vec<(TallyDecl, SourceSpan, u32)>,
 }
 
+#[derive(Clone, Copy)]
+enum ScalarOperator {
+    Group,
+    Negate,
+    Binary(crate::lexical_core::LexemeKind),
+}
+
+impl ScalarOperator {
+    fn precedence(self) -> usize {
+        match self {
+            Self::Group => 0,
+            Self::Binary(crate::lexical_core::LexemeKind::Star) => 2,
+            Self::Binary(_) => 1,
+            Self::Negate => 3,
+        }
+    }
+}
+
 struct Parser {
     tokens: Vec<Token>,
     index: usize,
     diagnostics: Vec<Diagnostic>,
+    diagnostic_limit: usize,
     declarations: Vec<SpannedDeclaration>,
     merge_order: Vec<StableId>,
     nesting: usize,
@@ -304,6 +373,49 @@ struct Parser {
 }
 
 impl Parser {
+    /// Contextual expansion names and entry projection rewrites must always
+    /// retain the 2.6 semantic pass, even for an otherwise core expression.
+    fn derived_heights(&self) -> BTreeMap<String, crate::syntax_resources::DerivedHeight> {
+        self.derived
+            .iter()
+            .map(|(name, table)| {
+                let height = table
+                    .circuit
+                    .formulas()
+                    .map(|formula| formula_shape_rel(formula).1)
+                    .max()
+                    .unwrap_or(1)
+                    .saturating_add(1);
+                (
+                    name.clone(),
+                    crate::syntax_resources::DerivedHeight {
+                        height,
+                        bits: table.bits.is_some(),
+                        size: table.size as usize,
+                    },
+                )
+            })
+            .chain(self.constants.iter().map(|(name, table)| {
+                (
+                    name.clone(),
+                    crate::syntax_resources::DerivedHeight {
+                        height: 2,
+                        bits: false,
+                        size: table.values.len(),
+                    },
+                )
+            }))
+            .collect()
+    }
+
+    fn core_environment(&self) -> bool {
+        self.tables.is_empty()
+            && self.constants.is_empty()
+            && self.derived.is_empty()
+            && self.scan.maps.is_empty()
+            && self.scan.entries.is_empty()
+    }
+
     fn parse(&mut self, diagnostic_limit: usize) -> ParsedProject {
         let version = if self.take_keyword("zeno") {
             self.take_u16("header.version").unwrap_or(0)
@@ -1678,6 +1790,9 @@ impl Parser {
         let body_start = self.index;
         let mut parts = Vec::new();
         for entry in entries {
+            if self.expanded > MAX_FORMULA_NODES {
+                break;
+            }
             self.index = body_start;
             self.entry_bound.push((variable.as_str().into(), entry));
             let condition = self
@@ -1919,15 +2034,22 @@ impl Parser {
                 ProjectionRoot::Pre
             }
         };
-        let mut segments = Vec::new();
+        let tail_start = self.index;
         while self.take_symbol(&TokenKind::Dot) {
-            if let Some(id) = self.take_id("path.segment") {
-                segments.push(id)
-            } else {
+            if self.take_id("path.segment").is_none() {
                 break;
             }
         }
-        match ProjectionPath::try_new(root, segments) {
+        let kinds: Vec<_> = self.tokens[tail_start..self.index]
+            .iter()
+            .map(|token| lexeme_kind(&token.kind))
+            .collect();
+        let segments = crate::semantic_readers::read_projection_tail(&kinds, 64).and_then(|ids| {
+            ids.into_iter()
+                .map(StableId::new)
+                .collect::<Option<Vec<_>>>()
+        });
+        match segments.and_then(|segments| ProjectionPath::try_new(root, segments)) {
             Some(path) => Some(path),
             None => {
                 self.error(
@@ -2401,15 +2523,36 @@ impl Parser {
         value
     }
     fn parse_not(&mut self) -> RelExpr {
-        if self.take_symbol(&TokenKind::Bang) || self.take_keyword("not") {
-            let value = self
-                .with_self_refusal("a negation cannot read the table being defined", |parser| {
-                    parser.nested("formula.not", RelExpr::Bool(false), |p| p.parse_not())
-                });
-            RelExpr::Not(Box::new(value))
-        } else {
-            self.parse_rel_atom()
+        let previous_nesting = self.nesting;
+        let mut prefixes = 0usize;
+        while self.take_symbol(&TokenKind::Bang) || self.take_keyword("not") {
+            if previous_nesting + prefixes >= MAX_FORMULA_DEPTH {
+                self.error(
+                    DiagnosticCode::ResourceLimit,
+                    "formula.not",
+                    text(MAX_FORMULA_DEPTH),
+                    "expression nesting exceeds the parser limit",
+                    "reduce nested operators or split the claim into named laws",
+                );
+                break;
+            }
+            prefixes += 1;
         }
+        if prefixes == 0 {
+            return self.parse_rel_atom();
+        }
+        // Preserve the old nesting/context seen by the operand without one
+        // Rust stack frame per prefix. Every prefix still creates one Not.
+        self.nesting = previous_nesting + prefixes;
+        let mut value = self
+            .with_self_refusal("a negation cannot read the table being defined", |parser| {
+                parser.parse_rel_atom()
+            });
+        self.nesting = previous_nesting;
+        for _ in 0..prefixes {
+            value = RelExpr::Not(Box::new(value));
+        }
+        value
     }
     /// A parenthesized scalar followed by arithmetic or a comparison.
     fn value_group_ahead(&self) -> bool {
@@ -2563,21 +2706,10 @@ impl Parser {
             .with_self_refusal("a comparison cannot read the table being defined", |p| {
                 p.parse_value()
             });
-        let op = if self.take_symbol(&TokenKind::EqEq) {
-            Some(CompareOp::Eq)
-        } else if self.take_symbol(&TokenKind::NotEq) {
-            Some(CompareOp::NotEq)
-        } else if self.take_symbol(&TokenKind::LessEq) {
-            Some(CompareOp::LessEq)
-        } else if self.take_symbol(&TokenKind::Less) {
-            Some(CompareOp::Less)
-        } else if self.take_symbol(&TokenKind::GreaterEq) {
-            Some(CompareOp::GreaterEq)
-        } else if self.take_symbol(&TokenKind::Greater) {
-            Some(CompareOp::Greater)
-        } else {
-            None
-        };
+        let op = crate::comparison_ops::read_compare_op(lexeme_kind(&self.current().kind));
+        if op.is_some() {
+            self.advance();
+        }
         if let Some(op) = op {
             let right = self
                 .with_self_refusal("a comparison cannot read the table being defined", |p| {
@@ -2595,39 +2727,223 @@ impl Parser {
             RelExpr::Bool(false)
         }
     }
+    /// Scalar groups and unary minus use invocation-local stacks. Delegated
+    /// atoms retain the 2.6 expansion actions, while groups no longer multiply
+    /// the native Rust call stack. Operators still fold left with * precedence.
     fn parse_value(&mut self) -> ValueExpr {
-        let mut value = self.parse_term();
-        let mut operators = 0usize;
-        while matches!(self.current().kind, TokenKind::Plus | TokenKind::Minus) {
-            if !self.chain_available("value.additive", operators) {
-                break;
+        let initial_nesting = self.nesting;
+        let mut values = Vec::with_capacity(2);
+        let mut operators: Vec<ScalarOperator> = Vec::with_capacity(4);
+        let mut groups = 0usize;
+        let mut operand = true;
+        loop {
+            if operand {
+                if self.take_symbol(&TokenKind::Minus) {
+                    if self.current().kind == TokenKind::Number(1u128 << 127) {
+                        self.advance();
+                        values.push((ValueExpr::Int(i128::MIN), 1));
+                    } else {
+                        if !self.scalar_nesting_available() {
+                            values.push((ValueExpr::Int(0), 1));
+                            break;
+                        }
+                        self.nesting += 1;
+                        operators.push(ScalarOperator::Negate);
+                        continue;
+                    }
+                } else if self.take_symbol(&TokenKind::LParen) {
+                    if !self.scalar_nesting_available() {
+                        values.push((ValueExpr::Int(0), 1));
+                        break;
+                    }
+                    self.nesting += 1;
+                    groups += 1;
+                    operators.push(ScalarOperator::Group);
+                    continue;
+                } else {
+                    let value = self.parse_value_atom();
+                    let height = match &value {
+                        ValueExpr::Int(_)
+                        | ValueExpr::U128(_)
+                        | ValueExpr::Var(_)
+                        | ValueExpr::Projection(_) => 1,
+                        _ => formula_shape_value(&value).1,
+                    };
+                    if height > crate::MAX_PARSED_EXPRESSION_HEIGHT {
+                        self.scalar_height_error();
+                        values.push((ValueExpr::Int(0), 1));
+                    } else {
+                        values.push((value, height));
+                    }
+                }
+                while matches!(operators.last(), Some(ScalarOperator::Negate)) {
+                    operators.pop();
+                    self.reduce_scalar(ScalarOperator::Negate, &mut values);
+                    self.nesting -= 1;
+                }
+                operand = false;
+                continue;
             }
-            let add = self.take_symbol(&TokenKind::Plus);
-            if !add {
-                self.take_symbol(&TokenKind::Minus);
-            }
-            operators += 1;
-            let right = self.parse_term();
-            value = if add {
-                ValueExpr::Add(Box::new(value), Box::new(right))
+            let kind = lexeme_kind(&self.current().kind);
+            if matches!(
+                kind,
+                crate::lexical_core::LexemeKind::Plus
+                    | crate::lexical_core::LexemeKind::Minus
+                    | crate::lexical_core::LexemeKind::Star
+            ) {
+                let next = ScalarOperator::Binary(kind);
+                while operators
+                    .last()
+                    .is_some_and(|top| top.precedence() >= next.precedence())
+                {
+                    if let Some(previous) = operators.pop() {
+                        self.reduce_scalar(previous, &mut values);
+                    }
+                }
+                self.advance();
+                operators.push(next);
+                operand = true;
+            } else if kind == crate::lexical_core::LexemeKind::RParen && groups > 0 {
+                while let Some(previous) = operators.pop() {
+                    if matches!(previous, ScalarOperator::Group) {
+                        break;
+                    }
+                    self.reduce_scalar(previous, &mut values);
+                }
+                self.advance();
+                self.nesting -= 1;
+                groups -= 1;
+                while matches!(operators.last(), Some(ScalarOperator::Negate)) {
+                    operators.pop();
+                    self.reduce_scalar(ScalarOperator::Negate, &mut values);
+                    self.nesting -= 1;
+                }
             } else {
-                ValueExpr::Sub(Box::new(value), Box::new(right))
-            };
-        }
-        value
-    }
-    fn parse_term(&mut self) -> ValueExpr {
-        let mut value = self.parse_value_atom();
-        let mut operators = 0usize;
-        while matches!(self.current().kind, TokenKind::Star) {
-            if !self.chain_available("value.multiplicative", operators) {
                 break;
             }
-            self.take_symbol(&TokenKind::Star);
-            operators += 1;
-            value = ValueExpr::Mul(Box::new(value), Box::new(self.parse_value_atom()));
         }
-        value
+        while let Some(previous) = operators.pop() {
+            if matches!(previous, ScalarOperator::Group) {
+                self.error(
+                    DiagnosticCode::ExpectedToken,
+                    "value",
+                    ")",
+                    self.describe_current(),
+                    "close the scalar group",
+                );
+            } else {
+                self.reduce_scalar(previous, &mut values);
+            }
+        }
+        self.nesting = initial_nesting;
+        if values.len() != 1 {
+            self.error(
+                DiagnosticCode::InvalidDeclaration,
+                "value",
+                "one scalar result",
+                "incomplete scalar fold",
+                "correct the scalar expression",
+            );
+        }
+        values.pop().map_or(ValueExpr::Int(0), |(value, _)| value)
+    }
+
+    fn scalar_nesting_available(&mut self) -> bool {
+        if self.nesting < MAX_FORMULA_DEPTH {
+            return true;
+        }
+        self.error(
+            DiagnosticCode::ResourceLimit,
+            "value",
+            text(MAX_FORMULA_DEPTH),
+            "expression nesting exceeds the parser limit",
+            "reduce nested scalar groups or negations",
+        );
+        false
+    }
+
+    fn scalar_height_error(&mut self) {
+        self.error(
+            DiagnosticCode::ResourceLimit,
+            "value",
+            text(crate::MAX_PARSED_EXPRESSION_HEIGHT),
+            "constructed expression height exceeds the parser limit",
+            "reduce combined scalar and expansion depth",
+        );
+    }
+
+    fn reduce_scalar(&mut self, operator: ScalarOperator, values: &mut Vec<(ValueExpr, usize)>) {
+        let Some((right, right_height)) = values.pop() else {
+            self.error(
+                DiagnosticCode::ExpectedToken,
+                "value",
+                "right scalar operand",
+                self.describe_current(),
+                "complete the scalar expression",
+            );
+            values.push((ValueExpr::Int(0), 1));
+            return;
+        };
+        let (kind, additive, left, left_height) = match operator {
+            ScalarOperator::Negate => (
+                crate::lexical_core::LexemeKind::Minus,
+                true,
+                ValueExpr::Int(0),
+                1,
+            ),
+            ScalarOperator::Binary(kind) => {
+                let Some((left, height)) = values.pop() else {
+                    self.error(
+                        DiagnosticCode::ExpectedToken,
+                        "value",
+                        "left scalar operand",
+                        self.describe_current(),
+                        "complete the scalar expression",
+                    );
+                    values.push((ValueExpr::Int(0), 1));
+                    return;
+                };
+                (
+                    kind,
+                    kind != crate::lexical_core::LexemeKind::Star,
+                    left,
+                    height,
+                )
+            }
+            ScalarOperator::Group => {
+                self.error(
+                    DiagnosticCode::InvalidDeclaration,
+                    "value",
+                    "arithmetic operator",
+                    "unclosed scalar group",
+                    "close the scalar group",
+                );
+                values.push((ValueExpr::Int(0), 1));
+                return;
+            }
+        };
+        let Some(height) = crate::value_expr::binary_height(
+            left_height,
+            right_height,
+            crate::MAX_PARSED_EXPRESSION_HEIGHT,
+        ) else {
+            self.scalar_height_error();
+            values.push((ValueExpr::Int(0), 1));
+            return;
+        };
+        match crate::value_expr::fold_arithmetic(kind, additive, left, right) {
+            Some(value) => values.push((value, height)),
+            None => {
+                self.error(
+                    DiagnosticCode::InvalidDeclaration,
+                    "value.operator",
+                    "the selected arithmetic operator",
+                    "semantic operator mismatch",
+                    "report this lowering validation failure",
+                );
+                values.push((ValueExpr::Int(0), 1));
+            }
+        }
     }
     fn parse_value_atom(&mut self) -> ValueExpr {
         if let Some(value) = self.constant_value() {
@@ -2653,21 +2969,11 @@ impl Parser {
             self.expect_symbol(TokenKind::RParen, "value.choose");
             return ValueExpr::Select(Box::new(condition), Box::new(then), Box::new(otherwise));
         }
-        if self.take_symbol(&TokenKind::Minus) {
-            if self.current().kind == TokenKind::Number(1u128 << 127) {
-                self.advance();
-                return ValueExpr::Int(i128::MIN);
-            }
-            let value = self.nested("value.negation", ValueExpr::Int(0), |parser| {
-                parser.parse_value_atom()
-            });
-            return ValueExpr::Sub(Box::new(ValueExpr::Int(0)), Box::new(value));
-        }
         if let TokenKind::Number(value) = self.current().kind.clone() {
             self.advance();
-            return match i128::try_from(value) {
-                Ok(value) => ValueExpr::Int(value),
-                Err(_) => {
+            return match crate::semantic_readers::signed_magnitude(false, value) {
+                Some(value) => ValueExpr::Int(value),
+                None => {
                     self.error(
                         DiagnosticCode::InvalidNumber,
                         "value.integer",
@@ -2678,13 +2984,6 @@ impl Parser {
                     ValueExpr::Int(0)
                 }
             };
-        }
-        if self.take_symbol(&TokenKind::LParen) {
-            let value = self.nested("value.group", ValueExpr::Int(0), |parser| {
-                parser.parse_value()
-            });
-            self.expect_symbol(TokenKind::RParen, "value");
-            return value;
         }
         if self.take_keyword("u128") {
             self.expect_symbol(TokenKind::LParen, "u128 literal");
@@ -2770,12 +3069,18 @@ impl Parser {
                 parser.parse_value()
             });
             self.expect_symbol(TokenKind::RParen, "division");
-            let mode = match name.as_str() {
-                "div_floor" => DivisionMode::Floor,
-                "div_ceil" => DivisionMode::Ceil,
-                _ => DivisionMode::Exact,
-            };
-            return ValueExpr::Div(mode, Box::new(left), Box::new(right));
+            let mode = crate::value_expr::read_division_mode(name.as_str().as_bytes())
+                .unwrap_or_else(|| {
+                    self.error(
+                        DiagnosticCode::InvalidDeclaration,
+                        "value.division",
+                        "the complete division mode",
+                        "semantic division mode mismatch",
+                        "report this lowering validation failure",
+                    );
+                    DivisionMode::Exact
+                });
+            return crate::value_expr::division(mode, left, right);
         }
         if name.as_str() == "sum" && self.table_form_ahead(0) {
             return self.parse_table_sum();
@@ -2840,8 +3145,21 @@ impl Parser {
                 return value;
             }
             self.entry_path(start, &mut segments);
-            if let Some(path) = ProjectionPath::try_new(root, segments) {
-                return ValueExpr::Projection(path);
+            if !segments.is_empty() {
+                return match ProjectionPath::try_new(root, segments) {
+                    Some(path) => ValueExpr::Projection(path),
+                    None => {
+                        self.error_at(
+                            start,
+                            DiagnosticCode::InvalidDeclaration,
+                            "projection",
+                            "one through 64 stable-ID segments",
+                            "invalid complete projection suffix",
+                            "keep every projection suffix within the path limit",
+                        );
+                        ValueExpr::Int(0)
+                    }
+                };
             }
         }
         if let Some(value) = self.index_value(name.as_str()) {
@@ -3028,6 +3346,9 @@ impl Parser {
         let start = self.index;
         let mut values = Vec::new();
         for k in 0..size {
+            if self.expanded > MAX_FORMULA_NODES {
+                break;
+            }
             self.index = start;
             self.bound
                 .push((variable.as_str().into(), Some(i128::from(k))));
@@ -3541,13 +3862,7 @@ impl Parser {
             return None;
         };
         self.advance();
-        let value = if negative && magnitude == 1u128 << 127 {
-            Some(i128::MIN)
-        } else {
-            i128::try_from(magnitude)
-                .ok()
-                .map(|value| if negative { -value } else { value })
-        };
+        let value = crate::semantic_readers::signed_magnitude(negative, magnitude);
         if value.is_none() {
             self.error(
                 DiagnosticCode::InvalidNumber,
@@ -3582,7 +3897,9 @@ impl Parser {
             match Identifier::try_new(value) {
                 Some(value) => Some(value),
                 None => {
-                    self.diagnostics.push(Diagnostic::new(DiagnosticCode::InvalidDeclaration,DiagnosticStage::Parse,AstPath::new(path),span,"ASCII identifier up to 128 bytes","invalid identifier","use letters, digits, underscore, and hyphen with a letter or underscore first"));
+                    self.error_at(span, DiagnosticCode::InvalidDeclaration, path,
+                        "ASCII identifier up to 128 bytes", "invalid identifier",
+                        "use letters, digits, underscore, and hyphen with a letter or underscore first");
                     None
                 }
             }
@@ -3627,6 +3944,9 @@ impl Parser {
         actual: impl Into<Box<str>>,
         remediation: impl Into<Box<str>>,
     ) {
+        if self.diagnostics.len() > self.diagnostic_limit {
+            return;
+        }
         let diagnostic = Diagnostic::new(
             code,
             DiagnosticStage::Parse,

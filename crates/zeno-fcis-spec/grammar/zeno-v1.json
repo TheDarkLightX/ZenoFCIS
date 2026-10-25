@@ -1,0 +1,1801 @@
+{
+  "schema": "zeno/ordered-syntax-grammar/1",
+  "language_version": 1,
+  "root": "Project",
+  "selection": "First matching lookahead decision commits; no backtracking. Absent second token is EOF. EBNF helpers are expanded mechanically.",
+  "terminals": {
+    "identifier": "ASCII maximal identifier; contextual keywords retain their spelling and are still permitted by Identifier.",
+    "number": "u128 magnitude; payload bounds are checked during typed lowering.",
+    "EOF": "EOF is lookahead only and excluded from the derivation frontier."
+  },
+  "constraints": {
+    "identifier_bytes": [
+      1,
+      128
+    ],
+    "stable_id": [
+      1,
+      4294967295
+    ],
+    "projection_segments": [
+      1,
+      64
+    ],
+    "scalar": "i128; direct -2^127 is the minimum, other negation is Sub(0,operand)",
+    "quantity": "only int; unit number atom must be 1; scale e0..e38; normalized by Quantity",
+    "source_bytes": 1048576,
+    "source_tokens": 262144,
+    "formula_depth": 256,
+    "operator_chain": 255,
+    "note": "These typed constraints are checked by lowering; they are not established by structural certificate membership alone."
+  },
+  "rules": [
+    {
+      "name": "Project",
+      "alternatives": [
+        {
+          "label": "project",
+          "rhs": [
+            "@zeno",
+            "U16",
+            "@;",
+            "@project",
+            "ID",
+            "Identifier",
+            "@;",
+            {
+              "many": [
+                "Declaration"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Declaration",
+      "alternatives": [
+        {
+          "label": "namespace",
+          "rhs": [
+            "Namespace"
+          ]
+        },
+        {
+          "label": "type",
+          "rhs": [
+            "Type"
+          ]
+        },
+        {
+          "label": "field",
+          "rhs": [
+            "Field"
+          ]
+        },
+        {
+          "label": "variant",
+          "rhs": [
+            "Variant"
+          ]
+        },
+        {
+          "label": "reason",
+          "rhs": [
+            "Reason"
+          ]
+        },
+        {
+          "label": "effect",
+          "rhs": [
+            "Effect"
+          ]
+        },
+        {
+          "label": "channel",
+          "rhs": [
+            "Channel"
+          ]
+        },
+        {
+          "label": "component",
+          "rhs": [
+            "Component"
+          ]
+        },
+        {
+          "label": "wiring",
+          "rhs": [
+            "Wiring"
+          ]
+        },
+        {
+          "label": "merge",
+          "rhs": [
+            "Merge"
+          ]
+        },
+        {
+          "label": "law",
+          "rhs": [
+            "Law"
+          ]
+        },
+        {
+          "label": "claim",
+          "rhs": [
+            "Claim"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Namespace",
+      "alternatives": [
+        {
+          "label": "namespace",
+          "rhs": [
+            "@namespace",
+            "ID",
+            "Identifier",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Type",
+      "alternatives": [
+        {
+          "label": "type",
+          "rhs": [
+            "@type",
+            "ID",
+            "TypeKind",
+            "Identifier",
+            {
+              "optional": [
+                "Range"
+              ]
+            },
+            {
+              "optional": [
+                "Quantity"
+              ]
+            },
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TypeKind",
+      "alternatives": [
+        {
+          "label": "state",
+          "rhs": [
+            "@state"
+          ]
+        },
+        {
+          "label": "command",
+          "rhs": [
+            "@command"
+          ]
+        },
+        {
+          "label": "context",
+          "rhs": [
+            "@context"
+          ]
+        },
+        {
+          "label": "effect",
+          "rhs": [
+            "@effect"
+          ]
+        },
+        {
+          "label": "destination",
+          "rhs": [
+            "@destination"
+          ]
+        },
+        {
+          "label": "payload",
+          "rhs": [
+            "@payload"
+          ]
+        },
+        {
+          "label": "data",
+          "rhs": [
+            "@data"
+          ]
+        },
+        {
+          "label": "bool",
+          "rhs": [
+            "@bool"
+          ]
+        },
+        {
+          "label": "int",
+          "rhs": [
+            "@int"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Range",
+      "alternatives": [
+        {
+          "label": "inclusive",
+          "rhs": [
+            "@in",
+            "SignedI128",
+            "@..",
+            "@=",
+            "SignedI128"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Quantity",
+      "alternatives": [
+        {
+          "label": "quantity",
+          "rhs": [
+            "@unit",
+            "UnitAtom",
+            {
+              "many": [
+                "UnitOperator",
+                "UnitAtom"
+              ]
+            },
+            "@scale",
+            "Scale"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "UnitOperator",
+      "alternatives": [
+        {
+          "label": "multiply",
+          "rhs": [
+            "@*"
+          ]
+        },
+        {
+          "label": "divide",
+          "rhs": [
+            "@/"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "UnitAtom",
+      "alternatives": [
+        {
+          "label": "one",
+          "rhs": [
+            "@NUMBER"
+          ]
+        },
+        {
+          "label": "name",
+          "rhs": [
+            "Identifier"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Scale",
+      "alternatives": [
+        {
+          "label": "scale",
+          "rhs": [
+            "Identifier"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Field",
+      "alternatives": [
+        {
+          "label": "field",
+          "rhs": [
+            "@field",
+            "ID",
+            "ID",
+            "Identifier",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Variant",
+      "alternatives": [
+        {
+          "label": "variant",
+          "rhs": [
+            "@variant",
+            "ID",
+            "ID",
+            "Identifier",
+            "VariantPayload",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VariantPayload",
+      "alternatives": [
+        {
+          "label": "none",
+          "rhs": [
+            "@none"
+          ]
+        },
+        {
+          "label": "type",
+          "rhs": [
+            "ID"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reason",
+      "alternatives": [
+        {
+          "label": "reason",
+          "rhs": [
+            "@reason",
+            "ID",
+            "Identifier",
+            "@precedence",
+            "U32",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Effect",
+      "alternatives": [
+        {
+          "label": "effect",
+          "rhs": [
+            "@effect",
+            "ID",
+            "Identifier",
+            "@destination",
+            "ID",
+            "@payload",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Channel",
+      "alternatives": [
+        {
+          "label": "channel",
+          "rhs": [
+            "@channel",
+            "ID",
+            "Identifier",
+            "@destination",
+            "ID",
+            "@payload",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Component",
+      "alternatives": [
+        {
+          "label": "component",
+          "rhs": [
+            "@component",
+            "ID",
+            "Identifier",
+            "@{",
+            {
+              "many": [
+                "ComponentItem"
+              ]
+            },
+            "@}"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ComponentItem",
+      "alternatives": [
+        {
+          "label": "owns",
+          "rhs": [
+            "Owns"
+          ]
+        },
+        {
+          "label": "port",
+          "rhs": [
+            "Port"
+          ]
+        },
+        {
+          "label": "footprint",
+          "rhs": [
+            "Footprint"
+          ]
+        },
+        {
+          "label": "budget",
+          "rhs": [
+            "Budget"
+          ]
+        },
+        {
+          "label": "assume",
+          "rhs": [
+            "Assume"
+          ]
+        },
+        {
+          "label": "guarantee",
+          "rhs": [
+            "Guarantee"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Owns",
+      "alternatives": [
+        {
+          "label": "owns",
+          "rhs": [
+            "@owns",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Port",
+      "alternatives": [
+        {
+          "label": "port",
+          "rhs": [
+            "@port",
+            "ID",
+            "PortDirection",
+            "Identifier",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PortDirection",
+      "alternatives": [
+        {
+          "label": "input",
+          "rhs": [
+            "@input"
+          ]
+        },
+        {
+          "label": "output",
+          "rhs": [
+            "@output"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Footprint",
+      "alternatives": [
+        {
+          "label": "footprint",
+          "rhs": [
+            "FootprintKind",
+            "Path",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FootprintKind",
+      "alternatives": [
+        {
+          "label": "reads",
+          "rhs": [
+            "@reads"
+          ]
+        },
+        {
+          "label": "writes",
+          "rhs": [
+            "@writes"
+          ]
+        },
+        {
+          "label": "contexts",
+          "rhs": [
+            "@contexts"
+          ]
+        },
+        {
+          "label": "effects",
+          "rhs": [
+            "@effects"
+          ]
+        },
+        {
+          "label": "outbox",
+          "rhs": [
+            "@outbox"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Budget",
+      "alternatives": [
+        {
+          "label": "budget",
+          "rhs": [
+            "@budget",
+            "BudgetKind",
+            "NonzeroU64",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "BudgetKind",
+      "alternatives": [
+        {
+          "label": "steps",
+          "rhs": [
+            "@steps"
+          ]
+        },
+        {
+          "label": "nodes",
+          "rhs": [
+            "@nodes"
+          ]
+        },
+        {
+          "label": "bytes",
+          "rhs": [
+            "@bytes"
+          ]
+        },
+        {
+          "label": "predicate_calls",
+          "rhs": [
+            "@predicate_calls"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Assume",
+      "alternatives": [
+        {
+          "label": "assume",
+          "rhs": [
+            "@assume",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Guarantee",
+      "alternatives": [
+        {
+          "label": "guarantee",
+          "rhs": [
+            "@guarantee",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Path",
+      "alternatives": [
+        {
+          "label": "path",
+          "rhs": [
+            "Root",
+            "@.",
+            "ID",
+            {
+              "many": [
+                "@.",
+                "ID"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Root",
+      "alternatives": [
+        {
+          "label": "pre",
+          "rhs": [
+            "@pre"
+          ]
+        },
+        {
+          "label": "post",
+          "rhs": [
+            "@post"
+          ]
+        },
+        {
+          "label": "command",
+          "rhs": [
+            "@command"
+          ]
+        },
+        {
+          "label": "context",
+          "rhs": [
+            "@context"
+          ]
+        },
+        {
+          "label": "effects",
+          "rhs": [
+            "@effects"
+          ]
+        },
+        {
+          "label": "outbox",
+          "rhs": [
+            "@outbox"
+          ]
+        },
+        {
+          "label": "events",
+          "rhs": [
+            "@events"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Wiring",
+      "alternatives": [
+        {
+          "label": "wire",
+          "rhs": [
+            "@wire",
+            "ID",
+            "@.",
+            "ID",
+            "@->",
+            "ID",
+            "@.",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Merge",
+      "alternatives": [
+        {
+          "label": "merge",
+          "rhs": [
+            "@merge",
+            "IdList",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "IdList",
+      "alternatives": [
+        {
+          "label": "list",
+          "rhs": [
+            "@[",
+            "_Ids",
+            "@]"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "_Ids",
+      "alternatives": [
+        {
+          "label": "items",
+          "rhs": [
+            "ID",
+            "_IdsTail"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "_IdsTail",
+      "alternatives": [
+        {
+          "label": "more",
+          "rhs": [
+            "@,",
+            "_Ids"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "Law",
+      "alternatives": [
+        {
+          "label": "law",
+          "rhs": [
+            "@law",
+            "ID",
+            "Identifier",
+            {
+              "optional": [
+                "Applicability"
+              ]
+            },
+            "@=",
+            "Rel",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Applicability",
+      "alternatives": [
+        {
+          "label": "applicability",
+          "rhs": [
+            "@on",
+            "LawScope",
+            {
+              "optional": [
+                "@,",
+                "@genesis"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LawScope",
+      "alternatives": [
+        {
+          "label": "any",
+          "rhs": [
+            "@any"
+          ]
+        },
+        {
+          "label": "accept",
+          "rhs": [
+            "@accept"
+          ]
+        },
+        {
+          "label": "reject",
+          "rhs": [
+            "@reject"
+          ]
+        },
+        {
+          "label": "failure",
+          "rhs": [
+            "@failure"
+          ]
+        },
+        {
+          "label": "commit",
+          "rhs": [
+            "@commit"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Claim",
+      "alternatives": [
+        {
+          "label": "claim",
+          "rhs": [
+            "@claim",
+            "ID",
+            "Identifier",
+            "Backend",
+            "ClaimTail"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Backend",
+      "alternatives": [
+        {
+          "label": "cvc5",
+          "rhs": [
+            "@cvc5"
+          ]
+        },
+        {
+          "label": "z3",
+          "rhs": [
+            "@z3"
+          ]
+        },
+        {
+          "label": "lean",
+          "rhs": [
+            "@lean"
+          ]
+        },
+        {
+          "label": "all",
+          "rhs": [
+            "@all"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ClaimTail",
+      "alternatives": [
+        {
+          "label": "relational",
+          "rhs": [
+            "@relational",
+            "@=",
+            "Rel",
+            "@;"
+          ]
+        },
+        {
+          "label": "finite",
+          "rhs": [
+            "@finite",
+            "U32",
+            "@=",
+            "Temporal",
+            "@;"
+          ]
+        },
+        {
+          "label": "unbounded",
+          "rhs": [
+            "@unbounded",
+            "@=",
+            "Temporal",
+            "@;"
+          ]
+        },
+        {
+          "label": "inductive",
+          "rhs": [
+            "@inductive",
+            "InductiveGroups",
+            "@=",
+            "Rel",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "InductiveGroups",
+      "alternatives": [
+        {
+          "label": "groups",
+          "rhs": [
+            {
+              "optional": [
+                "@assume",
+                "IdList"
+              ]
+            },
+            {
+              "optional": [
+                "@accept",
+                "IdList"
+              ]
+            },
+            {
+              "optional": [
+                "@failure",
+                "IdList"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rel",
+      "alternatives": [
+        {
+          "label": "rel",
+          "rhs": [
+            "RelImplies"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RelImplies",
+      "alternatives": [
+        {
+          "label": "implies",
+          "rhs": [
+            "RelOr",
+            {
+              "optional": [
+                "@->",
+                "RelImplies"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RelOr",
+      "alternatives": [
+        {
+          "label": "or",
+          "rhs": [
+            "RelAnd",
+            {
+              "many": [
+                "@||",
+                "RelAnd"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RelAnd",
+      "alternatives": [
+        {
+          "label": "and",
+          "rhs": [
+            "RelNot",
+            {
+              "many": [
+                "@&&",
+                "RelNot"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RelNot",
+      "alternatives": [
+        {
+          "label": "bang",
+          "rhs": [
+            "@!",
+            "RelNot"
+          ]
+        },
+        {
+          "label": "not",
+          "rhs": [
+            "@not",
+            "RelNot"
+          ]
+        },
+        {
+          "label": "atom",
+          "rhs": [
+            "RelAtom"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RelAtom",
+      "alternatives": [
+        {
+          "label": "true",
+          "rhs": [
+            "@true"
+          ]
+        },
+        {
+          "label": "false",
+          "rhs": [
+            "@false"
+          ]
+        },
+        {
+          "label": "group",
+          "rhs": [
+            "@(",
+            "Rel",
+            "@)"
+          ]
+        },
+        {
+          "label": "quantified",
+          "rhs": [
+            "Quantified"
+          ]
+        },
+        {
+          "label": "predicate",
+          "rhs": [
+            "NamedPredicate"
+          ],
+          "when": {
+            "first": "IDENTIFIERS",
+            "except_first": [
+              "div_exact",
+              "div_floor",
+              "div_ceil",
+              "mul_div_floor",
+              "mul_div_ceil",
+              "signed_mul_div_floor",
+              "repeat_mul_div_floor",
+              "repeat_signed_mul_div_floor"
+            ],
+            "second": [
+              "("
+            ]
+          }
+        },
+        {
+          "label": "comparison",
+          "rhs": [
+            "Comparison"
+          ],
+          "when": {
+            "always": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Quantified",
+      "alternatives": [
+        {
+          "label": "forall",
+          "rhs": [
+            "@forall",
+            "Identifier",
+            "@in",
+            "SignedI128",
+            "@..",
+            "SignedI128",
+            "@{",
+            "Rel",
+            "@}"
+          ]
+        },
+        {
+          "label": "exists",
+          "rhs": [
+            "@exists",
+            "Identifier",
+            "@in",
+            "SignedI128",
+            "@..",
+            "SignedI128",
+            "@{",
+            "Rel",
+            "@}"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NamedPredicate",
+      "alternatives": [
+        {
+          "label": "predicate",
+          "rhs": [
+            "PredicateName",
+            "@(",
+            "_Arguments",
+            "@)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "_Arguments",
+      "alternatives": [
+        {
+          "label": "arguments",
+          "rhs": [
+            "Value",
+            "_ArgumentsTail"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "_ArgumentsTail",
+      "alternatives": [
+        {
+          "label": "more",
+          "rhs": [
+            "@,",
+            "_Arguments"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "PredicateName",
+      "alternatives": [
+        {
+          "label": "identifier",
+          "rhs": [
+            "Identifier"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Comparison",
+      "alternatives": [
+        {
+          "label": "compare",
+          "rhs": [
+            "Value",
+            "CompareOp",
+            "Value"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CompareOp",
+      "alternatives": [
+        {
+          "label": "==",
+          "rhs": [
+            "@=="
+          ]
+        },
+        {
+          "label": "!=",
+          "rhs": [
+            "@!="
+          ]
+        },
+        {
+          "label": "<=",
+          "rhs": [
+            "@<="
+          ]
+        },
+        {
+          "label": "<",
+          "rhs": [
+            "@<"
+          ]
+        },
+        {
+          "label": ">=",
+          "rhs": [
+            "@>="
+          ]
+        },
+        {
+          "label": ">",
+          "rhs": [
+            "@>"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Value",
+      "alternatives": [
+        {
+          "label": "value",
+          "rhs": [
+            "Term",
+            {
+              "many": [
+                "AddOp",
+                "Term"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AddOp",
+      "alternatives": [
+        {
+          "label": "add",
+          "rhs": [
+            "@+"
+          ]
+        },
+        {
+          "label": "subtract",
+          "rhs": [
+            "@-"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Term",
+      "alternatives": [
+        {
+          "label": "term",
+          "rhs": [
+            "ValueAtom",
+            {
+              "many": [
+                "@*",
+                "ValueAtom"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ValueAtom",
+      "alternatives": [
+        {
+          "label": "negated",
+          "rhs": [
+            "Negated"
+          ]
+        },
+        {
+          "label": "integer",
+          "rhs": [
+            "NonnegativeI128"
+          ]
+        },
+        {
+          "label": "group",
+          "rhs": [
+            "@(",
+            "Value",
+            "@)"
+          ]
+        },
+        {
+          "label": "named",
+          "rhs": [
+            "NamedValue"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Negated",
+      "alternatives": [
+        {
+          "label": "negated",
+          "rhs": [
+            "@-",
+            "ValueAtom"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NamedValue",
+      "alternatives": [
+        {
+          "label": "fused",
+          "rhs": [
+            "FusedCall"
+          ],
+          "when": {
+            "first": [
+              "mul_div_floor",
+              "mul_div_ceil",
+              "signed_mul_div_floor",
+              "repeat_mul_div_floor",
+              "repeat_signed_mul_div_floor"
+            ],
+            "second": [
+              "("
+            ]
+          }
+        },
+        {
+          "label": "division",
+          "rhs": [
+            "DivisionCall"
+          ],
+          "when": {
+            "first": [
+              "div_exact",
+              "div_floor",
+              "div_ceil"
+            ],
+            "second": [
+              "("
+            ]
+          }
+        },
+        {
+          "label": "sum",
+          "rhs": [
+            "Sum"
+          ]
+        },
+        {
+          "label": "root",
+          "rhs": [
+            "RootProjectionOrVariable"
+          ]
+        },
+        {
+          "label": "variable",
+          "rhs": [
+            "Variable"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FusedCall",
+      "alternatives": [
+        {
+          "label": "fused",
+          "rhs": [
+            "FusedName",
+            "@(",
+            "Value",
+            "@,",
+            "Value",
+            "@,",
+            "Value",
+            {
+              "optional": [
+                "@,",
+                "Scale"
+              ]
+            },
+            "@)"
+          ]
+        },
+        {
+          "label": "repeat",
+          "rhs": [
+            "RepeatName",
+            "@(",
+            "Value",
+            "@,",
+            "Value",
+            "@,",
+            "Value",
+            "@,",
+            "RepeatCount",
+            "@)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FusedName",
+      "alternatives": [
+        {
+          "label": "mul_div_floor",
+          "rhs": [
+            "@mul_div_floor"
+          ]
+        },
+        {
+          "label": "mul_div_ceil",
+          "rhs": [
+            "@mul_div_ceil"
+          ]
+        },
+        {
+          "label": "signed_mul_div_floor",
+          "rhs": [
+            "@signed_mul_div_floor"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RepeatName",
+      "alternatives": [
+        {
+          "label": "repeat_mul_div_floor",
+          "rhs": [
+            "@repeat_mul_div_floor"
+          ]
+        },
+        {
+          "label": "repeat_signed_mul_div_floor",
+          "rhs": [
+            "@repeat_signed_mul_div_floor"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DivisionCall",
+      "alternatives": [
+        {
+          "label": "division",
+          "rhs": [
+            "DivisionName",
+            "@(",
+            "Value",
+            "@,",
+            "Value",
+            "@)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DivisionName",
+      "alternatives": [
+        {
+          "label": "div_exact",
+          "rhs": [
+            "@div_exact"
+          ]
+        },
+        {
+          "label": "div_floor",
+          "rhs": [
+            "@div_floor"
+          ]
+        },
+        {
+          "label": "div_ceil",
+          "rhs": [
+            "@div_ceil"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sum",
+      "alternatives": [
+        {
+          "label": "sum",
+          "rhs": [
+            "@sum",
+            "Identifier",
+            "@in",
+            "SignedI128",
+            "@..",
+            "SignedI128",
+            "@{",
+            "Value",
+            "@}"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RootProjectionOrVariable",
+      "alternatives": [
+        {
+          "label": "root",
+          "rhs": [
+            "Root",
+            {
+              "many": [
+                "@.",
+                "ID"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Variable",
+      "alternatives": [
+        {
+          "label": "variable",
+          "rhs": [
+            "Identifier"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Temporal",
+      "alternatives": [
+        {
+          "label": "temporal",
+          "rhs": [
+            "TemporalUntil"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TemporalUntil",
+      "alternatives": [
+        {
+          "label": "until",
+          "rhs": [
+            "TemporalOr",
+            {
+              "many": [
+                "@until",
+                "TemporalOr"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TemporalOr",
+      "alternatives": [
+        {
+          "label": "or",
+          "rhs": [
+            "TemporalAnd",
+            {
+              "many": [
+                "@||",
+                "TemporalAnd"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TemporalAnd",
+      "alternatives": [
+        {
+          "label": "and",
+          "rhs": [
+            "TemporalAtom",
+            {
+              "many": [
+                "@&&",
+                "TemporalAtom"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TemporalAtom",
+      "alternatives": [
+        {
+          "label": "next",
+          "rhs": [
+            "@next",
+            "TemporalAtom"
+          ]
+        },
+        {
+          "label": "always",
+          "rhs": [
+            "@always",
+            "TemporalAtom"
+          ]
+        },
+        {
+          "label": "eventually",
+          "rhs": [
+            "@eventually",
+            "TemporalAtom"
+          ]
+        },
+        {
+          "label": "not",
+          "rhs": [
+            "@not",
+            "TemporalAtom"
+          ]
+        },
+        {
+          "label": "!",
+          "rhs": [
+            "@!",
+            "TemporalAtom"
+          ]
+        },
+        {
+          "label": "atom",
+          "rhs": [
+            "@atom",
+            "@(",
+            "Rel",
+            "@)"
+          ]
+        },
+        {
+          "label": "group",
+          "rhs": [
+            "@(",
+            "Temporal",
+            "@)"
+          ]
+        },
+        {
+          "label": "true",
+          "rhs": [
+            "@true"
+          ]
+        },
+        {
+          "label": "false",
+          "rhs": [
+            "@false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Identifier",
+      "alternatives": [
+        {
+          "label": "identifier",
+          "rhs": [
+            "@IDENT"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "U16",
+      "alternatives": [
+        {
+          "label": "number",
+          "rhs": [
+            "@NUMBER"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "U32",
+      "alternatives": [
+        {
+          "label": "number",
+          "rhs": [
+            "@NUMBER"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ID",
+      "alternatives": [
+        {
+          "label": "number",
+          "rhs": [
+            "@NUMBER"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NonzeroU64",
+      "alternatives": [
+        {
+          "label": "number",
+          "rhs": [
+            "@NUMBER"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NonnegativeI128",
+      "alternatives": [
+        {
+          "label": "number",
+          "rhs": [
+            "@NUMBER"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RepeatCount",
+      "alternatives": [
+        {
+          "label": "number",
+          "rhs": [
+            "@NUMBER"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SignedI128",
+      "alternatives": [
+        {
+          "label": "signed",
+          "rhs": [
+            {
+              "optional": [
+                "@-"
+              ]
+            },
+            "@NUMBER"
+          ]
+        }
+      ]
+    }
+  ]
+}

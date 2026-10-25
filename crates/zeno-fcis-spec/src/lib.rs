@@ -12,18 +12,36 @@ extern crate alloc;
 mod ast;
 mod bool_circuit;
 mod builder;
+mod checked_parser;
 mod collections;
+mod comparison_ops;
 mod diagnostic;
 mod distribution;
 mod elaborate;
 mod induction;
 mod lexer;
+mod lexical_core;
 mod mini_determinator;
 mod parser;
 mod paths;
+mod semantic_readers;
 mod source;
+mod source_span;
+mod source_token;
 mod substance;
+mod surface_lexer;
+mod syntax;
+#[allow(dead_code, unreachable_pub)]
+// Shared generic API is independently exercised by proof harnesses.
+mod syntax_certificate;
+#[allow(dead_code)] // Generator exposes identities and roots to all grammar clients.
+mod syntax_grammar;
+#[allow(dead_code)]
+mod syntax_grammar_extended;
+mod syntax_lowering;
+mod syntax_resources;
 mod tables;
+mod value_expr;
 mod views;
 
 pub use ast::*;
@@ -80,6 +98,9 @@ pub const MAX_SOURCE_TOKENS: usize = 262_144;
 pub const MAX_RETAINED_DIAGNOSTICS: usize = 256;
 /// Maximum recursive expression nesting admitted by the language parser.
 pub const MAX_FORMULA_DEPTH: usize = 256;
+/// Maximum composite scalar/formula height built by source parsing. Numeric
+/// preflight applies this bound before allocating a recursive expression.
+pub const MAX_PARSED_EXPRESSION_HEIGHT: usize = MAX_FORMULA_DEPTH + 2;
 /// Maximum total formula nodes admitted by elaboration.
 pub const MAX_FORMULA_NODES: usize = 1_000_000;
 /// Maximum finite logical-trace horizon admitted by language version 1.

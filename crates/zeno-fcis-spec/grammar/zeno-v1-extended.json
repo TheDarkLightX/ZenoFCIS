@@ -1,0 +1,2633 @@
+{
+  "schema": "zeno/ordered-syntax-grammar/1",
+  "language_version": 1,
+  "root": "Project",
+  "selection": "First matching lookahead decision commits; no backtracking. Absent second token is EOF. EBNF helpers are expanded mechanically.",
+  "terminals": {
+    "identifier": "ASCII maximal identifier; contextual keywords retain their spelling and are still permitted by Identifier.",
+    "number": "u128 magnitude; payload bounds are checked during typed lowering.",
+    "EOF": "EOF is lookahead only and excluded from the derivation frontier."
+  },
+  "constraints": {
+    "identifier_bytes": [
+      1,
+      128
+    ],
+    "stable_id": [
+      1,
+      4294967295
+    ],
+    "projection_segments": [
+      1,
+      64
+    ],
+    "scalar": "i128; direct -2^127 is the minimum, other negation is Sub(0,operand)",
+    "quantity": "only int; unit number atom must be 1; scale e0..e38; normalized by Quantity",
+    "source_bytes": 1048576,
+    "source_tokens": 262144,
+    "formula_depth": 256,
+    "operator_chain": 255,
+    "note": "These typed constraints are checked by lowering; they are not established by structural certificate membership alone."
+  },
+  "rules": [
+    {
+      "name": "Project",
+      "alternatives": [
+        {
+          "label": "project",
+          "rhs": [
+            "@zeno",
+            "U16",
+            "@;",
+            "@project",
+            "ID",
+            "Identifier",
+            "@;",
+            {
+              "many": [
+                "Declaration"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Declaration",
+      "alternatives": [
+        {
+          "label": "namespace",
+          "rhs": [
+            "Namespace"
+          ]
+        },
+        {
+          "label": "type",
+          "rhs": [
+            "Type"
+          ]
+        },
+        {
+          "label": "field",
+          "rhs": [
+            "Field"
+          ]
+        },
+        {
+          "label": "variant",
+          "rhs": [
+            "Variant"
+          ]
+        },
+        {
+          "label": "reason",
+          "rhs": [
+            "Reason"
+          ]
+        },
+        {
+          "label": "effect",
+          "rhs": [
+            "Effect"
+          ]
+        },
+        {
+          "label": "channel",
+          "rhs": [
+            "Channel"
+          ]
+        },
+        {
+          "label": "component",
+          "rhs": [
+            "Component"
+          ]
+        },
+        {
+          "label": "wiring",
+          "rhs": [
+            "Wiring"
+          ]
+        },
+        {
+          "label": "merge",
+          "rhs": [
+            "Merge"
+          ]
+        },
+        {
+          "label": "law",
+          "rhs": [
+            "Law"
+          ]
+        },
+        {
+          "label": "claim",
+          "rhs": [
+            "Claim"
+          ]
+        },
+        {
+          "label": "table",
+          "rhs": [
+            "Table"
+          ]
+        },
+        {
+          "label": "constant",
+          "rhs": [
+            "ConstantTable"
+          ]
+        },
+        {
+          "label": "derived",
+          "rhs": [
+            "DerivedTable"
+          ]
+        },
+        {
+          "label": "map",
+          "rhs": [
+            "Map"
+          ]
+        },
+        {
+          "label": "entry",
+          "rhs": [
+            "Entry"
+          ]
+        },
+        {
+          "label": "order",
+          "rhs": [
+            "Order"
+          ]
+        },
+        {
+          "label": "summary",
+          "rhs": [
+            "Summary"
+          ]
+        },
+        {
+          "label": "tally",
+          "rhs": [
+            "Tally"
+          ]
+        },
+        {
+          "label": "random",
+          "rhs": [
+            "Random"
+          ]
+        },
+        {
+          "label": "distribution",
+          "rhs": [
+            "Distribution"
+          ]
+        },
+        {
+          "label": "reward",
+          "rhs": [
+            "Reward"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Namespace",
+      "alternatives": [
+        {
+          "label": "namespace",
+          "rhs": [
+            "@namespace",
+            "ID",
+            "Identifier",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Type",
+      "alternatives": [
+        {
+          "label": "type",
+          "rhs": [
+            "@type",
+            "ID",
+            "ExtendedTypeTail"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TypeKind",
+      "alternatives": [
+        {
+          "label": "state",
+          "rhs": [
+            "@state"
+          ]
+        },
+        {
+          "label": "command",
+          "rhs": [
+            "@command"
+          ]
+        },
+        {
+          "label": "context",
+          "rhs": [
+            "@context"
+          ]
+        },
+        {
+          "label": "effect",
+          "rhs": [
+            "@effect"
+          ]
+        },
+        {
+          "label": "destination",
+          "rhs": [
+            "@destination"
+          ]
+        },
+        {
+          "label": "payload",
+          "rhs": [
+            "@payload"
+          ]
+        },
+        {
+          "label": "data",
+          "rhs": [
+            "@data"
+          ]
+        },
+        {
+          "label": "bool",
+          "rhs": [
+            "@bool"
+          ]
+        },
+        {
+          "label": "int",
+          "rhs": [
+            "@int"
+          ]
+        },
+        {
+          "label": "u128",
+          "rhs": [
+            "@u128"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Range",
+      "alternatives": [
+        {
+          "label": "inclusive",
+          "rhs": [
+            "@in",
+            "SignedI128",
+            "@..",
+            "@=",
+            "SignedI128"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Quantity",
+      "alternatives": [
+        {
+          "label": "quantity",
+          "rhs": [
+            "@unit",
+            "UnitAtom",
+            {
+              "many": [
+                "UnitOperator",
+                "UnitAtom"
+              ]
+            },
+            "@scale",
+            "Scale"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "UnitOperator",
+      "alternatives": [
+        {
+          "label": "multiply",
+          "rhs": [
+            "@*"
+          ]
+        },
+        {
+          "label": "divide",
+          "rhs": [
+            "@/"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "UnitAtom",
+      "alternatives": [
+        {
+          "label": "one",
+          "rhs": [
+            "@NUMBER"
+          ]
+        },
+        {
+          "label": "name",
+          "rhs": [
+            "Identifier"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Scale",
+      "alternatives": [
+        {
+          "label": "scale",
+          "rhs": [
+            "Identifier"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Field",
+      "alternatives": [
+        {
+          "label": "field",
+          "rhs": [
+            "@field",
+            "ID",
+            "ID",
+            "Identifier",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Variant",
+      "alternatives": [
+        {
+          "label": "variant",
+          "rhs": [
+            "@variant",
+            "ID",
+            "ID",
+            "Identifier",
+            "VariantPayload",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VariantPayload",
+      "alternatives": [
+        {
+          "label": "none",
+          "rhs": [
+            "@none"
+          ]
+        },
+        {
+          "label": "type",
+          "rhs": [
+            "ID"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reason",
+      "alternatives": [
+        {
+          "label": "reason",
+          "rhs": [
+            "@reason",
+            "ID",
+            "Identifier",
+            "@precedence",
+            "U32",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Effect",
+      "alternatives": [
+        {
+          "label": "effect",
+          "rhs": [
+            "@effect",
+            "ID",
+            "Identifier",
+            "@destination",
+            "ID",
+            "@payload",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Channel",
+      "alternatives": [
+        {
+          "label": "channel",
+          "rhs": [
+            "@channel",
+            "ID",
+            "Identifier",
+            "@destination",
+            "ID",
+            "@payload",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Component",
+      "alternatives": [
+        {
+          "label": "component",
+          "rhs": [
+            "@component",
+            "ID",
+            "Identifier",
+            "@{",
+            {
+              "many": [
+                "ComponentItem"
+              ]
+            },
+            "@}"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ComponentItem",
+      "alternatives": [
+        {
+          "label": "owns",
+          "rhs": [
+            "Owns"
+          ]
+        },
+        {
+          "label": "port",
+          "rhs": [
+            "Port"
+          ]
+        },
+        {
+          "label": "footprint",
+          "rhs": [
+            "Footprint"
+          ]
+        },
+        {
+          "label": "budget",
+          "rhs": [
+            "Budget"
+          ]
+        },
+        {
+          "label": "assume",
+          "rhs": [
+            "Assume"
+          ]
+        },
+        {
+          "label": "guarantee",
+          "rhs": [
+            "Guarantee"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Owns",
+      "alternatives": [
+        {
+          "label": "owns",
+          "rhs": [
+            "@owns",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Port",
+      "alternatives": [
+        {
+          "label": "port",
+          "rhs": [
+            "@port",
+            "ID",
+            "PortDirection",
+            "Identifier",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PortDirection",
+      "alternatives": [
+        {
+          "label": "input",
+          "rhs": [
+            "@input"
+          ]
+        },
+        {
+          "label": "output",
+          "rhs": [
+            "@output"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Footprint",
+      "alternatives": [
+        {
+          "label": "footprint",
+          "rhs": [
+            "FootprintKind",
+            "Path",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FootprintKind",
+      "alternatives": [
+        {
+          "label": "reads",
+          "rhs": [
+            "@reads"
+          ]
+        },
+        {
+          "label": "writes",
+          "rhs": [
+            "@writes"
+          ]
+        },
+        {
+          "label": "contexts",
+          "rhs": [
+            "@contexts"
+          ]
+        },
+        {
+          "label": "effects",
+          "rhs": [
+            "@effects"
+          ]
+        },
+        {
+          "label": "outbox",
+          "rhs": [
+            "@outbox"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Budget",
+      "alternatives": [
+        {
+          "label": "budget",
+          "rhs": [
+            "@budget",
+            "BudgetKind",
+            "NonzeroU64",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "BudgetKind",
+      "alternatives": [
+        {
+          "label": "steps",
+          "rhs": [
+            "@steps"
+          ]
+        },
+        {
+          "label": "nodes",
+          "rhs": [
+            "@nodes"
+          ]
+        },
+        {
+          "label": "bytes",
+          "rhs": [
+            "@bytes"
+          ]
+        },
+        {
+          "label": "predicate_calls",
+          "rhs": [
+            "@predicate_calls"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Assume",
+      "alternatives": [
+        {
+          "label": "assume",
+          "rhs": [
+            "@assume",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Guarantee",
+      "alternatives": [
+        {
+          "label": "guarantee",
+          "rhs": [
+            "@guarantee",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Path",
+      "alternatives": [
+        {
+          "label": "path",
+          "rhs": [
+            "Root",
+            "@.",
+            "ID",
+            {
+              "many": [
+                "@.",
+                "ID"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Root",
+      "alternatives": [
+        {
+          "label": "pre",
+          "rhs": [
+            "@pre"
+          ]
+        },
+        {
+          "label": "post",
+          "rhs": [
+            "@post"
+          ]
+        },
+        {
+          "label": "command",
+          "rhs": [
+            "@command"
+          ]
+        },
+        {
+          "label": "context",
+          "rhs": [
+            "@context"
+          ]
+        },
+        {
+          "label": "effects",
+          "rhs": [
+            "@effects"
+          ]
+        },
+        {
+          "label": "outbox",
+          "rhs": [
+            "@outbox"
+          ]
+        },
+        {
+          "label": "events",
+          "rhs": [
+            "@events"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Wiring",
+      "alternatives": [
+        {
+          "label": "wire",
+          "rhs": [
+            "@wire",
+            "ID",
+            "@.",
+            "ID",
+            "@->",
+            "ID",
+            "@.",
+            "ID",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Merge",
+      "alternatives": [
+        {
+          "label": "merge",
+          "rhs": [
+            "@merge",
+            "IdList",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "IdList",
+      "alternatives": [
+        {
+          "label": "list",
+          "rhs": [
+            "@[",
+            "_Ids",
+            "@]"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "_Ids",
+      "alternatives": [
+        {
+          "label": "items",
+          "rhs": [
+            "ID",
+            "_IdsTail"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "_IdsTail",
+      "alternatives": [
+        {
+          "label": "more",
+          "rhs": [
+            "@,",
+            "_Ids"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "Law",
+      "alternatives": [
+        {
+          "label": "law",
+          "rhs": [
+            "@law",
+            "ID",
+            "Identifier",
+            {
+              "optional": [
+                "Applicability"
+              ]
+            },
+            "@=",
+            "Rel",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Applicability",
+      "alternatives": [
+        {
+          "label": "applicability",
+          "rhs": [
+            "@on",
+            "LawScope",
+            {
+              "optional": [
+                "@,",
+                "@genesis"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LawScope",
+      "alternatives": [
+        {
+          "label": "any",
+          "rhs": [
+            "@any"
+          ]
+        },
+        {
+          "label": "accept",
+          "rhs": [
+            "@accept"
+          ]
+        },
+        {
+          "label": "reject",
+          "rhs": [
+            "@reject",
+            {
+              "optional": [
+                "@:",
+                "ID"
+              ]
+            }
+          ]
+        },
+        {
+          "label": "failure",
+          "rhs": [
+            "@failure"
+          ]
+        },
+        {
+          "label": "commit",
+          "rhs": [
+            "@commit"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Claim",
+      "alternatives": [
+        {
+          "label": "claim",
+          "rhs": [
+            "@claim",
+            "ID",
+            "Identifier",
+            "Backend",
+            "ClaimTail"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Backend",
+      "alternatives": [
+        {
+          "label": "cvc5",
+          "rhs": [
+            "@cvc5"
+          ]
+        },
+        {
+          "label": "z3",
+          "rhs": [
+            "@z3"
+          ]
+        },
+        {
+          "label": "lean",
+          "rhs": [
+            "@lean"
+          ]
+        },
+        {
+          "label": "all",
+          "rhs": [
+            "@all"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ClaimTail",
+      "alternatives": [
+        {
+          "label": "relational",
+          "rhs": [
+            "@relational",
+            "@=",
+            "Rel",
+            "@;"
+          ]
+        },
+        {
+          "label": "finite",
+          "rhs": [
+            "@finite",
+            "U32",
+            "@=",
+            "Temporal",
+            "@;"
+          ]
+        },
+        {
+          "label": "unbounded",
+          "rhs": [
+            "@unbounded",
+            "@=",
+            "Temporal",
+            "@;"
+          ]
+        },
+        {
+          "label": "inductive",
+          "rhs": [
+            "@inductive",
+            "InductiveGroups",
+            "@=",
+            "Rel",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "InductiveGroups",
+      "alternatives": [
+        {
+          "label": "groups",
+          "rhs": [
+            {
+              "optional": [
+                "@assume",
+                "IdList"
+              ]
+            },
+            {
+              "optional": [
+                "@accept",
+                "IdList"
+              ]
+            },
+            {
+              "optional": [
+                "@failure",
+                "IdList"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rel",
+      "alternatives": [
+        {
+          "label": "rel",
+          "rhs": [
+            "ExprImplies"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CompareOp",
+      "alternatives": [
+        {
+          "label": "==",
+          "rhs": [
+            "@=="
+          ]
+        },
+        {
+          "label": "!=",
+          "rhs": [
+            "@!="
+          ]
+        },
+        {
+          "label": "<=",
+          "rhs": [
+            "@<="
+          ]
+        },
+        {
+          "label": "<",
+          "rhs": [
+            "@<"
+          ]
+        },
+        {
+          "label": ">=",
+          "rhs": [
+            "@>="
+          ]
+        },
+        {
+          "label": ">",
+          "rhs": [
+            "@>"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Value",
+      "alternatives": [
+        {
+          "label": "value",
+          "rhs": [
+            "ExprImplies"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AddOp",
+      "alternatives": [
+        {
+          "label": "add",
+          "rhs": [
+            "@+"
+          ]
+        },
+        {
+          "label": "subtract",
+          "rhs": [
+            "@-"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Temporal",
+      "alternatives": [
+        {
+          "label": "temporal",
+          "rhs": [
+            "TemporalUntil"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TemporalUntil",
+      "alternatives": [
+        {
+          "label": "until",
+          "rhs": [
+            "TemporalOr",
+            {
+              "many": [
+                "@until",
+                "TemporalOr"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TemporalOr",
+      "alternatives": [
+        {
+          "label": "or",
+          "rhs": [
+            "TemporalAnd",
+            {
+              "many": [
+                "@||",
+                "TemporalAnd"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TemporalAnd",
+      "alternatives": [
+        {
+          "label": "and",
+          "rhs": [
+            "TemporalAtom",
+            {
+              "many": [
+                "@&&",
+                "TemporalAtom"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TemporalAtom",
+      "alternatives": [
+        {
+          "label": "next",
+          "rhs": [
+            "@next",
+            "TemporalAtom"
+          ]
+        },
+        {
+          "label": "always",
+          "rhs": [
+            "@always",
+            "TemporalAtom"
+          ]
+        },
+        {
+          "label": "eventually",
+          "rhs": [
+            "@eventually",
+            "TemporalAtom"
+          ]
+        },
+        {
+          "label": "not",
+          "rhs": [
+            "@not",
+            "TemporalAtom"
+          ]
+        },
+        {
+          "label": "!",
+          "rhs": [
+            "@!",
+            "TemporalAtom"
+          ]
+        },
+        {
+          "label": "atom",
+          "rhs": [
+            "@atom",
+            "@(",
+            "Rel",
+            "@)"
+          ]
+        },
+        {
+          "label": "group",
+          "rhs": [
+            "@(",
+            "Temporal",
+            "@)"
+          ]
+        },
+        {
+          "label": "true",
+          "rhs": [
+            "@true"
+          ]
+        },
+        {
+          "label": "false",
+          "rhs": [
+            "@false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Identifier",
+      "alternatives": [
+        {
+          "label": "identifier",
+          "rhs": [
+            "@IDENT"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "U16",
+      "alternatives": [
+        {
+          "label": "number",
+          "rhs": [
+            "@NUMBER"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "U32",
+      "alternatives": [
+        {
+          "label": "number",
+          "rhs": [
+            "@NUMBER"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ID",
+      "alternatives": [
+        {
+          "label": "number",
+          "rhs": [
+            "@NUMBER"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NonzeroU64",
+      "alternatives": [
+        {
+          "label": "number",
+          "rhs": [
+            "@NUMBER"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SignedI128",
+      "alternatives": [
+        {
+          "label": "signed",
+          "rhs": [
+            {
+              "optional": [
+                "@-"
+              ]
+            },
+            "@NUMBER"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ExtendedTypeTail",
+      "alternatives": [
+        {
+          "label": "bits",
+          "rhs": [
+            "@bits",
+            "Identifier",
+            "@width",
+            "U32",
+            "@;"
+          ]
+        },
+        {
+          "label": "index",
+          "rhs": [
+            "@index",
+            "Identifier",
+            "@of",
+            "ID",
+            "@;"
+          ]
+        },
+        {
+          "label": "key",
+          "rhs": [
+            "@key",
+            "Identifier",
+            "@;"
+          ]
+        },
+        {
+          "label": "ordered",
+          "rhs": [
+            "@ordered",
+            "Identifier",
+            "Range",
+            "@;"
+          ]
+        },
+        {
+          "label": "ordinary",
+          "rhs": [
+            "TypeKind",
+            "Identifier",
+            {
+              "optional": [
+                "Range"
+              ]
+            },
+            {
+              "optional": [
+                "Quantity"
+              ]
+            },
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Table",
+      "alternatives": [
+        {
+          "label": "table",
+          "rhs": [
+            "@table",
+            "ID",
+            "ID",
+            "Identifier",
+            "ID",
+            "@size",
+            "U32",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ConstantTable",
+      "alternatives": [
+        {
+          "label": "constant",
+          "rhs": [
+            "@const",
+            "@table",
+            "ID",
+            "Identifier",
+            "ID",
+            "@size",
+            "U32",
+            "@[",
+            "ConstantItems",
+            "@]",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ConstantItems",
+      "alternatives": [
+        {
+          "label": "items",
+          "rhs": [
+            "ConstantLiteral",
+            {
+              "many": [
+                "@,",
+                "ConstantLiteral"
+              ]
+            }
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "ConstantLiteral",
+      "alternatives": [
+        {
+          "label": "true",
+          "rhs": [
+            "@true"
+          ]
+        },
+        {
+          "label": "false",
+          "rhs": [
+            "@false"
+          ]
+        },
+        {
+          "label": "unsigned",
+          "rhs": [
+            "@u128",
+            "@(",
+            "U128",
+            "@)"
+          ]
+        },
+        {
+          "label": "signed",
+          "rhs": [
+            "SignedI128"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DerivedTable",
+      "alternatives": [
+        {
+          "label": "derived",
+          "rhs": [
+            "@derived",
+            "@table",
+            "ID",
+            "Identifier",
+            "@[",
+            "Identifier",
+            "@]",
+            {
+              "optional": [
+                "@[",
+                "Identifier",
+                "@]"
+              ]
+            },
+            "@in",
+            "@table",
+            "ID",
+            {
+              "optional": [
+                "@bits",
+                "U32"
+              ]
+            },
+            "@rounds",
+            "U32",
+            "@{",
+            {
+              "many": [
+                "DerivedRow"
+              ]
+            },
+            "@default",
+            "Rel",
+            "@;",
+            "@}",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DerivedRow",
+      "alternatives": [
+        {
+          "label": "when",
+          "rhs": [
+            "@when",
+            "Rel",
+            "@then",
+            "Rel",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Map",
+      "alternatives": [
+        {
+          "label": "map",
+          "rhs": [
+            "@map",
+            "ID",
+            "ID",
+            "Identifier",
+            "ID",
+            "ID",
+            "@capacity",
+            "NonzeroU64",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Entry",
+      "alternatives": [
+        {
+          "label": "entry",
+          "rhs": [
+            "@entry",
+            "ID",
+            "Identifier",
+            "@of",
+            "ID",
+            "@at",
+            "Value",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Order",
+      "alternatives": [
+        {
+          "label": "order",
+          "rhs": [
+            "@order",
+            "ID",
+            "Identifier",
+            "@of",
+            "ID",
+            "OrderKind",
+            "@into",
+            "Value",
+            "@found",
+            "Value",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "OrderKind",
+      "alternatives": [
+        {
+          "label": "min",
+          "rhs": [
+            "@min"
+          ]
+        },
+        {
+          "label": "max",
+          "rhs": [
+            "@max"
+          ]
+        },
+        {
+          "label": "successor",
+          "rhs": [
+            "@successor",
+            "Value"
+          ]
+        },
+        {
+          "label": "predecessor",
+          "rhs": [
+            "@predecessor",
+            "Value"
+          ]
+        },
+        {
+          "label": "range",
+          "rhs": [
+            "@range",
+            "Value",
+            "@to",
+            "Value"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Summary",
+      "alternatives": [
+        {
+          "label": "summary",
+          "rhs": [
+            "@summary",
+            "ID",
+            "ID",
+            "Identifier",
+            "ID",
+            "SummaryAggregate",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SummaryAggregate",
+      "alternatives": [
+        {
+          "label": "count",
+          "rhs": [
+            "@count",
+            "ID"
+          ]
+        },
+        {
+          "label": "sum",
+          "rhs": [
+            "@sum",
+            "ID",
+            "@.",
+            "ID"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tally",
+      "alternatives": [
+        {
+          "label": "tally",
+          "rhs": [
+            "@tally",
+            "ID",
+            "Identifier",
+            "ID",
+            "@.",
+            "ID",
+            "@=",
+            "SummaryAggregate",
+            "@by",
+            "ID",
+            {
+              "optional": [
+                "@where",
+                "ID"
+              ]
+            },
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Random",
+      "alternatives": [
+        {
+          "label": "random",
+          "rhs": [
+            "@random",
+            "ID",
+            "Identifier",
+            "@on",
+            "Value",
+            "@bits",
+            "U16",
+            "@independent",
+            "@uniform",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Distribution",
+      "alternatives": [
+        {
+          "label": "distribution",
+          "rhs": [
+            "@distribution",
+            "ID",
+            "Identifier",
+            "@on",
+            "Value",
+            "@=",
+            "DistributionTarget",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DistributionTarget",
+      "alternatives": [
+        {
+          "label": "uniform",
+          "rhs": [
+            "@uniform",
+            "@over",
+            "@{",
+            "DistributionUniformItems",
+            "@}"
+          ]
+        },
+        {
+          "label": "weighted",
+          "rhs": [
+            "@{",
+            "DistributionWeightedItems",
+            "@}"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DistributionOutcome",
+      "alternatives": [
+        {
+          "label": "failure",
+          "rhs": [
+            "@committed-failure"
+          ]
+        },
+        {
+          "label": "value",
+          "rhs": [
+            "SignedI128"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DistributionUniformItems",
+      "alternatives": [
+        {
+          "label": "items",
+          "rhs": [
+            "DistributionOutcome",
+            "DistributionUniformTail"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "DistributionUniformTail",
+      "alternatives": [
+        {
+          "label": "more",
+          "rhs": [
+            "@,",
+            "DistributionUniformItems"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "DistributionWeightedItems",
+      "alternatives": [
+        {
+          "label": "items",
+          "rhs": [
+            "DistributionOutcome",
+            "@:",
+            "U128",
+            {
+              "optional": [
+                "@/",
+                "U128"
+              ]
+            },
+            "DistributionWeightedTail"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "DistributionWeightedTail",
+      "alternatives": [
+        {
+          "label": "more",
+          "rhs": [
+            "@,",
+            "DistributionWeightedItems"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "Reward",
+      "alternatives": [
+        {
+          "label": "reward",
+          "rhs": [
+            "@reward",
+            "ID",
+            "Identifier",
+            "@random",
+            "@{",
+            "BraceIds",
+            "@}",
+            "@on",
+            "Value",
+            {
+              "optional": [
+                "@failure",
+                "SignedI128"
+              ]
+            },
+            "@{",
+            {
+              "many": [
+                "RewardMeasure"
+              ]
+            },
+            "@}"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "BraceIds",
+      "alternatives": [
+        {
+          "label": "items",
+          "rhs": [
+            "ID",
+            "BraceIdsTail"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "BraceIdsTail",
+      "alternatives": [
+        {
+          "label": "more",
+          "rhs": [
+            "@,",
+            "BraceIds"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "RewardMeasure",
+      "alternatives": [
+        {
+          "label": "measure",
+          "rhs": [
+            "RewardKind",
+            "RewardComparison",
+            "SignedI128",
+            {
+              "optional": [
+                "@/",
+                "U128"
+              ]
+            },
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RewardKind",
+      "alternatives": [
+        {
+          "label": "expectation",
+          "rhs": [
+            "@expectation"
+          ]
+        },
+        {
+          "label": "variance",
+          "rhs": [
+            "@variance"
+          ]
+        },
+        {
+          "label": "threshold",
+          "rhs": [
+            "@threshold",
+            "SignedI128"
+          ]
+        },
+        {
+          "label": "excess",
+          "rhs": [
+            "@excess",
+            "SignedI128"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RewardComparison",
+      "alternatives": [
+        {
+          "label": "at-most",
+          "rhs": [
+            "@<="
+          ]
+        },
+        {
+          "label": "at-least",
+          "rhs": [
+            "@>="
+          ]
+        },
+        {
+          "label": "equal",
+          "rhs": [
+            "@="
+          ]
+        }
+      ]
+    },
+    {
+      "name": "U128",
+      "alternatives": [
+        {
+          "label": "magnitude",
+          "rhs": [
+            "@NUMBER"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ExprImplies",
+      "alternatives": [
+        {
+          "label": "implies",
+          "rhs": [
+            "ExprOr",
+            {
+              "optional": [
+                "@->",
+                "ExprImplies"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ExprOr",
+      "alternatives": [
+        {
+          "label": "or",
+          "rhs": [
+            "ExprAnd",
+            {
+              "many": [
+                "@||",
+                "ExprAnd"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ExprAnd",
+      "alternatives": [
+        {
+          "label": "and",
+          "rhs": [
+            "ExprComparison",
+            {
+              "many": [
+                "@&&",
+                "ExprComparison"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ExprComparison",
+      "alternatives": [
+        {
+          "label": "comparison",
+          "rhs": [
+            "ExprAdd",
+            {
+              "optional": [
+                "CompareOp",
+                "ExprAdd"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ExprAdd",
+      "alternatives": [
+        {
+          "label": "additive",
+          "rhs": [
+            "ExprTerm",
+            {
+              "many": [
+                "AddOp",
+                "ExprTerm"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ExprTerm",
+      "alternatives": [
+        {
+          "label": "multiplicative",
+          "rhs": [
+            "ExprUnary",
+            {
+              "many": [
+                "@*",
+                "ExprUnary"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ExprUnary",
+      "alternatives": [
+        {
+          "label": "bang",
+          "rhs": [
+            "@!",
+            "ExprUnary"
+          ]
+        },
+        {
+          "label": "not",
+          "rhs": [
+            "@not",
+            "ExprUnary"
+          ]
+        },
+        {
+          "label": "negative",
+          "rhs": [
+            "@-",
+            "ExprUnary"
+          ]
+        },
+        {
+          "label": "atom",
+          "rhs": [
+            "ExprAtom"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ExprAtom",
+      "alternatives": [
+        {
+          "label": "group",
+          "rhs": [
+            "@(",
+            "Rel",
+            "@)"
+          ]
+        },
+        {
+          "label": "number",
+          "rhs": [
+            "@NUMBER"
+          ]
+        },
+        {
+          "label": "call",
+          "rhs": [
+            "ExprCall"
+          ],
+          "when": {
+            "first": "IDENTIFIERS",
+            "second": [
+              "("
+            ]
+          }
+        },
+        {
+          "label": "quantified",
+          "rhs": [
+            "ExtendedQuantified"
+          ]
+        },
+        {
+          "label": "sum",
+          "rhs": [
+            "ExtendedSum"
+          ]
+        },
+        {
+          "label": "count",
+          "rhs": [
+            "TableCount"
+          ],
+          "when": {
+            "first": [
+              "count"
+            ],
+            "second": "IDENTIFIERS"
+          }
+        },
+        {
+          "label": "fold",
+          "rhs": [
+            "BitFold"
+          ]
+        },
+        {
+          "label": "circuit",
+          "rhs": [
+            "Circuit"
+          ]
+        },
+        {
+          "label": "named",
+          "rhs": [
+            "ExprNamed"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ExprCall",
+      "alternatives": [
+        {
+          "label": "call",
+          "rhs": [
+            "Identifier",
+            "@(",
+            "ExprArguments",
+            "@)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ExprArguments",
+      "alternatives": [
+        {
+          "label": "arguments",
+          "rhs": [
+            "Rel",
+            "ExprArgumentsTail"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "ExprArgumentsTail",
+      "alternatives": [
+        {
+          "label": "more",
+          "rhs": [
+            "@,",
+            "ExprArguments"
+          ]
+        },
+        {
+          "label": "empty",
+          "rhs": []
+        }
+      ]
+    },
+    {
+      "name": "ExprNamed",
+      "alternatives": [
+        {
+          "label": "named",
+          "rhs": [
+            "Identifier",
+            {
+              "many": [
+                "ProjectionSuffix"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ProjectionSuffix",
+      "alternatives": [
+        {
+          "label": "field",
+          "rhs": [
+            "@.",
+            "ProjectionSegment"
+          ]
+        },
+        {
+          "label": "index",
+          "rhs": [
+            "@[",
+            "Rel",
+            "@]"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ProjectionSegment",
+      "alternatives": [
+        {
+          "label": "number",
+          "rhs": [
+            "ID"
+          ]
+        },
+        {
+          "label": "entry-variable",
+          "rhs": [
+            "Identifier"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ExtendedQuantified",
+      "alternatives": [
+        {
+          "label": "forall",
+          "rhs": [
+            "@forall",
+            "Identifier",
+            "@in",
+            "QuantifiedDomain"
+          ]
+        },
+        {
+          "label": "exists",
+          "rhs": [
+            "@exists",
+            "Identifier",
+            "@in",
+            "QuantifiedDomain"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "QuantifiedDomain",
+      "alternatives": [
+        {
+          "label": "table",
+          "rhs": [
+            "@table",
+            "ID",
+            {
+              "optional": [
+                "@where",
+                "Rel"
+              ]
+            },
+            "@{",
+            "Rel",
+            "@}"
+          ]
+        },
+        {
+          "label": "entries",
+          "rhs": [
+            "@entries",
+            "ID",
+            {
+              "optional": [
+                "@where",
+                "Rel"
+              ]
+            },
+            "@{",
+            "Rel",
+            "@}"
+          ]
+        },
+        {
+          "label": "range",
+          "rhs": [
+            "SignedI128",
+            "@..",
+            "SignedI128",
+            "@{",
+            "Rel",
+            "@}"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ExtendedSum",
+      "alternatives": [
+        {
+          "label": "sum",
+          "rhs": [
+            "@sum",
+            "Identifier",
+            "@in",
+            "SumDomain"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SumDomain",
+      "alternatives": [
+        {
+          "label": "table",
+          "rhs": [
+            "@table",
+            "ID",
+            {
+              "optional": [
+                "@where",
+                "Rel"
+              ]
+            },
+            "@{",
+            "Rel",
+            "@}"
+          ]
+        },
+        {
+          "label": "entries-semantic-refusal",
+          "rhs": [
+            "@entries",
+            "ID",
+            {
+              "optional": [
+                "@where",
+                "Rel"
+              ]
+            },
+            "@{",
+            "Rel",
+            "@}"
+          ]
+        },
+        {
+          "label": "range",
+          "rhs": [
+            "SignedI128",
+            "@..",
+            "SignedI128",
+            "@{",
+            "Rel",
+            "@}"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TableCount",
+      "alternatives": [
+        {
+          "label": "count",
+          "rhs": [
+            "@count",
+            "Identifier",
+            "@in",
+            "CountCollectionKind",
+            "ID",
+            {
+              "optional": [
+                "@{",
+                "Rel",
+                "@}"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "BitFold",
+      "alternatives": [
+        {
+          "label": "join",
+          "rhs": [
+            "@join",
+            "Identifier",
+            "@in",
+            "@table",
+            "ID",
+            {
+              "optional": [
+                "@where",
+                "Rel"
+              ]
+            },
+            "@{",
+            "Rel",
+            "@}"
+          ]
+        },
+        {
+          "label": "meet",
+          "rhs": [
+            "@meet",
+            "Identifier",
+            "@in",
+            "@table",
+            "ID",
+            {
+              "optional": [
+                "@where",
+                "Rel"
+              ]
+            },
+            "@{",
+            "Rel",
+            "@}"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Circuit",
+      "alternatives": [
+        {
+          "label": "circuit",
+          "rhs": [
+            "@circuit",
+            "@{",
+            {
+              "many": [
+                "CircuitNode"
+              ]
+            },
+            "@}",
+            "@output",
+            "U32"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CircuitNode",
+      "alternatives": [
+        {
+          "label": "formula",
+          "rhs": [
+            "@formula",
+            "@{",
+            "Rel",
+            "@}",
+            "@;"
+          ]
+        },
+        {
+          "label": "true",
+          "rhs": [
+            "@true",
+            "@;"
+          ]
+        },
+        {
+          "label": "false",
+          "rhs": [
+            "@false",
+            "@;"
+          ]
+        },
+        {
+          "label": "not",
+          "rhs": [
+            "@not",
+            "U32",
+            "@;"
+          ]
+        },
+        {
+          "label": "and",
+          "rhs": [
+            "@and",
+            "U32",
+            "U32",
+            "@;"
+          ]
+        },
+        {
+          "label": "or",
+          "rhs": [
+            "@or",
+            "U32",
+            "U32",
+            "@;"
+          ]
+        },
+        {
+          "label": "select",
+          "rhs": [
+            "@select",
+            "U32",
+            "U32",
+            "U32",
+            "@;"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TableRead",
+      "alternatives": [
+        {
+          "label": "read",
+          "rhs": [
+            "Identifier",
+            {
+              "many": [
+                "@.",
+                "ProjectionSegment"
+              ]
+            },
+            "@[",
+            "Rel",
+            "@]",
+            {
+              "many": [
+                "@[",
+                "Rel",
+                "@]"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CountCollectionKind",
+      "alternatives": [
+        {
+          "label": "table",
+          "rhs": [
+            "@table"
+          ]
+        },
+        {
+          "label": "entries-semantic-refusal",
+          "rhs": [
+            "@entries"
+          ]
+        }
+      ]
+    }
+  ],
+  "profile": "zeno/ordered-structural-syntax/2.6",
+  "reference_revision": "e573ab3bd95c3d33095b4a4796b91730a75ce952",
+  "assurance": "Structural admission grammar for the complete 2.6 surface. Rel and Value deliberately share a precedence grammar to parse scalar and relational parentheses without a trusted classifier. The existing semantic pass must independently refuse inappropriate expression categories, arity, bounds, declarations, scopes and expansions. Structural certificate membership alone is not typed acceptance or a lowering proof.",
+  "roots": [
+    "Project",
+    "Rel",
+    "Value",
+    "TableRead"
+  ]
+}

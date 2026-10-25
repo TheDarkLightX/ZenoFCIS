@@ -61,6 +61,8 @@ jobs:
           python3 tools/test_authority_source_bundle.py
           python3 tools/test_proof_challenge.py
           python3 tools/test_signed_arithmetic.py
+          python3 tools/test_check_spec_parser.py
+          python3 tools/test_generate_spec_grammar.py
 
       - name: Spot reference and source tests
         run: python3 -B -m unittest discover -s core-apps/zenodex-spot/tests -p "test_*.py"

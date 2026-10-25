@@ -20,11 +20,21 @@ const VERSION: u32 = 1;
 /// exact bytes, in path order.
 pub const SOURCE_FILES: &[(&str, &[u8])] = &[
     ("Cargo.toml", include_bytes!("../Cargo.toml")),
+    (
+        "grammar/zeno-v1-extended.json",
+        include_bytes!("../grammar/zeno-v1-extended.json"),
+    ),
+    (
+        "grammar/zeno-v1.json",
+        include_bytes!("../grammar/zeno-v1.json"),
+    ),
     ("src/ast.rs", include_bytes!("ast.rs")),
     ("src/bits.rs", include_bytes!("bits.rs")),
     ("src/bool_circuit.rs", include_bytes!("bool_circuit.rs")),
     ("src/builder.rs", include_bytes!("builder.rs")),
+    ("src/checked_parser.rs", include_bytes!("checked_parser.rs")),
     ("src/collections.rs", include_bytes!("collections.rs")),
+    ("src/comparison_ops.rs", include_bytes!("comparison_ops.rs")),
     (
         "src/constant_tables.rs",
         include_bytes!("constant_tables.rs"),
@@ -34,6 +44,7 @@ pub const SOURCE_FILES: &[(&str, &[u8])] = &[
     ("src/elaborate.rs", include_bytes!("elaborate.rs")),
     ("src/induction.rs", include_bytes!("induction.rs")),
     ("src/lexer.rs", include_bytes!("lexer.rs")),
+    ("src/lexical_core.rs", include_bytes!("lexical_core.rs")),
     ("src/lib.rs", include_bytes!("lib.rs")),
     (
         "src/mini_determinator.rs",
@@ -45,10 +56,36 @@ pub const SOURCE_FILES: &[(&str, &[u8])] = &[
         "src/recursive_tables.rs",
         include_bytes!("recursive_tables.rs"),
     ),
+    (
+        "src/semantic_readers.rs",
+        include_bytes!("semantic_readers.rs"),
+    ),
     ("src/source.rs", include_bytes!("source.rs")),
+    ("src/source_span.rs", include_bytes!("source_span.rs")),
+    ("src/source_token.rs", include_bytes!("source_token.rs")),
     ("src/substance.rs", include_bytes!("substance.rs")),
+    ("src/surface_lexer.rs", include_bytes!("surface_lexer.rs")),
+    ("src/syntax.rs", include_bytes!("syntax.rs")),
+    (
+        "src/syntax_certificate.rs",
+        include_bytes!("syntax_certificate.rs"),
+    ),
+    ("src/syntax_grammar.rs", include_bytes!("syntax_grammar.rs")),
+    (
+        "src/syntax_grammar_extended.rs",
+        include_bytes!("syntax_grammar_extended.rs"),
+    ),
+    (
+        "src/syntax_lowering.rs",
+        include_bytes!("syntax_lowering.rs"),
+    ),
+    (
+        "src/syntax_resources.rs",
+        include_bytes!("syntax_resources.rs"),
+    ),
     ("src/table_lookup.rs", include_bytes!("table_lookup.rs")),
     ("src/tables.rs", include_bytes!("tables.rs")),
+    ("src/value_expr.rs", include_bytes!("value_expr.rs")),
     ("src/views.rs", include_bytes!("views.rs")),
 ];
 

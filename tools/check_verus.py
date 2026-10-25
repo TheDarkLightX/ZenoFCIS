@@ -45,6 +45,7 @@ SEMANTIC_FAILURES = frozenset((
     'requires not satisfied', 'invariant not satisfied at end of loop body',
     'loop invariant not satisfied', 'invariant not satisfied',
     'invariant not satisfied before loop',
+    'constructed value may fail to meet its declared type invariant',
     'possible arithmetic underflow/overflow',
 ))
 ERROR_HEADER = re.compile(r'^error(?:\[[A-Za-z0-9]+\])?: (.*)$', re.M)

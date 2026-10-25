@@ -98,6 +98,12 @@ class EvidenceAdmission(unittest.TestCase):
         self.assertTrue(classify(diagnostic + summary))
         self.assertTrue(classify(diagnostic.replace('postcondition not satisfied',
             'invariant not satisfied before loop') + summary))
+        type_invariant_diagnostic = diagnostic.replace('postcondition not satisfied',
+            'constructed value may fail to meet its declared type invariant')
+        self.assertTrue(classify(type_invariant_diagnostic + summary))
+        self.assertFalse(classify(type_invariant_diagnostic + 'note: solver returned unknown\n' + summary))
+        self.assertFalse(classify(type_invariant_diagnostic.replace('subject.rs', 'unrelated.rs') + summary))
+        self.assertFalse(classify(type_invariant_diagnostic.replace('error: ', 'error[E0308]: ') + summary))
         self.assertTrue(classify(diagnostic * 2 + 'error: aborting due to 2 previous errors\n'))
         for wrong in (
             diagnostic + 'note: SMT result UNKNOWN\n' + summary,

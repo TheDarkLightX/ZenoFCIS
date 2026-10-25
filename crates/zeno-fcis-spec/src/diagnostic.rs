@@ -5,48 +5,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-/// Half-open UTF-8 byte span with one-based display coordinates.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct SourceSpan {
-    start: u32,
-    end: u32,
-    line: u32,
-    column: u32,
-}
-
-impl SourceSpan {
-    /// Creates a span.
-    #[must_use]
-    pub const fn new(start: u32, end: u32, line: u32, column: u32) -> Self {
-        Self {
-            start,
-            end,
-            line,
-            column,
-        }
-    }
-
-    /// Returns the zero-based start byte.
-    #[must_use]
-    pub const fn start(self) -> u32 {
-        self.start
-    }
-    /// Returns the zero-based exclusive end byte.
-    #[must_use]
-    pub const fn end(self) -> u32 {
-        self.end
-    }
-    /// Returns the one-based line.
-    #[must_use]
-    pub const fn line(self) -> u32 {
-        self.line
-    }
-    /// Returns the one-based byte column.
-    #[must_use]
-    pub const fn column(self) -> u32 {
-        self.column
-    }
-}
+pub use crate::source_span::SourceSpan;
 
 /// Stable path into a parsed or elaborated project.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -302,8 +261,8 @@ impl fmt::Display for DiagnosticSet {
                 "{} {}:{}:{} {} expected {}; got {}; {}",
                 diagnostic.code.as_str(),
                 diagnostic.stage.as_str(),
-                diagnostic.span.line,
-                diagnostic.span.column,
+                diagnostic.span.line(),
+                diagnostic.span.column(),
                 diagnostic.path.as_str(),
                 diagnostic.expected,
                 diagnostic.actual,

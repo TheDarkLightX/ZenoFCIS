@@ -327,6 +327,10 @@ pub(crate) fn implementation() -> String {
         );
         bytes.extend_from_slice(source.as_bytes());
     }
+    // Grammar tables, source validators and semantic lowering all participate
+    // in the compiled specification identity, including its reviewed inventory.
+    bytes.extend_from_slice(b"zeno-fcis-spec-source-digest\0");
+    bytes.extend_from_slice(&zeno_fcis_spec::source_digest());
     bytes.extend_from_slice(&zeno_fcis_synthesis::finite::v2_authority::EVALUATOR);
     sha256_hex(&bytes)
 }

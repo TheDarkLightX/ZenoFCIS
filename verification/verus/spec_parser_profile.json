@@ -1,0 +1,945 @@
+{
+  "schema": "zeno-fcis/spec-parser-profile/1",
+  "scope": [
+    "Exact source-byte lexical stepping and complete validation of the actual borrowed Token stream, including numeric payloads, exact start/end bytes, one-based line/byte-column coordinates, identifier/hex spelling, inert empty spelling and the token budget.",
+    "Complete postorder ordered-grammar derivation and indexed terminal frontier. Both core and extended generated grammars are checked for reproducible generation.",
+    "Exact signed-magnitude conversion iff representable, and complete projection-tail conversion iff valid with every payload in order and no omitted suffix.",
+    "Exact six-way lexical mapping to the actual CompareOp enum, with full-width ordered i128/u128 comparison semantics.",
+    "Actual nongeneric ValueExpr arithmetic and division constructors preserve operator, policy and ordered operands; exact division-name mapping; bounded binary-height transfer."
+  ],
+  "unproved": [
+    "Grammar JSON to generated-table equivalence is reproducibility-checked, not formally proved.",
+    "Parser-producer completeness and useful resource-envelope completeness.",
+    "The entire typed AST fold, declaration lowering, and elaboration/evaluator composition.",
+    "Rust compiler, Verus/SMT toolchain, allocation failures, and human intent.",
+    "Real compiled Identifier, ProjectionPath and RelExpr operands are opaque external types with no assumed operations or semantic properties. Native Clone/Debug/Eq derives and the caller-to-certified-child mapping are outside the constructor proof.",
+    "Scalar-height lemmas parameterize relational height; the complete source-to-AST height correspondence remains separate.",
+    "The complete runtime syntax-resource preflight, its mapping from certified source children, and strict diagnostic collection are source-reviewed/tested rather than proved as a whole.",
+    "The actual borrowed-token validator proves successful-check soundness. Its surrounding diagnostic-producing lexer wrapper, acceptance completeness, and native Token derive operations are not included in that theorem."
+  ],
+  "bindings": [
+    ".github/workflows/verus.yml",
+    "Cargo.lock",
+    "Cargo.toml",
+    "crates/zeno-fcis-spec/Cargo.toml",
+    "rust-toolchain.toml",
+    "tools/check_spec_parser.py",
+    "tools/check_verus.py",
+    "tools/generate_spec_grammar.py",
+    "tools/qualification_controls.py",
+    "tools/qualification_sources.py",
+    "tools/test_check_spec_parser.py",
+    "tools/verus_ids.py",
+    "verification/verus/spec_parser_profile.json",
+    "verification/verus/toolchain.json",
+    "tools/test_generate_spec_grammar.py"
+  ],
+  "kernels": [
+    {
+      "name": "lexer",
+      "harness": "verification/verus/spec_lexer.rs",
+      "files": [
+        "crates/zeno-fcis-spec/src/lexical_core.rs",
+        "verification/verus/spec_lexer.rs",
+        "verification/verus/spec_lexer_tests.rs"
+      ],
+      "expected_verified": 22,
+      "expected_native_tests": 10,
+      "target_functions": [
+        "spec_lexer::lexical_core::next_lexeme",
+        "spec_lexer::lexical_core::check_spelling",
+        "spec_lexer::lexical_core::lexeme_unique",
+        "spec_lexer::lexical_core::decimal_push",
+        "spec_lexer::lexical_core::scan_decimal",
+        "spec_lexer::lexical_core::read_symbol",
+        "spec_lexer::lexical_core::is_member"
+      ],
+      "mutations": [
+        {
+          "name": "spelling-mismatch-bypass",
+          "function": "check_spelling",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "if bytes[start + cursor] != spelling[cursor] {\n            return false;",
+          "new": "if bytes[start + cursor] != spelling[cursor] {\n            return true;",
+          "target_functions": [
+            "spec_lexer::lexical_core::check_spelling"
+          ]
+        },
+        {
+          "name": "spelling-length-bypass",
+          "function": "check_spelling",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "if spelling.len() != end - start {\n        return false;",
+          "new": "if spelling.len() != end - start {\n        return true;",
+          "target_functions": [
+            "spec_lexer::lexical_core::check_spelling"
+          ]
+        },
+        {
+          "name": "decimal-base-nine",
+          "function": "decimal_push",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "Some(prefix * 10 + digit as u128)",
+          "new": "Some(prefix * 9 + digit as u128)",
+          "target_functions": [
+            "spec_lexer::lexical_core::decimal_push"
+          ]
+        },
+        {
+          "name": "nonmaximal-scan",
+          "function": "scan",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "end += 1;",
+          "new": "break;",
+          "target_functions": [
+            "spec_lexer::lexical_core::scan"
+          ]
+        },
+        {
+          "name": "identifier-loses-dash",
+          "function": "is_member",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "is_ident_start(byte) || (byte >= b'0' && byte <= b'9') || byte == b'-'",
+          "new": "is_ident_start(byte) || (byte >= b'0' && byte <= b'9')",
+          "target_functions": [
+            "spec_lexer::lexical_core::is_member"
+          ]
+        },
+        {
+          "name": "equality-prefix-changed",
+          "function": "read_symbol",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "(b'=', Some(b'=')) => (LexemeKind::EqEq, 2)",
+          "new": "(b'=', Some(b'=')) => (LexemeKind::Equal, 2)",
+          "target_functions": [
+            "spec_lexer::lexical_core::read_symbol"
+          ]
+        },
+        {
+          "name": "source-cursor-disconnected",
+          "function": "next_lexeme",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "let byte = bytes[start];",
+          "new": "let byte = bytes[0];",
+          "target_functions": [
+            "spec_lexer::lexical_core::next_lexeme"
+          ]
+        },
+        {
+          "name": "hex-width-65",
+          "function": "next_lexeme",
+          "subject": "crates/zeno-fcis-spec/src/lexical_core.rs",
+          "old": "let valid = end - start == 66",
+          "new": "let valid = end - start == 65",
+          "target_functions": [
+            "spec_lexer::lexical_core::next_lexeme"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "source-tokens",
+      "harness": "verification/verus/spec_source_tokens.rs",
+      "files": [
+        "crates/zeno-fcis-spec/src/source_token.rs",
+        "crates/zeno-fcis-spec/src/source_span.rs",
+        "crates/zeno-fcis-spec/src/lexical_core.rs",
+        "verification/verus/spec_source_tokens.rs",
+        "verification/verus/spec_source_tokens_tests.rs"
+      ],
+      "expected_verified": 35,
+      "expected_native_tests": 18,
+      "target_functions": [
+        "spec_source_tokens::source_token::tokens_match_source",
+        "spec_source_tokens::source_token::check_token_fields",
+        "spec_source_tokens::source_token::advance_coordinate",
+        "spec_source_tokens::source_token::extend_source_token",
+        "spec_source_tokens::source_token::extend_source_trivia",
+        "spec_source_tokens::source_span::SourceSpan::start",
+        "spec_source_tokens::source_span::SourceSpan::end",
+        "spec_source_tokens::source_span::SourceSpan::line",
+        "spec_source_tokens::source_span::SourceSpan::column"
+      ],
+      "mutations": [
+        {
+          "name": "kind-or-number-check-omitted",
+          "function": "check_token_fields",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "|| !same_kind(found.kind, token.kind)",
+          "new": "|| false",
+          "target_functions": [
+            "spec_source_tokens::source_token::check_token_fields"
+          ]
+        },
+        {
+          "name": "start-check-omitted",
+          "function": "check_token_fields",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "|| token.span.start() as u128 != found.start as u128",
+          "new": "|| false",
+          "target_functions": [
+            "spec_source_tokens::source_token::check_token_fields"
+          ]
+        },
+        {
+          "name": "end-check-omitted",
+          "function": "check_token_fields",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "|| token.span.end() as u128 != found.end as u128",
+          "new": "|| false",
+          "target_functions": [
+            "spec_source_tokens::source_token::check_token_fields"
+          ]
+        },
+        {
+          "name": "line-check-omitted",
+          "function": "check_token_fields",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "|| token.span.line() != line",
+          "new": "|| false",
+          "target_functions": [
+            "spec_source_tokens::source_token::check_token_fields"
+          ]
+        },
+        {
+          "name": "column-check-omitted",
+          "function": "check_token_fields",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "|| token.span.column() != column",
+          "new": "|| false",
+          "target_functions": [
+            "spec_source_tokens::source_token::check_token_fields"
+          ]
+        },
+        {
+          "name": "identifier-spelling-check-omitted",
+          "function": "check_token_fields",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "LexemeKind::Ident => check_spelling(bytes, found.start, found.end, spelling),",
+          "new": "LexemeKind::Ident => true,",
+          "target_functions": [
+            "spec_source_tokens::source_token::check_token_fields"
+          ]
+        },
+        {
+          "name": "hex-spelling-check-omitted",
+          "function": "check_token_fields",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "check_spelling(bytes, found.start + 2, found.end, spelling)",
+          "new": "true",
+          "target_functions": [
+            "spec_source_tokens::source_token::check_token_fields"
+          ]
+        },
+        {
+          "name": "inert-spelling-check-omitted",
+          "function": "check_token_fields",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "_ => spelling.is_empty(),",
+          "new": "_ => true,",
+          "target_functions": [
+            "spec_source_tokens::source_token::check_token_fields"
+          ]
+        },
+        {
+          "name": "span-start-getter-changed",
+          "function": "start",
+          "subject": "crates/zeno-fcis-spec/src/source_span.rs",
+          "old": "self.start",
+          "new": "self.end",
+          "target_functions": [
+            "spec_source_tokens::source_span::SourceSpan::start"
+          ]
+        },
+        {
+          "name": "span-end-getter-changed",
+          "function": "end",
+          "subject": "crates/zeno-fcis-spec/src/source_span.rs",
+          "old": "self.end",
+          "new": "self.start",
+          "target_functions": [
+            "spec_source_tokens::source_span::SourceSpan::end"
+          ]
+        },
+        {
+          "name": "span-line-getter-changed",
+          "function": "line",
+          "subject": "crates/zeno-fcis-spec/src/source_span.rs",
+          "old": "self.line",
+          "new": "self.column",
+          "target_functions": [
+            "spec_source_tokens::source_span::SourceSpan::line"
+          ]
+        },
+        {
+          "name": "span-column-getter-changed",
+          "function": "column",
+          "subject": "crates/zeno-fcis-spec/src/source_span.rs",
+          "old": "self.column",
+          "new": "self.line",
+          "target_functions": [
+            "spec_source_tokens::source_span::SourceSpan::column"
+          ]
+        },
+        {
+          "name": "coordinate-saturation-changed",
+          "function": "advance_coordinate",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "{\n        u32::MAX\n    } else",
+          "new": "{\n        u32::MAX - 1\n    } else",
+          "target_functions": [
+            "spec_source_tokens::source_token::advance_coordinate"
+          ]
+        },
+        {
+          "name": "coordinate-width-ignored",
+          "function": "advance_coordinate",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "value + amount as u32",
+          "new": "value",
+          "target_functions": [
+            "spec_source_tokens::source_token::advance_coordinate"
+          ]
+        },
+        {
+          "name": "token-budget-bypassed",
+          "function": "tokens_match_source",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "if tokens.len() > max_tokens {",
+          "new": "if false {",
+          "target_functions": [
+            "spec_source_tokens::source_token::tokens_match_source"
+          ]
+        },
+        {
+          "name": "invalid-or-missing-token-accepted",
+          "function": "tokens_match_source",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "if !is_token(found.kind) || used >= tokens.len() {\n                return false;",
+          "new": "if !is_token(found.kind) || used >= tokens.len() {\n                return true;",
+          "target_functions": [
+            "spec_source_tokens::source_token::tokens_match_source"
+          ]
+        },
+        {
+          "name": "actual-token-fields-bypassed",
+          "function": "tokens_match_source",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "if !check_token_fields(bytes, &tokens[used], found, line, column) {",
+          "new": "if false {",
+          "target_functions": [
+            "spec_source_tokens::source_token::tokens_match_source"
+          ]
+        },
+        {
+          "name": "surplus-tokens-accepted",
+          "function": "tokens_match_source",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "if used != tokens.len() {",
+          "new": "if false {",
+          "target_functions": [
+            "spec_source_tokens::source_token::tokens_match_source"
+          ]
+        },
+        {
+          "name": "newline-line-stagnates",
+          "function": "tokens_match_source",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "advance_coordinate(line, 1)",
+          "new": "line",
+          "target_functions": [
+            "spec_source_tokens::source_token::tokens_match_source"
+          ]
+        },
+        {
+          "name": "column-width-ignored",
+          "function": "tokens_match_source",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "advance_coordinate(column, found.end - cursor)",
+          "new": "column",
+          "target_functions": [
+            "spec_source_tokens::source_token::tokens_match_source"
+          ]
+        },
+        {
+          "name": "newline-column-not-reset",
+          "function": "tokens_match_source",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "let following_column = if newline {\n            1",
+          "new": "let following_column = if newline {\n            column",
+          "target_functions": [
+            "spec_source_tokens::source_token::tokens_match_source"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "syntax",
+      "harness": "verification/verus/spec_syntax.rs",
+      "files": [
+        "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+        "verification/verus/spec_syntax.rs",
+        "verification/verus/spec_syntax_tests.rs"
+      ],
+      "expected_verified": 23,
+      "expected_native_tests": 24,
+      "target_functions": [
+        "spec_syntax::syntax_certificate::select_production",
+        "spec_syntax::syntax_certificate::check_node",
+        "spec_syntax::syntax_certificate::check_derivation",
+        "spec_syntax::syntax_certificate::model::prefix_sound",
+        "spec_syntax::syntax_certificate::first_decision_rows",
+        "spec_syntax::syntax_certificate::select_production_indexed",
+        "spec_syntax::syntax_certificate::prepare_decisions",
+        "spec_syntax::syntax_certificate::check_derivation_prepared"
+      ],
+      "mutations": [
+        {
+          "name": "rhs-symbol-omitted",
+          "function": "check_node",
+          "subject": "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+          "old": "if !same_symbol(child.symbol, rhs[production.rhs_start + child_offset])",
+          "new": "if false",
+          "target_functions": [
+            "spec_syntax::syntax_certificate::check_node"
+          ]
+        },
+        {
+          "name": "trailing-input-allowed",
+          "function": "check_derivation_prepared",
+          "subject": "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+          "old": "        || root.end != token_tags.len()\n",
+          "new": "",
+          "target_functions": [
+            "spec_syntax::syntax_certificate::check_derivation_prepared"
+          ]
+        },
+        {
+          "name": "wrong-decision-result",
+          "function": "select_production",
+          "subject": "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+          "old": "return Some(row.production);",
+          "new": "return Some(0);",
+          "target_functions": [
+            "spec_syntax::syntax_certificate::select_production"
+          ]
+        },
+        {
+          "name": "first-rule-row-overwritten",
+          "function": "first_decision_rows",
+          "subject": "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+          "old": "if first_rows[slot] == decisions.len() {",
+          "new": "if true {",
+          "target_functions": [
+            "spec_syntax::syntax_certificate::first_decision_rows"
+          ]
+        },
+        {
+          "name": "first-rule-row-skipped",
+          "function": "first_decision_rows",
+          "subject": "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+          "old": "first_rows[slot] = index;",
+          "new": "first_rows[slot] = index + 1;",
+          "target_functions": [
+            "spec_syntax::syntax_certificate::first_decision_rows"
+          ]
+        },
+        {
+          "name": "wrong-indexed-result",
+          "function": "select_production_indexed",
+          "subject": "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+          "old": "return Some(row.production);",
+          "new": "return Some(0);",
+          "target_functions": [
+            "spec_syntax::syntax_certificate::select_production_indexed"
+          ]
+        },
+        {
+          "name": "prepared-index-disconnected",
+          "function": "prepare_decisions",
+          "subject": "crates/zeno-fcis-spec/src/syntax_certificate.rs",
+          "old": "let first_rows = first_decision_rows(decisions);",
+          "new": "let first_rows = [0; DECISION_PREFIX_SLOTS];",
+          "target_functions": [
+            "spec_syntax::syntax_certificate::prepare_decisions"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "semantic-readers",
+      "harness": "verification/verus/spec_semantic_readers.rs",
+      "files": [
+        "crates/zeno-fcis-spec/src/semantic_readers.rs",
+        "crates/zeno-fcis-spec/src/lexical_core.rs",
+        "verification/verus/spec_semantic_readers.rs",
+        "verification/verus/spec_semantic_readers_tests.rs"
+      ],
+      "expected_verified": 25,
+      "expected_native_tests": 12,
+      "target_functions": [
+        "spec_semantic_readers::semantic_readers::signed_magnitude",
+        "spec_semantic_readers::semantic_readers::read_projection_tail"
+      ],
+      "mutations": [
+        {
+          "name": "signed-sign-reversed",
+          "function": "signed_magnitude",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "Some(if negative { -value } else { value })",
+          "new": "Some(if negative { value } else { -value })",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::signed_magnitude"
+          ]
+        },
+        {
+          "name": "signed-minimum-shifted",
+          "function": "signed_magnitude",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "Some(i128::MIN)",
+          "new": "Some(i128::MIN + 1)",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::signed_magnitude"
+          ]
+        },
+        {
+          "name": "signed-valid-maximum-refused",
+          "function": "signed_magnitude",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "if magnitude <= i128::MAX as u128 {",
+          "new": "if magnitude < i128::MAX as u128 {",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::signed_magnitude"
+          ]
+        },
+        {
+          "name": "projection-budget-tail-discarded",
+          "function": "read_projection_tail",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "if kinds.len() % 2 != 0 || kinds.len() / 2 > max_segments {\n        return None;",
+          "new": "if kinds.len() % 2 != 0 || kinds.len() / 2 > max_segments {\n        return Some(Vec::new());",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::read_projection_tail"
+          ]
+        },
+        {
+          "name": "projection-separator-changed",
+          "function": "read_projection_tail",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "LexemeKind::Dot => (),",
+          "new": "LexemeKind::Comma => (),",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::read_projection_tail"
+          ]
+        },
+        {
+          "name": "projection-payload-replaced",
+          "function": "read_projection_tail",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "values.push(magnitude as u32);",
+          "new": "values.push(1);",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::read_projection_tail"
+          ]
+        },
+        {
+          "name": "projection-source-index-disconnected",
+          "function": "read_projection_tail",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "let magnitude = match kinds[offset + 1] {",
+          "new": "let magnitude = match kinds[1] {",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::read_projection_tail"
+          ]
+        },
+        {
+          "name": "projection-valid-maximum-refused",
+          "function": "read_projection_tail",
+          "subject": "crates/zeno-fcis-spec/src/semantic_readers.rs",
+          "old": "if magnitude == 0 || magnitude > u32::MAX as u128 {",
+          "new": "if magnitude == 0 || magnitude >= u32::MAX as u128 {",
+          "target_functions": [
+            "spec_semantic_readers::semantic_readers::read_projection_tail"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "comparison-ops",
+      "harness": "verification/verus/spec_comparison_ops.rs",
+      "files": [
+        "crates/zeno-fcis-spec/src/comparison_ops.rs",
+        "crates/zeno-fcis-spec/src/lexical_core.rs",
+        "verification/verus/spec_comparison_ops.rs",
+        "verification/verus/spec_comparison_ops_tests.rs"
+      ],
+      "expected_verified": 26,
+      "expected_native_tests": 7,
+      "target_functions": [
+        "spec_comparison_ops::comparison_ops::read_compare_op",
+        "spec_comparison_ops::comparison_ops::CompareOp::evaluate_i128",
+        "spec_comparison_ops::comparison_ops::CompareOp::evaluate_u128"
+      ],
+      "mutations": [
+        {
+          "name": "mapping-eqeq-changed",
+          "function": "read_compare_op",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "LexemeKind::EqEq => Some(CompareOp::Eq),",
+          "new": "LexemeKind::EqEq => Some(CompareOp::NotEq),",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::read_compare_op"
+          ]
+        },
+        {
+          "name": "mapping-noteq-changed",
+          "function": "read_compare_op",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "LexemeKind::NotEq => Some(CompareOp::NotEq),",
+          "new": "LexemeKind::NotEq => Some(CompareOp::Eq),",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::read_compare_op"
+          ]
+        },
+        {
+          "name": "mapping-less-changed",
+          "function": "read_compare_op",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "LexemeKind::Less => Some(CompareOp::Less),",
+          "new": "LexemeKind::Less => Some(CompareOp::LessEq),",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::read_compare_op"
+          ]
+        },
+        {
+          "name": "mapping-lesseq-changed",
+          "function": "read_compare_op",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "LexemeKind::LessEq => Some(CompareOp::LessEq),",
+          "new": "LexemeKind::LessEq => Some(CompareOp::GreaterEq),",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::read_compare_op"
+          ]
+        },
+        {
+          "name": "mapping-greater-changed",
+          "function": "read_compare_op",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "LexemeKind::Greater => Some(CompareOp::Greater),",
+          "new": "LexemeKind::Greater => Some(CompareOp::Less),",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::read_compare_op"
+          ]
+        },
+        {
+          "name": "mapping-greatereq-changed",
+          "function": "read_compare_op",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "LexemeKind::GreaterEq => Some(CompareOp::GreaterEq),",
+          "new": "LexemeKind::GreaterEq => Some(CompareOp::Greater),",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::read_compare_op"
+          ]
+        },
+        {
+          "name": "noncomparison-accepted",
+          "function": "read_compare_op",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "_ => None,",
+          "new": "_ => Some(CompareOp::Eq),",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::read_compare_op"
+          ]
+        },
+        {
+          "name": "i128-eq-changed",
+          "function": "evaluate_i128",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "fn evaluate_i128(self, left: i128, right: i128) -> bool {\n        match self {\n            Self::Eq => left == right,",
+          "new": "fn evaluate_i128(self, left: i128, right: i128) -> bool {\n        match self {\n            Self::Eq => left != right,",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::CompareOp::evaluate_i128"
+          ]
+        },
+        {
+          "name": "i128-noteq-changed",
+          "function": "evaluate_i128",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "fn evaluate_i128(self, left: i128, right: i128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,",
+          "new": "fn evaluate_i128(self, left: i128, right: i128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left == right,",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::CompareOp::evaluate_i128"
+          ]
+        },
+        {
+          "name": "i128-less-changed",
+          "function": "evaluate_i128",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "fn evaluate_i128(self, left: i128, right: i128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,",
+          "new": "fn evaluate_i128(self, left: i128, right: i128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left <= right,",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::CompareOp::evaluate_i128"
+          ]
+        },
+        {
+          "name": "i128-lesseq-changed",
+          "function": "evaluate_i128",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "fn evaluate_i128(self, left: i128, right: i128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,\n            Self::LessEq => left <= right,",
+          "new": "fn evaluate_i128(self, left: i128, right: i128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,\n            Self::LessEq => left < right,",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::CompareOp::evaluate_i128"
+          ]
+        },
+        {
+          "name": "i128-greater-changed",
+          "function": "evaluate_i128",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "fn evaluate_i128(self, left: i128, right: i128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,\n            Self::LessEq => left <= right,\n            Self::Greater => left > right,",
+          "new": "fn evaluate_i128(self, left: i128, right: i128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,\n            Self::LessEq => left <= right,\n            Self::Greater => left < right,",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::CompareOp::evaluate_i128"
+          ]
+        },
+        {
+          "name": "i128-greatereq-changed",
+          "function": "evaluate_i128",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "fn evaluate_i128(self, left: i128, right: i128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,\n            Self::LessEq => left <= right,\n            Self::Greater => left > right,\n            Self::GreaterEq => left >= right,",
+          "new": "fn evaluate_i128(self, left: i128, right: i128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,\n            Self::LessEq => left <= right,\n            Self::Greater => left > right,\n            Self::GreaterEq => left > right,",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::CompareOp::evaluate_i128"
+          ]
+        },
+        {
+          "name": "u128-eq-changed",
+          "function": "evaluate_u128",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "fn evaluate_u128(self, left: u128, right: u128) -> bool {\n        match self {\n            Self::Eq => left == right,",
+          "new": "fn evaluate_u128(self, left: u128, right: u128) -> bool {\n        match self {\n            Self::Eq => left != right,",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::CompareOp::evaluate_u128"
+          ]
+        },
+        {
+          "name": "u128-noteq-changed",
+          "function": "evaluate_u128",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "fn evaluate_u128(self, left: u128, right: u128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,",
+          "new": "fn evaluate_u128(self, left: u128, right: u128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left == right,",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::CompareOp::evaluate_u128"
+          ]
+        },
+        {
+          "name": "u128-less-changed",
+          "function": "evaluate_u128",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "fn evaluate_u128(self, left: u128, right: u128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,",
+          "new": "fn evaluate_u128(self, left: u128, right: u128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left <= right,",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::CompareOp::evaluate_u128"
+          ]
+        },
+        {
+          "name": "u128-lesseq-changed",
+          "function": "evaluate_u128",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "fn evaluate_u128(self, left: u128, right: u128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,\n            Self::LessEq => left <= right,",
+          "new": "fn evaluate_u128(self, left: u128, right: u128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,\n            Self::LessEq => left < right,",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::CompareOp::evaluate_u128"
+          ]
+        },
+        {
+          "name": "u128-greater-changed",
+          "function": "evaluate_u128",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "fn evaluate_u128(self, left: u128, right: u128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,\n            Self::LessEq => left <= right,\n            Self::Greater => left > right,",
+          "new": "fn evaluate_u128(self, left: u128, right: u128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,\n            Self::LessEq => left <= right,\n            Self::Greater => left < right,",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::CompareOp::evaluate_u128"
+          ]
+        },
+        {
+          "name": "u128-greatereq-changed",
+          "function": "evaluate_u128",
+          "subject": "crates/zeno-fcis-spec/src/comparison_ops.rs",
+          "old": "fn evaluate_u128(self, left: u128, right: u128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,\n            Self::LessEq => left <= right,\n            Self::Greater => left > right,\n            Self::GreaterEq => left >= right,",
+          "new": "fn evaluate_u128(self, left: u128, right: u128) -> bool {\n        match self {\n            Self::Eq => left == right,\n            Self::NotEq => left != right,\n            Self::Less => left < right,\n            Self::LessEq => left <= right,\n            Self::Greater => left > right,\n            Self::GreaterEq => left > right,",
+          "target_functions": [
+            "spec_comparison_ops::comparison_ops::CompareOp::evaluate_u128"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "value-expr",
+      "harness": "verification/verus/spec_value_expr.rs",
+      "files": [
+        "crates/zeno-fcis-spec/src/value_expr.rs",
+        "crates/zeno-fcis-spec/src/lexical_core.rs",
+        "verification/verus/spec_value_expr.rs",
+        "verification/verus/spec_value_expr_tests.rs"
+      ],
+      "expected_verified": 30,
+      "expected_native_tests": 11,
+      "target_functions": [
+        "spec_value_expr::value_expr::fold_arithmetic",
+        "spec_value_expr::value_expr::division",
+        "spec_value_expr::value_expr::read_division_mode",
+        "spec_value_expr::value_expr::binary_height",
+        "spec_value_expr::value_expr::arithmetic_height",
+        "spec_value_expr::value_expr::division_height",
+        "spec_value_expr::value_expr::value_height"
+      ],
+      "mutations": [
+        {
+          "name": "add-node-changed",
+          "function": "fold_arithmetic",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "Some(ValueExpr::Add(Box::new(left), Box::new(right)))",
+          "new": "Some(ValueExpr::Sub(Box::new(left), Box::new(right)))",
+          "target_functions": [
+            "spec_value_expr::value_expr::fold_arithmetic"
+          ]
+        },
+        {
+          "name": "subtraction-operands-swapped",
+          "function": "fold_arithmetic",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "Some(ValueExpr::Sub(Box::new(left), Box::new(right)))",
+          "new": "Some(ValueExpr::Sub(Box::new(right), Box::new(left)))",
+          "target_functions": [
+            "spec_value_expr::value_expr::fold_arithmetic"
+          ]
+        },
+        {
+          "name": "multiply-node-changed",
+          "function": "fold_arithmetic",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "Some(ValueExpr::Mul(Box::new(left), Box::new(right)))",
+          "new": "Some(ValueExpr::Add(Box::new(left), Box::new(right)))",
+          "target_functions": [
+            "spec_value_expr::value_expr::fold_arithmetic"
+          ]
+        },
+        {
+          "name": "product-level-bypassed",
+          "function": "fold_arithmetic",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "LexemeKind::Star if !additive",
+          "new": "LexemeKind::Star if true",
+          "target_functions": [
+            "spec_value_expr::value_expr::fold_arithmetic"
+          ]
+        },
+        {
+          "name": "nonarithmetic-token-accepted",
+          "function": "fold_arithmetic",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "_ => None,",
+          "new": "_ => Some(ValueExpr::Add(Box::new(left), Box::new(right))),",
+          "target_functions": [
+            "spec_value_expr::value_expr::fold_arithmetic"
+          ]
+        },
+        {
+          "name": "division-name-exact-changed",
+          "function": "read_division_mode",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "Some(DivisionMode::Exact)",
+          "new": "Some(DivisionMode::Floor)",
+          "target_functions": [
+            "spec_value_expr::value_expr::read_division_mode"
+          ]
+        },
+        {
+          "name": "division-name-floor-changed",
+          "function": "read_division_mode",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "Some(DivisionMode::Floor)",
+          "new": "Some(DivisionMode::Ceil)",
+          "target_functions": [
+            "spec_value_expr::value_expr::read_division_mode"
+          ]
+        },
+        {
+          "name": "division-name-ceil-changed",
+          "function": "read_division_mode",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "Some(DivisionMode::Ceil)",
+          "new": "Some(DivisionMode::Exact)",
+          "target_functions": [
+            "spec_value_expr::value_expr::read_division_mode"
+          ]
+        },
+        {
+          "name": "unknown-division-name-accepted",
+          "function": "read_division_mode",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "    } else {\n        None\n",
+          "new": "    } else {\n        Some(DivisionMode::Exact)\n",
+          "target_functions": [
+            "spec_value_expr::value_expr::read_division_mode"
+          ]
+        },
+        {
+          "name": "division-operands-swapped",
+          "function": "division",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "ValueExpr::Div(mode, Box::new(left), Box::new(right))",
+          "new": "ValueExpr::Div(mode, Box::new(right), Box::new(left))",
+          "target_functions": [
+            "spec_value_expr::value_expr::division"
+          ]
+        },
+        {
+          "name": "division-mode-replaced",
+          "function": "division",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "ValueExpr::Div(mode, Box::new(left), Box::new(right))",
+          "new": "ValueExpr::Div(DivisionMode::Exact, Box::new(left), Box::new(right))",
+          "target_functions": [
+            "spec_value_expr::value_expr::division"
+          ]
+        },
+        {
+          "name": "binary-height-layer-omitted",
+          "function": "binary_height",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "Some(1 + if left >= right { left } else { right })",
+          "new": "Some(if left >= right { left } else { right })",
+          "target_functions": [
+            "spec_value_expr::value_expr::binary_height"
+          ]
+        },
+        {
+          "name": "binary-height-minimum-used",
+          "function": "binary_height",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "Some(1 + if left >= right { left } else { right })",
+          "new": "Some(1 + if left <= right { left } else { right })",
+          "target_functions": [
+            "spec_value_expr::value_expr::binary_height"
+          ]
+        },
+        {
+          "name": "binary-height-limit-bypassed",
+          "function": "binary_height",
+          "subject": "crates/zeno-fcis-spec/src/value_expr.rs",
+          "old": "        return None;",
+          "new": "        return Some(0);",
+          "target_functions": [
+            "spec_value_expr::value_expr::binary_height"
+          ]
+        }
+      ],
+      "native_spec_dependency": true
+    }
+  ],
+  "binding_directories": [
+    "crates/zeno-fcis-spec/src",
+    "crates/zeno-fcis-spec/grammar"
+  ]
+}

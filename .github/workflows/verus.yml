@@ -9,6 +9,7 @@ on:
       - "crates/zeno-fcis-codec/**"
       - "crates/zeno-fcis-crypto/**"
       - "crates/zeno-fcis-value/**"
+      - "crates/zeno-fcis-spec/**"
       - "crates/zeno-fcis-cli/templates/**"
       - "crates/zeno-fcis-cli/src/**"
       - "crates/zeno-fcis-contract/**"
@@ -21,6 +22,12 @@ on:
       - "tools/test_negative_retention.py"
       - "tools/test_verus_contract_controls.py"
       - "tools/verus_coverage.py"
+      - "tools/verus_ids.py"
+      - "tools/qualification_controls.py"
+      - "tools/qualification_sources.py"
+      - "tools/generate_spec_grammar.py"
+      - "tools/test_generate_spec_grammar.py"
+      - "tools/spec_source_oracle.rs"
       - "tools/v2_proof_sources.py"
       - "crates/zeno-fcis-cli/tests/fixtures/escrow/**"
       - "crates/zeno-fcis-cli/tests/fixtures/spend-approval/**"
@@ -89,6 +96,7 @@ jobs:
           - {gate: reachable-probe, script: check_reachable_probe.py, output: receipt.json}
           - {gate: canonical-bytes, script: check_canonical_bytes.py, output: receipt.json}
           - {gate: value-decoder, script: check_value_decoder.py, output: receipt.json}
+          - {gate: spec-parser, script: check_spec_parser.py, output: run}
           - {gate: protected-input, script: check_protected_input.py, output: receipt.json}
           - {gate: envelope-frame, script: check_envelope_frame_v2.py, output: receipt.json}
           - {gate: schema-binding, script: check_schema_binding_v2.py, output: receipt.json}
@@ -183,8 +191,8 @@ jobs:
           persist-credentials: false
       - name: Install the pinned application toolchain
         run: rustup toolchain install 1.97.1 --profile minimal
-      - name: Check no-std authority compatibility
-        run: cargo +1.97.1 check -p zeno-fcis-authority -p zeno-fcis-synthesis --no-default-features --locked
+      - name: Check no-std authority and specification compatibility
+        run: cargo +1.97.1 check -p zeno-fcis-authority -p zeno-fcis-synthesis -p zeno-fcis-spec --no-default-features --locked
 
   shared-runtime-source:
     needs: [qualification, native-compatibility, tool-decisions]
