@@ -2401,7 +2401,7 @@
   "scope": "Source-closed production arithmetic and legacy-node correspondence, typed unsigned and checked-cast/width correspondence, rounding, necessary-premise and concrete reference witnesses; emitter separate",
   "source_sha256": {
     ".cargo/config.toml": "617c13aecf5b5eb08def4c002a76c19312b4b5bb1d5651cedd27f8db624e75cc",
-    "Cargo.lock": "2a01e60e759a319bf7e12314d3e349ace881fa4e2fba12ae59d20eb039c0a4e0",
+    "Cargo.lock": "ebdae23dea679a4a817d4e668ac8b68c1dd7560b4f1b6b87d9bfdf51bf909c88",
     "Cargo.toml": "f888b3e61952f6e6245c34af2d2b200b995de12cb0c365b274ce9fcd0b5e9156",
     "crates/zeno-fcis-codec/Cargo.toml": "c81261ddf1027a53fbd07e91ba1bc374a8b30fa98698a9bee6cdc244119ec65f",
     "crates/zeno-fcis-codec/src/artifact.rs": "3bd613e822e8fa6ef54a15c6d53fa528824b20bfc2ddd681327955e8511cdf41",

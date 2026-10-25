@@ -2435,7 +2435,7 @@
   "scope": "Six shipped Rust programs and eighteen operation probes: per-program mathematical emitted-AST correspondence for all inputs, under a trusted closed-grammar decoder and Program printer; exact verified helper bytes; no universal emitter or direct native-body proof",
   "source_sha256": {
     ".cargo/config.toml": "617c13aecf5b5eb08def4c002a76c19312b4b5bb1d5651cedd27f8db624e75cc",
-    "Cargo.lock": "2a01e60e759a319bf7e12314d3e349ace881fa4e2fba12ae59d20eb039c0a4e0",
+    "Cargo.lock": "ebdae23dea679a4a817d4e668ac8b68c1dd7560b4f1b6b87d9bfdf51bf909c88",
     "Cargo.toml": "f888b3e61952f6e6245c34af2d2b200b995de12cb0c365b274ce9fcd0b5e9156",
     "crates/zeno-fcis-cli/templates/agent-treasury-guard/synthesis.json": "fb27488ded0111d82315e0ae07a7e9fad330c70a202cd75f8c2bbe67f5221b34",
     "crates/zeno-fcis-cli/templates/agent-treasury-guard/synthesized/problem.json": "fb27488ded0111d82315e0ae07a7e9fad330c70a202cd75f8c2bbe67f5221b34",
