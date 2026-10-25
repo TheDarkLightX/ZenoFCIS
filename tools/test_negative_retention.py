@@ -280,6 +280,17 @@ class NegativeRetentionTests(unittest.TestCase):
                 self.assertTrue(Path(second['logs']).is_dir())
 
 class StrictGateMutationTests(unittest.TestCase):
+    def test_filtered_native_tests_keep_oracle_and_table_module_dependencies(self):
+        required = {
+            Path('crates/zeno-fcis-synthesis/src/finite/execution_v2/oracle/mod.rs'),
+            Path('crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/ordered_tests.rs'),
+            Path('crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/tests.rs'),
+        }
+        for gate in (check_finite_execution, check_metered_execution, check_protected_input,
+                     check_envelope_frame_v2, check_schema_binding_v2, check_decision_v2):
+            with self.subTest(gate=gate.__name__):
+                self.assertTrue(required.issubset(set(gate.UNIT_SOURCES)))
+
     def test_every_copy_list_binds_both_source_registry_files(self):
         for gate in (check_finite_execution, check_metered_execution, check_protected_input,
                      check_envelope_frame_v2, check_schema_binding_v2, check_decision_v2):
