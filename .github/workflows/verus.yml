@@ -143,6 +143,18 @@ jobs:
           check_verus.prepare_tools(Path.home() / '.cache/zeno-fcis/verus', pin, True)
           PY
           mkdir -p "$EVIDENCE_DIRECTORY" "$CARGO_TARGET_DIR"
+      - name: Match the qualified native control build profile
+        if: matrix.gate == 'shared-finite-checker'
+        run: |
+          {
+            echo 'CARGO_PROFILE_DEV_OPT_LEVEL=1'
+            echo 'CARGO_PROFILE_TEST_OPT_LEVEL=1'
+            echo 'CARGO_PROFILE_DEV_DEBUG_ASSERTIONS=true'
+            echo 'CARGO_PROFILE_TEST_DEBUG_ASSERTIONS=true'
+            echo 'CARGO_PROFILE_DEV_OVERFLOW_CHECKS=true'
+            echo 'CARGO_PROFILE_TEST_OVERFLOW_CHECKS=true'
+            echo 'RUST_MIN_STACK=33554432'
+          } >> "$GITHUB_ENV"
       - name: Check gate admission and failure controls
         run: python3 "tools/test_${GATE_SCRIPT}"
       - name: Require the complete exact-source proof and control suite

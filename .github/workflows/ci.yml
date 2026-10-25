@@ -29,7 +29,8 @@ env:
   CARGO_PROFILE_TEST_DEBUG_ASSERTIONS: "true"
   CARGO_PROFILE_DEV_OVERFLOW_CHECKS: "true"
   CARGO_PROFILE_TEST_OVERFLOW_CHECKS: "true"
-  RUST_TEST_THREADS: "2"
+  # Avoid competing short-deadline contained workers inside one test binary.
+  RUST_TEST_THREADS: "1"
   RUST_MIN_STACK: "33554432"
 
 concurrency:
