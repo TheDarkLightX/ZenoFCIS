@@ -5,7 +5,8 @@
     "Complete postorder ordered-grammar derivation and indexed terminal frontier. Both core and extended generated grammars are checked for reproducible generation.",
     "Exact signed-magnitude conversion iff representable, and complete projection-tail conversion iff valid with every payload in order and no omitted suffix.",
     "Exact six-way lexical mapping to the actual CompareOp enum, with full-width ordered i128/u128 comparison semantics.",
-    "Actual nongeneric ValueExpr arithmetic and division constructors preserve operator, policy and ordered operands; exact division-name mapping; bounded binary-height transfer."
+    "Actual nongeneric ValueExpr arithmetic and division constructors preserve operator, policy and ordered operands; exact division-name mapping; bounded binary-height transfer.",
+    "The actual lexer finalization body preserves its entire candidate token vector, appends exactly one supplied-span EOF, and on success binds the preceding tokens to the complete source with no internal EOF; an earlier failed scan cannot be admitted."
   ],
   "unproved": [
     "Grammar JSON to generated-table equivalence is reproducibility-checked, not formally proved.",
@@ -15,7 +16,8 @@
     "Real compiled Identifier, ProjectionPath and RelExpr operands are opaque external types with no assumed operations or semantic properties. Native Clone/Debug/Eq derives and the caller-to-certified-child mapping are outside the constructor proof.",
     "Scalar-height lemmas parameterize relational height; the complete source-to-AST height correspondence remains separate.",
     "The complete runtime syntax-resource preflight, its mapping from certified source children, and strict diagnostic collection are source-reviewed/tested rather than proved as a whole.",
-    "The actual borrowed-token validator proves successful-check soundness. Its surrounding diagnostic-producing lexer wrapper, acceptance completeness, and native Token derive operations are not included in that theorem."
+    "The actual borrowed-token validator proves successful-check soundness. Its surrounding diagnostic-producing lexer wrapper, acceptance completeness, and native Token derive operations are not included in that theorem.",
+    "The finalization theorem receives the scan-success flag and EOF span from the diagnostic wrapper; it does not prove that wrapper or the provenance of EOF coordinates. Successful-check soundness is separate from useful completeness."
   ],
   "bindings": [
     ".github/workflows/verus.yml",
@@ -147,8 +149,8 @@
         "verification/verus/spec_source_tokens.rs",
         "verification/verus/spec_source_tokens_tests.rs"
       ],
-      "expected_verified": 35,
-      "expected_native_tests": 18,
+      "expected_verified": 37,
+      "expected_native_tests": 22,
       "target_functions": [
         "spec_source_tokens::source_token::tokens_match_source",
         "spec_source_tokens::source_token::check_token_fields",
@@ -158,7 +160,9 @@
         "spec_source_tokens::source_span::SourceSpan::start",
         "spec_source_tokens::source_span::SourceSpan::end",
         "spec_source_tokens::source_span::SourceSpan::line",
-        "spec_source_tokens::source_span::SourceSpan::column"
+        "spec_source_tokens::source_span::SourceSpan::column",
+        "spec_source_tokens::source_token::source_prefix_token_kinds",
+        "spec_source_tokens::source_token::finish_tokens"
       ],
       "mutations": [
         {
@@ -369,6 +373,36 @@
           "new": "let following_column = if newline {\n            column",
           "target_functions": [
             "spec_source_tokens::source_token::tokens_match_source"
+          ]
+        },
+        {
+          "name": "finish-source-validation-bypassed",
+          "function": "finish_tokens",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "let checked = scan_succeeded && tokens_match_source(source, tokens, max_tokens);",
+          "new": "let checked = scan_succeeded;",
+          "target_functions": [
+            "spec_source_tokens::source_token::finish_tokens"
+          ]
+        },
+        {
+          "name": "finish-scan-failure-ignored",
+          "function": "finish_tokens",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "let checked = scan_succeeded && tokens_match_source(source, tokens, max_tokens);",
+          "new": "let checked = tokens_match_source(source, tokens, max_tokens);",
+          "target_functions": [
+            "spec_source_tokens::source_token::finish_tokens"
+          ]
+        },
+        {
+          "name": "finish-eof-kind-changed",
+          "function": "finish_tokens",
+          "subject": "crates/zeno-fcis-spec/src/source_token.rs",
+          "old": "kind: LexemeKind::End,",
+          "new": "kind: LexemeKind::Plus,",
+          "target_functions": [
+            "spec_source_tokens::source_token::finish_tokens"
           ]
         }
       ]

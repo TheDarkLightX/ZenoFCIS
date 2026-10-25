@@ -1,6 +1,6 @@
 use crate::lexical_core::LexemeKind as K;
 use crate::source_span::SourceSpan;
-use crate::source_token::{Token, advance_coordinate, tokens_match_source};
+use crate::source_token::{Token, advance_coordinate, finish_tokens, tokens_match_source};
 
 fn token(kind: K, start: u32, end: u32, line: u32, column: u32, spelling: &str) -> Token<'_> {
     Token {
@@ -16,6 +16,93 @@ fn public_span_keeps_const_construction_and_accessors() {
     const FIELDS: (u32, u32, u32, u32) = (SPAN.start(), SPAN.end(), SPAN.line(), SPAN.column());
     assert_eq!(FIELDS, (3, 7, 2, 4));
     assert_eq!(SPAN, SPAN.clone());
+}
+
+#[test]
+fn finished_frontier_keeps_payloads_order_spans_and_one_final_eof() {
+    let source = "x + 7 // tail\n";
+    let expected = alloc::vec![
+        token(K::Ident, 0, 1, 1, 1, "x"),
+        token(K::Plus, 2, 3, 1, 3, ""),
+        token(K::Number(7), 4, 5, 1, 5, ""),
+    ];
+    let mut tokens = expected.clone();
+    let eof = SourceSpan::new(source.len() as u32, source.len() as u32, 2, 1);
+    assert!(finish_tokens(source, &mut tokens, 3, true, eof));
+    assert_eq!(&tokens[..3], &expected);
+    assert_eq!(
+        tokens[3],
+        Token {
+            kind: K::End,
+            span: eof,
+            spelling: ""
+        }
+    );
+    assert_eq!(tokens.iter().filter(|t| t.kind == K::End).count(), 1);
+    assert!(tokens_match_source(source, &tokens[..3], 3));
+}
+
+#[test]
+fn finished_empty_or_trivia_frontier_does_not_spend_a_token() {
+    for source in ["", " \t\r", "// 雪\n"] {
+        let mut tokens = alloc::vec![];
+        let eof = SourceSpan::new(source.len() as u32, source.len() as u32, 1, 1);
+        assert!(finish_tokens(source, &mut tokens, 0, true, eof));
+        assert_eq!(
+            tokens,
+            alloc::vec![Token {
+                kind: K::End,
+                span: eof,
+                spelling: ""
+            }]
+        );
+    }
+}
+
+#[test]
+fn finished_frontier_cannot_erase_a_scan_failure_or_budget_refusal() {
+    for (scan_succeeded, budget) in [(false, 1), (true, 0)] {
+        let expected = alloc::vec![token(K::Number(7), 0, 1, 1, 1, "")];
+        let mut tokens = expected.clone();
+        let eof = SourceSpan::new(1, 1, 1, 2);
+        assert!(!finish_tokens(
+            "7",
+            &mut tokens,
+            budget,
+            scan_succeeded,
+            eof
+        ));
+        assert_eq!(&tokens[..1], &expected);
+        assert_eq!(
+            tokens[1],
+            Token {
+                kind: K::End,
+                span: eof,
+                spelling: ""
+            }
+        );
+    }
+}
+
+#[test]
+fn finished_frontier_refuses_forged_payload_inner_eof_and_missing_source() {
+    for expected in [
+        alloc::vec![token(K::Number(8), 0, 1, 1, 1, "")],
+        alloc::vec![token(K::End, 0, 1, 1, 1, "")],
+        alloc::vec![],
+    ] {
+        let mut tokens = expected.clone();
+        assert!(!finish_tokens(
+            "7",
+            &mut tokens,
+            1,
+            true,
+            SourceSpan::new(1, 1, 1, 2)
+        ));
+        assert_eq!(&tokens[..expected.len()], &expected);
+        assert_eq!(tokens.len(), expected.len() + 1);
+        assert_eq!(tokens.last().unwrap().kind, K::End);
+    }
 }
 
 #[test]

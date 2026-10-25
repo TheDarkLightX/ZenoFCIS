@@ -8,6 +8,7 @@ use crate::lexical_core::{
     Lexeme, LexemeKind, check_spelling, is_token, is_trivia, next_lexeme, same_kind,
 };
 use crate::source_span::SourceSpan;
+use alloc::vec::Vec;
 
 #[cfg(verus_keep_ghost)]
 use vstd::{prelude::*, string::StringSliceAdditionalSpecFns};
@@ -118,6 +119,42 @@ verus! {
         assert(tokens.push(token).last() == token);
         assert(source_step(bytes, start, end, kind, line, column,
                            next_line(kind, line), next_column(kind, column, (end - start) as nat)));
+    }
+
+    /// Trivia never contributes a token and EOF cannot occur inside a frontier.
+    /// This follows from the independent lexical relation, not the producer.
+    pub(crate) proof fn source_prefix_token_kinds(
+        bytes: Seq<u8>, end: int, tokens: Seq<Token<'_>>, line: u32, column: u32,
+    )
+        requires source_prefix(bytes, end, tokens, line, column),
+        ensures forall|i: int| 0 <= i < tokens.len() ==>
+            crate::lexical_core::token_kind(tokens[i].kind),
+        decreases end,
+    {
+        if end != 0 {
+            let (previous, kind, before_line, before_column) =
+                choose|previous: int, kind: LexemeKind, before_line: u32, before_column: u32|
+                    source_step(bytes, previous, end, kind, before_line, before_column, line, column)
+                    && ((crate::lexical_core::trivia_kind(kind)
+                            && source_prefix(bytes, previous, tokens, before_line, before_column))
+                        || (crate::lexical_core::token_kind(kind) && tokens.len() > 0
+                            && token_fields_match(bytes, tokens.last(), previous, end,
+                                                  kind, before_line, before_column)
+                            && source_prefix(bytes, previous, tokens.drop_last(), before_line, before_column)));
+            if crate::lexical_core::trivia_kind(kind) {
+                source_prefix_token_kinds(bytes, previous, tokens, before_line, before_column);
+            } else {
+                source_prefix_token_kinds(bytes, previous, tokens.drop_last(), before_line, before_column);
+                assert forall|i: int| 0 <= i < tokens.len() implies
+                    crate::lexical_core::token_kind(tokens[i].kind) by {
+                    if i < tokens.len() - 1 {
+                        assert(tokens.drop_last()[i] == tokens[i]);
+                    } else {
+                        assert(tokens[i] == tokens.last());
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -240,4 +277,66 @@ pub(crate) fn tokens_match_source(source: &str, tokens: &[Token<'_>], max_tokens
                           tokens@, final_line, final_column));
     }
     true
+}
+
+/// Appends the real lexer's final lookahead token after independent validation.
+/// A failed scan cannot be admitted. On every path, the supplied candidate
+/// tokens are preserved exactly and the caller's EOF span is appended once.
+/// Success certifies the complete source prefix before EOF, with no inner EOF.
+/// The caller still establishes the origin of `scan_succeeded` and `eof_span`.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures
+        final(tokens)@.len() == old(tokens)@.len() + 1,
+        final(tokens)@.drop_last() == old(tokens)@,
+        final(tokens)@.last().kind == LexemeKind::End,
+        final(tokens)@.last().span == eof_span,
+        final(tokens)@.last().spelling.spec_bytes().len() == 0,
+        result ==> scan_succeeded && final(tokens)@.len() - 1 <= max_tokens,
+        result ==> exists|line: u32, column: u32|
+            source_prefix(source.spec_bytes(), source.spec_bytes().len() as int,
+                          final(tokens)@.drop_last(), line, column),
+        result ==> forall|i: int| 0 <= i < final(tokens)@.len() - 1 ==>
+            crate::lexical_core::token_kind(final(tokens)@[i].kind),
+))]
+pub(crate) fn finish_tokens(
+    source: &str,
+    tokens: &mut Vec<Token<'_>>,
+    max_tokens: usize,
+    scan_succeeded: bool,
+    eof_span: SourceSpan,
+) -> bool {
+    let checked = scan_succeeded && tokens_match_source(source, tokens, max_tokens);
+    #[cfg(verus_keep_ghost)]
+    proof_decl! { let ghost prefix = tokens@; }
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        reveal_strlit("");
+        if checked {
+            let (line, column) = choose|line: u32, column: u32|
+                source_prefix(source.spec_bytes(), source.spec_bytes().len() as int,
+                              tokens@, line, column);
+            source_prefix_token_kinds(source.spec_bytes(), source.spec_bytes().len() as int,
+                                      tokens@, line, column);
+        }
+    }
+    tokens.push(Token {
+        kind: LexemeKind::End,
+        span: eof_span,
+        spelling: "",
+    });
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        assert(tokens@.drop_last() == prefix);
+        if checked {
+            let (line, column) = choose|line: u32, column: u32|
+                source_prefix(source.spec_bytes(), source.spec_bytes().len() as int,
+                              prefix, line, column);
+            assert(source_prefix(source.spec_bytes(), source.spec_bytes().len() as int,
+                                 tokens@.drop_last(), line, column));
+            assert(exists|line: u32, column: u32|
+                source_prefix(source.spec_bytes(), source.spec_bytes().len() as int,
+                              tokens@.drop_last(), line, column));
+        }
+    }
+    checked
 }

@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 pub(crate) use crate::lexical_core::LexemeKind as TokenKind;
 use crate::lexical_core::{LexemeKind, next_lexeme};
 pub(crate) use crate::source_token::Token;
-use crate::source_token::tokens_match_source;
+use crate::source_token::finish_tokens;
 use crate::{AstPath, Diagnostic, DiagnosticCode, DiagnosticStage, SourceLimits, SourceSpan};
 
 pub(crate) fn lex(source: &str, limits: SourceLimits) -> (Vec<Token<'_>>, Vec<Diagnostic>) {
@@ -121,7 +121,14 @@ pub(crate) fn lex(source: &str, limits: SourceLimits) -> (Vec<Token<'_>>, Vec<Di
             break;
         }
     }
-    if diagnostics.is_empty() && !tokens_match_source(source, &tokens, limits.max_tokens()) {
+    let checked = finish_tokens(
+        source,
+        &mut tokens,
+        limits.max_tokens(),
+        diagnostics.is_empty(),
+        span(index, index, line, column),
+    );
+    if diagnostics.is_empty() && !checked {
         diagnostics.push(diagnostic(
             DiagnosticCode::InvalidDeclaration,
             span(index, index, line, column),
@@ -130,11 +137,6 @@ pub(crate) fn lex(source: &str, limits: SourceLimits) -> (Vec<Token<'_>>, Vec<Di
             "report this parser validation failure",
         ));
     }
-    tokens.push(Token {
-        kind: TokenKind::End,
-        span: span(index, index, line, column),
-        spelling: "",
-    });
     (tokens, diagnostics)
 }
 
@@ -165,6 +167,7 @@ fn diagnostic(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::source_token::tokens_match_source;
 
     #[test]
     fn validation_binds_actual_token_payloads_and_complete_source() {
