@@ -53,7 +53,8 @@ curl --fail --location --output "$ARCHIVE.tar.gz" \
   "https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v$VERSION/$ARCHIVE.tar.gz"
 curl --fail --location --output DOWNLOADS.sha256 \
   "https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v$VERSION/DOWNLOADS.sha256"
-sha256sum --ignore-missing --check DOWNLOADS.sha256
+awk -v archive="$ARCHIVE.tar.gz" '$2 == archive { print; found=1 } END { if (!found) exit 1 }' \
+  DOWNLOADS.sha256 | sha256sum --check -
 tar -xzf "$ARCHIVE.tar.gz"
 export PATH="$PWD/$ARCHIVE:$PATH"
 zeno-fcis describe
@@ -63,8 +64,8 @@ The executable sits in the archive's top-level directory, beside its README
 and licenses. Keep that directory and add it to your shell's `PATH` to use the
 CLI in later sessions.
 
-`--ignore-missing` checks the downloaded assets listed in the flat
-`DOWNLOADS.sha256`; it does not check assets you have not downloaded. Verify
+The exact archive filename must appear in `DOWNLOADS.sha256`; a missing entry
+or checksum mismatch stops installation. Other assets need not be downloaded. Verify
 the published release's [detached checksum signature](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.5.0/DOWNLOADS.sha256.sig)
 separately, under your trusted signing-key policy. That published release must
 also provide the [signing key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.5.0/RELEASE-SIGNING-KEY.pub).
@@ -89,14 +90,15 @@ curl --fail --location --output "$ARCHIVE.tar.gz" \
   "https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v$VERSION/$ARCHIVE.tar.gz"
 curl --fail --location --output DOWNLOADS.sha256 \
   "https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v$VERSION/DOWNLOADS.sha256"
-grep "  $ARCHIVE.tar.gz\$" DOWNLOADS.sha256 | shasum -a 256 -c -
+awk -v archive="$ARCHIVE.tar.gz" '$2 == archive { print; found=1 } END { if (!found) exit 1 }' \
+  DOWNLOADS.sha256 | shasum -a 256 -c -
 tar -xzf "$ARCHIVE.tar.gz"
 export PATH="$PWD/$ARCHIVE:$PATH"
 zeno-fcis describe
 ```
 
-`shasum -a 256 -c -` checks only the line that `grep` selects, so this step
-does not depend on `--ignore-missing`. The executable is arm64 only, and its
+`shasum -a 256 -c -` checks the exact archive filename selected by `awk`;
+a missing entry or checksum mismatch stops installation. The executable is arm64 only, and its
 minimum-version field is macOS 11.0. The release workflow runs it only on the
 macOS 15 arm64 image.
 
@@ -132,16 +134,30 @@ platforms. `F_FULLFSYNC` asks the drive to flush its write cache. On every
 platform, durability against power loss still depends on the drive honouring
 the syncs it is asked for.
 
-### Linux-only features on macOS
+### Runtime conformance and Linux-only features on macOS
+
+Source builds support `synth verify` on Linux and macOS for Rust 1.97.1,
+Python 3 and Node.js 22. The runner checks the regenerated artifact, executes
+the exact emitted function over every admitted input, and records a separate
+finite-conformance receipt with no application authority. Each subprocess has
+a 30-second startup-inclusive deadline and a 32-MiB bound per output stream.
+On macOS, an owned live process-group member retains the group identity until
+cleanup, including when the target exits first. Failed setup, execution,
+capture or cleanup cannot produce a passing receipt.
+
+This is bounded process supervision, not a security sandbox for arbitrary
+executables. Use trusted compilers/interpreters and the registered emitters;
+the command executes regenerated code, not a supplied replacement source.
+Dynamic dependencies and runtime correctness remain external premises.
+Processes that deliberately leave the owned group and abrupt termination of
+the supervisor are outside its cleanup guarantee. A finite-conformance pass
+does not qualify the separate contained checker runtime or production trust.
 
 On macOS these features are unavailable or unqualified:
 
 - **Contained checker runtime** (`loop` commands and
   `transform check --offline-parallel`): exits 2 with an inconclusive result
   and does nothing; see [contained checker runtime](#contained-checker-runtime).
-- **`synth verify` execution of emitted code**: exits 2 with
-  `conformance-unknown` and code `unsupported-runtime-platform`, and writes no
-  receipt. `synth discover` and `synth run` work.
 - **Lean evidence**: the qualified Lean distribution is the pinned Linux x86-64
   tree, so a result from any other Lean installation stays blocked as
   unqualified evidence. The pinned CVC5 and Z3 binaries are also Linux x86-64.
