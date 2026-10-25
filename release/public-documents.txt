@@ -353,3 +353,6 @@ verification/verus/README.md
 crates/zeno-fcis-cli/tests/fixtures/order-fulfillment-split/README.md
 docs/KNOWLEDGE.md
 core-apps/zenodex-spot/README.md
+
+docs/RUNTIME_ASSEMBLER_DESIGN.md
+examples/runtime-assembly-design/README.md
