@@ -1,0 +1,213 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "task-intent-reference",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      16
+    ]
+  },
+  "variables": {
+    "phase1": "pre.100.110",
+    "phase2": "pre.100.111",
+    "packet": "pre.100.112",
+    "capability": "pre.100.113",
+    "action": "command.101.120",
+    "unit": "context.102.130"
+  },
+  "cases": [
+    {
+      "when": "action == 8 || action == 9",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 10",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 11",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 0 && phase1 == 0",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 1
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 1 && phase2 == 0",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "111": 1
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 2 && packet == 0 && (phase1 == 1 || phase1 == 2)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "112": 1,
+        "113": 0
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 3 && packet == 0 && (phase2 == 1 || phase2 == 2)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "112": 2,
+        "113": 0
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 4 && packet == 1 && phase1 == 1",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 2,
+        "113": 1
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "local-test",
+          "payload": {
+            "140": 1
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "action == 4 && packet == 2 && phase2 == 1",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "111": 2,
+        "113": 1
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "local-test",
+          "payload": {
+            "140": 2
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "action == 4 && ((packet == 1 && phase1 == 2) || (packet == 2 && phase2 == 2))",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "113": 1
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 5 && capability == 1 && packet == 1 && phase1 == 2",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 3,
+        "112": 0,
+        "113": 0
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 5 && capability == 1 && packet == 2 && phase2 == 2",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "111": 3,
+        "112": 0,
+        "113": 0
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 6 || action == 7",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "112": 0,
+        "113": 0
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0,
+    "112": 0,
+    "113": 0
+  },
+  "law_kinds": {
+    "500": "AuthoritySubjectRecipient",
+    "501": "StateInvariant",
+    "502": "AuthoritySubjectRecipient",
+    "503": "AuthoritySubjectRecipient",
+    "504": "AuthoritySubjectRecipient",
+    "505": "AuthoritySubjectRecipient",
+    "506": "AuthoritySubjectRecipient",
+    "510": "DebitCreditEffectEquality",
+    "511": "DebitCreditEffectEquality"
+  },
+  "delivery_laws": {
+    "510": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.140": {
+          "channel": 300,
+          "field": 140
+        }
+      }
+    },
+    "511": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300,
+          "destination": "local-test"
+        }
+      }
+    }
+  }
+}

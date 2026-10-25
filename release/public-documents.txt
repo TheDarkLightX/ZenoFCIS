@@ -451,3 +451,5 @@ docs/loops/contract-probe.md
 EXIT_CODES_AUDIT.md
 docs/RUNTIME_ASSEMBLY.md
 examples/apps/task-status/README.md
+docs/RUNTIME_REFINEMENT.md
+examples/runtime-refinement/task-intents/reference/SEMANTICS.md

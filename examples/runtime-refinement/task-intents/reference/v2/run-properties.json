@@ -1,0 +1,9 @@
+{
+  "schema": "zeno-fcis/run-properties/1",
+  "properties": [
+    {"kind": "at_most_once", "name": "one_application_per_slot", "channel": 300, "key_field": 140},
+    {"kind": "predicate", "name": "application_requires_durable_approval", "formula": "outbox.300 > 0 -> ((pre.100.112 == 1 && pre.100.110 == 1) || (pre.100.112 == 2 && pre.100.111 == 1))"},
+    {"kind": "predicate", "name": "durable_phases_never_regress", "formula": "post.100.110 >= pre.100.110 && post.100.111 >= pre.100.111"},
+    {"kind": "predicate", "name": "acked_slots_remain_acked", "formula": "(pre.100.110 == 3 -> post.100.110 == 3) && (pre.100.111 == 3 -> post.100.111 == 3)"}
+  ]
+}
