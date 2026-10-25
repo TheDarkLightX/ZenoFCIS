@@ -1,0 +1,26 @@
+zeno 1;
+project 1 assembly;
+namespace 2 design;
+type 100 state State;
+type 101 command Event;
+type 102 context Observations;
+type 105 int Status in 0..=1;
+type 106 bool Fact;
+field 110 100 status 105;
+field 160 102 supported_profile 106;
+field 161 102 source_hash_matches 106;
+field 162 102 schema_matches 106;
+field 163 102 capability_compatible 106;
+variant 120 101 assemble none;
+reason 200 not_eligible precedence 0;
+component 400 protocol {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 256;
+}
+merge [400];
+law 500 compatible on accept = context.102.160 == 1 && context.102.161 == 1 && context.102.162 == 1 && context.102.163 == 1;
+law 501 only_once on accept = pre.100.110 == 0 && post.100.110 == 1;
+law 502 domain on commit, genesis = post.100.110 <= 1;

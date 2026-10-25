@@ -22,6 +22,8 @@ with [Get started](#get-started), then follow a tutorial.
 
 ## Build and maintain applications
 
+- [Runtime assembler design proposal](RUNTIME_ASSEMBLER_DESIGN.md)
+
 - [Generated durable application milestone](GENERATED_APPLICATION_MILESTONE.md)
 - [Packaged application qualification](PACKAGED_APPLICATION_QUALIFICATION.md)
 - [Symbolic per-case checks](SYMBOLIC_CHECKS.md)
