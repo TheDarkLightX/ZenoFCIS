@@ -36,5 +36,5 @@ law 541 acceptance_eligibility on accept = (((true) && !(context.102.131 == 0)) 
 law 542 no_committed_failure on failure = false;
 // Core seed rate-limiter/1; parameters {"N": 3, "W": 1}.
 // Instance source-set SHA256 8e0f3c3b0912e7a82f6c6532920f068f4120f148fb86d4e7470b12a52df8447a.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/rate-limiter.json SHA256 6579c15f688ffba1185829a5db9a7aaa50a1255955c7a5e5abc5358e4b0af454; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/rate-limiter.json SHA256 fd2b17d20aa9523652e9b6dfccbe4c3c0769faf0a772fe222560e5ca137bdb18; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

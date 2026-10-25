@@ -1,5 +1,4 @@
 {
-  "schema": "zeno-fcis/arithmetic-emission-profile/1",
   "expected_verified": 1288,
   "functions": [
     "alloc::boxed::box_assume_init_into_vec_unsafe",
@@ -2432,6 +2431,8 @@
     "vstd::view::impl&%8::view",
     "vstd::view::impl&%9::deep_view"
   ],
+  "schema": "zeno-fcis/arithmetic-emission-profile/1",
+  "scope": "Six shipped Rust programs and eighteen operation probes: per-program mathematical emitted-AST correspondence for all inputs, under a trusted closed-grammar decoder and Program printer; exact verified helper bytes; no universal emitter or direct native-body proof",
   "source_sha256": {
     ".cargo/config.toml": "617c13aecf5b5eb08def4c002a76c19312b4b5bb1d5651cedd27f8db624e75cc",
     "Cargo.lock": "2a01e60e759a319bf7e12314d3e349ace881fa4e2fba12ae59d20eb039c0a4e0",
@@ -2584,13 +2585,13 @@
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/util.rs": "b0a5c6c9bf4177a79623e817de31daf4c72a8cdad493122dacdf3ee66fee26b5",
     "crates/zeno-fcis-synthesis/src/finite/ir.rs": "54a4f439fda83c94fb00abca94028e6f2ca8d405fe37d7a346ac4d892d66a049",
     "crates/zeno-fcis-synthesis/src/finite/ir/program.rs": "1715b48c269d224269023c622cd75391581297845e8e08b06aac01e32988d566",
-    "crates/zeno-fcis-synthesis/src/finite/mod.rs": "ea8d7f41c139bfc26b2c252d7b7d5b9e5cd35bb8f3c281f8b58c5f414fea9ac9",
+    "crates/zeno-fcis-synthesis/src/finite/mod.rs": "b78fefaeb1629cc8ee0d62b157266005e6ac3a6ec9962b9fce7f90f5d5bf0ccc",
     "crates/zeno-fcis-synthesis/src/finite/preparation.rs": "dbc1979ea7d135ac207dbd5de1ed0961e7961e02108ab0e09618c29e7f3f35de",
     "crates/zeno-fcis-synthesis/src/finite/value/mod.rs": "ba71b777357a25ceba5bc96d78cc41602f9e36e00437ff480b0996db5faab57f",
     "crates/zeno-fcis-synthesis/src/finite/value/scalar.rs": "b0bd6938daeaff9da36f9559d52ea0ad759d9297490958ae0f3d1b3edb650127",
     "crates/zeno-fcis-synthesis/src/finite/value/spec.rs": "2bbcbbebd198c2af3663e1358fc97e137b780f8e2ef93fe88660d300f29c17fe",
     "crates/zeno-fcis-synthesis/src/finite/value/wide.rs": "7ba3833708ab33c9267283799277c534af21ac1edec90722a6c0852cc0e2beff",
-    "crates/zeno-fcis-synthesis/src/finite_runtime.rs": "1871d00ad710599a4c46dcabe95bb148bead03bb4690331aa80b251ec8ad6812",
+    "crates/zeno-fcis-synthesis/src/finite_runtime.rs": "6235946f54174cf0da2776f3a743d72965a64e1979c605a02b3f359e4630039b",
     "crates/zeno-fcis-synthesis/src/lib.rs": "f69c723d0f5f2bac119554c4bc5e90fc5d0ce06fc7acf2b2db061941eed0b7d9",
     "crates/zeno-fcis-synthesis/src/system.rs": "85c804851d81de6dcbb968e7b155e584b31dd298fd6b11b4c0cba491244a9c24",
     "crates/zeno-fcis-value/Cargo.toml": "216653044e5c69a81f39692282ab40de52dd3baf4d6a6c66a44ec31e6e4d1701",
@@ -2625,6 +2626,5 @@
     "verification/verus/arithmetic_typed_spec.rs": "9025aca54adb45f13f42a026f7ce05a0766b24be87eec64480f710a1b6acf079",
     "verification/verus/arithmetic_vectors.rs": "3b63e3765e6051be0138760858394f1ebe99cdd0e61dc705ab93d1322a8cfc7e",
     "verification/verus/toolchain.json": "a8a66e9481c2701be0134c049a022558d6ee0f89e74618e3e47c13eb3c3bb862"
-  },
-  "scope": "Six shipped Rust programs and eighteen operation probes: per-program mathematical emitted-AST correspondence for all inputs, under a trusted closed-grammar decoder and Program printer; exact verified helper bytes; no universal emitter or direct native-body proof"
+  }
 }

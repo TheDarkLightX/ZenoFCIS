@@ -44,5 +44,5 @@ law 541 acceptance_eligibility on accept = (((((true) && !(pre.100.110 + pre.100
 law 542 no_committed_failure on failure = false;
 // Core seed reservation-pool/1; parameters {"C": 2, "Q": 1}.
 // Instance source-set SHA256 e43d8018375fbdab50e53ad8c08ebf7d7ac7ebceb8d12d245ebf4758f4fb1a44.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/reservation-pool.json SHA256 47f035ecd24d5d5d2b8d27ebb2391d3ce327dc4d4d6d414f745865f91adfeb88; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/reservation-pool.json SHA256 842fe96e8063baea13af89bd3638559e319cb444e97bc8f3147ab75374e110f9; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

@@ -460,88 +460,88 @@
       "path_roles": [
         "sqlite-production-port"
       ],
-      "production_lines": 2773,
+      "production_lines": 2876,
       "rank": 2,
       "score": 100,
       "signals": [
         {
           "id": "canonical-commitment",
           "lines": [
-            2279,
-            2414,
-            2467,
-            2583,
-            2588
+            2357,
+            2510,
+            2570,
+            2686,
+            2691
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            1691,
-            1717,
-            1747,
-            1772,
+            1752,
             1778,
-            2622
+            1808,
+            1833,
+            1839,
+            2725
           ]
         },
         {
           "id": "panic-or-unchecked-result",
           "lines": [
-            2871,
-            2887,
-            2890,
-            2893,
-            2894,
-            2897,
-            2900,
-            2902
+            2974,
+            2990,
+            2993,
+            2996,
+            2997,
+            3000,
+            3003,
+            3005
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            1291,
-            1834,
-            2851,
-            3144
+            1310,
+            1895,
+            2954,
+            3247
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
             197,
-            605,
-            702,
-            812,
-            863,
-            880,
-            919,
-            923
+            609,
+            706,
+            820,
+            882,
+            899,
+            938,
+            942
           ]
         },
         {
           "id": "sql-boundary",
           "lines": [
-            608,
-            609,
-            624,
-            626,
-            636,
-            644,
-            780,
-            893
+            612,
+            613,
+            628,
+            630,
+            640,
+            648,
+            788,
+            912
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            2276,
-            2277,
-            2412,
-            2413,
-            2580,
-            2585
+            2354,
+            2355,
+            2505,
+            2507,
+            2683,
+            2688
           ]
         }
       ],
@@ -976,38 +976,38 @@
         {
           "id": "filesystem-read-path",
           "lines": [
-            427
+            429
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            351
+            353
           ]
         },
         {
           "id": "release-or-publish",
           "lines": [
-            50,
-            61,
-            182,
-            183
+            52,
+            63,
+            184,
+            185
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
-            506,
-            509,
-            510
+            508,
+            511,
+            512
           ]
         },
         {
           "id": "sql-boundary",
           "lines": [
-            572,
             574,
-            577
+            576,
+            579
           ]
         }
       ],
@@ -1174,7 +1174,7 @@
       "path_roles": [
         "sqlite-production-port"
       ],
-      "production_lines": 208,
+      "production_lines": 229,
       "rank": 8,
       "score": 96,
       "signals": [
@@ -1182,27 +1182,27 @@
           "id": "replay-outbox-commit",
           "lines": [
             44,
-            82,
-            522,
-            533
+            89,
+            536,
+            547
           ]
         },
         {
           "id": "sql-boundary",
           "lines": [
             51,
-            90,
-            541,
-            551,
-            560,
-            572
+            97,
+            555,
+            572,
+            581,
+            593
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            325,
-            327
+            339,
+            341
           ]
         }
       ],
@@ -1318,7 +1318,7 @@
       "path_roles": [
         "sqlite-production-port"
       ],
-      "production_lines": 105,
+      "production_lines": 112,
       "rank": 10,
       "score": 96,
       "signals": [
@@ -1332,7 +1332,7 @@
           "id": "replay-outbox-commit",
           "lines": [
             68,
-            121
+            128
           ]
         },
         {
@@ -1414,7 +1414,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 3995,
+      "production_lines": 4045,
       "rank": 11,
       "score": 95,
       "signals": [
@@ -1425,15 +1425,15 @@
             986,
             1015,
             3280,
-            3546
+            3606
           ]
         },
         {
           "id": "concurrency-primitive",
           "lines": [
             225,
-            3417,
-            3431
+            3477,
+            3491
           ]
         },
         {
@@ -1481,7 +1481,8 @@
         {
           "id": "host-process-execution",
           "lines": [
-            3282
+            3282,
+            3379
           ]
         },
         {
@@ -1503,8 +1504,8 @@
             52,
             53,
             56,
-            4333,
-            4335
+            4393,
+            4395
           ]
         },
         {
@@ -2031,14 +2032,14 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 1881,
+      "production_lines": 1885,
       "rank": 16,
       "score": 93,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            605
+            608
           ]
         },
         {
@@ -2050,46 +2051,46 @@
         {
           "id": "external-verifier-result",
           "lines": [
-            1834
+            1838
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            848,
-            2010
+            852,
+            2014
           ]
         },
         {
           "id": "generated-source",
           "lines": [
             82,
-            1284
+            1288
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            653
+            656
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            1950
+            1954
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            270,
-            579,
-            606,
-            637,
-            805,
-            806,
-            1034,
-            1138
+            273,
+            582,
+            609,
+            640,
+            808,
+            809,
+            1038,
+            1142
           ]
         }
       ],
@@ -2429,39 +2430,202 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 831,
+      "production_lines": 842,
       "rank": 19,
       "score": 92,
       "signals": [
         {
           "id": "canonical-commitment",
           "lines": [
-            781
+            792
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            305,
-            313,
-            546,
-            793,
-            864
+            316,
+            324,
+            557,
+            804,
+            875
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            299,
-            300,
-            302,
-            303
+            310,
+            311,
+            313,
+            314
           ]
         },
         {
           "id": "release-or-publish",
           "lines": [
-            624
+            635
+          ]
+        }
+      ],
+      "tier": "priority-1"
+    },
+    {
+      "categories": [
+        "authority-access",
+        "codegen-build",
+        "effects-injection",
+        "formal-evidence",
+        "input-canonicalization",
+        "resource-exhaustion",
+        "secrets-crypto",
+        "state-replay",
+        "supply-chain-release"
+      ],
+      "components": {
+        "authority": 5,
+        "chain_adjacency": 5,
+        "complexity": 5,
+        "hazardous_mechanisms": 5,
+        "reachability": 5,
+        "state_coupling": 2
+      },
+      "confidence": "high",
+      "cwes": [
+        "CWE-20",
+        "CWE-22",
+        "CWE-73",
+        "CWE-78",
+        "CWE-89",
+        "CWE-94",
+        "CWE-174",
+        "CWE-200",
+        "CWE-208",
+        "CWE-269",
+        "CWE-284",
+        "CWE-285",
+        "CWE-321",
+        "CWE-327",
+        "CWE-331",
+        "CWE-345",
+        "CWE-353",
+        "CWE-362",
+        "CWE-367",
+        "CWE-400",
+        "CWE-494",
+        "CWE-502",
+        "CWE-532",
+        "CWE-664",
+        "CWE-667",
+        "CWE-674",
+        "CWE-754",
+        "CWE-770",
+        "CWE-789",
+        "CWE-807",
+        "CWE-829",
+        "CWE-834",
+        "CWE-841",
+        "CWE-862",
+        "CWE-863",
+        "CWE-1104",
+        "CWE-1287",
+        "CWE-1357"
+      ],
+      "path": "tools/rc_package.py",
+      "path_roles": [
+        "host-tool",
+        "release-control"
+      ],
+      "production_lines": 2037,
+      "rank": 20,
+      "score": 91,
+      "signals": [
+        {
+          "id": "ambient-context",
+          "lines": [
+            686,
+            1502,
+            1724,
+            1839,
+            1894,
+            2157,
+            2187
+          ]
+        },
+        {
+          "id": "cryptographic-verification",
+          "lines": [
+            147,
+            674,
+            703,
+            708,
+            798,
+            799,
+            1145,
+            1365
+          ]
+        },
+        {
+          "id": "filesystem-mutation",
+          "lines": [
+            633,
+            637,
+            638,
+            641,
+            721,
+            753,
+            754,
+            756
+          ]
+        },
+        {
+          "id": "filesystem-read-path",
+          "lines": [
+            127,
+            134,
+            217,
+            218,
+            412,
+            422,
+            505,
+            506
+          ]
+        },
+        {
+          "id": "host-process-execution",
+          "lines": [
+            106,
+            2111
+          ]
+        },
+        {
+          "id": "json-or-line-protocol",
+          "lines": [
+            134,
+            244,
+            1405,
+            2114
+          ]
+        },
+        {
+          "id": "potential-amplification",
+          "lines": [
+            801,
+            823,
+            1139,
+            1154,
+            1794,
+            1964,
+            1989
+          ]
+        },
+        {
+          "id": "release-or-publish",
+          "lines": [
+            2022,
+            2023,
+            2095,
+            2096,
+            2101,
+            2102
           ]
         }
       ],
@@ -2531,8 +2695,8 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 2656,
-      "rank": 20,
+      "production_lines": 2666,
+      "rank": 21,
       "score": 90,
       "signals": [
         {
@@ -2567,11 +2731,11 @@
             1982,
             1988,
             2003,
-            2810,
-            2832,
-            2835,
-            2842,
-            2858
+            2821,
+            2843,
+            2846,
+            2853,
+            2869
           ]
         },
         {
@@ -2642,7 +2806,7 @@
             148,
             181,
             1859,
-            2311
+            2313
           ]
         }
       ],
@@ -2700,21 +2864,21 @@
       "path_roles": [
         "sqlite-production-port"
       ],
-      "production_lines": 676,
-      "rank": 21,
+      "production_lines": 700,
+      "rank": 22,
       "score": 90,
       "signals": [
         {
           "id": "information-flow-observation",
           "lines": [
-            366
+            368
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            711,
-            1054
+            731,
+            1078
           ]
         }
       ],
@@ -2767,7 +2931,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 385,
-      "rank": 22,
+      "rank": 23,
       "score": 89,
       "signals": [
         {
@@ -2867,7 +3031,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 496,
-      "rank": 23,
+      "rank": 24,
       "score": 89,
       "signals": [
         {
@@ -2965,7 +3129,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 341,
-      "rank": 24,
+      "rank": 25,
       "score": 89,
       "signals": [
         {
@@ -3067,7 +3231,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 1400,
-      "rank": 25,
+      "rank": 26,
       "score": 89,
       "signals": [
         {
@@ -3150,7 +3314,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 286,
-      "rank": 26,
+      "rank": 27,
       "score": 89,
       "signals": [
         {
@@ -3225,7 +3389,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 888,
-      "rank": 27,
+      "rank": 28,
       "score": 89,
       "signals": [
         {
@@ -3307,7 +3471,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 284,
-      "rank": 28,
+      "rank": 29,
       "score": 89,
       "signals": [
         {
@@ -3419,8 +3583,8 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 769,
-      "rank": 29,
+      "production_lines": 803,
+      "rank": 30,
       "score": 89,
       "signals": [
         {
@@ -3429,7 +3593,9 @@
             62,
             150,
             152,
-            285
+            285,
+            302,
+            304
           ]
         },
         {
@@ -3437,9 +3603,10 @@
           "lines": [
             38,
             77,
-            500,
-            788,
-            825
+            303,
+            540,
+            828,
+            865
           ]
         },
         {
@@ -3464,11 +3631,11 @@
         {
           "id": "replay-outbox-commit",
           "lines": [
-            606,
-            621,
-            634,
-            658,
-            683
+            646,
+            661,
+            674,
+            698,
+            723
           ]
         },
         {
@@ -3476,9 +3643,10 @@
           "lines": [
             38,
             77,
-            500,
-            788,
-            825
+            303,
+            540,
+            828,
+            865
           ]
         }
       ],
@@ -3531,7 +3699,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 560,
-      "rank": 30,
+      "rank": 31,
       "score": 89,
       "signals": [
         {
@@ -3609,7 +3777,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 799,
-      "rank": 31,
+      "rank": 32,
       "score": 89,
       "signals": [
         {
@@ -3679,20 +3847,20 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 317,
-      "rank": 32,
+      "production_lines": 311,
+      "rank": 33,
       "score": 89,
       "signals": [
         {
           "id": "potential-amplification",
           "lines": [
-            204
+            198
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
-            330
+            324
           ]
         }
       ],
@@ -3745,7 +3913,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 350,
-      "rank": 33,
+      "rank": 34,
       "score": 89,
       "signals": [
         {
@@ -3818,7 +3986,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 389,
-      "rank": 34,
+      "rank": 35,
       "score": 89,
       "signals": [
         {
@@ -3895,7 +4063,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 706,
-      "rank": 35,
+      "rank": 36,
       "score": 89,
       "signals": [
         {
@@ -3978,7 +4146,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 159,
-      "rank": 36,
+      "rank": 37,
       "score": 89,
       "signals": [
         {
@@ -4065,7 +4233,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 698,
-      "rank": 37,
+      "rank": 38,
       "score": 89,
       "signals": [
         {
@@ -4204,7 +4372,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 229,
-      "rank": 38,
+      "rank": 39,
       "score": 89,
       "signals": [
         {
@@ -4302,7 +4470,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 910,
-      "rank": 39,
+      "rank": 40,
       "score": 89,
       "signals": [
         {
@@ -4415,7 +4583,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 534,
-      "rank": 40,
+      "rank": 41,
       "score": 89,
       "signals": [
         {
@@ -4536,7 +4704,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 1054,
-      "rank": 41,
+      "rank": 42,
       "score": 89,
       "signals": [
         {
@@ -4666,7 +4834,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 591,
-      "rank": 42,
+      "rank": 43,
       "score": 89,
       "signals": [
         {
@@ -4774,8 +4942,8 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 1303,
-      "rank": 43,
+      "production_lines": 1305,
+      "rank": 44,
       "score": 89,
       "signals": [
         {
@@ -4864,44 +5032,44 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 609,
-      "rank": 44,
+      "production_lines": 622,
+      "rank": 45,
       "score": 89,
       "signals": [
         {
           "id": "cryptographic-verification",
           "lines": [
             148,
-            586,
-            589,
-            765
+            588,
+            591,
+            779
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            637
+            651
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            679,
-            698
+            693,
+            712
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
-            470,
-            476,
-            523
+            472,
+            478,
+            525
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            637
+            651
           ]
         }
       ],
@@ -4974,7 +5142,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 837,
-      "rank": 45,
+      "rank": 46,
       "score": 89,
       "signals": [
         {
@@ -5113,7 +5281,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 1599,
-      "rank": 46,
+      "rank": 47,
       "score": 89,
       "signals": [
         {
@@ -5256,7 +5424,7 @@
         "generator-boundary"
       ],
       "production_lines": 957,
-      "rank": 47,
+      "rank": 48,
       "score": 89,
       "signals": [
         {
@@ -5342,7 +5510,7 @@
       "path": "crates/zeno-fcis-commons/src/lib.rs",
       "path_roles": [],
       "production_lines": 598,
-      "rank": 48,
+      "rank": 49,
       "score": 89,
       "signals": [
         {
@@ -5442,210 +5610,47 @@
         "host-tool",
         "release-control"
       ],
-      "production_lines": 742,
-      "rank": 49,
-      "score": 89,
-      "signals": [
-        {
-          "id": "filesystem-mutation",
-          "lines": [
-            469,
-            474,
-            528,
-            588,
-            627,
-            628,
-            660,
-            664
-          ]
-        },
-        {
-          "id": "filesystem-read-path",
-          "lines": [
-            319,
-            342,
-            380
-          ]
-        },
-        {
-          "id": "host-process-execution",
-          "lines": [
-            684
-          ]
-        },
-        {
-          "id": "json-or-line-protocol",
-          "lines": [
-            686
-          ]
-        },
-        {
-          "id": "potential-amplification",
-          "lines": [
-            250
-          ]
-        }
-      ],
-      "tier": "priority-1"
-    },
-    {
-      "categories": [
-        "authority-access",
-        "codegen-build",
-        "effects-injection",
-        "formal-evidence",
-        "input-canonicalization",
-        "resource-exhaustion",
-        "secrets-crypto",
-        "state-replay",
-        "supply-chain-release"
-      ],
-      "components": {
-        "authority": 5,
-        "chain_adjacency": 5,
-        "complexity": 4,
-        "hazardous_mechanisms": 5,
-        "reachability": 5,
-        "state_coupling": 2
-      },
-      "confidence": "high",
-      "cwes": [
-        "CWE-20",
-        "CWE-22",
-        "CWE-73",
-        "CWE-78",
-        "CWE-89",
-        "CWE-94",
-        "CWE-174",
-        "CWE-200",
-        "CWE-208",
-        "CWE-269",
-        "CWE-284",
-        "CWE-285",
-        "CWE-321",
-        "CWE-327",
-        "CWE-331",
-        "CWE-345",
-        "CWE-353",
-        "CWE-362",
-        "CWE-367",
-        "CWE-400",
-        "CWE-494",
-        "CWE-502",
-        "CWE-532",
-        "CWE-664",
-        "CWE-667",
-        "CWE-674",
-        "CWE-754",
-        "CWE-770",
-        "CWE-789",
-        "CWE-807",
-        "CWE-829",
-        "CWE-834",
-        "CWE-841",
-        "CWE-862",
-        "CWE-863",
-        "CWE-1104",
-        "CWE-1287",
-        "CWE-1357"
-      ],
-      "path": "tools/rc_package.py",
-      "path_roles": [
-        "host-tool",
-        "release-control"
-      ],
-      "production_lines": 1988,
+      "production_lines": 758,
       "rank": 50,
       "score": 89,
       "signals": [
         {
-          "id": "ambient-context",
-          "lines": [
-            686,
-            1451,
-            1673,
-            1788,
-            1843,
-            2106,
-            2136
-          ]
-        },
-        {
-          "id": "cryptographic-verification",
-          "lines": [
-            147,
-            674,
-            703,
-            708,
-            798,
-            799,
-            1145,
-            1314
-          ]
-        },
-        {
           "id": "filesystem-mutation",
           "lines": [
-            633,
-            637,
-            638,
-            641,
-            721,
-            753,
-            754,
-            756
+            481,
+            486,
+            540,
+            600,
+            639,
+            640,
+            672,
+            676
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            127,
-            134,
-            218,
-            219,
-            413,
-            423,
-            506,
-            507
+            330,
+            354,
+            392
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            106,
-            2060
+            696
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            134,
-            245,
-            1354,
-            2063
+            698
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            801,
-            823,
-            1139,
-            1154,
-            1743,
-            1913,
-            1938
-          ]
-        },
-        {
-          "id": "release-or-publish",
-          "lines": [
-            1971,
-            1972,
-            2044,
-            2045,
-            2050,
-            2051
+            256
           ]
         }
       ],
@@ -5987,18 +5992,18 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 18671816,
-    "admitted_files": 1226,
-    "inventory_sha256": "b4288729d37b4ca6e3d6adf2053c3141ff1ff121cdbea5684ad1ad5fb9bc953f",
-    "ranked_above_minimum": 1042,
+    "admitted_bytes": 18755043,
+    "admitted_files": 1233,
+    "inventory_sha256": "c1e74cd11497504d62ecf06608cd8fc054e2414ef09f22b94e9ea84b607608bb",
+    "ranked_above_minimum": 1048,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 72,
-      "priority-2": 340,
-      "priority-3": 381,
+      "priority-2": 343,
+      "priority-3": 383,
       "priority-4": 151,
-      "priority-5": 282
+      "priority-5": 284
     }
   }
 }
