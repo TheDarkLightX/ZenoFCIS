@@ -45,8 +45,9 @@ def process_limits():
 
 
 def compile_observer(rustc, library, out):
+    dependencies = library.parent / 'deps' if (library.parent / 'deps').is_dir() else library.parent
     command = [str(rustc), '--edition=2024', '-C', 'opt-level=2', '-C', 'overflow-checks=yes',
-               '--extern', f'zeno_fcis_spec={library}', '-L', f'dependency={library.parent}',
+               '--extern', f'zeno_fcis_spec={library}', '-L', f'dependency={dependencies}',
                str(ROOT / 'tools/spec_source_oracle.rs'), '-o', str(out)]
     completed = subprocess.run(command, capture_output=True, text=True)
     (out.parent / (out.name + '-compile.log')).write_text(completed.stdout + completed.stderr)
@@ -260,7 +261,7 @@ def main():
               'grammar_sha256': sha((ROOT/'crates/zeno-fcis-spec/grammar/zeno-v1-extended.json').read_bytes()),
               'cases': len(records), 'passed': sum(x['passed'] for x in records),
               'identical': sum(x['same'] for x in records), 'records': records,
-              'scope': 'Exact accepted Debug results; refusal status only. Partial exact2.6 source overlay with full specification crate. No whole-repository or end-to-end formal theorem.'}
+              'scope': 'Exact accepted Debug results on the declared corpus; refusal status only. Bound to the recorded libraries, compiler, inputs and grammar. No whole-repository or end-to-end formal theorem.'}
     (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps({key:report[key] for key in ['cases','passed','identical']},sort_keys=True))
     raise SystemExit(0 if report['passed']==report['cases'] else 1)
