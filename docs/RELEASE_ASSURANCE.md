@@ -222,9 +222,9 @@ and the two `verification/verus/` includes in
 standalone packaged tests at the next identity regeneration, when the verified
 sources next change.
 
-### Five tests are not interpreted by Miri
+### Focused Miri coverage and exhaustive native tests
 
-`.github/miri-exclusions.json` pins the five tests Miri skips. The first is
+`.github/miri-exclusions.json` pins every test Miri skips. The first is
 `legal_leaf_above_default_payload_remains_constructible_and_encodable` in
 `crates/zeno-fcis-value/tests/construction.rs`. It builds 64 MiB + 1 byte
 values and scans them byte by byte, which under Miri runs for hours and grows
@@ -273,38 +273,58 @@ the same signature, value and boundary pins over their complete corpora. This
 is finite sampling. It does not cover every internal path, every combination
 of values, or undefined behaviour in the omitted cases. **Miri's UB, provenance
 and aliasing checks are lost for every omitted execution.** No claim is made
-that only values are lost while paths are preserved. The 131 retained examples
-(12, 20, 23, 20, 26 and 30 per application) still run under Miri, with genesis
-and replay. Four applications retain their complete-example/genesis tests.
-Order-fulfillment and treasury use eleven `retained_examples_and_replay_*`
-batches of at most five examples plus two separate genesis/replay tests.
-Their exact intervals cover every original example once, and each batch
-checks its full corpus size and executed count. They are not
-drawn from these corpora and are not counted in them. The template
-remainder job checks that the exclusion step's Miri arguments skip exactly
-these four tests, and that its composed arguments keep those skips unchanged
-before skipping the exact-test groups. Every profile test, the retained
-examples, the policy-byte comparison and the two other semantic tests must
-run; the target has no ignored tests. V2’s ignored artifact writer is replaced
-by the pure `compiled_contracts_reproduce_their_committed_policy_bytes` test,
-which compares each compiled contract’s policy bytes without writing files.
+that only values are lost while paths are preserved.
 
-Splitting a test binary across Miri groups is not an exclusion. To keep each
-job under the workflow's configured 180-minute budget, the synthesis `completion` tests run their
-eight graph-seed groups separately. The synthesis library runs nine tests
-each in its own group: six byte-by-byte replay and comparison tests, and the
-three tests that the hosted run of 8eda309 measured at about 101 and 26
-minutes, or still running after more than 10 minutes. The template contracts run each
-bounded-profile corpus in a separate group. At 50e6b86, the order and treasury
-retained-example jobs also reached the 180-minute limit, so those two apps now
-use exact example batches and separate genesis jobs. Their per-case progress
-messages identify the active example without changing its assertions. At 8eda309, the job reached its 180-minute limit while the combined
-genesis-and-replay test was still running; these partitions retain every case
-and assertion. Each split
-target keeps one remainder group that skips exactly those tests and, for the
-template contracts, the four native-only tests. That job lists every group's
-selection under Miri and fails unless each listed test runs exactly once or is
-one of the remainder's pinned exclusions.
+All 131 retained examples and six template genesis/replay checks remain in
+native tests. Under Miri, counter, inventory, order and account keep their
+complete retained-example checks. Withdrawal keeps examples 0-4 and 25;
+treasury keeps examples 0 and 29 and its genesis/replay check. These fixed
+examples use the same fixture expectations and checked replay path as the
+native cases. The remaining withdrawal/treasury replay batches and withdrawal
+genesis are native only after repeated runner shutdowns and time limits.
+Generic genesis, original-input binding and byte-refusal tests remain
+interpreted in the authority/publication groups. The matrix preflight checks
+that each compiled template test is selected once or explicitly listed as a
+native-only workload; unlisted skips and ignored tests are refused.
+
+The historical-context per-byte mutation corpus also stays native. Miri keeps
+arbitrary-digest refusal, current/historical separation, and checked genuine,
+malformed and repeated publication replay in three independent groups. The
+incomplete exhaustive run is not counted as a passing check.
+
+The 2.6 profile also keeps the largest Merkle, recursive-bit, oracle-accounting
+and effect-schedule products in native CI. Five hosted groups reached their
+four-hour limits before completing these workloads. The pinned exclusion list
+records the exact test names, the observed limits and their native commands.
+
+Miri instead runs twelve deep-prefix Merkle updates against an independent
+rebuild and 40 recursive-bit assignments covering self-loops, chains, cycles
+and seed boundaries. It retains individual tests for durable restart and
+reservation, transcript replay and tampering, handler faults, oracle lifecycle
+and ingress, arithmetic traps and finite evaluation. These focused tests run
+natively too. The 160-case one-attempt process-loss product also timed out
+under Miri, so it and the full 25,760-edge explorer remain native checks. The
+original exhaustive bounds and assertions remain in native CI, and formal
+proof gates are unchanged.
+
+The three repeated certificate-producing finite synthesis tests also remain
+native. Miri keeps finite evaluation, refusal ordering and identity checks,
+plus the separately interpreted completion and template paths. Passing the
+focused profile does not establish undefined-behaviour freedom for omitted
+executions, nor replace the native products or formal proofs. A timed-out
+Miri run is incomplete, never passing evidence.
+
+Each Miri group has a 240-minute budget. The synthesis `completion` tests
+run their eight graph-seed groups separately. Nine larger synthesis-library
+tests and the retained template checks also have separate groups. Splitting
+these tests preserves their cases and assertions; the native-only exclusions
+listed above account for the omitted interpreted executions.
+
+Each split synthesis target keeps a remainder group. Its preflight lists the
+compiled tests and verifies that the exact-test groups, remainder and pinned
+native-only exclusions form the required selection. Template tests may not be
+ignored. The exclusion checker also confirms the native CI command and exact
+compiled name of each excluded test.
 
 ## Explicit non-claims
 

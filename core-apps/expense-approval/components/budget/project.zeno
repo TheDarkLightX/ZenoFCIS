@@ -30,5 +30,5 @@ law 541 acceptance_eligibility on accept = ((true) && !(context.102.130 == 0)) &
 law 542 no_committed_failure on failure = false;
 // Core seed consumable-budget/1; parameters {"C": 7}.
 // Instance source-set SHA256 9c2b6a5b69a5e005bdaace18bda30b7de81822af8c8e9b9f6a723b6f240bc31e.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/consumable-budget.json SHA256 7052d7ab9f48200bac3b906dce3388a392ff9182f48c49d3f834258a33db3e4d; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/consumable-budget.json SHA256 20a504e44711c55e75d3abf9029008dca88fcbfa36e52400124eab67ee4300f7; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

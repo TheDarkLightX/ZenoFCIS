@@ -246,6 +246,56 @@ fn all_long_prefix_subsets_and_insert_remove_orders_are_canonical() {
         "collection_merkle_corpus subsets=256 insertion_orders=8801 removal_orders=8801 shared_prefix_bits=253"
     );
 }
+// Fixed small interpretation profile. Native CI retains both complete corpora.
+#[test]
+fn long_prefix_miri_profile_matches_reference_and_owned_paths() {
+    let keys = keys();
+    let orders = [[0usize, 1, 7], [7usize, 1, 0]];
+    let mut visited = vec![0u16];
+    for order in orders {
+        let mut mask = 0;
+        for index in order {
+            mask |= 1 << index;
+            visited.push(mask);
+        }
+        for index in order {
+            mask &= !(1 << index);
+            visited.push(mask);
+        }
+    }
+    visited.sort_unstable();
+    visited.dedup();
+    let expected: Vec<_> = (0..256u16)
+        .map(|mask| {
+            let mut nodes = BTreeMap::new();
+            let root = if visited.contains(&mask) {
+                reference(mask, 0, &keys, &mut nodes)
+            } else {
+                m::empty_hash()
+            };
+            Reference { root, nodes }
+        })
+        .collect();
+    let leaves = std::array::from_fn(|i| m::leaf_hash(&keys[i], &[i as u8]));
+    let prefixes = std::array::from_fn(|i| std::array::from_fn(|depth| prefix(&keys[i], depth)));
+    let mut updates = 0;
+    for order in orders {
+        let mut tree = Tree::default();
+        for index in order {
+            tree.apply(index, true, &keys, &leaves, &prefixes, &expected);
+            updates += 1;
+        }
+        for index in order {
+            tree.apply(index, false, &keys, &leaves, &prefixes, &expected);
+            updates += 1;
+        }
+        assert_eq!(tree.mask, 0);
+        assert!(tree.nodes.is_empty());
+    }
+    assert_eq!(updates, 12);
+    assert!(visited.contains(&131));
+}
+
 #[test]
 fn prefix_bounds_and_path_limit_are_exact() {
     for key in keys().into_iter().chain([[0; 32], [255; 32]]) {

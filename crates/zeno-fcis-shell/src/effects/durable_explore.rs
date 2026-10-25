@@ -40,9 +40,9 @@ impl Terminal for Process<'_> {
     }
 }
 
-#[test]
-fn process_loss_explorer() {
-    // Exact enumeration of all prefixes through two attempts: two keys, ten
+fn process_loss_prefixes(bound: usize) -> (usize, usize) {
+    assert!((1..=2).contains(&bound));
+    // Exact enumeration through the supplied attempt bound: two keys, ten
     // cuts and eight terminal choices (seven Send outcomes plus NotInvoked).
     // Every node discards the handle; only bytes survive to its child.
     let mut frontier = vec![(
@@ -58,7 +58,7 @@ fn process_loss_explorer() {
     let mut effects = 0usize;
     let mut census = Vec::new();
     while let Some((bytes, world, expected_reserved, attempts, depth)) = frontier.pop() {
-        if depth == 2 {
+        if depth == bound {
             leaves += 1;
             continue;
         }
@@ -171,14 +171,23 @@ fn process_loss_explorer() {
             }
         }
     }
-    assert_eq!(edges, 25_760);
-    assert_eq!(leaves, 25_600);
     assert!(
         releases > 0 && effects > 0,
         "non-vacuity: no releases or receiver effects"
     );
     std::println!(
-        "durable explorer: bound=2, keys=2, cuts=10, outcomes=8, edges={edges}, leaves={leaves}, certified_releases={releases}, receiver_effect_observations={effects}, complete=true, census={}",
+        "durable explorer: bound={bound}, keys=2, cuts=10, outcomes=8, edges={edges}, leaves={leaves}, certified_releases={releases}, receiver_effect_observations={effects}, complete=true, census={}",
         RustCryptoSha256::hash(&census)
     );
+    (edges, leaves)
+}
+
+#[test]
+fn process_loss_explorer() {
+    assert_eq!(process_loss_prefixes(2), (25_760, 25_600));
+}
+
+#[test]
+fn bounded_process_loss_profile_covers_every_cut_and_outcome() {
+    assert_eq!(process_loss_prefixes(1), (160, 160));
 }

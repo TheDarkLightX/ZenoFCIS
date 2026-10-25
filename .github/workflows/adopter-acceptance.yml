@@ -39,6 +39,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Fetch the pinned historical evaluator source
+        # The copy check compares against this exact released commit.
+        # A depth-one checkout of the candidate does not contain it.
+        run: |
+          git fetch --no-tags --depth=1 origin 8c444487f96d6acd14c9f7fa55d9ba88ca780fb6
+
       - name: Establish contained checker runtime
         uses: ./.github/actions/checker-containment
 
