@@ -314,6 +314,16 @@ focused profile does not establish undefined-behaviour freedom for omitted
 executions, nor replace the native products or formal proofs. A timed-out
 Miri run is incomplete, never passing evidence.
 
+The publication, values, specification, synthesis-library, synthesis-finite,
+template-contract remainder, focused treasury replay and three historical
+groups use the pinned interpreter's Tree Borrows alias model. Other groups
+use Stacked Borrows. Both retain strict provenance and the default validity,
+bounds, alignment, data-race and leak checks. Tree Borrows makes the large
+byte-comparison and snapshot workloads tractable without removing their cases.
+These alias models have different semantics: a passing result names the model
+used and is not relabelled as a pass under the other model. Neither model
+establishes undefined-behaviour freedom for every possible execution.
+
 Each Miri group has a 240-minute budget. The synthesis `completion` tests
 run their eight graph-seed groups separately. Nine larger synthesis-library
 tests and the retained template checks also have separate groups. Splitting

@@ -106,7 +106,12 @@ jobs:
     env:
       # The spec and compose source-identity tests read the checked-out crates.
       # Keep them interpreted; only their groups need host filesystem access.
-      MIRIFLAGS: -Zmiri-strict-provenance ${{ (matrix.group == 'specification' || matrix.group == 'publication') && '-Zmiri-disable-isolation' || '' }}
+      # Large byte/snapshot workloads use Tree Borrows to keep alias tracking
+      # tractable. Every group retains strict provenance and memory checks.
+      MIRIFLAGS: >-
+        -Zmiri-strict-provenance
+        ${{ contains(fromJSON('["publication","values","specification","synthesis-library","synthesis-finite","synthesis-v2-template-contracts","synthesis-v2-template-focused-treasury-replay","synthesis-historical-context","synthesis-historical-runtime-separation","synthesis-historical-publication-replay"]'), matrix.group) && '-Zmiri-tree-borrows' || '' }}
+        ${{ (matrix.group == 'specification' || matrix.group == 'publication') && '-Zmiri-disable-isolation' || '' }}
       MIRI_TEST_ARGS: ""
     steps:
       - name: Checkout exact source
