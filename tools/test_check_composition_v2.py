@@ -59,7 +59,7 @@ class CompositionGate(unittest.TestCase):
 
     def test_source_closure_includes_new_imported_source(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
+            root = Path(temporary).resolve()
             # Specimen closure is manifest driven: preserve its real registered
             # files while testing discovery of an additional imported source.
             for registered in (*gate.execution_sources(gate.ROOT),

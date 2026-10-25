@@ -381,6 +381,10 @@ class CanonicalByteEvidence(unittest.TestCase):
                 output=b'raw incomplete proof stdout\n', stderr=b'raw solver timeout stderr\n')
         with tempfile.TemporaryDirectory() as temporary, ExitStack() as stack:
             directory = Path(temporary)
+            # This synthetic timeout fixture models the Linux proof pipeline.
+            # Actual non-Linux tool admission is tested separately.
+            stack.enter_context(patch.object(gate.platform, 'system', return_value='Linux'))
+            stack.enter_context(patch.object(gate.platform, 'machine', return_value='x86_64'))
             stack.enter_context(patch.object(gate.verifier, 'prepare_tools', return_value=directory / 'tools'))
             stack.enter_context(patch.object(gate.verifier, 'run', side_effect=fake_run))
             stack.enter_context(patch.object(gate, 'native_checks', return_value={}))
