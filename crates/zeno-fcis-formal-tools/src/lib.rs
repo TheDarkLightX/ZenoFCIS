@@ -3291,9 +3291,22 @@ fn run_fixed_unix(
         })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    #[cfg(target_os = "macos")]
+    let anchor = MacProcessGroup::new(
+        working_directory.path(),
+        start,
+        Duration::from_millis(timeout_ms),
+    )?;
+    #[cfg(target_os = "macos")]
+    command.process_group(anchor.pid()?);
+    #[cfg(not(target_os = "macos"))]
     command.process_group(0);
     let child = spawn_unless_busy(&mut command, start, Duration::from_millis(timeout_ms))?;
-    let mut child = ContainedChild::new(child)?;
+    let mut child = ContainedChild::new(
+        child,
+        #[cfg(target_os = "macos")]
+        anchor,
+    )?;
     let stdout = child
         .child
         .stdout
@@ -3352,24 +3365,71 @@ impl Drop for PrivateWorkingDirectory {
     }
 }
 
+// Darwin can return EPERM for a zombie-only process group. Keep a live,
+// owned member until signalling the group, rather than accepting permission
+// errors. Its unreaped PID also reserves the group identity after try_wait
+// reaps the target. This is process supervision, not a security sandbox.
+#[cfg(target_os = "macos")]
+struct MacProcessGroup(Child);
+#[cfg(target_os = "macos")]
+impl MacProcessGroup {
+    fn new(cwd: &Path, start: Instant, budget: Duration) -> Result<Self, ToolFailure> {
+        use std::os::unix::process::CommandExt as _;
+
+        let mut command = Command::new("/bin/cat");
+        command
+            .env_clear()
+            .current_dir(cwd)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(0);
+        // Both helper and target startup share the original operation budget.
+        // The parent's held pipe keeps the helper alive; parent death closes it.
+        spawn_unless_busy(&mut command, start, budget).map(Self)
+    }
+
+    fn pid(&self) -> Result<i32, ToolFailure> {
+        i32::try_from(self.0.id()).map_err(|_| ToolFailure::ProcessContainmentFailed)
+    }
+}
+#[cfg(target_os = "macos")]
+impl Drop for MacProcessGroup {
+    fn drop(&mut self) {
+        // Also runs when target startup fails, before ContainedChild exists.
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
 #[cfg(unix)]
 struct ContainedChild {
     child: Child,
     process_group: nix::unistd::Pid,
     armed: bool,
+    #[cfg(target_os = "macos")]
+    _anchor: MacProcessGroup,
 }
 #[cfg(unix)]
 impl ContainedChild {
-    fn new(mut child: Child) -> Result<Self, ToolFailure> {
-        let raw = i32::try_from(child.id()).map_err(|_| {
+    fn new(
+        mut child: Child,
+        #[cfg(target_os = "macos")] anchor: MacProcessGroup,
+    ) -> Result<Self, ToolFailure> {
+        #[cfg(target_os = "macos")]
+        let raw = anchor.pid();
+        #[cfg(not(target_os = "macos"))]
+        let raw = i32::try_from(child.id()).map_err(|_| ToolFailure::ProcessContainmentFailed);
+        let raw = raw.inspect_err(|_| {
             let _ = child.kill();
             let _ = child.wait();
-            ToolFailure::ProcessContainmentFailed
         })?;
         Ok(Self {
             child,
             process_group: nix::unistd::Pid::from_raw(raw),
             armed: true,
+            #[cfg(target_os = "macos")]
+            _anchor: anchor,
         })
     }
 
@@ -5000,7 +5060,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     fn busy_executables_are_retried_briefly_then_fail_closed() {
         use std::os::unix::fs::PermissionsExt as _;
 
@@ -5075,6 +5135,93 @@ mod tests {
             Err(other) => panic!("unexpected {other:?}"),
         }
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn exhausted_process_budget_starts_nothing() {
+        match spawn_unless_busy(&mut Command::new("/bin/sh"), Instant::now(), Duration::ZERO) {
+            Err(ToolFailure::Timeout) => {}
+            Ok(mut child) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("an exhausted budget started a process");
+            }
+            Err(other) => panic!("unexpected {other:?}"),
+        }
+        #[cfg(target_os = "macos")]
+        assert!(matches!(
+            MacProcessGroup::new(Path::new("/"), Instant::now(), Duration::ZERO),
+            Err(ToolFailure::Timeout)
+        ));
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn macos_group_identity_survives_target_exit_and_is_reaped_after_cleanup() {
+        use nix::{
+            errno::Errno,
+            sys::{signal::killpg, wait::waitpid},
+            unistd::Pid,
+        };
+        use std::os::unix::process::CommandExt as _;
+
+        let anchor = MacProcessGroup::new(Path::new("/"), Instant::now(), Duration::from_secs(1))
+            .unwrap_or_else(|error| panic!("start group anchor: {error:?}"));
+        let group = anchor.pid().unwrap_or_else(|_| unreachable!());
+        let target = Command::new("/usr/bin/true")
+            .process_group(group)
+            .spawn()
+            .unwrap_or_else(|error| panic!("start target: {error}"));
+        let mut child = ContainedChild::new(target, anchor).unwrap_or_else(|_| unreachable!());
+        assert!(
+            child
+                .child
+                .wait()
+                .unwrap_or_else(|_| unreachable!())
+                .success()
+        );
+        // The target is reaped, but a live owned member still reserves the group.
+        assert_eq!(killpg(Pid::from_raw(group), None), Ok(()));
+        assert_eq!(child.terminate(true), Ok(()));
+        drop(child);
+        assert_eq!(waitpid(Pid::from_raw(group), None), Err(Errno::ECHILD));
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn macos_group_anchor_is_reaped_on_setup_failure_and_cancellation() {
+        use nix::{errno::Errno, sys::wait::waitpid, unistd::Pid};
+        use std::os::unix::process::CommandExt as _;
+
+        let anchor = MacProcessGroup::new(Path::new("/"), Instant::now(), Duration::from_secs(1))
+            .unwrap_or_else(|error| panic!("start group anchor: {error:?}"));
+        let group = anchor.pid().unwrap_or_else(|_| unreachable!());
+        assert!(
+            Command::new("/zeno-fcis-missing-executable")
+                .process_group(group)
+                .spawn()
+                .is_err()
+        );
+        drop(anchor);
+        assert_eq!(waitpid(Pid::from_raw(group), None), Err(Errno::ECHILD));
+
+        let anchor = MacProcessGroup::new(Path::new("/"), Instant::now(), Duration::from_secs(1))
+            .unwrap_or_else(|error| panic!("start cancellation anchor: {error:?}"));
+        let group = anchor.pid().unwrap_or_else(|_| unreachable!());
+        let target = Command::new("/bin/cat")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(group)
+            .spawn()
+            .unwrap_or_else(|_| unreachable!());
+        let target_pid =
+            Pid::from_raw(i32::try_from(target.id()).unwrap_or_else(|_| unreachable!()));
+        // Dropping an unfinished guard must kill and reap both owned children.
+        drop(ContainedChild::new(target, anchor).unwrap_or_else(|_| unreachable!()));
+        assert_eq!(waitpid(target_pid, None), Err(Errno::ECHILD));
+        assert_eq!(waitpid(Pid::from_raw(group), None), Err(Errno::ECHILD));
     }
 
     #[test]
@@ -6904,7 +7051,7 @@ mod tests {
         std::mem::forget(descendant);
         let marker = root.join("descendant");
         for _ in 0..200 {
-            if marker.exists() {
+            if fs::metadata(&marker).is_ok_and(|metadata| metadata.len() > 0) {
                 return;
             }
             thread::sleep(Duration::from_millis(5));
@@ -6953,7 +7100,7 @@ mod tests {
         std::mem::forget(descendant);
         let marker = root.join("descendant");
         for _ in 0..200 {
-            if marker.exists() {
+            if fs::metadata(&marker).is_ok_and(|metadata| metadata.len() > 0) {
                 return;
             }
             thread::sleep(Duration::from_millis(5));
