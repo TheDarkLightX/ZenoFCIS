@@ -17,7 +17,7 @@ def main():
     parser.add_argument('--tcp',action='store_true')
     args=parser.parse_args()
     target=Path(os.environ.get('CARGO_TARGET_DIR',ROOT/'target')).resolve()
-    parent=args.out.resolve() if args.out else target/'app-factory-checks'
+    parent=args.out.resolve() if args.out else Path(tempfile.gettempdir())/'zeno-fcis-app-factory-checks'
     parent.mkdir(parents=True,exist_ok=True)
     out=Path(tempfile.mkdtemp(prefix='run-',dir=parent))
     environment=os.environ.copy()
