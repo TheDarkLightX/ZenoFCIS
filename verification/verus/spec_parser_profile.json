@@ -6,7 +6,8 @@
     "Exact signed-magnitude conversion iff representable, and complete projection-tail conversion iff valid with every payload in order and no omitted suffix.",
     "Exact six-way lexical mapping to the actual CompareOp enum, with full-width ordered i128/u128 comparison semantics.",
     "Actual nongeneric ValueExpr arithmetic and division constructors preserve operator, policy and ordered operands; exact division-name mapping; bounded binary-height transfer.",
-    "The actual lexer finalization body preserves its entire candidate token vector, appends exactly one supplied-span EOF, and on success binds the preceding tokens to the complete source with no internal EOF; an earlier failed scan cannot be admitted."
+    "The actual lexer finalization body preserves its entire candidate token vector, appends exactly one supplied-span EOF, and on success binds the preceding tokens to the complete source with no internal EOF; an earlier failed scan cannot be admitted.",
+    "The actual surface_lexer::lex body has an unconditional diagnostic-free-success contract: its output prefix independently validates against the entire original source, remains within the token budget, contains no internal EOF, and ends with exactly one empty-spelling EOF with the span supplied by the scan. Actual SourceLimits and Diagnostic representations are shared with the harness."
   ],
   "unproved": [
     "Grammar JSON to generated-table equivalence is reproducibility-checked, not formally proved.",
@@ -16,8 +17,8 @@
     "Real compiled Identifier, ProjectionPath and RelExpr operands are opaque external types with no assumed operations or semantic properties. Native Clone/Debug/Eq derives and the caller-to-certified-child mapping are outside the constructor proof.",
     "Scalar-height lemmas parameterize relational height; the complete source-to-AST height correspondence remains separate.",
     "The complete runtime syntax-resource preflight, its mapping from certified source children, and strict diagnostic collection are source-reviewed/tested rather than proved as a whole.",
-    "The actual borrowed-token validator proves successful-check soundness. Its surrounding diagnostic-producing lexer wrapper, acceptance completeness, and native Token derive operations are not included in that theorem.",
-    "The finalization theorem receives the scan-success flag and EOF span from the diagnostic wrapper; it does not prove that wrapper or the provenance of EOF coordinates. Successful-check soundness is separate from useful completeness."
+    "The actual borrowed-token validator proves successful-check soundness. Acceptance completeness and native Token derive operations remain outside that theorem; the actual diagnostic-free lexer success implication is now separately proved.",
+    "The lexer wrapper does not prove EOF span coordinates correspond to the independently certified frontier coordinates. Diagnostic text fidelity, retained-diagnostic collection, and useful completeness remain separate."
   ],
   "bindings": [
     ".github/workflows/verus.yml",
@@ -970,6 +971,66 @@
         }
       ],
       "native_spec_dependency": true
+    },
+    {
+      "name": "surface-lexer",
+      "harness": "verification/verus/spec_surface_lexer.rs",
+      "files": [
+        "crates/zeno-fcis-spec/src/lexical_core.rs",
+        "crates/zeno-fcis-spec/src/source_span.rs",
+        "crates/zeno-fcis-spec/src/source_token.rs",
+        "crates/zeno-fcis-spec/src/source_limits.rs",
+        "crates/zeno-fcis-spec/src/diagnostic.rs",
+        "crates/zeno-fcis-spec/src/surface_lexer.rs",
+        "verification/verus/spec_surface_lexer.rs",
+        "verification/verus/spec_surface_lexer_tests.rs"
+      ],
+      "expected_verified": 69,
+      "expected_native_tests": 6,
+      "target_functions": [
+        "spec_surface_lexer::surface_lexer::lex",
+        "spec_surface_lexer::surface_lexer::ascii_boundaries",
+        "spec_surface_lexer::surface_lexer::scalar_boundary",
+        "spec_surface_lexer::surface_lexer::lexeme_boundaries",
+        "spec_surface_lexer::surface_lexer::span",
+        "spec_surface_lexer::surface_lexer::u32_len",
+        "spec_surface_lexer::surface_lexer::diagnostic",
+        "spec_surface_lexer::diagnostic::Diagnostic::new",
+        "spec_surface_lexer::source_limits::SourceLimits::try_new",
+        "spec_surface_lexer::source_token::finish_tokens"
+      ],
+      "mutations": [
+        {
+          "name": "wrapper-validation-refusal-omitted",
+          "function": "lex",
+          "subject": "crates/zeno-fcis-spec/src/surface_lexer.rs",
+          "old": "if diagnostics.is_empty() && !checked {",
+          "new": "if false {",
+          "target_functions": [
+            "spec_surface_lexer::surface_lexer::lex"
+          ]
+        },
+        {
+          "name": "wrapper-diagnostics-erased",
+          "function": "lex",
+          "subject": "crates/zeno-fcis-spec/src/surface_lexer.rs",
+          "old": "(tokens, diagnostics)",
+          "new": "(tokens, Vec::new())",
+          "target_functions": [
+            "spec_surface_lexer::surface_lexer::lex"
+          ]
+        },
+        {
+          "name": "wrapper-eof-removed",
+          "function": "lex",
+          "subject": "crates/zeno-fcis-spec/src/surface_lexer.rs",
+          "old": "(tokens, diagnostics)",
+          "new": "tokens.pop();\n    (tokens, diagnostics)",
+          "target_functions": [
+            "spec_surface_lexer::surface_lexer::lex"
+          ]
+        }
+      ]
     }
   ],
   "binding_directories": [

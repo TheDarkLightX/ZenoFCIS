@@ -26,6 +26,7 @@ mod parser;
 mod paths;
 mod semantic_readers;
 mod source;
+mod source_limits;
 mod source_span;
 mod source_token;
 mod substance;
@@ -73,6 +74,9 @@ pub use paths::{
     declared_table_index_range, law_paths, resolve_path,
 };
 pub use source::{SOURCE_FILES, source_digest};
+pub use source_limits::{
+    MAX_RETAINED_DIAGNOSTICS, MAX_SOURCE_BYTES, MAX_SOURCE_TOKENS, SourceLimits,
+};
 pub use substance::{
     Substance, claim_substance, invariant_substance, law_substance, relation_substance,
     temporal_substance,
@@ -90,12 +94,6 @@ pub const PROJECT_SPEC_FORMAT_VERSION: u16 = 1;
 /// Version of relational and temporal formula canonical bytes.
 pub const TEMPORAL_SPEC_FORMAT_VERSION: u16 = 1;
 
-/// Maximum accepted UTF-8 source length.
-pub const MAX_SOURCE_BYTES: usize = 1024 * 1024;
-/// Maximum accepted lexer token count.
-pub const MAX_SOURCE_TOKENS: usize = 262_144;
-/// Maximum diagnostics retained in a returned set.
-pub const MAX_RETAINED_DIAGNOSTICS: usize = 256;
 /// Maximum recursive expression nesting admitted by the language parser.
 pub const MAX_FORMULA_DEPTH: usize = 256;
 /// Maximum composite scalar/formula height built by source parsing. Numeric
@@ -105,66 +103,6 @@ pub const MAX_PARSED_EXPRESSION_HEIGHT: usize = MAX_FORMULA_DEPTH + 2;
 pub const MAX_FORMULA_NODES: usize = 1_000_000;
 /// Maximum finite logical-trace horizon admitted by language version 1.
 pub const MAX_FINITE_HORIZON: u32 = 256;
-
-/// Caller-selected limits bounded by the hard language limits.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct SourceLimits {
-    max_bytes: usize,
-    max_tokens: usize,
-    max_diagnostics: usize,
-}
-
-impl SourceLimits {
-    /// Creates a nonzero limit set no larger than the language hard limits.
-    pub const fn try_new(
-        max_bytes: usize,
-        max_tokens: usize,
-        max_diagnostics: usize,
-    ) -> Option<Self> {
-        if max_bytes == 0
-            || max_bytes > MAX_SOURCE_BYTES
-            || max_tokens == 0
-            || max_tokens > MAX_SOURCE_TOKENS
-            || max_diagnostics == 0
-            || max_diagnostics > MAX_RETAINED_DIAGNOSTICS
-        {
-            return None;
-        }
-        Some(Self {
-            max_bytes,
-            max_tokens,
-            max_diagnostics,
-        })
-    }
-
-    /// Returns the source-byte limit.
-    #[must_use]
-    pub const fn max_bytes(self) -> usize {
-        self.max_bytes
-    }
-
-    /// Returns the token limit.
-    #[must_use]
-    pub const fn max_tokens(self) -> usize {
-        self.max_tokens
-    }
-
-    /// Returns the retained-diagnostic limit.
-    #[must_use]
-    pub const fn max_diagnostics(self) -> usize {
-        self.max_diagnostics
-    }
-}
-
-impl Default for SourceLimits {
-    fn default() -> Self {
-        Self {
-            max_bytes: MAX_SOURCE_BYTES,
-            max_tokens: MAX_SOURCE_TOKENS,
-            max_diagnostics: MAX_RETAINED_DIAGNOSTICS,
-        }
-    }
-}
 
 /// Elaboration and formula-complexity limits.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -3,6 +3,8 @@
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
+#[cfg(verus_keep_ghost)]
+use vstd::{prelude::*, string::StringSliceAdditionalSpecFns};
 
 pub(crate) use crate::lexical_core::LexemeKind as TokenKind;
 use crate::lexical_core::{LexemeKind, next_lexeme};
@@ -10,6 +12,83 @@ pub(crate) use crate::source_token::Token;
 use crate::source_token::finish_tokens;
 use crate::{AstPath, Diagnostic, DiagnosticCode, DiagnosticStage, SourceLimits, SourceSpan};
 
+#[cfg(verus_keep_ghost)]
+verus! {
+    use vstd::utf8::*;
+
+    proof fn ascii_boundaries(bytes: Seq<u8>, offset: int)
+        requires valid_utf8(bytes), 0 <= offset < bytes.len(), bytes[offset] < 128,
+        ensures is_char_boundary(bytes, offset), is_char_boundary(bytes, offset + 1),
+        decreases bytes.len(),
+    {
+        let width = length_of_first_scalar(bytes);
+        if offset < width {
+            assert(offset == 0);
+            reveal_with_fuel(is_char_boundary, 2);
+        } else {
+            let tail = pop_first_scalar(bytes);
+            ascii_boundaries(tail, offset - width);
+        }
+    }
+
+    proof fn scalar_boundary(bytes: Seq<u8>, start: int)
+        requires valid_utf8(bytes), 0 <= start < bytes.len(), is_char_boundary(bytes, start),
+        ensures valid_first_scalar(bytes[start..]),
+            0 < length_of_first_scalar(bytes[start..]) <= bytes.len() - start,
+            is_char_boundary(bytes, start + length_of_first_scalar(bytes[start..])),
+        decreases bytes.len(),
+    {
+        if start == 0 {
+            assert(bytes[start..] =~= bytes);
+            reveal_with_fuel(is_char_boundary, 2);
+        } else {
+            let width = length_of_first_scalar(bytes);
+            reveal_with_fuel(is_char_boundary, 2);
+            assert(start >= width);
+            let tail = pop_first_scalar(bytes);
+            scalar_boundary(tail, start - width);
+            assert(tail[start - width..] =~= bytes[start..]);
+        }
+    }
+
+    proof fn lexeme_boundaries(bytes: Seq<u8>, start: int, end: int, kind: LexemeKind)
+        requires valid_utf8(bytes),
+            crate::lexical_core::lexeme_matches(bytes, start, end, kind),
+            kind != LexemeKind::InvalidByte,
+        ensures is_char_boundary(bytes, end),
+            kind == LexemeKind::Hex || kind == LexemeKind::InvalidHex ==>
+                is_char_boundary(bytes, start + 2),
+    {
+        if kind == LexemeKind::Hex || kind == LexemeKind::InvalidHex {
+            assert(bytes[start + 1] == b'x');
+            ascii_boundaries(bytes, start + 1);
+        }
+        if end == bytes.len() {
+            is_char_boundary_start_end_of_seq(bytes);
+        } else if kind == LexemeKind::Comment {
+            assert(bytes[end] == b'\n');
+            ascii_boundaries(bytes, end);
+        } else {
+            assert(0 < end);
+            assert(bytes[end - 1] < 128);
+            ascii_boundaries(bytes, end - 1);
+        }
+    }
+}
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result.1@.len() == 0 ==> {
+        &&& result.0@.len() > 0
+        &&& result.0@.last().kind == TokenKind::End
+        &&& result.0@.last().spelling.spec_bytes().len() == 0
+        &&& result.0@.len() - 1 <= limits.fields().1
+        &&& exists|line: u32, column: u32|
+            crate::source_token::source_prefix(source.spec_bytes(), source.spec_bytes().len() as int,
+                result.0@.drop_last(), line, column)
+        &&& forall|i: int| 0 <= i < result.0@.len() - 1 ==>
+            crate::lexical_core::token_kind(result.0@[i].kind)
+    },
+))]
 pub(crate) fn lex(source: &str, limits: SourceLimits) -> (Vec<Token<'_>>, Vec<Diagnostic>) {
     if source.len() > limits.max_bytes() {
         return (
@@ -28,11 +107,30 @@ pub(crate) fn lex(source: &str, limits: SourceLimits) -> (Vec<Token<'_>>, Vec<Di
         );
     }
     let bytes = source.as_bytes();
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        vstd::utf8::encode_utf8_valid_utf8(source@);
+        vstd::utf8::is_char_boundary_start_end_of_seq(bytes@);
+    }
     let mut tokens = Vec::new();
     let mut diagnostics = Vec::new();
     let (mut index, mut line, mut column) = (0usize, 1u32, 1u32);
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant index <= bytes.len(), bytes@ == source.spec_bytes(),
+            vstd::utf8::valid_utf8(bytes@),
+            vstd::utf8::is_char_boundary(bytes@, bytes@.len() as int),
+            vstd::utf8::is_char_boundary(source.spec_bytes(), index as int),
+        ensures diagnostics@.len() == 0 ==> index == bytes.len(),
+        decreases bytes.len() - index,
+    ))]
     while index < bytes.len() {
         let item = next_lexeme(bytes, index);
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            if item.kind != LexemeKind::InvalidByte {
+                lexeme_boundaries(bytes@, index as int, item.end as int, item.kind);
+            }
+        }
         let start = index;
         let start_column = column;
         match item.kind {
@@ -61,11 +159,39 @@ pub(crate) fn lex(source: &str, limits: SourceLimits) -> (Vec<Token<'_>>, Vec<Di
             ));
             break;
         }
-        index = if item.kind == LexemeKind::InvalidByte {
-            start + source[start..].chars().next().map_or(1, char::len_utf8)
+        index = if matches!(item.kind, LexemeKind::InvalidByte) {
+            let suffix = source.split_at(start).1;
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                scalar_boundary(bytes@, start as int);
+                assert(suffix.spec_bytes() == bytes@.subrange(start as int, bytes@.len() as int));
+                if suffix@.len() == 0 {
+                    reveal(vstd::utf8::encode_utf8);
+                }
+                assert(suffix@.len() > 0);
+                vstd::utf8::encode_utf8_first_scalar(suffix@);
+            }
+            start
+                + match suffix.chars().next() {
+                    Some(character) => {
+                        #[cfg(verus_keep_ghost)]
+                        proof! { assert(character == suffix@[0]); }
+                        character.len_utf8()
+                    }
+                    None => 1,
+                }
         } else {
             item.end
         };
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            assert(start < index <= bytes.len());
+            assert(vstd::utf8::is_char_boundary(bytes@, index as int));
+            if item.kind == LexemeKind::Hex || item.kind == LexemeKind::InvalidHex {
+                assert(start + 2 <= index);
+                assert(vstd::utf8::is_char_boundary(bytes@, start as int + 2));
+            }
+        }
         column = column.saturating_add(u32_len(index - start));
         let location = span(start, index, line, start_column);
         let spelling = match item.kind {
@@ -143,8 +269,15 @@ pub(crate) fn lex(source: &str, limits: SourceLimits) -> (Vec<Token<'_>>, Vec<Di
 fn span(start: usize, end: usize, line: u32, column: u32) -> SourceSpan {
     SourceSpan::new(u32_len(start), u32_len(end), line, column)
 }
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result == crate::source_token::saturated(0, value as nat),
+))]
 fn u32_len(value: usize) -> u32 {
-    u32::try_from(value).unwrap_or(u32::MAX)
+    if value > u32::MAX as usize {
+        u32::MAX
+    } else {
+        value as u32
+    }
 }
 fn diagnostic(
     code: DiagnosticCode,

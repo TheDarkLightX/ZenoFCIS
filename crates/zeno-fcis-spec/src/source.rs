@@ -61,6 +61,7 @@ pub const SOURCE_FILES: &[(&str, &[u8])] = &[
         include_bytes!("semantic_readers.rs"),
     ),
     ("src/source.rs", include_bytes!("source.rs")),
+    ("src/source_limits.rs", include_bytes!("source_limits.rs")),
     ("src/source_span.rs", include_bytes!("source_span.rs")),
     ("src/source_token.rs", include_bytes!("source_token.rs")),
     ("src/substance.rs", include_bytes!("substance.rs")),

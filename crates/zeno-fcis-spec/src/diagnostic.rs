@@ -3,14 +3,22 @@
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
+#[cfg(not(verus_keep_ghost))]
 use core::fmt;
+#[cfg(verus_keep_ghost)]
+use vstd::prelude::*;
 
 pub use crate::source_span::SourceSpan;
 
 /// Stable path into a parsed or elaborated project.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(
+    not(verus_keep_ghost),
+    derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)
+)]
+#[cfg_attr(verus_keep_ghost, verifier::verify)]
 pub struct AstPath(Box<str>);
 
+#[cfg_attr(verus_keep_ghost, verifier::verify)]
 impl AstPath {
     /// Creates an owned path.
     #[must_use]
@@ -27,6 +35,7 @@ impl AstPath {
 /// Compiler stage producing a diagnostic.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(verus_keep_ghost, verifier::verify)]
 pub enum DiagnosticStage {
     Lex,
     Parse,
@@ -35,6 +44,7 @@ pub enum DiagnosticStage {
     Evaluate,
 }
 
+#[cfg_attr(verus_keep_ghost, verifier::verify)]
 impl DiagnosticStage {
     /// Returns the stable machine-readable stage name.
     #[must_use]
@@ -52,6 +62,7 @@ impl DiagnosticStage {
 /// Closed RC3 diagnostic-code registry.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(verus_keep_ghost, verifier::verify)]
 pub enum DiagnosticCode {
     SourceTooLarge,
     TokenLimit,
@@ -73,8 +84,10 @@ pub enum DiagnosticCode {
     Indeterminate,
 }
 
+#[cfg_attr(verus_keep_ghost, verifier::verify)]
 impl DiagnosticCode {
     /// Every code in stable registry order.
+    #[cfg_attr(verus_keep_ghost, verus_spec)]
     pub const ALL: [Self; 18] = [
         Self::SourceTooLarge,
         Self::TokenLimit,
@@ -123,7 +136,8 @@ impl DiagnosticCode {
 }
 
 /// One complete actionable compiler diagnostic.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(not(verus_keep_ghost), derive(Clone, Debug, Eq, PartialEq))]
+#[cfg_attr(verus_keep_ghost, verifier::verify)]
 pub struct Diagnostic {
     code: DiagnosticCode,
     stage: DiagnosticStage,
@@ -134,6 +148,7 @@ pub struct Diagnostic {
     remediation: Box<str>,
 }
 
+#[cfg_attr(verus_keep_ghost, verifier::verify)]
 impl Diagnostic {
     /// Creates a diagnostic with all stable schema fields.
     #[must_use]
@@ -194,12 +209,14 @@ impl Diagnostic {
 }
 
 /// Sorted bounded collection of accumulated diagnostics.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(not(verus_keep_ghost), derive(Clone, Debug, Eq, PartialEq))]
+#[cfg(not(verus_keep_ghost))]
 pub struct DiagnosticSet {
     diagnostics: Box<[Diagnostic]>,
     truncated: bool,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl DiagnosticSet {
     pub(crate) fn from_vec(mut diagnostics: Vec<Diagnostic>, limit: usize) -> Self {
         diagnostics.sort_by(|left, right| {
@@ -250,6 +267,7 @@ impl DiagnosticSet {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl fmt::Display for DiagnosticSet {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (index, diagnostic) in self.diagnostics.iter().enumerate() {
@@ -276,6 +294,7 @@ impl fmt::Display for DiagnosticSet {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn text(value: impl fmt::Display) -> Box<str> {
     let mut output = String::new();
     use core::fmt::Write as _;
