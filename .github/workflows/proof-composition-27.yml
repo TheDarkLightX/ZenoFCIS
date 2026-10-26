@@ -44,4 +44,5 @@ jobs:
           node experiments/proof-composition-27/run.cjs "$out/pairs25.json" > "$out/pairs25-report.json"
           node experiments/proof-composition-27/propose.cjs "$out/chain3-unproven.json" "$out/chain3-candidate.json"
           node experiments/proof-composition-27/run.cjs "$out/chain3-candidate.json" > "$out/chain3-proposed-report.json"
-          node -e 'const fs=require("fs");for(const n of ["chain3","pairs25","chain3-proposed"]){const x=JSON.parse(fs.readFileSync(process.argv[1]+"/"+n+"-report.json"));if(x.status!=="proved"||x.publication_authority!==false||x.executable_refinement!==false)process.exit(1);}' "$out"
+          node experiments/proof-composition-27/run_goals.cjs "$out/chain3-candidate.json" "$out/chain3-owner-goals.json" > "$out/chain3-goals-report.json"
+          node -e 'const fs=require("fs");for(const n of ["chain3","pairs25","chain3-proposed","chain3-goals"]){const x=JSON.parse(fs.readFileSync(process.argv[1]+"/"+n+"-report.json"));if(x.status!=="proved"||x.publication_authority!==false||x.executable_refinement!==false)process.exit(1);}' "$out"
