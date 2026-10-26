@@ -1,0 +1,43 @@
+{
+  "schema": "zeno-fcis/loop-architecture/1",
+  "components": [
+    {
+      "name": "remaining",
+      "owns": [
+        "bins_0"
+      ],
+      "reads": [
+        "histogram_0",
+        "histogram_1"
+      ],
+      "decides": [
+        "bad_histogram"
+      ]
+    },
+    {
+      "name": "receiving",
+      "owns": [
+        "bins_1"
+      ],
+      "reads": [
+        "histogram_1"
+      ],
+      "decides": [
+        "at_capacity"
+      ]
+    },
+    {
+      "name": "conservation",
+      "owns": [
+        "mass"
+      ],
+      "reads": [
+        "bins_0",
+        "bins_1"
+      ],
+      "decides": [
+        "inconsistent_mass"
+      ]
+    }
+  ]
+}

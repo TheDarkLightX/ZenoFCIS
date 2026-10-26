@@ -1,0 +1,37 @@
+{
+  "theory": "steps-over-integers",
+  "id": "owner_cars",
+  "kind": "law",
+  "authority": {
+    "status": "OPEN",
+    "source": "Owner's example in the 2026-10-25 conversation; illustrative reading, not an assertion about actual owners."
+  },
+  "scope": "Declared entities and stipulated Owner, Car and Has relations. Every owner has at least one car; cars may be shared, and owners may have several. No existence of owners is asserted.",
+  "domains": {
+    "D": {"member": "entity", "plural": "entities", "noun": "entities"}
+  },
+  "symbols": {
+    "Owner": {"kind": "predicate", "arity": 1, "args": ["D"], "clause": "{0} is an owner", "noun": "owner", "article": "an"},
+    "Car": {"kind": "predicate", "arity": 1, "args": ["D"], "clause": "{0} is a car", "noun": "car"},
+    "Has": {"kind": "predicate", "arity": 2, "args": ["D", "D"], "clause": "{0} has {1}"}
+  },
+  "definitions": [
+    {
+      "name": "HasCar",
+      "params": [{"name": "z", "domain": "D"}],
+      "body": "exists y in D: Car(y) and Has(z, y)",
+      "clause": "{0} has a car"
+    }
+  ],
+  "formula": "forall x in D: Owner(x) => HasCar(x)",
+  "fixtures": [
+    {"id": "one_owner_one_car", "domains": {"D": ["alice", "car1"]}, "symbols": {"Owner": {"rows": [[["alice"], true]], "default": false}, "Car": {"rows": [[["car1"], true]], "default": false}, "Has": {"rows": [[["alice", "car1"], true]], "default": false}}, "expected": true, "note": "One owner has a car."},
+    {"id": "different_cars", "domains": {"D": ["alice", "bob", "car1", "car2"]}, "symbols": {"Owner": {"rows": [[["alice"], true], [["bob"], true]], "default": false}, "Car": {"rows": [[["car1"], true], [["car2"], true]], "default": false}, "Has": {"rows": [[["alice", "car1"], true], [["bob", "car2"], true]], "default": false}}, "expected": true, "note": "The existential witness can differ for each owner."},
+    {"id": "shared_car", "domains": {"D": ["alice", "bob", "car1"]}, "symbols": {"Owner": {"rows": [[["alice"], true], [["bob"], true]], "default": false}, "Car": {"rows": [[["car1"], true]], "default": false}, "Has": {"rows": [[["alice", "car1"], true], [["bob", "car1"], true]], "default": false}}, "expected": true, "note": "No distinct-car requirement is stated."},
+    {"id": "two_cars", "domains": {"D": ["alice", "car1", "car2"]}, "symbols": {"Owner": {"rows": [[["alice"], true]], "default": false}, "Car": {"rows": [[["car1"], true], [["car2"], true]], "default": false}, "Has": {"rows": [[["alice", "car1"], true], [["alice", "car2"], true]], "default": false}}, "expected": true, "note": "A car means at least one, not exactly one."},
+    {"id": "missing_car", "domains": {"D": ["alice", "car1"]}, "symbols": {"Owner": {"rows": [[["alice"], true]], "default": false}, "Car": {"rows": [[["car1"], true]], "default": false}, "Has": {"rows": [], "default": false}}, "expected": false, "note": "An existing car is insufficient without the relation."},
+    {"id": "one_owner_missing", "domains": {"D": ["alice", "bob", "car1"]}, "symbols": {"Owner": {"rows": [[["alice"], true], [["bob"], true]], "default": false}, "Car": {"rows": [[["car1"], true]], "default": false}, "Has": {"rows": [[["alice", "car1"], true]], "default": false}}, "expected": false, "note": "One successful owner does not satisfy every owner."},
+    {"id": "not_a_car", "domains": {"D": ["alice", "bicycle"]}, "symbols": {"Owner": {"rows": [[["alice"], true]], "default": false}, "Car": {"rows": [], "default": false}, "Has": {"rows": [[["alice", "bicycle"], true]], "default": false}}, "expected": false, "note": "The object must satisfy Car."},
+    {"id": "no_owners", "domains": {"D": ["car1"]}, "symbols": {"Owner": {"rows": [], "default": false}, "Car": {"rows": [[["car1"], true]], "default": false}, "Has": {"rows": [], "default": false}}, "expected": true, "note": "A universal statement does not assert that any owner exists."}
+  ]
+}

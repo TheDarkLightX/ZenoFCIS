@@ -1,0 +1,31 @@
+zeno 1;
+project 1 observation_k0_m3;
+namespace 2 core;
+type 100 state State;
+type 101 command Input;
+type 102 context Context;
+type 105 int Value in 0..=2;
+type 106 int Delta in 0..=1;
+type 107 int Mode in 0..=2;
+type 108 int Unit in 0..=0;
+field 110 100 value 105;
+field 120 101 delta 106;
+field 121 101 mode 107;
+field 140 102 unit 108;
+reason 200 invalid_state precedence 0;
+reason 201 overflow precedence 1;
+component 400 evaluator {
+ owns 100;
+ reads pre.100;
+ writes post.100;
+ contexts context.102;
+ budget steps 512;
+}
+merge [400];
+law 499 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 2;
+law 500 accepts_exactly_valid on accept = !((command.101.121 != 2 && pre.100.110 > 0) || (command.101.121 == 2 && pre.100.110 >= 3)) && !(command.101.121 == 0 && pre.100.110 + command.101.120 > 0);
+law 501 exact_observation on accept = (command.101.121 == 0 -> post.100.110 == pre.100.110 + command.101.120) &&
+(command.101.121 == 1 -> post.100.110 == choose(pre.100.110 + command.101.120 > 0, 0, pre.100.110 + command.101.120)) &&
+(command.101.121 == 2 -> post.100.110 == choose(pre.100.110 + command.101.120 >= 3, pre.100.110 + command.101.120 - 3, pre.100.110 + command.101.120));
+law 502 reject_invalid on reject:200 = (command.101.121 != 2 && pre.100.110 > 0) || (command.101.121 == 2 && pre.100.110 >= 3);
+law 503 reject_overflow on reject:201 = !((command.101.121 != 2 && pre.100.110 > 0) || (command.101.121 == 2 && pre.100.110 >= 3)) && (command.101.121 == 0 && pre.100.110 + command.101.120 > 0);

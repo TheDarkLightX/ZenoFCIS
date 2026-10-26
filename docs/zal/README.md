@@ -1010,3 +1010,12 @@ Prior-art search pending.
 obligation. Reading, review and human acceptance grant no runtime, publication
 or authentication authority. A readable requirement still needs a checked
 refinement before its implementation can claim to satisfy it.
+
+## Optional relational reasoning experiment
+
+The [C2/C2mod backend](../../experiments/zal-relational/README.md) reuses the existing
+controlled-language ladder for exact finite counting, model evaluation and bounded
+meaning comparison with counterexamples and replay. Its [ladder placement](../../experiments/zal-relational/LADDER.md)
+distinguishes reasoning from presentation and records the remaining visual and
+FCIS-lowering connections. It is an optional experiment; native registration and
+the complete implementation proof remain open.

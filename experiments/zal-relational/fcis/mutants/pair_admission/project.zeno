@@ -1,0 +1,28 @@
+zeno 1;
+project 1 pair_admission;
+namespace 2 core;
+type 100 state State;
+type 101 command Input;
+type 102 context Context;
+type 105 int Bit in 0..=1;
+type 106 int Unit in 0..=0;
+field 110 100 result 105;
+field 140 102 unit 106;
+field 120 101 aa 105;
+field 121 101 bb 105;
+field 122 101 ab 105;
+field 123 101 ba 105;
+field 124 101 left 105;
+field 125 101 right 105;
+
+component 400 evaluator {
+ owns 100;
+ reads pre.100;
+ writes post.100;
+ contexts context.102;
+ budget steps 512;
+}
+merge [400];
+law 499 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 1;
+law 500 exact_result on accept = post.100.110 == choose(command.101.120 == 0 && command.101.121 == 0 && (command.101.122 == 0 || command.101.124 == 0 || command.101.125 == 1) && (command.101.123 == 0 || command.101.125 == 0 || command.101.124 == 1), 1, 0);
+law 501 always_answers on reject = false;

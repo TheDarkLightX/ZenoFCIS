@@ -449,3 +449,8 @@ crates/zeno-fcis-cli/tests/fixtures/run-properties-escrow/README.md
 examples/effect-policies/payment-sender/README.md
 docs/loops/contract-probe.md
 EXIT_CODES_AUDIT.md
+experiments/zal-relational/README.md
+experiments/zal-relational/SPECIFICATION.md
+experiments/zal-relational/OPERATIONS.md
+experiments/zal-relational/ASSURANCE.md
+experiments/zal-relational/LADDER.md

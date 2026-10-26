@@ -1,0 +1,19 @@
+{
+  "schema":"zal/relational-query/1",
+  "logic":"zal/c2mod/1",
+  "signature":[{"id":"edge","arity":2}],
+  "formula":{
+    "op":"and",
+    "left":{"op":"forall","var":"x","body":{"op":"not","body":{"op":"atom","predicate":"edge","args":["x","x"]}}},
+    "right":{
+      "op":"and",
+      "left":{"op":"forall","var":"x","body":{"op":"forall","var":"y","body":{
+        "op":"iff","left":{"op":"atom","predicate":"edge","args":["x","y"]},
+        "right":{"op":"atom","predicate":"edge","args":["y","x"]}
+      }}},
+      "right":{"op":"forall","var":"x","body":{"op":"mod_count","var":"y","cmp":"eq","residue":"0","modulus":"2","body":{"op":"atom","predicate":"edge","args":["x","y"]}}}
+    }
+  },
+  "operation":"count", "domain_size":"3", "weights":{"edge":["1","1"]},
+  "context_id":"example-simple-labeled-graph-even-degree"
+}

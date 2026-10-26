@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:zal:relational-query:1",
+  "title": "Proposed ZAL finite relational count query version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "logic", "signature", "formula", "operation", "domain_size", "weights", "context_id"],
+  "properties": {
+    "schema": {"const": "zal/relational-query/1"},
+    "logic": {"enum": ["zal/c2/1", "zal/c2mod/1"]},
+    "signature": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/predicate"}},
+    "formula": {"$ref": "#/$defs/formula"},
+    "operation": {"const": "count"},
+    "domain_size": {"$ref": "#/$defs/positive"},
+    "weights": {"type": "object", "propertyNames": {"$ref": "#/$defs/id"}, "additionalProperties": {"type": "array", "prefixItems": [{"$ref": "#/$defs/rational"}, {"$ref": "#/$defs/rational"}], "minItems": 2, "maxItems": 2}},
+    "context_id": {"type": "string", "minLength": 1, "maxLength": 256}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$", "maxLength": 128},
+    "variable": {"enum": ["x", "y"]},
+    "natural": {"type": "string", "pattern": "^(0|[1-9][0-9]*)$", "maxLength": 256},
+    "positive": {"type": "string", "pattern": "^[1-9][0-9]*$", "maxLength": 256},
+    "rational": {"type": "string", "pattern": "^(0|-?[1-9][0-9]*)(/[1-9][0-9]*)?$", "maxLength": 256},
+    "predicate": {"type": "object", "additionalProperties": false, "required": ["id", "arity"], "properties": {"id": {"$ref": "#/$defs/id"}, "arity": {"enum": [1, 2]}}},
+    "formula": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["op"], "properties": {"op": {"enum": ["true", "false"]}}},
+        {"type": "object", "additionalProperties": false, "required": ["op", "predicate", "args"], "properties": {"op": {"const": "atom"}, "predicate": {"$ref": "#/$defs/id"}, "args": {"type": "array", "minItems": 1, "maxItems": 2, "items": {"$ref": "#/$defs/variable"}}}},
+        {"type": "object", "additionalProperties": false, "required": ["op", "args"], "properties": {"op": {"const": "equal"}, "args": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/variable"}}}},
+        {"type": "object", "additionalProperties": false, "required": ["op", "body"], "properties": {"op": {"const": "not"}, "body": {"$ref": "#/$defs/formula"}}},
+        {"type": "object", "additionalProperties": false, "required": ["op", "left", "right"], "properties": {"op": {"enum": ["and", "or", "implies", "iff"]}, "left": {"$ref": "#/$defs/formula"}, "right": {"$ref": "#/$defs/formula"}}},
+        {"type": "object", "additionalProperties": false, "required": ["op", "var", "body"], "properties": {"op": {"enum": ["forall", "exists"]}, "var": {"$ref": "#/$defs/variable"}, "body": {"$ref": "#/$defs/formula"}}},
+        {"type": "object", "additionalProperties": false, "required": ["op", "var", "cmp", "threshold", "body"], "properties": {"op": {"const": "count"}, "var": {"$ref": "#/$defs/variable"}, "cmp": {"enum": ["eq", "le", "ge"]}, "threshold": {"$ref": "#/$defs/natural"}, "body": {"$ref": "#/$defs/formula"}}},
+        {"type": "object", "additionalProperties": false, "required": ["op", "var", "cmp", "residue", "modulus", "body"], "properties": {"op": {"const": "mod_count"}, "var": {"$ref": "#/$defs/variable"}, "cmp": {"enum": ["eq", "le", "ge"]}, "residue": {"$ref": "#/$defs/natural"}, "modulus": {"$ref": "#/$defs/positive"}, "body": {"$ref": "#/$defs/formula"}}}
+      ]
+    }
+  }
+}
