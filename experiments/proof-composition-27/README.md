@@ -104,6 +104,27 @@ This is a bounded seed for future CEGAR/PDR/CHC, abstraction libraries and
 Crucible search. It is not a general invariant synthesizer, and the proposal
 algorithm itself is neither verified nor trusted.
 
+## Separately frozen safety goals
+
+To prevent an untrusted invariant proposer from deciding what is worth proving,
+the independent `goal_checker.cjs` takes a **separate canonical goal packet**.
+Each goal is an owner-selected Boolean property represented by allowed tuples
+over a declared support and an explicit set of candidate invariant premises.
+It first independently checks induction of the candidate invariants and then
+exhaustively checks that the selected premises imply the goal over their combined
+local support. A failing implication returns a countermodel (not necessarily a
+reachable execution); an excessive support union returns `inconclusive`.
+
+The example generator freezes `chain3-owner-goals.json` independently of
+the proposer. This demonstrates the separation, **not** cryptographic
+authentication of a human's intent or a signed owner approval. The accepted
+claim is still for the declarative finite model, never the generated executable.
+
+```sh
+node experiments/proof-composition-27/propose.cjs /tmp/zfcis-proof-fixtures/chain3-unproven.json /tmp/zfcis-proof-fixtures/chain3-candidate.json
+node experiments/proof-composition-27/run_goals.cjs /tmp/zfcis-proof-fixtures/chain3-candidate.json /tmp/zfcis-proof-fixtures/chain3-owner-goals.json
+```
+
 ## Baseline examples and negative controls
 
 `pairs25.json` represents 50 variables / 50 transfer actions / 25 local
@@ -137,6 +158,7 @@ input/source identity hashes.
 | Compositional invariant proof *under exactly this model semantics* | Complete local enumerations plus mathematical induction argument |
 | Arbitrarily many history steps in the fixed model | Conditional mathematical induction |
 | Ability to verify 50 or 200 variable fixtures without a global product | Reproducible model-specific row counts |
+| Independently checked goal entailment under finite-table semantics | Local complete implication check following verified candidate induction |
 | Native `zeno-fcis contract check-composition /3` refinement | **NOT ESTABLISHED** |
 | Native `.zeno` parser/decision/collection/Authority equivalence | **NOT ESTABLISHED** |
 | Lean/Verus proof of this new checker's soundness or source code | **NOT ESTABLISHED** |
