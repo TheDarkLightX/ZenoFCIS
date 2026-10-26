@@ -1,0 +1,59 @@
+name: zal-relational
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "experiments/zal-relational/**"
+      - "integrations/zal/ladder.py"
+      - "integrations/zal/ladder_en.json"
+      - ".github/workflows/zal-relational.yml"
+  push:
+    branches:
+      - "feat/zal-relational-*"
+    paths:
+      - "experiments/zal-relational/**"
+      - "integrations/zal/ladder.py"
+      - "integrations/zal/ladder_en.json"
+      - ".github/workflows/zal-relational.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zal-relational-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  relational-semantics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install the reference Haskell packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ghc=9.4.7-3 libghc-aeson-dev=2.1.2.1-5 zstd
+
+      - name: Install pinned Lean arithmetic checker
+        env:
+          ZAL_LEAN_URL: https://github.com/leanprover/lean4/releases/download/v4.28.0/lean-4.28.0-linux.tar.zst
+          ZAL_LEAN_SHA256: ceb3a3f844f7aebf63245e2b51c28d5b0ed38942c19f93cf3febd520302160bd
+        run: |
+          ZAL_LEAN_ARCHIVE="$RUNNER_TEMP/zal-lean.tar.zst"
+          curl --fail --location --silent --show-error "$ZAL_LEAN_URL" --output "$ZAL_LEAN_ARCHIVE"
+          printf '%s  %s\n' "$ZAL_LEAN_SHA256" "$ZAL_LEAN_ARCHIVE" | sha256sum --check
+          tar --zstd -xf "$ZAL_LEAN_ARCHIVE" -C "$RUNNER_TEMP"
+          printf '%s\n' "$RUNNER_TEMP/lean-4.28.0-linux/bin" >> "$GITHUB_PATH"
+
+      - name: Qualify the optional backend
+        working-directory: experiments/zal-relational
+        run: python3 validate.py --with-lean
+
+      - name: Report this runner's source-bound result
+        working-directory: experiments/zal-relational
+        run: cat evidence/public-validation.json

@@ -1,0 +1,65 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "zal-relational-component",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "bins_0": "pre.100.110",
+    "bins_1": "pre.100.111",
+    "mass": "pre.100.112",
+    "histogram_0": "command.101.120",
+    "histogram_1": "command.101.121",
+    "unit": "context.102.140"
+  },
+  "cases": [
+    {
+      "when": "histogram_0 + histogram_1 != bins_0",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "bins_1 + histogram_1 > 2",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "bins_0 + bins_1 != mass",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "histogram_0",
+        "111": "bins_1 + histogram_1",
+        "112": "mass"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 2,
+    "111": 0,
+    "112": 2
+  },
+  "law_kinds": {
+    "500": "DebitCreditEffectEquality",
+    "501": "StateInvariant",
+    "502": "DebitCreditEffectEquality",
+    "503": "DebitCreditEffectEquality",
+    "504": "DebitCreditEffectEquality",
+    "505": "DebitCreditEffectEquality"
+  }
+}

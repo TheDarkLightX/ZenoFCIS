@@ -1,0 +1,6 @@
+.build/
+evidence/
+__pycache__/
+*.pyc
+dist-newstyle/
+.ghc.environment.*

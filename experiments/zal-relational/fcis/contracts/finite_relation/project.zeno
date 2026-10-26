@@ -1,0 +1,25 @@
+zeno 1;
+project 1 finite_relation;
+namespace 2 core;
+type 100 state State;
+type 101 command Input;
+type 102 context Context;
+type 105 int Bit in 0..=1;
+type 106 int Unit in 0..=0;
+field 110 100 result 105;
+field 140 102 unit 106;
+table 120 101 owner 105 size 2;
+table 122 101 car 105 size 2;
+table 124 101 has 105 size 4;
+
+component 400 evaluator {
+ owns 100;
+ reads pre.100;
+ writes post.100;
+ contexts context.102;
+ budget steps 512;
+}
+merge [400];
+law 499 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 1;
+law 500 exact_result on accept = post.100.110 == choose(forall i in table 120 { command.101.120[i] == 0 || exists j in table 122 { command.101.122[j] == 1 && command.101.124[i * 2 + j] == 1 } }, 1, 0);
+law 501 always_answers on reject = false;

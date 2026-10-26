@@ -1,0 +1,30 @@
+zeno 1;
+project 1 histogram;
+namespace 2 core;
+type 100 state State;
+type 101 command Input;
+type 102 context Context;
+type 105 int Population in 0..=2;
+type 106 int Mass in 0..=4;
+type 107 int Unit in 0..=0;
+table 110 100 bins 105 size 2;
+field 112 100 mass 106;
+table 120 101 histogram 105 size 2;
+field 140 102 unit 107;
+reason 200 bad_histogram precedence 0;
+reason 201 at_capacity precedence 1;
+reason 202 inconsistent_mass precedence 2;
+component 400 evaluator {
+ owns 100;
+ reads pre.100;
+ writes post.100;
+ contexts context.102;
+ budget steps 512;
+}
+merge [400];
+law 500 exact_move on accept = post.100.110 == command.101.120 && post.100.111 == pre.100.111 + command.101.121 && post.100.112 == pre.100.112;
+law 501 mass_conserved on commit, genesis = sum i in table 110 { post.100.110[i] } == post.100.112;
+law 502 valid_move on accept = !(sum i in table 120 { command.101.120[i] } != pre.100.110) && !(pre.100.111 + command.101.121 > 2) && !(pre.100.110 + pre.100.111 != pre.100.112);
+law 503 bad_histogram_reason on reject:200 = sum i in table 120 { command.101.120[i] } != pre.100.110;
+law 504 overflow_reason on reject:201 = !(sum i in table 120 { command.101.120[i] } != pre.100.110) && (pre.100.111 + command.101.121 > 2);
+law 505 mass_reason on reject:202 = !(sum i in table 120 { command.101.120[i] } != pre.100.110) && !(pre.100.111 + command.101.121 > 2) && (pre.100.110 + pre.100.111 != pre.100.112);

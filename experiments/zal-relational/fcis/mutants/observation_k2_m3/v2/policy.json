@@ -1,0 +1,61 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "zal-relational-component",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "value": "pre.100.110",
+    "delta": "command.101.120",
+    "mode": "command.101.121",
+    "unit": "context.102.140"
+  },
+  "cases": [
+    {
+      "when": "mode == 0 && value + delta > 2",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "mode == 1 && value + delta > 2",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "2"
+      },
+      "outbox": []
+    },
+    {
+      "when": "mode == 2 && value + delta >= 3",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "2"
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "value + delta"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0
+  },
+  "law_kinds": {
+    "499": "StateInvariant",
+    "500": "DebitCreditEffectEquality",
+    "501": "DebitCreditEffectEquality",
+    "503": "DebitCreditEffectEquality"
+  }
+}
