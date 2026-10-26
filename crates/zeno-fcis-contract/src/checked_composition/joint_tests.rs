@@ -316,3 +316,114 @@ fn the_constructor_refuses_tables_over_the_ceiling_before_building() {
         "{refusal}"
     );
 }
+
+/// Experimental 2.7 native bridge: check a source-pinned Zeno composition
+/// through BOTH the production composed-domain checker and its bound Authority
+/// joint-step API, against an independently written complete scalar reference.
+///
+/// The tested profile is the committed guarded-budget fixture only. Matching
+/// its finite transitions is differential evidence, NOT a machine-checked
+/// parser/Authority-to-Verus refinement theorem, nor deployment authority.
+#[test]
+fn native_bridge_27_guarded_budget_matches_independent_complete_reference() {
+    let (manifest, sources) = committed("guarded/composition.json");
+    let bundle = DomainSources {
+        manifest: &manifest,
+        components: &sources,
+    };
+    let checked = super::check_domain(&bundle).unwrap_or_else(fail);
+    assert_eq!(checked.verdict(), super::Verdict::Proved, "{}", checked.json());
+    let joint = JointComposition::from_sources(&bundle).unwrap_or_else(fail);
+
+    assert_eq!(joint.components(), ["guard", "budget"]);
+    assert_eq!(joint.genesis(), [3]);
+    assert_eq!(joint.state_layout().len(), 1);
+    assert_eq!(joint.state_layout()[0].component, "budget");
+    assert_eq!(joint.state_layout()[0].field, "remaining");
+    assert_eq!(
+        joint.state_layout()[0].domain,
+        FieldDomain::Int { min: 0, max: 3 }
+    );
+    assert_eq!(joint.request_layout().len(), 2);
+    assert_eq!(joint.request_layout()[0].name, "amount");
+    assert_eq!(joint.request_layout()[1].name, "authorized");
+    assert_eq!(joint.request_layout()[1].domain, FieldDomain::Bool);
+
+    let mut compared = 0usize;
+    let mut accepted = 0usize;
+    let mut rejected_auth = 0usize;
+    let mut rejected_funds = 0usize;
+    // This reference does not call, wrap or import the Authority decision
+    // table interpreter. It is independently stated owner intent.
+    // This tests the entire declared finite product, never samples.
+    for remaining in 0i128..=3 {
+        for amount in 0i128..=3 {
+            for authorized in 0i128..=1 {
+                let got = step(&joint, &[remaining], &[amount, authorized]);
+                let want = if authorized == 0 {
+                    rejected_auth += 1;
+                    JointOutcome {
+                        kind: OutcomeKind::Reject {
+                            component: "guard".to_owned(),
+                            reason: Some(200),
+                        },
+                        successor: vec![remaining],
+                    }
+                } else if amount > remaining {
+                    rejected_funds += 1;
+                    JointOutcome {
+                        kind: OutcomeKind::Reject {
+                            component: "budget".to_owned(),
+                            reason: Some(201),
+                        },
+                        successor: vec![remaining],
+                    }
+                } else {
+                    accepted += 1;
+                    JointOutcome {
+                        kind: OutcomeKind::Accept,
+                        successor: vec![remaining - amount],
+                    }
+                };
+                assert_eq!(
+                    got, want,
+                    "native composed-domain disagreement at remaining={remaining}, amount={amount}, authorized={authorized}"
+                );
+                assert!(got.successor[0] <= remaining);
+                assert!((0..=3).contains(&got.successor[0]));
+                compared += 1;
+            }
+        }
+    }
+    assert_eq!(compared, 32);
+    assert_eq!(rejected_auth, 16);
+    assert_eq!(rejected_funds, 6);
+    assert_eq!(accepted, 10);
+
+    // Every reachable state x every request must appear. A smaller limit
+    // MUST refuse, never silently truncate and then grant coverage.
+    let reachable = joint.reachable(32).unwrap_or_else(fail);
+    assert_eq!(reachable.len(), 32);
+    assert!(joint.reachable(31).is_err());
+    for row in reachable {
+        let expected = step(&joint, &row.state, &row.request);
+        assert_eq!(row.outcome, expected);
+        assert!((0..=3).contains(&row.outcome.successor[0]));
+    }
+}
+
+/// External source-byte commitments are checked BEFORE runtime binding and
+/// proof-like checking; changing project text invalidates both.
+#[test]
+fn native_bridge_27_tampering_one_component_source_fails_closed() {
+    let (manifest, mut sources) = committed("guarded/composition.json");
+    sources[0]
+        .project
+        .push_str("\n// deliberately changed after manifest pin\n");
+    let bundle = DomainSources {
+        manifest: &manifest,
+        components: &sources,
+    };
+    assert!(JointComposition::from_sources(&bundle).is_err());
+    assert!(super::check_domain(&bundle).is_err());
+}
