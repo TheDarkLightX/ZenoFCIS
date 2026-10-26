@@ -133,6 +133,54 @@ global oracle are compared on the reference models and seeded transition
 mutations. The reference is a cross-check, **not a machine-checked
 refinement theorem**, and runs in the same JavaScript runtime.
 
+## Native parser and Authority differential bridge (unqualified)
+
+The same draft PR now carries **four Rust tests in the actual
+`zeno-fcis-contract` crate**, rather than only JavaScript abstract models.
+These test sources have been committed, but a pinned Rust compiler is
+unavailable in the current execution environment and the corresponding GitHub
+workflow is queued. No native PASS or fully proved refinement is claimed.
+
+The focused tests are:
+
+- `native_bridge_27_guarded_budget_matches_independent_complete_reference`:
+  the real `check_domain` checker and `JointComposition::joint_step` bind
+  the committed two-component `.zeno` guarded-budget fixture. An independently
+  authored Rust reference compares **all 32** declared state/request tuples,
+  including authorization-first rejection, insufficient-budget rejection,
+  unchanged state on rejection and exact accepted decrements. The separate
+  native reachability enumeration must close at 32 rows; a cap of 31 refuses.
+- `native_bridge_27_tampering_one_component_source_fails_closed`: changing
+  the guard's source after its manifest was pinned must be rejected by both
+  native binding and the composed-domain checker.
+- `native_27_fifty_source_bound_components_keep_a_coupling_without_global_product`:
+  instantiate **25 and 50 independently named native Zeno contract instances**
+  (reusing the same reviewed bounded-counter source), with an actual
+  two-component equality coupling. The native checker must prove all local,
+  assumption and coupling obligations without enumerating the full product.
+  The same source-bound joint-step API must accept a valid simultaneous
+  increment and roll back all provisional Accepts if a late component rejects.
+- `native_27_noninductive_coupling_refutes_even_with_fifty_valid_components`:
+  the native coupling checker must refute a deliberately noninductive global
+  claim while all 50 component-local checks remain valid.
+
+**Do not confuse 50 instances of one small contract with 50 distinct
+codebases.** This is a first production-API scaling and correspondence
+*regression test*, not a theorem connecting the parser, Authority, proof
+obligations and full application shell. In particular, the actual 2.6
+composed-domain proof still has tested bridges and the full production
+implementation-to-Verus refinement remains open.
+
+The companion CI workflow has a new isolated pinned-Rust job:
+
+```sh
+cargo +1.97.1 test --locked --offline -p zeno-fcis-contract --lib native_bridge_27_ -- --nocapture
+cargo +1.97.1 test --locked --offline -p zeno-fcis-contract --lib native_27_ -- --nocapture
+```
+
+Hosted compilation, complete source-bound qualification, independent review,
+and the implementation-to-proof theorem are still required.
+
 ## Global conservation across many connected components
 
 A second independent checker, `linear_checker.cjs`, proves a **single global**
@@ -246,6 +294,7 @@ input/source identity hashes.
 | Arbitrarily many history steps in the fixed model | Conditional mathematical induction |
 | Ability to verify 50 or 200 variable fixtures without a global product | Reproducible model-specific row counts |
 | Independently checked goal entailment under finite-table semantics | Local complete implication check following verified candidate induction |
+| Native parser/Authority finite bridge test source | Four exact Rust regressions added; pinned native CI not yet passed |
 | Native `zeno-fcis contract check-composition /3` refinement | **NOT ESTABLISHED** |
 | Native `.zeno` parser/decision/collection/Authority equivalence | **NOT ESTABLISHED** |
 | Lean/Verus proof of this new checker's soundness or source code | **NOT ESTABLISHED** |
