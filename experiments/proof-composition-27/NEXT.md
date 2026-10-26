@@ -34,8 +34,15 @@ publication authority simply by returning success.
   delta checks (882/3,582 action rows); verify leakage mutants and goal tampering.
   Do not count this as the held-out benchmark for native `.zeno` contracts.
 - [x] Return explicit claim scope and no publication authority.
-- [ ] Obtain clean, hosted Node.js test and conformance workflow result at
-  the exact PR head (local executable qualification is not assumed).
+- [x] Commit **native Rust test sources** for the actual .zeno parser,
+  check_domain and bound Authority joint-step API over the complete 32-tuple
+  guarded-budget profile, with a source-pin negative control.
+- [x] Commit native **25/50 separately named contract instance** scaling
+  tests with one real coupling, a noninductive coupling mutant, positive
+  joint-state updates and late-Reject rollback. These are tests awaiting
+  qualification, not proved native production refinement.
+- [ ] Obtain clean hosted Node.js **and pinned native Rust** test runs at
+  the exact PR head; no hosted PASS is currently established.
 - [ ] Independently review the checker's mathematical argument and mutation
   strength; retain revisions and negative evidence.
 
