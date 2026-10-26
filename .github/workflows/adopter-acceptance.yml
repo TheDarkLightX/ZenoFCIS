@@ -22,6 +22,8 @@ env:
   # Keep unrelated process-spawning tests from inheriting a journey's file lock.
   # Tests that exercise concurrency explicitly still run those operations.
   RUST_TEST_THREADS: "1"
+  # Match the native CI stack used by the complete workspace test step.
+  RUST_MIN_STACK: "33554432"
   # Use the same native profile as local acceptance, retaining runtime checks.
   CARGO_PROFILE_DEV_OPT_LEVEL: "1"
   CARGO_PROFILE_DEV_DEBUG_ASSERTIONS: "true"

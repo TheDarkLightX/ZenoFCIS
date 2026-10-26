@@ -315,8 +315,10 @@ executions, nor replace the native products or formal proofs. A timed-out
 Miri run is incomplete, never passing evidence.
 
 The publication, values, specification, synthesis-library, synthesis-finite,
-template-contract remainder, focused treasury replay and three historical
-groups use the pinned interpreter's Tree Borrows alias model. Other groups
+template-contract remainder, focused treasury replay, retained inventory
+examples, order-fulfillment example batches, the final withdrawal example
+and three historical groups use the pinned interpreter's Tree Borrows alias
+model. Other groups
 use Stacked Borrows. Both retain strict provenance and the default validity,
 bounds, alignment, data-race and leak checks. The alias-model switch retains
 the selected cases in these groups.
@@ -329,21 +331,25 @@ Miri runs a bounded streaming test with three published vectors, every split of
 those vectors, and lengths around the 56-, 64-, 128- and 256-byte boundaries.
 The specification's generated-input test interprets at most 32 seeded cases;
 its native default remains 1,000. Deterministic nesting and refusal cases are
-unchanged. The effect-resumption test retains every scenario, order, policy
-and final-closure assertion. Miri keeps the initial seven-step checkpoint and
-first 127-step resume, then uses 4,096-step chunks; native runs retain every
-127-step cut. These changes reduce interpreted executions or pause schedules;
-they do not establish UB freedom for the omitted executions.
+unchanged. The specification's 64-entry combinatorial count expansion and
+43,008-case count truth table remain native. Miri retains small expansion
+comparisons, linear count boundaries, reparsing and stable-ID checks.
+The full effect-resumption closure comparison remains native after
+another four-hour Miri timeout. Native runs retain all eight scenario, order
+and policy combinations, every 127-step cut and exact final-closure equality.
+Miri keeps bounded incomplete exploration, checkpoint source/profile refusal,
+durable restart and transcript/history checks. It does not establish UB freedom
+for the omitted resumed-to-completion executions.
 
 Each Miri group has a 240-minute budget. The synthesis `completion` tests
-run their eight graph-seed groups separately. Fourteen larger synthesis-library
+run their eight graph-seed groups separately. Twenty-seven larger synthesis-library
 tests and the retained template checks also have separate groups. Splitting
 these tests preserves their cases and assertions; the native-only exclusions
 listed above account for the omitted interpreted executions.
 
 The publication remainder runs in eight compiled-test partitions, the
 synthesis-library remainder in sixteen, values and specification in four each,
-and the finite remainder in two. The 88 logical groups therefore use 117
+and the finite remainder in two. The 101 logical groups therefore use 130
 interpreter jobs. Values and specification run documentation examples in separate
 complete groups: Rustdoc and libtest interpret exact-name filters differently.
 Each partition retains the original filters, lists the

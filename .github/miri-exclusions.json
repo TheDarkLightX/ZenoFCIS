@@ -420,6 +420,42 @@
         "job": "rust",
         "command": "cargo +1.97.1 test --workspace --all-features --locked"
       }
+    },
+    {
+      "group": "publication",
+      "package": "zeno-fcis-shell",
+      "test_binary": "evidence_checks",
+      "test": "resumed_search_matches_uninterrupted_closure",
+      "reason": "Hosted run 40313167059, job 121539106456, reached its 240-minute limit after spending about 228 minutes in this full closure comparison, even with larger later resume chunks. Native CI retains all eight scenario/order/policy combinations, every 127-step resume and exact final equality. Miri retains bounded incomplete exploration, source/profile checkpoint-substitution refusal, durable restart/reservation, transcript tamper/replay and exact history/delivery checks. Full resumed-to-completion schedule exploration is native only; no Miri UB, provenance or aliasing coverage is claimed for those omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "specification",
+      "package": "zeno-fcis-spec",
+      "test_binary": "tables",
+      "test": "table_count_sizes_before_and_after_linear_values",
+      "reason": "Hosted run 40313167059, job 121539106607, reached its 240-minute limit. The tables binary spent about 145 minutes in its first selected count-size case without completing it. Native CI retains sizes 6, 16 and 64, including the 41,664-clause expansion. Miri retains the explicit small count expansion, linear count/value boundary cases, reparsing and stable-ID checks. No interpreted coverage is claimed for the omitted large expansion.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "specification",
+      "package": "zeno-fcis-spec",
+      "test_binary": "tables",
+      "test": "tables_count_matches_direct_counting_on_every_assignment",
+      "reason": "The complete count truth table has 42 operator/bound combinations and 1,024 assignments per combination (43,008 comparisons). It remains unchanged in native CI. The focused Miri profile retains explicit expansion equivalence and the count boundary cases instead of repeating this exhaustive corpus. The preceding count-size case timed out before this case was reached; no individual timeout or Miri UB-freedom claim is made for this omitted truth table.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
     }
   ]
 }

@@ -367,7 +367,7 @@ class RepairedRegistryTests(unittest.TestCase):
         isolated = [row["test"] for row in library if "test" in row]
         self.assertEqual([row["group"] for row in remainder], ["synthesis-library"])
         selected_remainder = next(row for row in raw_rows if row["group"] == "synthesis-library")
-        self.assertEqual(len(isolated), 14)
+        self.assertEqual(len(isolated), 27)
         # Each isolated name is one real library unit test, so CI cannot be
         # first to discover a misspelt selector.
         listed = subprocess.run(
@@ -501,7 +501,7 @@ class RepairedRegistryTests(unittest.TestCase):
                               + TEMPLATE_PROFILE_TESTS + [TEMPLATE_FOCUSED_REPLAY])
         entries = miri_exclusions.load_exclusions()
         self.assertEqual([e["test"] for e in entries if e["group"] == remainder["group"]], native_only)
-        self.assertEqual(len(entries), 35)
+        self.assertEqual(len(entries), 38)
         rust = (atdd.ROOT / TEMPLATE_TESTS).read_text()
         self.assertEqual(template_profile_problems(rust), [])
         sum_native = sum(size for _, size, _, _ in TEMPLATE_CORPORA)
