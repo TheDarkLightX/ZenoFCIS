@@ -74,7 +74,46 @@ function budget(which, maximum, declared) {
   return declared === undefined ? maximum : declared;
 }
 
-function verify(model, limits = {}) {
+// Selected pre-state hypotheses must themselves be discharged as part of
+// the same simultaneous induction. Circular dependencies are permissible:
+// genesis establishes the conjunction and all actions preserve it.
+const STRENGTHENING_SCHEMA = 'zeno-fcis/local-strengthening/experimental-1';
+function validateStrengthening(packet, invariants, actions) {
+  const found = new Map();
+  if (packet === null) return found;
+  record(packet, 'strengthening', ['schema', 'bindings']);
+  requireThat(packet.schema === STRENGTHENING_SCHEMA, 'strengthening: unsupported schema');
+  requireThat(Array.isArray(packet.bindings) && packet.bindings.length <= 10000,
+    'strengthening: invalid binding count');
+  let previous = '';
+  for (const b of packet.bindings) {
+    record(b, 'strengthening.binding', ['invariant', 'action', 'assuming']);
+    id(b.invariant, 'strengthening.invariant');
+    id(b.action, 'strengthening.action');
+    requireThat(invariants.has(b.invariant) && actions.has(b.action),
+      'strengthening: unknown invariant or action');
+    requireThat(actions.get(b.action).writes.some(n => invariants.get(b.invariant).support.includes(n)),
+      'strengthening: unused action/frame binding');
+    const identity = b.invariant + ':' + b.action;
+    requireThat(identity > previous, 'strengthening: unsorted or repeated binding');
+    previous = identity;
+    requireThat(Array.isArray(b.assuming) && b.assuming.length > 0 &&
+      b.assuming.length <= 24, 'strengthening: invalid hypothesis count');
+    const selected = [];
+    for (const assumption of b.assuming) {
+      id(assumption, 'strengthening.assuming');
+      requireThat(assumption !== b.invariant && invariants.has(assumption),
+        'strengthening: self or unknown hypothesis');
+      requireThat(!selected.length || selected[selected.length - 1].id < assumption,
+        'strengthening: unsorted or repeated hypothesis');
+      selected.push(invariants.get(assumption));
+    }
+    found.set(identity, selected);
+  }
+  return found;
+}
+
+function verify(model, limits = {}, strengthening = null) {
   record(limits, 'limits', Object.keys(limits)); // validated explicitly below
   for (const name of Object.keys(limits)) {
     requireThat(name === 'obligationRows' || name === 'totalObligationRows', 'unknown limit ' + name);
@@ -148,6 +187,7 @@ function verify(model, limits = {}) {
     invariants.set(p.id, { ...p, allowedSet: allowed });
   }
 
+  const assumptions = validateStrengthening(strengthening, invariants, actions);
   for (const p of invariants.values()) {
     const initial = p.support.map(n => variables.get(n).initial);
     if (!p.allowedSet.has(key(initial))) {
@@ -163,7 +203,10 @@ function verify(model, limits = {}) {
   for (const p of invariants.values()) {
     for (const a of actions.values()) {
       if (!a.writes.some(n => p.support.includes(n))) continue; // exact frame
-      const names = [...new Set([...p.support, ...a.reads])].sort();
+      const using = assumptions.get(p.id + ':' + a.id) || [];
+      const names = [...new Set([
+        ...p.support, ...a.reads, ...using.flatMap(q => q.support)
+      ])].sort();
       const count = sizeOf(names, variables);
       if (count > BigInt(maxPer) || total + count > BigInt(maxTotal)) {
         return result('inconclusive', 'obligation-budget', {
@@ -173,13 +216,13 @@ function verify(model, limits = {}) {
         });
       }
       total += count;
-      planned.push({ p, a, names, count: Number(count) });
+      planned.push({ p, a, using, names, count: Number(count) });
     }
   }
 
   let checked = 0, premises = 0, enabled = 0;
   const obligations = [];
-  for (const { p, a, names, count } of planned) {
+  for (const { p, a, using, names, count } of planned) {
     let localPremises = 0, localEnabled = 0, failure = null;
     tuples(names, variables, tuple => {
       if (failure) return;
@@ -187,6 +230,9 @@ function verify(model, limits = {}) {
       const state = Object.fromEntries(names.map((n, j) => [n, tuple[j]]));
       const before = p.support.map(n => state[n]);
       if (!p.allowedSet.has(key(before))) return;
+      // A candidate lemma is useful only where it holds on the pre-state;
+      // every lemma is separately required to be preserved by all actions.
+      if (using.some(q => !q.allowedSet.has(key(q.support.map(n => state[n]))))) return;
       premises++;
       localPremises++;
       const read = a.reads.map(n => state[n]);
@@ -197,7 +243,8 @@ function verify(model, limits = {}) {
       localEnabled++;
       const after = p.support.map(n => a.writeOffsets.has(n) ? next[a.writeOffsets.get(n)] : state[n]);
       if (!p.allowedSet.has(key(after))) {
-        failure = { invariant: p.id, action: a.id, frame: names, state: tuple,
+        failure = { invariant: p.id, action: a.id, assumed: using.map(q => q.id),
+          frame: names, state: tuple,
           read, writes: a.writes, written: next, invariant_before: before, invariant_after: after };
       }
     });
@@ -207,17 +254,19 @@ function verify(model, limits = {}) {
         global_states: states.toString()
       });
     }
-    obligations.push({ invariant: p.id, action: a.id, local_states: count,
-      admissible_pre_rows: localPremises, enabled_pre_rows: localEnabled });
+    requireThat(localPremises > 0, 'internal error: inconsistent induction hypotheses');
+    obligations.push({ invariant: p.id, action: a.id, assumed: using.map(q => q.id),
+      local_states: count, admissible_pre_rows: localPremises, enabled_pre_rows: localEnabled });
   }
-  return result('proved', 'all-local-induction-obligations-checked', {
+  return result('proved', strengthening ? 'all-mutual-induction-obligations-checked' : 'all-local-induction-obligations-checked', {
     global_states: states.toString(),
     monolithic_event_rows: (states * BigInt(actions.size)).toString(),
     variables: variables.size, actions: actions.size, invariants: invariants.size,
+    strengthening_bindings: assumptions.size,
     checked_action_table_rows: tableRows, planned_obligation_rows: total.toString(),
     checked_obligation_rows: checked, premise_rows: premises, enabled_rows: enabled,
     obligations,
-    theorem: 'By simultaneous induction over arbitrary finite or unbounded action histories, all declared invariants hold for every reachable state of this exact finite-table model. All actions change only their declared write fields. No generated source or shell is covered.'
+    theorem: 'By simultaneous induction over arbitrary finite or unbounded action histories, the conjunction of all invariants holds for every reachable state of this exact finite-table model. Each obligation assumes selected conjuncts only in the pre-state, proves its target after the step, and relies on the declared frame rule. No executable or shell refinement is covered.'
   });
 }
-module.exports = { SCHEMA, MAX, verify };
+module.exports = { SCHEMA, STRENGTHENING_SCHEMA, MAX, verify };
