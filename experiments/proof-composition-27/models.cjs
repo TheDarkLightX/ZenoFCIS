@@ -85,4 +85,30 @@ function mutualStrengthening() {
   };
 }
 
-module.exports = { makePairs, makeChain, makeMutual, mutualStrengthening };
+function makeLinkedLedger(count) {
+  if (!Number.isSafeInteger(count) || count < 3 || count > 200)
+    throw new Error('ledger size must be 3..200');
+  const variables = [];
+  for (let i = 0; i < count; i++) variables.push({
+    id: 'v' + String(i).padStart(3, '0'),
+    domain: [0, 1, 2], initial: i === 0 ? 2 : 0
+  });
+  const actions = [];
+  for (let i = 0; i + 1 < count; i++) {
+    const a = variables[i].id, b = variables[i + 1].id;
+    actions.push(...twoWay(a, b, 'move_' + String(i).padStart(3, '0') + '_' +
+      String(i + 1).padStart(3, '0')));
+  }
+  // Trivial native-model admission only; the global property is established
+  // separately by linear_checker, from every exact declared action row.
+  return { schema: SCHEMA, variables, actions, invariants: [
+    { id: 'admission_tautology', support: ['v000'], allowed: [[0], [1], [2]] }
+  ] };
+}
+function linearGoal(model) {
+  return { schema: 'zeno-fcis/linear-conservation/experimental-1',
+    weights: model.variables.map(v => ({ variable: v.id, coefficient: 1 })),
+    expected_sum: '2' };
+}
+
+module.exports = { makePairs, makeChain, makeMutual, mutualStrengthening, makeLinkedLedger, linearGoal };
