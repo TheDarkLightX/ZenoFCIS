@@ -831,6 +831,40 @@ fn native_27_fifty_source_bound_components_keep_a_coupling_without_global_produc
         // This is an actual 2.6 composition check, not synthetic JS rows.
         let (decisions, formula_cells) = result.work();
         assert!(decisions > 0 && formula_cells > 0);
+
+        // Evaluate the REAL joint-step API on the same source-backed
+        // composition, not merely the compositional proof's row counts.
+        let manifest = built.text();
+        let joint = super::JointComposition::from_sources(&DomainSources {
+            manifest: &manifest,
+            components: &built.sources,
+        })
+        .unwrap_or_else(fail);
+        assert_eq!(joint.state_layout().len(), n);
+        assert_eq!(joint.genesis(), vec![0i128; n]);
+        let initial = vec![0i128; n];
+        let positive = joint
+            .joint_step(&initial, &[0, 1, 1])
+            .unwrap_or_else(fail);
+        assert_eq!(positive.kind, super::OutcomeKind::Accept);
+        assert_eq!(positive.successor, vec![1i128; n]);
+
+        // A late Reject must roll back every earlier provisional Accept,
+        // including across 50 components. This is PURE joint-step behavior,
+        // not a SQLite transaction or external-effect durability proof.
+        let mut full_late = vec![0i128; n];
+        full_late[n - 1] = 2;
+        let refusal = joint
+            .joint_step(&full_late, &[0, 1, 1])
+            .unwrap_or_else(fail);
+        assert_eq!(
+            refusal.kind,
+            super::OutcomeKind::Reject {
+                component: format!("counter_{:02}", n - 1),
+                reason: Some(201),
+            }
+        );
+        assert_eq!(refusal.successor, full_late);
     }
 }
 
