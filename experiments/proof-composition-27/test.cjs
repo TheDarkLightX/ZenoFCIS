@@ -415,3 +415,86 @@ test('global oracle refuses to enumerate enormous composition products', () => {
   assert.equal(o.status, 'inconclusive');
   assert.equal(o.examined, 0);
 });
+
+const { checkLinear } = require('./linear_checker.cjs');
+const { makeLinkedLedger, linearGoal } = require('./models.cjs');
+test('connected 50-variable ledger proves a global sum without enumerating 3^50 states', () => {
+  const m = makeLinkedLedger(50);
+  const r = checkLinear(m, linearGoal(m));
+  assert.equal(r.status, 'proved');
+  assert.equal(r.global_conservation_established, true);
+  assert.equal(r.global_states, (3n ** 50n).toString());
+  assert.equal(r.action_delta_rows, 882);
+  assert.equal(r.actions, 98);
+  assert.equal(r.publication_authority, false);
+});
+test('connected 200-variable ledger proves a global sum from 3582 local rows', () => {
+  const m = makeLinkedLedger(200);
+  const r = checkLinear(m, linearGoal(m));
+  assert.equal(r.status, 'proved');
+  assert.equal(r.global_states, (3n ** 200n).toString());
+  assert.equal(r.action_delta_rows, 3582);
+  assert.equal(r.actions, 398);
+});
+test('non-conservative transfer is refuted even when model-admission invariant is tautological', () => {
+  const m = makeLinkedLedger(50);
+  m.actions[0].table.find(row => row.at[0] === 1 && row.at[1] === 1).next = [0, 0];
+  const report = checkLinear(m, linearGoal(m));
+  assert.equal(report.status, 'violated');
+  assert.equal(report.reason, 'weighted-delta-violation');
+  assert.equal(report.exact_delta, '-2');
+});
+test('frozen global total cannot be changed without a genesis failure', () => {
+  const m = makeLinkedLedger(3);
+  const goal = linearGoal(m);
+  goal.expected_sum = '3';
+  const report = checkLinear(m, goal);
+  assert.equal(report.status, 'violated');
+  assert.equal(report.reason, 'genesis-global-conservation');
+});
+test('partial, duplicate, zero and unrepresentable coefficient vectors refuse', () => {
+  const m = makeLinkedLedger(3);
+  let g = linearGoal(m); g.weights.pop();
+  assert.throws(() => checkLinear(m, g), /must name every variable exactly once/);
+  g = linearGoal(m); g.weights[1] = { ...g.weights[0] };
+  assert.throws(() => checkLinear(m, g), /unsorted, missing or duplicate/);
+  g = linearGoal(m); g.weights.forEach(w => w.coefficient = 0);
+  assert.throws(() => checkLinear(m, g), /all-zero weight vector/);
+  g = linearGoal(m); g.weights[1].coefficient = Number.MAX_SAFE_INTEGER;
+  assert.throws(() => checkLinear(m, g), /unrepresentable weight/);
+});
+test('small global conservation agrees with exhaustive three-account reference', () => {
+  const m = makeLinkedLedger(3), goal = linearGoal(m);
+  const allowed = [];
+  for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++)
+    for (let c = 0; c < 3; c++) if (a + b + c === 2) allowed.push([a, b, c]);
+  m.invariants = [{ id: 'global_exact', support: ['v000', 'v001', 'v002'], allowed }];
+  assert.equal(verify(m).status, 'proved');
+  assert.equal(examine(m).status, 'proved');
+  assert.equal(examine(m).reachable_safety, 'safe');
+  assert.equal(checkLinear(m, goal).status, 'proved');
+});
+test('independent conservation CLI freezes exact model and goal identities', () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'zfcis-linear-'));
+  try {
+    const m = makeLinkedLedger(50), goal = linearGoal(m);
+    const a = path.join(folder, 'model.json');
+    const b = path.join(folder, 'goal.json');
+    fs.writeFileSync(a, canonicalJSON(m));
+    fs.writeFileSync(b, canonicalJSON(goal));
+    const p = spawnSync(process.execPath, [path.join(__dirname, 'run_linear.cjs'), a, b],
+      { encoding: 'utf8', timeout: 15000 });
+    assert.equal(p.status, 0, p.stderr);
+    const report = JSON.parse(p.stdout);
+    assert.equal(report.global_conservation_established, true);
+    assert.match(report.goal_sha256, /^[0-9a-f]{64}$/);
+    assert.match(report.model_sha256, /^[0-9a-f]{64}$/);
+    assert.equal(report.executable_refinement, false);
+    const tampered = makeLinkedLedger(50);
+    tampered.actions[0].table.find(row => row.at[0] === 1 && row.at[1] === 1).next = [0, 0];
+    fs.writeFileSync(a, canonicalJSON(tampered));
+    const falseProof = spawnSync(process.execPath, [path.join(__dirname, 'run_linear.cjs'), a, b],
+      { encoding: 'utf8', timeout: 15000 });
+    assert.equal(falseProof.status, 1, falseProof.stderr);
+  } finally { fs.rmSync(folder, { recursive: true, force: true }); }
+});
