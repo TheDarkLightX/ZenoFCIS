@@ -23,6 +23,12 @@ publication authority simply by returning success.
 - [x] Keep owner-selected safety goals in a separate, canonical packet;
   check entailment from already verified candidate invariants without allowing
   the untrusted proposer to edit the goal.
+- [x] Check circular assume-guarantee lemma dependencies with a full
+  simultaneous induction and explicit, source-bound strengthening file;
+  failure of either target obligation blocks every final goal claim.
+- [x] Implement an independent small full-global-state oracle that separately
+  evaluates induction and actual reachable safety, with 30 deterministic
+  mutation comparisons and fail-closed global-product limits.
 - [x] Return explicit claim scope and no publication authority.
 - [ ] Obtain clean, hosted Node.js test and conformance workflow result at
   the exact PR head (local executable qualification is not assumed).
