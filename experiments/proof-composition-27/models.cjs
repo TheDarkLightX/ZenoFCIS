@@ -51,4 +51,38 @@ function makeChain() {
   return { schema: SCHEMA, variables, actions,
     invariants: [{ id: 'supply_conservation', support: ['a', 'b', 'c'], allowed }] };
 }
-module.exports = { makePairs, makeChain };
+function makeMutual() {
+  // Each invariant needs the OTHER invariant to be inductive. Circular use is
+  // sound only when every conjunct is proved under a common simultaneous
+  // induction, including the initial state.
+  const domain = [0, 1];
+  const table = fn => domain.flatMap(x => domain.map(y => ({
+    at: [x, y], next: [fn(x, y)]
+  })));
+  return {
+    schema: SCHEMA,
+    variables: [
+      { id: 'x', domain: domain.slice(), initial: 0 },
+      { id: 'y', domain: domain.slice(), initial: 0 }
+    ],
+    actions: [
+      { id: 'set_x', reads: ['x', 'y'], writes: ['x'], table: table((x, y) => y) },
+      { id: 'set_y', reads: ['x', 'y'], writes: ['y'], table: table((x, y) => x) }
+    ],
+    invariants: [
+      { id: 'x_zero', support: ['x'], allowed: [[0]] },
+      { id: 'y_zero', support: ['y'], allowed: [[0]] }
+    ]
+  };
+}
+function mutualStrengthening() {
+  return {
+    schema: 'zeno-fcis/local-strengthening/experimental-1',
+    bindings: [
+      { invariant: 'x_zero', action: 'set_x', assuming: ['y_zero'] },
+      { invariant: 'y_zero', action: 'set_y', assuming: ['x_zero'] }
+    ]
+  };
+}
+
+module.exports = { makePairs, makeChain, makeMutual, mutualStrengthening };
