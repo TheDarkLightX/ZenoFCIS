@@ -831,6 +831,11 @@ fn native_27_fifty_source_bound_components_keep_a_coupling_without_global_produc
         // This is an actual 2.6 composition check, not synthetic JS rows.
         let (decisions, formula_cells) = result.work();
         assert!(decisions > 0 && formula_cells > 0);
+        println!(
+            "native_27_scaling instances={n} local_and_coupling_rows={} monolithic_states={} authority_decisions={decisions} formula_cells={formula_cells}",
+            result.evaluated(),
+            report["monolithic"]["states"],
+        );
 
         // Evaluate the REAL joint-step API on the same source-backed
         // composition, not merely the compositional proof's row counts.
