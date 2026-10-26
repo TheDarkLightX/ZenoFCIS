@@ -82,12 +82,56 @@ The invariant must accurately capture the human-intended property;
 conservation of a model's integers does not automatically imply a real
 system's business correctness.
 
-The method is sound but incomplete. The current proof uses each invariant as
-its own inductive hypothesis: it does not strengthen one obligation with
-other invariants, PDR, IC3, CHC solving, CEGAR or symbolic arithmetic.
+The method is sound but incomplete. By default, each invariant is checked
+using only itself as a pre-state hypothesis. An optional **separate strengthening
+manifest** selects other invariants as assumptions for particular action/goal
+obligations. The verifier checks **every** invariant's genesis and preservation
+obligations together: this is *mutual induction*, so circular proof dependencies
+are sound when the whole conjunction is inductive. Hypotheses affect pre-state
+filtering only and can increase the checked local support; an oversized union
+returns `inconclusive`, not a partial proof. PDR, IC3, CHC solving, CEGAR and
+symbolic arithmetic are still unimplemented.
 The amount of work is still exponential in the *local* union `U(P,a)`.
 A genuinely global invariant involving all accounts can exceed the budget,
 and the checker returns `inconclusive`, never a sampled success.
+
+## Simultaneous induction and independently checked reference
+
+The opt-in strengthening file (`zeno-fcis/local-strengthening/experimental-1`)
+lists a sorted set of `(target invariant, action, assumed invariants)` bindings.
+Every named candidate lemma is also a separate, fully checked target.
+Assumptions are *only* active for its named transition obligation and only
+in the pre-state. No assumptions are discharged from a previously issued
+receipt, AI proposal or hash. Proofs remain conditional on this model's
+precise read/write/frame semantics.
+
+The `mutual.json` example has two variables, `x=y=0` initially, and actions
+`x := y` and `y := x`. Each candidate `x=0` and `y=0` is **not** inductive
+alone. A complete simultaneous induction is possible using `y=0` as an
+assumption when proving `x=0`, and conversely. A deliberately incorrect
+transition from `(0,0)` must still fail the strengthened checker.
+
+```sh
+node experiments/proof-composition-27/run.cjs /tmp/zfcis-proof-fixtures/mutual.json
+# Returns exit 1: supplied invariants are not individually inductive.
+node experiments/proof-composition-27/run.cjs /tmp/zfcis-proof-fixtures/mutual.json /tmp/zfcis-proof-fixtures/mutual-strengthening.json
+node experiments/proof-composition-27/run_goals.cjs /tmp/zfcis-proof-fixtures/mutual.json /tmp/zfcis-proof-fixtures/mutual-goals.json /tmp/zfcis-proof-fixtures/mutual-strengthening.json
+```
+
+The first CLI argument in the optional strengthening position is a separate
+canonical file; its byte hash is included in the result alongside the model,
+goals and checker source identities. This is a reproducible identity binding,
+not authentication of the owner or proof of binary provenance.
+
+`global_oracle.cjs` is a separately authored, deliberately expensive
+**full Cartesian product** reference. For small models it checks every
+global induction pair and reachable states separately, allowing the test
+suite to distinguish noninductive-but-reachable-safe candidate lemmas from
+actual unsafe behavior. It is capped at 4,096 global states and 50,000
+transitions; larger models return `inconclusive`. The local checker and
+global oracle are compared on the reference models and seeded transition
+mutations. The reference is a cross-check, **not a machine-checked
+refinement theorem**, and runs in the same JavaScript runtime.
 
 ## Bounded automatic proposal (not an acceptance algorithm)
 
@@ -156,6 +200,8 @@ input/source identity hashes.
 |---|---|
 | Correct finite-table model validation on the checked fixtures | Standalone JavaScript tests and negative controls |
 | Compositional invariant proof *under exactly this model semantics* | Complete local enumerations plus mathematical induction argument |
+| Optional mutual induction with circular lemma dependencies | Every inductive lemma is checked against every relevant action under selected pre-state hypotheses |
+| Differential global-state model oracle (small cases only) | Independent full-product enumeration, reachability and seeded mutants |
 | Arbitrarily many history steps in the fixed model | Conditional mathematical induction |
 | Ability to verify 50 or 200 variable fixtures without a global product | Reproducible model-specific row counts |
 | Independently checked goal entailment under finite-table semantics | Local complete implication check following verified candidate induction |
