@@ -49,10 +49,10 @@ function rowsToSet(rows, support, vars, where) {
   }
   return result;
 }
-function checkGoals(model, goalPacket, maxRows = MAX.obligationRows, maxTotal = MAX.totalObligationRows) {
+function checkGoals(model, goalPacket, maxRows = MAX.obligationRows, maxTotal = MAX.totalObligationRows, strengthening = null) {
   need(Number.isSafeInteger(maxRows) && maxRows >= 1 && maxRows <= MAX.obligationRows, 'invalid goal row limit');
   need(Number.isSafeInteger(maxTotal) && maxTotal >= 1 && maxTotal <= MAX.totalObligationRows, 'invalid total goal limit');
-  const base = verify(model); // check actual induction before trusting candidate premises
+  const base = verify(model, {}, strengthening); // discharge ALL simultaneous-induction obligations before using any premise
   if (base.status !== 'proved') return {
     schema: 'zeno-fcis/local-goal-result/experimental-1', status: base.status,
     reason: 'invariant-proof-blocked', model_result: base,
@@ -127,6 +127,7 @@ function checkGoals(model, goalPacket, maxRows = MAX.obligationRows, maxTotal = 
     checked_goal_rows: checks, planned_goal_rows: planned.toString(),
     antecedent_rows: antecedentRows,
     checked_inductive_obligation_rows: base.checked_obligation_rows,
+    strengthening_bindings: base.strengthening_bindings,
     goals, publication_authority: false, executable_refinement: false,
     theorem: 'Each chosen invariant holds on the initial model state and is inductive under every model action; the checked implication from selected invariants entails each separately stated safety goal in every reachable state and every finite prefix.'
   };
