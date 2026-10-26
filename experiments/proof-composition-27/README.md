@@ -22,6 +22,8 @@ node --test experiments/proof-composition-27/test.cjs
 node experiments/proof-composition-27/make_examples.cjs /tmp/zfcis-proof-fixtures
 node experiments/proof-composition-27/run.cjs /tmp/zfcis-proof-fixtures/chain3.json
 node experiments/proof-composition-27/run.cjs /tmp/zfcis-proof-fixtures/pairs25.json
+node experiments/proof-composition-27/propose.cjs /tmp/zfcis-proof-fixtures/chain3-unproven.json /tmp/zfcis-proof-fixtures/chain3-candidate.json
+node experiments/proof-composition-27/run.cjs /tmp/zfcis-proof-fixtures/chain3-candidate.json
 ```
 
 The CLI accepts *canonical* UTF-8 JSON only: object keys recursively sorted,
@@ -87,6 +89,21 @@ The amount of work is still exponential in the *local* union `U(P,a)`.
 A genuinely global invariant involving all accounts can exceed the budget,
 and the checker returns `inconclusive`, never a sampled success.
 
+## Bounded automatic proposal (not an acceptance algorithm)
+
+`propose_invariants.cjs` builds an *untrusted* graph from each action's declared
+read footprint. For dependency components of at most three variables and at
+most 4,096 finite domain tuples, it proposes a conserved-integer-sum invariant
+using the declared genesis as the candidate total. It does not infer that
+conservation is true. The separate checker is the only component that can
+return a model-level `proved` result. A modified transition is still refuted;
+an oversized connected dependency component returns `inconclusive`/a proposal
+refusal, not a silently partial claimed proof.
+
+This is a bounded seed for future CEGAR/PDR/CHC, abstraction libraries and
+Crucible search. It is not a general invariant synthesizer, and the proposal
+algorithm itself is neither verified nor trusted.
+
 ## Baseline examples and negative controls
 
 `pairs25.json` represents 50 variables / 50 transfer actions / 25 local
@@ -101,6 +118,9 @@ not Rust codebase-size benchmarks or measured solver speedups.
 three-account conservation property. It discharges four 27-row
 obligations (108 local rows), even though each individual action reads
 only two accounts.
+
+The test suite also validates automatic candidate discovery for both fixture
+families, and rejects incorrect proposals through the independent checker.
 
 The test suite deliberately corrupts a transfer, the genesis, table ordering
 and completeness, successor ranges, declared write/read footprints and model
