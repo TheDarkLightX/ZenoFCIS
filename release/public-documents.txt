@@ -399,6 +399,8 @@ examples/distribution-laws/shortfall-reward/README.md
 examples/dual-approval/README.md
 examples/quantitative-risk/swap-pool/README.md
 experiments/proof-challenge/README.md
+experiments/proof-composition-27/NEXT.md
+experiments/proof-composition-27/README.md
 integrations/commons/skills/commons-protocol/SKILL.md
 integrations/elite_archive/README.md
 integrations/ocaml/README.md
