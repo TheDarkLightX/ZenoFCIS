@@ -2,9 +2,9 @@
 
 **Status: implementation prototype, not production admission.** This is a separately
 executable, zero-package-dependency Node.js checker of a *new, narrow abstract
-finite-table model*. It does not parse \`.zeno\`, invoke the ZenoFCIS Authority,
+finite-table model*. It does not parse `.zeno`, invoke the ZenoFCIS Authority,
 verify Rust, construct an independently kernel-checked certificate, qualify a
-generated application, or authorize installation. Do not interpret its \`proved\`
+generated application, or authorize installation. Do not interpret its `proved`
 verdict as applying to arbitrary programs or the 2.6 release.
 
 **Purpose.** Demonstrate a precise way to prove invariants of many components
@@ -17,37 +17,37 @@ standalone mathematical model experiment.
 
 Node.js 22 recommended; no third-party packages, network, Rust or SMT solver.
 
-\`\`\`sh
+```sh
 node --test experiments/proof-composition-27/test.cjs
 node experiments/proof-composition-27/make_examples.cjs /tmp/zfcis-proof-fixtures
 node experiments/proof-composition-27/run.cjs /tmp/zfcis-proof-fixtures/chain3.json
 node experiments/proof-composition-27/run.cjs /tmp/zfcis-proof-fixtures/pairs25.json
-\`\`\`
+```
 
 The CLI accepts *canonical* UTF-8 JSON only: object keys recursively sorted,
 two-space indentation and one final newline. The example producer emits that
 format. All model objects have closed field sets. In particular, the canonical
-byte check rejects duplicate JSON object keys that standard \`JSON.parse\`
+byte check rejects duplicate JSON object keys that standard `JSON.parse`
 would otherwise silently collapse. A fresh result carries SHA-256 hashes of
 the complete input bytes and the JavaScript checker source, not authenticated
 provenance or proof of what runtime was executed.
 
-Exit codes: 0 \`proved\` (model-only), 1 \`violated\` (counterexample),
-2 \`inconclusive\` (no checked claim), 65 \`refused\` (malformed or unsupported
-input). All results have \`publication_authority:false\`.
+Exit codes: 0 `proved` (model-only), 1 `violated` (counterexample),
+2 `inconclusive` (no checked claim), 65 `refused` (malformed or unsupported
+input). All results have `publication_authority:false`.
 
 ## Exact semantics and soundness argument
 
-Let \`V\` be a finite set of named state variables, each with a nonempty finite
+Let `V` be a finite set of named state variables, each with a nonempty finite
 integer domain and a declared initial value. An **action** has a fixed read set
-\`R(a)\`, a write set \`W(a) ⊆ R(a)\`, and a **complete** transition table for
-*every* valuation of \`R(a)\`. A table row either stutters (\`next:null\`) or
-atomically supplies the new values for precisely \`W(a)\`; all other variables
+`R(a)`, a write set `W(a) ⊆ R(a)`, and a **complete** transition table for
+*every* valuation of `R(a)`. A table row either stutters (`next:null`) or
+atomically supplies the new values for precisely `W(a)`; all other variables
 are unchanged. The next values must lie in the declared domains. This
 abstract system has no concurrency inside one action, no effects, and no
 undocumented state. The checker enforces table completeness and write closure.
 
-Each invariant \`P\` has a support \`S(P)\` and an explicit finite set of
+Each invariant `P` has a support `S(P)` and an explicit finite set of
 allowed valuations over that support. It asserts exactly that the current
 projection is in that set; it has no access to state outside its support.
 
@@ -55,18 +55,18 @@ For each invariant, the checker verifies its declared genesis valuation is
 allowed. For each action whose writes intersect its support, it enumerates
 **every** valuation of
 
-\`\`\`
+```
 U(P, a) = S(P) ∪ R(a)
-\`\`\`
+```
 
 and checks the following implication under the exact transition table:
 
-\`\`\`
+```
 P(s|S(P)) ∧ action_a(s|R(a)) = s'
     ⇒ P(s'|S(P))
-\`\`\`
+```
 
-Every action whose write set is disjoint from \`S(P)\` preserves \`P\` by
+Every action whose write set is disjoint from `S(P)` preserves `P` by
 the structural frame rule, without enumerating any state. The conjunction of
 all invariants therefore holds initially and is preserved by every action.
 Ordinary simultaneous induction proves safety over executions of **any finite
@@ -83,21 +83,21 @@ system's business correctness.
 The method is sound but incomplete. The current proof uses each invariant as
 its own inductive hypothesis: it does not strengthen one obligation with
 other invariants, PDR, IC3, CHC solving, CEGAR or symbolic arithmetic.
-The amount of work is still exponential in the *local* union \`U(P,a)\`.
+The amount of work is still exponential in the *local* union `U(P,a)`.
 A genuinely global invariant involving all accounts can exceed the budget,
-and the checker returns \`inconclusive\`, never a sampled success.
+and the checker returns `inconclusive`, never a sampled success.
 
 ## Baseline examples and negative controls
 
-\`pairs25.json\` represents 50 variables / 50 transfer actions / 25 local
-conservation invariants. The global state space has \`3^50\`
+`pairs25.json` represents 50 variables / 50 transfer actions / 25 local
+conservation invariants. The global state space has `3^50`
 (717897987691852588770249) assignments, but the checker needs 450
 small local implication rows plus 450 action-table admission rows.
 The test suite also builds a 200-variable version (1,800 local rows);
 neither case enumerates global states. These are *state count* experiments,
 not Rust codebase-size benchmarks or measured solver speedups.
 
-\`chain3.json\` has three coupled accounts, four transfer actions and one
+`chain3.json` has three coupled accounts, four transfer actions and one
 three-account conservation property. It discharges four 27-row
 obligations (108 local rows), even though each individual action reads
 only two accounts.
@@ -105,7 +105,7 @@ only two accounts.
 The test suite deliberately corrupts a transfer, the genesis, table ordering
 and completeness, successor ranges, declared write/read footprints and model
 shape. It also verifies that an oversized global invariant and an overly
-tight work budget return \`inconclusive\` before any proof-obligation
+tight work budget return `inconclusive` before any proof-obligation
 evaluation. The CLI tests canonical-byte admission, exit statuses and
 input/source identity hashes.
 
@@ -117,8 +117,8 @@ input/source identity hashes.
 | Compositional invariant proof *under exactly this model semantics* | Complete local enumerations plus mathematical induction argument |
 | Arbitrarily many history steps in the fixed model | Conditional mathematical induction |
 | Ability to verify 50 or 200 variable fixtures without a global product | Reproducible model-specific row counts |
-| Native \`zeno-fcis contract check-composition /3\` refinement | **NOT ESTABLISHED** |
-| Native \`.zeno\` parser/decision/collection/Authority equivalence | **NOT ESTABLISHED** |
+| Native `zeno-fcis contract check-composition /3` refinement | **NOT ESTABLISHED** |
+| Native `.zeno` parser/decision/collection/Authority equivalence | **NOT ESTABLISHED** |
 | Lean/Verus proof of this new checker's soundness or source code | **NOT ESTABLISHED** |
 | SMT, CHC, IC3, CEGAR or machine-checked proof certificates | **NOT IMPLEMENTED** |
 | Executable, SQLite, outbox, adapter or isolated-worker refinement | **NOT ESTABLISHED** |
