@@ -8,7 +8,12 @@ fs.mkdirSync(dest, { recursive: true });
 for (const [name, packet] of [
   ['pairs25.json', makePairs(25)], ['chain3.json', makeChain()],
   ['pairs25-unproven.json', { ...makePairs(25), invariants: [] }],
-  ['chain3-unproven.json', { ...makeChain(), invariants: [] }]
+  ['chain3-unproven.json', { ...makeChain(), invariants: [] }],
+  ['chain3-owner-goals.json', {
+    schema: 'zeno-fcis/local-goals/experimental-1',
+    goals: [{ id: 'conserve_supply', support: ['a', 'b', 'c'],
+      allowed: makeChain().invariants[0].allowed, using: ['auto_sum_000'] }]
+  }]
 ]) {
   fs.writeFileSync(path.join(dest, name), canonicalJSON(packet), { flag: 'wx' });
   console.log(path.join(dest, name));
