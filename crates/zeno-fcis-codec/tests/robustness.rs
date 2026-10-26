@@ -216,3 +216,50 @@ fn random_bytes_never_panic() {
         check(&input, seed);
     }
 }
+#[test]
+fn sha256_bounded_streaming_vectors() {
+    use zeno_fcis_codec::{CommitmentHasher, Hash32, RustCryptoSha256 as H};
+
+    let vectors: &[(&[u8], Hash32)] = &[
+        (
+            b"",
+            Hash32::new([
+                0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f,
+                0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b,
+                0x78, 0x52, 0xb8, 0x55,
+            ]),
+        ),
+        (
+            b"abc",
+            Hash32::new([
+                0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde, 0x5d, 0xae,
+                0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c, 0xb4, 0x10, 0xff, 0x61,
+                0xf2, 0x00, 0x15, 0xad,
+            ]),
+        ),
+        (
+            b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+            Hash32::new([
+                0x24, 0x8d, 0x6a, 0x61, 0xd2, 0x06, 0x38, 0xb8, 0xe5, 0xc0, 0x26, 0x93, 0x0c, 0x3e,
+                0x60, 0x39, 0xa3, 0x3c, 0xe4, 0x59, 0x64, 0xff, 0x21, 0x67, 0xf6, 0xec, 0xed, 0xd4,
+                0x19, 0xdb, 0x06, 0xc1,
+            ]),
+        ),
+    ];
+    for &(message, expected) in vectors {
+        assert_eq!(H::hash(message), expected);
+        for split in 0..=message.len() {
+            assert_eq!(
+                H::hash_parts(&[&message[..split], b"", &message[split..]]),
+                expected
+            );
+        }
+    }
+    for length in [0, 1, 55, 56, 63, 64, 65, 127, 128, 129, 255, 256, 257] {
+        let bytes: Vec<u8> = (0_u8..=255).cycle().take(length).collect();
+        for chunk in [1, 55, 56, 63, 64, 65, 257] {
+            let parts: Vec<&[u8]> = bytes.chunks(chunk).collect();
+            assert_eq!(H::hash_parts(&parts), H::hash(&bytes));
+        }
+    }
+}

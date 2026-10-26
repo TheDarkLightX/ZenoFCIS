@@ -37,5 +37,5 @@ law 541 acceptance_eligibility on accept = ((((true) && !(context.102.130 == 0))
 law 542 no_committed_failure on failure = false;
 // Core seed logical-deadline/1; parameters {"C": 4}.
 // Instance source-set SHA256 925c6d27c558dce61bbd0b2f675c44a47b9b9eecf46248a6e107dba3ae76d1d1.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/logical-deadline.json SHA256 ec881eab49ecc6a28eccd3ec7b881ef4d5004ab09f5cf71dfcbfbd68f5c24c36; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/logical-deadline.json SHA256 c1106d30c3729a68de3e8b520e8f5eb8ac598eed4ddcf9659943cad50f2c4345; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

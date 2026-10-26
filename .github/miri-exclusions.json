@@ -317,6 +317,18 @@
       "group": "synthesis-v2-template-contracts",
       "package": "zeno-fcis-synthesis",
       "test_binary": "v2_template_contracts",
+      "test": "retained_examples_and_replay_withdrawal_queue_00_04",
+      "reason": "Hosted run40263624558/job121381103092 reached its240-minute limit on this five-example retained replay batch. The full batch remains native, alongside the other retained withdrawal batches. Miri retains the withdrawal bounded-domain profile and the final retained single-example replay. Omitted early retained examples have no interpreted UB/provenance/aliasing claim.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
       "test": "retained_examples_and_replay_withdrawal_queue_05_09",
       "reason": "The large template replay jobs repeatedly ended on runner shutdown or their deadline (runs 40177825753 and 40180272069); their incomplete runs are not passes. The full original examples and genesis assertions remain native. The focused Miri profile retains withdrawal examples 0-4 and 25, treasury examples 0 and 29, treasury genesis/replay, and all eight outcome/boundary profiles. Generic genesis/replay interpretation remains in the authority and publication tests. No Miri UB, provenance or aliasing claim covers the omitted executions.",
       "native": {
@@ -391,6 +403,18 @@
       "test_binary": "lib",
       "test": "effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome",
       "reason": "The 160-case one-attempt schedule product reached a 3600-second local Miri limit on 2026-10-25 without completing. Native CI retains these cases and the full 25,760-edge process-loss explorer. Miri retains the individual durable restart, reservation, corruption, store-failure and transcript tests. The timed-out run is incomplete evidence; Miri UB, provenance and aliasing checks are not obtained for omitted schedule executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "values",
+      "package": "zeno-fcis-codec",
+      "test_binary": "lib",
+      "test": "providers::tests::rustcrypto_fixed_vectors_and_streaming_boundaries",
+      "reason": "The 240-minute hosted values job and retained local values run did not complete the long streaming-vector workload. Native tests retain all message lengths and chunk sizes. The robustness integration test sha256_bounded_streaming_vectors interprets the standard empty/abc/multiblock answers and padding/block/streaming boundaries through257 bytes. Omitted large interpreted inputs have no Miri UB-freedom claim.",
       "native": {
         "workflow": ".github/workflows/ci.yml",
         "job": "rust",

@@ -134,7 +134,7 @@ TEMPLATE_NATIVE_REPLAYS = [
     *(f"retained_examples_and_replay_agent_treasury_guard_{start:02}_{start + 4:02}"
       for start in range(0, 30, 5)),
     *(f"retained_examples_and_replay_withdrawal_queue_{start:02}_{start + 4:02}"
-      for start in range(5, 25, 5)),
+      for start in range(0, 25, 5)),
     "retained_genesis_and_replay_withdrawal_queue",
 ]
 TEMPLATE_FOCUSED_REPLAY = "miri_bounded_retained_treasury_examples"
@@ -341,9 +341,22 @@ class RepairedRegistryTests(unittest.TestCase):
         ] + [("run", "--example", path.stem) for path in (synthesis / "examples").glob("*.rs")]
         self.assertEqual(collections.Counter(actual), collections.Counter(expected))
         template = [row for row in rows if row["target"] == "--test v2_template_contracts"]
-        self.assertEqual(len(template), 22)
+        self.assertEqual(len(template), 21)
         self.assertEqual(sum("test" not in row for row in template), 1)
         self.assertTrue(all("--skip" not in row["target"] for row in template))
+
+    def test_miri_values_and_specification_keep_documentation_out_of_libtest_partitions(self):
+        rows = logical_rows(miri_rows((atdd.ROOT / ".github/workflows/miri.yml").read_text()))
+        for name in ["values", "specification"]:
+            remainder = [r for r in rows if r["group"] == name]
+            docs = [r for r in rows if r["group"] == name + "-docs"]
+            self.assertEqual(len(remainder), 1)
+            self.assertEqual(len(docs), 1)
+            self.assertEqual(shlex.split(remainder[0]["target"]), ["--lib", "--tests"])
+            self.assertEqual(docs[0]["packages"], remainder[0]["packages"])
+            self.assertEqual(docs[0]["target"], "--doc")
+            self.assertNotIn("miri_skip", docs[0])
+            self.assertNotIn("test", docs[0])
 
     def test_miri_split_targets_run_each_listed_test_exactly_once(self):
         source = (atdd.ROOT / ".github/workflows/miri.yml").read_text()
@@ -354,7 +367,7 @@ class RepairedRegistryTests(unittest.TestCase):
         isolated = [row["test"] for row in library if "test" in row]
         self.assertEqual([row["group"] for row in remainder], ["synthesis-library"])
         selected_remainder = next(row for row in raw_rows if row["group"] == "synthesis-library")
-        self.assertEqual(len(isolated), 9)
+        self.assertEqual(len(isolated), 14)
         # Each isolated name is one real library unit test, so CI cannot be
         # first to discover a misspelt selector.
         listed = subprocess.run(
@@ -488,7 +501,7 @@ class RepairedRegistryTests(unittest.TestCase):
                               + TEMPLATE_PROFILE_TESTS + [TEMPLATE_FOCUSED_REPLAY])
         entries = miri_exclusions.load_exclusions()
         self.assertEqual([e["test"] for e in entries if e["group"] == remainder["group"]], native_only)
-        self.assertEqual(len(entries), 33)
+        self.assertEqual(len(entries), 35)
         rust = (atdd.ROOT / TEMPLATE_TESTS).read_text()
         self.assertEqual(template_profile_problems(rust), [])
         sum_native = sum(size for _, size, _, _ in TEMPLATE_CORPORA)
@@ -504,8 +517,8 @@ class RepairedRegistryTests(unittest.TestCase):
             if args is None:
                 args = miri_exclusions.miri_test_arguments(row)
             return run_miri_coverage_check(workflow, row, names, honour_skip=skip, ignored=ignore, test_args=args)
-        # The remainder keeps all fifteen native-only skips first, then skips
-        # the twenty-one exact-test groups; each exact group runs its one test.
+        # The remainder keeps all sixteen native-only skips first, then skips
+        # the twenty exact-test groups; each exact group runs its one test.
         self.assertEqual(coverage(), arguments + " " + shlex.join([a for name in isolated for a in ("--skip", name)]))
         for row in exact:
             self.assertEqual(coverage(row), "-- " + shlex.join(["--exact", row["test"]]))

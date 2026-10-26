@@ -34,5 +34,5 @@ law 541 acceptance_eligibility on accept = ((true) && !(context.102.130 == 0)) &
 law 542 no_committed_failure on failure = false;
 // Core seed idempotency-slot/1; parameters {"C": 2}.
 // Instance source-set SHA256 c80ea160ae0c81b82736a094b707febf603bf7373dd4656d62f86fa6aa1b8409.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/idempotency-slot.json SHA256 717a8b194acd4e0a731b88ab6ebd984179de746370508a8dba27f0443c7dcc15; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/idempotency-slot.json SHA256 6b81d30b69c4f33aa98ef2cdf341989019ac0346bb5e1a76fb12a480c54397f2; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

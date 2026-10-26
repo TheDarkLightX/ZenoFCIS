@@ -48,5 +48,5 @@ law 541 acceptance_eligibility on accept = (((((true) && !((pre.100.110 == 150 &
 law 542 no_committed_failure on failure = false;
 // Core seed approval-queue/1; parameters {"K": 2}.
 // Instance source-set SHA256 196d2c838546820890f645786787f10724a49250ad21cda07525c27c7352a653.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/approval-queue.json SHA256 86285e4290cc8856144023055c60bf3d10c2f7e8cebebc2c7653de9e44090df9; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/approval-queue.json SHA256 9a3a282b0f1a223d0dc4bea1d99fbfe1499145140fba5d28b123bab0e7af2cc7; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

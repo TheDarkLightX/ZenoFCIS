@@ -277,7 +277,7 @@ that only values are lost while paths are preserved.
 
 All 131 retained examples and six template genesis/replay checks remain in
 native tests. Under Miri, counter, inventory, order and account keep their
-complete retained-example checks. Withdrawal keeps examples 0-4 and 25;
+complete retained-example checks. Withdrawal keeps example 25;
 treasury keeps examples 0 and 29 and its genesis/replay check. These fixed
 examples use the same fixture expectations and checked replay path as the
 native cases. The remaining withdrawal/treasury replay batches and withdrawal
@@ -324,20 +324,34 @@ These alias models have different semantics: a passing result names the model
 used and is not relabelled as a pass under the other model. Neither model
 establishes undefined-behaviour freedom for every possible execution.
 
+The full SHA-256 fixed-vector and streaming-boundary corpus also remains native.
+Miri runs a bounded streaming test with three published vectors, every split of
+those vectors, and lengths around the 56-, 64-, 128- and 256-byte boundaries.
+The specification's generated-input test interprets at most 32 seeded cases;
+its native default remains 1,000. Deterministic nesting and refusal cases are
+unchanged. The effect-resumption test retains every scenario, order, policy
+and final-closure assertion. Miri keeps the initial seven-step checkpoint and
+first 127-step resume, then uses 4,096-step chunks; native runs retain every
+127-step cut. These changes reduce interpreted executions or pause schedules;
+they do not establish UB freedom for the omitted executions.
+
 Each Miri group has a 240-minute budget. The synthesis `completion` tests
-run their eight graph-seed groups separately. Nine larger synthesis-library
+run their eight graph-seed groups separately. Fourteen larger synthesis-library
 tests and the retained template checks also have separate groups. Splitting
 these tests preserves their cases and assertions; the native-only exclusions
 listed above account for the omitted interpreted executions.
 
-The publication and synthesis-library remainders each run in eight compiled-test
-partitions, and the finite remainder runs in two. The 82 logical groups therefore
-use 97 interpreter jobs. Each partition retains the original filters, lists the
+The publication remainder runs in eight compiled-test partitions, the
+synthesis-library remainder in sixteen, values and specification in four each,
+and the finite remainder in two. The 88 logical groups therefore use 117
+interpreter jobs. Values and specification run documentation examples in separate
+complete groups: Rustdoc and libtest interpret exact-name filters differently.
+Each partition retains the original filters, lists the
 compiled tests, and checks its actual exact-name selection before interpretation.
 Existing ignored tests retain their status and are recorded in each partition's
 inventory; partitioning does not enable or hide them.
 The matrix must contain every partition exactly once with identical original
-selectors. No test or case inside a test is removed. Separate test processes have
+selectors. Partitioning itself does not remove cases within a test. Separate test processes have
 different interpreter histories; this is not a claim that cross-test scheduling
 or shared interpreter state is identical to an unpartitioned run.
 

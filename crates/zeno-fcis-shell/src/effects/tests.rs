@@ -1,4 +1,3 @@
-use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::Debug;
@@ -707,94 +706,129 @@ fn port_registry() {
     for port in Port::ALL {
         assert_eq!(some(registry::signature(&REGISTRY, port)).port, port);
     }
-    let without = |index: usize| -> Vec<Signature> {
-        let mut signatures = SIGNATURES.to_vec();
-        signatures.remove(index);
-        signatures
-    };
-    let leak = |signatures: Vec<Signature>| -> &'static [Signature] {
-        Box::leak(signatures.into_boxed_slice())
-    };
-    let with = |signatures: &'static [Signature]| Registry {
-        signatures,
-        ..REGISTRY
-    };
+    // Registry borrows static data. Construct the mutant fixtures at compile
+    // time rather than leaking heap allocations to manufacture that lifetime.
+    const fn complete() -> [Signature; 10] {
+        let mut result = [SIGNATURES[0]; 10];
+        let mut index = 0;
+        while index < result.len() {
+            result[index] = SIGNATURES[index];
+            index += 1;
+        }
+        result
+    }
+    const fn without(removed: usize) -> [Signature; 9] {
+        let mut result = [SIGNATURES[0]; 9];
+        let mut source = 0;
+        let mut target = 0;
+        while source < SIGNATURES.len() {
+            if source != removed {
+                result[target] = SIGNATURES[source];
+                target += 1;
+            }
+            source += 1;
+        }
+        result
+    }
+    macro_rules! with {
+        ($signatures:expr) => {
+            Registry {
+                signatures: &const { $signatures },
+                ..REGISTRY
+            }
+        };
+    }
     assert_eq!(
-        registry::check(&with(leak(without(5)))),
+        registry::check(&with!(without(5))),
         Err(RegistryError::Missing(Port::Acknowledge))
     );
     assert_eq!(
-        registry::check(&with(leak(without(9)))),
+        registry::check(&with!(without(9))),
         Err(RegistryError::Missing(Port::Wait))
     );
-    let mut reordered = SIGNATURES.to_vec();
-    reordered.swap(1, 2);
     assert_eq!(
-        registry::check(&with(leak(reordered))),
+        registry::check(&with!({
+            let mut reordered = complete();
+            reordered.swap(1, 2);
+            reordered
+        })),
         Err(RegistryError::Missing(Port::Commit))
     );
-    let mut repeated = SIGNATURES.to_vec();
-    repeated[1] = SIGNATURES[0];
     assert_eq!(
-        registry::check(&with(leak(repeated))),
+        registry::check(&with!({
+            let mut repeated = complete();
+            repeated[1] = SIGNATURES[0];
+            repeated
+        })),
         Err(RegistryError::Order(Port::ReadState))
     );
-    let mut extra = SIGNATURES.to_vec();
-    extra.push(SIGNATURES[0]);
     assert_eq!(
-        registry::check(&with(leak(extra))),
+        registry::check(&with!({
+            let mut extra = [SIGNATURES[0]; 11];
+            let mut index = 0;
+            while index < SIGNATURES.len() {
+                extra[index] = SIGNATURES[index];
+                index += 1;
+            }
+            extra
+        })),
         Err(RegistryError::Order(Port::ReadState))
     );
-    let changed = |index: usize, edit: fn(&mut Signature)| {
-        let mut signatures = SIGNATURES.to_vec();
-        edit(&mut signatures[index]);
-        registry::check(&with(leak(signatures)))
-    };
+    macro_rules! changed {
+        ($index:expr, |$signature:ident| $edit:expr) => {
+            registry::check(&with!({
+                let mut signatures = complete();
+                let $signature = &mut signatures[$index];
+                $edit;
+                signatures
+            }))
+        };
+    }
     // A read port that writes durable state exceeds its capability.
     assert_eq!(
-        changed(0, |s| s.footprint.writes =
+        changed!(0, |s| s.footprint.writes =
             s.footprint.writes.and(registry::Resources::DURABLE)),
         Err(RegistryError::Footprint(Port::ReadState))
     );
     // A transport that touches the store exceeds its capability.
     assert_eq!(
-        changed(4, |s| s.footprint.reads = registry::Resources::DURABLE),
+        changed!(4, |s| s.footprint.reads = registry::Resources::DURABLE),
         Err(RegistryError::Footprint(Port::Send))
     );
     assert_eq!(
-        changed(1, |s| s.laws = &[]),
+        changed!(1, |s| s.laws = &[]),
         Err(RegistryError::Law(Port::Commit))
     );
     assert_eq!(
-        changed(1, |s| s.laws = &[1, 1]),
+        changed!(1, |s| s.laws = &[1, 1]),
         Err(RegistryError::Law(Port::Commit))
     );
     assert_eq!(
-        changed(1, |s| s.laws = &[1, 99]),
+        changed!(1, |s| s.laws = &[1, 99]),
         Err(RegistryError::Law(Port::Commit))
     );
     assert_eq!(
-        changed(1, |s| s.laws = &[1]),
+        changed!(1, |s| s.laws = &[1]),
         Err(RegistryError::UnusedLaw(2))
     );
     assert_eq!(
-        changed(0, |s| s.v2 = V2::OptIn),
+        changed!(0, |s| s.v2 = V2::OptIn),
         Err(RegistryError::Unmapped(Port::ReadState))
     );
     assert_eq!(
-        changed(5, |s| s.v2 = V2::Api(&[])),
+        changed!(5, |s| s.v2 = V2::Api(&[])),
         Err(RegistryError::Unmapped(Port::Acknowledge))
     );
     assert_eq!(
-        changed(0, |s| s.arguments = Kind::Hash),
+        changed!(0, |s| s.arguments = Kind::Hash),
         Err(RegistryError::Malformed(Port::ReadState, "arguments"))
     );
     assert_eq!(
-        changed(0, |s| s.answer = Answer::Outcome(Kind::Bytes(0))),
+        changed!(0, |s| s.answer = Answer::Outcome(Kind::Bytes(0))),
         Err(RegistryError::Malformed(Port::ReadState, "byte cap"))
     );
     assert_eq!(
-        changed(0, |s| s.answer = Answer::Outcome(Kind::Int(2, 1))),
+        changed!(0, |s| s.answer = Answer::Outcome(Kind::Int(2, 1))),
         Err(RegistryError::Malformed(Port::ReadState, "range"))
     );
     const TWICE: &[registry::Field] = &[
@@ -808,7 +842,7 @@ fn port_registry() {
         },
     ];
     assert_eq!(
-        changed(0, |s| s.arguments = Kind::Record(TWICE)),
+        changed!(0, |s| s.arguments = Kind::Record(TWICE)),
         Err(RegistryError::Malformed(Port::ReadState, "name"))
     );
     assert_eq!(
@@ -842,10 +876,18 @@ fn port_registry() {
         Err(RegistryError::UnusedLaw(10))
     );
     // The identity covers the data: a changed statement changes it.
-    let mut laws = registry::LAWS.to_vec();
-    laws[0].statement = "changed";
+    const OTHER_LAWS: [Law; 9] = {
+        let mut laws = [registry::LAWS[0]; 9];
+        let mut index = 0;
+        while index < laws.len() {
+            laws[index] = registry::LAWS[index];
+            index += 1;
+        }
+        laws[0].statement = "changed";
+        laws
+    };
     let other = Registry {
-        laws: Box::leak(laws.into_boxed_slice()),
+        laws: &OTHER_LAWS,
         ..REGISTRY
     };
     assert_ne!(registry::identity(&other), registry::identity(&REGISTRY));
