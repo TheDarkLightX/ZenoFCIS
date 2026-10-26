@@ -1,0 +1,84 @@
+name: proof-composition-27
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'experiments/proof-composition-27/**'
+      - '.github/workflows/proof-composition-27.yml'
+  push:
+    branches:
+      - main
+      - 'research/2.7-proof-carrying-composition-20261026'
+    paths:
+      - 'experiments/proof-composition-27/**'
+      - '.github/workflows/proof-composition-27.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proof-composition-27-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  finite-local-checker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Show Node runtime
+        run: node --version
+      - name: Test semantic checker, malformed input and adversarial mutants
+        run: node --test experiments/proof-composition-27/test.cjs
+      - name: Qualify generated model files with exact CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/proof-composition-$GITHUB_RUN_ID"
+          node experiments/proof-composition-27/make_examples.cjs "$out"
+          node experiments/proof-composition-27/run.cjs "$out/chain3.json" > "$out/chain3-report.json"
+          node experiments/proof-composition-27/run.cjs "$out/pairs25.json" > "$out/pairs25-report.json"
+          node experiments/proof-composition-27/propose.cjs "$out/chain3-unproven.json" "$out/chain3-candidate.json"
+          node experiments/proof-composition-27/run.cjs "$out/chain3-candidate.json" > "$out/chain3-proposed-report.json"
+          node experiments/proof-composition-27/run_goals.cjs "$out/chain3-candidate.json" "$out/chain3-owner-goals.json" > "$out/chain3-goals-report.json"
+          # Local invariants are each noninductive, but jointly inductive;
+          # a mere nonzero exit (UNKNOWN/refusal) is not a successful control.
+          set +e
+          node experiments/proof-composition-27/run.cjs "$out/mutual.json" > "$out/mutual-refutation.json"
+          bad_status=$?
+          set -e
+          test "$bad_status" -eq 1
+          node experiments/proof-composition-27/run.cjs "$out/mutual.json" "$out/mutual-strengthening.json" > "$out/mutual-report.json"
+          node experiments/proof-composition-27/run_goals.cjs "$out/mutual.json" "$out/mutual-goals.json" "$out/mutual-strengthening.json" > "$out/mutual-goals-report.json"
+          node experiments/proof-composition-27/run_linear.cjs "$out/ledger50.json" "$out/ledger50-goal.json" > "$out/ledger50-report.json"
+          node experiments/proof-composition-27/run_linear.cjs "$out/ledger200.json" "$out/ledger200-goal.json" > "$out/ledger200-report.json"
+          node -e 'const fs=require("fs");for(const n of ["chain3","pairs25","chain3-proposed","chain3-goals","mutual","mutual-goals","ledger50","ledger200"]){const x=JSON.parse(fs.readFileSync(process.argv[1]+"/"+n+"-report.json"));if(x.status!=="proved"||x.publication_authority!==false||x.executable_refinement!==false)process.exit(1);}' "$out"
+          node -e 'const fs=require("fs");for(const [n,rows] of [["ledger50",882],["ledger200",3582]]){const x=JSON.parse(fs.readFileSync(process.argv[1]+"/"+n+"-report.json"));if(x.global_conservation_established!==true||x.action_delta_rows!==rows||x.claim_level!=="DECLARATIVE_FINITE_MODEL_ONLY")process.exit(1);}' "$out"
+
+native-composition-bridge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+      - name: Fetch locked dependencies
+        uses: ./.github/actions/fetch-locked-crates
+      - name: Rust formatting
+        run: cargo +1.97.1 fmt --all -- --check
+      - name: Compare production Authority/joint step with independent full-domain reference
+        run: cargo +1.97.1 test --locked --offline -p zeno-fcis-contract --lib native_bridge_27_ -- --nocapture
+      - name: Check 25 and 50 native component instances, coupling and mutant
+        run: cargo +1.97.1 test --locked --offline -p zeno-fcis-contract --lib native_27_ -- --nocapture
+      - name: Strict native component lint
+        run: cargo +1.97.1 clippy --locked --offline -p zeno-fcis-contract --all-targets -- -D warnings

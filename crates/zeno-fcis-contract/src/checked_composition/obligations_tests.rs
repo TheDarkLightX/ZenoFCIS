@@ -777,3 +777,111 @@ fn a_proved_composition_reaches_committed_failure_steps() {
             .all(|row| row.outcome.successor[0] == row.outcome.successor[1])
     );
 }
+
+
+/// An actual native composition containing up to 50 separately bound .zeno
+/// contract *instances* and a nontrivial 2-member coupling. This checks
+/// executable parser / Authority / compositional checker behavior; it does
+/// NOT prove the missing implementation-to-Verus correspondence.
+fn native_27_counter_chain(n: usize, coupling: &str) -> Built {
+    let mut parts = Vec::with_capacity(n);
+    for i in 0..n {
+        let name = format!("counter_{i:02}");
+        parts.push(part(
+            &name,
+            "faults/counter",
+            &["value"],
+            "op == 0",
+            json!({"action": "150", "authorized": "authorized"}),
+            "true",
+            "true",
+        ));
+    }
+    Built::new(
+        parts,
+        json!([{
+            "name": "twin",
+            "members": ["counter_00", "counter_01"],
+            "invariant": coupling,
+        }]),
+    )
+}
+
+/// Proof workload scales with local and coupling obligations; it need not
+/// enumerate the huge Cartesian product of actual native component states.
+#[test]
+fn native_27_fifty_source_bound_components_keep_a_coupling_without_global_product() {
+    for n in [25usize, 50usize] {
+        let built = native_27_counter_chain(n, "counter_00.value == counter_01.value");
+        let result = built.check().unwrap_or_else(fail);
+        let report = result.json();
+        assert_eq!(result.verdict(), Verdict::Proved, "{report}");
+        assert_eq!(
+            report["monolithic"]["states"],
+            (0..n).fold(1u128, |product, _| product * 3).to_string(),
+        );
+        assert_eq!(report["monolithic"]["requests"], "12");
+        assert_eq!(report["monolithic"]["enumerated"], false);
+        assert_eq!(
+            report["obligations"].as_array().map(Vec::len),
+            Some(2 * n + 1),
+        );
+        assert!(result.evaluated() > 0);
+        assert!(result.evaluated() < 10_000);
+        // This is an actual 2.6 composition check, not synthetic JS rows.
+        let (decisions, formula_cells) = result.work();
+        assert!(decisions > 0 && formula_cells > 0);
+        println!(
+            "native_27_scaling instances={n} local_and_coupling_rows={} monolithic_states={} authority_decisions={decisions} formula_cells={formula_cells}",
+            result.evaluated(),
+            report["monolithic"]["states"],
+        );
+
+        // Evaluate the REAL joint-step API on the same source-backed
+        // composition, not merely the compositional proof's row counts.
+        let manifest = built.text();
+        let joint = super::JointComposition::from_sources(&DomainSources {
+            manifest: &manifest,
+            components: &built.sources,
+        })
+        .unwrap_or_else(fail);
+        assert_eq!(joint.state_layout().len(), n);
+        assert_eq!(joint.genesis(), vec![0i128; n]);
+        let initial = vec![0i128; n];
+        let positive = joint
+            .joint_step(&initial, &[0, 1, 1])
+            .unwrap_or_else(fail);
+        assert_eq!(positive.kind, super::OutcomeKind::Accept);
+        assert_eq!(positive.successor, vec![1i128; n]);
+
+        // A late Reject must roll back every earlier provisional Accept,
+        // including across 50 components. This is PURE joint-step behavior,
+        // not a SQLite transaction or external-effect durability proof.
+        let mut full_late = vec![0i128; n];
+        full_late[n - 1] = 2;
+        let refusal = joint
+            .joint_step(&full_late, &[0, 1, 1])
+            .unwrap_or_else(fail);
+        assert_eq!(
+            refusal.kind,
+            super::OutcomeKind::Reject {
+                component: format!("counter_{:02}", n - 1),
+                reason: Some(201),
+            }
+        );
+        assert_eq!(refusal.successor, full_late);
+    }
+}
+
+/// A deliberately false coupling must not be accepted merely because all
+/// 50 component-local checks passed. It is true at genesis, but falsified
+/// when both counters increment from 0 to 1 on an authorized request.
+#[test]
+fn native_27_noninductive_coupling_refutes_even_with_fifty_valid_components() {
+    let built = native_27_counter_chain(50, "counter_00.value == 0");
+    let result = built.check().unwrap_or_else(fail);
+    assert_eq!(result.verdict(), Verdict::Violated, "{}", result.json());
+    let report = result.json();
+    assert_eq!(report["witness"]["obligation"]["kind"], "couple");
+    assert_eq!(report["witness"]["obligation"]["subject"], "twin");
+}
