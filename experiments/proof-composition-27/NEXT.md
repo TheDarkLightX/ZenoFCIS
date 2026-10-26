@@ -20,6 +20,9 @@ publication authority simply by returning success.
   compositions, replayed failing mutants, malformed input and tightened budgets.
 - [x] Build a bounded *untrusted* dependency-graph constant-sum invariant proposer;
   require a separate independent checker verdict before accepting any proposal.
+- [x] Keep owner-selected safety goals in a separate, canonical packet;
+  check entailment from already verified candidate invariants without allowing
+  the untrusted proposer to edit the goal.
 - [x] Return explicit claim scope and no publication authority.
 - [ ] Obtain clean, hosted Node.js test and conformance workflow result at
   the exact PR head (local executable qualification is not assumed).
