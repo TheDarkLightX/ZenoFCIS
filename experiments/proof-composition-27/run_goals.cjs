@@ -14,18 +14,21 @@ function input(filename) {
   return { parsed, raw };
 }
 function main(argv) {
-  if (argv.length !== 2 || argv.some(s => s.startsWith('-'))) {
-    console.error('usage: node run_goals.cjs INDUCTIVE_MODEL.json FROZEN_GOALS.json');
+  if ((argv.length !== 2 && argv.length !== 3) || argv.some(s => s.startsWith('-'))) {
+    console.error('usage: node run_goals.cjs INDUCTIVE_MODEL.json FROZEN_GOALS.json [STRENGTHENING.json]');
     return 64;
   }
   try {
     const model = input(argv[0]);
     const goals = input(argv[1]);
-    const verdict = checkGoals(model.parsed, goals.parsed);
+    const assumptions = argv.length === 3 ? input(argv[2]) : null;
+    const verdict = checkGoals(model.parsed, goals.parsed, undefined, undefined,
+      assumptions === null ? null : assumptions.parsed);
     console.log(JSON.stringify({
       ...verdict,
       model_sha256: sha(model.raw),
       goal_sha256: sha(goals.raw),
+      strengthening_sha256: assumptions === null ? null : sha(assumptions.raw),
       checker_source_sha256: sha(fs.readFileSync(require.resolve('./goal_checker.cjs'))),
       induction_checker_source_sha256: sha(fs.readFileSync(require.resolve('./proof_checker.cjs'))),
       publication_authority: false
