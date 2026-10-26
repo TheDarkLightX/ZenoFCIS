@@ -25,7 +25,7 @@ WORKFLOW = ROOT / ".github" / "workflows" / "miri.yml"
 FORMAT = "zeno-fcis/miri-exclusions/1"
 ENTRY_KEYS = {"group", "package", "test_binary", "test", "reason", "native"}
 NATIVE_KEYS = {"workflow", "job", "command"}
-ROW_KEYS = {"group", "packages", "target", "test", "command", "miri_skip"}
+ROW_KEYS = {"group", "packages", "target", "test", "command", "miri_skip", "part", "parts"}
 NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 TEST_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*")
 
@@ -125,6 +125,11 @@ def check_native(root: Path, entry: dict) -> None:
 
 
 def check_static(root: Path, entries: list[dict], rows: list[dict]) -> None:
+    from miri_shards import logical_rows
+    try:
+        rows = logical_rows(rows)
+    except ValueError as error:
+        raise ExclusionError(str(error)) from error
     listed = {(entry["group"], entry["test"]) for entry in entries}
     skipped = workflow_skips(rows)
     if listed != skipped:

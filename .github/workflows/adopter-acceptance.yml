@@ -51,6 +51,49 @@ jobs:
       - name: Establish contained checker runtime
         uses: ./.github/actions/checker-containment
 
+      - name: Install the two pinned Lean proof runtimes
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          ELAN_HOME: ${{ runner.temp }}/lean-proof-tools/elan
+        run: |
+          # These runtimes expand to about 5.4 GiB together. Android is outside
+          # this job's tool closure and can be removed from this ephemeral runner.
+          if (( $(df -k --output=avail "$RUNNER_TEMP" | tail -n 1) < 20 * 1024 * 1024 )); then
+            sudo rm -rf /usr/local/lib/android
+          fi
+          test "$(df -k --output=avail "$RUNNER_TEMP" | tail -n 1)" -ge $((8 * 1024 * 1024))
+          tools="$RUNNER_TEMP/lean-proof-tools"
+          mkdir -p "$tools/installer"
+          cd "$tools"
+          check_archive() {
+            local archive="$1" expected
+            expected="$(awk -v name="$archive" '$2 == name {print $1}' \
+              "$GITHUB_WORKSPACE/release/lean-proof-tools-linux-x86_64.sha256")"
+            [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || return 1
+            printf '%s  %s\n' "$expected" "$archive" | sha256sum --check --strict
+          }
+          curl --fail --location --silent --show-error \
+            https://github.com/leanprover/elan/releases/download/v4.1.2/elan-x86_64-unknown-linux-gnu.tar.gz \
+            --output elan-x86_64-unknown-linux-gnu.tar.gz
+          check_archive elan-x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf elan-x86_64-unknown-linux-gnu.tar.gz -C installer
+          installer/elan-init -y --default-toolchain none --no-modify-path
+          versions="$(PYTHONPATH="$GITHUB_WORKSPACE/tools" python3 -c \
+            'from check_lean_proofs import VERSIONS; import re; assert VERSIONS and len(set(VERSIONS)) == len(VERSIONS) and all(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", v) for v in VERSIONS); print(*VERSIONS)')"
+          for version in $versions; do
+            archive="lean-$version-linux.tar.zst"
+            curl --fail --location --silent --show-error \
+              "https://github.com/leanprover/lean4/releases/download/v$version/$archive" \
+              --output "$archive"
+            check_archive "$archive"
+            tar --zstd -xf "$archive"
+            "$ELAN_HOME/bin/elan" toolchain link "leanprover/lean4:v$version" "$tools/lean-$version-linux"
+            "$ELAN_HOME/bin/elan" run "leanprover/lean4:v$version" lean --version
+            rm "$archive"
+          done
+          echo "ELAN_HOME=$ELAN_HOME" >> "$GITHUB_ENV"
+          echo "$ELAN_HOME/bin" >> "$GITHUB_PATH"
+
       - name: Install pinned Rust
         run: |
           rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt

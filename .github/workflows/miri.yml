@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   interpret:
-    name: interpret (${{ matrix.group }})
+    name: interpret (${{ matrix.group }}${{ matrix.parts && format(' part {0}/{1}', matrix.part, matrix.parts) || '' }})
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     strategy:
@@ -23,9 +23,23 @@ jobs:
           {"group": "values", "packages": "-p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec -p zeno-fcis-secret", "miri_skip": ["legal_leaf_above_default_payload_remains_constructible_and_encodable", "all_long_prefix_subsets_and_insert_remove_orders_are_canonical", "every_subset_root_matches_independent_sha256_vectors"]},
           {"group": "schemas", "packages": "-p zeno-fcis-project -p zeno-fcis-catalog -p zeno-fcis-schema -p zeno-fcis-refine"},
           {"group": "plans", "packages": "-p zeno-fcis-patch -p zeno-fcis-plan -p zeno-fcis-receipt -p zeno-fcis-security"},
-          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product"]},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product"], "part": 1, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product"], "part": 2, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product"], "part": 3, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product"], "part": 4, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product"], "part": 5, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product"], "part": 6, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product"], "part": 7, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product"], "part": 8, "parts": 8},
           {"group": "specification", "packages": "-p zeno-fcis-spec -p zeno-fcis-backend", "miri_skip": ["small_algebras_match_independent_boolean_lifts_exhaustively"]},
-          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"]},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 1, "parts": 8},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 2, "parts": 8},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 3, "parts": 8},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 4, "parts": 8},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 5, "parts": 8},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 6, "parts": 8},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 7, "parts": 8},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 8, "parts": 8},
           {"group": "synthesis-library-choice-closing", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::choice_tests::closing_every_choice_matches_the_previous_value_comparison"},
           {"group": "synthesis-library-schema-bytes", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::canonical_v2::schema::tests::every_original_schema_byte_and_truncation_is_bound"},
           {"group": "synthesis-library-publication-genesis-bytes", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::authority::bound::publication_tests::genuine_genesis_retains_initial_laws_identity_and_every_byte"},
@@ -38,7 +52,8 @@ jobs:
           {"group": "synthesis-documentation", "packages": "-p zeno-fcis-synthesis", "target": "--doc"},
           {"group": "synthesis-example-checked-continuation", "packages": "-p zeno-fcis-synthesis", "target": "--example checked_continuation", "command": "run"},
           {"group": "generated-code-tests-example-withdrawal-queue-decisions", "packages": "-p zeno-fcis-generated-code-tests", "target": "--example withdrawal_queue_decisions", "command": "run"},
-          {"group": "synthesis-finite", "packages": "-p zeno-fcis-synthesis", "target": "--test finite", "miri_skip": ["a_trapped_candidate_does_not_disturb_the_next_candidate", "distinguishes_unrealizable_contract_from_insufficient_grammar", "synthesizes_a_generic_relation_and_refutes_identity"]},
+          {"group": "synthesis-finite", "packages": "-p zeno-fcis-synthesis", "target": "--test finite", "miri_skip": ["a_trapped_candidate_does_not_disturb_the_next_candidate", "distinguishes_unrealizable_contract_from_insufficient_grammar", "synthesizes_a_generic_relation_and_refutes_identity"], "part": 1, "parts": 2},
+          {"group": "synthesis-finite", "packages": "-p zeno-fcis-synthesis", "target": "--test finite", "miri_skip": ["a_trapped_candidate_does_not_disturb_the_next_candidate", "distinguishes_unrealizable_contract_from_insufficient_grammar", "synthesizes_a_generic_relation_and_refutes_identity"], "part": 2, "parts": 2},
           {"group": "synthesis-oracle-accounts", "packages": "-p zeno-fcis-synthesis", "target": "--test oracle_accounts"},
           {"group": "synthesis-oracle-arithmetic", "packages": "-p zeno-fcis-synthesis", "target": "--test oracle_arithmetic"},
           {"group": "synthesis-oracle-prices", "packages": "-p zeno-fcis-synthesis", "target": "--test oracle_prices"},
@@ -145,15 +160,22 @@ jobs:
           import re
           import shlex
           import subprocess
+          import sys
+
+          sys.path.insert(0, str(Path('tools').resolve()))
+          from miri_shards import logical_row, logical_rows
 
           def run(arguments):
               return subprocess.run(arguments, check=True, text=True, stdout=subprocess.PIPE).stdout
 
           source = Path('.github/workflows/miri.yml').read_text()
-          rows = json.loads(source.split('        include: ', 1)[1].split('    env:', 1)[0])
+          raw_rows = json.loads(source.split('        include: ', 1)[1].split('    env:', 1)[0])
+          selected_raw = json.loads(os.environ['SELECTED_GROUP'])
+          assert selected_raw in raw_rows, 'selected part is absent from the checked matrix'
+          rows = logical_rows(raw_rows)
           assert len({row['group'] for row in rows}) == len(rows), 'duplicate Miri group'
           rows = [row for row in rows if row['packages'] == '-p zeno-fcis-synthesis']
-          selected = json.loads(os.environ['SELECTED_GROUP'])
+          selected = logical_row(selected_raw)
           assert selected in rows, 'selected group is absent from the checked matrix'
           cargo = ['cargo', '+nightly-2026-07-21']
           metadata = json.loads(run(cargo + ['metadata', '--locked', '--offline', '--no-deps', '--format-version', '1']))
@@ -320,8 +342,26 @@ jobs:
                   output.write('MIRI_TEST_ARGS=-- ' + shlex.join(arguments(selected)) + '\n')
           PY
 
+      - name: Interpret a complete compiled-test partition
+        if: matrix.parts
+        env:
+          SELECTED_GROUP: ${{ toJSON(matrix) }}
+        run: |
+          python3 tools/test_miri_shards.py
+          python3 tools/miri_shards.py
+
       - name: Interpret semantic boundary tests
+        if: ${{ !matrix.parts }}
         run: cargo +nightly-2026-07-21 miri ${{ matrix.command || 'test' }} --locked ${{ matrix.packages }} ${{ matrix.target }} ${MIRI_TEST_ARGS:-}
+
+      - name: Retain the compiled-test partition result
+        if: ${{ always() && matrix.parts }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: miri-test-part-${{ github.sha }}-${{ matrix.group }}-${{ matrix.part }}
+          path: ${{ runner.temp }}/miri-test-part.json
+          if-no-files-found: warn
+          retention-days: 30
 
   semantic-core:
     name: semantic-core

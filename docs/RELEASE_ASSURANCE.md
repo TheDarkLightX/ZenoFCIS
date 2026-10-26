@@ -318,8 +318,8 @@ The publication, values, specification, synthesis-library, synthesis-finite,
 template-contract remainder, focused treasury replay and three historical
 groups use the pinned interpreter's Tree Borrows alias model. Other groups
 use Stacked Borrows. Both retain strict provenance and the default validity,
-bounds, alignment, data-race and leak checks. Tree Borrows makes the large
-byte-comparison and snapshot workloads tractable without removing their cases.
+bounds, alignment, data-race and leak checks. The alias-model switch retains
+the selected cases in these groups.
 These alias models have different semantics: a passing result names the model
 used and is not relabelled as a pass under the other model. Neither model
 establishes undefined-behaviour freedom for every possible execution.
@@ -329,6 +329,17 @@ run their eight graph-seed groups separately. Nine larger synthesis-library
 tests and the retained template checks also have separate groups. Splitting
 these tests preserves their cases and assertions; the native-only exclusions
 listed above account for the omitted interpreted executions.
+
+The publication and synthesis-library remainders each run in eight compiled-test
+partitions, and the finite remainder runs in two. The 82 logical groups therefore
+use 97 interpreter jobs. Each partition retains the original filters, lists the
+compiled tests, and checks its actual exact-name selection before interpretation.
+Existing ignored tests retain their status and are recorded in each partition's
+inventory; partitioning does not enable or hide them.
+The matrix must contain every partition exactly once with identical original
+selectors. No test or case inside a test is removed. Separate test processes have
+different interpreter histories; this is not a claim that cross-test scheduling
+or shared interpreter state is identical to an unpartitioned run.
 
 Each split synthesis target keeps a remainder group. Its preflight lists the
 compiled tests and verifies that the exact-test groups, remainder and pinned
