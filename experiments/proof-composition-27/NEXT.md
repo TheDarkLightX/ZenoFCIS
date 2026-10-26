@@ -6,7 +6,7 @@ checkable symbolic proof evidence, and proved correspondence for its critical
 implemented transitions. **None of those end-to-end gates are complete yet.**
 
 Keep 2.6 release qualification and the 2.7 experiments separate. All new
-verification routes must preserve fail-closed \`UNKNOWN\` and false-claim
+verification routes must preserve fail-closed `UNKNOWN` and false-claim
 negative controls; no proposer, AI model, SMT solver or receipt hash gets
 publication authority simply by returning success.
 
@@ -26,18 +26,18 @@ publication authority simply by returning success.
 
 ## Phase 1 — Close production composition bridge (highest priority)
 
-- [ ] Inventory current \`zeno-fcis/checked-composition/3\` obligations,
+- [ ] Inventory current `zeno-fcis/checked-composition/3` obligations,
   predicates, refusal behavior, domain tables and the conditional Verus
   induction theorem from #137. Freeze precise semantics and source revisions.
 - [ ] Verify construction of **every actual** local/assume/couple obligation
-  from parsed \`.zeno\` and the bound native Authority; cover skipped and
+  from parsed `.zeno` and the bound native Authority; cover skipped and
   read-only components, CommittedFailure, rejection ordering and framing.
 - [ ] Machine-check or translation-validate all admitted obligation
   enumerations, including bounds and edge cases, against those semantics.
 - [ ] Prove composition of checked premises with the existing Verus
   induction theorem. No equivalence may rely solely on table hashes.
 - [ ] Produce *source-bound, independently replayable* native receipts.
-  Turn all missing/unsupported proof cases into UNKNOWN, not \`proved\`.
+  Turn all missing/unsupported proof cases into UNKNOWN, not `proved`.
 - [ ] Retain a counterexample distinguishing a subtly wrong actual
   implementation bridge, not just a wrong abstract table.
 
