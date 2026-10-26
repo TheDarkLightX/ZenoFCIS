@@ -48,6 +48,7 @@ crates/zeno-fcis-cli/tests/fixtures/spend-approval/README.md
 crates/zeno-fcis-cli/tests/fixtures/transform-check/README.md
 crates/zeno-fcis-loop-doors/README.md
 crates/zeno-fcis-program-search/README.md
+docs/ABSTRACT_MACHINE_DISCOVERY_27_PROPOSAL.md
 docs/ACCEPTANCE_TESTING.md
 docs/ADMITTED_ENVELOPE.md
 docs/ADMITTED_VALUE_WITNESS.md

@@ -73,6 +73,7 @@ with [Get started](#get-started), then follow a tutorial.
 - [ZAL types and effect signatures](zal/EFFECTS.md)
 - [ZAL harness integration](zal/HARNESS_INTEGRATION.md)
 - [ZAL prototype source map](ZAL_SOURCE_MAP.md)
+- [Abstract-machine discovery for 2.7](ABSTRACT_MACHINE_DISCOVERY_27_PROPOSAL.md) (draft proposal)
 
 ## Architecture and design records
 
