@@ -18,6 +18,8 @@ publication authority simply by returning success.
   unused global state and never samples an oversized obligation.
 - [x] Exercise a three-account coupling, 50-variable and 200-variable
   compositions, replayed failing mutants, malformed input and tightened budgets.
+- [x] Build a bounded *untrusted* dependency-graph constant-sum invariant proposer;
+  require a separate independent checker verdict before accepting any proposal.
 - [x] Return explicit claim scope and no publication authority.
 - [ ] Obtain clean, hosted Node.js test and conformance workflow result at
   the exact PR head (local executable qualification is not assumed).
