@@ -54,4 +54,7 @@ jobs:
           test "$bad_status" -eq 1
           node experiments/proof-composition-27/run.cjs "$out/mutual.json" "$out/mutual-strengthening.json" > "$out/mutual-report.json"
           node experiments/proof-composition-27/run_goals.cjs "$out/mutual.json" "$out/mutual-goals.json" "$out/mutual-strengthening.json" > "$out/mutual-goals-report.json"
-          node -e 'const fs=require("fs");for(const n of ["chain3","pairs25","chain3-proposed","chain3-goals","mutual","mutual-goals"]){const x=JSON.parse(fs.readFileSync(process.argv[1]+"/"+n+"-report.json"));if(x.status!=="proved"||x.publication_authority!==false||x.executable_refinement!==false)process.exit(1);}' "$out"
+          node experiments/proof-composition-27/run_linear.cjs "$out/ledger50.json" "$out/ledger50-goal.json" > "$out/ledger50-report.json"
+          node experiments/proof-composition-27/run_linear.cjs "$out/ledger200.json" "$out/ledger200-goal.json" > "$out/ledger200-report.json"
+          node -e 'const fs=require("fs");for(const n of ["chain3","pairs25","chain3-proposed","chain3-goals","mutual","mutual-goals","ledger50","ledger200"]){const x=JSON.parse(fs.readFileSync(process.argv[1]+"/"+n+"-report.json"));if(x.status!=="proved"||x.publication_authority!==false||x.executable_refinement!==false)process.exit(1);}' "$out"
+          node -e 'const fs=require("fs");for(const [n,rows] of [["ledger50",882],["ledger200",3582]]){const x=JSON.parse(fs.readFileSync(process.argv[1]+"/"+n+"-report.json"));if(x.global_conservation_established!==true||x.action_delta_rows!==rows||x.claim_level!=="DECLARATIVE_FINITE_MODEL_ONLY")process.exit(1);}' "$out"
