@@ -133,6 +133,46 @@ global oracle are compared on the reference models and seeded transition
 mutations. The reference is a cross-check, **not a machine-checked
 refinement theorem**, and runs in the same JavaScript runtime.
 
+## Global conservation across many connected components
+
+A second independent checker, `linear_checker.cjs`, proves a **single global**
+weighted-sum safety property using only local action tables and their exact
+frame conditions. The separately frozen goal lists every variable with a
+bounded integer coefficient and an exact decimal-string expected total.
+
+Let `S(s) = Σᵢ wᵢ·sᵢ`. For each action row, the checker establishes:
+
+```text
+    Σᵢ∈writes(action) wᵢ · (postᵢ − preᵢ) = 0
+```
+
+Since the complete finite-table transition updates **only** the declared
+write set, all other summands cancel. The goal also checks `S(genesis)`
+equals the frozen expected total. Induction therefore establishes this
+**specific model property** for every execution history, without exploring
+the Cartesian product of the global state. Both sides use exact `BigInt`
+arithmetic; model admission validates all row domains and framing.
+
+The connected path ledger has transfers between adjacent accounts, not
+independent pairs. For 50 accounts it uses **882** local action-table rows
+rather than checking 3⁵⁰ global states. For 200 accounts it uses **3,582**
+local rows rather than 3²⁰⁰ global states. These are bounded toy ledger
+models, **not** 50 or 200 source modules, native `.zeno` contracts, or
+executable benchmarks. The model-admission invariant is intentionally
+tautological: the *global* property is proved by the new delta checker.
+
+```sh
+node experiments/proof-composition-27/run_linear.cjs /tmp/zfcis-proof-fixtures/ledger50.json /tmp/zfcis-proof-fixtures/ledger50-goal.json
+node experiments/proof-composition-27/run_linear.cjs /tmp/zfcis-proof-fixtures/ledger200.json /tmp/zfcis-proof-fixtures/ledger200-goal.json
+```
+
+Faults that leak or create tokens, omit coefficients, supply an incorrect
+genesis total, or change the meaning of the goal are refused or refuted.
+Future work is proving that native composition/collection/SQLite operations
+actually refine this restricted model. ZenoFCIS 2.6 already has related
+collection summary-delta and Lean/Verus work; this standalone experiment
+neither replaces nor completes those existing bridges.
+
 ## Bounded automatic proposal (not an acceptance algorithm)
 
 `propose_invariants.cjs` builds an *untrusted* graph from each action's declared
@@ -201,6 +241,7 @@ input/source identity hashes.
 | Correct finite-table model validation on the checked fixtures | Standalone JavaScript tests and negative controls |
 | Compositional invariant proof *under exactly this model semantics* | Complete local enumerations plus mathematical induction argument |
 | Optional mutual induction with circular lemma dependencies | Every inductive lemma is checked against every relevant action under selected pre-state hypotheses |
+| Global weighted conservation across a connected ledger | Exact per-action delta proof, separate frozen total, and 50/200-variable bounded experiments |
 | Differential global-state model oracle (small cases only) | Independent full-product enumeration, reachability and seeded mutants |
 | Arbitrarily many history steps in the fixed model | Conditional mathematical induction |
 | Ability to verify 50 or 200 variable fixtures without a global product | Reproducible model-specific row counts |
