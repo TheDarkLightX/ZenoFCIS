@@ -110,6 +110,7 @@ and other tools can use the same public boundaries.
 
 ## Security
 
+- [Proposed 2.7 runtime isolation and application evidence](RUNTIME_ISOLATION_27_PROPOSAL.md) (draft design)
 - [LLM cybersecurity review orchestrator](LLM_CYBERSECURITY_REVIEW.md)
 - [Evidence-first security review playbook](SECURITY_REVIEW_PLAYBOOK.md)
 - [EPI hotspot and exploit-chain model](SECURITY_HOTSPOT_MODEL.md)
