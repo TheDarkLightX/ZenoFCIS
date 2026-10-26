@@ -273,3 +273,101 @@ test('separate proposer, frozen goals and checker CLIs agree end-to-end', () => 
     assert.equal(verdict.executable_refinement, false);
   } finally { fs.rmSync(folder, { recursive: true, force: true }); }
 });
+
+const { STRENGTHENING_SCHEMA } = require('./proof_checker.cjs');
+const { makeMutual, mutualStrengthening } = require('./models.cjs');
+
+test('individually insufficient invariants are refuted without strengthening', () => {
+  const x = verify(makeMutual());
+  assert.equal(x.status, 'violated');
+  assert.equal(x.reason, 'step-violation');
+});
+test('simultaneous induction validates mutually dependent lemmas', () => {
+  const x = verify(makeMutual(), {}, mutualStrengthening());
+  assert.equal(x.status, 'proved');
+  assert.equal(x.strengthening_bindings, 2);
+  assert.equal(x.checked_obligation_rows, 8);
+  assert.equal(x.obligations.length, 2);
+  assert.equal(x.obligations[0].assumed[0], 'y_zero');
+  assert.equal(x.obligations[1].assumed[0], 'x_zero');
+});
+test('dropping even one necessary mutual assumption blocks induction', () => {
+  const packet = mutualStrengthening();
+  packet.bindings.pop();
+  const x = verify(makeMutual(), {}, packet);
+  assert.equal(x.status, 'violated');
+});
+test('unsound action remains refuted under both jointly discharged hypotheses', () => {
+  const model = makeMutual();
+  model.actions[0].table[0].next = [1]; // bad even at the actual genesis
+  const x = verify(model, {}, mutualStrengthening());
+  assert.equal(x.status, 'violated');
+  assert.equal(x.reason, 'step-violation');
+  assert.deepEqual(x.witness.state, [0, 0]);
+});
+test('unknown or self-citing strengthening premise is refused', () => {
+  const wrong = mutualStrengthening();
+  wrong.bindings[0].assuming = ['fake_lemma'];
+  assert.throws(() => verify(makeMutual(), {}, wrong), /self or unknown/);
+  wrong.bindings[0].assuming = ['x_zero'];
+  assert.throws(() => verify(makeMutual(), {}, wrong), /self or unknown/);
+});
+test('duplicate or unsorted binding cannot conceal a missing proof', () => {
+  const wrong = mutualStrengthening();
+  wrong.bindings.reverse();
+  assert.throws(() => verify(makeMutual(), {}, wrong), /unsorted or repeated binding/);
+  const duplicate = mutualStrengthening();
+  duplicate.bindings.push(duplicate.bindings[1]);
+  assert.throws(() => verify(makeMutual(), {}, duplicate), /unsorted or repeated binding/);
+});
+test('strengthened implication exceeding its limit is unknown before checking rows', () => {
+  const x = verify(makeMutual(), { obligationRows: 3 }, mutualStrengthening());
+  assert.equal(x.status, 'inconclusive');
+  assert.equal(x.evaluated_rows, 0);
+  assert.equal(x.reason, 'obligation-budget');
+});
+test('frozen safety goal is derived from the mutually inductive conjunction', () => {
+  const m = makeMutual();
+  const goals = { schema: GOAL_SCHEMA, goals: [
+    { id: 'human_goal', support: ['x'], allowed: [[0]], using: ['x_zero'] }
+  ] };
+  assert.equal(checkGoals(m, goals).status, 'violated');
+  const checked = checkGoals(m, goals, undefined, undefined, mutualStrengthening());
+  assert.equal(checked.status, 'proved');
+  assert.equal(checked.strengthening_bindings, 2);
+  assert.equal(checked.goal_safety_established, true);
+});
+test('mutually inductive CLI emits source- and assumption-bound receipt', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zfcis-mutual-'));
+  try {
+    const m = path.join(temp, 'model.json');
+    const b = path.join(temp, 'strengthening.json');
+    const g = path.join(temp, 'goals.json');
+    fs.writeFileSync(m, canonicalJSON(makeMutual()));
+    fs.writeFileSync(b, canonicalJSON(mutualStrengthening()));
+    fs.writeFileSync(g, canonicalJSON({ schema: GOAL_SCHEMA, goals: [
+      { id: 'human_goal', support: ['x'], allowed: [[0]], using: ['x_zero'] }
+    ] }));
+    const alone = spawnSync(process.execPath, [path.join(__dirname, 'run.cjs'), m],
+      { encoding: 'utf8', timeout: 15000 });
+    assert.equal(alone.status, 1);
+    const strengthened = spawnSync(process.execPath, [path.join(__dirname, 'run.cjs'), m, b],
+      { encoding: 'utf8', timeout: 15000 });
+    assert.equal(strengthened.status, 0, strengthened.stderr);
+    assert.equal(JSON.parse(strengthened.stdout).strengthening_bindings, 2);
+    const claim = spawnSync(process.execPath, [path.join(__dirname, 'run_goals.cjs'), m, g, b],
+      { encoding: 'utf8', timeout: 15000 });
+    assert.equal(claim.status, 0, claim.stderr);
+    const receipt = JSON.parse(claim.stdout);
+    assert.equal(receipt.goal_safety_established, true);
+    assert.match(receipt.strengthening_sha256, /^[0-9a-f]{64}$/);
+    assert.equal(receipt.publication_authority, false);
+    // Disturbing the original hypotheses must invalidate their digest AND the check.
+    const tamper = mutualStrengthening();
+    tamper.bindings.pop();
+    fs.writeFileSync(b, canonicalJSON(tamper));
+    const forbidden = spawnSync(process.execPath, [path.join(__dirname, 'run_goals.cjs'), m, g, b],
+      { encoding: 'utf8', timeout: 15000 });
+    assert.equal(forbidden.status, 1, forbidden.stderr);
+  } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
