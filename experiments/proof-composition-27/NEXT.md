@@ -29,6 +29,10 @@ publication authority simply by returning success.
 - [x] Implement an independent small full-global-state oracle that separately
   evaluates induction and actual reachable safety, with 30 deterministic
   mutation comparisons and fail-closed global-product limits.
+- [x] Prove an independently frozen **global linear conservation property**
+  on connected 50/200-account finite-state ledgers using exact, local write-set
+  delta checks (882/3,582 action rows); verify leakage mutants and goal tampering.
+  Do not count this as the held-out benchmark for native `.zeno` contracts.
 - [x] Return explicit claim scope and no publication authority.
 - [ ] Obtain clean, hosted Node.js test and conformance workflow result at
   the exact PR head (local executable qualification is not assumed).
