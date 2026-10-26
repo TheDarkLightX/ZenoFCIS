@@ -1,5 +1,7 @@
 # Proposed runtime isolation and application evidence for 2.7
 
+[Implementation checklist and handoff](RUNTIME_ISOLATION_27_PROGRESS.md).
+
 **Status: draft design; no new runtime guarantee or production qualification.**
 
 This proposal gives library users a path from an approved decision to a
