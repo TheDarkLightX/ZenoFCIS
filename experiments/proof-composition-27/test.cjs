@@ -371,3 +371,47 @@ test('mutually inductive CLI emits source- and assumption-bound receipt', () => 
     assert.equal(forbidden.status, 1, forbidden.stderr);
   } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
+
+const { examine } = require('./global_oracle.cjs');
+test('independent global oracle agrees on qualified small models and coupling', () => {
+  for (const [m, assumptions] of [
+    [makePairs(1), null],
+    [makePairs(2), null],
+    [makeChain(), null],
+    [makeMutual(), null],
+    [makeMutual(), mutualStrengthening()]
+  ]) {
+    const local = verify(m, {}, assumptions);
+    const reference = examine(m, assumptions);
+    assert.equal(reference.status, local.status);
+    if (local.status === 'proved') assert.equal(reference.reachable_safety, 'safe');
+  }
+});
+test('global reachability and inductive proof are different claims', () => {
+  const local = verify(makeMutual());
+  const global = examine(makeMutual());
+  assert.equal(local.status, 'violated'); // the supplied lemmas are not individually inductive
+  assert.equal(global.reachable_safety, 'safe'); // actual execution stays at genesis
+  assert.equal(global.reachable_states, 1);
+  assert.equal(examine(makeMutual(), mutualStrengthening()).status, 'proved');
+});
+test('separate exhaustive oracle agrees with 30 deterministic candidate mutations', () => {
+  let seed = 0x5eeda11;
+  const next = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0);
+  for (let sample = 0; sample < 30; sample++) {
+    const m = makePairs(2);
+    const a = m.actions[next() % m.actions.length];
+    const r = a.table[next() % a.table.length];
+    // Only corrupt exact declared next values; leave model otherwise well formed.
+    r.next = [(next() % 3), (next() % 3)];
+    const local = verify(m);
+    const global = examine(m);
+    assert.equal(global.status, local.status, 'mutation #' + sample);
+    if (local.status === 'proved') assert.equal(global.reachable_safety, 'safe');
+  }
+});
+test('global oracle refuses to enumerate enormous composition products', () => {
+  const o = examine(makePairs(25));
+  assert.equal(o.status, 'inconclusive');
+  assert.equal(o.examined, 0);
+});
