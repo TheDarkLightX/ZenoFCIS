@@ -199,3 +199,77 @@ test('untrusted proposer CLI yields a candidate that requires a separate checker
     assert.equal(JSON.parse(output.stdout).status, 'proved');
   } finally { fs.rmSync(folder, { recursive: true, force: true }); }
 });
+
+const { checkGoals, SCHEMA: GOAL_SCHEMA } = require('./goal_checker.cjs');
+function freezeGoal(allowed, using = ['auto_sum_000']) {
+  return { schema: GOAL_SCHEMA, goals: [{ id: 'human_conservation',
+    support: ['a', 'b', 'c'], allowed, using }] };
+}
+test('separately stated safety goal is entailed by proposed and independently proved invariants', () => {
+  const original = makeChain();
+  const goal = freezeGoal(original.invariants[0].allowed);
+  original.invariants = [];
+  const candidate = propose(original);
+  const x = checkGoals(candidate.model, goal);
+  assert.equal(x.status, 'proved');
+  assert.equal(x.goal_safety_established, true);
+  assert.equal(x.checked_goal_rows, 27);
+  assert.equal(x.publication_authority, false);
+});
+test('false frozen intent is not accepted even if a different invariant is proved', () => {
+  const m = makeChain();
+  const g = freezeGoal([[2, 0, 0]], ['supply_conservation']);
+  const x = checkGoals(m, g);
+  assert.equal(x.status, 'violated');
+  assert.equal(x.reason, 'goal-not-entailed-by-invariants');
+  assert.equal(x.witness_may_be_unreachable, true);
+});
+test('false invariant or broken transition blocks goal proof before entailment', () => {
+  const m = makeChain();
+  m.actions[0].table.find(row => row.at[0] === 1 && row.at[1] === 1).next = [0, 0];
+  const x = checkGoals(m, freezeGoal(m.invariants[0].allowed, ['supply_conservation']));
+  assert.equal(x.status, 'violated');
+  assert.equal(x.reason, 'invariant-proof-blocked');
+});
+test('an oversized frozen goal is inconclusive with zero entailment rows', () => {
+  const m = makePairs(25);
+  const g = { schema: GOAL_SCHEMA, goals: [{
+    id: 'global', support: m.variables.map(v => v.id),
+    allowed: [m.variables.map(v => v.initial)], using: ['pair_000']
+  }] };
+  const x = checkGoals(m, g);
+  assert.equal(x.status, 'inconclusive');
+  assert.equal(x.checked_goal_rows, 0);
+  assert.equal(x.goal_safety_established, false);
+});
+test('malformed goal packet is refused rather than assumed', () => {
+  const m = makeChain();
+  const g = freezeGoal(m.invariants[0].allowed, ['supply_conservation']);
+  g.goals[0].using = ['missing'];
+  assert.throws(() => checkGoals(m, g), /unknown name/);
+});
+test('separate proposer, frozen goals and checker CLIs agree end-to-end', () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'zfcis-frozen-goal-'));
+  try {
+    const original = makeChain();
+    const goal = freezeGoal(original.invariants[0].allowed);
+    original.invariants = [];
+    const input = path.join(folder, 'input.json');
+    const candidate = path.join(folder, 'candidate.json');
+    const goalFile = path.join(folder, 'goals.json');
+    fs.writeFileSync(input, canonicalJSON(original));
+    fs.writeFileSync(goalFile, canonicalJSON(goal));
+    const p = spawnSync(process.execPath, [path.join(__dirname, 'propose.cjs'), input, candidate],
+      { encoding: 'utf8', timeout: 15000 });
+    assert.equal(p.status, 0, p.stderr);
+    const checked = spawnSync(process.execPath,
+      [path.join(__dirname, 'run_goals.cjs'), candidate, goalFile],
+      { encoding: 'utf8', timeout: 15000 });
+    assert.equal(checked.status, 0, checked.stderr);
+    const verdict = JSON.parse(checked.stdout);
+    assert.equal(verdict.goal_safety_established, true);
+    assert.match(verdict.goal_sha256, /^[0-9a-f]{64}$/);
+    assert.match(verdict.model_sha256, /^[0-9a-f]{64}$/);
+    assert.equal(verdict.executable_refinement, false);
+  } finally { fs.rmSync(folder, { recursive: true, force: true }); }
+});
