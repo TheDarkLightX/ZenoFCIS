@@ -1,0 +1,149 @@
+name: private-platform-review
+
+on:
+  push:
+    branches: ["platform/2.6-private-review-20261027"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_BUILD_JOBS: "3"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+  macos:
+    name: Apple silicon candidate for private review
+    runs-on: macos-15
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - name: Checkout review tools
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          path: probe
+          persist-credentials: false
+      - name: Checkout released source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: v2.6.0
+          path: source
+          persist-credentials: false
+      - name: Check source, host and Rust
+        run: |
+          test "$(git rev-parse HEAD)" = 7d175c47099866939c86acd463ac85219abba882
+          test "$(uname -s)/$(uname -m)" = Darwin/arm64
+          rustup toolchain install 1.97.1 --profile minimal
+          test "$(rustc +1.97.1 -vV | sed -n 's/^host: //p')" = aarch64-apple-darwin
+      - name: Build candidate and retain privacy refusal
+        id: candidate
+        run: |
+          set +e
+          python3 tools/rc_package.py build-host-binary --output "$RUNNER_TEMP/host" > "$RUNNER_TEMP/host-build.log" 2>&1
+          status=$?
+          set -e
+          python3 "$GITHUB_WORKSPACE/probe/.github/review-mac-candidate.py" "$status" "$RUNNER_TEMP/host" "$RUNNER_TEMP/host-build.log" > "$RUNNER_TEMP/host/CANDIDATE-REVIEW.json"
+          cat "$RUNNER_TEMP/host/CANDIDATE-REVIEW.json"
+      - name: Run the installed-binary journey
+        run: |
+          mkdir "$RUNNER_TEMP/source-tree"
+          git archive --format=tar HEAD | tar -x -f - -C "$RUNNER_TEMP/source-tree"
+          python3 tools/check_installed_cli.py --release "$RUNNER_TEMP/host" --source "$RUNNER_TEMP/source-tree" --work-dir "$RUNNER_TEMP/journey" --report "$RUNNER_TEMP/host/INSTALLED-JOURNEY.json"
+      - name: Encrypt the candidate for local review
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        run: |
+          cp "$RUNNER_TEMP/host-build.log" "$RUNNER_TEMP/host/host-build.log"
+          tar -C "$RUNNER_TEMP" -cf "$RUNNER_TEMP/mac-review.tar" host
+          openssl smime -encrypt -binary -aes256 -outform DER -in "$RUNNER_TEMP/mac-review.tar" -out "$RUNNER_TEMP/mac-review.p7m" "$GITHUB_WORKSPACE/probe/.github/platform-review-certificate.pem"
+          rm "$RUNNER_TEMP/mac-review.tar"
+      - name: Retain encrypted Mac review packet
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: encrypted-macos-review-2.6.0
+          path: ${{ runner.temp }}/mac-review.p7m
+          if-no-files-found: error
+          retention-days: 7
+
+  windows:
+    name: Windows x64 candidate for private review
+    runs-on: windows-2025
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: source
+    steps:
+      - name: Checkout review tools
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          path: probe
+          persist-credentials: false
+      - name: Checkout released source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: v2.6.0
+          path: source
+          persist-credentials: false
+      - name: Check source and install Rust
+        run: |
+          if ((git rev-parse HEAD) -ne '7d175c47099866939c86acd463ac85219abba882') { throw 'unexpected source' }
+          rustup toolchain install 1.97.1 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build the remapped Windows CLI
+        id: candidate
+        run: |
+          $flags = @("--remap-path-prefix=$env:USERPROFILE=/zeno-fcis-home", "--remap-path-prefix=$env:GITHUB_WORKSPACE\source=/zeno-fcis-source")
+          $env:CARGO_ENCODED_RUSTFLAGS = $flags -join [char]31
+          cargo +1.97.1 build --locked --release -p zeno-fcis-cli --bin zeno-fcis
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Check the executable and generated application
+        run: |
+          $cli = Join-Path $env:GITHUB_WORKSPACE 'source/target/release/zeno-fcis.exe'
+          $version = & $cli --version
+          if ($LASTEXITCODE -ne 0 -or $version.Trim() -ne 'zeno-fcis 2.6.0') { throw 'unexpected CLI version' }
+          & $cli check 'examples/guide-counter/project.zeno' --format json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $app = Join-Path $env:RUNNER_TEMP 'zenofcis-counter'
+          & $cli new $app --template durable-counter --source (Join-Path $env:GITHUB_WORKSPACE 'source')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Push-Location $app
+          try {
+            cargo +1.97.1 test --offline
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            cargo +1.97.1 run --offline -- new-counter.sqlite
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Pop-Location
+          }
+      - name: Encrypt the candidate for local review
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        run: |
+          $stage = Join-Path $env:RUNNER_TEMP 'windows-review'
+          New-Item -ItemType Directory $stage | Out-Null
+          $exe = Join-Path $env:GITHUB_WORKSPACE 'source/target/release/zeno-fcis.exe'
+          Copy-Item $exe (Join-Path $stage 'zeno-fcis.exe')
+          @{ source_commit = '7d175c47099866939c86acd463ac85219abba882'; host = 'x86_64-pc-windows-msvc'; sha256 = (Get-FileHash -Algorithm SHA256 $exe).Hash.ToLowerInvariant() } | ConvertTo-Json | Set-Content (Join-Path $stage 'HOST-BINARY.json')
+          $tar = Join-Path $env:RUNNER_TEMP 'windows-review.tar'
+          tar -cf $tar -C $stage .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $openssl = (Get-Command openssl.exe -ErrorAction SilentlyContinue).Source
+          if (-not $openssl) { $openssl = 'C:\Program Files\Git\usr\bin\openssl.exe' }
+          & $openssl smime -encrypt -binary -aes256 -outform DER -in $tar -out (Join-Path $env:RUNNER_TEMP 'windows-review.p7m') (Join-Path $env:GITHUB_WORKSPACE 'probe/.github/platform-review-certificate.pem')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item $tar
+      - name: Retain encrypted Windows review packet
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: encrypted-windows-review-2.6.0
+          path: ${{ runner.temp }}/windows-review.p7m
+          if-no-files-found: error
+          retention-days: 7
