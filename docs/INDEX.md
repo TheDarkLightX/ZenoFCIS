@@ -87,6 +87,7 @@ with [Get started](#get-started), then follow a tutorial.
 
 ## Assurance and verification
 
+- [Computational feasibility and complexity-claim integrity](COMPUTATIONAL_FEASIBILITY.md): prospective evidence gate for new algorithmic routes, opt-in qualification and default changes
 - [Release assurance](RELEASE_ASSURANCE.md)
 - [BDD and acceptance testing](ACCEPTANCE_TESTING.md)
 - [Deterministic developer guardrails](DEVELOPER_GUARDRAILS.md)

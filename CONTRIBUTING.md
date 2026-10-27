@@ -87,6 +87,28 @@ channel, domain, codec, schema, precedence, profile, or algorithm identifier.
 A semantic change under an existing Rust API still requires a new protocol
 identity and reviewed migration evidence.
 
+## Algorithmic route feasibility
+
+New verification, synthesis, optimization, counting or solver-selection
+algorithms must follow [computational feasibility and complexity-claim
+integrity](docs/COMPUTATIONAL_FEASIBILITY.md) before opt-in qualification
+or default adoption. Add the algorithm route to
+`docs/feasibility/registry.json` and record a versioned card. Research
+may explicitly have unknown cost and inconclusive experiments; never present
+an unproved complexity assumption as an unconditional barrier or an
+asymptotic bound as measured speed.
+
+Run the stdlib-only preflight for records you change:
+
+```bash
+python3 tools/check_computational_feasibility.py --self-test
+python3 tools/check_computational_feasibility.py
+```
+
+CI validates structure, not benchmarks, proofs, omitted route registrations or
+promotion authority. Reviewers must inspect the underlying evidence and
+signed-off scope independently.
+
 ## Pull requests
 
 Keep one conceptual change per PR. Describe:

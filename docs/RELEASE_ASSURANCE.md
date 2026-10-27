@@ -56,6 +56,8 @@ python3 tools/security_hotspots.py self-test
 python3 tools/security_hotspots.py check
 python3 tools/check_assurance.py --self-test
 python3 tools/check_assurance.py
+python3 tools/check_computational_feasibility.py --self-test
+python3 tools/check_computational_feasibility.py
 python3 tools/rc_package.py self-test
 python3 tools/rc_package.py check
 python3 tools/atdd.py self-test

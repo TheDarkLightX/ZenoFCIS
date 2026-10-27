@@ -1,0 +1,66 @@
+{
+  "schema": "zenofcis/computational-feasibility/1",
+  "id": "example-research",
+  "tier": "research",
+  "theory": {
+    "status": "unreviewed",
+    "bound": "unknown; no asymptotic claim",
+    "model": "finite Boolean decision problems only; illustrative",
+    "assumptions": [
+      "No external complexity-theoretic hypothesis is treated as an established barrier."
+    ],
+    "source": "https://cacm.acm.org/opinion/the-moral-hazard-of-complexity-theoretic-assumptions/"
+  },
+  "correctness": {
+    "status": "unverified",
+    "scope": "No implemented algorithm; illustrative record only.",
+    "encoding": "not-run",
+    "oracle": "not-run",
+    "evidence": null
+  },
+  "concrete": {
+    "status": "unknown",
+    "operation_count": "unknown",
+    "memory_model": "unknown",
+    "overheads": "not measured"
+  },
+  "empirical": {
+    "status": "not-measured",
+    "baseline_commit": null,
+    "candidate_commit": null,
+    "corpus_sha256": null,
+    "reproducer": null,
+    "environment": null,
+    "trials": 0,
+    "cases": {
+      "development": 0,
+      "held_out": 0
+    },
+    "baseline_cost": null,
+    "candidate_cost": null,
+    "failure_report": null,
+    "raw_evidence": null,
+    "crossover": {
+      "status": "not-tested",
+      "detail": "No experimental crossover study."
+    },
+    "predeclared_criteria": null
+  },
+  "assurance": {
+    "status": "pending",
+    "trusted_base": "No new authority or dependencies are introduced by this example.",
+    "evidence": null,
+    "fallback": "Use the currently qualified verifier.",
+    "unknown_policy": "Timeout, disagreement, or incomplete checking remains inconclusive."
+  },
+  "decision": {
+    "scope": "documentation-only example",
+    "claim": "none",
+    "rationale": "Demonstrate research-tier cards without fictional benchmark or correctness evidence.",
+    "reviewer": null,
+    "limitations": [
+      "This example does not correspond to an implementation.",
+      "No measured performance or correctness claim."
+    ]
+  }
+}
