@@ -2,7 +2,7 @@ name: mobile-runtime-probes
 
 on:
   push:
-    branches: ["platform/2.6-mobile-runtime-20261027"]
+    branches: ["platform/2.6-mobile-runtime-20261027", "platform/2.6-android-runtime-retry-20261027"]
 
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
           test "$(git rev-parse HEAD)" = 7d175c47099866939c86acd463ac85219abba882
           rustup toolchain install 1.97.1 --profile minimal
           rustup target add --toolchain 1.97.1 x86_64-linux-android
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "system-images;android-35;default;x86_64"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platform-tools" "system-images;android-35;default;x86_64"
       - name: Build the synthesis test executable
         run: |
           tools="$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
@@ -48,6 +48,7 @@ jobs:
           PY
       - name: Boot Android emulator and run the test
         run: |
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666"' | sudo tee /etc/udev/rules.d/99-zenofcis-kvm.rules >/dev/null
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
@@ -66,6 +67,7 @@ jobs:
 
   ios:
     name: iOS simulator synthesis test
+    if: github.ref_name != 'platform/2.6-android-runtime-retry-20261027'
     runs-on: macos-15
     timeout-minutes: 45
     steps:
