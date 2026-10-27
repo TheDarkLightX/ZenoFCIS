@@ -74,17 +74,13 @@ the imperative shell. A passing stage check is not a release receipt.
 
 ## Release status
 
-**2.6.0** is the current release source. It builds on the first stable V2
-line, 2.3.0; the [2.6.0 release notes](docs/RELEASE_NOTES.md) describe the
-new arithmetic, search, loop and contract-judge features. Final qualification
-and publication remain separate release gates. The previous release,
-[2.5.0](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.5.0), is
-published. The release set provides the **Linux x86_64 GNU CLI** (glibc 2.39
-or later). A **macOS on Apple silicon** (`aarch64-apple-darwin`) binary will
-follow native platform validation. Every published archive must pass its
-build, custody and installed-binary checks. See
-[installation](docs/INSTALLATION.md) and the
-[workflow qualification scope](docs/FEATURE_MATRIX.md#host-platforms).
+**2.6.0** is [released](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.6.0).
+The CLI is available for Linux x86_64 GNU, Windows x64 and Apple-silicon macOS.
+The Mac archive includes a small launcher fix and identifies its own source
+commit; the signed `v2.6.0` tag is unchanged. The Windows CLI cannot run
+`synth verify` in this release. See [installation](docs/INSTALLATION.md),
+the [platform scope](docs/FEATURE_MATRIX.md#host-platforms), and the
+[release notes](docs/RELEASE_NOTES.md).
 
 [Release assurance](docs/RELEASE_ASSURANCE.md) describes the required checks
 and trusted assumptions. Source verification and qualification, exact-head
@@ -104,7 +100,7 @@ The normal V2 library route declares a complete checked program. It is
 available in the 2.6.0 release, both with default features and with
 `default-features = false`. The historical `1.1.0` package has its own V1 API.
 
-After qualification and publication, check out the `v2.6.0` tag as the [installation guide](docs/INSTALLATION.md)
+Check out the matching source as the [installation guide](docs/INSTALLATION.md)
 describes, then bind the dependency to that source:
 
 ```toml

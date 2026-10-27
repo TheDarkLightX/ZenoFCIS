@@ -210,9 +210,9 @@ supported V2 route.
 
 ## Status
 
-The workspace is version `2.6.0`, the current release source, following the
-first stable V2 line, 2.3.0. Final qualification and publication remain pending.
-Its V2 API differs from the historical crates.io `1.1.0` API and is used from the matching `v2.6.0` source tag; see
+The workspace is version `2.6.0`, following the first stable V2 line, 2.3.0.
+The release is published. Its V2 API differs from the historical crates.io
+`1.1.0` API; use the source revision matching your CLI. See
 [installation](INSTALLATION.md) and the
 [2.6.0 release notes](RELEASE_NOTES.md). The earlier public candidates
 `v2.2.0-rc.1` and `v2.3.0-rc.1` were prereleases; their
