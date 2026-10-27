@@ -43,6 +43,14 @@ def required(value: object, label: str, errors: list[str]) -> None:
         errors.append(f"{label}: nonempty text required")
 
 
+def evidence_reference(value: object, label: str, errors: list[str]) -> None:
+    required(value, label, errors)
+    if isinstance(value, str) and value.strip().lower() in {
+        "not-run", "unknown", "none", "todo", "n/a", "unreviewed", "pending"
+    }:
+        errors.append(f"{label}: placeholder is not evidence")
+
+
 def one_of(value: object, options: tuple[str, ...],
            label: str, errors: list[str]) -> None:
     if value not in options:
@@ -136,6 +144,15 @@ def validate_card(value: object, expected_id: str, expected_tier: str) -> list[s
             and empirical.get("status") != "measured"):
         errors.append("empirical.crossover: cannot claim a result without measurements")
 
+    if empirical.get("status") == "not-measured":
+        for key in ("baseline_commit", "candidate_commit", "corpus_sha256",
+                    "reproducer", "environment", "baseline_cost",
+                    "candidate_cost", "failure_report", "raw_evidence",
+                    "predeclared_criteria"):
+            if empirical.get(key) is not None:
+                errors.append(f"empirical.{key}: unmeasured record must use null")
+        if trials != 0 or cases.get("development") != 0 or held_out != 0:
+            errors.append("empirical: unmeasured record must report zero trials and cases")
     if empirical.get("status") == "measured":
         for key, pattern in (("baseline_commit", SHA40),
                              ("candidate_commit", SHA40),
@@ -145,7 +162,7 @@ def validate_card(value: object, expected_id: str, expected_tier: str) -> list[s
                 errors.append(f"empirical.{key}: lowercase pinned hash required")
         for key in ("reproducer", "environment", "failure_report",
                     "raw_evidence", "predeclared_criteria"):
-            required(empirical.get(key), f"empirical.{key}", errors)
+            evidence_reference(empirical.get(key), f"empirical.{key}", errors)
         for key in ("baseline_cost", "candidate_cost"):
             validate_cost(empirical.get(key), f"empirical.{key}", errors)
 
@@ -170,6 +187,9 @@ def validate_card(value: object, expected_id: str, expected_tier: str) -> list[s
     ):
         errors.append("decision.limitations: nonempty text array required")
 
+    if decision.get("claim") == "scoped-benefit" and empirical.get("status") != "measured":
+        errors.append("decision.claim: no measured benefit can be claimed without runs")
+
     if expected_tier != "research":
         if correctness.get("status") != "checked":
             errors.append("promotion: correctness must be independently checked")
@@ -180,10 +200,12 @@ def validate_card(value: object, expected_id: str, expected_tier: str) -> list[s
                           "and held-out cases required")
         if assurance.get("status") != "reviewed":
             errors.append("promotion: assurance review required")
-        for name, field in (("correctness.evidence", correctness.get("evidence")),
+        for name, field in (("correctness.encoding", correctness.get("encoding")),
+                            ("correctness.oracle", correctness.get("oracle")),
+                            ("correctness.evidence", correctness.get("evidence")),
                             ("assurance.evidence", assurance.get("evidence")),
                             ("decision.reviewer", decision.get("reviewer"))):
-            required(field, name, errors)
+            evidence_reference(field, name, errors)
         if expected_tier == "default" and decision.get("claim") != "scoped-benefit":
             errors.append("default: a scoped, reviewed measured benefit required")
     return errors
@@ -267,6 +289,38 @@ def self_test() -> list[str]:
         errors.append("conditional premise omission was accepted")
     if not validate_card(sample, "example-research", "default"):
         errors.append("unmeasured default promotion was accepted")
+    promoted = copy.deepcopy(sample)
+    promoted["tier"] = "qualified-opt-in"
+    promoted["correctness"].update(status="checked", encoding="encoding-audit",
+                                   oracle="reference-check", evidence="checked-replay")
+    promoted["concrete"]["status"] = "measured"
+    cost = {"encoding_ms": 1, "solving_ms": 2, "evidence_ms": 1,
+            "checking_ms": 1, "other_ms": 0, "total_ms": 5,
+            "peak_rss_bytes": 1024}
+    promoted["empirical"].update(
+        status="measured", baseline_commit="a" * 40, candidate_commit="b" * 40,
+        corpus_sha256="c" * 64, reproducer="harness@pinned",
+        environment="synthetic test host", trials=3,
+        cases={"development": 2, "held_out": 1},
+        baseline_cost=copy.deepcopy(cost), candidate_cost=copy.deepcopy(cost),
+        failure_report="fixture failure log", raw_evidence="fixture raw runs",
+        predeclared_criteria="fixture criteria",
+        crossover={"status": "not-observed", "detail": "Within fixture range"})
+    promoted["assurance"].update(status="reviewed", evidence="fixture review")
+    promoted["decision"].update(reviewer="fixture reviewer")
+    if validate_card(promoted, "example-research", "qualified-opt-in"):
+        errors.append("valid synthetic opt-in fixture was rejected")
+    promoted["tier"] = "default"
+    promoted["decision"]["claim"] = "scoped-benefit"
+    if validate_card(promoted, "example-research", "default"):
+        errors.append("valid structural default fixture was rejected")
+    promoted["empirical"]["candidate_cost"]["total_ms"] = 1
+    if not validate_card(promoted, "example-research", "default"):
+        errors.append("impossible phase-cost total was accepted")
+    promoted["empirical"]["candidate_cost"]["total_ms"] = 5
+    promoted["correctness"]["evidence"] = "not-run"
+    if not validate_card(promoted, "example-research", "default"):
+        errors.append("promoted placeholder evidence was accepted")
     bad = copy.deepcopy(sample)
     bad["empirical"]["crossover"]["status"] = "observed"
     if not validate_card(bad, "example-research", "research"):
