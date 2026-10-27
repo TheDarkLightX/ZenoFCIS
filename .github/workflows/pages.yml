@@ -37,6 +37,9 @@ jobs:
         with:
           node-version-file: .node-version
 
+      - name: Fetch locked Rust dependencies
+        run: cargo +1.97.1 fetch --locked
+
       # Generates each application with the CLI, builds every module twice
       # and requires identical bytes, replays the examples, and checks the
       # exact artifact under a subpath in headless Chrome.
