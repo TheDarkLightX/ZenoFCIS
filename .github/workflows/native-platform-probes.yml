@@ -3,7 +3,7 @@ name: native-platform-probes
 on:
   workflow_dispatch:
   push:
-    branches: ["platform/2.6-native-probes-20261027"]
+    branches: ["platform/2.6-native-probes-20261027", "platform/2.6-android-probe-20261027"]
 
 permissions:
   contents: read
@@ -17,6 +17,7 @@ env:
 jobs:
   windows-cli:
     name: Windows x64 CLI and generated app
+    if: ${{ github.ref != 'refs/heads/platform/2.6-android-probe-20261027' }}
     runs-on: windows-2025
     timeout-minutes: 90
     defaults:
@@ -87,14 +88,18 @@ jobs:
           rustup target add --toolchain 1.97.1 aarch64-linux-android
       - name: Build the core and SQLite shell for Android
         run: |
-          cc="${ANDROID_NDK_LATEST_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
+          tools="${ANDROID_NDK_LATEST_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          cc="$tools/aarch64-linux-android24-clang"
           test -x "$cc"
+          test -x "$tools/llvm-ar"
           export CC_aarch64_linux_android="$cc"
+          export AR_aarch64_linux_android="$tools/llvm-ar"
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$cc"
           cargo +1.97.1 build --locked -p zeno-fcis --features authoring,authority,sqlite-shell --target aarch64-linux-android
 
   ios-library:
     name: iOS arm64 Rust library build
+    if: ${{ github.ref != 'refs/heads/platform/2.6-android-probe-20261027' }}
     runs-on: macos-15
     timeout-minutes: 45
     steps:
