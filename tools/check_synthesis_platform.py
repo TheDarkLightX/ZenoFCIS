@@ -99,6 +99,20 @@ def check(cli: Path, out: Path) -> dict:
             finally:
                 path.write_bytes(original)
 
+    # Exercise the default rustup discovery path as well as explicit --tool.
+    # Canonicalizing a rustup symlink must not invoke it as rustup-init.
+    default_receipt = out / "rust-default-conformance.json"
+    default = call(
+        "rust-default-conformance",
+        ["synth", "verify", problem, "--target", "rust", "--out", artifacts["rust"],
+         "--receipt", default_receipt],
+        status="passed",
+    )
+    require(default == json.loads(default_receipt.read_text()), "default Rust receipt differs")
+    require(default["authority"] == "none" and default["inputs_checked"] == 16, "wrong default Rust coverage")
+    require(default["stdout_sha256"] == expected_digest, "default Rust output differs")
+    require(default["tool"]["binary_sha256"] == digest(tools["rust"].resolve()), "default Rust tool differs")
+
     def stand_in(name, body, version="Python 3.9.6"):
         path = out / name
         path.write_text(f'#!/bin/sh\nif [ "$1" = "--version" ]; then printf "%s\\n" "{version}"; exit 0; fi\n{body}\n')
