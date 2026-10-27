@@ -57,11 +57,13 @@ not an automated declaration that a benchmark or formal proof is true.
    resource constraints. A cost gain cannot compensate for a failed
    correctness/assurance gate.
 
-Total cost for a workload includes, at minimum:
+Total cost for a workload includes, at minimum, the observed invocation
+wall time and a breakdown of work:
 
 ```text
-end-to-end wall time = encoding + solving + evidence generation
-                     + independent checking + other measured overhead
+serial phase work = encoding + solving + evidence generation
+                  + independent checking + other measured overhead
+end-to-end wall time = measured at the invocation boundary
 ```
 
 These stages should be instrumented separately. For **sequential** phases,
@@ -102,6 +104,19 @@ result. The stdlib-only preflight is:
 python3 tools/check_computational_feasibility.py --self-test
 python3 tools/check_computational_feasibility.py
 ```
+
+For a measured card, the benchmark section records 40-hex-digit baseline
+and candidate commit IDs, a 64-hex-digit corpus SHA-256, environment,
+reproducer, predeclared criteria, development/held-out case counts, trial
+count, raw evidence and failure-accounting references. Each baseline/candidate
+cost has the numeric fields `encoding_ms`, `solving_ms`,
+`evidence_ms`, `checking_ms`, `other_ms`, `total_ms`, and
+`peak_rss_bytes`, plus `phase_model` (`sequential` or
+`overlapping`) and `overlap_notes`. The summary measurements must be
+explained by linked per-case raw data; the preflight does not recompute them.
+An unmeasured research record uses null for absent measurements and zero
+trials/cases. Complexity-theoretic conjectures without a proven conditional
+result use `theory.status = "unreviewed"` and list the conjecture explicitly.
 
 The tool checks identity, field types, digest formats, honest unknown
 statuses, tier/evidence consistency, phase-cost arithmetic, card registration,
