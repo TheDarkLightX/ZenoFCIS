@@ -17,6 +17,11 @@ by tools, such as contract sources, evaluator identities, lockfiles and
 fixtures. Each part is checked by the judges, tests and proofs named in its
 section, and each claim below is stated at the strength its evidence supports.
 
+The published CLI has Linux x86_64, Windows x64 and Apple-silicon macOS
+downloads. The Mac download includes a launcher fix with its own source pin;
+the signed `v2.6.0` tag is unchanged. Windows does not support `synth verify`
+in this release. See [installation](INSTALLATION.md) for checksums and scope.
+
 ### Highlights
 
 - **Applications from contracts.** `zeno-fcis new DIR --contract project.zeno --app`
@@ -605,10 +610,9 @@ context are application inputs; ZenoFCIS does not authenticate them.
 
 ### Platforms and upgrading
 
-The initial 2.5.0 publication is Linux-only. The Mac binary is deferred until
-native platform validation is complete; its full portable test suite has not
-passed. The optional Mac build and installed-binary journey do not replace
-that outstanding validation.
+The initial 2.5.0 publication was Linux-only. The platform information in
+this historical section describes that release; see [installation](INSTALLATION.md)
+for the current 2.6.0 downloads.
 
 The release process publishes a binary for each of these targets only after
 its platform qualification, installation and release-custody checks pass:
@@ -618,9 +622,9 @@ its platform qualification, installation and release-custody checks pass:
 | Linux x86_64 GNU | glibc 2.39 floor; qualification belongs to the completed matching Linux host run |
 | macOS on Apple silicon | `aarch64-apple-darwin`; minimum-version metadata is macOS 11.0; qualification belongs to the completed macOS 15 arm64 run, not every macOS version |
 
-There is no Windows or Intel macOS binary. Linux-only containment and
-emitted-code execution for `synth verify` do not become macOS-qualified
-features. A configured workflow or minimum-version field does not establish
+The 2.5.0 release did not include a Windows or Intel macOS binary. Its
+Linux-only containment and emitted-code execution for `synth verify` were not
+qualified on macOS. A configured workflow or minimum-version field does not establish
 a qualified host, published executable, notarization or verified download
 signature. Follow the [installation guide](INSTALLATION.md) and the actual
 release record for available assets and their verification.
