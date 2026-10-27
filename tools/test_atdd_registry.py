@@ -501,7 +501,7 @@ class RepairedRegistryTests(unittest.TestCase):
                               + TEMPLATE_PROFILE_TESTS + [TEMPLATE_FOCUSED_REPLAY])
         entries = miri_exclusions.load_exclusions()
         self.assertEqual([e["test"] for e in entries if e["group"] == remainder["group"]], native_only)
-        self.assertEqual(len(entries), 38)
+        self.assertEqual(len(entries), 39)
         rust = (atdd.ROOT / TEMPLATE_TESTS).read_text()
         self.assertEqual(template_profile_problems(rust), [])
         sum_native = sum(size for _, size, _, _ in TEMPLATE_CORPORA)
