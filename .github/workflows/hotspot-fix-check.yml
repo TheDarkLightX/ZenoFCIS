@@ -1,0 +1,26 @@
+name: hotspot-fix-check
+
+on:
+  push:
+    branches: ["platform/2.6-hotspot-check-20261027"]
+
+permissions:
+  contents: read
+
+jobs:
+  hotspot-fix-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact fix and inventory
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: 5f3c4cca2daea1a44b809e8be105f7d313a5690d
+          persist-credentials: false
+      - name: Check the inventory and its controls
+        run: |
+          test "$(git rev-parse HEAD)" = 5f3c4cca2daea1a44b809e8be105f7d313a5690d
+          python3 tools/security_hotspots.py self-test
+          python3 tools/security_hotspots.py check
+          python3 tools/security_hotspots.py scan --format markdown --top 30 > "$RUNNER_TEMP/zenofcis-hotspots.md"
+          python3 tools/check_library_docs.py
