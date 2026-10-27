@@ -2,7 +2,7 @@ name: private-platform-review
 
 on:
   push:
-    branches: ["platform/2.6-private-review-20261027", "platform/2.6-mac-private-review-20261027"]
+    branches: ["platform/2.6-mac-fix-package-20261027"]
 
 permissions:
   contents: read
@@ -33,13 +33,13 @@ jobs:
       - name: Checkout released source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          ref: v2.6.0
+          ref: e9e381db36de6124d4d2a80861c8666f1583629d
           path: source
           persist-credentials: false
       - name: Check source, host and Rust
         id: sourcecheck
         run: |
-          test "$(git rev-parse HEAD)" = 7d175c47099866939c86acd463ac85219abba882
+          test "$(git rev-parse HEAD)" = e9e381db36de6124d4d2a80861c8666f1583629d
           test "$(uname -s)/$(uname -m)" = Darwin/arm64
           rustup toolchain install 1.97.1 --profile minimal
           test "$(rustc +1.97.1 -vV | sed -n 's/^host: //p')" = aarch64-apple-darwin
@@ -76,14 +76,14 @@ jobs:
         if: ${{ !cancelled() && steps.sourcecheck.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: encrypted-macos-review-2.6.0
+          name: encrypted-macos-fix-review-2.6.0
           path: ${{ runner.temp }}/mac-review.p7m
           if-no-files-found: error
           retention-days: 7
 
   windows:
     name: Windows x64 candidate for private review
-    if: ${{ github.ref != 'refs/heads/platform/2.6-mac-private-review-20261027' }}
+    if: ${{ false }}
     runs-on: windows-2025
     timeout-minutes: 120
     defaults:
