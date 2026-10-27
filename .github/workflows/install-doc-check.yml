@@ -1,0 +1,72 @@
+name: install-doc-check
+
+on:
+  push:
+    branches: ["platform/2.6-install-doc-check-20261027"]
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Checkout the proposed guide
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: 9564a5465d14b0466b7134340722a1e5e75ecf02
+          persist-credentials: false
+      - name: Run the published Mac install commands
+        shell: bash
+        run: |
+          python3 - "$RUNNER_TEMP/install.sh" <<'PY'
+          import sys
+          from pathlib import Path
+          text = Path('docs/INSTALLATION.md').read_text()
+          block = text.split('## Install on macOS (Apple silicon)', 1)[1].split('```bash\n', 1)[1].split('```', 1)[0]
+          Path(sys.argv[1]).write_text(block)
+          PY
+          mkdir "$RUNNER_TEMP/install"
+          cd "$RUNNER_TEMP/install"
+          export VERSION=2.6.0
+          bash -euo pipefail "$RUNNER_TEMP/install.sh"
+          curl --fail --location --output MACOS.sha256.sig https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.6.0/MACOS.sha256.sig
+          curl --fail --location --output RELEASE-SIGNING-KEY.pub https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.6.0/RELEASE-SIGNING-KEY.pub
+          ssh-keygen -lf RELEASE-SIGNING-KEY.pub -E sha256 | grep -F 'SHA256:dIlSeZjogR21GU3QVYyoBoW2LqLyiUosSLvuEqcFWGw'
+          { printf 'release '; cat RELEASE-SIGNING-KEY.pub; } > allowed_signers
+          ssh-keygen -Y verify -f allowed_signers -I release -n file -s MACOS.sha256.sig < MACOS.sha256
+
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - name: Checkout the proposed guide
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: 9564a5465d14b0466b7134340722a1e5e75ecf02
+          persist-credentials: false
+      - name: Run the published Windows install commands
+        shell: pwsh
+        run: |
+          $doc = Get-Content 'docs/INSTALLATION.md' -Raw
+          if ($doc -notmatch '(?s)## Install on Windows x64.*?```powershell\r?\n(.*?)```') { throw 'Windows install block missing' }
+          $script = [ScriptBlock]::Create($Matches[1])
+          $install = Join-Path $env:RUNNER_TEMP 'install'
+          New-Item -ItemType Directory $install | Out-Null
+          Push-Location $install
+          try {
+            & $script
+            if ($LASTEXITCODE -ne 0) { throw 'installed CLI failed' }
+            $url = 'https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.6.0'
+            Invoke-WebRequest "$url/WINDOWS.sha256.sig" -OutFile WINDOWS.sha256.sig
+            Invoke-WebRequest "$url/RELEASE-SIGNING-KEY.pub" -OutFile RELEASE-SIGNING-KEY.pub
+            $fingerprint = & ssh-keygen -lf RELEASE-SIGNING-KEY.pub -E sha256
+            if ($LASTEXITCODE -ne 0 -or $fingerprint -notmatch 'SHA256:dIlSeZjogR21GU3QVYyoBoW2LqLyiUosSLvuEqcFWGw') { throw 'unexpected signing key' }
+            $key = (Get-Content RELEASE-SIGNING-KEY.pub -Raw).Trim()
+            [IO.File]::WriteAllText((Join-Path $install 'allowed_signers'), "release $key`n", [Text.UTF8Encoding]::new($false))
+            cmd /c 'ssh-keygen -Y verify -f allowed_signers -I release -n file -s WINDOWS.sha256.sig < WINDOWS.sha256'
+            if ($LASTEXITCODE -ne 0) { throw 'signature verification failed' }
+          } finally {
+            Pop-Location
+          }
