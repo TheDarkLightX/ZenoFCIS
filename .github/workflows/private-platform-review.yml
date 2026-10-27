@@ -2,7 +2,7 @@ name: private-platform-review
 
 on:
   push:
-    branches: ["platform/2.6-private-review-20261027"]
+    branches: ["platform/2.6-private-review-20261027", "platform/2.6-mac-private-review-20261027"]
 
 permissions:
   contents: read
@@ -37,11 +37,17 @@ jobs:
           path: source
           persist-credentials: false
       - name: Check source, host and Rust
+        id: sourcecheck
         run: |
           test "$(git rev-parse HEAD)" = 7d175c47099866939c86acd463ac85219abba882
           test "$(uname -s)/$(uname -m)" = Darwin/arm64
           rustup toolchain install 1.97.1 --profile minimal
           test "$(rustc +1.97.1 -vV | sed -n 's/^host: //p')" = aarch64-apple-darwin
+      - name: Fetch locked dependencies
+        run: |
+          cargo +1.97.1 fetch --locked
+          cargo +1.97.1 fetch --locked --manifest-path verification/Cargo.toml
+          cargo +1.97.1 fetch --locked --manifest-path tools/resolved-purity/Cargo.toml
       - name: Build candidate and retain privacy refusal
         id: candidate
         run: |
@@ -49,22 +55,25 @@ jobs:
           python3 tools/rc_package.py build-host-binary --output "$RUNNER_TEMP/host" > "$RUNNER_TEMP/host-build.log" 2>&1
           status=$?
           set -e
-          python3 "$GITHUB_WORKSPACE/probe/.github/review-mac-candidate.py" "$status" "$RUNNER_TEMP/host" "$RUNNER_TEMP/host-build.log" > "$RUNNER_TEMP/host/CANDIDATE-REVIEW.json"
-          cat "$RUNNER_TEMP/host/CANDIDATE-REVIEW.json"
+          python3 "$GITHUB_WORKSPACE/probe/.github/review-mac-candidate.py" "$status" "$RUNNER_TEMP/host" "$RUNNER_TEMP/host-build.log" > "$RUNNER_TEMP/CANDIDATE-REVIEW.json"
+          cp "$RUNNER_TEMP/CANDIDATE-REVIEW.json" "$RUNNER_TEMP/host/CANDIDATE-REVIEW.json"
+          cat "$RUNNER_TEMP/CANDIDATE-REVIEW.json"
       - name: Run the installed-binary journey
         run: |
           mkdir "$RUNNER_TEMP/source-tree"
           git archive --format=tar HEAD | tar -x -f - -C "$RUNNER_TEMP/source-tree"
           python3 tools/check_installed_cli.py --release "$RUNNER_TEMP/host" --source "$RUNNER_TEMP/source-tree" --work-dir "$RUNNER_TEMP/journey" --report "$RUNNER_TEMP/host/INSTALLED-JOURNEY.json"
       - name: Encrypt the candidate for local review
-        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.sourcecheck.outcome == 'success' }}
         run: |
-          cp "$RUNNER_TEMP/host-build.log" "$RUNNER_TEMP/host/host-build.log"
-          tar -C "$RUNNER_TEMP" -cf "$RUNNER_TEMP/mac-review.tar" host
+          mkdir "$RUNNER_TEMP/mac-review"
+          if test -d "$RUNNER_TEMP/host"; then mv "$RUNNER_TEMP/host" "$RUNNER_TEMP/mac-review/host"; fi
+          if test -f "$RUNNER_TEMP/host-build.log"; then cp "$RUNNER_TEMP/host-build.log" "$RUNNER_TEMP/mac-review/host-build.log"; fi
+          tar -C "$RUNNER_TEMP" -cf "$RUNNER_TEMP/mac-review.tar" mac-review
           openssl smime -encrypt -binary -aes256 -outform DER -in "$RUNNER_TEMP/mac-review.tar" -out "$RUNNER_TEMP/mac-review.p7m" "$GITHUB_WORKSPACE/probe/.github/platform-review-certificate.pem"
           rm "$RUNNER_TEMP/mac-review.tar"
       - name: Retain encrypted Mac review packet
-        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.sourcecheck.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: encrypted-macos-review-2.6.0
@@ -74,6 +83,7 @@ jobs:
 
   windows:
     name: Windows x64 candidate for private review
+    if: ${{ github.ref != 'refs/heads/platform/2.6-mac-private-review-20261027' }}
     runs-on: windows-2025
     timeout-minutes: 120
     defaults:
