@@ -24,7 +24,7 @@ RUNTIME_SCHEMA = 'zeno-fcis/core-family-runtime-source/1'
 # Build products live in OUT_DIR; every crate source remains identity-bound.
 INPUTS = ('tools/instantiate_core.py', 'tools/check_core_components.py',
           'tools/prove_core_families.py', 'tools/test_data/core_components/reference.py')
-NATIVE_REPORT_SHA256 = '9d78521c914f61c0ee787d7444dec48b079a371f748b343f2c9df6a2fbe6f1e4'
+NATIVE_REPORT_SHA256 = '8a8def1194bff8decd625234d0ffa82fab34701d7e1065e29577467c6fdb746c'
 COUNTS = {'reservation-pool': (9, 2216), 'rate-limiter': (9, 2646), 'approval-queue': (3, 1296),
           'bounded-counter': (8, 176), 'consumable-budget': (8, 568),
           'versioned-register': (8, 30664), 'idempotency-slot': (8, 61328),

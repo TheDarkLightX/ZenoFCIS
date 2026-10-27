@@ -8,13 +8,13 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 
 SCHEMA = "zeno-fcis/coverage-loop/1"
 DIMENSIONS = ("value", "authority", "state", "input", "order", "privacy", "liveness",
               "failure", "time and resources", "story", "unclassified")
-DEFAULT_BIN = "/media/trevormoc/4986929f-65e6-4021-94a2-943a5e427718/tmp/zf26-rev-zalgames/bin/zeno-fcis"
 MAX_FILE = 1024 * 1024
 MAX_PROPOSALS = 128
 DIMENSION_RULES = (
@@ -403,6 +403,17 @@ def markdown(report):
     return "\n".join(lines) + "\n"
 
 
+def binary_path():
+    """Use the configured executable or discover the installed CLI on PATH."""
+    configured = os.environ.get("ZENO_FCIS_BIN")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    executable = shutil.which("zeno-fcis")
+    if executable is None:
+        raise FileNotFoundError("zeno-fcis not found on PATH; set ZENO_FCIS_BIN to its path")
+    return Path(executable).resolve()
+
+
 def run(options):
     out, contract = options.out.resolve(), options.directory.resolve()
     if out == contract or contract in out.parents:
@@ -434,7 +445,7 @@ def run(options):
         return result
     supplied = proposals(options.proposals, options.zal, project, allocate)
     supplied += proposals(getattr(options, "idioms", None), options.zal, project, allocate, idioms=True)
-    binary = Path(os.environ.get("ZENO_FCIS_BIN", DEFAULT_BIN)).resolve()
+    binary = binary_path()
     report = {"schema": SCHEMA, "authority": "none", "status": "ran", "exit_code": 0, "rounds": [],
               "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
               "sources": {"project_sha256": hashlib.sha256(project.encode()).hexdigest(),

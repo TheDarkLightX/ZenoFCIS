@@ -3583,7 +3583,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 803,
+      "production_lines": 804,
       "rank": 30,
       "score": 89,
       "signals": [
@@ -3595,7 +3595,7 @@
             152,
             285,
             302,
-            304
+            307
           ]
         },
         {
@@ -3603,10 +3603,10 @@
           "lines": [
             38,
             77,
-            303,
-            540,
-            828,
-            865
+            306,
+            543,
+            831,
+            868
           ]
         },
         {
@@ -3631,11 +3631,11 @@
         {
           "id": "replay-outbox-commit",
           "lines": [
-            646,
-            661,
-            674,
-            698,
-            723
+            649,
+            664,
+            677,
+            701,
+            726
           ]
         },
         {
@@ -3643,10 +3643,10 @@
           "lines": [
             38,
             77,
-            303,
-            540,
-            828,
-            865
+            306,
+            543,
+            831,
+            868
           ]
         }
       ],
@@ -5992,16 +5992,16 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 19486271,
-    "admitted_files": 1256,
-    "inventory_sha256": "5af3f21231ef1c79062c8a229b94194ef729a8d280a8bc74aa9b5e8e1e05b1c1",
-    "ranked_above_minimum": 1071,
+    "admitted_bytes": 19541328,
+    "admitted_files": 1258,
+    "inventory_sha256": "7afa6e977bfb824497a012c4c030f4bfe21076ba910bb9e069c361ead9c55ff0",
+    "ranked_above_minimum": 1073,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 72,
-      "priority-2": 348,
-      "priority-3": 397,
+      "priority-2": 349,
+      "priority-3": 398,
       "priority-4": 155,
       "priority-5": 284
     }

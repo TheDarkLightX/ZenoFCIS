@@ -41,6 +41,17 @@ def public_content(data: bytes) -> bool:
     return len(data) <= 65536 and hashlib.sha256(data).hexdigest() == PUBLIC_SHA256
 
 
+def build_copy(location: str) -> bool:
+    """Recognize copies in build output, without authorizing them for publication."""
+    path = PurePosixPath(location)
+    if ("\\" in location or path.is_absolute() or ".." in path.parts
+            or location != str(path) or not path.parts or path.parts[0] != "target"):
+        return False
+    example = PurePosixPath(EXAMPLE).parts
+    return (path.parts[-len(example):] == example
+            or listed_location("/".join(path.parts[-3:])))
+
+
 def check(root: Path) -> list[str]:
     """Inspect names including ignored/untracked files; unknown KB bytes are unread."""
     failures = []
@@ -75,10 +86,10 @@ def check(root: Path) -> list[str]:
                     continue
                 p = parent / name
                 relative = p.relative_to(root).as_posix()
-                if relative != EXAMPLE:
+                if relative != EXAMPLE and not build_copy(relative):
                     failures.append("kb-unlisted-file")
                     continue
-                found_example = True
+                found_example = found_example or relative == EXAMPLE
                 if p.is_symlink() or not p.is_file():
                     failures.append("kb-example-nonregular")
                     continue

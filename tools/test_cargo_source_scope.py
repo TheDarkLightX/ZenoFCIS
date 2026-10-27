@@ -14,7 +14,8 @@ from cargo_source_scope import source_environment
 class SourceScopeTest(unittest.TestCase):
     def test_binary_environment_and_arguments_are_preserved(self) -> None:
         with tempfile.TemporaryDirectory(prefix="compiler-scope-env-") as directory:
-            environment=source_environment(Path(directory),dict(os.environ))
+            environment=source_environment(Path(directory),dict(os.environ,
+                CARGO_TARGET_DIR=str(Path(directory) / "target")))
             environment["CARGO_BIN_EXE_app-server"]="test-sentinel"
             result=subprocess.run([environment["RUSTC_WORKSPACE_WRAPPER"],sys.executable,"-c",
                 "import os,sys; print(os.environ.get('CARGO_BIN_EXE_app-server')); print(repr(sys.argv[1:]))",
@@ -23,8 +24,6 @@ class SourceScopeTest(unittest.TestCase):
             self.assertEqual(result.stdout.splitlines(),["test-sentinel","['argument with spaces', '', 'literal-$value']"])
 
     def test_backdated_copy_and_restored_mutant(self) -> None:
-        environment = dict(os.environ, CARGO_NET_OFFLINE="true")
-        self.assertIn("CARGO_TARGET_DIR", environment)
         cargo = ["cargo", "+1.97.1", "test", "--locked", "--offline",
                  "--lib", "exact_source", "--", "--exact", "--nocapture"]
 
@@ -46,6 +45,8 @@ class SourceScopeTest(unittest.TestCase):
                 self.assertIn("test result: FAILED", result.stdout)
 
         with tempfile.TemporaryDirectory(prefix="cargo-source-scope-") as directory:
+            environment = dict(os.environ, CARGO_NET_OFFLINE="true",
+                               CARGO_TARGET_DIR=str(Path(directory) / "target"))
             roots = [Path(directory) / name for name in ("first", "second")]
             for expected, root in enumerate(roots, 1):
                 (root / "src").mkdir(parents=True)
