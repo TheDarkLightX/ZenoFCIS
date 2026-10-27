@@ -18,6 +18,25 @@ from check_release_privacy import PATTERNS, Scan, load_allowlist, match_fingerpr
 
 
 class PrivacyTests(unittest.TestCase):
+    def test_private_media_paths_are_redacted_without_a_marker_file(self):
+        for prefix in (b"/" + b"media/", b"/run/" + b"media/"):
+            private = prefix + b"alice/drive/private.txt"
+            scan = Scan()
+            scan.inspect("report.txt", private)
+            report = scan.report()
+            self.assertEqual(report["status"], "failed")
+            self.assertEqual(report["findings"][0]["code"], "personal-media-path")
+            self.assertNotIn(private.decode(), json.dumps(report))
+            scan = Scan()
+            scan.inspect(private.decode(), b"")
+            report = scan.report()
+            self.assertEqual(report["status"], "failed")
+            self.assertNotIn(private.decode(), json.dumps(report))
+
+        scan = Scan()
+        scan.inspect("report.txt", b"/" + b"media/user/drive/public.txt")
+        self.assertEqual(scan.report()["status"], "passed")
+
     def exception(self, location, data):
         match = PATTERNS["model-api-token"].search(data)
         self.assertIsNotNone(match)

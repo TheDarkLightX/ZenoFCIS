@@ -20,7 +20,8 @@
 # Expand witnessed contract coverage
 
 Use this Python CLI card to propose additional laws for human confirmation.
-Set `ZENO_FCIS_BIN` to a compatible binary with `contract review --gaps`.
+Put a compatible `zeno-fcis` with `contract review --gaps` on `PATH`, or set
+`ZENO_FCIS_BIN` to its path.
 Set `WORK` to a fresh writable directory outside the contract. From the repository root:
 
 ```sh

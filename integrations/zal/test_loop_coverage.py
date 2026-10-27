@@ -22,6 +22,28 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 
 
+class CoverageBinaryTests(unittest.TestCase):
+    def test_discovers_installed_binary_on_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "zeno-fcis"
+            binary.write_text("fixture")
+            binary.chmod(0o700)
+            with patch.dict(os.environ, {"PATH": directory}, clear=True):
+                self.assertEqual(coverage.binary_path(), binary.resolve())
+
+    def test_explicit_binary_path_takes_precedence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "chosen"
+            binary.write_text("fixture")
+            with patch.dict(os.environ, {"PATH": "", "ZENO_FCIS_BIN": str(binary)}, clear=True):
+                self.assertEqual(coverage.binary_path(), binary.resolve())
+
+    def test_missing_binary_is_a_clear_refusal(self):
+        with patch.dict(os.environ, {"PATH": ""}, clear=True):
+            with self.assertRaisesRegex(FileNotFoundError, "set ZENO_FCIS_BIN"):
+                coverage.binary_path()
+
+
 class CoverageVerdictTests(unittest.TestCase):
     def setUp(self):
         self.before_packet = json.loads((HERE / "test-data/coverage/before.json").read_text())

@@ -376,8 +376,8 @@ with the actual decisions and closes an open input or rejects an admitted
 mutant. It retains only proposals meeting both conditions. Nothing is adopted:
 read and confirm each proposed law before editing the contract.
 
-Set `ZENO_FCIS_BIN` to a compatible `zeno-fcis` binary, and `WORK` to a fresh
-writable directory outside the contract. From the repository root:
+Put a compatible `zeno-fcis` on `PATH`, or set `ZENO_FCIS_BIN` to its path.
+Set `WORK` to a fresh writable directory outside the contract. From the repository root:
 
 ```sh
 python3 integrations/zal/run.py coverage examples/guide-counter --out "$WORK/counter"
