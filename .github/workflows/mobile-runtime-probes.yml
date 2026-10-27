@@ -1,0 +1,115 @@
+name: mobile-runtime-probes
+
+on:
+  push:
+    branches: ["platform/2.6-mobile-runtime-20261027"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_BUILD_JOBS: "3"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+  android:
+    name: Android x64 emulator synthesis test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout released source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: v2.6.0
+          persist-credentials: false
+      - name: Install tools
+        run: |
+          test "$(git rev-parse HEAD)" = 7d175c47099866939c86acd463ac85219abba882
+          rustup toolchain install 1.97.1 --profile minimal
+          rustup target add --toolchain 1.97.1 x86_64-linux-android
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "system-images;android-35;default;x86_64"
+      - name: Build the synthesis test executable
+        run: |
+          tools="$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export CC_x86_64_linux_android="$tools/x86_64-linux-android24-clang"
+          export AR_x86_64_linux_android="$tools/llvm-ar"
+          export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$CC_x86_64_linux_android"
+          cargo +1.97.1 test --locked -p zeno-fcis-synthesis --lib --target x86_64-linux-android --no-run --message-format=json > "$RUNNER_TEMP/android-build.json"
+          python3 - "$RUNNER_TEMP/android-build.json" "$RUNNER_TEMP/android-executable" <<'PY'
+          import json, sys
+          from pathlib import Path
+          rows = [json.loads(line) for line in Path(sys.argv[1]).read_text().splitlines()]
+          paths = [x["executable"] for x in rows if x.get("reason") == "compiler-artifact"
+                   and x.get("profile", {}).get("test") is True and x.get("executable")]
+          if len(paths) != 1:
+              raise SystemExit("expected one synthesis test executable")
+          Path(sys.argv[2]).write_text(paths[0])
+          PY
+      - name: Boot Android emulator and run the test
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666"' | sudo tee /etc/udev/rules.d/99-zenofcis-kvm.rules >/dev/null
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -w /dev/kvm
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/android-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name zenofcis --package "system-images;android-35;default;x86_64"
+          "$ANDROID_HOME/emulator/emulator" -avd zenofcis -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel on > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          trap 'adb emu kill >/dev/null 2>&1 || true' EXIT
+          timeout 300 adb wait-for-device
+          timeout 300 bash -c 'until test "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1; do sleep 2; done'
+          adb push "$(cat "$RUNNER_TEMP/android-executable")" /data/local/tmp/zenofcis-tests
+          adb shell chmod 700 /data/local/tmp/zenofcis-tests
+          adb shell /data/local/tmp/zenofcis-tests finite::ir::evaluation_tests::canonical_program_import_rejects_hostile_artifacts --exact --nocapture | tr -d '\r' | tee "$RUNNER_TEMP/android-test.log"
+          grep -q 'test result: ok. 1 passed; 0 failed;' "$RUNNER_TEMP/android-test.log"
+
+  ios:
+    name: iOS simulator synthesis test
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout released source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: v2.6.0
+          persist-credentials: false
+      - name: Install tools and build the synthesis test
+        run: |
+          test "$(git rev-parse HEAD)" = 7d175c47099866939c86acd463ac85219abba882
+          rustup toolchain install 1.97.1 --profile minimal
+          rustup target add --toolchain 1.97.1 aarch64-apple-ios-sim
+          cargo +1.97.1 test --locked -p zeno-fcis-synthesis --lib --target aarch64-apple-ios-sim --no-run --message-format=json > "$RUNNER_TEMP/ios-build.json"
+          python3 - "$RUNNER_TEMP/ios-build.json" "$RUNNER_TEMP/ios-executable" <<'PY'
+          import json, sys
+          from pathlib import Path
+          rows = [json.loads(line) for line in Path(sys.argv[1]).read_text().splitlines()]
+          paths = [x["executable"] for x in rows if x.get("reason") == "compiler-artifact"
+                   and x.get("profile", {}).get("test") is True and x.get("executable")]
+          if len(paths) != 1:
+              raise SystemExit("expected one synthesis test executable")
+          Path(sys.argv[2]).write_text(paths[0])
+          PY
+      - name: Boot an iOS simulator and run the test
+        run: |
+          xcrun simctl list devices available --json > "$RUNNER_TEMP/ios-devices.json"
+          device="$(python3 - "$RUNNER_TEMP/ios-devices.json" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1]))
+          for runtime, devices in sorted(data["devices"].items(), reverse=True):
+              if ".iOS-" in runtime:
+                  for item in devices:
+                      if item.get("isAvailable") and item.get("state") in ("Shutdown", "Booted"):
+                          print(item["udid"])
+                          raise SystemExit(0)
+          raise SystemExit("no available iOS simulator")
+          PY
+          )"
+          xcrun simctl boot "$device" || test "$(xcrun simctl list devices --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next((x["state"] for v in d["devices"].values() for x in v if x["udid"] == sys.argv[1]), ""))' "$device")" = Booted
+          trap 'xcrun simctl shutdown "$device" >/dev/null 2>&1 || true' EXIT
+          xcrun simctl bootstatus "$device" -b
+          executable="$(cat "$RUNNER_TEMP/ios-executable")"
+          codesign --force --sign - "$executable"
+          codesign --verify "$executable"
+          xcrun simctl spawn "$device" "$executable" finite::ir::evaluation_tests::canonical_program_import_rejects_hostile_artifacts --exact --nocapture | tee "$RUNNER_TEMP/ios-test.log"
+          grep -q 'test result: ok. 1 passed; 0 failed;' "$RUNNER_TEMP/ios-test.log"
