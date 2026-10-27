@@ -1,0 +1,116 @@
+name: native-platform-probes
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["platform/2.6-native-probes-20261027"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_BUILD_JOBS: "3"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+  windows-cli:
+    name: Windows x64 CLI and generated app
+    runs-on: windows-2025
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout released 2.6 source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: v2.6.0
+          persist-credentials: false
+      - name: Verify source and install Rust
+        run: |
+          if ((git rev-parse HEAD) -ne '7d175c47099866939c86acd463ac85219abba882') { throw 'unexpected source' }
+          rustup toolchain install 1.97.1 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustc +1.97.1 -vV
+      - name: Build the Windows CLI
+        run: cargo +1.97.1 build --locked --release -p zeno-fcis-cli --bin zeno-fcis
+      - name: Check the executable and a project
+        run: |
+          $cli = Join-Path $env:GITHUB_WORKSPACE 'target/release/zeno-fcis.exe'
+          $version = & $cli --version
+          if ($LASTEXITCODE -ne 0 -or $version.Trim() -ne 'zeno-fcis 2.6.0') { throw 'unexpected CLI version' }
+          & $cli check 'examples/guide-counter/project.zeno' --format json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-FileHash -Algorithm SHA256 $cli | ConvertTo-Json | Set-Content (Join-Path $env:RUNNER_TEMP 'windows-cli-sha256.json')
+      - name: Generate and test a durable application
+        run: |
+          $cli = Join-Path $env:GITHUB_WORKSPACE 'target/release/zeno-fcis.exe'
+          $app = Join-Path $env:RUNNER_TEMP 'zenofcis-counter'
+          & $cli new $app --template durable-counter --source $env:GITHUB_WORKSPACE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Push-Location $app
+          try {
+            cargo +1.97.1 test --offline
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            cargo +1.97.1 run --offline -- new-counter.sqlite
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Pop-Location
+          }
+      - name: Retain the candidate and its hash
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-cli-candidate-2.6.0
+          path: |
+            target/release/zeno-fcis.exe
+            ${{ runner.temp }}/windows-cli-sha256.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  android-library:
+    name: Android arm64 Rust library build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout released 2.6 source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: v2.6.0
+          persist-credentials: false
+      - name: Verify source and install Rust target
+        run: |
+          test "$(git rev-parse HEAD)" = 7d175c47099866939c86acd463ac85219abba882
+          rustup toolchain install 1.97.1 --profile minimal
+          rustup target add --toolchain 1.97.1 aarch64-linux-android
+      - name: Build the core and SQLite shell for Android
+        run: |
+          cc="${ANDROID_NDK_LATEST_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
+          test -x "$cc"
+          export CC_aarch64_linux_android="$cc"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$cc"
+          cargo +1.97.1 build --locked -p zeno-fcis --features authoring,authority,sqlite-shell --target aarch64-linux-android
+
+  ios-library:
+    name: iOS arm64 Rust library build
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout released 2.6 source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: v2.6.0
+          persist-credentials: false
+      - name: Verify source and install Rust targets
+        run: |
+          test "$(git rev-parse HEAD)" = 7d175c47099866939c86acd463ac85219abba882
+          rustup toolchain install 1.97.1 --profile minimal
+          rustup target add --toolchain 1.97.1 aarch64-apple-ios aarch64-apple-ios-sim
+          xcrun --sdk iphoneos --show-sdk-path
+          xcrun --sdk iphonesimulator --show-sdk-path
+      - name: Build the core and SQLite shell for iOS
+        run: |
+          cargo +1.97.1 build --locked -p zeno-fcis --features authoring,authority,sqlite-shell --target aarch64-apple-ios
+          cargo +1.97.1 build --locked -p zeno-fcis --features authoring,authority,sqlite-shell --target aarch64-apple-ios-sim
