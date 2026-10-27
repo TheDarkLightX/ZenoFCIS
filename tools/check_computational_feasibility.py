@@ -23,7 +23,8 @@ SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 SHA64 = re.compile(r"[0-9a-f]{64}\Z")
 TIERS = ("research", "qualified-opt-in", "default")
 COST = ("encoding_ms", "solving_ms", "evidence_ms", "checking_ms",
-        "other_ms", "total_ms", "peak_rss_bytes")
+        "other_ms", "total_ms", "peak_rss_bytes", "phase_model",
+        "overlap_notes")
 
 
 def shape(value: object, name: str, keys: tuple[str, ...],
@@ -67,7 +68,7 @@ def integer(value: object, label: str, errors: list[str]) -> int:
 def validate_cost(value: object, label: str, errors: list[str]) -> None:
     record = shape(value, label, COST, errors)
     numbers = []
-    for key in COST[:-1]:
+    for key in COST[:6]:
         v = record.get(key)
         if type(v) not in (int, float) or not math.isfinite(v) or v < 0:
             errors.append(f"{label}.{key}: finite nonnegative number required")
@@ -76,8 +77,12 @@ def validate_cost(value: object, label: str, errors: list[str]) -> None:
     rss = record.get("peak_rss_bytes")
     if type(rss) is not int or rss < 0:
         errors.append(f"{label}.peak_rss_bytes: nonnegative integer required")
-    if numbers[5] + 1e-6 < sum(numbers[:5]):
-        errors.append(f"{label}.total_ms: smaller than its measured phases")
+    one_of(record.get("phase_model"), ("sequential", "overlapping"),
+           f"{label}.phase_model", errors)
+    required(record.get("overlap_notes"), f"{label}.overlap_notes", errors)
+    if (record.get("phase_model") == "sequential"
+            and numbers[5] + 1e-6 < sum(numbers[:5])):
+        errors.append(f"{label}.total_ms: smaller than exclusive measured phases")
 
 
 def validate_card(value: object, expected_id: str, expected_tier: str) -> list[str]:
@@ -296,7 +301,8 @@ def self_test() -> list[str]:
     promoted["concrete"]["status"] = "measured"
     cost = {"encoding_ms": 1, "solving_ms": 2, "evidence_ms": 1,
             "checking_ms": 1, "other_ms": 0, "total_ms": 5,
-            "peak_rss_bytes": 1024}
+            "peak_rss_bytes": 1024, "phase_model": "sequential",
+            "overlap_notes": "No concurrent phases in synthetic fixture."}
     promoted["empirical"].update(
         status="measured", baseline_commit="a" * 40, candidate_commit="b" * 40,
         corpus_sha256="c" * 64, reproducer="harness@pinned",
