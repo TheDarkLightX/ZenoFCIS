@@ -38,6 +38,9 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = 7d175c47099866939c86acd463ac85219abba882
           rustup toolchain install 1.97.1 --profile minimal
+          cargo +1.97.1 fetch --locked
+          cargo +1.97.1 fetch --locked --manifest-path verification/Cargo.toml
+          cargo +1.97.1 fetch --locked --manifest-path tools/resolved-purity/Cargo.toml
       - name: Recover the encrypted candidate
         env:
           GH_TOKEN: ${{ github.token }}
