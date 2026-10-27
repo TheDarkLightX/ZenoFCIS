@@ -22,7 +22,6 @@ jobs:
       CARGO_BUILD_JOBS: "3"
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
-      ZF26_DIAGNOSTICS: ${{ runner.temp }}/zf26-diagnostics
     steps:
       - name: Checkout diagnostics
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -80,6 +79,7 @@ jobs:
           printf '%s  %s\n' 36db653c509431e6031f1d9828ff15b62ece1a8612c37a9da9ba8f7c6161304f "$RUNNER_TEMP/mac-review/host/binaries/zeno-fcis-2.6.0-aarch64-apple-darwin.tar.gz" | shasum -a 256 -c -
       - name: Run the installed journey with failure capture
         run: |
+          export ZF26_DIAGNOSTICS="$RUNNER_TEMP/zf26-diagnostics"
           mkdir "$RUNNER_TEMP/source-tree"
           git archive --format=tar HEAD | tar -x -f - -C "$RUNNER_TEMP/source-tree"
           python3 "$GITHUB_WORKSPACE/probe/.github/capture-mac-journey.py" --release "$RUNNER_TEMP/mac-review/host" --source "$RUNNER_TEMP/source-tree" --work-dir "$RUNNER_TEMP/journey" --report "$RUNNER_TEMP/zf26-diagnostics/report.json"
