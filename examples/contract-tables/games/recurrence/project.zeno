@@ -1,0 +1,31 @@
+zeno 1;
+project 1 recurrence;
+type 100 state S;
+type 101 command C;
+type 102 context X;
+type 103 int Zero in 0..=0;
+type 104 int Bit in 0..=1;
+field 300 100 padding 103;
+field 301 101 dummy 103;
+variant 302 102 Session none;
+// States: 0 entry, 1 good, 2 return, 3 isolated (also good).
+// Moves: entry -> good -> return -> good. No move leaves isolated.
+const table 110 good 104 size 4 [0,1,0,1];
+const table 120 edge0 104 size 4 [0,1,0,0];
+const table 121 edge1 104 size 4 [0,0,1,0];
+const table 122 edge2 104 size 4 [0,1,0,0];
+const table 123 edge3 104 size 4 [0,0,0,0];
+component 400 core {
+  owns 100; reads pre.100; writes post.100; contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+// Nonempty paths: direct edge, or an edge followed by a nonempty path.
+derived table 700 path[i][j] in table 110 rounds 16 {
+  default (i == 0 && edge0[j] == 1) || (i == 1 && edge1[j] == 1) || (i == 2 && edge2[j] == 1) || (i == 3 && edge3[j] == 1) || exists k in table 110 { ((i == 0 && edge0[k] == 1) || (i == 1 && edge1[k] == 1) || (i == 2 && edge2[k] == 1) || (i == 3 && edge3[k] == 1)) && path[k][j] };
+};
+law 499 domain on commit, genesis = true;
+law 500 from_entry on commit = exists a in table 110 { good[a] == 1 && path[0][a] && path[a][a] };
+law 501 from_good on commit = exists a in table 110 { good[a] == 1 && path[1][a] && path[a][a] };
+law 502 from_return on commit = exists a in table 110 { good[a] == 1 && path[2][a] && path[a][a] };
+law 503 from_isolated on commit = exists a in table 110 { good[a] == 1 && path[3][a] && path[a][a] };

@@ -17,7 +17,7 @@ from verus_coverage import require_coverage
 # Diagnostic order and duplicate catalog postcondition are retained; paths are relative.
 # This fixture tests classification and is not a proof result.
 RETAINED_OMIT = """error: precondition not satisfied
-   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs:180:13
+   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs:188:13
 
 error: postcondition not satisfied
   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog.rs:83:63
@@ -42,6 +42,20 @@ error: aborting due to 7 previous errors
 
 
 class SchemaCoverage(unittest.TestCase):
+    def test_numeric_metadata_contract_locations_match_production_callers(self):
+        caller = "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs"
+        lines = (gate.ROOT / caller).read_text().splitlines()
+        for name, statement in (
+            ("omit_original_getter_contract", "compound::spec::slice_equal(checked.view().0,bytes)"),
+            ("weaken_original_getter_contract", "compound::spec::slice_equal(checked.view().0,bytes)"),
+            ("narrow_original_getter_domain", "let bytes = checked.original();"),
+        ):
+            with self.subTest(control=name):
+                locations = [line for _, path, line in gate.CONTRACT_REJECTIONS[name]
+                             if path == caller]
+                self.assertEqual(len(locations), 1)
+                self.assertIn(statement, lines[locations[0] - 1])
+
     def test_coverage_controls_use_their_own_complete_verifier_report(self):
         # Synthetic runner integration: this does not execute or establish a proof.
         from tempfile import TemporaryDirectory

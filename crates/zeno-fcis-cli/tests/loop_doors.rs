@@ -947,9 +947,48 @@ fn meaning_of(directory: &Directory, original: &str, label: &str, outputs: &[&st
         "--expressions",
         &path.to_string_lossy(),
     ]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(
+        exit,
+        Some(if report["detail"]["same_as_original"] == true {
+            0
+        } else {
+            1
+        }),
+        "{report}"
+    );
     assert_eq!(report["status"], "keyed", "{report}");
     report["detail"].clone()
+}
+
+#[test]
+fn meaning_verdict_exits_distinguish_same_different_and_over_budget() {
+    let directory = Directory::new();
+    let domain = |max: &str| json!({"kind": "Int", "min": "0", "max": max});
+    let identity = |max: &str| json!({"inputs": [domain(max)], "outputs": [domain(max)], "nodes": [["Input", 0]], "roots": [0]});
+    let original = directory.write("identity.zcve", &encode(&identity("1")));
+    let zero = json!({"inputs": [domain("1")], "outputs": [domain("1")], "nodes": [["Int", "0"]], "roots": [0]});
+    let different = directory.write("zero.zcve", &encode(&zero));
+    let large = directory.write("large.zcve", &encode(&identity("131072")));
+    for (left, right, expected) in [
+        (&original, &original, 0),
+        (&original, &different, 1),
+        (&large, &large, 2),
+    ] {
+        let (exit, report) = run(&[
+            "loop",
+            "meaning",
+            "--original",
+            &left.to_string_lossy(),
+            "--candidate",
+            &right.to_string_lossy(),
+        ]);
+        assert_eq!(exit, Some(expected), "{report}");
+        if expected == 2 {
+            assert_eq!(report["status"], "inconclusive");
+        } else {
+            assert_eq!(report["detail"]["same_as_original"], expected == 0);
+        }
+    }
 }
 
 #[test]
@@ -1040,7 +1079,7 @@ fn meaning_keys_are_equal_exactly_when_transform_check_finds_equivalence() {
         "--candidate",
         &keyed[3].2.to_string_lossy(),
     ]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     assert_eq!(report["detail"]["key"], keyed[2].1["key"]);
 }
 

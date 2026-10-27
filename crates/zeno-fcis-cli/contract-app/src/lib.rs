@@ -63,6 +63,8 @@ pub struct Example {
     pub post: Vec<i128>,
     /// Each delivery's channel and payload fields.
     pub outbox: Vec<(u32, Vec<i128>)>,
+    /// Optional exact delivery and idempotency ordinals.
+    pub ordinals: Vec<Option<(u32, u128)>>,
 }
 
 /// Parses decision examples, one per line: `inputs | class reason post |
@@ -91,6 +93,7 @@ pub fn examples(text: &str) -> AppResult<Vec<Example>> {
             reason: line.reason,
             post: line.post,
             outbox: line.outbox,
+            ordinals: line.ordinals,
         })
         .collect())
 }
@@ -292,7 +295,17 @@ pub fn compare(
     if candidate.outbox().len() != example.outbox.len() {
         return differ("delivery count");
     }
-    for (delivery, (channel, numbers)) in candidate.outbox().iter().zip(&example.outbox) {
+    for (index, (delivery, (channel, numbers))) in
+        candidate.outbox().iter().zip(&example.outbox).enumerate()
+    {
+        if let Some((ordinal, idempotency)) = example.ordinals.get(index).copied().flatten() {
+            if delivery.ordinal != ordinal {
+                return differ("delivery ordinal");
+            }
+            if delivery.idempotency != c::Atom::U128(idempotency) {
+                return differ("idempotency ordinal");
+            }
+        }
         let declared = descriptor
             .channels
             .iter()

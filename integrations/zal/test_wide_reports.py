@@ -99,7 +99,7 @@ class WideCliReports(unittest.TestCase):
                 rules.write_text(json.dumps({'schema': 'zeno-fcis/loop-rules/1', 'rules': [
                     {'id': 'wrong', 'where': 'true', 'class': 'Accept', 'reason': None,
                      'sets': {'value': '1 - value', 'anchor': str(value)}}]}))
-                judged = self.run_cli('loop', 'teach-back', '--contract', folder, '--rule', rules)
+                judged = self.run_cli('loop', 'teach-back', '--contract', folder, '--rule', rules, exits=(1,))
                 self.assertEqual(judged['detail']['rules'][0]['verdict'], 'wrong')
                 self.assertGreater(judged['detail']['rules'][0]['exceptions'], 0)
                 self.assert_named(judged, 'amount', value)
@@ -109,7 +109,7 @@ class WideCliReports(unittest.TestCase):
         for index, value in enumerate(ENDPOINTS):
             with self.subTest(value=value):
                 spec = self.root / f'learn-{index}.json';spec.write_text(json.dumps(declaration(value)))
-                report = self.run_cli('loop', 'learn', '--spec', spec, exits=(0, 3))
+                report = self.run_cli('loop', 'learn', '--spec', spec, exits=(0,) if value == 0 else (2,))
                 if value == 0:
                     self.assertEqual(report['status'], 'determined');continue
                 self.assertEqual(report['status'], 'question')
@@ -146,9 +146,20 @@ class WideCliReports(unittest.TestCase):
                 self.assertIn(str(value), text)
                 probe = self.run_cli('contract', 'probe', 'explain', folder, '--input', f'0 {value} {value} 0')
                 self.assertEqual(N.integer(probe['result']['input']['command.101.120']), value)
-                gaps = self.run_cli('contract', 'review', folder, '--gaps', '--format', 'json')
+                # The fixture's first guard is true, so its required fallback
+                # is dead. Keep those semantics and check the diagnostic as
+                # well as the lossless gap witnesses.
+                gaps = self.run_cli('contract', 'review', folder, '--gaps', '--format', 'json', exits=(1,))
                 self.assertEqual(gaps['schema'], 'zeno-fcis/contract-review/4')
                 self.assertIn(str(value), json.dumps(gaps['gaps']))
+                self.assertEqual(gaps['summary']['case_findings'], 1)
+                self.assertEqual(gaps['case_coverage']['status'], 'checked')
+                finding, = gaps['findings']
+                self.assertEqual((finding['case'], finding['kind'], finding['cause']),
+                                 (1, 'case-never-decides', 'covered by earlier cases'))
+                self.assertEqual(finding['covered_by'], [
+                    {'case': 0, 'when': 'true', 'witness': {
+                        'ordinal': 0, 'input': ['0', str(value), str(value), '0']}}])
                 architecture = self.root / f'architecture-{index}.json'
                 architecture.write_text(json.dumps({'schema': 'zeno-fcis/loop-architecture/1', 'components': [
                     {'name': 'calculate', 'owns': ['value', 'anchor'], 'reads': ['amount', 'context'], 'decides': []}]}))

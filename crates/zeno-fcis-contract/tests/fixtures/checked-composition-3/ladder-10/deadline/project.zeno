@@ -27,7 +27,15 @@ merge [400];
 law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 8 && 0 <= post.100.111 && post.100.111 <= 8;
 law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 8 && 0 <= post.100.111 && post.100.111 <= 8;
 law 502 exact_deadline on accept = command.101.120 >= pre.100.111 && command.101.120 >= pre.100.110 && post.100.110 == pre.100.110 && post.100.111 == command.101.120 && post.100.112 == 1;
+// Independent complete relation; ordered guards exclude earlier reasons.
+law 520 reason_200 on reject:200 = (true) && (context.102.130 == 0);
+law 521 reason_201 on reject:201 = ((true) && !(context.102.130 == 0)) && (command.101.120 < pre.100.111);
+law 522 reason_202 on reject:202 = (((true) && !(context.102.130 == 0)) && !(command.101.120 < pre.100.111)) && (pre.100.112 == 1);
+law 523 reason_203 on reject:203 = ((((true) && !(context.102.130 == 0)) && !(command.101.120 < pre.100.111)) && !(pre.100.112 == 1)) && (command.101.120 < pre.100.110);
+law 540 legitimate_acceptance on reject = !(((((true) && !(context.102.130 == 0)) && !(command.101.120 < pre.100.111)) && !(pre.100.112 == 1)) && !(command.101.120 < pre.100.110));
+law 541 acceptance_eligibility on accept = ((((true) && !(context.102.130 == 0)) && !(command.101.120 < pre.100.111)) && !(pre.100.112 == 1)) && !(command.101.120 < pre.100.110);
+law 542 no_committed_failure on failure = false;
 // Core seed logical-deadline/1; parameters {"C": 8}.
-// Instance source-set SHA256 a632d7ee78fadc87d1f1b87ab500b4ca7f4a37ec78cc19516f5a9ed00db34ce5.
+// Instance source-set SHA256 92b77f288372dafb49406a2f397bebc7447c4c128cdf9c42de46fcfc58f94c39.
 // Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

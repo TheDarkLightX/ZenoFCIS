@@ -34,10 +34,10 @@ pub(crate) const FILE: &str = "tests/decision-scenarios.txt";
 
 /// One scenario: its name, header line and steps.
 #[derive(Clone, Debug)]
-struct Scenario {
-    name: String,
-    line: usize,
-    steps: Vec<Example>,
+pub(super) struct Scenario<E = Example> {
+    pub(super) name: String,
+    pub(super) line: usize,
+    pub(super) steps: Vec<E>,
 }
 
 /// Where a replay stopped.
@@ -68,6 +68,16 @@ pub(crate) fn replay(
     text: &str,
     label: &str,
 ) -> Result<Replayed, ContractError> {
+    if zeno_fcis_contract::collections::judges::has_maps(project)? {
+        let result = zeno_fcis_contract::collections::judges::scenarios(project, rules, text)?;
+        return Ok(Replayed {
+            failed: result.packet()["failed"].as_u64().unwrap_or(1) as usize,
+            packet: result.packet().clone(),
+        });
+    }
+    if Rules::read_for_project(project, rules)?.unsigned {
+        return super::unsigned::scenario(project, rules, text, label);
+    }
     let loaded = Loaded::read(project, rules)?;
     let width = loaded.state_width;
     let genesis = genesis_values(&loaded);
@@ -80,10 +90,10 @@ pub(crate) fn replay(
                 error.reason(),
             )
         })?;
-        let scenarios = group(text, parsed, label)?;
+        let scenarios = group(text, parsed, label, |example| example.line)?;
         let results: Vec<Option<Failure>> = scenarios
             .iter()
-            .map(|scenario| run(authority, framer, scenario, width))
+            .map(|scenario| run(authority, framer, scenario, width, genesis.as_deref()))
             .collect();
         Ok((scenarios, results))
     })?;
@@ -176,6 +186,7 @@ fn genesis_values(loaded: &Loaded) -> Option<Vec<i128>> {
         .iter()
         .map(
             |position| match loaded.rules.genesis.get(&position.field?)? {
+                Constant::U128(_) => None,
                 Constant::Bool(value) => Some(i128::from(*value)),
                 Constant::Int(value) => Some(*value),
             },
@@ -184,8 +195,13 @@ fn genesis_values(loaded: &Loaded) -> Option<Vec<i128>> {
 }
 
 /// Groups the parsed examples under the scenario headers of `text`.
-fn group(text: &str, parsed: Vec<Example>, label: &str) -> Result<Vec<Scenario>, ContractError> {
-    let mut scenarios: Vec<Scenario> = Vec::new();
+pub(super) fn group<E>(
+    text: &str,
+    parsed: Vec<E>,
+    label: &str,
+    line_of: impl Fn(&E) -> usize,
+) -> Result<Vec<Scenario<E>>, ContractError> {
+    let mut scenarios: Vec<Scenario<E>> = Vec::new();
     let mut headers: Vec<(usize, String)> = Vec::new();
     for (index, line) in text.lines().enumerate() {
         let Some(comment) = line.trim_start().strip_prefix('#') else {
@@ -210,7 +226,7 @@ fn group(text: &str, parsed: Vec<Example>, label: &str) -> Result<Vec<Scenario>,
     }
     let mut next = 0;
     for example in parsed {
-        while next < headers.len() && headers[next].0 < example.line {
+        while next < headers.len() && headers[next].0 < line_of(&example) {
             let (line, name) = headers[next].clone();
             if scenarios.iter().any(|scenario| scenario.name == name) {
                 return Err(ContractError::new(
@@ -227,7 +243,7 @@ fn group(text: &str, parsed: Vec<Example>, label: &str) -> Result<Vec<Scenario>,
         }
         let Some(scenario) = scenarios.last_mut() else {
             return Err(ContractError::new(
-                format!("{label} line {}", example.line),
+                format!("{label} line {}", line_of(&example)),
                 "is a step before any `# scenario NAME` header",
             ));
         };
@@ -259,8 +275,34 @@ fn run(
     framer: &Framer,
     scenario: &Scenario,
     width: usize,
+    genesis: Option<&[i128]>,
 ) -> Option<Failure> {
     let mut state: Vec<i128> = scenario.steps[0].inputs[..width].to_vec();
+    let first = &scenario.steps[0];
+    let refusal = if genesis == Some(state.as_slice()) {
+        zeno_fcis_contract::internals::genesis::admit(authority, &framer.frame(&first.inputs)[0])
+            .err()
+            .map(|refusal| refusal.reason)
+    } else {
+        let descriptor = authority.descriptor();
+        evaluate::first_unsatisfied_state_law(
+            descriptor,
+            &evaluate::state_laws(descriptor),
+            framer,
+            &first.inputs,
+        )
+        .map(|id| {
+            format!("no admissible starting state: law {id}: stated pre-state violates a state law")
+        })
+    };
+    if let Some(reason) = refusal {
+        return Some(Failure {
+            step: 0,
+            line: first.line,
+            reason,
+            outcome: None,
+        });
+    }
     for (index, step) in scenario.steps.iter().enumerate() {
         if step.inputs[..width] != state[..] {
             return Some(Failure {
@@ -302,12 +344,15 @@ fn failure_json(failure: &Failure) -> Value {
     })
 }
 
-fn outcome_json(outcome: &Outcome) -> Value {
+pub(super) fn outcome_json(outcome: &Outcome) -> Value {
     match outcome {
         Outcome::Decision(decision) => json!({
             "class": decision.class.name(),
             "reason": decision.reason,
-            "post": decision.post.iter().map(|(_, value)| value.number().map(|number| number.to_string())).collect::<Vec<_>>(),
+            "post": decision.post.iter().map(|(_, value)| match value {
+                evaluate::Value::U128(number) => Some(number.to_string()),
+                _ => value.number().map(|number| number.to_string()),
+            }).collect::<Vec<_>>(),
             "deliveries": decision.outbox.len(),
         }),
         Outcome::Refused(refusal) => json!({
@@ -327,9 +372,18 @@ fn bind_and_run(
     scenarios: &[Scenario],
 ) -> Result<Vec<Option<Failure>>, ContractError> {
     loaded.bind(rules, |authority, framer| {
+        let genesis = genesis_values(loaded);
         Ok(scenarios
             .iter()
-            .map(|scenario| run(authority, framer, scenario, loaded.state_width))
+            .map(|scenario| {
+                run(
+                    authority,
+                    framer,
+                    scenario,
+                    loaded.state_width,
+                    genesis.as_deref(),
+                )
+            })
             .collect())
     })
 }

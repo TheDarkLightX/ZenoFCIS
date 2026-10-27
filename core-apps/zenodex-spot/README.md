@@ -30,4 +30,23 @@ Evidence is finite oracle exploration, native observation comparison and
 Attested finite-domain law checking. These establish their declared examples
 and bounds. They do not establish an any-length No-free-value theorem,
 full-range refinement, authenticated custody, durable publication or release
-qualification. No KernelChecked proof is claimed for this application.
+qualification, and no KernelChecked proof is claimed for them.
+
+The Lean Spot theorems for the rational contract model are classical because core `Rat` operations in Lean 4.30 depend on `Classical.choice`.
+
+The refinement gate checks the compiled decision program itself:
+
+```sh
+python3 tools/check_refinement.py --out "$CHECK_DIRECTORY" --lean-root "$LEAN_ROOT"
+```
+
+With the pinned Verus it proves, for every input in the declared domains,
+that the successor each accepting branch assigns equals the Spot core
+specification's, rounding included, and meets the integer Step contract that
+`proofs/NativeBridge.lean` states. `NativeBridge.lean` re-proves the closed
+round-trip and creation results on such integer traces without
+`Classical.choice`. The gate also compares the program with
+`tools/spot_reference.py` on a declared finite domain, and five planted
+defects must fail both checks. The proof runs on the library's evaluator
+specification; that the executable evaluator, decision construction and
+publication meet that specification rests on the library's own Verus gates.

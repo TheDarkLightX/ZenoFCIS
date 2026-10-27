@@ -25,10 +25,10 @@ doors over the contract's whole declared domain ("Requirements" below).
 | Door | You submit | What comes back | What it means |
 |---|---|---|---|
 | Expression | One expression per output (`loop candidate --expressions`) | Accepted, or a counterexample with the failing region, ranked repair sites and possibly a checked repair | The session's own check decides; the repair is labelled "checked repair" only after `transform check` accepts it and its receipt replays |
-| Sketch | Expressions with holes (`loop sketch`) | `completed`, `unrealizable`, `not-found`, `inconclusive` or `refused` | `completed` passed `transform check` with replay; the session checks it or recognizes a byte duplicate; `unrealizable` is the doors' claim, with a witness input or a listed, exhausted, complete candidate space; `not-found` claims nothing |
+| Sketch | Expressions with holes (`loop sketch`) | `completed`, `unrealizable`, `not-found`, `inconclusive` or `refused` | `completed` passed `transform check` with replay; the session checks it or recognizes a byte duplicate; `unrealizable` in detail.door.status is the doors' search finding, with a witness input or exhausted complete candidate space; its top-level result is proposal-failed:empty (exit 1, attempt spent); `not-found` claims nothing |
 | Family | One program over family parameters (`loop family`) | A verdict per instance, the smallest failing instance, and fitted forms `a * $P + b` checked again | Holds on the checked instances only; only a checker counterexample makes an instance `refuted`, and an unrealizable sketch is labelled `unrealizable` |
 | Transfer | A program written for one instance (`loop transfer`) | Per target instance: carried over directly, by opening constants near a changed parameter, or by repair | Each result is checked on its instance |
-| Meaning | A complete program (`loop meaning`) | Its meaning key and whether it means what the original means | Equal keys exactly when `transform check` finds the programs equivalent, within its limits |
+| Meaning | A complete program (`loop meaning`) | Its meaning key and whether it means what the original means | Keys hash all eager output/failure observations over the declared domain; equality is collision-qualified and supplies no independent transform verdict |
 
 Each expression or sketch spends one session attempt, like a JSON
 candidate. A duplicate that passes the door's confirming check and replay
@@ -37,18 +37,19 @@ The door's confirming `transform check` and replay run first; if
 they do not complete in the invocation's time, the result is `inconclusive`,
 the attempt is not spent and the incumbent is unchanged. Family and transfer runs keep no session. A loop session refuses an
 original whose check would need more work than its per-check allowance
-(`work-infeasible`). Where that happens depends on the program's size as
-well as its input tuples: with the default allowance, the core components'
-programs reach it above roughly 6,000 tuples, and the smallest programs near
-18,000. On such a core only the family and transfer doors are available,
-and a workspace cannot be opened on it.
+(`work-infeasible`). The check and session work ceilings scale with the original within fixed
+hard caps; admission depends on graph size, declared tuples and projected
+whole-session work, not a fixed tuple threshold. See the current
+[loop work limits](../CLI_REFERENCE.md#loop-commands). Family and transfer
+have their own finite-door limits.
 
 ### The expression language
 
 It is the contract policy-expression grammar: fields by name, declared
 variant names (`action == Inc`), `true`, `false`, `!`, `&&`, `||`, `->`,
-`==`, `!=`, `<`, `<=`, `>`, `>=`, `+`, `-`, and `c ? a : b` at the lowest
-level. Boolean fields used as integers lower as `field ? 1 : 0`, including
+`==`, `!=`, `<`, `<=`, `>`, `>=`, `+`, `-`, checked `*`, and `c ? a : b`
+at the lowest level. The closed division and product functions listed in the
+[CLI expression grammar](../CLI_REFERENCE.md) are also supported. Boolean fields used as integers lower as `field ? 1 : 0`, including
 vote sums. The doors add:
 
 | Form | Meaning |
@@ -137,15 +138,28 @@ on it is a check on an instance it was not fitted on.
 
 ## The workspace and the terminal
 
+Choose one initializer for each new workspace. These contract and family examples are alternatives.
+
+Contract-backed workspace:
+
 ```sh
-python3 integrations/zal/terminal.py loop init --contract DIR --workspace W.json
-python3 integrations/zal/terminal.py loop init --family bounded-counter --workspace W.json
-python3 integrations/zal/terminal.py loop show --workspace W.json            # latest events
-python3 integrations/zal/terminal.py loop show --workspace W.json --packet   # the subject card
-python3 integrations/zal/terminal.py loop next --workspace W.json           # next contract question
-python3 integrations/zal/terminal.py loop answer q1 2 --workspace W.json     # or any / none
-python3 integrations/zal/terminal.py loop say "rule t1: where value == 0 -> reject at_zero;" --workspace W.json
+python3 integrations/zal/terminal.py loop init --contract DIR --workspace contract-W.json
+python3 integrations/zal/terminal.py loop show --workspace contract-W.json            # latest events
+python3 integrations/zal/terminal.py loop show --workspace contract-W.json --packet   # the subject card
+python3 integrations/zal/terminal.py loop next --workspace contract-W.json           # next contract question
+python3 integrations/zal/terminal.py loop answer q1 2 --workspace contract-W.json     # answer only if q1 is open
 ```
+
+Family-backed workspace:
+
+```sh
+python3 integrations/zal/terminal.py loop init --family bounded-counter --workspace family-W.json
+python3 integrations/zal/terminal.py loop show --workspace family-W.json
+python3 integrations/zal/terminal.py loop say "rule t1: where value == 0 -> reject at_zero;" --workspace family-W.json
+```
+
+Run `loop answer q1` only when the contract-backed workspace reports an open q1. A family can have every case
+determined already, so there may be no question to answer.
 
 The workspace binds its subject by revision: the SHA-256 of the contract
 text, its policy and the exported program's digest. At initialization it
@@ -248,11 +262,19 @@ are reported, not refused: an answer that differs from the core is a
 leaves some input with no admissible decision, given the earlier answers, is
 refused, and the question and the recorded requirements stay as they were.
 
-The contract law language cannot name a reject reason. When the owner picks
-a reason, the reason is recorded beside the laws and only the question door
-applies it; the gaps judge does not see it. Stats and workspace facts report
-`determined_by_laws` beside `determined_with_reasons`. The legacy `determined`
-and `determined_rate` fields retain their meaning with recorded reasons.
+Reject reasons are expressible as `on reject:R` scopes or as
+`decision_reason == R` in reject laws. Both judges check these requirements.
+Both define determination over the complete outcome: class, reason, next state
+and ordered deliveries, with successful native agreement. Disagreements remain
+open with input witnesses. `determined_by_laws` covers the exported laws;
+`determined` also includes explicit delivery answers. The output names
+`deliveries` in `determination.uncovered_components` when the exported laws
+cannot express the complete outbox requirement. A committing answer for a
+channel-bearing contract must give `deliveries: []`, a complete list, or
+`deliveries: "case"`; omission is refused instead of repeating the question.
+The law-only term `decision_reason` also applies to failure laws without genesis.
+Inspect the exported laws before comparing judges: a reason annotation beside a
+law constrains the gaps judge only when its constraint is in the submitted law.
 Conflicts include an input and the requirements responsible; proposed-law
 false alarms include the owning answer, scope and formula beside the law ID.
 
@@ -346,6 +368,99 @@ inputs it misses), so equal keys give equal verdicts. The same
 invariant or rule in other words is answered from memory with its earlier
 verdict (`same i2 as i1: 9 states, event 3, inductive;`).
 
+## Coverage expansion
+
+The coverage loop measures behaviours the declared laws leave open, proposes
+additional laws, and asks the native gap judge whether each proposal agrees
+with the actual decisions and closes an open input or rejects an admitted
+mutant. It retains only proposals meeting both conditions. Nothing is adopted:
+read and confirm each proposed law before editing the contract.
+
+Set `ZENO_FCIS_BIN` to a compatible `zeno-fcis` binary, and `WORK` to a fresh
+writable directory outside the contract. From the repository root:
+
+```sh
+python3 integrations/zal/run.py coverage examples/guide-counter --out "$WORK/counter"
+```
+
+Expected stdout (exit 0):
+
+```json
+{"schema": "zeno-fcis/coverage-loop/1", "status": "no-residual-witness", "exit": 0, "before": {"gaps": 12, "admitted_mutants": 9}, "after": {"gaps": 0, "admitted_mutants": 0}}
+```
+
+The first synthesized template recovers the rejection guard described in
+[the gap-judge tutorial](../CONTRACT_JUDGES.md#do-the-laws-pin-the-contract-down):
+the counter rejects only an unauthorized change or a change at a bound.
+Reason templates preserve the ordered cases' precedence. Field templates
+state the accepted update or unchanged frame. Input templates name the
+individual native witnesses. These suggestions restate existing decisions;
+they do not independently establish that those decisions express the intent.
+
+For a deliberately insufficient judge budget:
+
+```sh
+python3 integrations/zal/run.py coverage examples/guide-counter --max-work 1 --out "$WORK/budget"
+```
+
+Expected stdout (exit 2):
+
+```json
+{"schema": "zeno-fcis/coverage-loop/1", "status": "inconclusive", "exit": 2, "before": {"gaps": null, "admitted_mutants": null}, "after": {"gaps": null, "admitted_mutants": null}}
+```
+
+Optional `--proposals FILE` supplies one contract law per line. Tag its target
+with `# targets: authority,gap-ID` (a dimension, an emitted witness ID, or both).
+An omitted tag remains visible as `unclassified`. The output separates these
+`proposed` laws from the deterministic templates' `synthesized` laws. Fresh
+numeric IDs are assigned without changing the supplied law body.
+
+`--idioms FILE` supplies a third source: a JSON list whose entries have
+`schema: "zeno-fcis/design-idiom-instance/1"`, an `idiom` ID, one `law`, a
+`dimension`, and a `source` note. These library instances follow the same
+native agreement and coverage-gain checks as other proposals, and appear
+separately as `idiom`, with their ID and source note retained. With `--zal`,
+the `law` string may be an `invariant` or `require` statement. This input
+consumes instantiated candidates; it does not interpret an idiom library.
+
+With `--zal MODEL.zal`, lines may instead contain profile-2 `invariant` or
+`require` statements, for example `require authorized_change: accepted => authorized;`
+when the model declares `authorized`. The model and contract must share the
+lowering vocabulary. The shared profile-2 syntax lowering produces the laws;
+no Python model check decides whether a proposal is true. Each statement's ZAL
+text, lowered laws and existing controlled-English reading stay together.
+One requirement may lower to separate accept and reject laws; it is judged
+as a single proposal. A tautology that lowers to no laws closes nothing.
+
+`--rounds N` defaults to 3 (1–32). Each native check includes all earlier kept
+laws. Laws rejected for no progress are reconsidered after the kept set changes;
+kept and disagreeing laws are not resubmitted. The loop stops when no witness remains, a round keeps nothing, or the
+round limit is reached. `--max-work` forwards the native law-check budget.
+Exit 0 means the loop ran, even with residual witnesses; exit 1 retains a
+disagreement and its native input; exit 2 preserves an inconclusive judge.
+Malformed proposals and filesystem failures retain refusal codes.
+
+`OUT/coverage.json` uses `zeno-fcis/coverage-loop/1`; `OUT/COVERAGE.md` presents
+the readings, proposed laws and witnesses for confirmation. Each round gives
+exact open-input and admitted-mutant totals before and after. Per-dimension
+counts cover **emitted witnesses only**: the judge samples open inputs. Tags
+use explicit name/rule patterns for value, authority, state, input, order,
+privacy, liveness, failure, time and resources, and story. They may overlap.
+Every tag records its rule; unmatched witnesses remain `unclassified`.
+The owned subject copy, adapter/binary hashes, law files, native requests,
+stdout, stderr and exit codes remain beside the report. Reports are local
+evidence, not publication permission or authenticated attestations.
+
+Background: E. M. Clarke, O. Grumberg, S. Jha, Y. Lu and H. Veith,
+*Counterexample-Guided Abstraction Refinement*, CAV 2000; R. A. DeMillo,
+R. J. Lipton and F. G. Sayward, *Hints on Test Data Selection: Help for the
+Practicing Programmer*, Computer, 1978. Their methods provide background on
+witness refinement and mutation testing. What is new here: prior-art search
+pending; no novelty claim. Scope: coverage here means witnessed by the gap
+judge's mutants and gaps, not every possible behaviour. A dimension tag is
+not a two-run privacy/order check, a liveness proof, or a check of the story.
+The [coverage card](COVERAGE_CARD.md) repeats the tested commands and outputs.
+
 ## MCP tools
 
 `integrations/zal/mcp.py` offers, for the workspace named by
@@ -383,9 +498,11 @@ requirement: adoption stays `zeno-fcis contract adopt`.
   `forbidden` with an admitted decision as the witness. The copy check on a
   workspace's contract is a hash comparison before each judge call, not a
   lock against a writer inside the workspace's own directory.
-- An answer's reason, which no law can state, binds only the question door.
-  The gaps judge does not see reason requirements: its counts and its
-  false-alarm checks cover the answers' laws only.
+- The gap judge sees exported reason laws. Complete delivery answer requirements
+  are not exported as laws; the named uncovered component explains the
+  difference between its law-only count and the question door's answer count.
+  A reason annotation beside a law does not add a constraint to the submitted
+  formulas.
 - A decomposition that passes steps 1 to 3 is not claimed to compose to the
   core; the composed check claims it on the core's declared domain only.
 - Steps 1 to 3 of a decomposition are the door's own evaluation of the given
@@ -503,12 +620,18 @@ Its spec uses the existing finite-program domain vocabulary:
 ```
 
 ```sh
-zeno-fcis loop capture open --spec spec.json --reference reference.py --session capture
+zeno-fcis --containment-backend systemd loop capture open --spec spec.json --reference reference.py --session capture
 zeno-fcis loop capture packet --session capture
-zeno-fcis loop capture candidate --session capture --candidate-json proposal.json
-zeno-fcis loop capture status --session capture
-zeno-fcis loop capture status --session capture --full
+zeno-fcis --containment-backend posix loop capture candidate --session capture --candidate-json proposal.json
+zeno-fcis --containment-backend posix loop capture status --session capture
+zeno-fcis --containment-backend posix loop capture status --session capture --full
 ```
+
+Reference acquisition (`open`, profile `python-reference/1`) needs the systemd
+user manager. Candidate checking and captured-result replay use `finite-data/1`
+on POSIX. Select the backend for each step as shown above; `packet` only reads
+the public packet. `status` can replay a captured result, so the example selects
+POSIX for it too. An unavailable backend refuses instead of falling back.
 
 `open` requires a new directory. It observes each point six times: twice in
 each of three fresh workers, ordered forward, reverse and forward. A crash,
@@ -1080,3 +1203,21 @@ than an irreducible subset mislabeled as a smallest one. See
   unanswered inputs remain part of its scalar meaning.
 - No source exploratory numbers, model-quality gain, adoption, publication
   or application authority is claimed. Every result carries `authority: none`.
+
+## Background and scope of determination reporting
+
+Edmund M. Clarke, E. Allen Emerson and A. Prasad Sistla, “Automatic Verification
+of Finite-State Concurrent Systems Using Temporal Logic Specifications,”
+*ACM Transactions on Programming Languages and Systems* 8(2), 1986, is
+background for the exhaustive finite checks described here. Shared determination
+reporting covers the declared finite domains and retains the runtime Authority;
+its comparative prior-art search is pending.
+
+## Method background and scope
+
+Armando Solar-Lezama et al., “Combinatorial Sketching for Finite Programs”,
+ASPLOS, 2006, supplies background for counterexample-guided synthesis; Dana
+Angluin, “Learning Regular Sets from Queries and Counterexamples”, Information
+and Computation, 1987, supplies background for query and counterexample loops.
+These commands use their stated finite grammars, domains and independent checks;
+no new synthesis method or runtime publication guarantee is claimed.

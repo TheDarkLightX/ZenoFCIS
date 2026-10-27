@@ -1,0 +1,8 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Factory artifact check</title>
+<style>html,body{margin:0}iframe{border:0;width:100%;height:100vh;display:block}#results{white-space:pre-wrap}</style>
+<iframe title="Published demonstration"></iframe><pre id="results">pending</pre>
+<script type="module">
+import("./factory.js").catch(error => {
+  document.getElementById("results").textContent = JSON.stringify({results:{},errors:[String(error)]});
+});
+</script></html>

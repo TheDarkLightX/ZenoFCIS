@@ -1,0 +1,25 @@
+zeno 1;
+project 1 claims;
+namespace 2 presentation;
+type 100 state ViewState;
+type 101 command ViewEvent;
+type 102 context ViewContext;
+type 105 int Flag;
+type 106 int Count;
+type 107 int Total;
+field 110 100 verdict 105;
+field 120 101 checked 106;
+field 121 101 total 107;
+field 122 101 complete 105;
+field 123 101 timeout 105;
+field 130 102 scope 105;
+component 400 presentation {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 512;
+}
+merge [400];
+law 499 state_bounds on commit, genesis = post.100.110 >= 0 && post.100.110 <= 1;
+law 500 claims_need_evidence on any = post.100.110 == 1 -> command.101.122 == 1 && command.101.123 == 0 && command.101.120 == command.101.121 && context.102.130 == 1;

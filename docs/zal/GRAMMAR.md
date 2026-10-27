@@ -4,7 +4,9 @@ This is the implemented Boolean control-FSM dialect in
 [`behavior.py`](../../integrations/zal/behavior.py), not the earlier numerical
 ZAL/0 or ZAL 0.1 designs. See the [specification](SPECIFICATION.md) for semantics
 and the [README](README.md) for commands. The parser and live legend share the
-statement registry; parsing never invokes an LLM.
+statement registry; parsing never invokes an LLM. Profile `zal/finite-fsm/2`,
+with integers, requirements and temporal properties, is
+[described at the end](#profile-zalfinite-fsm2).
 
 ## Lexical rules
 
@@ -124,6 +126,12 @@ These commands belong to the review terminal, not the model grammar:
 | `translate english`, `translate symbolic` | Complete current canonical model in the chosen surface. |
 | `why` | Help for the currently selected object, without assumed input values. |
 | `why STATE EVENT FACT=yes ...` | One exact decision explanation; supply every declared fact once. |
+| `whynot STATE EVENT FACT=yes ... want Accept [TARGET]` | Fewest input changes giving the wanted outcome; also `want Reject [REASON]`, `want rule ID`, and a trailing `scope input`. |
+| `whatif STATE EVENT FACT=yes ... change FACT=no [state:NAME] [event:NAME]` | Apply every named change and compare both decisions rule by rule. |
+| `story`, `story candidate`, `story trace EVENT FACT=yes then ...` | Numbered story of a counterexample or trace, paired with symbolic lines. |
+| `guide [TOPIC]` | Construct help generated from the construct registry (`zal/help/2`). |
+| `ladder list`, `ladder render ID [RUNG]`, `ladder parse ID RUNG TEXT` | Ladder statements; the revision read when the command runs is bound. |
+| `ladder same ID OTHER_ID`, `ladder same ID RUNG TEXT`, `ladder explain ID [[RUNG] TEXT]`, `ladder lower ID` | Meaning comparison with evidence, rung and scope explanation, inert lowering. |
 
 `yes`/`true` and `no`/`false` are Boolean values in terminal input commands.
 MCP/HTTP input uses actual JSON Booleans. Missing or extra keys and non-Boolean
@@ -224,3 +232,371 @@ not retained. A rename can change both revision and typed IDs; graph layout
 does not. The checker source identity is separate from the model revision.
 Hashes are identities, not proofs, signatures, human attestations or factory
 publication capabilities.
+
+## Profile `zal/finite-fsm/2`
+
+Profile 2 is implemented in
+[`behavior2.py`](../../integrations/zal/behavior2.py); its semantics are in
+the [specification](SPECIFICATION.md#profile-zalfinite-fsm2-integers-requirements-and-temporal-properties).
+The lexical rules above apply. The header selects the profile, and the
+singleton declarations are those of profile 1 with a new header and frame.
+
+### Paired example
+
+Each block is one complete model with one canonical revision. It is
+[`order2.zal`](../../integrations/zal/examples/order2.zal) in canonical order.
+
+```zal
+zal 2;
+machine order_dialogue;
+states approved, cancelled, draft, pending;
+events approve, cancel, submit;
+context authorized;
+initial draft;
+step atomic; frame control_and_variables;
+default reject not_enabled unchanged;
+rule approve_order: pending + approve [authorized] -> accept approved;
+rule cancel_order: pending + cancel [true] -> accept cancelled;
+rule submit_order: draft + submit [true] -> accept pending;
+require approve_only_if_authorized: ((accepted & event == approve & state' == approved) => authorized);
+```
+
+```text
+ZAL version 2.
+The machine is order_dialogue.
+The states are approved, cancelled, draft, pending.
+The events are approve, cancel, submit.
+The context observations are authorized.
+Initially the state is draft.
+Each step is atomic. Only the control state and the declared variables may change.
+Otherwise reject because not_enabled and keep the state unchanged.
+Rule approve_order: when the state is pending and the event is approve, if authorized, move to approved.
+Rule cancel_order: when the state is pending and the event is cancel, if true, move to cancelled.
+Rule submit_order: when the state is draft and the event is submit, if true, move to pending.
+Requirement approve_only_if_authorized: (if (accepted and event is approve and state after this event is approved), then authorized).
+```
+
+[`withdrawal2.zal`](../../integrations/zal/examples/withdrawal2.zal) and
+[`keeper2.zal`](../../integrations/zal/examples/keeper2.zal) add variables,
+an input, fairness and every temporal operator.
+
+### Statement forms
+
+| Symbolic | Controlled English |
+| --- | --- |
+| `zal 2;` | `ZAL version 2.` |
+| `input NAME in LOW..=HIGH;` | `The input NAME is an integer from LOW to HIGH inclusive.` |
+| `var NAME in LOW..=HIGH initially VALUE;` | `The variable NAME is an integer from LOW to HIGH inclusive, initially VALUE.` |
+| `step atomic; frame control_and_variables;` | `Each step is atomic. Only the control state and the declared variables may change.` |
+| `rule ID: STATE + EVENT [GUARD] -> accept TARGET, UPDATE, UPDATE;` | `Rule ID: when the state is STATE and the event is EVENT, if GUARD, move to TARGET with UPDATE and UPDATE.` |
+| `VARIABLE = TERM` | `VARIABLE set to TERM` |
+| `VARIABLE += TERM` | `VARIABLE increased by TERM` |
+| `VARIABLE -= TERM` | `VARIABLE decreased by TERM` |
+| `invariant ID: STATE_FORMULA;` | `Invariant ID: STATE_FORMULA.` |
+| `require ID: STEP_FORMULA;` | `Requirement ID: STEP_FORMULA.` |
+| `fairness ID: infinitely often (STEP_FORMULA);` | `Fairness ID: assume (STEP_FORMULA) happens infinitely often.` |
+| `player NAME moves in STATE;` | `Player NAME moves in STATE.` |
+| `property ID: TEMPORAL_FORMULA;` | `Property ID: TEMPORAL_FORMULA.` |
+| `property ID: NAME can force eventually (FORMULA);` | `Property ID: NAME can force (FORMULA) to happen eventually.` |
+| `property ID: NAME can force always (FORMULA);` | `Property ID: NAME can force (FORMULA) to hold always.` |
+| `property ID: NAME can force infinitely often (FORMULA);` | `Property ID: NAME can force (FORMULA) to happen infinitely often.` |
+| `property ID: NAME can force within K (FORMULA);` | `Property ID: NAME can force (FORMULA) to happen within K steps.` |
+| `property ID: NAME can force infinitely often (Q1) and infinitely often (Q2);` | `Property ID: NAME can force (Q1) and (Q2) to each happen infinitely often.` |
+
+The `machine`, `states`, `events`, `context`, `initial`, `default`, reject
+rule and `unresolved` forms are unchanged from profile 1. An Accept rule
+without updates is written as in profile 1. `TERM` in an update is an integer
+literal, a variable or an input. A rule updates each variable at most once.
+Inputs and variables are each listed in name order in the canonical
+rendering. Context facts, inputs and variables share one namespace.
+
+### Formulas
+
+```ebnf
+formula     = implication, [ "<=>", implication ] ;
+implication = disjunction, [ "=>", disjunction ] ;
+disjunction = conjunction, { "|", conjunction } ;
+conjunction = unary, { "&", unary } ;
+unary       = "!", unary | atom ;
+atom        = "(", formula, ")" | "true" | "false" | "accepted" | FACT
+            | "state", [ "'" ], "==", STATE | "event", "==", EVENT
+            | term, ( "==" | "!=" | "<" | "<=" | ">" | ">=" ), term
+            | temporal ;
+term        = value, { ( "+" | "-" ), value } ;
+value       = INTEGER | VARIABLE, [ "'" ] | INPUT ;
+temporal    = ( "always" | "never" | "eventually" | "next" ), "(", formula, ")"
+            | "within", "(", BOUND, ",", formula, ")"
+            | "until", "(", formula, ",", formula, ")" ;
+```
+
+`=>` and `<=>` do not chain: group a second one with parentheses. A negative
+literal is written `-5`. Which atoms a formula may use depends on where it
+appears:
+
+| Position | May read |
+| --- | --- |
+| Guard | facts, inputs, `state == S`, variables |
+| Invariant | `state == S`, variables |
+| Requirement, fairness and property operands | everything above, plus `event == E`, `accepted`, `state'` and `x'` |
+| Property | one supported temporal shape over step formulas |
+
+The English surface uses these words for the symbolic operators:
+
+| Symbolic | Controlled English |
+| --- | --- |
+| `!A`, `A & B`, `A \| B` | `not A`, `A and B`, `A or B` |
+| `(A => B)` | `(if A, then B)` |
+| `(A <=> B)` | `(A if and only if B)` |
+| `state == S`, `state' == S`, `event == E` | `state is S`, `state after this event is S`, `event is E` |
+| `x'` | `x after this event` |
+| `==`, `!=` | `equals`, `does not equal` |
+| `<`, `<=`, `>`, `>=` | `is less than`, `is at most`, `is greater than`, `is at least` |
+| `+`, `-` | `plus`, `minus` |
+| `always(P)`, `never(P)`, `eventually(P)` | `always (P)`, `never (P)`, `eventually (P)` |
+| `next(P)` | `at the next event, which must exist, (P)` |
+| `within(k, P)` | `now or within the next k events, (P)` |
+| `until(P, Q)` | `(P) holds until (Q) happens, and that must happen` |
+
+The temporal phrases are the intuitive-rung templates of the
+[temporal ladder](ladder/TEMPORAL.md), so one statement reads the same in
+both. Profile 2 reserves every word of these phrases, and the update words
+`with`, `set`, `to`, `by`, `increased` and `decreased`, as names. The
+complete list is in the legend.
+
+### Game properties
+
+`NAME` is one of two declared players, and the two players' disjoint state
+lists cover the machine's states. `FORMULA` is a state formula in invariant
+scope. The bound `K` in a `within` game property is a literal from 0 to 64. A
+recurring multi-goal property has two to four state formulas. A game property
+counts toward the eight-property limit; at most four game properties may be
+declared.
+
+A play starts at the initial configuration (control state and variables). In a
+configuration whose state is in player P's list, P chooses the event. When the
+model declares context, the context of each step is chosen against the
+property's player: by the other player. The step follows the rules exactly as
+`check` does: an accepted rule moves, a rejection keeps the configuration.
+Every configuration has a step for every event, so plays are infinite.
+A fairness formula holds on a step when it holds on the configuration after the step.
+
+- `P can force eventually (Q)`: P can play so that every play reaches Q,
+  or some fairness formula holds on only finitely many steps.
+- `P can force infinitely often (Q)`: P can play so that every play visits
+  Q infinitely often, or some fairness formula holds on only finitely many
+  steps.
+- `P can force always (Q)`: P can play so that every play stays in Q.
+  Fairness does not apply: a violation happens at a finite time.
+- `P can force within K (Q)`: P can play so that every play reaches a
+  configuration satisfying Q at one of the step offsets 0 through K
+  inclusive, as `within` already means. A step is one rule application; the
+  context node inside a step is not a step. Fairness does not apply. The
+  context rule is unchanged.
+- `P can force infinitely often (Q1) and infinitely often (Q2) ...`: P can
+  play so that every play visits each of Q1, Q2, and any additional declared
+  goal infinitely often, or some fairness formula holds on only finitely
+  many steps.
+- The property holds when P can do this from the initial configuration.
+
+The game graph contains configurations reachable from the initial one. A
+configuration is owned by the player whose state list contains it. In states
+owned by the property's player, there is one edge per event; with context,
+each such edge leads to an intermediate node owned by the other player, who
+chooses the context. In the other player's states, the opponent chooses each
+event and context together. Intermediate nodes make every goal and fairness
+formula false. Fairness formulas read only the post-step state (`state'` and
+primed variables).
+
+The unbounded objectives reduce to “goal infinitely often, provided every
+fairness formula holds infinitely often.” For `eventually`, goal
+configurations become absorbing, with goal and fairness true. For `always`,
+fairness is ignored, violating configurations become absorbing with goal
+false, and every other node has goal true. `infinitely often` uses the graph
+unchanged. If there are no applicable fairness formulas, one assumption true
+on every node is used.
+
+Two independent solvers must agree on the winning set. With
+CPre(X)(v) meaning that the property player has some successor in X at its
+nodes and the other player has every successor in X, the fixed-point solver
+computes `νZ. μY. ⋁ᵢ νX. (goal ∧ CPre(Z)) ∨ CPre(Y) ∨ (¬fairᵢ ∧ CPre(X))` by
+iterating sets to stability. It does not unroll a bound. The parity solver
+uses product nodes `(v,d)` for the fairness assumptions, advances `d` when
+the current assumption holds, and assigns priority 2 for goal, 1 when the
+last assumption advances, and 0 otherwise. A recursive Zielonka solver uses
+maximum parity, with even priorities winning for the property player. A
+disagreement is `UNKNOWN`, and `check` does not pass.
+
+For `within K`, solver A uses backward induction over complete steps: W0 is
+the set of Q configurations, and each next stratum adds configurations from
+which the property player forces the next configuration into the preceding
+stratum. Solver B forms a product of the game graph and a remaining-step
+counter; context choices keep the counter and a completed
+configuration-to-configuration step reduces it. An ordinary reachability attractor decides
+the product. The table export contains the nonrecursive `r0` through `rK`
+strata and no `stable` law. Bounded perfect-information games are determined
+by backward induction (Zermelo, 1913).
+
+For recurring multiple goals, solver A places the conjunction over goals
+inside the outer greatest fixed point:
+`νZ. ⋀ⱼ μY. ⋁ᵢ νX. (Qⱼ ∧ CPre(Z)) ∨ CPre(Y) ∨ (¬fairᵢ ∧ CPre(X))`.
+Solver B adds round-robin counters for the goals and the fairness assumptions
+to the parity product, then solves it with the same independent Zielonka
+algorithm. Their winning sets must agree on every node or the result is
+`UNKNOWN`.
+
+The table export command is:
+
+```sh
+python3 integrations/zal/run.py export-game FILE --property ID --out PATH
+```
+
+It emits the contract tables for the reduced game using the fixed-point
+solver's first stable outer and middle strata. A `stable` table compares each
+proposed stratum with its predecessor, and `law 510 stable on commit =
+stable[0];` must expand to exactly `true` before the table answers are
+accepted. For `within K`, the exporter emits nonrecursive `r0` through `rK`
+strata instead. For multiple recurring goals, it emits one `goal0`, `goal1`,
+and further goal table per state formula and checks all per-goal strata with
+one `stable` law. It refuses graphs above 64 nodes. Native formula expansion
+has a lower practical limit: measured expansion is about 20 nodes with one
+goal and one fairness assumption, and about 12 nodes with two of each. Beyond
+the expansion limit, the ZAL check result stands. The game semantics use the
+“can force” operator from Alur, Henzinger and Kupferman,
+“Alternating-Time Temporal Logic,” *JACM*, 2002. The parity construction follows Piterman, Pnueli and Sa'ar,
+“Synthesis of Reactive(1) Designs,” *VMCAI*, 2006; the recursive solver is
+from Zielonka, “Infinite Games on Finitely Coloured Graphs,” *Theoretical
+Computer Science*, 1998.
+
+### Symmetry quotients
+
+Symmetry declarations can accompany LLM-generated or synthesized profile-2
+machines. These two statements describe the same generator:
+
+```text
+symmetry rivals: swap (a b) (c d);
+Symmetry rivals: swapping a with b and c with d changes nothing.
+```
+
+Each pair contains declared names of one kind: variables with identical ranges
+and initial values, states, or events. Names in a generator are disjoint; a name
+shared by different declaration kinds is ambiguous and refused. At most four
+generators are allowed. Pair order, pair orientation and declaration order are
+canonicalized. A machine without declarations retains its existing revision.
+
+Before reducing a graph, `check` checks all four obligations, exhaustively over
+the declared domains. A failure refuses with the symmetry statement's ID and
+the obligation's name; there is no automatic fallback.
+
+1. **Automorphism:** initialization is fixed. For every configuration, event
+   and context, simultaneously renaming configuration and event preserves
+   class, reason, rule outcome and successor. Overlaps and arithmetic traps
+   must correspond too. Observed rule IDs have a consistent bijective renaming;
+   explicit rejection reasons and the default outcome stay fixed.
+2. **Claim invariance:** every invariant, requirement, fairness formula,
+   temporal property and game objective is unchanged by renaming on the
+   configurations or steps where it is evaluated. Temporal constructors retain
+   their non-temporal predicates. A claim observing one swapped party is
+   refused with “the property observes a swapped name”; fix that observer in
+   the symmetry instead of replacing its claim with a symmetric closure.
+3. **Players:** each player's states map to that same player's states.
+   The opponent's context choice is unchanged: context names and values do
+   not move, and each representative retains every event/context combination.
+4. **Finiteness:** the existing limits of 4,096 configurations and 16,384 input
+   tuples still apply before reduction. Symmetry cannot admit a larger domain.
+
+The generated group acts on configurations. An orbit's representative is its
+least configuration in the existing canonical state/value order. Reachable
+invariants, reachable transition requirements and game arenas use these
+representatives. Requirements and invariant preservation on all admissible
+declared configurations retain their full-domain checks. Game ownership and
+fairness labels are preserved; winning counts weight orbits by their concrete
+sizes. Concrete counterexample paths come from the retained full graph.
+Linear temporal checks, including fairness lassos, lowering and export retain
+the full graph. The result includes
+`"symmetry": {"generators": N, "configurations": C, "orbits": O}`.
+Use `python3 integrations/zal/run.py check FILE --no-symmetry` to use the full
+graph for every check; the declarations' obligations are still checked.
+
+See the [collateral ladder example](../../integrations/zal/examples/ladder_symmetry2.zal):
+Alice is the fixed observed borrower, while Bob and Carol are swappable.
+Its declared domain has 54 configurations and 36 orbits.
+
+**Background.** This follows Emerson and Sistla, “Symmetry and Model Checking,”
+*Formal Methods in System Design*, 1996; Ip and Dill, “Better Verification
+Through Symmetry,” *Formal Methods in System Design*, 1996; and Clarke,
+Enders, Filkorn and Jha, “Exploiting Symmetry in Temporal Logic Model Checking,”
+*Formal Methods in System Design*, 1996.
+
+**What is new here.** This is a bounded integration of established symmetry
+reduction methods. Comparative prior-art search pending.
+
+**Scope.** Orbit equivalence preserves the checked state claims and game
+objectives under these obligations. With renamed events, bisimulation uses
+joint configuration/event/outcome orbits as labels; it does not preserve each
+concrete event spelling. No privacy theorem, parameterized population cutoff,
+runtime speed-up or production authorization is established.
+
+### Property shapes and refusals
+
+A property is `always(P)`, `never(P)`, `always(P => T)`, `always(T)` or `T`,
+where `T` is `next(Q)`, `within(k, Q)`, `eventually(Q)` or `until(P, Q)`,
+and P and Q are step formulas without temporal operators. The bound k is a
+literal from 0 to 64. A model with `eventually` or `until` and no fairness
+declaration is refused with "liveness needs a fairness declaration". Other
+named refusals include an unsupported temporal shape, a construct outside its
+position, a Boolean observation used as an integer, a chained implication, an
+update outside a declared variable or repeated on one, a range or domain
+above the limits in the specification, and a variable that starts outside its
+range.
+
+## Profiles `zal/finite-types/1`, `zal/effects/1` and `zal/typed-fsm/1`
+
+These profiles are implemented in [`adt.py`](../../integrations/zal/adt.py),
+[`effects.py`](../../integrations/zal/effects.py) and
+[`typed2.py`](../../integrations/zal/typed2.py); their meaning, checks and
+scope are in [types and effects](EFFECTS.md). One statement per line; `#`
+starts a comment line. Type, port, capability and answer names are a capital
+letter followed by letters and digits; field, case and resource names follow
+the lowercase name rule above. Both surfaces parse to one value, and the
+canonical rendering of either surface parses back to it.
+
+```text
+type     := "type" TypeName "=" (ty | "{" [field ":" ty {"," field ":" ty}] "}" | case {"|" case}) ";"
+case     := name ["(" ty ")"]
+ty       := "unit" | "bool" | "int" INT "..=" INT | "bytes" "..=" CAP | "bytes" CAP
+          | "list" "..=" CAP "of" ty | TypeName
+English  := "The type" TypeName "is" (ty-en | "a record with fields" name "(" ty-en ")" {"," ...}
+          | "a record with no fields" | "one of" name ["(" ty-en ")"] {"," ...}) "."
+ty-en    := "nothing" | "a Boolean" | "an integer from" INT "to" INT "inclusive" | "at most" CAP "bytes"
+          | "exactly" CAP "bytes" | "a list of at most" CAP "items of" ty-en | TypeName
+```
+
+`zal/effects/1` statements, symbolic first:
+
+| Concept | Symbolic | English |
+| --- | --- | --- |
+| header | `zal effects 1;` | `ZAL effects version 1.` |
+| name | `effects NAME;` | `The effect signature is NAME.` |
+| schema | `schema SCHEMA;` | `It lowers to the record schema SCHEMA.` |
+| resource | `resource NAME = BIT;` | `Resource NAME has bit value BIT.` |
+| capability | `capability C = N: store, reads {R, R}, writes {R};` | `Capability C, number N, is a store capability that allows reading R and R and writing R.` |
+| answer | `answer A = N: ok(T) \| refused(Code);` | `Answer A, number N, is one of ok (the result), refused (Code).` |
+| frame | `frame A: ok applied, refused unchanged;` | `For answer A, ok means the operation took effect, refused means nothing changed.` |
+| ports | `ports P = 1, Q = 2;` | `The ports are P (1), Q (2).` |
+| law | `law ID name-with-hyphens: "STATEMENT";` | `Law ID name-with-hyphens: "STATEMENT".` |
+| operation | `operation P(field: TYPE) -> A TYPE;` | `Operation P takes field (TYPE) and answers A of TYPE.` |
+| footprint | `footprint P: capability C, reads {R}, writes {}, laws [ID], v2 calls [CALL];` | `Operation P needs capability C, reads R, writes nothing, obeys law ID, and maps to the V2 call CALL.` |
+
+A footprint's V2 mapping is also `v2 external CALL` ("maps to the external CALL
+outside the store") or `v2 opt_in` ("has no default V2 call"). English lists use
+"a, b and c" and "nothing" for an empty list. A statement text is printable
+ASCII without `"`, at most 512 characters. Limits: 160 statements, 64 types,
+32 fields or cases per type, 64 items of each other kind, 64 KiB per surface.
+
+`zal/typed-fsm/1` is profile 2 with the header `zal typed 1;`, `type`
+statements after the context declaration, and two more statement forms:
+`var NAME: TYPE initially VALUE;` ("The variable NAME holds TYPE, initially
+VALUE.") and `input NAME: TYPE;` ("The input NAME holds TYPE."). Inside
+formulas and updates, a typed name appears as `NAME == VALUE`, `NAME != VALUE`,
+`NAME' == VALUE` or `NAME = VALUE` ("NAME equals VALUE", "NAME does not equal
+VALUE", "NAME after this event equals VALUE", "NAME set to VALUE").

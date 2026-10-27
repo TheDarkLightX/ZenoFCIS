@@ -57,9 +57,9 @@ def receipt_tuples(receipt: Path) -> int:
 # ends with an empty vault and priority on lane B, away from genesis.
 SESSION = """\
 # Three decisions that leave lane A's payout pending away from genesis.
-0 180 0 180 0 0 0 170 160 170 2 190 0 | accept - 2 180 0 180 0 0 0 170 | -
-2 180 0 180 0 0 0 170 161 170 2 191 0 | accept - 2 181 2 180 0 0 0 170 | -
-2 181 2 180 0 0 0 170 162 170 1 193 0 | accept - 0 180 0 180 0 0 0 171 | 300 170 2
+0 180 0 180 0 0 0 170 160 170 2 190 0 0 | accept - 2 180 0 180 0 0 0 170 | -
+2 180 0 180 0 0 0 170 161 170 2 191 0 0 | accept - 2 181 2 180 0 0 0 170 | -
+2 181 2 180 0 0 0 170 162 170 1 193 0 0 | accept - 0 180 0 180 0 0 0 171 | 300 170 2
 """
 
 
@@ -249,4 +249,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        sys.exit(main())
+    run_cli(_entrypoint)

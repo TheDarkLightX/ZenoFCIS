@@ -1,0 +1,21 @@
+#![cfg(feature = "std")]
+#[path = "support/hmac.rs"]
+mod issuer;
+#[path = "support/step4.rs"]
+mod support;
+include!("support/journey.rs");
+#[test]
+fn test_only_hmac_matches_independent_python_vector() {
+    assert_eq!(
+        issuer::mac(b"ReceiptVerifierV1 test-only"),
+        [
+            0xaa, 0x9f, 0x99, 0x07, 0xae, 0xd0, 0x7f, 0x97, 0x48, 0x10, 0x36, 0xf1, 0xcb, 0x9a,
+            0xd2, 0x44, 0x61, 0x26, 0xae, 0x92, 0x06, 0xe0, 0x03, 0xdb, 0x20, 0xe8, 0x93, 0x36,
+            0x02, 0xe6, 0x99, 0xe5
+        ]
+    );
+    println!(
+        "source-bound step4 evaluator: {:?}",
+        application::evaluator_identity()
+    );
+}

@@ -1,0 +1,66 @@
+zeno 1;
+project 1 escrow_deal;
+namespace 2 escrow;
+// One escrow deal. The buyer deposits 1..3 units, the seller marks the goods
+// shipped, then the buyer releases the money to the seller, or the operator
+// refunds it to the buyer after day 7, the seller's shipping deadline. Every
+// deposited unit is either held or paid out once, by a delivery on the
+// payee's channel. The server sets the day, counted from the policy's epoch.
+type 100 state Deal;
+type 101 command DealCommand;
+type 102 context Caller;
+type 103 destination Payee;
+type 104 payload Payment;
+type 105 int Units in 0..=3;
+type 106 int DepositUnits in 1..=3;
+type 107 data DealStatus;
+type 108 data DealAction;
+type 109 data Party;
+type 115 int Day in 0..=14;
+field 110 100 status 107;
+field 111 100 held 105;
+field 112 100 paid_to_seller 105;
+field 113 100 refunded_to_buyer 105;
+field 120 101 action 108;
+field 121 101 amount 106;
+field 130 102 party 109;
+field 131 102 day 115;
+field 140 104 units 105;
+variant 150 107 Open none;
+variant 151 107 Funded none;
+variant 152 107 Shipped none;
+variant 153 107 Released none;
+variant 154 107 Refunded none;
+variant 160 108 Deposit none;
+variant 161 108 MarkShipped none;
+variant 162 108 Release none;
+variant 163 108 Refund none;
+variant 170 109 Buyer none;
+variant 171 109 Seller none;
+variant 172 109 Operator none;
+variant 173 109 Outsider none;
+reason 200 wrong_party precedence 0;
+reason 201 wrong_stage precedence 1;
+reason 202 before_deadline precedence 2;
+channel 300 seller_payout destination 103 payload 104;
+channel 301 buyer_refund destination 103 payload 104;
+component 400 deal {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  outbox outbox.301;
+  budget steps 64;
+}
+merge [400];
+// Each stage holds exactly the money it should.
+law 500 stage_holds_money on commit, genesis = (post.100.110 == 150 -> post.100.111 == 0 && post.100.112 == 0 && post.100.113 == 0) && ((post.100.110 == 151 || post.100.110 == 152) -> post.100.111 > 0 && post.100.112 == 0 && post.100.113 == 0) && (post.100.110 == 153 -> post.100.111 == 0 && post.100.112 > 0 && post.100.113 == 0) && (post.100.110 == 154 -> post.100.111 == 0 && post.100.112 == 0 && post.100.113 > 0);
+// Money is never created or lost: only a deposit adds to the total.
+law 501 money_conserved on commit = (command.101.120 == 160 -> post.100.111 + post.100.112 + post.100.113 == pre.100.111 + pre.100.112 + pre.100.113 + command.101.121) && (command.101.120 != 160 -> post.100.111 + post.100.112 + post.100.113 == pre.100.111 + pre.100.112 + pre.100.113);
+law 502 right_party on commit = (command.101.120 == 160 -> context.102.130 == 170) && (command.101.120 == 161 -> context.102.130 == 171) && (command.101.120 == 162 -> (context.102.130 == 170 || context.102.130 == 173)) && (command.101.120 == 163 -> context.102.130 == 172);
+// The operator refunds only after day 7.
+law 503 refund_after_deadline on commit = command.101.120 == 163 -> context.102.131 > 7;
+// Every unit paid out is actually delivered to that payee.
+law 510 seller_paid_by_delivery on commit = outbox.104 <= 1 && outbox.104.140 == post.100.112 - pre.100.112;
+law 511 buyer_refunded_by_delivery on commit = outbox.104 <= 1 && outbox.104.140 == post.100.113 - pre.100.113;

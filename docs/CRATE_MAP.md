@@ -1,12 +1,12 @@
 # ZenoFCIS crate map
 
-This guide documents the `2.5.0` source. Its retained V1
+This guide documents the `2.6.0` source. Its retained V1
 protocol guidance is historical; see [the release notes](RELEASE_NOTES.md)
 for the current checked API and assurance boundaries.
 
 ZenoFCIS is a workspace of small crates arranged around a pure semantic core.
 The classes below describe architectural role, not current Cargo stability.
-All public workspace crates are version `2.5.0`.
+All public workspace crates are version `2.6.0`.
 
 ## Dependency direction
 
@@ -74,7 +74,7 @@ policy.
 | `zeno-fcis-refine` | Exact normalized-decision comparison and promotion reports |
 | `zeno-fcis-evidence` | Source/tool/query/assumption/coverage-bound evidence envelopes and importers |
 | `zeno-fcis-synthesis` | Canonical bounded candidate enumeration and honest incomplete-search results |
-| `zeno-fcis-program-search` | Untrusted, deterministic search for smaller equivalent finite programs (resubstitution, top-down synthesis, folding, decision-diagram resynthesis); proposes only, `transform check` decides |
+| `zeno-fcis-program-search` | Untrusted, deterministic search for smaller equivalent finite programs (resubstitution, top-down synthesis, folding, decision-diagram resynthesis, opt-in indexed branches); proposes; the exact check accepts |
 | `zeno-fcis-loop-doors` | Untrusted proposer-side doors of the bounded loop: the loop expression language with holes and family parameters, lowering, inverse semantics, failing regions, repair sites and repairs, sketch completion and family fits and transfer; proposes only, `transform check` decides |
 | `zeno-fcis-contract` | Application-contract compiler core shared with the `zeno-fcis` binary, and the checked assume-guarantee composition checker with its groups, aggregate generation and assembly validation, receipt and replay |
 | `zeno-fcis-backend` | Checked engine/verifier protocol for Lean, SMT/Z3, CVC5, Kani, private checkers, compilers, and other tools |
@@ -116,6 +116,7 @@ publication uses the nominal authorization boundary instead.
 | Crate | Responsibility |
 |---|---|
 | `zeno-fcis-shell-sqlite` | Crash-atomic, policy-pinned SQLite authorized publication and outbox delivery |
+| `zeno-fcis-ingress` | Bounded authenticated HTTP acquisition around the checked shell-effect programs and SQLite handler |
 | `zeno-fcis-adapter` | Callable and strict JSON-line mounted-runtime comparison |
 | `zeno-fcis-codegen` | Deterministic Rust/Python schema and vector generation |
 | `zeno-fcis-bootstrap` | Deterministic project starter generation from a reviewed catalog |

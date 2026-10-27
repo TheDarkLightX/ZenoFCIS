@@ -11,7 +11,7 @@ use agent_treasury_guard::{
     bindings::GeneratedProject,
     context, failed,
     generated::{Caller, Direction, GuardContext, ModelId, Treasury, TreasuryCommand},
-    genesis_state, profile, propose, settled, v2_contract,
+    genesis_state, profile, propose, refund_expired, settled, v2_contract,
 };
 use zeno_fcis_site_common::{
     Application, Authority, Json, Map, Names, Request, RustCryptoSha256, SchemaAdmittedEnvelope,
@@ -64,7 +64,12 @@ impl Application for AgentTreasuryGuard {
         let mut request = Request::new(request);
         let command = match request.choice(
             "command",
-            &[("ProposeSwap", 0), ("SwapSettled", 1), ("SwapFailed", 2)],
+            &[
+                ("ProposeSwap", 0),
+                ("SwapSettled", 1),
+                ("SwapFailed", 2),
+                ("RefundExpired", 3),
+            ],
         )? {
             0 => propose(
                 request.choice(
@@ -78,7 +83,8 @@ impl Application for AgentTreasuryGuard {
                 request.integer("min_out")?,
             ),
             1 => settled(request.integer("intent")?, request.integer("amount_out")?),
-            _ => failed(request.integer("intent")?),
+            2 => failed(request.integer("intent")?),
+            _ => refund_expired(request.integer("intent")?),
         };
         let caller = request.choice("caller", &[("Agent", Caller::Agent), ("Dex", Caller::Dex)])?;
         let now = request.integer("now")?;
@@ -247,6 +253,20 @@ mod tests {
     }
 
     #[test]
+    fn last_safe_proposal_can_be_recovered_by_the_agent_at_the_final_tick() {
+        let mut demo = Demo::<AgentTreasuryGuard>::new().unwrap();
+        demo.step(&proposal("BuyBase", 1, 1, "Agent", 9, 1))
+            .unwrap();
+        let input = r#"{"command":"RefundExpired","intent":9,"caller":"Agent","now":11,"price":1,"price_time":0,"model":"UnlistedModel"}"#;
+        let recovered = demo.step(input).unwrap();
+        assert_eq!(recovered["decision"], "Accept");
+        assert_eq!(recovered["after"]["quote"], 6);
+        assert_eq!(recovered["after"]["pending_amount"], 0);
+        assert_eq!(recovered["outbox"], json!([]));
+        assert_eq!(demo.step(input).unwrap()["decision"], "Reject");
+    }
+
+    #[test]
     fn law_statuses_follow_the_manifest_scopes() {
         let mut demo = Demo::<AgentTreasuryGuard>::new().unwrap();
         let accept = demo
@@ -254,12 +274,17 @@ mod tests {
             .unwrap();
         assert_eq!(
             law_ids(&accept),
-            [500, 501, 502, 503, 504, 505, 506, 507, 991]
+            [
+                500, 501, 502, 503, 504, 505, 506, 507, 510, 511, 513, 514, 515, 516, 991
+            ]
         );
         let failed_swap = demo.step(&failure(1, "Dex", 2)).unwrap();
-        assert_eq!(law_ids(&failed_swap), [500, 501, 502, 508, 991]);
+        assert_eq!(
+            law_ids(&failed_swap),
+            [500, 501, 502, 508, 510, 513, 514, 515, 516, 991]
+        );
         let reject = demo.step(&failure(1, "Dex", 3)).unwrap();
-        assert_eq!(law_ids(&reject), [509, 991]);
+        assert_eq!(law_ids(&reject), [512, 909, 991]);
     }
 
     #[test]

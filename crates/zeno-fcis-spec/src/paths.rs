@@ -71,6 +71,49 @@ pub enum DeclaredDomain {
     /// The declared range of an `int` type.
     Range(IntRange),
 }
+
+/// Inclusive typed integer bounds used for finite table positions and declared
+/// integer domain sizes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TableIndexRange {
+    /// A signed `int` range.
+    Signed {
+        /// Inclusive lower bound.
+        min: i128,
+        /// Inclusive upper bound.
+        max: i128,
+    },
+    /// A `u128` range, retained unsigned during the table-bound check.
+    Unsigned {
+        /// Inclusive lower bound.
+        min: u128,
+        /// Inclusive upper bound.
+        max: u128,
+    },
+}
+
+impl TableIndexRange {
+    /// The number of values, or `None` for reversed bounds or a size above `u128`.
+    /// Computes no signed difference and never enumerates the domain.
+    #[must_use]
+    pub fn cardinality(self) -> Option<u128> {
+        let width = match self {
+            Self::Signed { min, max } if min <= max => min.abs_diff(max),
+            Self::Unsigned { min, max } => max.checked_sub(min)?,
+            _ => return None,
+        };
+        width.checked_add(1)
+    }
+
+    /// Returns true when every value lies in `0..size`.
+    #[must_use]
+    pub fn fits_table(self, size: u32) -> bool {
+        match self {
+            Self::Signed { min, max } => min >= 0 && max < i128::from(size),
+            Self::Unsigned { min, max } => min <= max && max < u128::from(size),
+        }
+    }
+}
 impl DeclaredDomain {
     /// Returns true when `value` lies in the domain.
     #[must_use]
@@ -111,6 +154,27 @@ pub fn declared_domain(spec: &ProjectSpec, path: &ProjectionPath) -> Option<Decl
     match (declared.kind(), declared.range()) {
         (TypeKind::Bool, _) => Some(DeclaredDomain::Values(alloc::vec![0, 1])),
         (TypeKind::Int, Some(range)) => Some(DeclaredDomain::Range(range)),
+        _ => None,
+    }
+}
+
+/// Returns the declared integer bounds at a resolved projection, preserving
+/// the distinction between signed and unsigned inputs for table-index checks.
+#[must_use]
+pub fn declared_table_index_range(
+    spec: &ProjectSpec,
+    path: &ProjectionPath,
+) -> Option<TableIndexRange> {
+    let leaf = leaf_type(spec, path)?;
+    let declared = spec.types().iter().find(|declared| declared.id() == leaf)?;
+    match declared.kind() {
+        TypeKind::Int => declared.range().map(|range| TableIndexRange::Signed {
+            min: range.min(),
+            max: range.max(),
+        }),
+        TypeKind::U128 => declared
+            .unsigned_range()
+            .map(|(min, max)| TableIndexRange::Unsigned { min, max }),
         _ => None,
     }
 }
@@ -221,6 +285,13 @@ fn temporal_paths<'a>(formula: &'a TemporalFormula, paths: &mut Vec<&'a Projecti
 
 fn relation_paths<'a>(expr: &'a RelExpr, paths: &mut Vec<&'a ProjectionPath>) {
     match expr {
+        RelExpr::Circuit(c) => {
+            for node in c.nodes() {
+                if let crate::BoolNode::Formula(f) = node {
+                    relation_paths(f, paths);
+                }
+            }
+        }
         RelExpr::Bool(_) => {}
         RelExpr::Not(inner) => relation_paths(inner, paths),
         RelExpr::And(left, right) | RelExpr::Or(left, right) | RelExpr::Implies(left, right) => {
@@ -242,6 +313,13 @@ fn relation_paths<'a>(expr: &'a RelExpr, paths: &mut Vec<&'a ProjectionPath>) {
 
 fn value_paths<'a>(expr: &'a ValueExpr, paths: &mut Vec<&'a ProjectionPath>) {
     match expr {
+        ValueExpr::Select(c, a, b) => {
+            relation_paths(c, paths);
+            value_paths(a, paths);
+            value_paths(b, paths);
+        }
+        ValueExpr::U128(_) => {}
+        ValueExpr::ToI128(v) | ValueExpr::ToU128(v) => value_paths(v, paths),
         ValueExpr::Int(_) | ValueExpr::Var(_) => {}
         ValueExpr::Projection(path) => paths.push(path),
         ValueExpr::Add(left, right)
@@ -659,6 +737,9 @@ mod tests {
                 Declaration::Wiring(v) => builder.wiring(v),
                 Declaration::Law(v) => builder.law(v),
                 Declaration::Claim(v) => builder.claim(v),
+                Declaration::Random(v) => builder.random_input(v),
+                Declaration::Distribution(v) => builder.distribution(v),
+                Declaration::Reward(v) => builder.reward(v),
             };
         }
         let errors = builder

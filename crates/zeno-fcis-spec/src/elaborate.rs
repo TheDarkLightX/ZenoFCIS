@@ -24,6 +24,7 @@ pub fn elaborate_project(
         declarations,
         merge_order,
         diagnostic_limit,
+        collections,
     } = parsed;
     let mut diagnostics = Vec::new();
     if version != ZENO_DSL_VERSION {
@@ -74,6 +75,9 @@ pub fn elaborate_project(
         Vec::new(),
         Vec::new(),
     );
+    let mut random_inputs = Vec::new();
+    let mut distributions = Vec::new();
+    let mut rewards = Vec::new();
     let mut spans = BTreeMap::new();
     for spanned in declarations {
         match spanned.declaration {
@@ -116,6 +120,18 @@ pub fn elaborate_project(
             Declaration::Law(value) => {
                 spans.insert((9, value.id().get()), spanned.span);
                 laws.push(value)
+            }
+            Declaration::Random(value) => {
+                spans.insert((11, value.id().get()), spanned.span);
+                random_inputs.push(value);
+            }
+            Declaration::Distribution(value) => {
+                spans.insert((12, value.id().get()), spanned.span);
+                distributions.push(value);
+            }
+            Declaration::Reward(value) => {
+                spans.insert((13, value.id().get()), spanned.span);
+                rewards.push(value);
             }
             Declaration::Claim(value) => {
                 spans.insert((10, value.id().get()), spanned.span);
@@ -217,6 +233,62 @@ pub fn elaborate_project(
         &mut diagnostics,
     );
 
+    sort_and_duplicates(
+        &mut random_inputs,
+        |v| v.id(),
+        |v| (None, v.name()),
+        "random",
+        11,
+        &spans,
+        &mut diagnostics,
+    );
+    sort_and_duplicates(
+        &mut distributions,
+        |v| v.id(),
+        |v| (None, v.name()),
+        "distribution",
+        12,
+        &spans,
+        &mut diagnostics,
+    );
+
+    sort_and_duplicates(
+        &mut rewards,
+        |v| v.id(),
+        |v| (None, v.name()),
+        "reward",
+        13,
+        &spans,
+        &mut diagnostics,
+    );
+    let random_ids: Vec<_> = random_inputs.iter().map(|v| v.id()).collect();
+    for reward in &rewards {
+        if random_ids.is_empty() || reward.random() != random_ids {
+            push(
+                &mut diagnostics,
+                DiagnosticCode::UnknownReference,
+                span_for(&spans, 13, reward.id()),
+                format!("reward.{}.random", reward.id().get()),
+                "all declared random premise IDs in sorted order",
+                "missing, extra or unknown premise",
+                "name every declared random input; rewards use the same full random domain",
+            );
+        }
+    }
+
+    for value in &types {
+        if value.kind() == TypeKind::U128 && value.unsigned_range().is_none() {
+            push(
+                &mut diagnostics,
+                DiagnosticCode::InvalidDeclaration,
+                span_for(&spans, 1, value.id()),
+                format!("type.{}.range", value.id().get()),
+                "explicit unsigned bounds",
+                "missing bounds",
+                "declare u128 in MIN..=MAX",
+            );
+        }
+    }
     let type_map: BTreeMap<StableId, TypeKind> = types
         .iter()
         .map(|value| (value.id(), value.kind()))
@@ -720,6 +792,10 @@ pub fn elaborate_project(
         composition: CompositionAst::new(wirings, merge_order),
         laws: laws.into_boxed_slice(),
         claims: claims.into_boxed_slice(),
+        random_inputs: random_inputs.into_boxed_slice(),
+        collections,
+        distributions: distributions.into_boxed_slice(),
+        rewards: rewards.into_boxed_slice(),
     };
     // Resolve only after schema and formula-shape admission. Both parsed input
     // and ProjectSpecBuilder pass through this mandatory boundary.
@@ -731,7 +807,24 @@ pub fn elaborate_project(
         .claims()
         .iter()
         .map(|claim| (10, "claim", claim.id(), crate::claim_paths(claim)));
-    for (tag, kind, id, paths) in law_paths.chain(claim_paths) {
+    let random_paths = spec
+        .random_inputs()
+        .iter()
+        .map(|v| (11, "random", v.id(), alloc::vec![v.input()]));
+    let distribution_paths = spec
+        .distributions()
+        .iter()
+        .map(|v| (12, "distribution", v.id(), alloc::vec![v.outcome()]));
+    let reward_paths = spec
+        .rewards()
+        .iter()
+        .map(|v| (13, "reward", v.id(), alloc::vec![v.outcome()]));
+    for (tag, kind, id, paths) in law_paths
+        .chain(claim_paths)
+        .chain(random_paths)
+        .chain(distribution_paths)
+        .chain(reward_paths)
+    {
         for path in paths {
             let resolution = crate::resolve_path(&spec, path);
             let actual = match resolution {
@@ -1011,6 +1104,7 @@ const fn scope_keyword(scope: LawScope) -> &'static str {
         LawScope::Reject => "reject",
         LawScope::CommittedFailure => "failure",
         LawScope::Committing => "commit",
+        LawScope::RejectReason(_) => "reject:ID",
     }
 }
 

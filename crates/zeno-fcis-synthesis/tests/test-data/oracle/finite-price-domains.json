@@ -1,0 +1,24 @@
+{
+  "bounds": {
+    "B": 1000000,
+    "C": 64,
+    "F": 2000000,
+    "I": 8192
+  },
+  "extra_control": "U128 deviation overflow refuses price but admits independent time",
+  "meter_limits": {
+    "Byte": 10000000,
+    "Read": 10000000,
+    "Step": 10000000,
+    "WitnessByte": 10000000
+  },
+  "nonclaims": "exhaustive only over these frozen factored projections; no full Cartesian-world, crypto, composition or parametric proof claim",
+  "price_cases": 1380000,
+  "price_domain": "committed slot absent/a0; pending absent/a0/a1; quarantine absent/report1/a0/a1; epoch,watermark,stored nonce,clock,submitted nonce independently0..4; 8 commands; 3 security modes unavailable/available0/overcap0; round0 price2/epoch0/time0, round1 price1/epoch1/time1; four reporters/sources; frozen templates include unreachable guard boundaries; exclude nonmonotone equal committed/pending round, exclude pending observed/publication epoch1 from state epoch0; pending publication equals aggregate observed epoch and buffer endpoints publication+2",
+  "profile": "oracle-finite-price-projections/1",
+  "quorum_cases": 112585,
+  "quorum_domain": "all 0..4 report source assignments labels1..4 and every permutation (6565); every price triple1..5 and permutation (750); independent epoch/time triples0..4 with every permutation (93750); each of five classification dimensions, all4^4 class assignments and minimum/maximum1..3 (11520)",
+  "reporter_alias_controls": 341,
+  "result_domain": "entire exact successor or 32 ordered reasons; every command has accepts; independently written runtime laws; no 991",
+  "test_only": true
+}

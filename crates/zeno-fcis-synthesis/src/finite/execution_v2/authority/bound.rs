@@ -42,14 +42,16 @@ pub(super) fn framing_bytes(config: &Framing) -> Option<Vec<u8>> {
         Part::Bytes(config.context.schema.as_slice()),
         Part::Word(config.context.max_bytes as u128)
     ];
-    let out = canonical::encode(&parts);
     #[cfg(verus_keep_ghost)]
     proof! {
-        assert((match out{Some(v)=>Some(v@),None=>None::<Seq<u8>>})==Some(super::bound_spec::framing_bytes(config))) by {
-            reveal_with_fuel(super::spec::prefix,12);reveal_with_fuel(super::spec::length,12);
+        assert(super::spec::length(parts@,11) == 283) by {
+            reveal_with_fuel(super::spec::length,12);
+        }
+        assert(super::spec::prefix(parts@,11) == super::bound_spec::framing_bytes(config)) by {
+            reveal_with_fuel(super::spec::prefix,12);
         }
     }
-    out
+    canonical::encode(&parts)
 }
 
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures outcome_spec::owned_bytes_result(result)==outcome_spec::replay(outcome_spec::owned_bytes_result(actual),expected@),))]

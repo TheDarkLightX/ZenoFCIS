@@ -6,6 +6,7 @@ The symbolic and controlled-English parsers build exactly the same value.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 import hashlib
 import itertools
@@ -21,6 +22,40 @@ FUTURE = {"effects", "liveness", "fairness", "arithmetic", "concurrency"}
 
 class Refusal(ValueError):
     """Invalid source or an unsupported operation; never a business rejection."""
+
+    def __init__(self, message, *, location=None):
+        super().__init__(message)
+        self.location = location
+
+
+def source_lines(text):
+    """Retain physical positions; a whole comment, including semicolons, is ignored."""
+    return [(number, len(line) - len(line.lstrip()) + 1, line.strip())
+            for number, line in enumerate(text.splitlines(), 1)
+            if line.strip() and not line.lstrip().startswith("#")]
+
+
+@contextmanager
+def at_source(location):
+    """Attach parser-local source context without storing spans in the canonical IR."""
+    try:
+        yield
+    except Refusal as error:
+        if error.location is None:
+            raise Refusal(str(error), location=location) from error
+        raise
+
+
+def grammar_refusal(number, line, english, location):
+    message = f"Statement {number}: not in the controlled grammar; clarify this statement"
+    long_name = next((m for m in re.finditer(r"[a-z][a-z0-9_]*", line) if len(m[0]) > 32), None)
+    if long_name:
+        message += f"; identifier exceeds 32 characters ({len(long_name[0])})"
+        location = (location[0], location[1] + long_name.start())
+    elif not line.endswith("." if english else ";"):
+        message += "; missing statement terminator"
+        location = (location[0], location[1] + len(line))
+    return Refusal(message, location=location)
 
 
 @dataclass(frozen=True)
@@ -403,20 +438,21 @@ def parse(text: str, syntax="symbolic") -> Model:
     if syntax not in {"symbolic", "english"}:
         raise Refusal("Choose symbolic or english syntax")
     english = syntax == "english"
-    lines = [line.strip() for line in text.splitlines() if line.strip() and not line.lstrip().startswith("#")]
+    lines = source_lines(text)
     if len(lines) > 80:
         raise Refusal("Source exceeds 80 statements")
     patterns = grammar_patterns(english)
-    fields = {}
+    fields, locations = {}, {}
     raw_rules, raw_invariants, obligations = [], [], []
     terminator = r"\." if english else ";"
-    for number, line in enumerate(lines, 1):
+    for number, (physical, column, line) in enumerate(lines, 1):
         for key, pattern in patterns.items():
             match = re.fullmatch(pattern, line)
             if match:
                 if key in fields:
-                    raise Refusal(f"Statement {number}: duplicate {key}")
+                    raise Refusal(f"Statement {number}: duplicate {key}", location=(physical, column))
                 fields[key] = match.group(1) if match.groups() else True
+                locations[key] = (physical, column)
                 break
         else:
             pattern = (rf"Rule ({NAME}): when the state is ({NAME}) and the event is ({NAME}), if (.+), (.+)\." if english else
@@ -424,52 +460,62 @@ def parse(text: str, syntax="symbolic") -> Model:
             match = re.fullmatch(pattern, line)
             if match:
                 raw_rules.append(match.groups())
+                locations[("rule", match[1])] = (physical, column)
                 continue
             match = re.fullmatch(rf"{'Invariant' if english else 'invariant'} ({NAME}): (.+){terminator}", line)
             if match:
                 raw_invariants.append(match.groups())
+                locations[("invariant", match[1])] = (physical, column)
                 continue
             match = re.fullmatch(rf"{'Unresolved' if english else 'unresolved'} ({NAME}): ([a-zA-Z0-9_ ,!?()/-]{{1,200}}){terminator}", line)
             if match and match[1] in FUTURE:
                 obligations.append(match.groups())
                 continue
-            raise Refusal(f"Statement {number}: not in the controlled grammar; clarify this statement")
+            raise grammar_refusal(number, line, english, (physical, column))
     missing = set(patterns) - set(fields)
     if missing:
-        raise Refusal("Missing explicit declarations: " + ", ".join(sorted(missing)))
+        raise Refusal("Missing explicit declarations: " + ", ".join(sorted(missing)),
+                      location=(len(text.splitlines()) + 1, 1))
 
     def names(key, maximum, empty=False):
         raw = [] if empty and fields[key] == "none" else [x.strip() for x in fields[key].split(",")]
+        if any(len(name) > 32 for name in raw):
+            raise Refusal(f"{key}: identifier exceeds 32 characters", location=locations[key])
         if not (0 if empty else 1) <= len(raw) <= maximum or len(set(raw)) != len(raw) or any(not re.fullmatch(NAME, x) for x in raw):
-            raise Refusal(f"{key} needs {'0' if empty else '1'}..{maximum} distinct names")
+            raise Refusal(f"{key} needs {'0' if empty else '1'}..{maximum} distinct names", location=locations[key])
         return tuple(sorted(raw))
 
     states, events, facts = names("states", 8), names("events", 8), names("facts", 4, True)
     reserved = {"none", "true", "false", "state", "not", "and", "or", "is", "default"}
     if reserved & (set(states) | set(events) | set(facts)):
-        raise Refusal("A declaration uses a reserved word")
+        key = next(key for key, values in [("states", states), ("events", events), ("facts", facts)] if reserved & set(values))
+        raise Refusal("A declaration uses a reserved word", location=locations[key])
     if fields["initial"] not in states:
-        raise Refusal("Initial state is undeclared or empty")
+        raise Refusal("Initial state is undeclared or empty", location=locations["initial"])
     if len(raw_rules) > 32 or len(raw_invariants) > 8 or len(obligations) > 8:
         raise Refusal("Bounds: 32 rules, 8 invariants, 8 unresolved obligations")
     rules = []
     for rid, source, event, guard, outcome in raw_rules:
-        if source not in states or event not in events:
-            raise Refusal(f"Rule {rid} refers to an undeclared state or event")
-        accepted = re.fullmatch(rf"{'move to' if english else 'accept'} ({NAME})", outcome)
-        rejected = re.fullmatch(rf"reject {'because ' if english else ''}({NAME}) {'and keep the state unchanged' if english else 'unchanged'}", outcome)
-        if not accepted and not rejected:
-            raise Refusal(f"Rule {rid} needs an explicit outcome and frame")
-        target = accepted[1] if accepted else None
-        if target is not None and target not in states:
-            raise Refusal(f"Rule {rid} targets an undeclared state")
-        rules.append(Rule(rid, source, event, parse_formula(guard, facts, states, english), target, rejected[1] if rejected else None))
+        with at_source(locations[("rule", rid)]):
+            if source not in states or event not in events:
+                raise Refusal(f"Rule {rid} refers to an undeclared state or event")
+            accepted = re.fullmatch(rf"{'move to' if english else 'accept'} ({NAME})", outcome)
+            rejected = re.fullmatch(rf"reject {'because ' if english else ''}({NAME}) {'and keep the state unchanged' if english else 'unchanged'}", outcome)
+            if not accepted and not rejected:
+                raise Refusal(f"Rule {rid} needs an explicit outcome and frame")
+            target = accepted[1] if accepted else None
+            if target is not None and target not in states:
+                raise Refusal(f"Rule {rid} targets an undeclared state")
+            rules.append(Rule(rid, source, event, parse_formula(guard, facts, states, english), target, rejected[1] if rejected else None))
     identifiers = [r.id for r in rules] + [name for name, _ in raw_invariants]
     if len(set(identifiers)) != len(identifiers) or "default" in identifiers:
         raise Refusal("Rule and invariant IDs must be distinct and not default")
-    invariants = tuple(sorted((name, parse_formula(formula, (), states, english, invariant=True)) for name, formula in raw_invariants))
+    invariants = []
+    for name, formula in raw_invariants:
+        with at_source(locations[("invariant", name)]):
+            invariants.append((name, parse_formula(formula, (), states, english, invariant=True)))
     return Model(fields["name"], states, events, facts, fields["initial"], fields["default"],
-                 tuple(sorted(rules, key=lambda r: r.id)), invariants, tuple(sorted(obligations)))
+                 tuple(sorted(rules, key=lambda r: r.id)), tuple(sorted(invariants)), tuple(sorted(obligations)))
 
 
 def witness(state, event, context):

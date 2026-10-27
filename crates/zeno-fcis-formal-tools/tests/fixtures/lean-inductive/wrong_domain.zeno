@@ -1,0 +1,22 @@
+zeno 1;
+project 1 induction_control;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 105 int Count;
+type 106 int Bounded in 0..=3;
+field 110 100 x 105;
+field 111 100 y 106;
+variant 120 101 A none;
+variant 121 101 B none;
+reason 200 denied precedence 0;
+component 300 machine {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 32;
+}
+merge [300];
+law 400 increment on commit = post.100.110 == pre.100.110 + 1 && post.100.111 == pre.100.111;
+claim 600 bounded all inductive assume [400] = pre.100.110 <= 3;

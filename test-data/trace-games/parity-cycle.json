@@ -1,0 +1,44 @@
+{
+  "schema": "zeno-fcis/arena/1",
+  "observation": "perfect",
+  "roots": [
+    0
+  ],
+  "objective": {
+    "kind": "parity",
+    "priorities": [
+      1,
+      2
+    ]
+  },
+  "nodes": [
+    {
+      "owner": 1,
+      "observation": "0",
+      "edges": [
+        [
+          "odd",
+          0
+        ],
+        [
+          "even",
+          1
+        ]
+      ]
+    },
+    {
+      "owner": 0,
+      "observation": "1",
+      "edges": [
+        [
+          "back",
+          0
+        ],
+        [
+          "stay",
+          1
+        ]
+      ]
+    }
+  ]
+}

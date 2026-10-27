@@ -84,7 +84,7 @@ class Fake:
     def meaning(self, path):
         outputs = tuple(json.loads(Path(path).read_text())["outputs"])
         key = self.keys.get(outputs, LW.Z.digest({"outputs": list(outputs)})[:64].ljust(64, "0"))
-        return 0, {"status": "keyed", "door": "meaning",
+        return (0 if key == "core" else 1), {"status": "keyed", "door": "meaning",
                    "detail": {"key": "c" * 64 if key == "core" else key, "same_as_original": key == "core"}}
 
 
@@ -301,6 +301,14 @@ class LoopWorkspaceTests(unittest.TestCase):
             events = self.submit(f"program {pid} out0 = {text};\n")
             self.assertEqual(events[1]["act"]["kind"], "accepted", events)
         self.assertEqual(len(self.fake.calls), 2, "each correct program is judged for its cost")
+
+    def test_meaning_memory_requires_a_negative_exit_and_matching_packet(self):
+        state = self.workspace.load()
+        for code, same, expected in [(1, False, "d" * 64), (0, True, None), (2, False, None),
+                                     (0, False, None), (1, True, None), (1, None, None)]:
+            report = {"status": "keyed", "detail": {"key": "d" * 64, "same_as_original": same}}
+            with self.subTest(code=code, same=same), patch.object(loop_doors, "meaning", return_value=(code, report)):
+                self.assertEqual(self.workspace._meaning(state, self.dir / "proposal.json"), expected)
 
     def test_an_invariant_cycle_returns_its_counterexample_then_accepts_the_revision(self):
         cti = {"state": [7], "input": [150, 1], "successor": [8], "count": 1}
@@ -710,13 +718,15 @@ class LoopMcpTools(unittest.TestCase):
         self.assertEqual(names[:7], self.ORIGINAL)
         self.assertEqual(names[7:12], ["zal_loop_read", "zal_loop_packet", "zal_loop_submit", "zal_loop_translate",
                                      "zal_loop_legend"])
-        self.assertEqual(names[12:], ["zal_capture_read", "zal_capture_packet", "zal_capture_submit",
-                                      "zal_capture_translate", "zal_capture_legend"])
+        self.assertEqual(names[12:17], ["zal_capture_read", "zal_capture_packet", "zal_capture_submit",
+                                        "zal_capture_translate", "zal_capture_legend"])
+        self.assertTrue(all(name.startswith(("zal_why_not", "zal_what_if", "zal_narrate", "zal_guide", "zal_ladder_"))
+                            for name in names[17:]), names[17:])
         for tool in mcp.TOOLS:
             self.assertFalse(any(word in tool["name"] for word in ("answer", "say", "accept")), tool["name"])
         for tool in mcp.TOOLS[7:12]:
             self.assertIn("not the owner's agreement", tool["description"])
-        for tool in mcp.TOOLS[12:]:
+        for tool in mcp.TOOLS[12:17]:
             self.assertIn("Tool permission is not owner agreement.", tool["description"])
 
     def test_a_model_document_with_an_answer_is_refused_through_mcp(self):

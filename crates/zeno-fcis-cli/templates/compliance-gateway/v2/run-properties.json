@@ -1,0 +1,15 @@
+{
+  "schema": "zeno-fcis/run-properties/1",
+  "properties": [
+    {
+      "kind": "predicate",
+      "name": "every_block_alert_names_the_new_strike_count",
+      "formula": "verdict.failure -> outbox.301 == 1 && outbox.301.148 == post.100.120"
+    },
+    {
+      "kind": "predicate",
+      "name": "rejected_reinstatement_has_no_effect",
+      "formula": "verdict.reject -> post.100.120 == pre.100.120 && outbox.300 == 0 && outbox.301 == 0"
+    }
+  ]
+}

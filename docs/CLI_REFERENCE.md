@@ -1,17 +1,17 @@
 # `zeno-fcis` CLI reference
 
-This guide documents the `2.5.0` source. Its retained V1
+This guide documents the `2.6.0` source. Its retained V1
 protocol guidance is historical; see [the release notes](RELEASE_NOTES.md)
 for the current checked API and assurance boundaries.
 
-The `zeno-fcis-cli` package in `1.1.0` publishes the `zeno-fcis` binary.
+The `zeno-fcis-cli` package in `2.6.0` publishes the `zeno-fcis` binary.
 It pins `clap = 4.6.1` without environment parsing or color output.
 
 ```text
 zeno-fcis describe [COMMAND...]
 zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter|prepared-counter|account-lockout|order-fulfillment|inventory-reservation|compliance-gateway|withdrawal-queue|agent-treasury-guard [--source TREE]
 zeno-fcis new <dir> --contract <contract-dir> [--source TREE]
-zeno-fcis check [project.zeno] [--format human|json] [--require-substantive] [--require-resolved-paths]
+zeno-fcis check [project.zeno] [--format human|json] [--require-substantive] [--require-resolved-paths] [--expand]
 zeno-fcis generate [project.zeno] --out <dir> [--check] [--format human|json]
 zeno-fcis generate contract [<app-dir>] [--out <dir>] [--check] [--format human|json]
 zeno-fcis graph [project.zeno] --format dot|mermaid|json
@@ -34,6 +34,8 @@ zeno-fcis contract draft propose --session DIR --revision SHA256 --rules FILE --
 zeno-fcis contract draft questions|check --session DIR
 zeno-fcis contract draft label --session DIR --revision SHA256 --examples FILE --provenance TEXT
 zeno-fcis contract draft finalize --session DIR --revision SHA256 --out NEW_DIR
+zeno-fcis construct --family priority-collection --requirement BUNDLE --owner-approval FILE --layout T|I --out DIR
+zeno-fcis contract refine-check ABSTRACT_DIR CONCRETE_DIR --abstraction FILE [--max-checks N] [--format human|json]
 zeno-fcis contract review [<app-dir>] [--out PACKET.json] [--max-tuples N] [--mutant-programs DIR] [--format human|json]
 zeno-fcis contract export-program [<contract-dir>] --out FILE [--format human|json]
 zeno-fcis contract export --tau [<contract-dir>] --out DIR [--max-tuples N] [--samples N] [--format human|json]
@@ -47,6 +49,19 @@ zeno-fcis contract check-composition MANIFEST [--aggregate DIR | --write-aggrega
 ```
 
 `new` refuses a nonempty target. `check` parses and elaborates in one command.
+`check --expand` instead prints the project with every
+[table](CONTRACT_TABLES.md) form replaced by the declarations and formulas it
+expands to, after checking that the printed text parses to the same canonical
+project, and reports the tables, the inputs and the input domain size on
+stderr (with `--format json`, in one document). It prints nothing for a
+project with errors and exits 1. For a project with
+[keyed collections](COLLECTIONS.md) it prints the view, and the check
+compares it with the project's view.
+`zeno-fcis contract collections [<app-dir>] [--max-tuples N] [--out FILE]`
+checks a collections contract over every admissible view: exit 0 checked, 1
+refuted with a counterexample view and the obligation it breaks, 2 when the
+view domain exceeds the tuple limit. The packet,
+`zeno-fcis/collections-check/1`, lists its premises and grants no authority.
 A field name must be unique within its record; other declaration names are
 unique in the project. The summary line's `unresolved_obligations=N` counts
 evidence that the check does not establish and generated code cannot
@@ -149,8 +164,8 @@ release binary, extract the release's `source/zeno-fcis-<version>-source.tar.gz`
 and pass `--source <extracted source tree>`:
 
 ```sh
-tar -xzf zeno-fcis-2.5.0-source.tar.gz
-zeno-fcis new my-app --contract my-contract --source zeno-fcis-2.5.0
+tar -xzf zeno-fcis-2.6.0-source.tar.gz
+zeno-fcis new my-app --contract my-contract --source zeno-fcis-2.6.0
 ```
  The generated README lists the build commands, which
 `tools/check_app_journey.py` runs exactly as written, in a new directory, on
@@ -228,7 +243,7 @@ may still reject a value. Descriptive help text is not an executable instruction
 commands that can be invoked on their own.
 Unknown command paths return versioned JSON and exit `64`. Discovery reads no
 project or tool input and grants no authority. These interfaces are available
-in the 1.1.0 CLI.
+in the 2.6.0 CLI.
 
 `generate --format json` returns `status: "generated"`; with `--check` it
 returns `current` (exit `0`) or `drift` (exit `1`). Results include `path`,
@@ -306,7 +321,9 @@ uses schema `zeno-fcis/purity-report/1`. A clean result is checked against the
 rule table; it is not a proof of determinism. See
 [determinism](DETERMINISM.md).
 
-## Exit classes
+<a id="exit-classes"></a>
+
+## Exit codes
 
 `describe` reports the compiled package's `cli_version` and a
 `source_identity` fingerprint of the compiled loop-program source set, the
@@ -317,12 +334,22 @@ filename does not change the compiled package version.
 
 | Code | Meaning |
 | ---: | --- |
-| 0 | requested positive result completed |
-| 1 | invalid specification or refuted claim |
-| 2 | blocked, indeterminate, missing evidence, or unavailable tool |
+| 0 | positive verdict: checked, holds, agrees; or a completed query/operation |
+| 1 | negative verdict: refuted, counterexample, disagreement, implication fails; or invalid specification |
+| 2 | UNKNOWN: limit, incomplete, budget, blocked prerequisite, missing evidence, or unavailable tool |
 | 3 | tool, filesystem, or bounded execution failure |
 | 64 | invalid command-line usage |
 | 65 | a contract judge's input has no contract form: a formula, scenario file or proposed law, or for `profile`, `lemma`, `scenario` and `probe` the contract itself |
+
+The pure core decides the verdict; the command shell only maps its result to
+an exit status. Existing usage, malformed-input, filesystem and tool-error
+codes are unchanged. Counts, rendered traces and lifecycle reports are
+completed queries or operations; diagnostic outcomes inside them are not
+additional verdicts. Read each command's packet and stated scope.
+
+Background: IEEE and The Open Group, *POSIX.1-2024*, Shell Command Language,
+2024, defines shell exit status conventions. The verdict classes here are
+this library's existing interface convention, now applied consistently.
 
 An exit code does not create formal evidence or authority. In particular, a
 successful graph or generation command says only that the requested derived
@@ -334,13 +361,21 @@ Formal commands apply the exit classes to each backend result:
 | --- | ---: | ---: | --- |
 | CVC5 returns UNSAT with proof-shaped output | 2 | 2 | The proposal and output are retained. The current path does not independently check the proof. |
 | Z3 returns UNSAT | 2 | 2 | The result remains blocked because the current path has no Z3 proof checker. |
-| CVC5 or Z3 returns SAT and the built-in evaluator replays the model | 1 | 0 | A normalized counterexample is retained. |
-| `--backend lean` | 2 | 2 | The current public exporter refuses this unsupported mode. The historical exporter is test-only. |
+| CVC5 or Z3 returns SAT and the built-in evaluator replays the model | 1 | 1 | A normalized counterexample is retained. |
+| `--backend lean` with a compatible inductive claim | 0 if kernel-checked; 2 if blocked | 64 (SMT backends only) | Public `prove` dispatches to `export_inductive_lean`; acceptance requires the pinned kernel and allowed-axiom checks. |
 | Tool is missing, reports `unknown`, or supplies unsupported evidence | 2 | 2 | The requested result remains blocked. |
 | Tool crashes, times out, exceeds a bound, or encounters a filesystem failure | 3 | 3 | The bounded execution failed. |
 
-The retained `KernelChecked` evidence type does not provide a public Lean
-exporter. For independently checked scalar program equivalence, use
+Public `prove --backend lean` exports compatible inductive claims through
+`export_inductive_lean`. The generated `history_holds` theorem is conditional
+on the initial-state, law-enforcement and runtime-observation premises described
+in [inductive claims](INDUCTIVE_CLAIMS.md). Emitting that source does not establish
+`KernelChecked`: the configured pinned runtime, expected theorem and allowed
+axioms must also pass their checks. End-to-end acceptance with the pinned
+Lean 4.30 runtime remains unverified in this qualification. Non-inductive Lean
+export remains unsupported, and `counterexample` accepts only CVC5 and Z3.
+
+For independently checked scalar program equivalence, use
 `transform check-certificates` and `transform replay-certificates`; see the
 [certificate route](SYMBOLIC_CHECKS.md#independently-checked-scalar-certificates)
 for its restricted fragment, checker setup, receipt format and trusted base.
@@ -394,9 +429,13 @@ zeno-fcis contract adopt . --candidate candidate.zcve --receipt receipt.json --u
 Arithmetic development graphs within 256 nodes, 16 outputs and 32 inputs use
 `zeno-fcis/finite-i128/3`. `contract export-program`, finite `transform check`
 and `transform replay` carry that profile and its exact arithmetic. Older
-readers refuse it. Legacy `optimize` and loop/search proposal profiles refuse
-the new opcodes; symbolic and independent-certificate program encoders also
-report unsupported. Native and proof requalification on this changed source
+readers refuse it. Program-file admission is distinct from proposal support:
+`optimize` can admit `/3` but return `no-checked-improvement` (exit 2), with
+`detail.search.stopped: original-not-typable` and zero phases run. Inspect that
+stop reason before claiming search ran. Loop check/replay can compare `/3`
+programs even when a selected proposer or rule miner cannot type their nodes.
+Symbolic and independent-certificate program encoders report unsupported.
+Native and proof requalification on this changed source
 is pending; parser acceptance is not that qualification.
 
 `transform`, `optimize` and `contract review` enumerate input domains, and a
@@ -415,7 +454,7 @@ and `new --contract` refuse a contract past any of these limits and name the
 counts. `export-program` writes either profile, and an application built
 from either decides through the library Authority. The commands that read a
 `program.zcve` file, `transform`, `optimize` and `loop`, read it with the
-library importer, which admits profile 1 only. `transform check` and
+library importer, which admits profiles `/1` and `/3`. `transform check` and
 `optimize` refuse a file over 64 KiB as `program-too-large` before decoding
 it, and a smaller profile 2 program with status `refused`, detail `{"code":
 "program-encoding", "reason": "original-not-admitted"}` and exit 1. No
@@ -458,7 +497,7 @@ schema `zeno-fcis/transform-receipt/1`, is compact JSON with sorted keys and a
 final newline. It records both programs' SHA-256 digests, sizes and node
 counts, the domains, both limits, the tuples checked, the Step usage report
 and the checker identity: the checker's semantics version,
-`zeno-fcis/transform-check/4`, and the library's evaluator digest. The
+`zeno-fcis/transform-check/5`, and the library's evaluator digest. The
 semantics version changes only with a deliberate change of what the check
 means. Known answers under `crates/zeno-fcis-cli/tests/fixtures/transform-check/`
 pin it, so a refactor of the checker or a new crate version changes no
@@ -495,8 +534,9 @@ that already contains a witness.
 | `--work-units` | 1000000000000 | Complete reservation must fit |
 | `--deadline-ms` | 60000 | 1–60000 |
 
-These flags require `--offline-parallel`. This mode uses the Linux contained
-runtime described in [Installation](INSTALLATION.md#contained-checker-runtime).
+These flags require `--offline-parallel`. On Linux this mode requires
+`--containment-backend systemd`; the default backend yields an inconclusive
+containment result. This mode uses the Linux contained runtime described in [Installation](INSTALLATION.md#contained-checker-runtime).
 On macOS it prints one JSON result with `"status":"inconclusive"`,
 `"authority":"none"`, `"reason":"containment-unavailable:platform"` and
 `"accounting_complete":false`, exits 2, and checks and writes nothing; the
@@ -904,6 +944,9 @@ full domain at the full Step budget with the default declared Step limit of
 bytes, largest Step usage, canonical bytes). Step usage is reported from the
 receipt and never compared for equivalence.
 
+`--indexed-branches` tries indexed branch proposals after ordinary search;
+the exact transform checker still decides acceptance.
+
 Results use schema `zeno-fcis/optimize-result/1`. Every result has a `detail`
 object; once the program and strategy are read, the report also carries
 `original_sha256`, `strategy_sha256` (of the strategy file, or of the built-in
@@ -919,7 +962,7 @@ reason), every candidate with its run and verdict (`accepted`,
 `accepted-not-better`, `counterexample`, `inconclusive`, `refused`,
 `not-smaller`, `duplicate`, `not-better-than-incumbent`, `unextractable`), each
 supplied program with its digest, size, verdict and whether it was fused, and
-`best` with its run and phase (or the index of the supplied program it is),
+`best` with its run and `phase_index` (or the index of the supplied program it is),
 the candidate's digest, sizes, largest Step usage and its complete transform
 receipt. Each run also reports how many supplied roots were merged and
 refused. With a portfolio, the top-level `enodes` and
@@ -928,9 +971,9 @@ refused. With a portfolio, the top-level `enodes` and
 | Status | Exit | Meaning |
 | --- | ---: | --- |
 | `improved` | 0 | An accepted candidate is smaller than the original. `--candidate-out` and `--receipt` were created when given. |
-| `unsupported-original` | 2 | An instruction in the original is outside the optimizer's instruction set, no search phase ran, and no supplied improvement was accepted. The report names the node and instruction. Nothing is written. |
+| `unsupported-original` | 2 | An instruction in the original is outside the optimizer's e-graph instruction set, no search phase ran, and no supplied or indexed improvement was accepted. `detail.unsupported_node` names its index and opcode; `next_step` gives a checked-candidate route. A one-line diagnostic is also printed on stderr. Nothing is written. |
 | `no-checked-improvement` | 2 | At least one search phase ran and the search completed without an accepted smaller candidate; the original stands. Nothing is written. |
-| `inconclusive` | 2 | No improvement was accepted and the search could not finish: for example, a search limit was reached, or the domain exceeds `--max-input-tuples` (default 100,000,000). Inspect the reported reason. |
+| `inconclusive` | 2 | No improvement was accepted and the search could not finish: for example, a search limit was reached, or the domain exceeds `--max-input-tuples` (default 100,000,000). Read the reported reason and next step; there is no completed-search or equivalence claim. |
 | `refused` | 1 | The original failed the library importer, exceeds 64 KiB, has an empty input domain, or has an ABI or domain size the requested profile cannot hold; or more than 8 programs, or one larger than 64 KiB, were supplied. |
 | `invalid-strategy` | 1 | The strategy is not a document of the closed grammar, exceeds 64 KiB, or names a profile other than `--profile`. |
 | `output-exists` | 1 | A `--candidate-out` or `--receipt` path already exists, as a file or a link; nothing was searched. |
@@ -939,6 +982,15 @@ refused. With a portfolio, the top-level `enodes` and
 The written receipt is the checker's `zeno-fcis/transform-receipt/1` for the
 original and the written candidate; `transform replay` reproduces it byte for
 byte. The same program, strategy and profile give byte-identical output.
+
+Output creation is sequential: candidate first, then receipt, each with exclusive
+creation. The pair is not transactional. An output `io-error` reports both
+requested paths under `detail.publication`, with status `published`,
+`write-failed`, or `not-attempted`; an unrequested artifact is `null`.
+A published candidate remains when receipt creation fails. A failed write tries
+to remove its incomplete file; inspect that path if cleanup also failed.
+Keep published artifacts, correct the write error, and retry with unused output
+paths. Existing destinations are never overwritten.
 
 For `unsupported-original`, increasing limits cannot add instruction support.
 For example, `MulDivCeil` can be checked by `transform` but is not in this
@@ -972,7 +1024,78 @@ covers three inputs, and an accepted candidate changes Step usage, so adopting
 one into an application remains a separate reviewed step that this command
 does not perform.
 
-## Bounded optimization loop
+## Loop commands
+
+### Which loop to use
+
+| Task | Subcommand | Checker that decides |
+| --- | --- | --- |
+| Admit a reference and freeze proposal budgets | `loop open` | Program/profile/request admission; no equivalence verdict |
+| Check one supplied program or expression | `loop candidate` | Session transform checker on every declared input; expressions also require check/replay |
+| Drive local, fake, or disabled hosted proposals | `loop run` | Same session checker for every submitted candidate |
+| Recover retained evidence | `loop resume` | Request/ledger validation and reserved checker replay |
+| Convert finite-program JSON to canonical bytes | `loop encode` | Library program admission and codec; no equivalence verdict |
+| Inspect canonical bytes as finite-program JSON | `loop print` | Library decoder/admission; representation only |
+| Compare a candidate with a complete paged arithmetic reference | `loop capture whole` | Transform checker and receipt replay on every complete lookup piece |
+| Freeze an executable observation table | `loop capture open` | Repeated observations plus table/evaluator consistency; no candidate acceptance |
+| Obtain public capture examples | `loop capture packet` | Session-binding validation; no program verdict |
+| Submit a capture proposal | `loop capture candidate` | Exposed-example precheck, then full-table transform check and replay |
+| Inspect private capture evidence | `loop capture status` | Session validation and fresh check/replay of retained success |
+| Complete, repair or simplify a proposal | `loop pipeline` | Transform check and matching replay against the fixed original |
+| Select stage sequences on development, then evaluate | `loop strategy --tasks` | Pipeline check/replay per task; ranking selects a sequence, not program acceptance |
+| Assemble by cases, diagnose faults, or ask about readings | `loop strategy --kind` | Split: capture plus original-bound check/replay; other modes: advisory finite inference |
+| Query or plan from structural usage facts | `loop strategy --kb-op` | Bounded knowledge/type inference; no program acceptance |
+| Discover or reuse concrete finite-domain rewrites | `loop rules` | Target-domain rule check/replay and whole-program check/replay |
+| Learn expressions from complete examples | `loop learn` | Library evaluator checks examples; with `--original`, capture plus original-bound check/replay |
+| Fill finite holes in an existing proposal session | `loop sketch` | Confirming check/replay, then the session transform checker |
+| Check a parameterized program or fit finite hole values | `loop family` | Transform check/replay on each listed instance only |
+| Try direct use, sketching, then repair on new instances | `loop transfer` | Transform check/replay on each listed target only |
+| Compute finite observation hashes | `loop meaning` | Library evaluator over the full domain; no independent transform verdict |
+| Evaluate one expression at one input | `loop evaluate` | Library evaluator at that point; no equivalence verdict |
+| Ask where contract decisions remain open | `loop question --contract` | Door admissibility computation and gaps judge where applicable; answers remain advisory |
+| Distinguish finite requirement/sketch completions | `loop question --specification` | Enumeration proposes; singleton needs law evaluator plus transform check/replay |
+| Check restated rules against the core | `loop teach-back` | Door evaluator over declared inputs and reachable states; wrong rules still give a completed report |
+| Evaluate component interfaces/tables | `loop decompose` | Door simulation; `--compose` additionally uses the composition checker and obligation check |
+
+All reports have `authority: none`. A session is a persistent directory holding
+a frozen request and charged attempt/check/replay ledger. An **attempt** is one
+proposal submitted to its driver, including malformed or duplicate proposals;
+intake or an unfinished preliminary stage may return before submission.
+**Typed feedback** means structured JSON checker outcomes, witnesses and reasons.
+The **incumbent** is the retained best checked program, initially the original.
+**Finite-program JSON** (historically “fixture vocabulary”) has exactly
+`inputs`, `outputs`, `nodes`, `roots`; Int bounds/literals are canonical decimal
+strings. A **bound proposal** names the exact reference and implementation
+hashes. **Guarded stages** run only when their input conditions hold.
+**No session** means no ordinary session directory or attempt ledger is created;
+explicitly requested evidence files can still be written. Capture has its own
+private session schema and protocol, distinct from ordinary proposal sessions.
+
+Use `zeno-fcis loop COMMAND --help` for accepted flags and defaults. Help exits
+0; malformed command-line usage exits 64. Operation exits are not interchangeable:
+`run` can exit 0 without improvement; unequal `meaning` keys exit 1.
+`teach-back` exits 1 for wrong/refused rules and 2 for vacuous/incomplete rules.
+`strategy --tasks` can exit 0 with unqualified evaluation tasks; an open
+`learn` question exits 2.
+Containment may return inconclusive, exit 2, before application work starts.
+Neither a proposer, a hash, a role label nor a session file grants publication
+authority. Capture owner/proposer roles are conventions, not authenticated users.
+
+### Loop method background and scope
+
+Background: Armando Solar-Lezama, Liviu Tancau, Rastislav Bodik, Sanjit Seshia and
+Vijay Saraswat, “Combinatorial Sketching for Finite Programs”, ASPLOS, 2006
+(counterexample-guided synthesis); Dana Angluin, “Learning Regular Sets from
+Queries and Counterexamples”, Information and Computation, 1987 (query and
+counterexample learning); Ross Tate, Michael Stepp, Zachary Tatlock and Sorin
+Lerner, “Equality Saturation: A New Approach to Optimization”, POPL, 2009
+(equality-based optimization). These sources describe background methods, not
+proofs of this implementation. This reference adds no new algorithm or priority
+claim. Scope: full-domain checking is limited to each command's declared finite
+domains, admitted profile and resource limits; enumeration, ranking and
+suggested questions retain their stated advisory status.
+
+### Bounded optimization loop
 
 Choose a loop when a task needs repeated proposals and feedback. For example,
 submit a replacement, inspect the counterexample when it differs, revise it,
@@ -1003,17 +1126,44 @@ or a "passed" flag cannot build one. Proposals are data, never code.
 | Command | Effect |
 | --- | --- |
 | `loop open --original P --session DIR [--profile functional-bool-v1\|checked-i128-v1] [--attempts N] [--checks N] [--model-calls N] [--check-work N] [--session-work N] [--deadline-ms N]` | Admits the original under the profile (default `checked-i128-v1`), freezes the canonical request (`zeno-fcis/transform-request/1`) and its `request_id`, and creates the session directory. Limits above the ceilings (8 attempts, 8 checks, 4 model calls, 20,000 ms, and the work ceilings scaled to the original, below) are refused; lower limits win, and an omitted work limit takes its ceiling. Hosted providers, source disclosure and spending are fixed disabled. |
-| `loop candidate --session DIR (--candidate C \| --candidate-json J) [--provenance FILE]` | Spends one attempt on a supplied candidate (canonical bytes, or the fixture vocabulary `{inputs, outputs, nodes, roots}` encoded canonically first) and prints typed feedback: a replayed counterexample, an admission refusal, an incomplete check, or an equivalence with its actual cost and selection reason. |
+| `loop candidate --session DIR (--candidate C \| --candidate-json J \| --expressions E) [--provenance FILE]` | Spends one attempt on a supplied candidate (canonical bytes, or the finite-program JSON `{inputs, outputs, nodes, roots}` encoded canonically first) and prints typed feedback: a replayed counterexample, an admission refusal, an incomplete check, or an equivalence with its actual cost and selection reason. |
 | `loop run --session DIR --proposer local\|fake\|hosted [--script S] [--hosted-config H] [--seed P]...` | Drives attempts until the proposer is exhausted or a limit stops the session. Each `--seed` program (canonical bytes, such as an `optimize --candidate-out` candidate or a `contract review --mutant-programs` mutant) is proposed first, in order, as an ordinary candidate attempt with no model call metered; a seed is never trusted, only checked. `local` is a deterministic rewriter; `fake` replays a script (`zeno-fcis/fake-provider-script/1`) and is metered as a model; `hosted` is the provider adapter, which is disabled in this build and answers "unavailable" without any network, credential or spending path. |
 | `loop resume --session DIR` | Re-admits the request, verifies the ledger chain against its head, replays the incumbent through the checker and prints the report. Any failure leaves no trusted incumbent. |
-| `loop encode --program J --out P` | Encodes a fixture-vocabulary program as canonical bytes after library admission; the output file is never overwritten. |
+| `loop encode --program J --out P` | Encodes finite-program JSON as canonical bytes after library admission; the output file is never overwritten. |
+| `loop print --program P` | Reads canonical Bool/signed-i128 bytes (at most 524,288 bytes) with the library decoder and prints the finite-program JSON accepted by encode. No caller file, session or receipt is created or changed. |
 
-Results use schema `zeno-fcis/transform-loop/1` with `authority: none`.
-`open` exits 0 when the request is admitted and 1 when it is refused.
-`candidate` exits 0 for an equivalent candidate (improvement or not), 1 for a
-difference, refusal or duplicate, and 2 for an inconclusive check or a closed
-session. `run` exits 0 when the loop completed; `resume` exits 0 with a
+Except for successful `print`, results use schema `zeno-fcis/transform-loop/1`
+with `authority: none`.
+`open` exits 0 (`opened`) when the request is admitted and 1 when it is refused.
+`encode` exits 0 (`encoded`) on success and 1 for malformed programs or an
+existing output path (`output-exists`).
+For data interchange, encode and print support the existing extended scalar
+shape (at most 64 inputs, 64 outputs and 4,096 nodes). Small graphs retain
+their existing profiles and bytes. Candidate and checker shape limits remain
+unchanged. `SignedMulDivFloor` is represented as `["SignedMulDivFloor", a, b, d]`
+in program JSON. Historical i64 profiles are refused rather than reinterpreted.
+
+`print` exits 0 with exactly `inputs`, `outputs`, `nodes` and `roots`: compact
+JSON, sorted object keys, one trailing newline. Int bounds and literals are
+canonical signed-i128 decimal strings; indices are JSON integers. This success
+has no report wrapper, schema field or equivalence verdict. Redirect it to a
+file and pass that file to `loop encode --program` to recover identical canonical
+program bytes. Malformed, unsupported and oversized bytes are refused (1);
+containment unavailable/inconclusive exits 2; filesystem failures exit 3;
+invalid command-line usage exits 64. Failure diagnostics use
+`zeno-fcis/transform-loop/1`, with `status` and `detail.reason`.
+The representation follows Tim Bray, "The JavaScript Object Notation (JSON)
+Data Interchange Format", RFC 8259, IETF, 2017. This command exposes the existing
+codec and adds no decoding or verification method.
+`candidate` exits 0 for an equivalent candidate (`checked-improvement` or
+`equivalent-without-improvement:<reason>`), 1 for a
+difference, refusal or duplicate for canonical/JSON proposals, and 2 for an
+inconclusive check or a closed session. Expression/sketch submissions return 0
+for duplicates independently confirmed by transform check and receipt replay;
+their failed proposals return 1. Their attempt count still increases. `run` exits 0 (`completed`) when the driver returns, including proposal
+failures and no improvement; `resume` exits 0 with a
 replayed incumbent and 2 (`resume-refused`, `resume-inconclusive`) otherwise.
+Containment/acquisition can stop any invocation inconclusive (2).
 I/O failures exit 3. The report (`zeno-fcis/transform-loop-report/1`) states
 `no-checked-improvement` or `best-checked-so-far`, the actual stop reason, the
 receipt status, every attempt's outcome and cost, the accounting (attempts,
@@ -1114,6 +1264,23 @@ owner-only temporary file in that same directory and renamed atomically into
 its final name. Readers select the invocation before decoding; malformed
 matching records still fail their checks.
 
+Retention runs on each record write. Defaults are 64 MiB of completed records
+and 24 hours, removing the oldest eligible records. Size counts the larger of
+logical bytes and allocated file blocks, so small files count toward the cap.
+`ZENO_FCIS_OPERATOR_MAX_BYTES` and `ZENO_FCIS_OPERATOR_MAX_AGE_SECONDS` accept
+unsigned decimal overrides; zero disables that cap. Invalid settings use the
+stderr diagnostic fallback. Live writers and live parent readers are exempt
+from both caps, including partial or malformed records of a live writer;
+therefore active diagnostics can temporarily exceed the size limit. Cleanup
+resumes on subsequent writes; no background service is installed. Unrelated
+files and symlinks are left alone. Retention supplies no checker authority.
+
+The retention method follows size and age rotation as described by Red Hat,
+*logrotate(8)*, logrotate manual (2024); process-lifetime observations follow
+Michael Kerrisk, *proc_pid_stat(5)*, Linux man-pages (2024). This applies only
+to these optional operator records; prior-art search pending.
+
+
 A zero-remaining stage records a timeout
 without starting work. Durable session records can retain earlier completed
 checks even if a later stage fails; resume independently rechecks them.
@@ -1185,7 +1352,7 @@ any candidate, and only the loop's check can replace the incumbent. The MCP tool
 runs the local and fake arms of the preregistered protocol over a cases file
 and reports every result, including failures.
 
-### Loop doors (2.5.0)
+### Loop doors (2.6.0)
 
 The doors let a proposer submit expressions, sketches with holes and family
 programs instead of whole canonical programs. They are untrusted proposers
@@ -1197,15 +1364,65 @@ guide is
 | Command | Effect |
 | --- | --- |
 | `loop candidate --session DIR --expressions FILE [--provenance FILE]` | Lowers one expression per output (`zeno-fcis/loop-expressions/1`) to a program with the original's exact domains and spends one attempt on it, like `--candidate-json`: an unreadable or over-large file is refused, and an undecodable or unknown-name document is a failed proposal that still consumes the attempt. The door's own `transform check` with replay runs before the attempt; if it does not complete (for example on a short `--deadline-ms`), the result is `inconclusive` (exit 2), the attempt is not spent and the incumbent is unchanged. On a counterexample, `detail.door.explanation` adds the failing region (a formula the doors confirm on every tuple with their own evaluator, or the shared field values), ranked repair sites in the proposer's text, and a repair. A repair is labelled `checked repair` only after `transform check` accepts it and `transform replay` matches its receipt. |
-| `loop sketch --session DIR --sketch FILE [--provenance FILE]` | Spends one attempt. Solves the holes (several holes in an output: holes alone on their route derived exactly, the rest branched over effect classes; `detail.door.searched[].search` is `meanings`); a completion goes through an in-process `transform check` with replay and then the session's check. If that confirming check does not complete, the result is `inconclusive` (exit 2) with `detail.door.status` `completion-not-confirmed`, and no attempt is spent; a search that stops on its budget is `inconclusive` (exit 2, `door-search-not-completed`) and spends no attempt either. Otherwise `detail.door.status` is `completed`, `unrealizable` (with a witness input, or after a listed complete candidate space was exhausted), `not-found` (claims nothing), `inconclusive` (a budget ran out) or `refused`. |
-| `loop family --instances MANIFEST --program FILE [--fit]` | No session. Judges a program over family parameters on every instance of a `zeno-fcis/loop-family-manifest/1` manifest (at most 10) with `transform check` and `transform replay`; reports nodes against each instance's optimize result when listed, and the smallest failing instance. Only a checker counterexample makes a row `refuted`; a row whose sketch the doors find unrealizable is labelled `unrealizable`. `--fit` fits each hole to `a * $P + b` on the instances not marked `"fit": false` and checks the lifted program on every instance, including those. Coverage is stated as "checked on these N instances". |
-| `loop transfer --from FILE --to-instances MANIFEST` | No session. Moves a program written for one instance (whose parameters the document gives) to each listed instance: directly, then with the constants near a changed parameter opened as choice holes, then by repair. Each result is checked as above. |
-| `loop meaning --original FILE (--expressions FILE \| --candidate FILE)` | No session. Keys a complete program by its observation on every declared input (every output, or the evaluator's exact failure), computed by the library evaluator as `transform check` observes it, and reports whether it means what the original means. Two programs get equal keys exactly when `transform check` finds them equivalent, within its limits. The loop workspace uses it to answer a refuted program written another way from memory. |
-| `loop question --contract DIR [--answers FILE]` | No session. Groups the inputs where the declared laws and the recorded answers (`zeno-fcis/loop-answers/1`) admit more than one decision, by the case that fires there, and asks about the largest group: a formula checked to hold on exactly its inputs, an example, the decisions still admitted and the core's own. Each answer becomes laws over exactly its inputs (`detail.answers[].laws`), checked by the gaps judge against the core (a text with no exact law form, such as a truth value compared with a number, is refused); an answer that differs from the core in class, reason or, for an accept that gives one, successor is a `disagreement`, never adopted. An answer that leaves some input with no admissible decision is refused (`conflict`, exit 1). A reject reason has no law form and is recorded as a requirement only this door applies. In practice, on the 5-second stage deadline, a question with answers can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples, and admissibility is refused as inconclusive above 4,000,000 law checks. |
+| `loop sketch --session DIR --sketch FILE [--provenance FILE]` | Spends one attempt. Solves the holes (several holes in an output: holes alone on their route derived exactly, the rest branched over effect classes; `detail.door.searched[].search` is `meanings`); a completion goes through an in-process `transform check` with replay and then the session's check. If that confirming check does not complete, the result is `inconclusive` (exit 2) with `detail.door.status` `completion-not-confirmed`, and no attempt is spent; a search that stops on its budget is `inconclusive` (exit 2, `door-search-not-completed`) and spends no attempt either. An unrealizable search returns top-level `proposal-failed:empty` (exit 1), consumes an attempt, and records `detail.door.status: unrealizable`. Otherwise `detail.door.status` is `completed`, `unrealizable` (with a witness input, or after a listed complete candidate space was exhausted), `not-found` (claims nothing), `inconclusive` (a budget ran out) or `refused`. |
+| `loop family --instances MANIFEST --program FILE [--fit]` | No session. Judges a program over family parameters on every instance of a `zeno-fcis/loop-family-manifest/1` manifest (at most 10) with `transform check` and `transform replay`; reports nodes against each instance's optimize result when listed, and the smallest failing instance. Only a checker counterexample makes a row `refuted`; a row whose sketch the doors find unrealizable is labelled `unrealizable`. `--fit` fits each hole to `a * $P + b` on the instances not marked `"fit": false` and checks the lifted program on every instance, including those. The top-level verdict/exit summarizes the initial per-instance checks; `detail.lifted_check` reports the fitted template separately and does not change that exit. Manifest parameter values are signed-64-bit JSON integers. Coverage is stated as "checked on these N instances". |
+| `loop transfer --from FILE --to-instances MANIFEST` | No session. Moves a program written for one instance (whose parameters the document gives) to each listed instance: directly, then with the constants near a changed parameter opened as choice holes, then by repair. Each result is checked as above. Source expressions use literal constants with signed-64-bit JSON parameter metadata; `$PARAMETERS` are refused in source expressions. If no target transfers, `failed` exits 1, including per-target budget stops; partial transfer exits 2. |
+| `loop meaning --original FILE (--expressions FILE \| --candidate FILE)` | No session. Keys a complete program by its observation on every declared input (every output, or the evaluator's exact failure), computed by the library evaluator as `transform check` observes it, and reports whether it means what the original means. The key includes the domains and the complete observations used by `transform check`; digest equality is subject to hash collisions and is not a checker verdict or receipt. Exit 0 (`keyed`) means equal keys; unequal keys exit 1. The loop workspace uses it to answer a refuted program written another way from memory. |
+| `loop question --contract DIR [--answers FILE]` | No session. Groups the inputs where the declared laws and the recorded answers (`zeno-fcis/loop-answers/1`) admit more than one decision, by the case that fires there, and asks about the largest group: a formula checked to hold on exactly its inputs, an example, the decisions still admitted and the core's own. Each answer's class and successor constraints become laws over exactly its inputs (`detail.answers[].laws`), checked by the gaps judge against the core (a text with no exact law form, such as a truth value compared with a number, is refused); an answer that differs from the core in class, reason or, for a committing answer that gives one, successor is a `disagreement`, never adopted. An answer that leaves some input with no admissible decision is refused (`conflict`, exit 1). Reject reasons have law forms: the door excludes other case-used reasons with `on reject:ID`; `decision_reason` is also available in `on reject` and `on failure` laws. Both doors use the same full-outcome and native-agreement test for determination. Literal delivery requirements remain separate from exported law-only constraints; reports name their basis and uncovered delivery components. Committing answers must give deliveries (`[]` or `"case"`). A completed report with disagreeing answers exits 1; inspect every answer status. In practice, on the 5-second stage deadline, a question with answers can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples, and admissibility is refused as inconclusive above 4,000,000 law checks. |
+
 | `loop teach-back --contract DIR --rule FILE [--answers FILE]` | No session. Judges each rule (`zeno-fcis/loop-rules/1`) on every declared input and on the reachable states: `exact`, `holds` (with the missing region), `wrong` (exceptions grouped by the core's decision, with regions and examples) or `vacuous`; whether the requirements already force it (`required`: on the inputs where it holds, how many the requirements force it on, leave `open`, or `forbidden` it on, with an admitted decision as the witness; left out with `summary.required.not_computed` when the admissibility table is over its budget); a meaning key (equal keys give equal verdicts); and a summary of the exact and holding rules. In practice, on the 5-second stage deadline, it can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples. |
 | `loop decompose --contract DIR --architecture FILE [--compose [--export DIR]]` | No session. Steps 1 to 3 for components in merge order (`zeno-fcis/loop-architecture/1`): required behaviour per component, interface counterexamples with suggested reads (and reads owned by a later component), unowned reasons, failures that must change a later-owned field, case tables projected from the core or tabulated for components without cases, and blame with regions for components with cases. Verdicts: `refused`, `unrealizable` (also whenever a structure problem or interface counterexample is found), `realizable`, `completed`, `meets-requirements`, `refuted`. Steps 1 to 3 are the door's own evaluation of the tables (`decided_by: door-simulation`), not a checker's, and do not claim that the composed architecture behaves as the core. With `--compose`, a realizable architecture whose components all have case tables becomes a `zeno-fcis/checked-composition/3` composition of generated contracts, every submitted guard kept (a catch-all reject with its own reason is appended where a last guard is not `true`); the composition checker's joint step is compared with the core on every declared input and its obligation check runs (`detail.compose`, `decided_by: composition-checker`). The verdict is the weaker of steps 1 to 3 and the composed check: `accepted` only when step 3 blames nothing, the joint step equals the core and the obligations are proved; `refuted` when either differs. `--export DIR` writes the manifest and contracts to a new directory (an existing one is refused), whatever the verdict. |
 
-For `loop question`, an option without `sets` leaves the successor unspecified;
+The question loop and gap judge enumerate the same scalar decision space, with
+reasons restricted to their declared decision class. Offered options come from
+the law-checked relation for every input in the question. A suggested `sets`
+object is included only if those exact updates remain lawful throughout that
+region; otherwise the option leaves the successor unspecified. Selecting an
+option records a requirement or disagreement and grants no adoption authority.
+
+Both judges define a determined input as exactly one complete lawful outcome
+that equals the Authority's successfully executed decision: class, next state,
+reason and the full ordered delivery list. A disagreeing answer stays open;
+`disagreement_witnesses` lists its input rows. Execution refusals and conflicting
+requirements are reported separately.
+
+`determination.basis` identifies the requirements measured. The gap judge uses
+declared and proposed laws; the question door also uses recorded delivery
+requirements. Its `determined_by_laws` count matches the gap judge on the
+exported answer laws. `determination.uncovered_components` names `deliveries`
+when those laws cannot constrain the complete outbox; it describes the law
+export, even when an explicit answer covers that component. Thus answer-based
+and law-only counts can differ with the missing component stated explicitly.
+Reject reasons do have a law form: `on reject:R` selects reason R, and a law
+`on reject = CONDITION -> decision_reason == R` constrains it directly. A
+failure-only reason cannot be used as a reject scope.
+
+For supported scalar contracts with declared channels, the question includes
+complete delivery choices: channel, destination, typed payload, delivery ordinal
+and idempotency ordinal. An answer may supply `"deliveries": []`, a complete
+array of those records, or `"deliveries": "case"` to use each matching input's
+native outbox. These are advisory requirements compared with the complete
+native decision; they are not emitted as contract laws. A committing answer
+that omits `deliveries` is refused with a one-line reason to use `[]` or
+`"case"`; rejects may omit it because they cannot deliver. Offered committing
+options include `"deliveries": "case"`. Literal delivery choices and
+`question.core.deliveries` describe an example and may differ elsewhere in the
+region; `"case"` retains the expressions at each input. A differing outbox is a
+`disagreement` and is excluded from the determined count. The judge independently checks every declared channel and both
+empty and nonempty witnesses. It uses an exact symbolic delivery family only
+when selected predicates cannot observe its contents; delivery-observing laws
+retain the complete-universe guard. Outcome counts for unrestricted families are
+explicit lower bounds; whether there are zero, one or multiple outcomes is exact
+within this profile. Unsupported payload or destination domains remain out of
+scope.
+
+`loop teach-back` exits 1 if any rule is `wrong` or `refused`, 2 if any
+remaining rule is `vacuous` (or no rules were judged), and 0 when every
+rule is `exact` or `holds`. Coverage and `required` remain separate
+annotations; exit 0 does not mean the rules cover every contract decision.
+`loop meaning` exits 1 when `same_as_original` is false and 2 when its
+enumeration budget is exceeded.
+
 `"sets": {}` explicitly requires unchanged state. The original case's updates
 are shown only for its own decision, never copied onto a different option.
 `answer_supported: false` marks an admissible class the answer format cannot
@@ -1266,8 +1483,9 @@ characters, excluding reserved words, output names and macro names. The
 vocabulary defaults to constants `[1,2,3]` and arithmetic `["+","-"]`;
 other operation lists default to empty and `conditional` to false. Listed
 operations must be distinct. Only the fixed `min`, `max`, `abs` macros are
-available. Multiplication, custom macro objects, opaque primitives and
-nonzero `misses` are refused.
+available. Arithmetic also admits `*`, `div_floor`, `div_ceil`, `mul_div_floor` and
+`mul_div_ceil`; compare also admits `products_ge` (two- or three-factor forms).
+Custom macro objects, opaque primitives and nonzero `misses` are refused.
 
 Expressions grow by size. A leaf costs one; an operation or standard macro
 costs one plus its arguments. `min`, `max` and `abs` expand to checked IR
@@ -1291,7 +1509,7 @@ Statuses:
 | Status | Exit | Scope |
 |---|---|---|
 | `determined` | 0 | One meaning per output fits; the lowered candidate reproduced every example through the existing library evaluator. Uniqueness is an enumeration proposal |
-| `question` | 3 | Several meanings fit; `detail.question` minimizes the largest joint bucket, then the sum of squared buckets, then the unasked input ordinal. The candidate reproduces the examples but the question remains open |
+| `question` | 2 | Several meanings fit; `detail.question` minimizes the largest joint bucket, then the sum of squared buckets, then the unasked input ordinal. The candidate reproduces the examples but the question remains open |
 | `outside-vocabulary` | 1 | No expression in this vocabulary and size bound fits; `detail.core` is a minimum-cardinality set of example indices, ordered and tied by input ordinal. This is a proposal |
 | `ambiguous` | 1 | Several meanings remain without a distinguishing unanswered input; a proposal, not a final program |
 | `inconclusive` | 2 | An enumeration budget/deadline clears counts, question, core and candidate. A later capture/check stop retains the completed example-learning result and exports no qualified candidate |
@@ -1395,6 +1613,130 @@ fields, these two lines are the same example:
 150 161 160 | 140 | 162 | accept - 151 161 162 | 162 161
 ```
 
+## Replay and compare recorded JSON run artifacts
+
+From a source checkout, `tools/replay_run.py` runs an explicit replay command
+and compares selected JSON artifacts with a recorded run in one invocation:
+
+```sh
+python3 tools/replay_run.py recorded-run --out replayed-run \
+  --file run.json --ignore run.json:/elapsed_ms \
+  -- tool replay --input '{recorded}/input.json' --out '{out}'
+```
+
+Replace the command after `--` with the run's actual replay invocation. The
+output directory must be fresh; the replay command creates it. Each token's
+`{recorded}` and `{out}` expands to the respective absolute directory. The
+command executes directly, without a shell, with a 300-second default timeout
+(`--timeout SECONDS` overrides it). Its stdout and stderr are retained in
+sibling `OUTPUT.stdout.log` and `OUTPUT.stderr.log` files. The recorded files
+are read before execution and never rewritten by the comparison tool.
+
+Repeat `--file` to select more JSON files. Exact scalar JSON pointers supplied
+as `--ignore FILE:POINTER` declare nondeterministic observations; no timing,
+path, digest or manifest field is silently ignored. Object keys, list order,
+lengths and scalar kinds still compare. Absolute paths beginning with each
+run's own directory normalize to the same relative run path. Other absolute
+paths and hashes remain exact: explicitly select stable artifact fields or
+declare the precise derived digest observations to ignore. Files are compared
+in filename order, object keys in key order, and arrays in index order. The
+result reports the earliest difference as `file` and JSON `pointer`, together
+with the two values or a missing-field indication.
+
+Exit 0 means the selected artifacts matched within that declared scope; 1
+means a difference or unsuccessful replay; 2 means malformed input, a missing
+artifact, I/O failure or timeout. Equality supplies no checker, release or
+publication authority and makes no claim about unselected artifacts. JSON
+artifacts are limited to 16 MiB each; duplicate keys and nonfinite values
+refuse. Use only a replay command whose effects you intend to execute.
+
+Background: Glenford J. Myers, *The Art of Software Testing*, Wiley (1979),
+describes expected-result comparisons; Bryan and Zyp, *JSON Pointer*, RFC 6901,
+IETF (2013), defines the difference locations. This is a scoped replay wrapper
+with explicit nondeterminism declarations; prior-art search pending.
+
+## Contract representation refinement (2.6, unreleased)
+
+The [construction guide](CONSTRUCTION.md) describes how a frozen requirements reference and different
+implementation layouts use this gate. `construct` runs the supported priority-collection
+construction from an approved frozen requirements bundle. It returns a checked
+candidate and retained receipts, a counterexample, or an explicit incomplete/refused
+result. See the guide for input preparation, exits and finite scope.
+
+`contract refine-check` compares two rules-compiled contracts through an explicit
+abstraction table. It reads their `project.zeno` and `v2/policy.json` files and
+binds both to the library Authority. It writes no application files.
+
+```sh
+zeno-fcis contract refine-check \
+  examples/contract-refinement/reservation/abstract \
+  examples/contract-refinement/reservation/concrete \
+  --abstraction examples/contract-refinement/reservation/abstraction.json \
+  --max-checks 384 --format json
+```
+
+The bundled example specifies three reservation identities, capacity two and
+permanent retirement. The abstract state indexes 26 ternary configurations;
+the concrete state uses six bits for active and previously seen identities.
+Its declared domain has 64 raw concrete states and six commands: 384 pairs,
+including 228 pairs on invalid concrete representations. Native qualification
+checks these expectations against an independent Python semantic model.
+
+The abstraction file has schema `zeno-fcis/contract-refinement/1` and exactly:
+
+- `abstract_project_sha256`, `abstract_policy_sha256`,
+  `concrete_project_sha256`, `concrete_policy_sha256`: lowercase SHA-256 of
+  the exact UTF-8 source bytes, including whitespace;
+- `abstraction`: one abstract state ordinal or `null` per raw concrete state;
+- `invalid_state_law`: the concrete law ID that must refuse each `null` state.
+
+State ordinals enumerate the declared state fields in program order, last
+field fastest. Inputs enumerate command fields followed by context fields the
+same way. State roots must be records; the command/context layouts, type IDs
+and domains must match. Every abstract state needs a concrete representative.
+An abstract domain therefore describes the complete abstract carrier, not a
+subset inferred from state laws. Both genuine genesis states must be admitted
+and the concrete initial state must map to the abstract initial state.
+
+The checker visits every concrete state/input pair, including unreachable
+states. Committing successors must remain related. Decision class, reason,
+effects and outbox deliveries must agree exactly, including order, channel,
+canonical destination and payload bytes, and the idempotency ordinal marker.
+A rejection or refusal preserves the exact concrete state. An invalid state
+must produce `Law(Violated)` for `invalid_state_law`; a policy rejection,
+arithmetic error, or meter refusal does not substitute for that obligation.
+The law must actually hold for any mapped state whose abstract transition
+would commit. It need not be a state invariant; the example uses a pre-state
+law that applies to every transition.
+
+The result schema is `zeno-fcis/contract-refinement-result/1`. Initial-state
+and coverage failures precede pair comparisons. Otherwise a counterexample
+names the smallest state ordinal and then the smallest input ordinal; within
+a row, unchanged rejection precedes successor and then observation comparison.
+Exit codes are 0 for `refines`, 1 for `counterexample`, 2 for `inconclusive`,
+65 for malformed or unsupported intake, and 3 for a file-reading failure.
+
+`--max-checks` defaults to 262144 and counts completed pair comparisons. At
+most 4096 states per contract, 64 input tuples, and 1 MiB per source file are
+supported. Larger domain products are inconclusive before Authority evaluation;
+malformed source bounds or a comparison limit above 262144 are refused.
+Compilation and two genesis evaluations are outside the pair budget. Even a
+zero comparison budget checks genesis, initial mapping and coverage. Exhaustion
+never reports `refines`. A meter refusal stops the comparison as inconclusive
+and preserves all measured work; that incomplete row is not credited.
+Reports record Authority invocation counts and summed logical resource usage,
+including genesis and refused attempts, as decimal strings in the listed order.
+These diagnostic totals are not executable resource authority.
+
+The claim is finite contract refinement only, with `authority: none`. It does
+not cover malformed byte encodings, values outside the declared domains,
+resource equality, persisted publication subjects, derived delivery IDs,
+contextual refinement or migration of a running store. Source identities name
+the checker and its compiler/evaluator dependencies; release qualification
+must refresh and verify the evaluator source pin. Adopted programs and contract
+evolution histories are outside this profile. No successful result authorizes
+a deployment, publication, or store update.
+
 ## Contract review
 
 `contract review` is advisory. It reads an application's `project.zeno`,
@@ -1411,8 +1753,10 @@ The packet records:
 
 - The inputs: every program input position with its admitted domain, and the
   input set. A domain of at most `--max-tuples` tuples (default 2^20) is
-  enumerated in full (`full-domain`). Otherwise each integer position takes a
-  boundary set: its endpoints and every integer constant the rules compare
+  enumerated in full (`full-domain`). Above that cap the command uses symbolic
+  law checking and leaves case coverage `not checked`. The pure review helper
+  retains deterministic boundary inputs for native example checks: each
+  integer position takes a boundary set: its endpoints and every integer constant the rules compare
   with, add to, subtract from or assign to a value of its type, with that
   constant's two neighbours, where in domain; genesis values count as
   constants; a sum takes every variant and a boolean both values. When the
@@ -1471,6 +1815,24 @@ The packet records:
   shares; `equivalent-over-full-domain`, only after a fully enumerated
   domain; otherwise `not-distinguished-within-boundary-set`, which claims
   nothing more.
+- Case coverage, only after complete enumeration: `case_coverage.status` is
+  `checked`, `scope` is `full-domain`, and `tuples` is the domain count.
+  `case_coverage.cases[]` carries `case`, `rule`, `when`, `guard_true`,
+  `decided` and `law_consistent`. Counts measure first-match selections
+  before Authority admission, including selections whose resulting decision
+  is refused; the second selection count restricts to pre-states satisfying
+  every state law. A `case-never-decides` finding has `decided: 0` and `cause`
+  `guard never true` or `covered by earlier cases`. `covered_by[]` gives each
+  actual earlier decider's `case`, `when` and first `witness.{ordinal,input}`;
+  witness inputs use decimal strings in program order.
+  `case-only-on-excluded-pre-states` has a positive `decided` count and zero
+  `law_consistent`, with `first.{ordinal,input,unsatisfied_state_law}`.
+  Both carry the human `text`. The [case-coverage guide](CONTRACT_JUDGES.md#does-every-case-decide)
+  gives an example and scope. `summary.case_findings` counts these findings,
+  included in `summary.findings`. Above the cap, symbolic reports explicitly
+  use `case_coverage.status: "not checked"`, `reason` and `cases: null`;
+  boundary-only or undefined-guard coverage makes no live/dead claim either.
+  These are additive fields in the existing scalar review packet schemas.
 - The findings: owner examples the contract decides differently; owner
   examples whose outcome is a mutant's rather than the contract's, the
   signature of a wrong constant or comparison in the rules; and law
@@ -1481,7 +1843,8 @@ The packet records:
   decision program selects for it. A law refusal for which the library's
   diagnostics name no law, such as a malformed law frame, is named by that
   case and input alone. Refusals of other classes are counted but are not
-  findings.
+  findings. Cases that never decide and cases selecting only excluded
+  pre-states are separate findings as described above.
 
 The human summary labels original example disagreements and law refusals,
 declared-law `gaps` and scenario coverage separately. Review does not run the
@@ -1496,8 +1859,10 @@ them, removes the finding. A pre-state that breaks a state law is never a
 committed state, so a refusal there is reported apart and is not a finding.
 
 Exit codes: 0 `reviewed`; 1 `disagreement` when an owner example disagrees,
-otherwise `law-refusal` when a law refusal is a finding, the packet still
-written in both cases, or `contract-invalid`, nothing written and the entry
+otherwise `law-refusal` when a law refusal is a finding, otherwise
+`case-coverage` when either case finding kind is present. Each exits 1 with
+the packet written, including the weaker excluded-only finding; or
+`contract-invalid`, nothing written and the entry
 at fault named; 3 when a file could not be read or the packet could not be
 written; 64 for usage, including `--max-tuples 0`. The human summary counts
 the refusals by class and by pre-state, and gives one line for each law
@@ -1519,6 +1884,12 @@ the transform checker's own verdict against the contract's program
 (`program_equivalent`), and the optimizer and the loop check it again before
 using it. The JSON summary lists each seed's path, size and SHA-256 under
 `mutant_programs`; an existing directory is refused (exit 3).
+
+Case-coverage lineage: first-match subsumption, overlap and missing-rule
+analysis are established decision-table techniques. A DMN analysis
+bibliography could not be confirmed offline; no unverified citation is
+asserted. This integration counts the generated selection graph exhaustively
+over the declared domain only; prior-art search pending.
 
 ## Generated application command line
 
@@ -1648,16 +2019,21 @@ and also writes the message to stderr.
 
 ## Contract adoption and store upgrades
 
-**2.5 breaking change.** ZenoFCIS 2.5 changed the integer encoding. Contracts adopted with ZenoFCIS
-2.4.x, their i64 transform receipts, and stores created by 2.4 applications
-are incompatible with 2.5. Use the ZenoFCIS 2.4.0 CLI and matching 2.4
-runtime for those applications and stores.
+**Restored in 2.6.** Contracts adopted with the released ZenoFCIS 2.4.0 CLI
+can be generated and their existing stores upgraded with the current CLI.
+This restores the compatibility broken by 2.5's integer encoding change.
+Support covers the 2.4.0 release only.
 
-To start a separate 2.5 lineage, return to the original pre-adoption
-declarations and rules, check the candidate with the 2.5 CLI, and use
-`contract adopt` under 2.5 with the new receipt. Start a new store;
-re-adoption does not migrate a 2.4 store. Keep the retained policies,
-digests and receipts unchanged. Compatibility is planned for 2.5.1.
+Keep the adopted contract's declarations, rules, policies, candidate bytes,
+receipts and digests unchanged. Generation reconstructs each superseded
+policy and replays every retained receipt field with the released evaluator.
+An edited superseded version still refuses. The generated application's
+`--audit` checks the original history; `--upgrade` explicitly carries a
+genesis or non-genesis version 1 store to version 2, preserving pending delivery IDs.
+The `released-24-adoption` record binds the retained adoption comparison
+and checks the current state laws at the store's head. Every decision after
+the upgrade uses the current evaluator. Historical verification grants no
+new historical publication capability.
 
 
 `contract adopt DIR --candidate C.zcve --receipt R.json --usage
@@ -2446,7 +2822,11 @@ proposal. Fixture replay and generated-app tests do not establish a live owner
 interaction or correct automatic translation of prose.
 
 
-### Requirements-only version-space questions (2.5.0)
+### Requirements-only version-space questions (2.6.0)
+
+For `loop question --specification`, `determined` exits 0,
+`no-completion` exits 1, and a remaining `question` exits 2. The latter
+retains its complete distinguishing-question packet; it is not an input error.
 
 ```sh
 zeno-fcis loop question --specification FILE [--max-work N] [--max-domain N] \
@@ -2455,9 +2835,20 @@ zeno-fcis loop question --specification FILE [--max-work N] [--max-domain N] \
 
 This is an alternative to `loop question --contract DIR [--answers FILE]`.
 The specification mode reads no prior core and refuses `--contract` or
-`--answers` together with `--specification`. Existing contract mode is
-unchanged. The bounded ASCII JSON document (64 KiB maximum, unique properties,
-integral numbers) has exactly these fields:
+`--answers` together with `--specification`. The five `--max-*` flags above
+apply to specification mode; contract mode accepts but ignores them and uses
+its own 131,072-tuple and 4,000,000-admissibility-check limits.
+
+| Specification flag | Default | Hard cap |
+| --- | ---: | ---: |
+| --max-work | 2,000,000 | 100,000,000 |
+| --max-domain | 4,096 | 65,536 |
+| --max-meanings | 4,096 | 16,384 |
+| --max-cells | 1,000,000 | 8,000,000 |
+| --max-conflict-subsets | 10,000 | 1,000,000 |
+The bounded ASCII JSON document has at most 64 KiB and unique properties.
+Int domain bounds and integer example coordinates are signed-64-bit JSON
+integers; Boolean coordinates accept booleans or 0/1. It has exactly these fields:
 
 ```json
 {
@@ -2474,10 +2865,14 @@ every input. An example names a complete input and output tuple. Names and
 requirement IDs are unique; at most 16 independent holes, 16 outputs,
 32 input/output fields combined and 64 requirements are supported.
 The grammar is the loop expression grammar with finite constant/choice holes
-and strict kinds. No `keep`, parameters or multiplication are supported.
+and strict kinds. No `keep` or parameters are supported. Checked multiplication and the
+closed division/product operations of the expression grammar are supported.
 An unbounded integer constant or expression hole returns inconclusive.
 
-Reports carry `authority: none` and `attempts_spent: 0`. `question` contains
+Reports use `zeno-fcis/loop-version-space/2`, with `authority: none` and
+`attempts_spent: 0`. A completed `determined` report exits 0;
+`no-completion` or refusal exits 1, and `question` or an incomplete computation exits 2.
+Early document-read errors can use `zeno-fcis/transform-loop/1`. `question` contains
 an exact proposed count, the chosen input and all output buckets with survivor
 counts. `determined` contains a single representative, its full-domain law
 check and replayed transform receipts. `no-completion` contains a minimum
@@ -2496,9 +2891,12 @@ budgets, both surfaces and explicit nonclaims.
 
 <!-- BEGIN black-box capture reference: additive block -->
 
-### Black-box capture (2.5.0)
+### Black-box capture (2.6.0)
 
 ```text
+zeno-fcis loop capture whole --spec FILE --reference FILE
+  (--candidate-json FILE | --expressions FILE)
+  [--max-tuples 4096] [--node-visits 2000000]
 zeno-fcis loop capture open --spec FILE --reference FILE --session NEW_DIR
   [--reference-format python-function-v1] [--max-tuples 4096] [--rounds 32]
   [--max-examples 4096] [--node-visits 2000000]
@@ -2508,7 +2906,28 @@ zeno-fcis loop capture candidate --session DIR
 zeno-fcis loop capture status --session DIR [--full]
 ```
 
-`open` is owner-side. It accepts Python 3.11+ source defining
+`whole`, `open` and `status` are owner-side; `packet` is public and
+`candidate` is proposer-facing. `whole` creates no session: it compares a
+complete candidate over nonnegative Int inputs with a paged complete reference
+cover. `--max-tuples` bounds each page, not the whole domain (at most 20 pages
+fit the shared 62-frame limit). Each lookup piece requires transform checking
+and exact receipt replay; the report has chained receipt digests and complete
+coverage, not one exported whole-program receipt. Partial coverage is
+inconclusive. It exits 0 `captured-exact`, 1 `refuted`/`refused`, or 2
+`inconclusive`.
+
+Normal results of all five operations use `zeno-fcis/black-box-capture/2`.
+Outer unavailable containment returns `refused`, exit 1, under
+`zeno-fcis/black-box-capture/1`; an outer stop uses that diagnostic schema
+with `inconclusive`, exit 2. Such diagnostics retain unknown child accounting
+and cannot establish application work or candidate acceptance.
+ `open` succeeds as
+`opened` (0), and `packet` as `packet` (0). `status` preserves the stored
+state's exit class (ready/success 0, decided refusal/refutation 1,
+inconclusive 2), subject to fresh validation/replay. Role names do not
+authenticate callers; keep private sessions and status outside proposer access.
+
+`open` accepts Python 3.11+ source defining
 `reference(point) -> list[int]`, and an ABI object containing exactly `inputs`
 and `outputs` in the finite-program fixture vocabulary. Six observations per
 input freeze a complete successful table inside the existing contained runtime.
@@ -2529,7 +2948,9 @@ never acceptance. `--expressions` reads
 complete expressions over input names `x0`, `x1`, ...; holes, parameters,
 `keep` and output references are refused. Counterexample variation and condition
 coverage are labelled proposals. Budget stops before a checker decision exit 2 without spending a
-candidate attempt; the invocation's work reservation remains charged. A
+candidate attempt; the invocation's work reservation remains charged. A checker
+refusal also returns without an attempt; malformed or ABI-mismatched candidates,
+example refutations and completed equivalence/counterexample decisions consume one. A
 decided refutation remains `refuted`, exit 1, and spends an attempt even when
 example/coverage feedback cannot complete. Its advisory sub-status describes
 that stop. The check reservation uses the fixed target capacity, so a budget
@@ -2548,7 +2969,8 @@ outer supervisor exhaustion is inconclusive with unknown child accounting.
 Work fields record reservations and complete observations, not actual CPU usage;
 partial worker progress on a failed schedule is unknown.
 
-The hard bounds are 4,096 tuples/examples, 64 attempts, 10,000,000 node visits per
+For session capture, the hard bounds are 4,096 tuples/examples, 64 attempts,
+10,000,000 node visits per
 invocation, 64 KiB input files and 2 MiB protocol/session data. The table encoding
 must fit the existing checker's 256-node profile; inability to encode within it
 is inconclusive. Exactness is only against the complete observed finite table;
@@ -2581,7 +3003,10 @@ document with vocabulary), and optional `stages`. The default sequence is
 `["complete", "repair", "canonical"]`, maximum length five. Only complete
 on holes, repair on checker-refuted hole-free expressions, and canonical or
 resubstitute on qualified programs are enabled. Unknown stages refuse. Every
-generated program is independently checked against the same original.
+generated program is independently checked against the same original. Discovery
+also requires at least one successful original evaluation; an all-failure
+original returns `inconclusive` (2), reason `all-original-observations-fail`.
+The rules command can instead qualify an unchanged all-failure original.
 
 ### loop strategy
 
@@ -2687,9 +3112,41 @@ has `lhs` and `rhs` finite term programs. Bank metadata is advisory. Rules are
 requalified on the target domain, and every changed whole program is checked
 against the fixed original, both with replay. An unchanged qualified result has
 `improved: false` and `result_kind: unchanged-original`; its exported bytes are
-the original and ZAL records a fact. Exact all-failure originals can be checked
+the original and ZAL records a fact. Even if rule mining cannot type the
+original's arithmetic, the command can qualify the unchanged original:
+`detail.checks: []` means no rule/replacement checks, while
+`detail.baseline_check` still records the original-versus-itself full-domain
+transform check and matching receipt replay. Read `improved`, `claim` and
+`rules_requalified`; qualification alone does not establish search support or
+an improving rule. Exact all-failure originals can be checked
 as unchanged; this makes no successful-output or improvement claim. Rules are
 concrete finite-domain proposals, not universal arithmetic identities.
+
+The additive top-level `rules_summary` makes rule outcomes visible without
+changing `status`, `detail.checks`, `rules_requalified` or any acceptance gate.
+It is also retained in `detail.rules_summary` and the exported `result.json`.
+After valid bank/corpus intake and qualification processing it contains:
+
+| Field | Meaning |
+| --- | --- |
+| `considered` | Number of supplied or discovered rule entries |
+| `qualified` | Rules passing target-domain equivalence and matching replay; equals `detail.rules_requalified` |
+| `refuted` | Distinct rule indices with a checker counterexample at either stage |
+| `refused` | Distinct rule indices with a structural or checker refusal |
+| `inconclusive` | Distinct rule indices with an unfinished check or unmatched replay |
+| `unexamined` | Rules with no `target-rule` check/refusal row, for example after a baseline stop |
+| `refutations` | First counterexample per rule, ordered by zero-based `rule` index: `stage`, `ordinal`, `input`, `original`, `candidate`, and `verdict: counterexample` |
+| `refusals` | First refusal per rule, with zero-based `rule`, `stage` and `code` |
+
+The two stages are `target-rule` and `whole-program`. Counterexample `input`
+is an array of decimal strings. At `target-rule`, the observations are lhs/rhs;
+at `whole-program`, they are the fixed reference/replacement. Each observation
+has `ok` (decimal-string output array) or `error` (evaluation-failure tag).
+A term rule may qualify but produce a refuted replacement, so `qualified` and
+`refuted` can overlap. A refusal or budget stop is not a refutation. Early
+input errors can return before any summary is available. One stderr line per
+refuted rule names its index, refuting stage and witness input. These are
+derived diagnostics; they grant no equivalence, resource or publication authority.
 
 ### Shared bounds and output
 
@@ -2752,3 +3209,67 @@ remain text. Completion result `/2` declares the same encoding for failure `inpu
 and `state` tuples, including optional invalid-plan states. Small coordinates keep
 their numeric form. Completion source documents and canonical plan bytes retain
 their existing formats; a replayed failure case still fails and supplies no plan.
+
+## Offline task guide
+
+```sh
+zeno-fcis guide list
+zeno-fcis guide find "check a probability distribution"
+zeno-fcis guide show contract-distribution
+```
+
+`guide` reads embedded public cards, without a workspace or private knowledge
+layer. List and find return `zeno-fcis/guide/1`, with `authority: none`; show
+prints the complete Markdown card. Find ranks the best task-phrase token
+overlap, with full phrase matches first and card names breaking ties. The
+ranking is deterministic. Retrieval supplies no checker acceptance.
+
+Start with [project checks](loops/check.md), [contract review](loops/contract-review.md),
+[invariants](loops/contract-lemma.md), [scenarios](loops/contract-scenario.md),
+[specification gaps](loops/contract-gaps.md), [collection availability](loops/contract-collections.md)
+or [finite distribution laws](loops/contract-distribution.md).
+For program changes, distinguish [automatic e-graph search](loops/program-search.md),
+[checked proposal sessions](loops/loop-workspace.md) and [equivalence evidence](loops/transform.md).
+[Trace games](loops/trace-game.md) and the [adversarial synthesis duel](loops/adversarial-synthesis-duel.md)
+state the finite attacker model and certificate/bound/budget stop rules.
+The remaining cards cover [new projects](loops/new.md), [generation](loops/generate.md),
+[formal backends](loops/prove.md), [ZAL](loops/zal.md), [usage advice](loops/knowledge.md)
+and [finite synthesis](loops/synth.md).
+
+Cards state exact command contracts and mark unverified fields `unknown`.
+Their examples also supply command help. `tools/check_guide_cards.py --write`
+regenerates the embedded copies; its `--run --cli FILE --evidence DIR` mode
+executes every Steps and Worked example command and checks the declared result.
+Trace evidence needs committed source and a fresh directory outside the tree.
+Optional [telemetry](TELEMETRY.md) observes invocation results without granting
+checker, resource-accounting or publication authority.
+
+The read-only MCP tools are `guide_list`, `guide_show(name)` and
+`guide_find(task)`. They share the CLI's embedded cards. The standard-library
+Commons bridge advertises them alongside its coordination tools:
+
+```sh
+python3 -I integrations/commons/mcp.py --store COMMONS_DIR --actor NAME
+```
+
+The optional synthesis MCP server exposes the same handlers. Guide lookups do
+not append Commons events, consult a private knowledge layer or read a project.
+
+## Lineage of the added judge and search behavior
+
+**Background.** Edmund M. Clarke, E. Allen Emerson and A. Prasad Sistla,
+“Automatic Verification of Finite-State Concurrent Systems Using Temporal
+Logic Specifications,” ACM Transactions on Programming Languages and Systems
+8(2), 1986, is background for exhaustive finite-state judgments. Ross Tate,
+Michael Stepp, Zachary Tatlock and Sorin Lerner, “Equality Saturation: A New
+Approach to Optimization,” ACM POPL, 2009, is background for equality-based
+proposal search.
+
+**What is new here.** The added behavior shares typed decision alternatives
+between gaps and questions, distinguishes proposal limitations from a completed
+search, and reports retained work and sequential artifact publication. The
+comparative assessment is **prior-art search pending**.
+
+**Scope.** Each judgment retains its declared finite domain, resource limits
+and independent acceptance checks. Advisory output, telemetry, search ranking
+and artifact creation do not confer runtime or adoption authority.

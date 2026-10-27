@@ -503,7 +503,11 @@ fn prepare<'p, D: DescriptorData<'p> + 'p>(
     for (index, stored) in segments.upgrades.iter().enumerate() {
         if matches!(
             upgrade::Kind::of_record(&stored.record),
-            Some(upgrade::Kind::ProgramSuccessor | upgrade::Kind::Migration)
+            Some(
+                upgrade::Kind::ProgramSuccessor
+                    | upgrade::Kind::Released24Adoption
+                    | upgrade::Kind::Migration
+            )
         ) {
             let (from, to) = (segments.position(index), segments.position(index + 1));
             // The outcome, failures included, is kept for the transaction.
@@ -564,11 +568,12 @@ fn settle<'p, T, D: DescriptorData<'p> + 'p>(
 /// runs now. There is no application evaluator.
 pub struct V2SqliteShell<'a, 'p, D: DescriptorData<'p> + 'p = Descriptor<'p>> {
     members: Members<'a, 'p, D>,
-    connection: Connection,
+    connection: Box<Connection>,
     anchor: Anchor,
     genesis: Hash32,
     delivery_interpreter: Hash32,
     data_version: i64,
+    reject_external_changes: bool,
 }
 
 impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
@@ -654,11 +659,12 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
         };
         Ok(Self {
             members: Members::One(authority),
-            connection,
+            connection: connection.into(),
             anchor,
             genesis: chain,
             delivery_interpreter,
             data_version,
+            reject_external_changes: false,
         })
     }
     /// Re-admit genesis and recompute every complete decision and delivery on
@@ -701,7 +707,13 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
                 check_schema(&tx)?;
                 let authorities = members.authorities();
                 let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
-                let (genesis, initial) = genesis_anchor(&tx, segments.authority(authorities, 0))?;
+                let (genesis, initial) = genesis_anchor_retained(
+                    &tx,
+                    segments.authority(authorities, 0),
+                    members
+                        .lineage()
+                        .and_then(|lineage| lineage.historical(segments.position(0))),
+                )?;
                 let delivery_interpreter = MemoryDestination::interpreter_identity()?;
                 let (start, consumed) = match checkpoint {
                     None => (initial, 0),
@@ -710,7 +722,7 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
                             return Err(Error::Identity);
                         }
                         let consumed = check_checkpoint(&tx, &segments, c)?;
-                        if c.identity != segments.authority(authorities, consumed).identity() {
+                        if c.identity != segments.identity(consumed) {
                             return Err(Error::Identity);
                         }
                         (c.anchor.clone(), consumed)
@@ -737,14 +749,57 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
             })?;
         let shell = Self {
             members,
-            connection,
+            connection: connection.into(),
             anchor,
             genesis,
             delivery_interpreter,
             data_version,
+            reject_external_changes: false,
         };
         Ok((shell, position))
     }
+    // Read the genesis on this exact connection, rather than opening its path
+    // again. Used only to bind the opt-in effect adapter after a path rebind.
+    pub(crate) fn effects_identity(&self) -> Result<Hash32, Error> {
+        let (_, genesis) = genesis_anchor_retained(&self.connection, self.authority(), None)?;
+        Ok(crate::effects::store_identity(
+            &genesis.state,
+            self.authority().identity(),
+            self.delivery_interpreter,
+        ))
+    }
+
+    pub(crate) fn effects_exclusive(&mut self) {
+        self.reject_external_changes = true;
+    }
+
+    // Refuse even a valid externally appended commit until an explicit audit.
+    // This check is also made inside each operation's immediate transaction.
+    pub(crate) fn effects_unchanged(&self) -> Result<(), Error> {
+        if data_version(&self.connection)? != self.data_version {
+            return Err(Error::History);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn effects_configuration(&self) -> Result<Vec<u8>, Error> {
+        let timeout: i64 = self
+            .connection
+            .query_row("PRAGMA busy_timeout", [], |r| r.get(0))?;
+        Ok(format!(
+            "{:?}|{:?}|{:?}|{}|{}|{}|{}|{}",
+            self.anchor,
+            self.genesis,
+            self.delivery_interpreter,
+            self.data_version,
+            data_version(&self.connection)?,
+            timeout,
+            self.connection.is_autocommit(),
+            self.reject_external_changes
+        )
+        .into_bytes())
+    }
+
     /// The contract the store runs now: the last member this handle is bound to.
     pub fn authority(&self) -> &'a Authority<'p, D> {
         self.current()
@@ -767,7 +822,13 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
                 let authorities = members.authorities();
                 let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
                 segments.require_current(authorities)?;
-                let (genesis, initial) = genesis_anchor(&tx, segments.authority(authorities, 0))?;
+                let (genesis, initial) = genesis_anchor_retained(
+                    &tx,
+                    segments.authority(authorities, 0),
+                    members
+                        .lineage()
+                        .and_then(|lineage| lineage.historical(segments.position(0))),
+                )?;
                 let anchor = audit_tail(
                     &tx,
                     authorities,
@@ -792,13 +853,23 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
     // another connection invalidates this cache and forces a coherent full audit.
     fn synchronize(&mut self) -> Result<(), Error> {
         if data_version(&self.connection)? != self.data_version {
+            if self.reject_external_changes {
+                return Err(Error::History);
+            }
             self.audit()?;
         }
         Ok(())
     }
     fn checkpoint_value(&self) -> Checkpoint {
         Checkpoint {
-            identity: self.current().identity().to_vec(),
+            identity: self
+                .members
+                .lineage()
+                .map_or_else(
+                    || self.current().identity(),
+                    |lineage| lineage.identity(self.members.authorities().len() - 1),
+                )
+                .to_vec(),
             genesis: self.genesis,
             anchor: self.anchor.clone(),
         }
@@ -833,11 +904,11 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
             self.members.authorities(),
         )?;
         let binding = segments.identity(segments.current()).to_vec();
-        let (bundles, replays): (i64, i64) = tx.query_row(
-            "SELECT count(*),count(DISTINCT replay_id) FROM v2_commits",
-            [],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        )?;
+        // Full admission established gap-free positions and the schema makes
+        // replay_id unique. Our transactions append exactly one row; the
+        // data-version/tip guard excludes intervening external writes.
+        let bundles = self.anchor.sequence;
+        let replays = bundles;
         let pending: i64 = tx.query_row(
             "SELECT count(*) FROM v2_deliveries WHERE acknowledged=0",
             [],
@@ -937,6 +1008,89 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
         expected_version: Option<u64>,
         byte_limit: Option<usize>,
     ) -> Result<CommitReceipt, Error> {
+        self.commit_controlled(
+            replay_id,
+            publication,
+            crash,
+            expected_version,
+            byte_limit,
+            #[cfg(feature = "crash-injection")]
+            super::CrashMode::Error,
+            #[cfg(feature = "crash-injection")]
+            || {},
+        )
+    }
+    /// Per-call simulation controls. The callback is consumed before BEGIN,
+    /// never retained, and cannot access this handle while it is borrowed.
+    /// These controls confer no decision or publication authority.
+    #[cfg(feature = "crash-injection")]
+    pub fn commit_with_test_controls(
+        &mut self,
+        replay_id: Hash32,
+        publication: Publication<'_>,
+        crash: Option<CrashPoint>,
+        mode: super::CrashMode,
+        before_transaction: impl FnOnce(),
+    ) -> Result<CommitReceipt, Error> {
+        self.commit_controlled(
+            replay_id,
+            publication,
+            crash,
+            None,
+            None,
+            mode,
+            before_transaction,
+        )
+    }
+    // Preserve the production mode's version/cap guards during real abort tests.
+    #[cfg(feature = "crash-injection")]
+    pub(crate) fn commit_effects_abort(
+        &mut self,
+        mode: zeno_fcis_shell::effects::port::CommitMode,
+        replay_id: Hash32,
+        publication: Publication<'_>,
+        crash: Option<CrashPoint>,
+    ) -> Result<CommitReceipt, Error> {
+        use zeno_fcis_shell::effects::port::CommitMode;
+        let (expected, cap) = match mode {
+            CommitMode::Unversioned => (None, None),
+            CommitMode::At(version) => (Some(version), None),
+            CommitMode::BoundedAt(version, cap) => (Some(version), Some(cap)),
+        };
+        self.commit_controlled(
+            replay_id,
+            publication,
+            crash,
+            expected,
+            cap,
+            super::CrashMode::Abort,
+            || {},
+        )
+    }
+
+    /// Set a connection-local wait limit for deterministic busy simulations.
+    #[cfg(feature = "crash-injection")]
+    pub fn set_test_busy_timeout(&mut self, timeout: std::time::Duration) -> Result<(), Error> {
+        Ok(self.connection.busy_timeout(timeout)?)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn commit_controlled(
+        &mut self,
+        replay_id: Hash32,
+        publication: Publication<'_>,
+        crash: Option<CrashPoint>,
+        expected_version: Option<u64>,
+        byte_limit: Option<usize>,
+        #[cfg(feature = "crash-injection")] mode: super::CrashMode,
+        #[cfg(feature = "crash-injection")] before_transaction: impl FnOnce(),
+    ) -> Result<CommitReceipt, Error> {
+        let interrupt = |point| {
+            #[cfg(feature = "crash-injection")]
+            if mode == super::CrashMode::Abort && crash == Some(point) {
+                std::process::abort();
+            }
+            inject(crash, point)
+        };
         if publication.identity() != self.current().identity() {
             return Err(Error::Identity);
         }
@@ -945,7 +1099,9 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
         }
         let compact = compact_publication(publication.identity(), publication.subject())?;
         self.synchronize()?;
-        inject(crash, CrashPoint::BeforeTransaction)?;
+        #[cfg(feature = "crash-injection")]
+        before_transaction();
+        interrupt(CrashPoint::BeforeTransaction)?;
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -973,6 +1129,7 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
                 &segments,
                 &row,
                 publication.evaluation().raw().state,
+                self.members.lineage(),
             )?;
             if row.publication != compact
                 || row.command != publication.evaluation().raw().command
@@ -1009,12 +1166,12 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
             publication.subject(),
         )?;
         let chain = hash(zeno_fcis_codec::domains::V2_CHAIN, &certificate)?;
-        inject(crash, CrashPoint::AfterValidation)?;
+        interrupt(CrashPoint::AfterValidation)?;
         let changed = tx.execute("UPDATE v2_state SET sequence=?1,state=?2,root=?3,chain=?4 WHERE singleton=1 AND sequence=?5 AND root=?6 AND chain=?7", params![sequence, publication.poststate(), post_root.as_bytes().as_slice(), chain.as_bytes().as_slice(), self.anchor.sequence, self.anchor.root.as_bytes().as_slice(), self.anchor.chain.as_bytes().as_slice()])?;
         if changed != 1 {
             return Err(Error::Concurrent);
         }
-        inject(crash, CrashPoint::AfterStateWrite)?;
+        interrupt(CrashPoint::AfterStateWrite)?;
         tx.execute(
             "INSERT INTO v2_commits VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
             params![
@@ -1031,10 +1188,17 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
                 certificate
             ],
         )?;
-        inject(crash, CrashPoint::AfterReplayWrite)?;
-        insert_deliveries(&tx, sequence, &publication, &certificate)?;
-        inject(crash, CrashPoint::AfterOutboxWrite)?;
-        inject(crash, CrashPoint::BeforeCommit)?;
+        interrupt(CrashPoint::AfterReplayWrite)?;
+        insert_deliveries(
+            &tx,
+            sequence,
+            &publication,
+            &certificate,
+            #[cfg(feature = "crash-injection")]
+            || interrupt(CrashPoint::AfterFirstOutboxWrite),
+        )?;
+        interrupt(CrashPoint::AfterOutboxWrite)?;
+        interrupt(CrashPoint::BeforeCommit)?;
         let data_version = data_version(&tx)?;
         tx.commit()?;
         self.anchor = Anchor {
@@ -1044,7 +1208,7 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
             chain,
         };
         self.data_version = data_version;
-        inject(crash, CrashPoint::AfterCommit)?;
+        interrupt(CrashPoint::AfterCommit)?;
         Ok(CommitReceipt {
             sequence: sequence as u64,
             chain,
@@ -1180,6 +1344,18 @@ struct Segments {
     upgrades: Vec<StoredUpgrade>,
     positions: Vec<usize>,
 }
+
+/// Position lookup only. Historical authorization still requires the attached
+/// checked context at genesis and every commit. No evaluation is relabelled.
+fn released_identity_lookup(current: &[u8], retained: &[u8]) -> bool {
+    let Some(prefix) = current.len().checked_sub(32) else {
+        return false;
+    };
+    retained.len() == current.len()
+        && current[prefix..] == zeno_fcis_synthesis::finite::v2_authority::EVALUATOR
+        && retained[prefix..] == zeno_fcis_synthesis::finite::historical::RELEASED_EVALUATOR
+        && current[..prefix] == retained[..prefix]
+}
 impl Segments {
     fn load<'p, D: DescriptorData<'p> + 'p>(
         connection: &Connection,
@@ -1195,7 +1371,17 @@ impl Segments {
             .chain(upgrades.iter().map(|upgrade| upgrade.identity.as_slice()))
             .collect();
         let members: Vec<&[u8]> = lineage.iter().map(|member| member.identity()).collect();
-        let positions = upgrade::assign(&members, &identities)?;
+        let lookup: Vec<&[u8]> = identities
+            .iter()
+            .map(|retained| {
+                members
+                    .iter()
+                    .copied()
+                    .find(|current| released_identity_lookup(current, retained))
+                    .unwrap_or(retained)
+            })
+            .collect();
+        let positions = upgrade::assign(&members, &lookup)?;
         Ok(Self {
             genesis_identity,
             upgrades,
@@ -1239,7 +1425,12 @@ impl Segments {
         lineage: &[Authority<'p, D>],
     ) -> Result<(), Error> {
         match lineage.last() {
-            Some(last) if last.identity() == self.identity(self.current()) => Ok(()),
+            Some(last)
+                if last.identity() == self.identity(self.current())
+                    || released_identity_lookup(last.identity(), self.identity(self.current())) =>
+            {
+                Ok(())
+            }
             _ => Err(Error::Identity),
         }
     }
@@ -1333,6 +1524,7 @@ fn check_commit<'p, D: DescriptorData<'p> + 'p>(
     segments: &Segments,
     row: &StoredCommit,
     pre: &[u8],
+    historical: Option<&Lineage<'_, '_>>,
 ) -> Result<(), Error> {
     if row.sequence <= 0
         || hash(zeno_fcis_codec::domains::V2_STATE, pre)? != row.pre_root
@@ -1348,6 +1540,36 @@ fn check_commit<'p, D: DescriptorData<'p> + 'p>(
     let segment = segments.segment_of(row.sequence);
     let authority = segments.authority(lineage, segment);
     let binding = segments.identity(segment);
+    if let Some(context) =
+        historical.and_then(|lineage| lineage.historical(segments.position(segment)))
+    {
+        context
+            .verify_identity(binding)
+            .map_err(|_| Error::Identity)?;
+        let full = expand_publication(binding, &row.publication)?;
+        let checked = context
+            .verify_publication(pre, &row.command, &row.context, &full)
+            .into_result()
+            .map_err(|_| Error::History)?;
+        if checked.poststate() != row.post {
+            return Err(Error::History);
+        }
+        let certificate = certificate_bytes(
+            row.sequence,
+            row.replay_id,
+            row.pre_root,
+            row.post_root,
+            row.previous_chain,
+            &full,
+        )?;
+        if row.certificate != certificate
+            || hash(zeno_fcis_codec::domains::V2_CHAIN, &certificate)? != row.chain
+            || row.previous_chain != segments.chain_before(connection, row.sequence)?
+        {
+            return Err(Error::History);
+        }
+        return check_retained_deliveries(connection, row.sequence, &checked, &certificate);
+    }
     if authority.identity() != binding {
         return Err(Error::Identity);
     }
@@ -1410,7 +1632,10 @@ fn check_upgrade<'p, D: DescriptorData<'p> + 'p>(
     let from = segments.identity(index);
     let (old, new) = (segments.position(index), segments.position(index + 1));
     let authority = &lineage[new];
-    if authority.identity() != upgrade.identity || from == upgrade.identity {
+    let historical = declared.lineage.and_then(|lineage| lineage.historical(new));
+    let expected_identity =
+        historical.map_or_else(|| authority.identity(), |context| context.identity());
+    if expected_identity != upgrade.identity || from == upgrade.identity {
         return Err(Error::Identity);
     }
     let sequence = u64::try_from(anchor.sequence).map_err(|_| Error::Range)?;
@@ -1419,17 +1644,27 @@ fn check_upgrade<'p, D: DescriptorData<'p> + 'p>(
     let admission = match kind {
         upgrade::Kind::GenesisAdmission => {
             let full = expand_publication(&upgrade.identity, &upgrade.publication)?;
-            let PublicationOutcome::Commit(p) =
-                authority.replay_genesis_publication(&anchor.state, &full)
-            else {
-                return Err(Error::History);
-            };
-            if p.poststate() != anchor.state {
-                return Err(Error::History);
+            if let Some(context) = historical {
+                let checked = context
+                    .verify_genesis(&anchor.state, &full)
+                    .into_result()
+                    .map_err(|_| Error::History)?;
+                if checked.poststate() != anchor.state {
+                    return Err(Error::History);
+                }
+            } else {
+                let PublicationOutcome::Commit(p) =
+                    authority.replay_genesis_publication(&anchor.state, &full)
+                else {
+                    return Err(Error::History);
+                };
+                if p.poststate() != anchor.state {
+                    return Err(Error::History);
+                }
             }
             full
         }
-        upgrade::Kind::ProgramSuccessor => {
+        upgrade::Kind::ProgramSuccessor | upgrade::Kind::Released24Adoption => {
             // A handle opened with one Authority holds no catalog, and its
             // store cannot hold an upgrade.
             let (Some(declarer), true) = (declared.lineage, new < declared.len) else {
@@ -1452,6 +1687,17 @@ fn check_upgrade<'p, D: DescriptorData<'p> + 'p>(
                     return Err(Error::Succession(upgrade::Unsupported::Premise(premise)));
                 }
             };
+            if premises.released_24() != (kind == upgrade::Kind::Released24Adoption) {
+                return Err(Error::History);
+            }
+            if premises.released_24() {
+                behaviour::check(
+                    declarer.catalogs()[new],
+                    declarer.claims(new),
+                    &anchor.state,
+                )
+                .map_err(|_| Error::History)?;
+            }
             // The stored digests must be the lineage's, value for value.
             let evidence = upgrade::evidence_bytes(receipts);
             if upgrade.publication != evidence {
@@ -1709,7 +1955,14 @@ fn audit_tail_with_inputs<'p, D: DescriptorData<'p> + 'p>(
         {
             return Err(Error::History);
         }
-        check_commit(connection, lineage, segments, &row, &anchor.state)?;
+        check_commit(
+            connection,
+            lineage,
+            segments,
+            &row,
+            &anchor.state,
+            declared.lineage,
+        )?;
         if let Some(commits) = commits.as_mut() {
             let publishing = lineage
                 .get(segments.position(consumed))
@@ -1756,15 +2009,24 @@ fn audit_tail_with_inputs<'p, D: DescriptorData<'p> + 'p>(
     if consumed != segments.upgrades.len() || read_anchor(connection)? != anchor {
         return Err(Error::History);
     }
+    // Establish the cardinality invariant at admission, including rows whose
+    // nonpositive positions a hostile writer inserted with CHECKs disabled.
+    // Cached operations preserve it rather than recounting the prefix.
+    let retained: i64 =
+        connection.query_row("SELECT count(*) FROM v2_commits", [], |r| r.get(0))?;
+    if retained != anchor.sequence {
+        return Err(Error::History);
+    }
     let orphan: i64 = connection.query_row("SELECT count(*) FROM v2_deliveries d LEFT JOIN v2_commits c ON d.sequence=c.sequence WHERE c.sequence IS NULL", [], |r| r.get(0))?;
     if orphan != 0 {
         return Err(Error::History);
     }
     Ok(anchor)
 }
-fn genesis_anchor<'p, D: DescriptorData<'p> + 'p>(
+fn genesis_anchor_retained<'p, D: DescriptorData<'p> + 'p>(
     connection: &Connection,
     authority: &Authority<'p, D>,
+    historical: Option<&zeno_fcis_synthesis::finite::historical::HistoricalContext<'_>>,
 ) -> Result<(Hash32, Anchor), Error> {
     let (identity, initial, publication, interpreter, chain) = connection.query_row(
         "SELECT identity,initial,publication,delivery_interpreter,chain FROM v2_genesis WHERE singleton=1",
@@ -1779,17 +2041,29 @@ fn genesis_anchor<'p, D: DescriptorData<'p> + 'p>(
             ))
         },
     )?;
-    if identity != authority.identity() {
+    if let Some(context) = historical {
+        context
+            .verify_identity(&identity)
+            .map_err(|_| Error::Identity)?;
+    } else if identity != authority.identity() {
         return Err(Error::Identity);
     }
     if parse_hash(&interpreter)? != MemoryDestination::interpreter_identity()? {
         return Err(Error::Interpreter);
     }
     let full = expand_publication(&identity, &publication)?;
-    if !matches!(
-        authority.replay_genesis_publication(&initial, &full),
-        PublicationOutcome::Commit(_)
-    ) {
+    let admitted = if let Some(context) = historical {
+        context
+            .verify_genesis(&initial, &full)
+            .into_result()
+            .is_ok()
+    } else {
+        matches!(
+            authority.replay_genesis_publication(&initial, &full),
+            PublicationOutcome::Commit(_)
+        )
+    };
+    if !admitted {
         return Err(Error::History);
     }
     let root = hash(zeno_fcis_codec::domains::V2_STATE, &initial)?;
@@ -1886,12 +2160,15 @@ fn previous_state(connection: &Connection, sequence: i64) -> Result<Vec<u8>, Err
     }
 }
 fn check_tip(connection: &Connection, segments: &Segments, anchor: &Anchor) -> Result<(), Error> {
-    let (count, max): (i64, i64) = connection.query_row(
-        "SELECT count(*),coalesce(max(sequence),0) FROM v2_commits",
+    // Gaps were rejected by audit_tail at admission. Between audits the
+    // data-version guard rejects any other connection's write; library writes
+    // preserve contiguity. The indexed maximum detects an unexpected tail.
+    let max: i64 = connection.query_row(
+        "SELECT coalesce(max(sequence),0) FROM v2_commits",
         [],
-        |r| Ok((r.get(0)?, r.get(1)?)),
+        |r| r.get(0),
     )?;
-    if count != anchor.sequence || max != anchor.sequence {
+    if max != anchor.sequence {
         return Err(Error::History);
     }
     match moved_state(connection, anchor.sequence, None)? {
@@ -2107,6 +2384,7 @@ fn insert_deliveries(
     sequence: i64,
     p: &Publication<'_>,
     certificate: &[u8],
+    #[cfg(feature = "crash-injection")] after_outbox_write: impl Fn() -> Result<(), Error>,
 ) -> Result<(), Error> {
     for (lane, ds) in [(0_u8, p.effects()), (1_u8, p.outbox())] {
         for d in ds {
@@ -2127,6 +2405,10 @@ fn insert_deliveries(
                     entry.as_bytes().as_slice()
                 ],
             )?;
+            #[cfg(feature = "crash-injection")]
+            if lane == 1 && d.ordinal() == 0 {
+                after_outbox_write()?;
+            }
         }
     }
     Ok(())
@@ -2181,6 +2463,66 @@ fn check_deliveries(
                 || actual.marker != d.idempotency()
                 || actual.delivery_id != id
                 || actual.entry_hash != entry
+            {
+                return Err(Error::Delivery);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Verify the original delivery rows from replay-only owned reporting data.
+/// This function cannot insert a row or consume a current publication capability.
+fn check_retained_deliveries(
+    connection: &Connection,
+    sequence: i64,
+    publication: &zeno_fcis_synthesis::finite::historical::CheckedPublication,
+    certificate: &[u8],
+) -> Result<(), Error> {
+    let count: i64 = connection.query_row(
+        "SELECT count(*) FROM v2_deliveries WHERE sequence=?1",
+        [sequence],
+        |row| row.get(0),
+    )?;
+    if count as u128 != publication.effects().len() as u128 + publication.outbox().len() as u128 {
+        return Err(Error::Delivery);
+    }
+    let candidate = framed_hash(
+        zeno_fcis_codec::domains::V2_PUBLICATION,
+        &[publication.subject(), certificate],
+    )?;
+    for (lane, deliveries) in [(0_u8, publication.effects()), (1_u8, publication.outbox())] {
+        for delivery in deliveries {
+            let actual = load_delivery(
+                connection,
+                sequence,
+                i64::from(lane),
+                i64::from(delivery.ordinal),
+            )?;
+            let entry = OutboxEntry::new(
+                delivery.ordinal,
+                delivery.channel,
+                decode_value(&delivery.destination, DecodeLimits::default())
+                    .map_err(|_| Error::Delivery)?,
+                decode_value(&delivery.payload, DecodeLimits::default())
+                    .map_err(|_| Error::Delivery)?,
+            )
+            .canonical_bytes()?;
+            let mut preimage = candidate.as_bytes().to_vec();
+            preimage.extend_from_slice(&entry);
+            let domain = if lane == 1 {
+                zeno_fcis_codec::domains::DELIVERY
+            } else {
+                zeno_fcis_codec::domains::V2_EFFECT_DELIVERY
+            };
+            if actual.channel != delivery.channel
+                || actual.destination_root != delivery.destination_root
+                || actual.payload_root != delivery.payload_root
+                || actual.destination != delivery.destination
+                || actual.payload != delivery.payload
+                || actual.marker != delivery.idempotency
+                || actual.delivery_id != hash(domain, &preimage)?
+                || actual.entry_hash != hash(zeno_fcis_codec::domains::OUTBOX_ENTRY, &entry)?
             {
                 return Err(Error::Delivery);
             }

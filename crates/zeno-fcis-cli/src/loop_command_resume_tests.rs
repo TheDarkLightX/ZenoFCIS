@@ -323,20 +323,16 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
 /// source/profile-bound digests were refreshed; no field is filtered.
 /// The transcript includes recorded, explicitly unreplayed historical feedback;
 /// that diagnostic change leaves the ledger, head and checker identity intact.
+const METERED_EVALUATOR_IDENTITY: &str =
+    "f213221ee84c4b996860ef4ae73f93d94c296a85d8267ca551b56e5d7f2344e1";
 const METERED_LEDGER_SHA256: &str =
-    "2d8eb1414430127a07cc511cb2f287bcfabb1ccec5d3ea5c28f7d7fe0039ec64";
+    "cf690a5a134a32bfa35a92e8d98133a5d7843d28a03df283463238b7bca9fda9";
 const METERED_HEAD_SHA256: &str =
-    "82540dc845d77cde61452e4ddfecab98da8dde0f6c05c5e1cf7a9f1ce2e18323";
+    "19cd0900bdf9ed3e8adf6a35fba229e7a6f55a943598c83e27ab50e745809afb";
 const METERED_DIRECT_OUTPUTS_SHA256: &str =
-    "b4527efd6e4a213c0c058646ac05f4154062a836765ab26727c14ee37cad6510";
+    "a39e3bfc119d93430a5daba7a4975baa3a1301b743a2ac50a81a3afeab0cace1";
 
-#[test]
-fn an_uninterrupted_resume_preserves_the_metered_identity_and_complete_transcript() {
-    assert_eq!(
-        crate::neural_loop::request::CheckerIdentity::current().evaluator_identity,
-        "ef2c4e5bf4e723bc871cd7197ad6ea16f0137d80721273afe30c559e3c98792d",
-        "checker identity changed: replay the recorded metered journey before refreshing its digests"
-    );
+fn metered_journey_bytes() -> [Vec<u8>; 3] {
     let scratch = Scratch::new();
     let session = scratch.session();
     let (exit, report) = open(
@@ -376,20 +372,77 @@ fn an_uninterrupted_resume_preserves_the_metered_identity_and_complete_transcrip
         transcript.extend_from_slice(&canonical_json(value));
     }
     let (ledger, head) = durable_bytes(&session);
-    let found = [
-        sha256_hex(&ledger),
-        sha256_hex(&head),
-        sha256_hex(&transcript),
-    ];
-    eprintln!("uninterrupted scenario digests: {found:?}");
+    [ledger, head, transcript]
+}
+
+#[test]
+fn an_uninterrupted_resume_preserves_the_metered_identity_and_complete_transcript() {
+    assert_eq!(
+        crate::neural_loop::request::CheckerIdentity::current().evaluator_identity,
+        METERED_EVALUATOR_IDENTITY,
+        "checker identity changed: replay the recorded metered journey before refreshing its digests"
+    );
+    let found = metered_journey_bytes().map(|bytes| sha256_hex(&bytes));
     assert_eq!(
         found,
         [
             METERED_LEDGER_SHA256,
             METERED_HEAD_SHA256,
-            METERED_DIRECT_OUTPUTS_SHA256
+            METERED_DIRECT_OUTPUTS_SHA256,
         ]
     );
+}
+
+// Like the scalar source-manifest generator, this is an explicit maintenance
+// operation. Every existing journey/status assertion runs before any pin changes.
+#[test]
+#[ignore = "regenerates the source-bound metered journey fixture"]
+fn regenerate_metered_journey_fixture() {
+    let bytes = metered_journey_bytes();
+    let digests = bytes.each_ref().map(|bytes| sha256_hex(bytes));
+    let evaluator = crate::neural_loop::request::CheckerIdentity::current().evaluator_identity;
+    let evidence = std::path::PathBuf::from(
+        std::env::var_os("ZENO_METERED_FIXTURE_EVIDENCE")
+            .unwrap_or_else(|| panic!("retain the complete journey bytes")),
+    );
+    fs::create_dir_all(&evidence).unwrap_or_else(|error| panic!("fixture directory: {error}"));
+    for (name, bytes) in ["ledger.bin", "head.bin", "transcript.bin"]
+        .into_iter()
+        .zip(&bytes)
+    {
+        fs::write(evidence.join(name), bytes)
+            .unwrap_or_else(|error| panic!("fixture bytes: {error}"));
+    }
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/loop_command_resume_tests.rs");
+    let before =
+        fs::read_to_string(&path).unwrap_or_else(|error| panic!("fixture source: {error}"));
+    let mut source = before.clone();
+    for (name, digest) in [
+        ("METERED_EVALUATOR_IDENTITY", evaluator.as_str()),
+        ("METERED_LEDGER_SHA256", digests[0].as_str()),
+        ("METERED_HEAD_SHA256", digests[1].as_str()),
+        ("METERED_DIRECT_OUTPUTS_SHA256", digests[2].as_str()),
+    ] {
+        assert!(digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit()));
+        let anchor = format!("const {name}: &str =\n    \"");
+        assert_eq!(source.matches(&anchor).count(), 1);
+        let start = source
+            .find(&anchor)
+            .unwrap_or_else(|| panic!("fixture anchor"))
+            + anchor.len();
+        let end = source[start..]
+            .find('"')
+            .unwrap_or_else(|| panic!("fixture quote"))
+            + start;
+        assert_eq!(end - start, 64);
+        source.replace_range(start..end, digest);
+    }
+    fs::write(evidence.join("source-before.rs"), &before)
+        .unwrap_or_else(|error| panic!("fixture preimage: {error}"));
+    fs::write(evidence.join("source-after.rs"), &source)
+        .unwrap_or_else(|error| panic!("fixture postimage: {error}"));
+    fs::write(&path, source).unwrap_or_else(|error| panic!("fixture install: {error}"));
 }
 
 #[test]

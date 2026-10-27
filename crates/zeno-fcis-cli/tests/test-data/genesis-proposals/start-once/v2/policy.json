@@ -1,0 +1,37 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "start-once",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {},
+  "cases": [
+    {
+      "rule": "start_once",
+      "when": "pre.100.110 == 150 && command.101 == 120 && (true)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 151
+      },
+      "outbox": []
+    },
+    {
+      "rule": "default",
+      "when": "true",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 150
+  },
+  "law_kinds": {
+    "500": "StateInvariant"
+  }
+}

@@ -23,6 +23,7 @@ pub mod execution_v2;
 #[cfg(test)]
 extern crate self as zeno_fcis_synthesis;
 pub mod finite {
+    pub(crate) use crate::value;
     #[cfg(test)]
     pub use crate::execution_v2::order_fixture_transition as v2_order_fixture_transition;
     pub use crate::{canonical_v2,evaluation,execution_v2};

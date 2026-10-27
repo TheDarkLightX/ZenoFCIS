@@ -60,6 +60,414 @@
         "job": "rust",
         "command": "cargo +1.97.1 test --workspace --all-features --locked"
       }
+    },
+    {
+      "group": "values",
+      "package": "zeno-fcis-codec",
+      "test_binary": "collection_merkle",
+      "test": "all_long_prefix_subsets_and_insert_remove_orders_are_canonical",
+      "reason": "The values job reached its 240-minute limit in collection_merkle (run 40177825753, job 121122254061). This test enumerates 17,602 insertion/removal orders plus every ascending/reverse subset. long_prefix_miri_profile_matches_reference_and_owned_paths checks twelve deep-prefix updates and ownership against the same independent reference; native CI retains every original order. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "values",
+      "package": "zeno-fcis-codec",
+      "test_binary": "collection_merkle",
+      "test": "every_subset_root_matches_independent_sha256_vectors",
+      "reason": "Same four-hour collection_merkle workload. Native CI retains all 256 reference vectors; Miri keeps the independent reference and production path comparison at the fixed long-prefix profile, plus exact prefix/path-limit boundaries. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "specification",
+      "package": "zeno-fcis-spec",
+      "test_binary": "recursive_bits",
+      "test": "small_algebras_match_independent_boolean_lifts_exhaustively",
+      "reason": "The specification job reached 240 minutes without completing this 15,552-assignment product (run 40177825753, job 121122254089). bounded_boolean_lift_profile_covers_cycles_and_seed_boundaries interprets 40 fixed assignments using the same independent assertion; native CI retains the complete original bounds. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "publication",
+      "package": "zeno-fcis-shell",
+      "test_binary": "lib",
+      "test": "effects::durable::explore::process_loss_explorer",
+      "reason": "The publication job reached 240 minutes in the shell test target (run 40177825753, job 121122254149). This case enumerates schedules/products. Native CI retains the complete case. Miri keeps durable restart/reservation tests, exact transcript tamper/replay, handler faults, policy refusal tests and bounded incomplete-exploration checks. Multi-step exhaustive schedule coverage is native only. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "publication",
+      "package": "zeno-fcis-shell",
+      "test_binary": "lib",
+      "test": "effects::explore_tests::simulation_laws",
+      "reason": "The publication job reached 240 minutes in the shell test target (run 40177825753, job 121122254149). This case enumerates schedules/products. Native CI retains the complete case. Miri keeps durable restart/reservation tests, exact transcript tamper/replay, handler faults, policy refusal tests and bounded incomplete-exploration checks. Multi-step exhaustive schedule coverage is native only. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "publication",
+      "package": "zeno-fcis-shell",
+      "test_binary": "lib",
+      "test": "effects::explore_tests::explore_frozen_profile",
+      "reason": "The publication job reached 240 minutes in the shell test target (run 40177825753, job 121122254149). This case enumerates schedules/products. Native CI retains the complete case. Miri keeps durable restart/reservation tests, exact transcript tamper/replay, handler faults, policy refusal tests and bounded incomplete-exploration checks. Multi-step exhaustive schedule coverage is native only. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "publication",
+      "package": "zeno-fcis-shell",
+      "test_binary": "lib",
+      "test": "effects::explore_tests::late_replies_refused",
+      "reason": "The publication job reached 240 minutes in the shell test target (run 40177825753, job 121122254149). This case enumerates schedules/products. Native CI retains the complete case. Miri keeps durable restart/reservation tests, exact transcript tamper/replay, handler faults, policy refusal tests and bounded incomplete-exploration checks. Multi-step exhaustive schedule coverage is native only. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "publication",
+      "package": "zeno-fcis-shell",
+      "test_binary": "lib",
+      "test": "effects::policy_tests::policy_retry_product",
+      "reason": "The publication job reached 240 minutes in the shell test target (run 40177825753, job 121122254149). This case enumerates schedules/products. Native CI retains the complete case. Miri keeps durable restart/reservation tests, exact transcript tamper/replay, handler faults, policy refusal tests and bounded incomplete-exploration checks. Multi-step exhaustive schedule coverage is native only. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-library",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "lib",
+      "test": "finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes",
+      "reason": "The synthesis library job reached 240 minutes on the oracle finite products after completing the preceding law tests (run 40177825753, job 121122254035). Native CI retains every product and count assertion. Miri retains the oracle ordered-law tests, actual-key lifecycle/ingress/refusal cases, and the oracle_accounts integration target. This does not claim Miri coverage of the omitted Cartesian combinations. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-library",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "lib",
+      "test": "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes",
+      "reason": "The synthesis library job reached 240 minutes on the oracle finite products after completing the preceding law tests (run 40177825753, job 121122254035). Native CI retains every product and count assertion. Miri retains the oracle ordered-law tests, actual-key lifecycle/ingress/refusal cases, and the oracle_accounts integration target. This does not claim Miri coverage of the omitted Cartesian combinations. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-library",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "lib",
+      "test": "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions",
+      "reason": "The synthesis library job reached 240 minutes on the oracle finite products after completing the preceding law tests (run 40177825753, job 121122254035). Native CI retains every product and count assertion. Miri retains the oracle ordered-law tests, actual-key lifecycle/ingress/refusal cases, and the oracle_accounts integration target. This does not claim Miri coverage of the omitted Cartesian combinations. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-library",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "lib",
+      "test": "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security",
+      "reason": "The synthesis library job reached 240 minutes on the oracle finite products after completing the preceding law tests (run 40177825753, job 121122254035). Native CI retains every product and count assertion. Miri retains the oracle ordered-law tests, actual-key lifecycle/ingress/refusal cases, and the oracle_accounts integration target. This does not claim Miri coverage of the omitted Cartesian combinations. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-finite",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "finite",
+      "test": "a_trapped_candidate_does_not_disturb_the_next_candidate",
+      "reason": "The finite job reached 240 minutes (run 40177825753, job 121122254038): each of the first two certificate-producing cases took about 60 minutes, and the next makes repeated synthesis calls. Native CI retains these exact tests. Miri retains evaluation/reference parity, product cloning, arithmetic traps, resource/type refusals, ordering of contract traps and unrealizability, identity partitioning and language-adapter identity checks. Successful certificate-producing synthesis remains covered by the separate interpreted completion and template groups, without claiming these omitted executions. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-finite",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "finite",
+      "test": "distinguishes_unrealizable_contract_from_insufficient_grammar",
+      "reason": "The finite job reached 240 minutes (run 40177825753, job 121122254038): each of the first two certificate-producing cases took about 60 minutes, and the next makes repeated synthesis calls. Native CI retains these exact tests. Miri retains evaluation/reference parity, product cloning, arithmetic traps, resource/type refusals, ordering of contract traps and unrealizability, identity partitioning and language-adapter identity checks. Successful certificate-producing synthesis remains covered by the separate interpreted completion and template groups, without claiming these omitted executions. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-finite",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "finite",
+      "test": "synthesizes_a_generic_relation_and_refutes_identity",
+      "reason": "The finite job reached 240 minutes (run 40177825753, job 121122254038): each of the first two certificate-producing cases took about 60 minutes, and the next makes repeated synthesis calls. Native CI retains these exact tests. Miri retains evaluation/reference parity, product cloning, arithmetic traps, resource/type refusals, ordering of contract traps and unrealizability, identity partitioning and language-adapter identity checks. Successful certificate-producing synthesis remains covered by the separate interpreted completion and template groups, without claiming these omitted executions. Miri UB, provenance and aliasing checks are not obtained for omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "retained_examples_and_replay_agent_treasury_guard_00_04",
+      "reason": "The large template replay jobs repeatedly ended on runner shutdown or their deadline (runs 40177825753 and 40180272069); their incomplete runs are not passes. The full original examples and genesis assertions remain native. The focused Miri profile retains withdrawal examples 0-4 and 25, treasury examples 0 and 29, treasury genesis/replay, and all eight outcome/boundary profiles. Generic genesis/replay interpretation remains in the authority and publication tests. No Miri UB, provenance or aliasing claim covers the omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "retained_examples_and_replay_agent_treasury_guard_05_09",
+      "reason": "The large template replay jobs repeatedly ended on runner shutdown or their deadline (runs 40177825753 and 40180272069); their incomplete runs are not passes. The full original examples and genesis assertions remain native. The focused Miri profile retains withdrawal examples 0-4 and 25, treasury examples 0 and 29, treasury genesis/replay, and all eight outcome/boundary profiles. Generic genesis/replay interpretation remains in the authority and publication tests. No Miri UB, provenance or aliasing claim covers the omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "retained_examples_and_replay_agent_treasury_guard_10_14",
+      "reason": "The large template replay jobs repeatedly ended on runner shutdown or their deadline (runs 40177825753 and 40180272069); their incomplete runs are not passes. The full original examples and genesis assertions remain native. The focused Miri profile retains withdrawal examples 0-4 and 25, treasury examples 0 and 29, treasury genesis/replay, and all eight outcome/boundary profiles. Generic genesis/replay interpretation remains in the authority and publication tests. No Miri UB, provenance or aliasing claim covers the omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "retained_examples_and_replay_agent_treasury_guard_15_19",
+      "reason": "The large template replay jobs repeatedly ended on runner shutdown or their deadline (runs 40177825753 and 40180272069); their incomplete runs are not passes. The full original examples and genesis assertions remain native. The focused Miri profile retains withdrawal examples 0-4 and 25, treasury examples 0 and 29, treasury genesis/replay, and all eight outcome/boundary profiles. Generic genesis/replay interpretation remains in the authority and publication tests. No Miri UB, provenance or aliasing claim covers the omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "retained_examples_and_replay_agent_treasury_guard_20_24",
+      "reason": "The large template replay jobs repeatedly ended on runner shutdown or their deadline (runs 40177825753 and 40180272069); their incomplete runs are not passes. The full original examples and genesis assertions remain native. The focused Miri profile retains withdrawal examples 0-4 and 25, treasury examples 0 and 29, treasury genesis/replay, and all eight outcome/boundary profiles. Generic genesis/replay interpretation remains in the authority and publication tests. No Miri UB, provenance or aliasing claim covers the omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "retained_examples_and_replay_agent_treasury_guard_25_29",
+      "reason": "The large template replay jobs repeatedly ended on runner shutdown or their deadline (runs 40177825753 and 40180272069); their incomplete runs are not passes. The full original examples and genesis assertions remain native. The focused Miri profile retains withdrawal examples 0-4 and 25, treasury examples 0 and 29, treasury genesis/replay, and all eight outcome/boundary profiles. Generic genesis/replay interpretation remains in the authority and publication tests. No Miri UB, provenance or aliasing claim covers the omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "retained_examples_and_replay_withdrawal_queue_00_04",
+      "reason": "Hosted run40263624558/job121381103092 reached its240-minute limit on this five-example retained replay batch. The full batch remains native, alongside the other retained withdrawal batches. Miri retains the withdrawal bounded-domain profile and the final retained single-example replay. Omitted early retained examples have no interpreted UB/provenance/aliasing claim.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "retained_examples_and_replay_withdrawal_queue_05_09",
+      "reason": "The large template replay jobs repeatedly ended on runner shutdown or their deadline (runs 40177825753 and 40180272069); their incomplete runs are not passes. The full original examples and genesis assertions remain native. The focused Miri profile retains withdrawal examples 0-4 and 25, treasury examples 0 and 29, treasury genesis/replay, and all eight outcome/boundary profiles. Generic genesis/replay interpretation remains in the authority and publication tests. No Miri UB, provenance or aliasing claim covers the omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "retained_examples_and_replay_withdrawal_queue_10_14",
+      "reason": "The large template replay jobs repeatedly ended on runner shutdown or their deadline (runs 40177825753 and 40180272069); their incomplete runs are not passes. The full original examples and genesis assertions remain native. The focused Miri profile retains withdrawal examples 0-4 and 25, treasury examples 0 and 29, treasury genesis/replay, and all eight outcome/boundary profiles. Generic genesis/replay interpretation remains in the authority and publication tests. No Miri UB, provenance or aliasing claim covers the omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "retained_examples_and_replay_withdrawal_queue_15_19",
+      "reason": "The large template replay jobs repeatedly ended on runner shutdown or their deadline (runs 40177825753 and 40180272069); their incomplete runs are not passes. The full original examples and genesis assertions remain native. The focused Miri profile retains withdrawal examples 0-4 and 25, treasury examples 0 and 29, treasury genesis/replay, and all eight outcome/boundary profiles. Generic genesis/replay interpretation remains in the authority and publication tests. No Miri UB, provenance or aliasing claim covers the omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "retained_examples_and_replay_withdrawal_queue_20_24",
+      "reason": "The large template replay jobs repeatedly ended on runner shutdown or their deadline (runs 40177825753 and 40180272069); their incomplete runs are not passes. The full original examples and genesis assertions remain native. The focused Miri profile retains withdrawal examples 0-4 and 25, treasury examples 0 and 29, treasury genesis/replay, and all eight outcome/boundary profiles. Generic genesis/replay interpretation remains in the authority and publication tests. No Miri UB, provenance or aliasing claim covers the omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "retained_genesis_and_replay_withdrawal_queue",
+      "reason": "The large template replay jobs repeatedly ended on runner shutdown or their deadline (runs 40177825753 and 40180272069); their incomplete runs are not passes. The full original examples and genesis assertions remain native. The focused Miri profile retains withdrawal examples 0-4 and 25, treasury examples 0 and 29, treasury genesis/replay, and all eight outcome/boundary profiles. Generic genesis/replay interpretation remains in the authority and publication tests. No Miri UB, provenance or aliasing claim covers the omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-historical-context",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "historical_context",
+      "test": "every_retained_publication_field_is_bound",
+      "reason": "The historical-context job reached 240 minutes during this per-byte replay corpus (run 40177825753, job 121122254174). Native CI retains every original byte flip. Miri keeps arbitrary-digest refusal, current/historical separation and genuine publication replay including malformed and repeated subjects, split into independent groups. UB, provenance and aliasing checks are not obtained for the omitted per-byte executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "publication",
+      "package": "zeno-fcis-shell",
+      "test_binary": "lib",
+      "test": "effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome",
+      "reason": "The 160-case one-attempt schedule product reached a 3600-second local Miri limit on 2026-10-25 without completing. Native CI retains these cases and the full 25,760-edge process-loss explorer. Miri retains the individual durable restart, reservation, corruption, store-failure and transcript tests. The timed-out run is incomplete evidence; Miri UB, provenance and aliasing checks are not obtained for omitted schedule executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "values",
+      "package": "zeno-fcis-codec",
+      "test_binary": "lib",
+      "test": "providers::tests::rustcrypto_fixed_vectors_and_streaming_boundaries",
+      "reason": "The 240-minute hosted values job and retained local values run did not complete the long streaming-vector workload. Native tests retain all message lengths and chunk sizes. The robustness integration test sha256_bounded_streaming_vectors interprets the standard empty/abc/multiblock answers and padding/block/streaming boundaries through257 bytes. Omitted large interpreted inputs have no Miri UB-freedom claim.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "publication",
+      "package": "zeno-fcis-shell",
+      "test_binary": "evidence_checks",
+      "test": "resumed_search_matches_uninterrupted_closure",
+      "reason": "Hosted run 40313167059, job 121539106456, reached its 240-minute limit after spending about 228 minutes in this full closure comparison, even with larger later resume chunks. Native CI retains all eight scenario/order/policy combinations, every 127-step resume and exact final equality. Miri retains bounded incomplete exploration, source/profile checkpoint-substitution refusal, durable restart/reservation, transcript tamper/replay and exact history/delivery checks. Full resumed-to-completion schedule exploration is native only; no Miri UB, provenance or aliasing coverage is claimed for those omitted executions.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "specification",
+      "package": "zeno-fcis-spec",
+      "test_binary": "tables",
+      "test": "table_count_sizes_before_and_after_linear_values",
+      "reason": "Hosted run 40313167059, job 121539106607, reached its 240-minute limit. The tables binary spent about 145 minutes in its first selected count-size case without completing it. Native CI retains sizes 6, 16 and 64, including the 41,664-clause expansion. Miri retains the explicit small count expansion, linear count/value boundary cases, reparsing and stable-ID checks. No interpreted coverage is claimed for the omitted large expansion.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "specification",
+      "package": "zeno-fcis-spec",
+      "test_binary": "tables",
+      "test": "tables_count_matches_direct_counting_on_every_assignment",
+      "reason": "The complete count truth table has 42 operator/bound combinations and 1,024 assignments per combination (43,008 comparisons). It remains unchanged in native CI. The focused Miri profile retains explicit expansion equivalence and the count boundary cases instead of repeating this exhaustive corpus. The preceding count-size case timed out before this case was reached; no individual timeout or Miri UB-freedom claim is made for this omitted truth table.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "publication",
+      "package": "zeno-fcis-shell",
+      "test_binary": "lib",
+      "test": "effects::handler_tests::policy_fault_invocation_reports_match_world",
+      "reason": "Publication partition 1/8 reached its 240-minute budget in run40386677759/job121796687666. After fault_handler_laws finished, the 456-case nested fault-schedule product occupied the remaining 197 minutes without completing. The complete product remains native. Miri retains policy_composed_suspend_retains_forwarded_reservation, policy_nested_suspend_preserves_invocation, policy_unknown_suspend_keeps_reservation, policy_suspend_and_crash, and fault_handler_laws across all operation fault branches. The omitted combinations have no Miri UB, provenance or aliasing claim.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
     }
   ]
 }

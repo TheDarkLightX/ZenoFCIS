@@ -24,5 +24,6 @@ pub use execution_v2::catalog;
 
 // Preserve the production module paths; no algorithm or specification adapter.
 pub mod finite {
+    pub(crate) use crate::value;
     #[cfg(test)]
     pub use crate::execution_v2::order_fixture_transition as v2_order_fixture_transition; pub use crate::{canonical_v2, evaluation, execution_v2}; }

@@ -26,7 +26,10 @@ usage_topic(L,S) :- lesson(L,S).
 usage_topic(L,S) :- lesson(L,C),isa(S,C).
 usage_unknown_environment(L) :- usage_topic(L,S),usage_known(subject,S),blocker(L,_),not usage_known(environment,_).
 usage_scope(L,S) :- usage_topic(L,S),usage_known(subject,S),not usage_missing(L,_,_).
-usage_ready(L) :- record(L,promoted,usage-v1,_,_,_),usage_validated(L).
+usage_tier_one(L) :- strength(L,proved).
+usage_tier_one(L) :- strength(L,refuted).
+usage_tier_one(L) :- strength(L,certified).
+usage_ready(L) :- record(L,promoted,usage-v1,_,_,_),usage_validated(L),not usage_tier_one(L).
 usage_active_replace(N,O) :- supersedes(N,O),usage_ready(N).
 usage_active_replace(N,O) :- supersedes(N,M),usage_ready(N),usage_active_replace(M,O).
 usage_defeated(O,S) :- usage_active_replace(N,O),usage_scope(N,S),usage_scope(O,S).
@@ -38,7 +41,7 @@ SCHEMA = {"lesson":2,"scope":3,"strength":2,"effect":2,"evidence":3,"isa":2,
           "limit":4,"blocker":2,"cost":3,"prefer":3,"supersedes":2,"conflict":2,"record":6}
 METADATA = set(SCHEMA)-{"isa","supersedes","conflict"}
 DIMENSIONS = {"tool","version","family","environment","capability","prerequisite"}
-MODES = {"observation","exact-precondition","reproduced-blocker"}
+MODES = {"observation","exact-precondition","reproduced-blocker","proved","refuted","certified"}
 
 
 def conflict_failure(usage,a,b):
@@ -163,8 +166,11 @@ class Usage:
                 if p=="evidence" and (not row[1] or type(row[2]) is not str or re.fullmatch('[0-9a-fA-F]{64}',row[2]) is None):problems.add("kb-evidence-format")
                 if p=="scope" and (row[1] not in DIMENSIONS or type(row[2]) is not str or row[2] in {"","unknown"}):problems.add("kb-scope-key")
                 if p=="effect" and row[1] not in {"helps","hurts","neutral","defect","limit"}:problems.add("kb-effect")
-                if p=="strength" and row[1] not in {"declared","observed","measured","preregistered","proposed"}:problems.add("kb-strength")
+                if p=="strength" and row[1] not in {"declared","observed","measured","preregistered","proposed","proved","refuted","certified"}:problems.add("kb-strength")
                 if p=="record" and (type(row[3]) is not str or re.fullmatch("[0-9a-fA-F]{64}",row[3]) is None or row[1] not in {"proposed","promoted","rejected"} or row[2]!="usage-v1" or row[4] not in MODES):problems.add("kb-record-schema")
+        for id,strength in self.rows("strength"):
+            if strength in {"proved","refuted","certified"} and (id,) not in self.db.get("usage_validated",()):
+                problems.add("kb-fact-replay-required")
         for id in self.lessons:
             if re.fullmatch('[a-z0-9-]{1,96}',id) is None:problems.add("kb-lesson-id")
             for p,code in (("evidence","kb-lesson-without-evidence"),("strength","kb-lesson-without-strength"),("effect","kb-lesson-without-effect")):

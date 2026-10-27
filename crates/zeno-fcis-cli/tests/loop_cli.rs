@@ -673,6 +673,7 @@ fn describe_declares_loop_effects() {
             json!("meaning"),
             json!("open"),
             json!("pipeline"),
+            json!("print"),
             json!("question"),
             json!("resume"),
             json!("rules"),

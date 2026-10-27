@@ -16,6 +16,7 @@ from typing import Iterator
 
 from resolved_purity import ResolvedChecker, ResolutionError
 from workflow_contexts import check_contexts
+from check_ingress import source_failures as ingress_source_failures
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,7 +69,7 @@ DEPENDENCY_RING = {
     "zeno-fcis-evidence": 2,
     "zeno-fcis-authenticated": 2,
     "zeno-fcis-authenticated-authority": 5,
-    "zeno-fcis-synthesis": 2,
+    "zeno-fcis-synthesis": 2,  # oracle relations and installed verification port
     "zeno-fcis-program-search": 3,
     "zeno-fcis-loop-doors": 4,
     "zeno-fcis-contract": 3,
@@ -89,8 +90,17 @@ DEPENDENCY_RING = {
     "zeno-fcis-adapter": 3,
     "zeno-fcis-adapter-zenodex": 3,
     "zeno-fcis-shell-sqlite": 5,
+    "zeno-fcis-ingress": 6,
+    "zeno-fcis-bls": 5,  # shell-only oracle and receipt verification
+    "zeno-fcis-commons": 5,  # effectful coordination store, without decision authority
+    "zenofcis-zusd-v1": 3,  # exact native oracle composition, no shell crypto
     "zeno-fcis-collections": 3,
 }
+
+
+# Standalone applications also require manifest/unsafe boundary checks. Their
+# application shell is not classified as a pure semantic crate.
+EXTRA_CRATES = {"zenofcis-zusd-v1": ROOT / "core-apps/zusd-v1"}
 
 
 @dataclass(frozen=True)
@@ -99,17 +109,23 @@ class DecoderAllocationRegion:
     start_marker: str
     end_marker: str
     required_patterns: tuple[str, ...]
+    # Non-allocation patterns that must also occur exactly once, such as a reservation helper's bounded route.
+    route_patterns: tuple[str, ...] = ()
 
 
 DECODER_ALLOCATION_REGIONS = (
+    # The value decoder reserves through its state, which bounds the wire-derived capacity by the node limit.
     DecoderAllocationRegion(
         "crates/zeno-fcis-codec/src/lib.rs",
-        "fn decode_value_inner(",
+        "fn reservation(",
         "fn initial_collection_capacity(",
         (
-            r"Vec::with_capacity\(initial_collection_capacity\(count,cursor\.remaining\(\),1,?\)\?\)",
-            r"Vec::with_capacity\(initial_collection_capacity\(count,cursor\.remaining\(\),3,?\)\?\)",
-            r"Vec::with_capacity\(initial_collection_capacity\(count,cursor\.remaining\(\),10,?\)\?\)",
+            r"Vec::with_capacity\(state\.reservation\(count,cursor\.remaining\(\),1,?\)\?\)",
+            r"Vec::with_capacity\(state\.reservation\(count,cursor\.remaining\(\),3,?\)\?\)",
+            r"Vec::with_capacity\(state\.reservation\(count,cursor\.remaining\(\),10,?\)\?\)",
+        ),
+        (
+            r"initial_collection_capacity\(count,remaining_wire_bytes,minimum_wire_bytes_per_item,?\)\?\.min\(nodes\)",
         ),
     ),
     DecoderAllocationRegion(
@@ -225,6 +241,29 @@ def check_dependency_ring(manifest: Path) -> list[str]:
     return failures
 
 
+def check_shell_crypto_boundary(manifests: list[Path]) -> list[str]:
+    """Crypto must remain outside even transitive semantic/test dependencies."""
+    graph = {}
+    for manifest in manifests:
+        doc = read_toml(manifest)
+        graph[doc["package"]["name"]] = {
+            (spec.get("package", name) if isinstance(spec, dict) else name)
+            for _, table in dependency_tables(doc) for name, spec in table.items()
+        }
+    failures = []
+    for name in (*SEMANTIC_CRATES, "zenofcis-zusd-v1"):
+        pending, seen = [name], set()
+        while pending:
+            dependency = pending.pop()
+            if dependency in seen:
+                continue
+            seen.add(dependency)
+            if dependency in {"blst", "zeno-fcis-bls"}:
+                failures.append(f"semantic crate {name} reaches shell crypto {dependency}")
+            pending.extend(graph.get(dependency, ()))
+    return failures
+
+
 def line_number(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
@@ -260,6 +299,7 @@ def check_decoder_region_text(
     label: str,
     text: str,
     required_patterns: tuple[str, ...],
+    route_patterns: tuple[str, ...] = (),
 ) -> list[str]:
     failures: list[str] = []
     compact = re.sub(r"\s+", "", text)
@@ -275,6 +315,10 @@ def check_decoder_region_text(
             failures.append(
                 f"{label}: required wire-bounded allocation pattern occurs {count} time(s): {pattern}"
             )
+    for pattern in route_patterns:
+        count = len(re.findall(pattern, compact))
+        if count != 1:
+            failures.append(f"{label}: required bounded reservation route occurs {count} time(s): {pattern}")
     return failures
 
 
@@ -297,7 +341,8 @@ def check_decoder_allocation_guards() -> list[str]:
             continue
         label = f"{requirement.path}:{line_number(text, start)}"
         failures.extend(
-            check_decoder_region_text(label, text[start:end], requirement.required_patterns)
+            check_decoder_region_text(label, text[start:end], requirement.required_patterns,
+                                      requirement.route_patterns)
         )
     return failures
 
@@ -475,6 +520,16 @@ def check_resolver_package_self_test(checker: ResolvedChecker) -> list[str]:
             "Cargo.toml": "[package]\nname='inactive_fixture'\nversion='0.0.0'\nedition='2024'\n[workspace]\n",
             "src/lib.rs": "#![cfg(test)]\n#![no_std]\n#![forbid(unsafe_code)]\nunsupported!();\n",
         },
+        "literal-path-positive": {
+            "Cargo.toml": "[package]\nname='path_positive'\nversion='0.0.0'\nedition='2024'\n[workspace]\n",
+            "src/lib.rs": '#![no_std]\n#![forbid(unsafe_code)]\n#[path="fixed.rs"] mod renamed;\n',
+            "src/fixed.rs": "pub fn value()->u8{7}\n",
+        },
+        "literal-path-effect": {
+            "Cargo.toml": "[package]\nname='path_effect'\nversion='0.0.0'\nedition='2024'\n[workspace]\n",
+            "src/lib.rs": '#![no_std]\n#![forbid(unsafe_code)]\n#[path="fixed.rs"] mod renamed;\n',
+            "src/fixed.rs": 'pub fn ambient(){std::env::var("EFFECT");}\n',
+        },
     }
     with tempfile.TemporaryDirectory(prefix="zeno-assurance-package-") as directory:
         base = Path(directory)
@@ -498,6 +553,15 @@ def check_resolver_package_self_test(checker: ResolvedChecker) -> list[str]:
         if not any(str(base / "inactive" / "src/lib.rs") in location
                    for location in report["resolution"]["skipped_cfg"]):
             failures.append("package self-test omitted custody of the recognized inactive root")
+        positive = str(base / "literal-path-positive") + "/"
+        if any(f["file"].startswith(positive) for f in report["findings"]):
+            failures.append("literal path self-test rejected the pure declared module")
+        if str(base / "literal-path-positive/src/fixed.rs") not in report["resolution"]["active_files"]:
+            failures.append("literal path self-test did not traverse the pure module")
+        effect = str(base / "literal-path-effect/src/fixed.rs")
+        if not any(f["file"] == effect and f["rule"] == "environment" and f["severity"] == "error"
+                   for f in report["findings"]):
+            failures.append("literal path self-test missed the actual ambient effect")
         if not semantic_report_failures(report):
             failures.append("package self-test unsupported closure became assurance success")
         return failures
@@ -665,6 +729,12 @@ def run_self_test(checker: ResolvedChecker | None = None) -> list[str]:
     mutant = "Vec::with_capacity(count)"
     if not check_decoder_region_text("self-test-mutant", mutant, requirement):
         failures.append("decoder allocation self-test accepted a raw-count mutant")
+    route = DECODER_ALLOCATION_REGIONS[0].route_patterns
+    bounded = "Ok(initial_collection_capacity(count, remaining_wire_bytes, minimum_wire_bytes_per_item)?.min(nodes))"
+    if check_decoder_region_text("self-test-route", bounded, (), route):
+        failures.append("decoder allocation self-test rejected its bounded reservation witness")
+    if not check_decoder_region_text("self-test-route-mutant", "Ok(count as usize)", (), route):
+        failures.append("decoder allocation self-test accepted an unbounded reservation")
 
     deploy_scopes = "permissions:\n  pages: write\n  id-token: write\n"
     if check_workflow_text(PAGES_WORKFLOW, deploy_scopes):
@@ -739,7 +809,7 @@ def main() -> int:
     missing_semantic = sorted(set(SEMANTIC_CRATES) - member_names)
     failures.extend(f"semantic crate absent from workspace: {name}" for name in missing_semantic)
 
-    for member in members:
+    for member in [*members, *EXTRA_CRATES.values()]:
         failures.extend(check_unsafe_prohibition(member))
         manifest = member / "Cargo.toml"
         if not manifest.is_file():
@@ -751,12 +821,18 @@ def main() -> int:
         except (OSError, tomllib.TOMLDecodeError) as error:
             failures.append(f"{manifest.relative_to(ROOT)}: cannot parse: {error}")
 
+    failures.extend(check_shell_crypto_boundary(
+        [member / "Cargo.toml" for member in members]
+        + [ROOT / "core-apps/zusd-v1/Cargo.toml"]
+    ))
+
     if checker is not None:
         failures.extend(check_semantic_sources(checker))
     else:
         failures.append("semantic source inspection not performed: actual resolver unavailable")
     failures.extend(check_decoder_allocation_guards())
     failures.extend(check_workflows())
+    failures.extend(ingress_source_failures(ROOT))
 
     if failures:
         for failure in failures:
@@ -773,4 +849,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

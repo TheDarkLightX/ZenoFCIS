@@ -1,0 +1,5 @@
+law 9000 closed_reason on reject:200 = pre.100.110 != 150;
+law 9001 unauthorized_reason on reject:201 = pre.100.110 == 150 && context.102.120 == 160;
+law 9002 repeated_reason on reject:203 = pre.100.110 == 150 && context.102.120 != 160 && command.101 == 140 && context.102.120 == pre.100.111;
+law 9003 acceptance_eligibility on accept = pre.100.110 == 150 && context.102.120 != 160 && command.101 == 140 && context.102.120 != pre.100.111;
+law 9004 failure_eligibility on failure = pre.100.110 == 150 && context.102.120 != 160 && command.101 == 141;

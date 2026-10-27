@@ -1,0 +1,43 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "constant-product",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "102": [
+      "I128",
+      0,
+      0
+    ]
+  },
+  "variables": {
+    "received": "mul_div_floor(command.101.121, pre.100.111, pre.100.110 + command.101.121)"
+  },
+  "cases": [
+    {
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "pre.100.110 + command.101.121",
+        "111": "pre.100.111 - received",
+        "112": "choose(command.101.120 == 0, received, pre.100.112)",
+        "113": "choose(command.101.120 == 1, received, pre.100.113)"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 1,
+    "111": 3,
+    "112": 0,
+    "113": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DecisionConformance"
+  }
+}

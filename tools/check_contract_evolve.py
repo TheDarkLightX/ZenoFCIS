@@ -250,7 +250,7 @@ def claims_journey(directory: Path, packages: dict[str, Path], version: str) -> 
     upgraded = upgrades.report(upgrades.run_app(second, ["--upgrade", str(store)]), "upgrade")
     upgrades.expect(upgraded, {
         "kind": "behaviour-change", "at_commit": 3, "contract_version": 2, "pending": 1,
-        "behaviour": {"state_laws_held": [500], "claims_held": [600, 601],
+        "behaviour": {"state_laws_held": [500, 506], "claims_held": [600, 601],
                       "not_evaluated": [990],
                       "reviews": [evolved["evolution"]["review_sha256"]]},
     }, "upgrade with claims")
@@ -283,7 +283,14 @@ def main() -> int:
 
 if __name__ == "__main__":
     try:
-        sys.exit(main())
-    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
-        print(f"contract evolve: FAIL: {error}", file=sys.stderr)
-        sys.exit(1)
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        try:
+            sys.exit(main())
+        except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
+            print(f'contract evolve: FAIL: {error}', file=sys.stderr)
+            sys.exit(1)
+    run_cli(_entrypoint)

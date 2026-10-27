@@ -1,0 +1,105 @@
+# Collection application
+
+This application runs its checked contract over named collection entries.
+The application shell is LLM-generated and checked by regression tests.
+The synthesized interface is a plain form. Keys in command and context arrays
+are exactly 64 lowercase hexadecimal digits; scalar values are canonical number
+strings in interface field order. Review `context.json` before serving.
+
+Create a private file containing a nonzero 64-digit hexadecimal credential.
+Set `ZENO_APP_SECRET_FILE` to it, then run:
+
+```text
+cargo +1.97.1 run --locked --offline --bin app-server
+```
+
+The default address is http://127.0.0.1:8080. Optional settings are
+`ZENO_APP_ADDRESS` (loopback only), `ZENO_APP_STORE` (SQLite database) and
+`ZENO_APP_CONTEXT` (configured context file). The authenticated principal
+selects the fixed context; a request cannot choose one. This profile supports
+standalone collection contracts without deliveries or a server clock.
+
+For both issuer and holder roles in one running application, set
+`ZENO_APP_PARTIES` to a private JSON file. Each party has exactly `principal`,
+`context` and `secret_file`; credential paths are relative to that JSON file:
+
+```json
+[
+  {"principal":"0707070707070707070707070707070707070707070707070707070707070707","context":["180"],"secret_file":"issuer.secret"},
+  {"principal":"0808080808080808080808080808080808080808080808080808080808080808","context":["181"],"secret_file":"holder.secret"}
+]
+```
+
+The example roles apply to the included token contract. Review the interface for
+other contexts. Each credential file has the same private 64-digit format as
+above. There may be 1 through 32 parties; configuration files are limited to
+64 KiB. Leave `ZENO_APP_SECRET_FILE` and `ZENO_APP_CONTEXT` unset in this mode.
+Contexts and credentials are copied at startup. Local recovery reads the party
+contexts but does not need the credential files; it replays the historical
+contexts recorded in the journal.
+
+`GET /state` returns the revision, scalar state, configured context and interface.
+`POST /preview` and `/command` take the existing ingress envelope: byte 1,
+32-byte contract ID, 32-byte retry key, big-endian u64 expected revision, then a
+JSON array of command strings. Every request carries the credential in its
+Authorization header. Preview loads the same named entries and calls the same
+Authority as commit. An invalid key receives HTTP 400 with body `Malformed`.
+
+Receipts bind scalar state and every named map root before and after the
+commit. The submission, scalar state, map writes and retry index commit in one
+SQLite transaction. A restart replays the journal through the same Authority
+and checks every stored map before serving. Local recovery commands are:
+
+```text
+app-server --journal app.sqlite > journal.json
+app-server --replay journal.json restored.sqlite
+app-server --audit restored.sqlite
+```
+
+Restore requires a new destination and publishes it only after complete replay
+and head comparison. The journal profile remains `zeno-fcis/collection-journal/2`.
+Export, restore and startup audit page one journal entry at a time. Each JSON
+value is limited to 64 MiB; total history has no 64 MiB limit. Every submission
+is replayed through Authority, with independent scalar and named-root checks.
+There is no state checkpoint or partial-replay fallback.
+
+Startup rebuilds and checks every Merkle cache row. Replay uses automatically
+deleted disk-backed SQLite with a 2 MiB page cache per connection and memory
+mapping disabled. Recovery memory depends on bounded head metadata, one journal
+page and the declared live map capacities, rather than total journal length. Recovery
+time and temporary disk grow with history. Choose a sufficiently large local
+temporary volume (SQLite respects `SQLITE_TMPDIR`); insufficient disk refuses
+recovery. The convenience `journal()` API still materializes history.
+
+Source-bound application identities change with implementation changes.
+Import accepts the exact preceding implementation's journal binding when its
+contract and compiled checker/Authority match, fully replays its records and
+binds the new store to the current implementation. Export the old store with
+its matching executable before importing. Other source bindings and earlier
+collection-application profiles require an explicit migration.
+
+The form retains an uncertain command for exact retry while the page remains
+open. Resolve that command before reloading. The credential is never saved in
+browser storage. A key picker, collection listing and durable browser request
+recovery are follow-ups. This application profile is separate from the scalar
+SQLite publication shell; the collection store is a storage utility and does
+not itself supply a library publication capability.
+
+## Background
+
+J. Gray and A. Reuter, *Transaction Processing: Concepts and Techniques*,
+Morgan Kaufmann, 1993, describes database recovery. T. Bray, *The JavaScript
+Object Notation (JSON) Data Interchange Format*, RFC 8259, 2017, specifies the
+JSON format. R. C. Merkle, *Protocols for Public Key Cryptosystems*, IEEE
+Symposium on Security and Privacy, 1980, supplies hash-tree background.
+These sources do not establish this implementation's correctness.
+
+## What is new here
+
+prior-art search pending. No priority claim is made for this integration.
+
+## Scope
+
+Decisions are checked by the existing Authority. Storage, authentication and
+transport retain their separate trust boundaries. The included HTTP tests use
+local byte streams and do not establish a deployed service guarantee.

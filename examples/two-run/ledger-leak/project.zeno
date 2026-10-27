@@ -1,0 +1,22 @@
+zeno 1;
+project 1 ledger_leak;
+namespace 2 core;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 105 int Balance in 0..=2;
+type 106 bool Flag;
+type 107 int Bit in 0..=1;
+field 110 100 balance 105;
+field 111 100 sequence 107;
+field 112 100 private_flag 106;
+field 120 101 amount 107;
+component 400 decision {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 256;
+}
+merge [400];
+law 500 bounded on commit, genesis = post.100.110 >= 0;

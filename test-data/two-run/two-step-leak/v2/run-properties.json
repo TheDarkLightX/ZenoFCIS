@@ -1,0 +1,10 @@
+{
+  "schema": "zeno-fcis/run-properties/1",
+  "properties": [
+    {
+      "kind": "predicate",
+      "name": "public_stays_zero",
+      "formula": "post.100.110 == 0"
+    }
+  ]
+}

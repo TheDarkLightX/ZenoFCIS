@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Collection contract</title>
+<style>body{font:16px system-ui;max-width:50rem;margin:3rem auto;padding:0 1rem;color:#182231;background:#f7f9fb}label{display:block;margin:1rem 0}input{display:block;box-sizing:border-box;width:100%;padding:.6rem;font:inherit}button{padding:.7rem 1rem;margin:.4rem .4rem .4rem 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;padding:1rem;border:1px solid #ccd5df}small{color:#46576b}</style>
+<h1>Collection contract</h1><p>Enter the configured credential, then fill the command fields. Keys are exactly 64 lowercase hexadecimal digits.</p>
+<form id="sign-in"><label>Credential<input id="credential" type="password" autocomplete="off" maxlength="64" required></label><button>Open contract</button></form>
+<form id="command" hidden><div id="fields"></div><button>Preview</button><button id="commit" type="button" disabled>Commit preview</button><button id="retry" type="button" disabled>Retry retained command</button></form>
+<p id="status" role="status" aria-live="polite"></p><pre id="result">Sign in to load the current revision and interface.</pre>
+<script src="/form.js" defer></script></html>

@@ -22,7 +22,39 @@ use super::rules::{Class, LawKind};
 
 /// Encodes the policy and checks the complete catalog binding.
 pub fn encode(contract: &Contract<'_>, schema: &[u8]) -> Result<Vec<u8>, ContractError> {
-    bound(contract, schema, |policy, _| Ok(policy.to_vec()))
+    bound(contract, schema, EncodeUse)
+}
+
+/// Check the application's original record genesis with its bound runtime Authority.
+/// Framing scratch is owned here; only an owned refusal can leave the invocation.
+///
+/// # Errors
+/// The catalog, Authority or starting-state refusal, including the refusing law.
+pub fn check_genesis(contract: &Contract<'_>, schema: &[u8]) -> Result<(), ContractError> {
+    use zeno_fcis_synthesis::finite::canonical_v2::output;
+    let max = usize::try_from(contract.frame_bytes[0]).unwrap_or(usize::MAX);
+    let fields: Vec<_> = contract
+        .genesis
+        .iter()
+        .map(|(id, value)| c::Field {
+            id: *id,
+            value: atom(value),
+        })
+        .collect();
+    let state = output::encode_record(&fields, max)
+        .and_then(|payload| {
+            output::encode_envelope(ROOTS[0].1, &contract.commitment, &payload, max)
+        })
+        .unwrap_or_default();
+    if contract.unsigned {
+        with_numeric_authority(contract, schema, |authority| {
+            super::genesis::admit(authority, &state).map_err(|refusal| refusal.error())
+        })?
+    } else {
+        with_authority(contract, schema, |authority| {
+            super::genesis::admit(authority, &state).map_err(|refusal| refusal.error())
+        })?
+    }
 }
 
 /// Binds the library Authority of a contract, after the same catalog binding
@@ -35,15 +67,19 @@ pub fn with_authority<R>(
     schema: &[u8],
     use_authority: impl FnOnce(&authority::Authority<'_>) -> R,
 ) -> Result<R, ContractError> {
-    bound(contract, schema, |_, catalog| {
-        let bound = authority::bind(catalog).map_err(|refusal| {
-            ContractError::new(
-                "library authority",
-                format!("refused the generated contract: {refusal:?}"),
-            )
-        })?;
-        Ok(use_authority(&bound))
-    })
+    bound(
+        contract,
+        schema,
+        ScalarUse(|_: &[u8], catalog: &catalog::BoundCatalog<'_>| {
+            let bound = authority::bind(catalog).map_err(|refusal| {
+                ContractError::new(
+                    "library authority",
+                    format!("refused the generated contract: {refusal:?}"),
+                )
+            })?;
+            Ok(use_authority(&bound))
+        }),
+    )
 }
 
 /// Runs `use_catalog` on the policy bytes and the library's checked catalog
@@ -57,7 +93,7 @@ pub fn with_catalog<R>(
     schema: &[u8],
     use_catalog: impl FnOnce(&[u8], &catalog::BoundCatalog<'_>) -> Result<R, ContractError>,
 ) -> Result<R, ContractError> {
-    bound(contract, schema, use_catalog)
+    bound(contract, schema, ScalarUse(use_catalog))
 }
 
 /// Builds the library values the descriptor borrows, encodes the policy,
@@ -66,7 +102,7 @@ pub fn with_catalog<R>(
 fn bound<R>(
     contract: &Contract<'_>,
     schema: &[u8],
-    use_bound: impl FnOnce(&[u8], &catalog::BoundCatalog<'_>) -> Result<R, ContractError>,
+    use_bound: impl BoundUse<R>,
 ) -> Result<R, ContractError> {
     let declarations = contract.declarations;
     let fields: Vec<Vec<s::Field<'_>>> = declarations
@@ -109,6 +145,10 @@ fn bound<R>(
                 Form::Record(_) => s::Kind::Record(fields),
                 Form::Sum(_) => s::Kind::Sum(variants),
                 Form::Leaf(Leaf::Bool) => s::Kind::Bool,
+                Form::Leaf(Leaf::U128 { min, max }) => s::Kind::U128 {
+                    min: *min,
+                    max: *max,
+                },
                 Form::Leaf(Leaf::I128 { min, max }) => s::Kind::I128 {
                     min: *min,
                     max: *max,
@@ -142,15 +182,44 @@ fn bound<R>(
         .map(|channel| (channel.id, channel.destination_type, channel.payload_type))
         .collect();
 
-    let roots: Vec<Root> = contract.roots.iter().map(Root::from).collect();
-    let output_types: Vec<InputLeaf> = contract.output_types.iter().map(input_leaf).collect();
-    let inputs: Vec<ScalarDomain> = contract.input_domains.iter().map(scalar_domain).collect();
-    let outputs: Vec<ScalarDomain> = contract.output_domains.iter().map(scalar_domain).collect();
-    let nodes = contract
-        .nodes
-        .iter()
-        .map(scalar_op)
-        .collect::<Result<Vec<Op>, _>>()?;
+    let unsigned = contract.unsigned;
+    let roots: Vec<Root> = if unsigned {
+        Vec::new()
+    } else {
+        contract.roots.iter().map(Root::from).collect()
+    };
+    let output_types: Vec<InputLeaf> = if unsigned {
+        Vec::new()
+    } else {
+        contract.output_types.iter().map(input_leaf).collect()
+    };
+    let inputs: Vec<ScalarDomain> = if unsigned {
+        Vec::new()
+    } else {
+        contract
+            .input_domains
+            .iter()
+            .map(scalar_domain)
+            .collect::<Result<_, _>>()?
+    };
+    let outputs: Vec<ScalarDomain> = if unsigned {
+        Vec::new()
+    } else {
+        contract
+            .output_domains
+            .iter()
+            .map(scalar_domain)
+            .collect::<Result<_, _>>()?
+    };
+    let nodes = if unsigned {
+        Vec::new()
+    } else {
+        contract
+            .nodes
+            .iter()
+            .map(scalar_op)
+            .collect::<Result<Vec<Op>, _>>()?
+    };
     let program_roots = contract
         .program_roots
         .iter()
@@ -317,6 +386,72 @@ fn bound<R>(
             .with_limit(Resource::Depth, 0)
             .with_limit(Resource::Step, budgets.step),
     };
+    if unsigned {
+        let roots = contract
+            .roots
+            .iter()
+            .map(numeric_root)
+            .collect::<Result<Vec<_>, _>>()?;
+        let inputs = contract
+            .input_domains
+            .iter()
+            .map(numeric_domain)
+            .collect::<Vec<_>>();
+        let outputs = contract
+            .output_domains
+            .iter()
+            .map(numeric_domain)
+            .collect::<Vec<_>>();
+        let nodes = contract
+            .nodes
+            .iter()
+            .map(numeric_op)
+            .collect::<Result<Vec<_>, _>>()?;
+        let output_types = contract
+            .output_types
+            .iter()
+            .map(numeric_leaf)
+            .collect::<Result<Vec<_>, _>>()?;
+        let descriptor = c::NumericDescriptor {
+            state: roots[0].schema(),
+            command: roots[1].schema(),
+            context: roots[2].schema(),
+            program: zeno_fcis_synthesis::finite::V2NumericProgram {
+                inputs: &inputs,
+                outputs: &outputs,
+                nodes: &nodes,
+                roots: &program_roots,
+            },
+            output_types: &output_types,
+            bindings: &bindings,
+            decision_output: 0,
+            branches: &branches,
+            reasons: &reasons,
+            channels: &channels,
+            laws: &laws,
+            required: &required,
+            limits: parts.limits,
+        };
+        let policy = authority::numeric_policy_bytes(&descriptor, schema, &framing, &channel_roots)
+            .ok_or_else(|| ContractError::new("numeric policy", "encoding overflow"))?;
+        let binder = Binder {
+            schema,
+            description: &description,
+            counts: contract.schema_counts(),
+            framing: &framing,
+        };
+        let catalog = catalog::bind_original(
+            schema,
+            &description,
+            binder.limits(&policy),
+            &policy,
+            &descriptor,
+            &framing,
+            &channel_roots,
+        )
+        .map_err(|failure| ContractError::new("U128 catalog", format!("{failure:?}")))?;
+        return use_bound.numeric(&policy, &catalog);
+    }
     let descriptor = parts.descriptor();
     let policy = authority::policy_bytes(&descriptor, schema, &framing, &channel_roots)
         .ok_or_else(|| {
@@ -341,7 +476,7 @@ fn bound<R>(
         let entry = binder.locate(contract, &parts, &channel_roots);
         catalog_refusal(failure, entry)
     })?;
-    use_bound(&policy, &catalog)
+    use_bound.scalar(&policy, &catalog)
 }
 
 /// Everything a descriptor borrows, so that a probe can replace one part.
@@ -614,6 +749,10 @@ impl Root {
 fn input_leaf(leaf: &model::InputLeaf) -> InputLeaf {
     match leaf {
         model::InputLeaf::Bool => InputLeaf::Bool,
+        model::InputLeaf::U128 { min, max } => InputLeaf::U128 {
+            min: *min,
+            max: *max,
+        },
         model::InputLeaf::I128 { min, max } => InputLeaf::I128 {
             min: *min,
             max: *max,
@@ -621,26 +760,33 @@ fn input_leaf(leaf: &model::InputLeaf) -> InputLeaf {
         model::InputLeaf::Sum { type_id, variants } => InputLeaf::Sum {
             type_id: *type_id,
             min: variants.first().copied().map_or(0, i128::from),
-            max: variants.last().copied().map_or(0, i128::from),
+            max: variants.first().copied().map_or(0, i128::from) + variants.len() as i128 - 1,
             variants: variants
                 .iter()
-                .map(|id| InputVariant {
+                .enumerate()
+                .map(|(index, id)| InputVariant {
                     id: *id,
-                    code: i128::from(*id),
+                    code: variants.first().copied().map_or(0, i128::from) + index as i128,
                 })
                 .collect(),
         },
     }
 }
 
-pub fn scalar_domain(domain: &model::ScalarDomain) -> ScalarDomain {
-    match domain {
+pub fn scalar_domain(domain: &model::ScalarDomain) -> Result<ScalarDomain, ContractError> {
+    Ok(match domain {
+        model::ScalarDomain::Unsigned { .. } => {
+            return Err(ContractError::new(
+                "scalar domain",
+                "U128SubjectUnsupported",
+            ));
+        }
         model::ScalarDomain::Bool => ScalarDomain::Bool,
         model::ScalarDomain::Int { min, max } => ScalarDomain::Int {
             min: *min,
             max: *max,
         },
-    }
+    })
 }
 
 pub fn small(index: usize) -> Result<u16, ContractError> {
@@ -650,6 +796,12 @@ pub fn small(index: usize) -> Result<u16, ContractError> {
 
 pub fn scalar_op(op: &ScalarOp) -> Result<Op, ContractError> {
     Ok(match *op {
+        ScalarOp::Numeric(_) => {
+            return Err(ContractError::new(
+                "scalar program",
+                "U128SubjectUnsupported",
+            ));
+        }
         ScalarOp::Input(a) => Op::Input(small(a)?),
         ScalarOp::Int(value) => Op::Int(value),
         ScalarOp::Bool(value) => Op::Bool(value),
@@ -711,6 +863,10 @@ fn atom(value: &Atom) -> c::Atom<'_> {
 fn domain(value: &model::Domain) -> c::Domain<'_> {
     match value {
         model::Domain::Bool => c::Domain::Bool,
+        model::Domain::U128 { min, max } => c::Domain::U128 {
+            min: *min,
+            max: *max,
+        },
         model::Domain::I128 { min, max } => c::Domain::I128 {
             min: *min,
             max: *max,
@@ -813,7 +969,158 @@ fn scope(value: zeno_fcis_spec::LawScope) -> l::Scope {
         LawScope::Always => l::Scope::Always,
         LawScope::Accept => l::Scope::Accept,
         LawScope::Reject => l::Scope::Reject,
+        LawScope::RejectReason(reason) => l::Scope::RejectReason(reason),
         LawScope::CommittedFailure => l::Scope::CommittedFailure,
         LawScope::Committing => l::Scope::Committing,
     }
 }
+
+/// Owned preparation data borrowed only for this catalog-binding invocation.
+enum NumericRoot<'a> {
+    Leaf(c::Domain<'a>),
+    Record(Vec<InputField<c::Domain<'a>>>),
+}
+impl<'a> NumericRoot<'a> {
+    fn schema(&self) -> c::Schema<'_, c::Domain<'a>> {
+        match self {
+            Self::Leaf(v) => c::Schema::Leaf(v),
+            Self::Record(v) => c::Schema::Record(v),
+        }
+    }
+}
+fn numeric_leaf(leaf: &model::InputLeaf) -> Result<c::Domain<'_>, ContractError> {
+    Ok(match leaf {
+        model::InputLeaf::Bool => c::Domain::Bool,
+        model::InputLeaf::I128 { min, max } => c::Domain::I128 {
+            min: *min,
+            max: *max,
+        },
+        model::InputLeaf::U128 { min, max } => c::Domain::U128 {
+            min: *min,
+            max: *max,
+        },
+        model::InputLeaf::Sum { type_id, variants } => c::Domain::Sum {
+            type_id: *type_id,
+            variants,
+        },
+    })
+}
+fn numeric_root(root: &RootSchema) -> Result<NumericRoot<'_>, ContractError> {
+    Ok(match root {
+        RootSchema::Leaf(v) => NumericRoot::Leaf(numeric_leaf(v)?),
+        RootSchema::Record(v) => NumericRoot::Record(
+            v.iter()
+                .map(|(id, v)| {
+                    Ok(InputField {
+                        id: *id,
+                        leaf: numeric_leaf(v)?,
+                    })
+                })
+                .collect::<Result<_, ContractError>>()?,
+        ),
+    })
+}
+pub fn numeric_domain(d: &model::ScalarDomain) -> c::Domain<'static> {
+    match d {
+        model::ScalarDomain::Bool => c::Domain::Bool,
+        model::ScalarDomain::Int { min, max } => c::Domain::I128 {
+            min: *min,
+            max: *max,
+        },
+        model::ScalarDomain::Unsigned { min, max } => c::Domain::U128 {
+            min: *min,
+            max: *max,
+        },
+    }
+}
+/// The same immutable compiler graph, lifted to the typed evaluator without signed projections.
+pub fn numeric_op(
+    op: &ScalarOp,
+) -> Result<zeno_fcis_synthesis::finite::V2NumericOp, ContractError> {
+    use zeno_fcis_synthesis::finite::{V2IntegerWidth as W, V2NumericOp as N};
+    if let ScalarOp::Numeric(v) = op {
+        return Ok(*v);
+    }
+    Ok(match scalar_op(op)? {
+        Op::Input(a) => N::Input(a),
+        Op::Int(v) => N::I128(v),
+        Op::Bool(v) => N::Bool(v),
+        Op::Add(a, b) => N::Add(W::Signed128, a, b),
+        Op::Sub(a, b) => N::Sub(W::Signed128, a, b),
+        Op::Mul(a, b) => N::Mul(W::Signed128, a, b),
+        Op::DivFloor(a, b) => N::DivFloor(W::Signed128, a, b),
+        Op::DivCeil(a, b) => N::DivCeil(W::Signed128, a, b),
+        Op::Eq(a, b) => N::Eq(a, b),
+        Op::Lt(a, b) => N::Lt(a, b),
+        Op::And(a, b) => N::And(a, b),
+        Op::Not(a) => N::Not(a),
+        Op::Select(c, a, b) => N::Select(c, a, b),
+        Op::MulDivFloor(a, b, d) => N::NonnegativeMulDivFloor(W::Signed128, a, b, d),
+        Op::MulDivCeil(a, b, d) => N::NonnegativeMulDivCeil(W::Signed128, a, b, d),
+        Op::SignedMulDivFloor(a, b, d) => N::SignedMulDivFloor(a, b, d),
+        Op::ProductsGe(a, b) => N::NonnegativeProductsGe(a, b),
+        _ => return Err(ContractError::new("numeric graph", "unsupported operation")),
+    })
+}
+
+trait BoundUse<R> {
+    fn scalar(self, policy: &[u8], catalog: &catalog::BoundCatalog<'_>)
+    -> Result<R, ContractError>;
+    fn numeric(self, policy: &[u8], catalog: &NumericCatalog<'_>) -> Result<R, ContractError>;
+}
+struct EncodeUse;
+impl BoundUse<Vec<u8>> for EncodeUse {
+    fn scalar(self, p: &[u8], _: &catalog::BoundCatalog<'_>) -> Result<Vec<u8>, ContractError> {
+        Ok(p.to_vec())
+    }
+    fn numeric(self, p: &[u8], _: &NumericCatalog<'_>) -> Result<Vec<u8>, ContractError> {
+        Ok(p.to_vec())
+    }
+}
+struct ScalarUse<F>(F);
+impl<R, F: FnOnce(&[u8], &catalog::BoundCatalog<'_>) -> Result<R, ContractError>> BoundUse<R>
+    for ScalarUse<F>
+{
+    fn scalar(self, p: &[u8], c: &catalog::BoundCatalog<'_>) -> Result<R, ContractError> {
+        (self.0)(p, c)
+    }
+    fn numeric(self, _: &[u8], _: &NumericCatalog<'_>) -> Result<R, ContractError> {
+        Err(ContractError::new(
+            "legacy scalar binding",
+            "U128RequiresNumericAuthority",
+        ))
+    }
+}
+struct NumericUse<F>(F);
+impl<R, F: FnOnce(&[u8], &NumericCatalog<'_>) -> Result<R, ContractError>> BoundUse<R>
+    for NumericUse<F>
+{
+    fn scalar(self, _: &[u8], _: &catalog::BoundCatalog<'_>) -> Result<R, ContractError> {
+        Err(ContractError::new(
+            "numeric binding",
+            "numeric subject required",
+        ))
+    }
+    fn numeric(self, p: &[u8], c: &NumericCatalog<'_>) -> Result<R, ContractError> {
+        (self.0)(p, c)
+    }
+}
+/// Bind full-width contracts using the same library catalog and Authority.
+pub fn with_numeric_authority<R>(
+    contract: &Contract<'_>,
+    schema: &[u8],
+    use_authority: impl FnOnce(&NumericAuthority<'_>) -> R,
+) -> Result<R, ContractError> {
+    bound(
+        contract,
+        schema,
+        NumericUse(|_: &[u8], catalog: &NumericCatalog<'_>| {
+            let bound = authority::bind(catalog)
+                .map_err(|e| ContractError::new("numeric authority", format!("{e:?}")))?;
+            Ok(use_authority(&bound))
+        }),
+    )
+}
+
+type NumericCatalog<'p> = catalog::BoundCatalog<'p, c::NumericDescriptor<'p>>;
+type NumericAuthority<'p> = authority::Authority<'p, c::NumericDescriptor<'p>>;

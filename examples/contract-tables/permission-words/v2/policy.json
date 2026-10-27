@@ -1,0 +1,48 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/4",
+  "template": "permission-words",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "permitted": "circuit { formula { command.101.120 == 0 }; formula { command.101.121 - u128(2) * div_floor(command.101.121, u128(2)) == u128(1) }; not 1; false; true; formula { pre.100.210 - u128(2) * div_floor(pre.100.210, u128(2)) == u128(1) }; formula { pre.100.110 == 0 }; and 6 3; formula { pre.100.110 == 1 }; and 8 3; or 7 9; or 5 10; select 4 11 3; formula { div_floor(pre.100.210, u128(2)) - u128(2) * div_floor(pre.100.210, u128(4)) == u128(1) }; or 13 10; select 4 14 3; formula { div_floor(pre.100.210, u128(4)) - u128(2) * div_floor(pre.100.210, u128(8)) == u128(1) }; or 16 10; select 4 17 3; formula { pre.100.211 - u128(2) * div_floor(pre.100.211, u128(2)) == u128(1) }; formula { pre.100.111 == 0 }; and 20 3; formula { pre.100.111 == 1 }; and 22 3; or 21 23; or 19 24; select 4 25 3; formula { div_floor(pre.100.211, u128(2)) - u128(2) * div_floor(pre.100.211, u128(4)) == u128(1) }; or 27 24; select 4 28 3; formula { div_floor(pre.100.211, u128(4)) - u128(2) * div_floor(pre.100.211, u128(8)) == u128(1) }; or 30 24; select 4 31 3; and 6 12; and 8 26; or 33 34; or 5 35; select 4 36 3; and 6 15; and 8 29; or 38 39; or 13 40; select 4 41 3; and 6 18; and 8 32; or 43 44; or 16 45; select 4 46 3; and 20 12; and 22 26; or 48 49; or 19 50; select 4 51 3; and 20 15; and 22 29; or 53 54; or 27 55; select 4 56 3; and 20 18; and 22 32; or 58 59; or 30 60; select 4 61 3; and 6 37; and 8 52; or 63 64; or 5 65; select 4 66 3; and 6 42; and 8 57; or 68 69; or 13 70; select 4 71 3; and 6 47; and 8 62; or 73 74; or 16 75; select 4 76 3; and 20 37; and 22 52; or 78 79; or 19 80; select 4 81 3; and 20 42; and 22 57; or 83 84; or 27 85; select 4 86 3; and 20 47; and 22 62; or 88 89; or 30 90; select 4 91 3; and 6 67; and 8 82; or 93 94; or 5 95; select 4 96 3; and 6 72; and 8 87; or 98 99; or 13 100; select 4 101 3; and 6 77; and 8 92; or 103 104; or 16 105; select 4 106 3; and 20 67; and 22 82; or 108 109; or 19 110; select 4 111 3; and 20 72; and 22 87; or 113 114; or 27 115; select 4 116 3; and 20 77; and 22 92; or 118 119; or 30 120; select 4 121 3; and 6 97; and 8 112; or 123 124; or 5 125; select 4 126 3; and 6 102; and 8 117; or 128 129; or 13 130; select 4 131 3; and 6 107; and 8 122; or 133 134; or 16 135; select 4 136 3; and 20 97; and 22 112; or 138 139; or 19 140; select 4 141 3; and 20 102; and 22 117; or 143 144; or 27 145; select 4 146 3; and 20 107; and 22 122; or 148 149; or 30 150; select 4 151 3; and 6 127; and 8 142; or 153 154; or 5 155; select 4 156 3; and 6 132; and 8 147; or 158 159; or 13 160; select 4 161 3; and 6 137; and 8 152; or 163 164; or 16 165; select 4 166 3; and 20 127; and 22 142; or 168 169; or 19 170; select 4 171 3; and 20 132; and 22 147; or 173 174; or 27 175; select 4 176 3; and 20 137; and 22 152; or 178 179; or 30 180; select 4 181 3; or 2 157; formula { div_floor(command.101.121, u128(2)) - u128(2) * div_floor(command.101.121, u128(4)) == u128(1) }; not 184; or 185 162; and 183 186; formula { div_floor(command.101.121, u128(4)) - u128(2) * div_floor(command.101.121, u128(8)) == u128(1) }; not 188; or 189 167; and 187 190; and 0 191; formula { command.101.120 == 1 }; or 2 172; or 185 177; and 194 195; or 189 182; and 196 197; and 193 198; or 192 199; } output 200"
+  },
+  "cases": [
+    {
+      "rule": "the role needs every requested permission",
+      "when": "!permitted",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "permit without changing the hierarchy",
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "pre.100.110",
+        "111": "pre.100.111",
+        "210": "pre.100.210",
+        "211": "pre.100.211"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0,
+    "210": "u128(1)",
+    "211": "u128(2)"
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "AuthoritySubjectRecipient",
+    "503": "RejectNoAuthority"
+  }
+}

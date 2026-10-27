@@ -22,6 +22,7 @@ pub const ROOTS: [(Source, u32); 3] = [
 pub enum Leaf {
     Bool,
     I128 { min: i128, max: i128 },
+    U128 { min: u128, max: u128 },
     Text { min: u32, max: u32 },
 }
 
@@ -69,13 +70,8 @@ pub struct Law {
     pub formula: Ast,
 }
 
-/// The original input a scalar program position reads.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum Source {
-    State,
-    Command,
-    Context,
-}
+mod source;
+pub use source::Source;
 
 impl Source {
     /// The name prefix rules and laws use: `pre`, `command` or `context`.
@@ -110,6 +106,7 @@ pub struct Input {
 pub enum Kind<'d> {
     Bool,
     I128 { min: i128, max: i128 },
+    U128 { min: u128, max: u128 },
     Text,
     Sum(&'d [Variant]),
 }
@@ -202,21 +199,29 @@ impl Declarations {
                 .collect::<Result<Vec<_>, ContractError>>()?;
             // A binding may restate a declared range but not change it, as
             // in schema lowering.
-            let leaf = match (declared.range(), bindings.get(&id)) {
-                (Some(range), binding) => {
-                    let declared = Leaf::I128 {
-                        min: range.min(),
-                        max: range.max(),
-                    };
-                    if binding.is_some_and(|binding| *binding != declared) {
-                        return Err(ContractError::new(
-                            place(),
-                            "its leaf binding differs from its declared range",
-                        ));
-                    }
-                    Some(declared)
+            let leaf = if let Some((min, max)) = declared.unsigned_range() {
+                let leaf = Leaf::U128 { min, max };
+                if bindings.get(&id).is_some_and(|v| *v != leaf) {
+                    return Err(invalid("U128 binding mismatch".into()));
                 }
-                (None, binding) => binding.copied(),
+                Some(leaf)
+            } else {
+                match (declared.range(), bindings.get(&id)) {
+                    (Some(range), binding) => {
+                        let declared = Leaf::I128 {
+                            min: range.min(),
+                            max: range.max(),
+                        };
+                        if binding.is_some_and(|binding| *binding != declared) {
+                            return Err(ContractError::new(
+                                place(),
+                                "its leaf binding differs from its declared range",
+                            ));
+                        }
+                        Some(declared)
+                    }
+                    (None, binding) => binding.copied(),
+                }
             };
             match (declared.kind(), leaf) {
                 (TypeKind::Bool, Some(leaf)) if leaf != Leaf::Bool => {
@@ -262,8 +267,10 @@ impl Declarations {
         if types.values().any(|t| t.quantity.is_some()) {
             use zeno_fcis_codec::CommitmentHasher;
             for declared in types.values_mut() {
-                if matches!(declared.form, Form::Leaf(Leaf::I128 { .. }))
-                    && declared.quantity.is_none()
+                if matches!(
+                    declared.form,
+                    Form::Leaf(Leaf::I128 { .. } | Leaf::U128 { .. })
+                ) && declared.quantity.is_none()
                 {
                     return Err(invalid(
                         "every integer type needs unit U scale eP in a quantity contract"
@@ -271,7 +278,11 @@ impl Declarations {
                     ));
                 }
                 if let Some(q) = &declared.quantity {
-                    let mut bytes = b"zeno-fcis/quantity/i128/1\0".to_vec();
+                    let mut bytes = if matches!(declared.form, Form::Leaf(Leaf::U128 { .. })) {
+                        b"zeno-fcis/quantity/u128/1\0".to_vec()
+                    } else {
+                        b"zeno-fcis/quantity/i128/1\0".to_vec()
+                    };
                     bytes.extend_from_slice(&(declared.name.len() as u32).to_be_bytes());
                     bytes.extend_from_slice(declared.name.as_bytes());
                     bytes.push(q.scale());
@@ -367,6 +378,28 @@ impl Declarations {
         })
     }
 
+    /// Full unsigned subjects require the typed core path.
+    pub fn unsigned(&self) -> bool {
+        self.types
+            .values()
+            .any(|t| matches!(t.form, Form::Leaf(Leaf::U128 { .. })))
+            || self
+                .laws
+                .iter()
+                .any(|law| super::expr::uses_unsigned(&law.formula))
+            || self.notes.claims.iter().any(|claim| match claim.formula() {
+                zeno_fcis_spec::ClaimFormula::Relational(v) => v.uses_u128(),
+                zeno_fcis_spec::ClaimFormula::Temporal(v) => v.uses_u128(),
+            })
+    }
+    /// Restricted consumer admission, before lowering or projection.
+    pub fn refuse_unsigned(&self, consumer: &str) -> Result<(), ContractError> {
+        if self.unsigned() {
+            Err(ContractError::new(consumer, "U128SubjectUnsupported"))
+        } else {
+            Ok(())
+        }
+    }
     pub fn get(&self, id: u32) -> Result<&Type, ContractError> {
         self.types
             .get(&id)
@@ -388,6 +421,10 @@ impl Declarations {
     pub fn kind(&self, id: u32) -> Result<Kind<'_>, ContractError> {
         Ok(match &self.get(id)?.form {
             Form::Leaf(Leaf::Bool) => Kind::Bool,
+            Form::Leaf(Leaf::U128 { min, max }) => Kind::U128 {
+                min: *min,
+                max: *max,
+            },
             Form::Leaf(Leaf::I128 { min, max }) => Kind::I128 {
                 min: *min,
                 max: *max,

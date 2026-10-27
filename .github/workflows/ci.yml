@@ -22,6 +22,16 @@ env:
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_PROFILE_TEST_DEBUG: "0"
   CARGO_INCREMENTAL: "0"
+  # Match the qualified native profile without disabling runtime checks.
+  CARGO_PROFILE_DEV_OPT_LEVEL: "1"
+  CARGO_PROFILE_TEST_OPT_LEVEL: "1"
+  CARGO_PROFILE_DEV_DEBUG_ASSERTIONS: "true"
+  CARGO_PROFILE_TEST_DEBUG_ASSERTIONS: "true"
+  CARGO_PROFILE_DEV_OVERFLOW_CHECKS: "true"
+  CARGO_PROFILE_TEST_OVERFLOW_CHECKS: "true"
+  # Avoid competing short-deadline contained workers inside one test binary.
+  RUST_TEST_THREADS: "1"
+  RUST_MIN_STACK: "33554432"
 
 concurrency:
   group: zeno-fcis-ci-${{ github.ref }}
@@ -60,6 +70,10 @@ jobs:
           python3 tools/test_miri_exclusions.py
           python3 tools/test_authority_source_bundle.py
           python3 tools/test_proof_challenge.py
+          python3 tools/test_signed_arithmetic.py
+
+      - name: Spot reference and source tests
+        run: python3 -B -m unittest discover -s core-apps/zenodex-spot/tests -p "test_*.py"
       # BEGIN neutral knowledge source and packaging guards.
       - name: Knowledge file include policy and engine reference
         run: |

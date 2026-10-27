@@ -12,7 +12,7 @@ readme.workspace = true
 
 [features]
 default = ["std"]
-std = []
+std = ["zeno-fcis-codec/std", "zeno-fcis-value/std"]
 # Enable the rpds persistent hash map.
 rpds-backend = ["dep:rpds"]
 # Enable the ordered map with thread-safe, shared snapshots.
@@ -21,8 +21,8 @@ ordered-map = ["dep:rpds"]
 imbl-backend = ["ordered-map"]
 
 [dependencies]
-zeno-fcis-codec = { version = "=2.5.0", path = "../zeno-fcis-codec" }
-zeno-fcis-value = { version = "=2.5.0", path = "../zeno-fcis-value" }
+zeno-fcis-codec = { version = "=2.6.0", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-value = { version = "=2.6.0", path = "../zeno-fcis-value", default-features = false }
 
 # Optional persistent collection backends.
 # Pinned exactly per ZenoFCIS dependency policy.

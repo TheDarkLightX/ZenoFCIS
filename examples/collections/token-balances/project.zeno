@@ -1,0 +1,51 @@
+zeno 1;
+project 1 token_balances;
+namespace 2 tokens;
+// Token balances for any number of accounts, keyed by opaque account IDs.
+// The issuer mints to an account; any holder transfers between accounts.
+// The total supply is a summary: every decision changes it by exactly the
+// change of the accounts it names, so it equals the sum of all balances.
+type 100 state Ledger;
+type 101 command TokenCommand;
+type 102 context Desk;
+type 103 key AccountId;
+type 104 data Account;
+type 105 int Amount in 0..=3;
+type 106 int Supply in 0..=6;
+type 107 data Action;
+field 140 104 balance 105;
+map 110 100 accounts 103 104 capacity 1048576;
+summary 120 100 supply 106 sum 110.140;
+field 130 101 action 107;
+field 131 101 from 103;
+field 132 101 to 103;
+field 133 101 amount 105;
+variant 150 107 Mint none;
+variant 151 107 Transfer none;
+variant 180 102 Issuer none;
+variant 181 102 Holder none;
+// The accounts a command names: entry 160 is the sender, 170 the receiver.
+// In the view, 160 is 1 when the sender's account exists and 161 is its
+// balance; 170 and 171 are the receiver's.
+entry 160 sender of 110 at command.101.131;
+entry 170 receiver of 110 at command.101.132;
+reason 200 issuer_required precedence 0;
+reason 201 no_account precedence 1;
+reason 202 insufficient_balance precedence 2;
+reason 203 over_limit precedence 3;
+component 400 ledger {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 128;
+}
+merge [400];
+// Only the issuer mints.
+law 500 issuer_mints on commit = command.101.130 == 150 -> context.102 == 180;
+// An account that does not exist holds nothing.
+law 501 absent_accounts_hold_nothing on commit, genesis =
+  forall e in entries 110 { post.100.e == 1 || post.100.e.140 == 0 };
+// A transfer never creates an account for the sender.
+law 502 transfers_need_a_sender on commit =
+  command.101.130 == 151 -> pre.100.160 == 1;

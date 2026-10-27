@@ -8,9 +8,9 @@
 //! every state law, the judge reports:
 //!
 //! - admissible decisions: for each tuple, every decision a contract of this
-//!   schema could make (a reject with each reject-class reason; an accept with
-//!   each declared state; a committed failure with each failure-class reason
-//!   and state), checked against the declared laws by the
+//!   schema could make (a reject with each declared reason; an accept with
+//!   each declared state; a committed failure with each reason and state),
+//!   checked against the declared laws by the
 //!   library's law evaluator. A tuple is determined when exactly one decision
 //!   is admitted. Tuples where the contract's own decision is refused are
 //!   counted apart.
@@ -25,7 +25,8 @@
 //!   otherwise; an admitted mutant is a concrete decision table the laws
 //!   allow and the contract excludes.
 //! - proposed laws: each must hold wherever it applies to the contract's
-//!   decisions; the judge then repeats the measures with them.
+//!   decisions and, when declared, at genesis; the judge then repeats the
+//!   measures with them.
 //!
 //! The framework laws generation adds are not among the declared laws: law
 //! 991 admits only the case table's own decision, so with it every tuple
@@ -39,11 +40,12 @@ use serde_json::{Value, json};
 use super::super::ContractError;
 use super::super::declarations::Declarations;
 use super::super::rules::{Class, LawKind, Rules};
+use super::decision_space::{DeliveryChoices, determination, determination_scope};
+use super::deliveries::{self, DeliveryUniverse};
 use super::evaluate::{self, Framer, LawSet, Proposed};
 use super::machine::{self, Inconclusive, Loaded, Machine, Observed, Space};
 use super::mutants::{self, Mutant};
 use super::parallel;
-use zeno_fcis_contract::internals::decision_space;
 use zeno_fcis_synthesis::finite::v2_authority::Authority;
 
 /// The default limit on law checks: tuples times candidate decisions times
@@ -109,7 +111,8 @@ impl Gaps {
         match self {
             Self::Measured(value) | Self::FalseAlarm(value) => value.clone(),
             Self::Inconclusive(inconclusive) => inconclusive.json(),
-            Self::OutOfScope(reason) => json!({"status": "out-of-scope", "reason": reason}),
+            Self::OutOfScope(reason) => json!({"status": "out-of-scope", "reason": reason,
+                "determination": determination_scope(true, "declared-and-proposed-laws")}),
             Self::Withheld(reason) => json!({"status": "withheld", "reason": reason}),
             Self::InvalidProposals { place, reason } => {
                 json!({"status": "invalid-proposals", "place": place, "reason": reason})
@@ -120,21 +123,34 @@ impl Gaps {
     /// The counts a summary carries.
     pub(crate) fn summary(&self) -> Value {
         let mut summary = json!({"status": self.status()});
+        if let Self::OutOfScope(_) = self {
+            summary = self.json();
+        }
         if let Self::Measured(value) = self {
-            for domain in ["full", "valid"] {
-                summary[domain] = json!({
-                    "tuples": value["admissible"][domain]["tuples"],
-                    "determined": value["admissible"][domain]["determined"],
-                    "mutants_admitted": value["mutation"][domain]["admitted"],
-                    "mutants_caught": value["mutation"][domain]["caught"],
-                });
+            summary = measured_summary(value);
+            if let Some(after) = value["proposals"].get("after").filter(|v| v.is_object()) {
+                summary["with_proposals"] = measured_summary(after);
             }
-            summary["inactive_laws"] = value["activation"]["inactive"].clone();
-            summary["reject_everything_admitted"] =
-                value["reject_everything"]["admitted_where_the_contract_decides"].clone();
         }
         summary
     }
+}
+
+/// Project measured counts without changing either checked measure.
+fn measured_summary(value: &Value) -> Value {
+    let mut summary = json!({"status": "measured", "determination": value["determination"]});
+    for domain in ["full", "valid"] {
+        summary[domain] = json!({
+            "tuples": value["admissible"][domain]["tuples"],
+            "determined": value["admissible"][domain]["determined"],
+            "mutants_admitted": value["mutation"][domain]["admitted"],
+            "mutants_caught": value["mutation"][domain]["caught"],
+        });
+    }
+    summary["inactive_laws"] = value["activation"]["inactive"].clone();
+    summary["reject_everything_admitted"] =
+        value["reject_everything"]["admitted_where_the_contract_decides"].clone();
+    summary
 }
 
 /// Runs the judge on a contract.
@@ -148,7 +164,7 @@ pub(crate) fn judge(
     options: Options<'_>,
 ) -> Result<Gaps, ContractError> {
     let loaded = Loaded::read(project, rules)?;
-    if let Some(reason) = out_of_scope(&loaded.rules) {
+    if let Some(reason) = out_of_scope(&loaded) {
         return Ok(Gaps::OutOfScope(reason));
     }
     let space = match Space::new(&loaded.positions, loaded.state_width, options.max_tuples) {
@@ -163,6 +179,7 @@ pub(crate) fn judge(
         Ok(measured) => measured,
         Err(Stop::Contract(error)) => return Err(error),
         Err(Stop::Withheld(reason)) => return Ok(Gaps::Withheld(reason)),
+        Err(Stop::OutOfScope(reason)) => return Ok(Gaps::OutOfScope(reason)),
     };
     let Some(text) = options.proposals else {
         return Ok(Gaps::Measured(before.json(work, options.max_work, None)));
@@ -203,6 +220,7 @@ pub(crate) fn judge(
         Ok(measured) => measured,
         Err(Stop::Contract(error)) => return Err(error),
         Err(Stop::Withheld(reason)) => return Ok(Gaps::Withheld(reason)),
+        Err(Stop::OutOfScope(reason)) => return Ok(Gaps::OutOfScope(reason)),
     };
     let (admitted, killed) = match (&before.mutation, &after.mutation) {
         (Some(earlier), Some(later)) => (
@@ -249,6 +267,7 @@ fn over_limit(work: u128, max_work: u64, reason: &'static str) -> Option<Gaps> {
 
 /// Why a measure stopped.
 enum Stop {
+    OutOfScope(String),
     Contract(ContractError),
     Withheld(String),
 }
@@ -259,9 +278,22 @@ impl From<ContractError> for Stop {
     }
 }
 
-/// Why the judge does not run on these rules: it proposes decisions without
-/// deliveries, so a contract that delivers is outside it.
-fn out_of_scope(rules: &Rules) -> Option<String> {
+/// The same declaration admission and scalar profile used before gap enumeration.
+/// Question preparation calls this over its owned source snapshot.
+pub(crate) fn profile_scope(project: &str, rules: &str) -> Result<Option<String>, ContractError> {
+    let loaded = Loaded::read(project, rules)?;
+    Ok(out_of_scope(&loaded))
+}
+
+/// Why the scalar decision universe cannot cover this contract.
+fn out_of_scope(loaded: &Loaded) -> Option<String> {
+    if DeliveryUniverse::new(&loaded.declarations, &loaded.rules).is_some() {
+        return None;
+    }
+    if !loaded.declarations.channels.is_empty() {
+        return Some("declared channels require a complete delivery decision universe".to_owned());
+    }
+    let rules = &loaded.rules;
     if rules.cases.iter().any(|case| !case.outbox.is_empty()) || !rules.delivery_laws.is_empty() {
         return Some(
             "the contract delivers; the judge proposes decisions without deliveries".to_owned(),
@@ -277,21 +309,25 @@ fn out_of_scope(rules: &Rules) -> Option<String> {
 /// # Errors
 /// The generator's refusal of the contract.
 fn work_of(loaded: &Loaded, space: &Space) -> Result<u128, ContractError> {
-    let contract = super::super::model::Contract::build(
+    let laws = super::super::model::Contract::build(
         &loaded.declarations,
         &loaded.rules,
         loaded.commitment,
-    )?;
-    let laws = contract.laws.len() as u128;
-    let rejects = decision_space::reasons_for(&contract.reasons, Class::Reject).len() as u128;
-    let failures =
-        decision_space::reasons_for(&contract.reasons, Class::CommittedFailure).len() as u128;
-    let candidates = rejects + (space.states as u128) * (1 + failures);
+    )?
+    .laws
+    .len() as u128;
+    let candidates = super::decision_space::DecisionSpace::new(&loaded.rules).count(space.states);
+    let candidates = if DeliveryUniverse::new(&loaded.declarations, &loaded.rules).is_some() {
+        2 * candidates + 1
+    } else {
+        candidates
+    };
     Ok((space.tuples() as u128) * candidates * laws.max(1))
 }
 
 /// Every measure of one contract.
 struct Measured {
+    delivery_universe: Option<DeliveryUniverse>,
     machine: Machine,
     declared: Vec<u32>,
     /// Whether each state satisfies every state law.
@@ -321,13 +357,14 @@ impl Measured {
                 "tuples": admissible.tuples,
                 "reference_refused": admissible.refused,
                 "determined": admissible.determined,
-                "undetermined": admissible.tuples - admissible.refused - admissible.determined,
+                "zero_outcome": admissible.zero,
+                "undetermined": admissible.tuples - admissible.determined,
                 "freedom": {
                     "class": admissible.class,
                     "reject_reason": admissible.reason,
                     "successor": admissible.successor,
                 },
-                "examples": admissible.examples.iter().map(|example| example.json(space)).collect::<Vec<_>>(),
+                "examples": admissible.examples.iter().map(|example| example.json(space, &self.machine, self.delivery_universe.as_ref())).collect::<Vec<_>>(),
             })
         };
         let activation = |index: usize| -> Value {
@@ -345,14 +382,26 @@ impl Measured {
             .filter(|(_, count)| **count == 0)
             .map(|(id, _)| *id)
             .collect();
-        json!({
+        let mut report = json!({
             "status": "measured",
+            "determination": determination_scope(self.delivery_universe.is_some(), "declared-and-proposed-laws"),
             "domain": {
                 "states": space.states,
                 "inputs": space.inputs,
                 "tuples": space.tuples(),
                 "valid_states": valid_states,
                 "state_laws": self.state_laws,
+            },
+            "completeness": {
+                "status": if self.admissible[0].determined == space.tuples() && self.admissible[0].refused == 0 && self.machine.observed.iter().any(|o| matches!(o, Observed::Decided { class: Class::Accept, .. })) { "complete-finite" } else { "incomplete" },
+                "law_991_used": false,
+                "decision_universe": if self.delivery_universe.is_some() { "all declared scalar successors, reasons restricted to their catalog decision class, and schema-valid outboxes; exact determination by delivery independence; unrestricted delivery counts are lower bounds" } else { "all declared scalar successors with canonical difference patches, every declared reason restricted to its catalog decision class, Accept/Reject/CommittedFailure; effects and channels structurally excluded by the scalar profile" },
+                "exactly_one": self.admissible[0].determined,
+                "zero_outcome": self.admissible[0].zero,
+                "execution_refusals": self.admissible[0].refused,
+                "accepted_rows": self.machine.observed.iter().filter(|o| matches!(o, Observed::Decided { class: Class::Accept, .. })).count(),
+                "residual_witnesses": self.admissible[0].examples.iter().map(|e| e.json(space, &self.machine, self.delivery_universe.as_ref())).collect::<Vec<_>>(),
+                "meaning": "the declared laws only; compare against an independent reviewed relation before adoption",
             },
             "declared_laws": self.declared,
             "work": work.to_string(),
@@ -370,7 +419,11 @@ impl Measured {
             },
             "mutation": self.mutation.as_ref().map(Mutation::json),
             "proposals": proposals,
-        })
+        });
+        if let Some(universe) = &self.delivery_universe {
+            report["completeness"]["delivery_universe"] = universe.json();
+        }
+        report
     }
 }
 
@@ -380,6 +433,7 @@ struct Admissible {
     tuples: usize,
     refused: usize,
     determined: usize,
+    zero: usize,
     /// Undetermined tuples where more than one class is admitted, more than
     /// one reject reason, or more than one committed successor.
     class: usize,
@@ -399,8 +453,8 @@ struct Example {
 }
 
 impl Example {
-    fn json(&self, space: &Space) -> Value {
-        json!({
+    fn json(&self, space: &Space, machine: &Machine, universe: Option<&DeliveryUniverse>) -> Value {
+        let mut value = json!({
             "input": crate::report_numbers::integers(&space.at(self.ordinal)),
             "contract": self.reference.json(space),
             "admissible": self.admissible,
@@ -409,7 +463,21 @@ impl Example {
                 "reason": reason,
                 "post": next.map(|next| crate::report_numbers::integers(&space.state(next))),
             })).collect::<Vec<_>>(),
-        })
+        });
+        if let Some(universe) = universe {
+            value["admissible_count_is_lower_bound"] = json!(true);
+            if self.reference.commits() {
+                let own = machine.outbox_at(self.ordinal);
+                let alternate = if own.is_empty() {
+                    universe.example()
+                } else {
+                    Vec::new()
+                };
+                value["delivery_choices"] =
+                    json!([deliveries::shown(own), deliveries::shown(&alternate)]);
+            }
+        }
+        value
     }
 }
 
@@ -417,6 +485,7 @@ impl Example {
 struct TupleGap {
     refused: bool,
     admissible: usize,
+    determined: bool,
     classes: usize,
     reasons: usize,
     successors: usize,
@@ -432,34 +501,60 @@ fn measure(
     max_tuples: u64,
     mutants: bool,
 ) -> Result<Measured, Stop> {
+    let delivery_universe = DeliveryUniverse::new(&loaded.declarations, &loaded.rules);
     let declared = loaded.declared_laws();
-    let reasons = super::super::model::Contract::build(
-        &loaded.declarations,
-        &loaded.rules,
-        loaded.commitment,
-    )?
-    .reasons;
-    let (machine, valid, state_laws, gaps) = loaded.bind(&loaded.rules, |authority, framer| {
-        let descriptor = authority.descriptor();
-        let machine = Machine::observe(authority, framer, space, &loaded.positions, &loaded.rules)?;
-        let space = &machine.space;
-        let state_laws = evaluate::state_laws(descriptor);
-        let input = space.input(0);
-        let valid: Vec<bool> = (0..space.states)
-            .map(|state| {
-                let mut tuple = space.state(state);
-                tuple.extend_from_slice(&input);
-                evaluate::first_unsatisfied_state_law(descriptor, &state_laws, framer, &tuple)
-                    .is_none()
-            })
-            .collect();
-        let laws = LawSet::new(descriptor, &declared);
-        let states: Vec<Vec<i128>> = (0..space.states).map(|state| space.state(state)).collect();
-        let gaps = parallel(space.tuples(), |ordinal| {
-            tuple_gap(&laws, framer, &machine, &states, &reasons, ordinal)
-        });
-        Ok((machine, valid, state_laws, gaps))
-    })?;
+    let decisions = super::decision_space::DecisionSpace::new(&loaded.rules);
+    let Some((machine, valid, state_laws, gaps)) =
+        loaded.bind(&loaded.rules, |authority, framer| {
+            let descriptor = authority.descriptor();
+            let machine =
+                Machine::observe(authority, framer, space, &loaded.positions, &loaded.rules)?;
+            let space = &machine.space;
+            let state_laws = evaluate::state_laws(descriptor);
+            let input = space.input(0);
+            let valid: Vec<bool> = (0..space.states)
+                .map(|state| {
+                    let mut tuple = space.state(state);
+                    tuple.extend_from_slice(&input);
+                    evaluate::first_unsatisfied_state_law(descriptor, &state_laws, framer, &tuple)
+                        .is_none()
+                })
+                .collect();
+            // The compiler's closed no-failure profile is independent of case order.
+            // Its mandatory false law excludes CF even for legacy incomplete laws.
+            let mut selected = declared.clone();
+            if !loaded
+                .rules
+                .law_kinds
+                .values()
+                .any(|kind| *kind == LawKind::CommittedFailureEffects)
+            {
+                selected.push(loaded.rules.failure_law);
+            }
+            let laws = LawSet::new(descriptor, &selected);
+            if delivery_universe.is_some() && !laws.delivery_independent() {
+                return Ok(None);
+            }
+
+            let states: Vec<Vec<i128>> =
+                (0..space.states).map(|state| space.state(state)).collect();
+            let gaps = parallel(space.tuples(), |ordinal| {
+                tuple_gap(
+                    &laws,
+                    framer,
+                    &machine,
+                    (&states, &decisions),
+                    ordinal,
+                    delivery_universe.as_ref(),
+                )
+            });
+            Ok(Some((machine, valid, state_laws, gaps)))
+        })?
+    else {
+        return Err(Stop::OutOfScope(
+            "delivery-observing laws require a complete delivery decision universe".into(),
+        ));
+    };
     let space = &machine.space;
     let mut admissible = [Admissible::default(), Admissible::default()];
     let mut activation = [vec![0; declared.len()], vec![0; declared.len()]];
@@ -476,12 +571,12 @@ fn measure(
             counts.tuples += 1;
             if gap.refused {
                 counts.refused += 1;
-                continue;
             }
             for (count, active) in activation[index].iter_mut().zip(&gap.active) {
                 *count += usize::from(*active);
             }
-            if gap.admissible == 1 {
+            counts.zero += usize::from(gap.admissible == 0);
+            if gap.determined {
                 counts.determined += 1;
                 continue;
             }
@@ -521,6 +616,7 @@ fn measure(
         (None, None)
     };
     Ok(Measured {
+        delivery_universe,
         machine,
         declared,
         valid,
@@ -539,68 +635,70 @@ fn tuple_gap(
     laws: &LawSet<'_>,
     framer: &Framer,
     machine: &Machine,
-    states: &[Vec<i128>],
-    reasons: &[(u32, Class)],
+    domains: (&[Vec<i128>], &super::decision_space::DecisionSpace),
     ordinal: usize,
+    universe: Option<&DeliveryUniverse>,
 ) -> TupleGap {
+    let (states, decisions) = domains;
     let space = &machine.space;
     let tuple = space.at(ordinal);
     let state = ordinal / space.inputs;
     let reference = machine.observed[ordinal];
-    let Observed::Decided {
-        class,
-        reason,
-        next,
-    } = reference
-    else {
-        return TupleGap {
-            refused: true,
-            admissible: 0,
-            classes: 0,
-            reasons: 0,
-            successors: 0,
-            also: Vec::new(),
-            active: Vec::new(),
-            mismatch: false,
+    let decided = match reference {
+        Observed::Decided {
+            class,
+            reason,
+            next,
+        } => Some((class, reason, next)),
+        _ => None,
+    };
+    let check =
+        |class: Class, reason: Option<u32>, post: &[i128], outbox: &[evaluate::Delivery]| {
+            laws.on_transition_with_outbox(
+                framer,
+                &tuple,
+                &Proposed {
+                    class,
+                    reason,
+                    post,
+                },
+                outbox,
+            )
         };
-    };
-    let check = |class: Class, reason: Option<u32>, post: &[i128]| {
-        laws.on_transition(
-            framer,
-            &tuple,
-            &Proposed {
-                class,
-                reason,
-                post,
-            },
-        )
-    };
-    // The contract's own decision, framed as every candidate is.
-    let (admitted, diagnostics) = check(class, reason, &states[next]);
+    // Enumeration is independent of executable totality, including on refusals.
+    let (admitted, diagnostics) = decided.map_or((true, Vec::new()), |(class, reason, next)| {
+        check(class, reason, &states[next], machine.outbox_at(ordinal))
+    });
     let active = laws
         .ids()
         .iter()
         .map(|id| {
-            diagnostics.iter().any(|diagnostic| {
-                diagnostic.id == *id
-                    && diagnostic.verdict != zeno_fcis_synthesis::finite::v2_laws::Verdict::Skipped
+            diagnostics.iter().any(|d| {
+                d.id == *id && d.verdict != zeno_fcis_synthesis::finite::v2_laws::Verdict::Skipped
             })
         })
         .collect();
-    let candidates = decision_space::alternatives(reasons, space.states);
-    let own = (class, reason, (class != Class::Reject).then_some(next));
-    let mut admissible = 0;
+    let own = decided
+        .map(|(class, reason, next)| (class, reason, (class != Class::Reject).then_some(next)));
+    let mut witness_mismatch = false;
     let mut classes = BTreeSet::new();
     let mut reject_reasons = BTreeSet::new();
     let mut successors = BTreeSet::new();
     let mut also = Vec::new();
-    for candidate in candidates {
+    let candidates = decisions.candidates(space.states).filter_map(|candidate| {
         let (class, reason, successor) = candidate;
         let post = successor.map_or(&states[state][..], |successor| &states[successor][..]);
-        if !check(class, reason, post).0 {
-            continue;
+        if !check(class, reason, post, &[]).0 {
+            return None;
         }
-        admissible += 1;
+        if class != Class::Reject
+            && let Some(u) = universe
+        {
+            let witness = u.example();
+            witness_mismatch |= witness.is_empty()
+                || !u.allows(&witness)
+                || !check(class, reason, post, &witness).0;
+        }
         classes.insert(class.code());
         match successor {
             None => {
@@ -610,19 +708,33 @@ fn tuple_gap(
                 successors.insert((class.code(), successor));
             }
         }
-        if candidate != own && also.len() < EXAMPLES {
+        if Some(candidate) != own && also.len() < EXAMPLES {
             also.push(candidate);
         }
-    }
+        Some((class, reason, successor.unwrap_or(state)))
+    });
+    let measure = determination(
+        candidates,
+        decided,
+        machine.outbox_at(ordinal),
+        if universe.is_some() {
+            DeliveryChoices::Unrestricted
+        } else {
+            DeliveryChoices::Fixed(&[])
+        },
+    );
     TupleGap {
-        refused: false,
-        admissible,
+        refused: decided.is_none(),
+        admissible: measure.outcomes,
+        determined: measure.determined,
         classes: classes.len(),
         reasons: reject_reasons.len(),
         successors: successors.len(),
         also,
         active,
-        mismatch: !admitted,
+        mismatch: witness_mismatch
+            || !admitted
+            || universe.is_some_and(|u| !u.allows(machine.outbox_at(ordinal))),
     }
 }
 
@@ -969,8 +1081,39 @@ fn extend(
     Ok((Loaded::with(&source, extended)?, ids, lines))
 }
 
-/// Each proposal, alone, on the contract's decision of every tuple where it
-/// decides: where the proposal applies, and the first tuple where it fails.
+/// Shared initiation check for signed and full-width numeric proposals.
+/// Genesis admission is separate from the transition activation counts.
+pub(super) fn proposal_genesis_alarm(
+    declarations: &Declarations,
+    ids: &[u32],
+    sets: &[LawSet<'_>],
+    initial: zeno_fcis_synthesis::finite::v2_laws::RootView<'_, '_>,
+    state: Value,
+) -> Option<Value> {
+    use zeno_fcis_synthesis::finite::v2_laws::{Frame, Verdict};
+    let frame = Frame::Genesis { initial };
+    for (id, set) in ids.iter().zip(sets) {
+        if declarations
+            .laws
+            .iter()
+            .any(|law| law.id == *id && law.genesis)
+        {
+            // The library's own genesis-frame evaluator supplies the verdict.
+            // Skipped, undefined or missing diagnostics cannot satisfy initiation.
+            let (ok, diagnostics) = set.on_frame(&frame);
+            if !ok
+                || !diagnostics
+                    .iter()
+                    .any(|d| d.id == *id && d.verdict == Verdict::Satisfied)
+            {
+                return Some(json!({"law": id, "at": "genesis", "state": state}));
+            }
+        }
+    }
+    None
+}
+
+/// Check initiation, then each proposal on every actual decided transition.
 fn check_proposals(
     extended: &Loaded,
     ids: &[u32],
@@ -984,6 +1127,23 @@ fn check_proposals(
             .map(|id| LawSet::new(authority.descriptor(), &[*id]))
             .collect();
         let space = &machine.space;
+        let genesis = space.at(machine.genesis * space.inputs);
+        let root = &framer.roots[0];
+        let fields = framer.fields(root, &genesis);
+        if let Some(alarm) = proposal_genesis_alarm(
+            &extended.declarations,
+            ids,
+            &sets,
+            framer.view(root, &genesis, &fields),
+            crate::report_numbers::integers(&space.state(machine.genesis)),
+        ) {
+            return Ok(Checked {
+                ids: ids.to_vec(),
+                texts,
+                applies: vec![0; ids.len()],
+                false_alarm: Some(alarm),
+            });
+        }
         let states: Vec<Vec<i128>> = (0..space.states).map(|state| space.state(state)).collect();
         let verdicts = parallel(space.tuples(), |ordinal| {
             let Observed::Decided {
@@ -1002,7 +1162,12 @@ fn check_proposals(
             };
             sets.iter()
                 .map(|set| {
-                    let (_, diagnostics) = set.on_transition(framer, &tuple, &proposed);
+                    let (_, diagnostics) = set.on_transition_with_outbox(
+                        framer,
+                        &tuple,
+                        &proposed,
+                        machine.outbox_at(ordinal),
+                    );
                     diagnostics.first().map(|diagnostic| diagnostic.verdict)
                 })
                 .collect::<Vec<_>>()
@@ -1015,8 +1180,9 @@ fn check_proposals(
                     Some(Verdict::Satisfied) => applies[index] += 1,
                     Some(Verdict::Skipped) => {}
                     _ => {
-                        if verdict.is_some() {
-                            // A false or refused applicable law still applies.
+                        // A refusing law still applies to this transition.
+                        // Count activation separately from whether it is satisfied.
+                        if matches!(verdict, Some(Verdict::Refused(_))) {
                             applies[index] += 1;
                         }
                         false_alarm.get_or_insert_with(|| {

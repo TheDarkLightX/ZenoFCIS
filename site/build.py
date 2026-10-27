@@ -22,12 +22,14 @@ In order:
    (the library crates come from the cache), and identical bytes required.
    The result is copied to site/public/<template>.wasm, and the sizes are
    printed.
-5. replay: compiled ABI bounds/private-memory checks, then
+5. native: generate native expectations, compare synthesis and review witnesses
+   against the pinned CLI, then run the factory module and worker checks.
+6. replay: compiled ABI bounds/private-memory checks, then
    `node site/tests/replay.mjs <template>...`.
-6. scripts: `node --check` on every script under site/public/ and
+7. scripts: `node --check` on every script under site/public/ and
    site/tests/: the replay loads only the module loader, so this is what
    catches a syntax error in the page's own script before a browser does.
-7. browser: `site/tests/deploy_check.py`, the exact artifact served from a
+8. browser: `site/tests/deploy_check.py`, the exact artifact served from a
    subpath, in headless Chrome. `--no-browser` skips it on a machine without
    Chrome.
 
@@ -63,7 +65,7 @@ PUBLIC = SITE / "public"
 COMMON_CRATE = "zeno-fcis-site-common"
 TEMPLATES = ("account-lockout", "order-fulfillment", "inventory-reservation", "compliance-gateway",
              "withdrawal-queue", "agent-treasury-guard")
-STAGES = ("generate", "lock", "check", "module", "replay", "scripts", "browser")
+STAGES = ("generate", "lock", "check", "module", "native", "replay", "scripts", "zenoui", "browser")
 TARGET = "wasm32-unknown-unknown"
 
 sys.path.insert(0, str(ROOT / "tools"))
@@ -83,6 +85,12 @@ def module(template: str) -> Path:
 
 
 def run(command: list[str], cwd: Path, environment: dict[str, str], *, capture: bool = False) -> str:
+    if command[0] == "cargo" and any(step in command for step in ("build", "check", "clippy", "test")):
+        subprocess.run(["df", "-B1G", "/"], check=True)
+        free = shutil.disk_usage("/").free
+        print(f"disk: {free / (1 << 30):.2f} GiB available", flush=True)
+        if free < 6 * (1 << 30):
+            raise RuntimeError("build stopped: less than 6 GiB available")
     print("+", " ".join(command), flush=True)
     result = subprocess.run(command, cwd=cwd, check=True, text=True, env=environment,
                             stdout=subprocess.PIPE if capture else None)
@@ -94,7 +102,7 @@ def target_dir(environment: dict[str, str]) -> Path:
 
 
 def build_cli(environment: dict[str, str]) -> Path:
-    run(["cargo", "+1.97.1", "fetch", "--locked"], ROOT, environment)
+    run(["cargo", "+1.97.1", "fetch", "--locked", "--offline"], ROOT, environment)
     run(["cargo", "+1.97.1", "build", "-p", "zeno-fcis-cli", "--locked", "--offline"], ROOT, environment)
     return target_dir(environment) / "debug" / "zeno-fcis"
 
@@ -143,6 +151,7 @@ def local_manifests() -> dict[tuple[str, str], Path]:
     allowed = {(tomllib.loads(manifest.read_text())["package"]["name"], version): manifest
                for manifest in sorted((ROOT / "crates").glob("*/Cargo.toml"))}
     site_version = tomllib.loads((SITE / "Cargo.toml").read_text())["workspace"]["package"]["version"]
+    allowed[("zeno-fcis-site-factory", site_version)] = SITE / "factory" / "Cargo.toml"
     allowed[(COMMON_CRATE, site_version)] = SITE / "common" / "Cargo.toml"
     for template in TEMPLATES:
         application = tomllib.loads((app(template) / "Cargo.toml").read_text())["package"]
@@ -194,7 +203,7 @@ def module_environment(environment: dict[str, str]) -> dict[str, str]:
 
 def build_module(template: str, environment: dict[str, str]) -> bytes:
     crate = demo_crate(template)
-    run(["cargo", "+1.97.1", "build", "--release", "--locked", "--offline", "--target", TARGET,
+    run(["cargo", "+1.97.1", "build", "--lib", "--release", "--locked", "--offline", "--target", TARGET,
          "-p", crate], SITE, module_environment(environment))
     raw = (target_dir(environment) / TARGET / "release" / f"{crate.replace('-', '_')}.wasm").read_bytes()
     return private_module(raw)
@@ -203,7 +212,7 @@ def build_module(template: str, environment: dict[str, str]) -> bytes:
 def reproducible_module(template: str, environment: dict[str, str]) -> bytes:
     first = build_module(template, environment)
     run(["cargo", "+1.97.1", "clean", "--offline", "--release", "--target", TARGET,
-         "-p", demo_crate(template), "-p", template], SITE, environment)
+         "-p", demo_crate(template), *([] if template == "factory" else ["-p", template])], SITE, environment)
     second = build_module(template, environment)
     if first != second:
         raise RuntimeError(f"{template}: the module differs between two builds")
@@ -236,6 +245,10 @@ def main() -> None:
     templates = tuple(args.only or TEMPLATES)
     environment = dict(os.environ)
     environment.setdefault("CARGO_INCREMENTAL", "0")
+    environment["CARGO_NET_OFFLINE"] = "true"
+    environment.setdefault("CARGO_BUILD_JOBS", "2")
+    environment["CARGO_PROFILE_DEV_DEBUG"] = "0"
+    environment["CARGO_PROFILE_TEST_DEBUG"] = "0"
     # The CLI and site are separate Cargo workspaces. Give both one absolute
     # target directory, including when no caller supplied CARGO_TARGET_DIR.
     environment["CARGO_TARGET_DIR"] = str(target_dir(environment))
@@ -248,19 +261,36 @@ def main() -> None:
     if "check" in stages:
         check_site(environment)
     if "module" in stages:
-        for template in templates:
+        for template in (*templates, "factory"):
             built = reproducible_module(template, environment)
             module(template).write_bytes(built)
             print(f"{module(template).relative_to(ROOT)}: sha256 {hashlib.sha256(built).hexdigest()}, "
                   "identical across two builds")
         report_sizes()
+    if "native" in stages:
+        run(["node", str(SITE / "tests" / "factory-width.test.mjs")], ROOT, environment)
+        run(["python3", str(SITE / "tests" / "factory_check.py")], ROOT, environment)
+        run(["python3", str(SITE / "tests" / "presentation_check.py")], ROOT, environment)
+        run(["node", str(SITE / "tests" / "browser-checks.test.mjs")], ROOT, environment)
+        run(["node", str(SITE / "tests" / "pipe-browser.test.mjs")], ROOT, environment)
+        run(["node", "--experimental-vm-modules", str(SITE / "tests" / "factory-readiness.test.mjs")], ROOT, environment)
+        run(["node", str(SITE / "tests" / "browser-launcher.test.mjs")], ROOT, environment)
+        run(["node", str(SITE / "tests" / "asset-manifest.test.mjs")], ROOT, environment)
+        run(["python3", "-B", "-m", "unittest", "discover", "-s", str(SITE / "tests"),
+             "-p", "test_socket_free_launcher.py"], ROOT, environment)
     if "replay" in stages:
         run(["node", str(SITE / "tests" / "abi.mjs"), *templates], ROOT, environment)
         run(["node", str(SITE / "tests" / "replay.mjs"), *templates], ROOT, environment)
+        run(["node", str(SITE / "tests" / "challenge.mjs")], ROOT, environment)
     if "scripts" in stages:
         scripts = [*PUBLIC.glob("**/*.js"), *(SITE / "tests").glob("**/*.js"), *(SITE / "tests").glob("*.mjs")]
         for script in sorted(scripts):
             run(["node", "--check", str(script)], ROOT, environment)
+    if "zenoui" in stages:
+        run(["cargo", "+1.97.1", "build", "--release", "--locked", "--offline", "-p",
+             "zeno-fcis-site-factory", "--bin", "ui_contract"], SITE, environment)
+        run(["python3", str(ROOT / "tools/check_zenoui.py"), "--out",
+             str(target_dir(environment) / "zenoui-check")], ROOT, environment)
     if "browser" in stages:
         if args.no_browser:
             print("site: the browser check was skipped")

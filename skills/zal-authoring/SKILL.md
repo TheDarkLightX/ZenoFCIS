@@ -27,6 +27,18 @@ Use `zal_help` with an empty topic for the index, an exact typed ID for an objec
 or `grammar:TOPIC` for grammar. Use `zal_explain` for one complete input and
 `zal_trace` for a hypothetical sequence. Explain their supplied assumptions.
 These calls use deterministic logic; free prose is not normative source.
+For "why was this rejected" or "what would make it accept", call `zal_why_not`
+and report its scope, minimal changes and deciding rule. Use `zal_what_if` to
+show the effect of named input changes, and `zal_narrate` to tell a
+counterexample or trace; quote its generated sentences rather than paraphrasing
+them. `zal_guide` gives construct forms and meanings.
+
+Ladder and temporal statements use their own revisions: call `zal_ladder_read`,
+then pass the statement ID and exact revision to `zal_ladder_render`,
+`zal_ladder_parse`, `zal_ladder_same`, `zal_ladder_explain` or
+`zal_ladder_lower`. Keep the scope strip attached when you restate one. A
+"different normal forms" answer does not show different meanings, and a
+lowered claim is an inert obligation, not evidence.
 
 For a requested change, compare the complete candidate with `zal_compare` and
 show a concrete distinguishing input. Stage it with `zal_propose` using the exact

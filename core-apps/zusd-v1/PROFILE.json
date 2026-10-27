@@ -1,0 +1,542 @@
+{
+  "schema_id": "zenofcis.zusd.v1.native-review.2",
+  "status": "Executable closed schema and scoped native/wire review candidate; complete application dispatch/law binding is not mounted",
+  "authority": "No activation, funding, mint, authentication, usage receipt or publication authority",
+  "nominal_ids": {
+    "Account": "bytes32; distinct nominal role",
+    "VaultID": "bytes32; distinct nominal role",
+    "AssetID": "bytes32; distinct nominal role",
+    "Hash": "bytes32; distinct nominal role"
+  },
+  "quantities": {
+    "Z": "zUSD e18",
+    "A": "AGRS e18",
+    "T": "zDEX e18",
+    "Rate": "dimensionless e18 [0,10^18]",
+    "PositiveP": "dimensionless e18 [1,10^18]",
+    "Ratio": "dimensionless e18 U128",
+    "NICR": "AGRS/zUSD e20 [1,2^128-1]",
+    "LA": "AGRS/AGRS e18",
+    "LZ": "zUSD/AGRS e18",
+    "S": "AGRS/zUSD e36",
+    "G": "zDEX/zUSD e36",
+    "FZ": "zUSD/zDEX e18",
+    "FA": "AGRS/zDEX e18"
+  },
+  "quantity_wire": "exact U128; no signed projection",
+  "records": {
+    "Vault": {
+      "owner": "Account",
+      "status": "Status",
+      "collateral": "A",
+      "debt": "Z",
+      "reserve": "Z",
+      "stake": "A",
+      "snapshot_c": "LA",
+      "snapshot_d": "LZ",
+      "parameter_version": "u64"
+    },
+    "OrderEntry": {
+      "priority": "NICR",
+      "metadata": "Unit",
+      "payload": "VaultID"
+    },
+    "SPDeposit": {
+      "initial": "Z",
+      "tag": "Maybe<Account>",
+      "p": "PositiveP",
+      "s": "S",
+      "g": "G",
+      "epoch": "u64",
+      "scale": "u64"
+    },
+    "FrontEnd": {
+      "kickback": "Rate",
+      "initial": "Z",
+      "p": "PositiveP",
+      "g": "G",
+      "epoch": "u64",
+      "scale": "u64"
+    },
+    "SPHistory": {
+      "s": "S",
+      "g": "G"
+    },
+    "SPEpoch": {
+      "last_scale": "u64",
+      "sealed": "Bool"
+    },
+    "Staker": {
+      "stake": "T",
+      "snapshot_z": "FZ",
+      "snapshot_a": "FA"
+    },
+    "RailClaim": {
+      "amount": "A",
+      "provenance": "Hash",
+      "adapter": "Hash"
+    },
+    "Parameters": {
+      "minimum_net": "Z",
+      "reserve": "Z",
+      "mcr": "Ratio",
+      "ccr": "Ratio",
+      "collateral_divisor": "u32",
+      "borrow_floor": "Rate",
+      "redeem_floor": "Rate",
+      "borrow_cap": "Rate",
+      "beta": "u32",
+      "decay_factor": "Rate",
+      "decay_cap_minutes": "u64",
+      "bootstrap_minutes": "u64",
+      "sp_scale": "u64",
+      "reward_cap": "T",
+      "clock": "Maybe<Hash>",
+      "drip": "Maybe<Hash>",
+      "oracle": "Maybe<Hash>",
+      "exposure": "Maybe<Hash>",
+      "change_authority": "Maybe<Hash>",
+      "bounded_data": "BoundedBytes"
+    },
+    "Header": {
+      "profile": "Hash",
+      "assets": "Hash",
+      "units": "Hash",
+      "adapter": "Hash",
+      "oracle": "Hash",
+      "zdex_supply": "Hash",
+      "funding": "Hash",
+      "burn": "Hash",
+      "exposure": "Hash",
+      "custody_health": "Hash",
+      "current_epoch": "u64",
+      "deployment_epoch": "u64",
+      "last_fee_epoch": "u64",
+      "parameter_version": "u64",
+      "base_rate": "Rate",
+      "default_debt": "Z",
+      "default_collateral": "A",
+      "total_stakes": "A",
+      "stakes_snapshot": "A",
+      "collateral_snapshot": "A",
+      "la": "LA",
+      "lz": "LZ",
+      "error_la": "AGRS e36",
+      "error_lz": "zUSD e36",
+      "supply": "Z",
+      "sp_total": "Z",
+      "sp_p": "PositiveP",
+      "sp_epoch": "u64",
+      "sp_scale": "u64",
+      "sp_error_loss": "zUSD e36",
+      "sp_error_s": "AGRS e36",
+      "sp_error_g": "zDEX e36",
+      "total_stake_zdex": "T",
+      "fz": "FZ",
+      "fa": "FA",
+      "remaining": "T",
+      "scheduled": "T",
+      "allocated": "T",
+      "missed": "T",
+      "paid": "T",
+      "last_trigger_epoch": "u64",
+      "drip_state": "BoundedBytes"
+    }
+  },
+  "state_fields": [
+    {
+      "id": 1,
+      "name": "Header",
+      "type": "Header"
+    },
+    {
+      "id": 2,
+      "name": "Vaults",
+      "key": "VaultID",
+      "value": "Vault",
+      "capacity": "C_v",
+      "item_bytes": "I_Vaults",
+      "snapshot_bytes": "B_Vaults"
+    },
+    {
+      "id": 3,
+      "name": "OrderMap",
+      "key": "VaultID",
+      "value": "OrderEntry",
+      "capacity": "C_v",
+      "item_bytes": "I_OrderMap",
+      "snapshot_bytes": "B_OrderMap"
+    },
+    {
+      "id": 4,
+      "name": "Order",
+      "key": "Vector<VaultID>",
+      "value": "Unit",
+      "capacity": "C_v",
+      "item_bytes": "I_Order",
+      "snapshot_bytes": "B_Order"
+    },
+    {
+      "id": 5,
+      "name": "Balances",
+      "key": "(Account,AssetID)",
+      "value": "Quantity<Z|A|T>",
+      "capacity": "C_b",
+      "item_bytes": "I_Balances",
+      "snapshot_bytes": "B_Balances"
+    },
+    {
+      "id": 6,
+      "name": "SPDeposits",
+      "key": "Account",
+      "value": "SPDeposit",
+      "capacity": "C_d",
+      "item_bytes": "I_SPDeposits",
+      "snapshot_bytes": "B_SPDeposits"
+    },
+    {
+      "id": 7,
+      "name": "FrontEnds",
+      "key": "Account",
+      "value": "FrontEnd",
+      "capacity": "C_f",
+      "item_bytes": "I_FrontEnds",
+      "snapshot_bytes": "B_FrontEnds"
+    },
+    {
+      "id": 8,
+      "name": "SPHistory",
+      "key": "(u64,u64)",
+      "value": "SPHistory",
+      "capacity": "C_h",
+      "item_bytes": "I_SPHistory",
+      "snapshot_bytes": "B_SPHistory"
+    },
+    {
+      "id": 9,
+      "name": "SPEpochs",
+      "key": "u64",
+      "value": "SPEpoch",
+      "capacity": "C_e",
+      "item_bytes": "I_SPEpochs",
+      "snapshot_bytes": "B_SPEpochs"
+    },
+    {
+      "id": 10,
+      "name": "Stakers",
+      "key": "Account",
+      "value": "Staker",
+      "capacity": "C_s",
+      "item_bytes": "I_Stakers",
+      "snapshot_bytes": "B_Stakers"
+    },
+    {
+      "id": 11,
+      "name": "Surplus",
+      "key": "Account",
+      "value": "A",
+      "capacity": "C_u",
+      "item_bytes": "I_Surplus",
+      "snapshot_bytes": "B_Surplus"
+    },
+    {
+      "id": 12,
+      "name": "RailClaims",
+      "key": "(Account,AssetID)",
+      "value": "RailClaim",
+      "capacity": "C_q",
+      "item_bytes": "I_RailClaims",
+      "snapshot_bytes": "B_RailClaims"
+    },
+    {
+      "id": 13,
+      "name": "Nonces",
+      "key": "Account",
+      "value": "u64",
+      "capacity": "C_n",
+      "item_bytes": "I_Nonces",
+      "snapshot_bytes": "B_Nonces"
+    },
+    {
+      "id": 14,
+      "name": "Seen",
+      "key": "Hash",
+      "value": "Unit",
+      "capacity": "C_r",
+      "item_bytes": "I_Seen",
+      "snapshot_bytes": "B_Seen"
+    },
+    {
+      "id": 15,
+      "name": "Params",
+      "key": "u64",
+      "value": "Parameters",
+      "capacity": "C_p",
+      "item_bytes": "I_Params",
+      "snapshot_bytes": "B_Params"
+    }
+  ],
+  "commands": [
+    {
+      "tag": 1,
+      "name": "Open",
+      "fields": {
+        "collateral": "A",
+        "principal": "Z",
+        "max_fee": "Rate",
+        "upper": "Maybe<VaultID>",
+        "lower": "Maybe<VaultID>"
+      }
+    },
+    {
+      "tag": 2,
+      "name": "Adjust",
+      "fields": {
+        "collateral": "Delta<A>",
+        "debt": "Delta<Z>",
+        "max_fee": "Rate",
+        "upper": "Maybe<VaultID>",
+        "lower": "Maybe<VaultID>"
+      }
+    },
+    {
+      "tag": 3,
+      "name": "Close",
+      "fields": {}
+    },
+    {
+      "tag": 4,
+      "name": "LiquidateDirect",
+      "fields": {
+        "vault": "VaultID"
+      }
+    },
+    {
+      "tag": 5,
+      "name": "LiquidateLowest",
+      "fields": {
+        "maximum": "u32"
+      }
+    },
+    {
+      "tag": 6,
+      "name": "LiquidateBatch",
+      "fields": {
+        "vaults": "BoundedVector<VaultID>"
+      }
+    },
+    {
+      "tag": 7,
+      "name": "Redeem",
+      "fields": {
+        "maximum": "Z",
+        "visits": "u32",
+        "first": "Maybe<VaultID>",
+        "partial_nicr": "NICR-or-zero-hint",
+        "upper": "Maybe<VaultID>",
+        "lower": "Maybe<VaultID>",
+        "max_fee": "Rate",
+        "min_out": "A"
+      }
+    },
+    {
+      "tag": 8,
+      "name": "SPDeposit",
+      "fields": {
+        "amount": "Z",
+        "tag": "Maybe<Account>"
+      }
+    },
+    {
+      "tag": 9,
+      "name": "SPWithdraw",
+      "fields": {
+        "request": "Z"
+      }
+    },
+    {
+      "tag": 10,
+      "name": "SPClaim",
+      "fields": {}
+    },
+    {
+      "tag": 11,
+      "name": "MoveSPGainToVault",
+      "fields": {
+        "upper": "Maybe<VaultID>",
+        "lower": "Maybe<VaultID>"
+      }
+    },
+    {
+      "tag": 12,
+      "name": "RegisterFrontEnd",
+      "fields": {
+        "kickback": "Rate"
+      }
+    },
+    {
+      "tag": 13,
+      "name": "Stake",
+      "fields": {
+        "amount": "T"
+      }
+    },
+    {
+      "tag": 14,
+      "name": "Unstake",
+      "fields": {
+        "request": "T"
+      }
+    },
+    {
+      "tag": 15,
+      "name": "ClaimStakingFees",
+      "fields": {}
+    },
+    {
+      "tag": 16,
+      "name": "ClaimSurplus",
+      "fields": {}
+    },
+    {
+      "tag": 17,
+      "name": "ImportPending",
+      "fields": {
+        "checked_oracle_transition": "Hash"
+      }
+    },
+    {
+      "tag": 18,
+      "name": "CommitMatured",
+      "fields": {
+        "checked_oracle_transition": "Hash"
+      }
+    },
+    {
+      "tag": 19,
+      "name": "InitializeFirstMatured",
+      "fields": {
+        "checked_oracle_transition": "Hash"
+      }
+    },
+    {
+      "tag": 20,
+      "name": "AdvanceCertifiedEpochOrWatermark",
+      "fields": {
+        "checked_clock_transition": "Hash"
+      }
+    }
+  ],
+  "command_envelope": {
+    "actor": "Account",
+    "nonce": "u64",
+    "pre_root": "Hash",
+    "profile_root": "Hash",
+    "authorization": "checked receipt subject, binding deferred"
+  },
+  "reasons": {
+    "1000": "Unauthorized",
+    "1001": "Replay",
+    "1002": "NonceExhausted",
+    "1010": "BadOperation",
+    "1011": "Position",
+    "1012": "Tag",
+    "1020": "OracleUnavailable",
+    "1021": "OracleStale",
+    "1022": "OracleDisputed",
+    "1023": "OracleUncertain",
+    "1024": "SecurityCapacity",
+    "1030": "FeeDomain",
+    "1031": "Bootstrap",
+    "1032": "RedemptionTCR",
+    "1033": "InsufficientBalance",
+    "1040": "DebtFloor",
+    "1041": "LastVault",
+    "1042": "RecoveryRestriction",
+    "1043": "Ratio",
+    "1044": "Ineligible",
+    "1045": "NoExecution",
+    "1050": "ZeroRedemptionBase",
+    "1051": "FeeConsumesDraw",
+    "1052": "FeeLimit",
+    "1053": "Slippage",
+    "1060": "ItemTooLarge",
+    "1061": "Full",
+    "1062": "SnapshotTooLarge",
+    "1063": "SequenceTooLarge"
+  },
+  "parameters_v1": {
+    "minimum_net": "500000000000000000000",
+    "reserve": "50000000000000000000",
+    "mcr": "1100000000000000000",
+    "ccr": "1500000000000000000",
+    "collateral_divisor": 200,
+    "borrow_floor": "5000000000000000",
+    "redeem_floor": "5000000000000000",
+    "borrow_cap": "50000000000000000",
+    "beta": 2,
+    "decay_factor": "999037758833783000",
+    "decay_cap_minutes": 525600000,
+    "bootstrap_minutes": 20160,
+    "sp_scale": 1000000000,
+    "reward_cap": "35000000000000000000000000"
+  },
+  "unbound": {
+    "clock": null,
+    "drip": null,
+    "oracle_timing_security": null,
+    "funding_provenance": null,
+    "exposure": null,
+    "change_authority": null,
+    "parameter_migration": null,
+    "external_rail": null
+  },
+  "genesis": {
+    "tables": "empty except one zero SPHistory[0,0], one unsealed SPEpochs[0], and admitted active Params entry",
+    "economic_scalars": "zero except P=10^18",
+    "reward_stock": "conditional on authenticated existing zDEX funding exactly reward_cap; otherwise activation unbound",
+    "roots_and_epochs": "must bind checked genesis receipts; absent here"
+  },
+  "complete_law_form": [
+    "Reject(i) implies independently ordered F_i for every catalogued i",
+    "Accept implies independently defined eligibility",
+    "eligible with sufficient budget must Accept; reject-all and zero-outcome forbidden",
+    "exact complete output plus union-domain frames",
+    "technical failures supply no checked decision; no law 991 as independent evidence"
+  ],
+  "implemented_law_subjects": [
+    "pending reward Vault record",
+    "liquidation Partition record",
+    "canonical collection patches and exact ordered monetary movement observations"
+  ],
+  "pending_law_subjects": [
+    "all-input complete application/economic-leg/outbox binding",
+    "full native schema-to-economic-command dispatch and global state invariants",
+    "parametric/all-history proof and runtime/source refinement"
+  ],
+  "instance_bounds": "Wire/observation instance bounds are explicit in wire::Bounds. Native component bounds are separately passed and are not yet one bound full application instance.",
+  "executable_schema": {
+    "generator": "tools/schema.py",
+    "definitions": "src/schema_generated.rs",
+    "stable_ids": "schema-ids.json",
+    "types": 119,
+    "old_state_type": 57,
+    "old_command_type": 83
+  },
+  "codec_structural_limits": {
+    "max_depth": 64,
+    "max_nodes": 1000000,
+    "max_payload_bytes": 67108864,
+    "max_collection_len": 1000000,
+    "owner_parameter": false
+  },
+  "finite_reference_subjects": {
+    "owner": 471,
+    "liquidation": 240,
+    "redemption": 116,
+    "sp_positions": 153,
+    "staking": 432,
+    "domain_note": "Witness rows are component domains; unbound rows are excluded from lawful decision counts; not the step-5 atlas or an all-input proof"
+  },
+  "accumulator_wire": "LA/LZ/S/G/FZ/FA, their snapshots and five feedback errors: exact uint256 as tuple(high U128, low U128), big-endian limbs; no new library kind"
+}

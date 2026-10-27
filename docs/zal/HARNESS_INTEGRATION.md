@@ -37,6 +37,11 @@ python3 integrations/zal/setup.py --project /path/to/your/project --harness both
 python3 integrations/zal/setup.py --project /path/to/your/project --harness both --apply
 ```
 
+Setup from 2.6 also enables the explanation and ladder tools. A Codex entry made
+by an earlier setup lists only the seven original tools, so setup refuses to
+change it; inspect that `[mcp_servers.zal]` entry, remove it, and run setup
+again to enable the new tools. The Claude entry has no tool list and is unchanged.
+
 `--harness codex` or `--harness claude` installs only that harness. An optional
 `--model /path/to/model.zal` supplies a new workspace's seed; it never replaces
 existing state. The default order seed is an example with zero application

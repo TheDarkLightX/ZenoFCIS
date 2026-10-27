@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// LLM-generated example; qualification runs through the contract Authority.
+zeno 1;
+project 1 reservation_abstract;
+namespace 2 reservation;
+type 100 state State;
+type 101 command Request;
+type 102 context Context;
+type 103 destination Destination;
+type 104 payload Event;
+type 105 int Representation in 0..=25;
+type 106 int Action in 0..=5;
+type 107 int Unit in 0..=0;
+field 110 100 representation 105;
+field 120 101 action 106;
+field 130 102 unit 107;
+field 140 104 event 106;
+reason 200 already_active precedence 0;
+reason 201 retired precedence 1;
+reason 202 full precedence 2;
+reason 203 not_active precedence 3;
+channel 300 events destination 103 payload 104;
+component 400 reservation {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  budget steps 65536;
+}
+merge [400];
+law 501 state_bounds on commit, genesis = post.100.110 >= 0 && post.100.110 <= 25;

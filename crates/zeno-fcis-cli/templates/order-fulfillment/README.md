@@ -1,239 +1,105 @@
-# Generated order fulfillment
+# Order fulfillment
 
-This local application follows one order from checkout to delivery. Payment
-and shipping happen in other systems: the order sends them requests through
-the outbox, and their answers come back as commands. It shows three patterns:
-- a synthesized finite decision core, which selects the decision branch and
-  complete successor state from the order, command, and caller;
-- idempotent external requests: each request is queued once, by the decision
-  that moves the order, and carries a number the receiver can use to recognize
-  a retry;
-- callbacks that arrive twice or late are rejected and change nothing: the
-  order has moved on, or the callback names an older payment attempt.
+One order coordinates a customer, payment provider, and carrier. The checked
+V2 Authority evaluates `v2/policy.json` and the independent `project.zeno` laws
+before publishing a state change and its requests together. The state records
+status and payment attempt, not a money balance or a physical parcel.
 
-`synthesis.json` defines the closed finite decision relation. `zeno-fcis
-synth` selected `synthesized/transition.rs` after checking all 1,728 input
-tuples. Its output includes the branch, post-decision status, and post-decision
-payment-attempt count, including the unchanged state on rejection.
-`src/program.rs` is a reviewed adapter from that output to typed state writes,
-rejection reasons, and outbox requests. Its executed decisions are checked
-against an independent model for all 1,440 inputs over
-lawful pre-states. The law checker in `src/laws.rs` also evaluates the formulas
-in `project.zeno` against each decision before publication.
+## Decisions and deadlines
 
-`project.zeno` owns record fields, command variants, reason order, channel
-types, and relational formulas. `build.rs` supplies explicit scalar bounds and
-catalog meanings, then checks and generates the schema and project bindings.
-`profile.rs` binds the exact source and the runtime-only law manifest.
+The context supplies an authenticated caller and an absolute day in 0..=8.
+This bounded example uses a fixed calendar: payment before day 2, dispatch
+before day 4, delivery before day 6, and dispute before day 8. A deployment
+must supply a trustworthy, nondecreasing clock and service recovery requests
+at the final admitted day; this example does not roll its calendar forward.
+`invoke` preserves the original day-zero demonstration; `invoke_at` supplies
+an explicit day.
 
-## V2 execution and retained legacy evidence
+| Action | Caller | Transition | Outbox |
+| --- | --- | --- | --- |
+| Checkout | Customer | Placed to AwaitingPayment; increment attempt | Capture |
+| PaymentCaptured | Provider | AwaitingPayment to Paid before day 2 | Shipping request |
+| PaymentDeclined | Provider | AwaitingPayment to Placed; committed failure 204 | None |
+| ParcelDispatched | Carrier | Paid to Shipped before day 4 | None |
+| ParcelDelivered | Carrier | Shipped to Delivered before day 6 | None |
+| CancelOrder | Customer | Placed or AwaitingPayment to Cancelled | Void if awaiting |
+| TimeoutOrder | Customer | AwaitingPayment/Paid/Shipped to Cancelled at day 2/4/6 | Void/Refund/Refund |
+| DisputeDelivery | Customer | Delivered to Cancelled before day 8 | Refund |
+| ReleaseDelivered | Any authenticated role | Delivered to Settled at or after day 8 | Release |
 
-The normal `src/lib.rs` and demonstration use `v2_contract::Contract`, its
-complete original-schema descriptor, and the checked library V2 Authority.
-The library reads the original envelopes, evaluates the declared typed graph,
-constructs the complete decision, and checks the original law programs with
-one meter. The SQLite shell consumes genuine `Publication` and
-`Publication` capabilities; exact replay recomputes the same original inputs.
+Provider callbacks must name the current attempt. There are at most three
+attempts. Checkout at a late day is allowed, but its customer can immediately
+time out an awaiting payment. A timely dispute refunds without adjudication.
+A carrier report counts as delivery confirmation; the customer has at least
+two days to dispute before release. Cancelled and Settled are final.
 
-The LLM-generated adapters, legacy law engines and earlier synthesis/model
-checks described below are retained only in the repository’s nonpublished
-`verification/kernel-laws/src/oracle/templates/order-fulfillment` package for independent oracle
-and historical evidence tests. They do not execute the normal V2 decision.
-The declared policy still requires independent review of the intended rules.
-Host input framing, caller authentication and typed display remain shell
-assumptions; the demonstration destination's ledger persists only in-process.
+Reject precedence is wrong caller (200), wrong status (201), stale payment
+callback (202), exhausted attempts (203), missed deadline (205), then early
+recovery (206). Rejection changes nothing and queues nothing. An eligible
+request cannot be replaced with an arbitrary rejection. The original day-zero
+checkout, decline, retry, payment, shipping, and delivery sequence is retained.
 
-## The rules
+## What the laws bind
 
-The order has two fields: `status` (field 120) and `payment_attempts` (field
-121, from 0 to 3). It starts `Placed` with no payment attempt. Every command
-has an `action` (field 125) and a `callback_attempt` (field 126, from 0 to 3),
-and carries its `caller` (field 130) in the context. A payment provider's
-callback uses `callback_attempt` to name the attempt it answers; every other
-action ignores it.
+Original laws 500–506 retain state shape, callers, transitions, and decline
+behavior. Added laws 507–508 bind recovery, dispute, release, and settled-state
+shape. Laws 510–511 bind the first rejection guard and callback deadlines.
+Laws 512–515 bind the exact request count, attempt, action, channel, and
+recipient; law 516 binds the committed-failure reason. Capture, Void, Refund,
+and Release go to `payment-provider`; shipping goes to `carrier`. No unrelated
+request may accompany another transition. The generated structural law 909 checks unchanged state and no effects on
+rejection alongside project law 510; conformance law 991 remains mandatory.
 
-| Action | ID | Sent by | From status | To status | Request queued |
-| --- | --- | --- | --- | --- | --- |
-| `Checkout` | 150 | `Customer` | `Placed` | `AwaitingPayment` | capture, numbered with the new attempt |
-| `PaymentCaptured` | 151 | `PaymentProvider` | `AwaitingPayment` | `Paid` | shipping, numbered with the paid attempt |
-| `PaymentDeclined` | 152 | `PaymentProvider` | `AwaitingPayment` | `Placed` | none |
-| `ParcelDispatched` | 153 | `Carrier` | `Paid` | `Shipped` | none |
-| `ParcelDelivered` | 154 | `Carrier` | `Shipped` | `Delivered` | none |
-| `CancelOrder` | 155 | `Customer` | `Placed` or `AwaitingPayment` | `Cancelled` | from `AwaitingPayment`, a void of the pending attempt |
+The customer has a local recovery path from every pending stage even when
+the carrier and provider send no callbacks. After confirmed delivery, any
+role can request release at day 8. These are paths to checked requests and
+terminal local states, not a proof that an external recipient transfers money.
+The reachable run checks in `v2/run-properties.json` also establish at most one
+terminal payment request, at most one shipping request, and no later payment or
+shipping request after a Void or Refund, over the declared finite domain.
 
-Statuses are 160 `Placed`, 161 `AwaitingPayment`, 162 `Paid`, 163 `Shipped`,
-164 `Delivered`, and 165 `Cancelled`. `Delivered` and `Cancelled` are final.
+## External responsibilities
 
-The rules apply in this order, and the first that applies decides:
+Capture must reserve the attempt's payment until Release. Void must close an
+attempt and return any payment already captured, even if a callback arrives
+late; Refund must return its held payment. Release must pay the merchant once.
+The receiver must persist delivery IDs and closed attempt IDs, and safely
+handle delayed or reordered Capture/Void/Refund/Release requests. These are
+integration obligations: the template neither authenticates remote callers
+nor implements a payment provider or parcel custody. Physical delivery racing
+with timeout needs an external return policy.
 
-1. An action from any other caller is rejected with `wrong_caller` (200).
-2. An action from any other status is rejected with `invalid_transition`
-   (201). This covers a repeated or late callback: a second
-   `PaymentCaptured` finds the order already `Paid`.
-3. A `PaymentCaptured` or `PaymentDeclined` whose `callback_attempt` is not
-   the current `payment_attempts` is rejected with `stale_callback` (202). A
-   late answer about an earlier attempt cannot settle the current one.
-4. `Checkout` when three payment attempts have been made is rejected with
-   `attempts_exhausted` (203).
-5. `Checkout` accepts, adds one to `payment_attempts`, and queues a capture
-   request numbered with the new count.
-6. `PaymentDeclined` commits failure `payment_declined` (204): the order
-   returns to `Placed` and keeps its attempt count, so the customer can check
-   out again with a new attempt number.
-7. Every other action in the table accepts as shown, and changes no field
-   the table does not name.
+The shell persists requests and retries them with the same delivery identity.
+The demonstration's recipient ledger is in memory. Publication, receipt, and
+external settlement are distinct. A changed schema identity requires a new
+database or a separately reviewed migration.
 
-A rejection changes nothing and queues nothing. Payment requests go to
-`payment-provider` on channel 300 with the attempt number and the action (175
-`Capture` or 176 `Void`); shipping requests go to `carrier` on channel 301 with
-the paid attempt number.
+## Regeneration and checks
 
-## How requests stay idempotent
+Use `zeno-fcis generate contract <directory>` and its `--check` mode. Contract
+scenario files check concrete sequences; `tools/test_template_rules.py` checks
+that counterpolicies are refused by the independent laws. Native trace games
+and the finite table liveness checker assess only their declared actors,
+commands, clock values, and scheduling assumptions. Earlier synthesis and
+native-model checks are historical comparisons for the original day-zero
+behavior, not coverage of the added recovery actions.
 
-- A request is queued by the same decision that changes the status, so a
-  status change and its request are published together or not at all.
-- A queued request stays pending until the destination acknowledges it, and
-  every delivery attempt carries the same delivery ID. The destination must
-  record delivery IDs, so a delivery repeated after a crash is recognized, not
-  acted on twice.
-- The attempt number in each payment request lets the provider recognize a
-  retried capture. A new checkout after a decline uses a new number, so the
-  provider can tell a new attempt from a retry.
-- The provider's answers name the attempt too, and an answer about an older
-  attempt is rejected. A decline of attempt 1 that arrives late, after the
-  customer checked out again, cannot decline attempt 2.
-- Incoming duplicates meet two layers. Publishing the same authorized decision
-  again is an idempotent replay in the shell; the demonstration checks this
-  for every committed decision. A callback that arrives again, under the same
-  message ID or a new one, is decided against the order's current status: once
-  the order has moved on, the state machine rejects it.
+Generate an isolated application with `zeno-fcis new --template
+order-fulfillment <directory>` and run `cargo +1.97.1 test --offline` there.
+The `sqlite` feature supplies `create`, `invoke`, `invoke_at`, and `journey`;
+without it the declarations and checked decision API remain available.
 
-No answer ever comes back inside a decision: the provider's and the carrier's
-answers are new commands.
+## Lineage
 
-## What is checked
+Guarded state transitions and independent predicates follow the established
+approach of E. W. Dijkstra, “Guarded Commands, Nondeterminacy and Formal
+Derivation of Programs,” Communications of the ACM 18(8), 1975,
+[doi:10.1145/360933.360975](https://doi.org/10.1145/360933.360975).
+Deadline refunds and delayed release are conventional application choices;
+prior-art search pending. No novelty claim is made.
 
-Regenerate and check the decision core with:
-
-```sh
-python3 decision_to_synthesis.py --check
-zeno-fcis synth run synthesis.json --out synthesized --check
-zeno-fcis synth verify synthesis.json --out synthesized
-```
-
-The synthesis claim covers branch selection and the complete pure successor
-state on the declared finite inputs. The branch also selects the request kind;
-the synthesized attempt count supplies its request number. The typed mapping
-to reasons and outbox requests remains reviewed adapter code, checked against
-the independent app-level model on every lawful finite input. External payment
-and carrier systems are outside that claim.
-
-Every decision is checked at run time, before it can be published:
-- law 500: an order awaiting payment, paid, shipped, or delivered has made at
-  least one payment attempt (a cancelled order may have made none);
-- laws 501 to 505: each accepted action came from its caller and started from
-  its status, a capture named the current attempt, the order moved as the
-  table says, and a declined payment is never accepted;
-- law 506: a decline of the current attempt returns the order to `Placed`
-  and keeps the count;
-- in Rust, because formulas cannot see them: the rejection reason, the exact
-  request, the absence of effects, and the genesis.
-
-A rejection publishes nothing by construction, and the law framework records
-law 509 as satisfied for every rejection. That law has no formula, so
-`profile.rs` registers it instead of `project.zeno` carrying an always-true
-placeholder. As a result, this passes:
-
-```sh
-zeno-fcis check project.zeno --require-substantive --require-resolved-paths
-```
-
-Each law with a formula also declares the decisions it is enforced on: `on
-commit, genesis` for 500, `on accept` for 501 to 505, and `on failure` for
-506. the privately retained native authority checks the law manifest against those declarations before
-it builds the authority, and `tests/laws.rs` shows a manifest that binds law
-501 to every commit, or to the genesis, reported as a mismatch.
-
-The tests check the running application:
-- `tests/conformance.rs` explores the application from genesis and finds 20
-  reachable states: exactly the admitted states that satisfy law 500. It runs
-  1,440 commands from those states, every action with every attempt a
-  callback could name, from every caller, through admission, the authority,
-  the program, the law checker, the committed patch, and the outbox. It
-  compares each outcome with the expected one, checks that every reachable
-  order can still reach `Delivered` or `Cancelled`, and compares 23 examples
-  in `tests/decision-examples.txt`.
-- `tests/laws.rs` gives the law checker decisions a faulty program could
-  make, such as a capture from the customer, a capture or decline of an older
-  attempt, a second shipping request, or a cancellation without a void, and
-  requires it to refuse each one.
-- `tests/lifecycle.rs` runs the demonstration, a late decline of an older
-  attempt, a repeated capture callback, and a cancellation while payment is
-  pending.
-- `tests/determinism.rs` decides 400 inputs (every reachable state with every
-  action and caller, plus each payment callback naming a stale attempt) eight
-  times each through `execute_probed`, then again in three child processes
-  with a changed environment, and requires every decision digest to match.
-
-The expected outcomes come from a reference model in the test, written from
-these rules by the program's author. It catches binding and adapter errors,
-not a misreading shared by both. The examples file is the check on that: its
-header records who wrote the examples and whether the project's owner has
-reviewed them.
-
-```sh
-zeno-fcis purity src/program.rs src/laws.rs
-```
-
-All of these are detectors: agreement shows that these runs matched and that
-no error-level rule fired, not that the application is correct for every
-possible deployment.
-
-## Run this development candidate
-
-This template depends on the current ZenoFCIS checkout. From that checkout,
-run:
-
-```sh
-python3 tools/check_generated_application.py
-```
-
-That gate creates a fresh application using the CLI, checks the dependency
-binding `zeno-fcis new` wrote to the exact checkout, checks dependency
-versions against the workspace lock, then compiles and runs its tests and
-demonstration as an isolated package.
-`zeno-fcis new` binds the application to a ZenoFCIS source tree, the one it
-was built from or the one `--source` names: `Cargo.toml` ends with a
-`[patch.crates-io]` section, and the tree's `Cargo.lock` and
-`rust-toolchain.toml` are copied. From the application's directory:
-
-```sh
-cargo +1.97.1 test --offline
-cargo +1.97.1 run --offline -- new-order.sqlite
-```
-
-The first build adds the application to its lock, so `--locked` works only
-after it.
-
-The SQLite shell is the `sqlite` feature, on by default. Without it,
-`cargo +1.97.1 build --no-default-features` builds the V2 declarations,
-checked Authority and generated proposal/admission helpers; original native
-oracles are confined to the nonpublished private suite
-without a database. The gate also checks `wasm32-unknown-unknown`.
-`create`, `invoke`, `journey` and the demonstration binary need the feature.
-
-The demonstration requires a new database path. It declines one payment and
-refuses a late capture of it. After a second checkout, it refuses a late
-decline of the first attempt, a capture from the wrong caller, a repeated
-capture, and a late cancellation, then pays, ships, and delivers the order.
-It then interrupts request delivery, reopens the database, and finishes
-delivery. It prints a JSON summary.
-
-The destination keeps an in-memory idempotency ledger, which survives the
-database reopen only within one process. A real destination must persist its
-delivery IDs and entry hashes. The context's `caller` and the principal are
-trusted tutorial inputs, not remote authentication: a deployment must
-authenticate each caller before admission. Source hashes identify reviewed
-example policy, not certified binaries or release evidence. Changing the source
-changes policy identity and requires a new database unless a separately
-reviewed migration is implemented.
+The server clock holds its final admitted day after the finite horizon. Late
+recovery remains available in that terminal phase; no operator clock reset is
+needed. This does not automatically submit a refund or release.
+The typed `invoke_at` helper uses the same terminal phase, records the bounded
+logical day, and continues to refuse negative times.

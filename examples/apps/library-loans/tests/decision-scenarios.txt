@@ -1,0 +1,48 @@
+# Adversarial runs on library loans: what an attacker would try.
+#
+# Provenance: LLM-generated on 2026-10-21 by the input-hardening review from
+# the contract's rules; not an independent oracle. Not yet reviewed by the owner.
+#
+# Inputs: copy_1 copy_2 copy_3 | action copy member | desk | decision | deliveries
+# scenario a-lent-copy-is-not-lent-again
+0 0 0 | 150 1 1 | 130 | accept - 1 0 0 | -
+1 0 0 | 150 1 2 | 130 | reject 201 1 0 0 | -
+1 0 0 | 150 1 1 | 130 | reject 201 1 0 0 | -
+# scenario only-the-holder-returns
+0 0 0 | 150 2 3 | 130 | accept - 0 3 0 | -
+0 3 0 | 151 2 1 | 130 | reject 203 0 3 0 | -
+0 3 0 | 151 1 3 | 130 | reject 203 0 3 0 | -
+0 3 0 | 151 2 3 | 130 | accept - 0 0 0 | -
+0 0 0 | 151 2 3 | 130 | reject 203 0 0 0 | -
+# scenario a-visitor-records-nothing
+0 0 0 | 150 1 1 | 131 | reject 200 0 0 0 | -
+0 0 0 | 150 1 1 | 130 | accept - 1 0 0 | -
+1 0 0 | 151 1 1 | 131 | reject 200 1 0 0 | -
+# scenario no-member-holds-three
+0 0 0 | 150 1 2 | 130 | accept - 2 0 0 | -
+2 0 0 | 150 2 2 | 130 | accept - 2 2 0 | -
+2 2 0 | 150 3 2 | 130 | reject 202 2 2 0 | -
+2 2 0 | 150 3 1 | 130 | accept - 2 2 1 | -
+# scenario returns-touch-only-their-copy
+0 0 0 | 150 1 1 | 130 | accept - 1 0 0 | -
+1 0 0 | 150 3 2 | 130 | accept - 1 0 2 | -
+1 0 2 | 150 2 3 | 130 | accept - 1 3 2 | -
+1 3 2 | 151 1 1 | 130 | accept - 0 3 2 | -
+0 3 2 | 151 3 2 | 130 | accept - 0 3 0 | -
+0 3 0 | 151 2 3 | 130 | accept - 0 0 0 | -
+# scenario a-member-at-the-limit-can-still-return
+0 0 0 | 150 1 3 | 130 | accept - 3 0 0 | -
+3 0 0 | 150 3 3 | 130 | accept - 3 0 3 | -
+3 0 3 | 151 3 3 | 130 | accept - 3 0 0 | -
+3 0 0 | 150 2 3 | 130 | accept - 3 3 0 | -
+3 3 0 | 151 1 3 | 130 | accept - 0 3 0 | -
+# scenario one-copy-each-still-borrows-a-second
+0 0 0 | 150 1 1 | 130 | accept - 1 0 0 | -
+1 0 0 | 150 2 2 | 130 | accept - 1 2 0 | -
+1 2 0 | 150 3 3 | 130 | accept - 1 2 3 | -
+1 2 3 | 151 2 2 | 130 | accept - 1 0 3 | -
+1 0 3 | 150 2 1 | 130 | accept - 1 1 3 | -
+1 1 3 | 151 1 1 | 130 | accept - 0 1 3 | -
+0 1 3 | 151 3 3 | 130 | accept - 0 1 0 | -
+0 1 0 | 150 3 2 | 130 | accept - 0 1 2 | -
+0 1 2 | 150 1 2 | 130 | accept - 2 1 2 | -

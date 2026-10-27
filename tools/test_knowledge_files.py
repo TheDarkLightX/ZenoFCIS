@@ -41,6 +41,37 @@ class KnowledgeFiles(unittest.TestCase):
                 scan.file(path, name)
             self.assertEqual(scan.report()["status"], "failed")
 
+    def test_build_copies_require_the_exact_public_bytes_and_are_not_release_members(self):
+        for name in ("target/package/zeno-fcis-loop-doors-2.6.0/examples/strategy-example.kb",
+                     "target/atdd/app/runtime/" + K.EXAMPLE):
+            with self.subTest(name=name):
+                root = self.fixture()
+                copy = root / name
+                copy.parent.mkdir(parents=True)
+                copy.write_bytes((root / K.EXAMPLE).read_bytes())
+                self.assertEqual(K.check(root), [])
+                # A cache location is not a permitted release/archive location.
+                scan = Scan()
+                scan.inspect("archive!" + name, copy.read_bytes())
+                self.assertEqual(scan.report()["status"], "failed")
+                copy.write_text("private(a).")
+                self.assertIn("kb-example-content-mismatch", K.check(root))
+
+    def test_build_output_does_not_hide_unknown_paths_or_replace_the_source_example(self):
+        for name in ("target/other.kb", "target/cache/strategy-example.kb",
+                     "target/package/other-2.6.0/examples/strategy-example.kb"):
+            root = self.fixture()
+            copy = root / name
+            copy.parent.mkdir(parents=True)
+            copy.write_bytes((root / K.EXAMPLE).read_bytes())
+            self.assertIn("kb-unlisted-file", K.check(root))
+        root = self.fixture()
+        copy = root / ("target/stage/" + K.EXAMPLE)
+        copy.parent.mkdir(parents=True)
+        copy.write_bytes((root / K.EXAMPLE).read_bytes())
+        (root / K.EXAMPLE).unlink()
+        self.assertIn("kb-example-missing", K.check(root))
+
     def test_only_the_pinned_neutral_contents_can_use_the_example_name(self):
         root = self.fixture()
         (root / K.EXAMPLE).write_text("custom(a).")
@@ -100,8 +131,11 @@ class KnowledgeFiles(unittest.TestCase):
         paths = [snapshots.MANIFEST]
         for name in manifest["sources"]:
             paths += [Path("crates") / name, snapshots.DIRECTORY / (name + ".txt")]
+        for name in manifest.get("repository_sources", []):
+            paths += [Path(name), snapshots.DIRECTORY / "repository" / (name + ".txt")]
         paths += [path.relative_to(K.ROOT)
-                  for path in (K.ROOT / snapshots.CLI / "src").rglob("*.rs")
+                  for path in [*(K.ROOT / snapshots.CLI / "src").rglob("*.rs"),
+                               *(K.ROOT / snapshots.CLI / "examples").rglob("*.rs")]
                   if "source-snapshots/" in path.read_text()]
         for relative in paths:
             destination = root / relative

@@ -30,11 +30,11 @@ import check_payload_migrate as payloads
 ROOT = applications.ROOT
 TEMPLATE = ROOT / "crates/zeno-fcis-cli/templates/order-fulfillment"
 SPLIT = migrations.FIXTURES / "order-fulfillment-split"
-ORDER_COUNTS = (24, 20, 1, 1_440)
+ORDER_COUNTS = (28, 23, 1, 22_356)
 DROP_COUNTS = (160, 114, 1, 29_184)
 COUNT_KEYS = ("states", "states_satisfying_state_laws", "genesis_states", "tuples_compared")
 STATUS = {160: (False, 0), 161: (False, 1), 165: (False, 2),
-          162: (True, 0), 163: (True, 1), 164: (True, 2)}
+          162: (True, 0), 163: (True, 1), 164: (True, 2), 166: (True, 3)}
 
 
 def mapped_label(line: str) -> str:
@@ -45,7 +45,7 @@ def mapped_label(line: str) -> str:
     paid, progress = STATUS[int(after[2])]
     after = [*after[:2], after[3], str(int(paid)), str(progress)]
     if outbox[0] == "300":
-        outbox[2] = str(int(outbox[2] == "175"))
+        outbox[2] = str(int(outbox[2]) - 175)
     return " ".join(before) + " | " + " ".join(after) + " | " + " ".join(outbox)
 
 
@@ -85,7 +85,7 @@ def operation(binary: Path, command: str, store: Path, *words: str) -> dict:
 def order_commit(binary: Path, store: Path, action: str, callback: int, caller: str,
                  commit: int, decision: str = "Accept", reason: int | None = None) -> dict:
     result = operation(binary, "submit", store, f"action={action}",
-                       f"callback_attempt={callback}", f"caller={caller}")
+                       f"callback_attempt={callback}", f"caller={caller}", "now=0")
     upgrades.expect(result, {"status": "committed", "class": decision,
                             "reason": reason, "commit": commit}, action)
     return result
@@ -173,7 +173,7 @@ def order_refusals(directory: Path) -> dict:
         found[name] = migrations.refused_evolution(
             app, SPLIT, ["--migration", str(path)], words, name)
     bad = copy.deepcopy(good)
-    bad["payloads"]["300"]["142"] = {"from": 141, "map": {"175": False, "176": False}}
+    bad["payloads"]["300"]["142"] = {"from": 141, "map": {str(code): 0 for code in range(175, 179)}}
     path = migrations.write_json(directory / "constant-capture.json", bad)
     found["constant-capture"] = migrations.refused_evolution(
         app, SPLIT, ["--migration", str(path)], ["payload"], "a lossy constant capture")
@@ -232,7 +232,7 @@ def order_journey(directory: Path, packages: dict, version: str) -> dict:
                                       "version 1 over the split order")
 
     # A second retained source path: checkout, upgrade, then cancellation.
-    # The pending Capture is old bytes; the new Void uses capture=false.
+    # The pending Capture is old bytes; the new Void uses request_kind=1.
     operation(first, "init", store_b)
     order_commit(first, store_b, "Checkout", 0, "Customer", 1)
     capture = pending_exports(store_b)
@@ -244,7 +244,7 @@ def order_journey(directory: Path, packages: dict, version: str) -> dict:
     upgrades.expect(cancelled, {"state": {"payment_attempts": 1, "paid": False, "progress": 2}},
                     "mapped cancel label")
     if cancelled["deliveries"] != [
-            {"channel": 300, "payload": {"request_attempt": 1, "capture": False}}]:
+            {"channel": 300, "payload": {"request_attempt": 1, "request_kind": 1}}]:
         raise RuntimeError(f"cancel did not publish the mapped Void payload: {cancelled}")
     mixed = pending_exports(store_b)
     if len(mixed) != 2 or mixed[0] != capture[0] or mixed[1]["payload"] == mixed[0]["payload"]:
@@ -355,7 +355,14 @@ def main() -> int:
 
 if __name__ == "__main__":
     try:
-        sys.exit(main())
-    except (OSError, RuntimeError, subprocess.CalledProcessError, KeyError, ValueError) as error:
-        print(f"template migrate: FAIL: {error}", file=sys.stderr)
-        sys.exit(1)
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        try:
+            sys.exit(main())
+        except (OSError, RuntimeError, subprocess.CalledProcessError, KeyError, ValueError) as error:
+            print(f'template migrate: FAIL: {error}', file=sys.stderr)
+            sys.exit(1)
+    run_cli(_entrypoint)

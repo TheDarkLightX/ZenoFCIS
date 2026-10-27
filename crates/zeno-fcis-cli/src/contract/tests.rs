@@ -21,6 +21,8 @@ use super::{
 };
 use crate::transform::{self, DEFAULT_MAX_INPUT_TUPLES, DEFAULT_STEP_LIMIT, Limits};
 
+const COUNTER_REJECT_LAW: &str = "law 503 reject_no_authority on reject = context.102 != 1 || (command.101 == 120 && pre.100.110 == 3) || (command.101 == 121 && pre.100.111 == 3);";
+
 const TEMPLATES: [&str; 8] = [
     "durable-counter",
     "inventory-reservation",
@@ -31,6 +33,67 @@ const TEMPLATES: [&str; 8] = [
     "prepared-counter",
     "compliance-gateway",
 ];
+
+#[test]
+fn genesis_factory_refuses_law_500() {
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/apps/library-loans");
+    let project = fs::read_to_string(base.join("project.zeno")).unwrap_or_else(|e| panic!("{e}"));
+    let mut rules: Value = serde_json::from_str(
+        &fs::read_to_string(base.join("v2/policy.json")).unwrap_or_else(|e| panic!("{e}")),
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    rules["genesis"] = serde_json::json!({"110":1,"111":1,"112":1});
+    let rules = rules.to_string();
+    let sources = ContractSources {
+        project: &project,
+        rules: &rules,
+        schema_origin: None,
+        adoptions: &[],
+        replayed: &[],
+        evolutions: &[],
+    };
+    let result = super::generate_startable_contract(sources);
+    assert!(
+        result.is_err(),
+        "assertion failed: factory must refuse invalid genesis"
+    );
+    let error = result.err().unwrap_or_else(|| panic!("missing refusal"));
+    assert_eq!(error.place(), "genesis");
+    assert_eq!(
+        error.reason(),
+        "no admissible starting state: law 500: Core(Law(Violated))"
+    );
+}
+
+#[test]
+fn genesis_factory_accepts_valid_scalar_and_numeric_contracts() {
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval");
+    let project = fs::read_to_string(base.join("project.zeno")).unwrap_or_else(|e| panic!("{e}"));
+    let rules = fs::read_to_string(base.join("v2/policy.json")).unwrap_or_else(|e| panic!("{e}"));
+    let sources = ContractSources {
+        project: &project,
+        rules: &rules,
+        schema_origin: None,
+        adoptions: &[],
+        replayed: &[],
+        evolutions: &[],
+    };
+    let generated = super::generate_startable_contract(sources).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(
+        generated.policy(),
+        generate_contract(sources)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .policy()
+    );
+    let mut rules: Value = serde_json::from_str(&rules).unwrap_or_else(|e| panic!("{e}"));
+    rules["schema"] = serde_json::json!("zeno-fcis/template-declarative-policy/4");
+    let rules = rules.to_string();
+    let sources = ContractSources {
+        rules: &rules,
+        ..sources
+    };
+    assert!(super::generate_startable_contract(sources).is_ok());
+}
 
 struct Template {
     project: String,
@@ -251,7 +314,7 @@ fn rule_precedence_and_tokens_outside_the_language_refuse() {
 // Replaces test_complete_original_definitions_and_scopes.
 #[test]
 fn templates_declare_complete_types_and_scoped_laws() {
-    for (name, count) in TEMPLATES.into_iter().zip([6, 9, 12, 10, 13, 21, 7, 15]) {
+    for (name, count) in TEMPLATES.into_iter().zip([6, 9, 13, 10, 15, 21, 7, 15]) {
         let files = template(name);
         let declarations = files.declarations();
         assert_eq!(declarations.types.len(), count, "{name}");
@@ -299,6 +362,13 @@ fn templates_declare_complete_types_and_scoped_laws() {
             (506, LawScope::Accept, false),
             (507, LawScope::Accept, false),
             (508, LawScope::CommittedFailure, false),
+            (510, LawScope::Committing, true),
+            (511, LawScope::Accept, false),
+            (512, LawScope::Reject, false),
+            (513, LawScope::Committing, false),
+            (514, LawScope::Committing, true),
+            (515, LawScope::Committing, false),
+            (516, LawScope::Committing, false),
         ]
     );
 }
@@ -378,6 +448,8 @@ fn prepared_counter_shape_bounds_and_all_216_inputs() {
             (501, LawScope::Accept, false),
             (502, LawScope::CommittedFailure, false),
             (503, LawScope::Reject, false),
+            (510, LawScope::Committing, false),
+            (511, LawScope::Committing, false),
         ]
     );
     let channels: Vec<(u32, u32, u32)> = declarations
@@ -650,16 +722,13 @@ fn planted_declaration_errors_are_refused_where_they_are() {
     let counter = template("durable-counter");
     let cases = [
         (
-            counter.with_project(
-                "law 503 reject_no_authority on reject = context.102 != 1 || (command.101 == 120 && pre.100.110 == 3) || (command.101 == 121 && pre.100.111 == 3);",
-                "law 503 reject_no_authority = true;",
-            ),
+            counter.with_project(COUNTER_REJECT_LAW, "law 503 reject_no_authority = true;"),
             "project.zeno law 503",
             "needs a scope",
         ),
         (
             counter.with_project(
-                "law 503 reject_no_authority on reject = context.102 != 1 || (command.101 == 120 && pre.100.110 == 3) || (command.101 == 121 && pre.100.111 == 3);",
+                COUNTER_REJECT_LAW,
                 "law 503 reject_no_authority on reject = forall i in 0..2 { pre.100.110 >= 0 };",
             ),
             "project.zeno law 503",
@@ -791,13 +860,13 @@ fn library_rules_are_refused_where_they_are_written() {
     // The withdrawal queue decides no committed failure, so its framework
     // failure law applies; it may not share the structural reject law's ID.
     let shared = template("withdrawal-queue").with_rules(|rules| {
-        rules["framework_failure_law"] = 509.into();
+        rules["framework_failure_law"] = 909.into();
     });
     assert_eq!(
         shared.refusal(),
         (
             "v2/policy.json".to_owned(),
-            "the framework CommittedFailureEffects and RejectNoAuthority laws share ID 509"
+            "the framework CommittedFailureEffects and AuthoritySubjectRecipient laws share ID 909"
                 .to_owned()
         )
     );
@@ -805,14 +874,7 @@ fn library_rules_are_refused_where_they_are_written() {
     // Each project edit, with the rules edit that keeps the rest consistent.
     // A changed schema no longer matches the template's schema origin, so
     // these contracts are generated without one.
-    let declared: [(&str, &str, Edit, &str, &str); 4] = [
-        (
-            "variant 121 101 RecordFailure none;",
-            "variant 122 101 RecordFailure none;",
-            Box::new(|_| {}),
-            "project.zeno",
-            "sum type 101 needs consecutive variant IDs to be a program input or output",
-        ),
+    let declared: [(&str, &str, Edit, &str, &str); 3] = [
         (
             "law 503 reject_no_authority",
             "law 909 reject_no_authority",
@@ -834,8 +896,8 @@ fn library_rules_are_refused_where_they_are_written() {
             "applies at genesis, where `pre.100.110` has no value",
         ),
         (
-            "on reject = context.102 != 1 || (command.101 == 120 && pre.100.110 == 3) || (command.101 == 121 && pre.100.111 == 3);",
-            "on reject = pre.100 == pre.100;",
+            COUNTER_REJECT_LAW,
+            "law 503 reject_no_authority on reject = pre.100 == pre.100;",
             Box::new(|_| {}),
             "project.zeno law 503",
             "`pre.100` is a record; name one of its fields",
@@ -1203,7 +1265,12 @@ fn adoptions_replay_their_receipts_in_order_and_emit_every_version() {
     );
     assert_eq!(generated.previous()[0].policy(), counter.policy);
     assert_ne!(generated.policy(), counter.policy, "the program changed");
-    assert_eq!(generated.program(), padded_once);
+    assert_eq!(
+        generated
+            .program()
+            .unwrap_or_else(|| panic!("legacy signed program")),
+        padded_once
+    );
     assert!(generated.source().contains("pub const VERSION: u32 = 2;"));
     assert!(
         generated
@@ -1453,7 +1520,13 @@ fn an_edit_after_adoption_is_refused_and_version_one_is_kept() {
         counter.policy,
         "the edit changes the policy"
     );
-    assert_eq!(fresh.program(), original, "but not the decision program");
+    assert_eq!(
+        fresh
+            .program()
+            .unwrap_or_else(|| panic!("legacy signed program")),
+        original,
+        "but not the decision program"
+    );
     let refused = generate_contract(ContractSources {
         rules: &adopted,
         adoptions: &files,
@@ -1468,11 +1541,8 @@ fn an_edit_after_adoption_is_refused_and_version_one_is_kept() {
     assert_eq!(
         refused.reason(),
         "differs from version 1's policy as these declarations and rules produce it: \
-         version 1 was edited after adoption, or this contract was adopted by ZenoFCIS 2.4.x, \
-         whose integer encoding changed in 2.5. Restore any edits to superseded versions. \
-         For a 2.4-adopted contract, operate the app with the ZenoFCIS 2.4.0 CLI, or re-adopt \
-         it under 2.5 from the original pre-adoption contract with a newly checked candidate \
-         and receipt. Compatibility is planned for 2.5.1"
+         version 1 was edited after adoption. Restore the original declarations and rules of \
+         superseded versions and retain their adoption evidence unchanged"
     );
     // The unedited inputs still give version 1 exactly.
     let kept = generate_contract(ContractSources {
@@ -1736,14 +1806,34 @@ fn a_step_limit_must_cover_each_program_and_every_law_node() {
 /// The durable counter with a second delivery, ordinal 1 and idempotency
 /// ordinal 2, on its accepting case.
 fn counter_with_two_deliveries() -> Template {
-    template("durable-counter").with_rules(|rules| {
+    let mut counter = template("durable-counter").with_rules(|rules| {
         let mut second = rules["cases"][2]["outbox"][0].clone();
         second["ordinal"] = 1.into();
         second["idempotency_ordinal"] = 2.into();
         if let Some(outbox) = rules["cases"][2]["outbox"].as_array_mut() {
             outbox.push(second);
         }
-    })
+        for law in ["510", "511"] {
+            rules["delivery_laws"][law]["max_deliveries"] = 2.into();
+        }
+    });
+    // This resource fixture intentionally sends two notifications on Increment.
+    // Retain exact payload and destination checks for that two-entry variant.
+    counter.project = counter
+        .project
+        .lines()
+        .map(|line| {
+            if line.starts_with("law 510 ") {
+                "law 510 notification_matches_both_post_counters on commit = (command.101 == 120 -> outbox.104 == 2 && outbox.104.112 == post.100.110 + post.100.110 && outbox.104.113 == post.100.111 + post.100.111) && (command.101 == 121 -> outbox.104 == 1 && outbox.104.112 == post.100.110 && outbox.104.113 == post.100.111);"
+            } else if line.starts_with("law 511 ") {
+                "law 511 notification_goes_to_the_local_observer on commit = (command.101 == 120 -> outbox.104 == 2) && (command.101 == 121 -> outbox.104 == 1);"
+            } else {
+                line
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    counter
 }
 
 /// The counter's framed state, command and context.
@@ -1881,10 +1971,18 @@ fn a_case_delivers_in_increasing_ordinal_order() {
 
 #[test]
 fn a_committed_failure_needs_a_committed_failure_law() {
-    // Law 502 is the counter's only CommittedFailureEffects law; case 3 is
-    // its committed failure.
+    // Reclassify every failure law in this scratch fixture; case 3 must not
+    // remain admissible when its required law family is absent.
     let unlawful = template("durable-counter").with_rules(|rules| {
-        rules["law_kinds"]["502"] = "AuthoritySubjectRecipient".into();
+        for kind in rules["law_kinds"]
+            .as_object_mut()
+            .unwrap_or_else(|| panic!("required law bindings are missing"))
+            .values_mut()
+        {
+            if kind.as_str() == Some("CommittedFailureEffects") {
+                *kind = "AuthoritySubjectRecipient".into();
+            }
+        }
     });
     let (place, reason) = unlawful.refusal();
     assert_eq!(place, "v2/policy.json cases[3]");
@@ -2005,11 +2103,12 @@ fn the_rules_reference_documents_exactly_what_the_generator_reads() {
     use super::expr::{FUNCTIONS, OPERATORS};
     use super::model::required_declaration;
     use super::rules::{
-        ADOPTION_KEYS, CASE_KEYS, DELIVERY_KEYS, EVOLUTION_KEYS, FILE_KEYS, LEAVES, LawKind,
-        MIGRATION_FIELD_KEYS, MIGRATION_KEYS, ROOT_KEYS, SHORTCUT_KEYS,
+        ADOPTION_KEYS, CASE_KEYS, CLOCK_KEYS, DELIVERY_KEYS, EVOLUTION_KEYS, FILE_KEYS, LEAVES,
+        LawKind, MIGRATION_FIELD_KEYS, MIGRATION_KEYS, ROOT_KEYS, SHORTCUT_KEYS,
     };
     for (table, keys) in [
         ("file", FILE_KEYS.as_slice()),
+        ("clock", CLOCK_KEYS.as_slice()),
         ("roots", ROOT_KEYS.as_slice()),
         ("case", CASE_KEYS.as_slice()),
         ("delivery", DELIVERY_KEYS.as_slice()),
@@ -2076,4 +2175,43 @@ fn adoption_preserves_empty_array_trivia_and_decoded_key_spellings() {
             assert!(twice.contains(&format!("\"{key}\"")));
         }
     }
+}
+
+#[test]
+fn sparse_action_ids_keep_wire_identity_and_refuse_undeclared_holes() {
+    let mut files = template("durable-counter");
+    files.project = files.project.replace("121", "129");
+    files.rules = files.rules.replace("121", "129");
+    let rules = files.rules();
+    let declarations = files.declarations();
+    let bytes = schema::encode(&declarations).unwrap_or_else(|error| panic!("{error}"));
+    let commitment = schema_commitment(&bytes).unwrap_or_else(|error| panic!("{error}"));
+    let contract = Contract::build(&declarations, &rules, commitment)
+        .unwrap_or_else(|error| panic!("{error}"));
+    generate_contract(ContractSources {
+        schema_origin: None,
+        ..files.sources()
+    })
+    .unwrap_or_else(|error| panic!("{error}"));
+    policy::with_authority(&contract, &bytes, |authority| {
+        for (command, expected) in [
+            (120, Some(c::Class::Accept)),
+            (129, Some(c::Class::CommittedFailure)),
+            (121, None),
+            (128, None),
+        ] {
+            let raw = counter_input(&commitment, 0, command);
+            let evaluation = authority.evaluate(c::Raw {
+                state: &raw[0],
+                command: &raw[1],
+                context: &raw[2],
+            });
+            assert_eq!(
+                evaluation.result().ok().map(|v| v.class()),
+                expected,
+                "wire action {command}"
+            );
+        }
+    })
+    .unwrap_or_else(|error| panic!("{error}"));
 }

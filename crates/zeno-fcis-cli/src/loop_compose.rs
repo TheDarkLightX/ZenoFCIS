@@ -70,7 +70,8 @@ struct Fields {
 }
 
 fn fields(core: &Core) -> Result<Fields> {
-    let rules = Rules::read(core.rules_text())?;
+    let rules = Rules::read_for_project(core.project(), core.rules_text())?;
+    rules.refuse_unsigned("loop composition")?;
     let declarations = Declarations::read(core.project(), &rules.leaf_bindings)?;
     // Generated leaves and the core decision projection have no outbox.
     // Refuse even unused channels: this profile cannot compare deliveries.
@@ -114,6 +115,7 @@ fn fields(core: &Core) -> Result<Fields> {
         .iter()
         .filter(|p| p.source == Source::State)
         .map(|p| match p.field.and_then(|f| rules.genesis.get(&f)) {
+            Some(Constant::U128(_)) => refuse("U128SubjectUnsupported"),
             Some(Constant::Bool(b)) => Ok(i128::from(*b)),
             Some(Constant::Int(v)) => Ok(*v),
             None => refuse("compose-genesis-missing"),
@@ -528,7 +530,8 @@ fn leaf(core: &Core, f: &Fields, parts: &[Part], k: usize) -> Result<Leaf> {
 /// The bound program's identity, as the composition checker pins it, and
 /// the program's node count.
 fn program_identity(project: &str, policy_text: &str) -> Result<(String, usize)> {
-    let rules = Rules::read(policy_text)?;
+    let rules = Rules::read_for_project(project, policy_text)?;
+    rules.refuse_unsigned("loop composition")?;
     let declarations = Declarations::read(project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     let commitment = schema_commitment(&schema)?;
@@ -803,7 +806,7 @@ mod tests {
     fn a_delivery_source_is_refused_before_composition() {
         let witness =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/loop-compose-deliveries");
-        let core = Core::load(&witness).unwrap_or_else(|error| panic!("core: {error:?}"));
+        let core = Core::load(&witness, false).unwrap_or_else(|error| panic!("core: {error:?}"));
         assert_eq!(core.decisions.len(), 8);
         assert!(core.decisions.iter().all(Option::is_some));
         assert_eq!(

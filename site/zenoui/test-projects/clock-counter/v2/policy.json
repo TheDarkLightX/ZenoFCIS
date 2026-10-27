@@ -1,0 +1,45 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "clock-counter",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "variables": {
+    "count": "pre.100.110",
+    "caller": "context.102.140"
+  },
+  "cases": [
+    {
+      "when": "caller != 130",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "count"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AssetConservation"
+  },
+  "clock": {
+    "field": 141,
+    "unit": "days",
+    "epoch": "2099-01-01"
+  },
+  "leaf_bindings": {}
+}

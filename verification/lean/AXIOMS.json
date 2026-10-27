@@ -1,0 +1,417 @@
+{
+  "Collections.decision_renaming": [
+    "Quot.sound",
+    "propext"
+  ],
+  "Collections.frame_admissible": [],
+  "Collections.frame_renaming": [
+    "Quot.sound",
+    "propext"
+  ],
+  "Collections.role_local_preserved": [
+    "propext"
+  ],
+  "Collections.role_named_outputs": [
+    "propext"
+  ],
+  "Collections.role_only_counterexample": [
+    "Quot.sound",
+    "propext"
+  ],
+  "Collections.role_write_frame": [
+    "propext"
+  ],
+  "Collections.run_preserves": [
+    "Quot.sound",
+    "propext"
+  ],
+  "Collections.step_preserves": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsAggregate.namedTotal_le": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsAggregate.summary_step": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsAggregate.writes_preserve": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsAggregate.writes_total": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsPatterns.enumerate_iff": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsPatterns.enumerate_nodup": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsPatterns.equality_pattern_coverage": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsPatterns.normalize_pattern": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsPatterns.pattern_unique": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsPatternsExecutable.canonical_classes_iff": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsPatternsExecutable.law_filter_ext": [],
+  "CollectionsReduction.collections_reduction": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReduction.commit_named": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReduction.commit_unnamed": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReduction.decision_renaming": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReduction.frame_admissible": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReduction.frame_renaming": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReduction.frame_representatives": [
+    "propext"
+  ],
+  "CollectionsReduction.run_preserves": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReduction.step_preserves": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReductionGenesis.canonical_none": [],
+  "CollectionsReductionGenesis.frame_genesis": [],
+  "CollectionsReductionGenesis.genesis_check_iff": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReductionGenesis.genesis_uniform": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReductionGenesis.removed_payload_is_least": [],
+  "CollectionsReductionTallies.affected_covers_all_deltas": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReductionTallies.genesis_tally": [],
+  "CollectionsReductionTallies.tally_run": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReductionTallies.tally_step": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReductionValidation.library_cases_checked": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReductionValidation.library_delta": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReductionValidation.library_run_tally": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReductionValidation.token_cases_checked": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReductionValidation.token_checked": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsReductionValidation.token_supply_growth_needs_issuer": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsRequiresEM.checked": [],
+  "CollectionsRequiresEM.specialized_implies_em": [
+    "propext"
+  ],
+  "CollectionsSignedTallies.summary_step": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsSignedTallies.tally_run": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsSignedTallies.tally_step": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsSignedTallies.writes_total": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsValidationPremises.Tallies.t1_joint_countermodel": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsValidationPremises.Tallies.t3_joint_countermodel": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsValidationPremises.Tallies.t4_joint_countermodel": [
+    "propext"
+  ],
+  "CollectionsValidationPremises.p2_joint_countermodel": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsValidationPremises.p3_joint_countermodel": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsValidationPremises.p4_joint_countermodel": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsValidationWitnesses.absent_default_does_not_bind_stored_key": [],
+  "CollectionsValidationWitnesses.aliased_readonly_law_rechecked": [],
+  "CollectionsValidationWitnesses.bad_initial_condition_rejected": [],
+  "CollectionsValidationWitnesses.conflicting_aliases_rejected": [],
+  "CollectionsValidationWitnesses.false_undefined_and_vacuous_relations": [],
+  "CollectionsValidationWitnesses.lawful_removal_and_canonical_transition": [],
+  "CollectionsValidationWitnesses.library_zero_return_is_inadmissible": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsValidationWitnesses.missing_supply_increment_rejected": [],
+  "CollectionsValidationWitnesses.noncanonical_genesis_rejected": [],
+  "CollectionsValidationWitnesses.p1_follows_from_p2": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsValidationWitnesses.p2_hidden_read_counterexample": [],
+  "CollectionsValidationWitnesses.p3_role_counterexample": [
+    "Quot.sound",
+    "propext"
+  ],
+  "CollectionsValidationWitnesses.p4_unnamed_write_counterexample": [],
+  "CollectionsValidationWitnesses.removed_payload_rejected": [],
+  "CollectionsValidationWitnesses.self_transfer_mint_rejected": [],
+  "CollectionsValidationWitnesses.signed_overflow_rejected": [],
+  "CollectionsValidationWitnesses.summary_delta_cannot_be_dropped": [],
+  "CollectionsValidationWitnesses.t1_fixed_group_counterexample": [
+    "propext"
+  ],
+  "CollectionsValidationWitnesses.t2_negative_coverage_counterexample": [],
+  "CollectionsValidationWitnesses.t3_nonempty_genesis_counterexample": [
+    "propext"
+  ],
+  "CollectionsValidationWitnesses.t4_missing_target_delta_counterexample": [
+    "propext"
+  ],
+  "CollectionsValidationWitnesses.token_bound_one_is_not_inductive": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.ascending": [],
+  "FixedPoints.ascending_repeats": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.below_antisymm": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.below_refl": [],
+  "FixedPoints.below_top": [],
+  "FixedPoints.below_trans": [],
+  "FixedPoints.bottom_below": [],
+  "FixedPoints.descending": [],
+  "FixedPoints.descending_repeats": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.gfp_greatest": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.greatest_of_stable": [],
+  "FixedPoints.greatest_unique": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.inner_monotone": [],
+  "FixedPoints.iter_comparison": [],
+  "FixedPoints.least_of_stable": [],
+  "FixedPoints.least_unique": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.lfp_least": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.nested_stable": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.stable_forever": [],
+  "FixedPoints.strata_are_iterations": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.top_seed_counterexample": [
+    "propext"
+  ],
+  "FixedPoints.weight_bound": [
+    "Quot.sound",
+    "propext"
+  ],
+  "FixedPoints.weight_order": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.bounded_certificate": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.complement_eq_iff": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.complement_involution": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.complement_join": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.complement_meet": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.complement_order": [
+    "propext"
+  ],
+  "IndexedFixedPoints.complemented_lfp": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.concrete_certificate": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.dual_iteration": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.dual_monotone": [
+    "propext"
+  ],
+  "IndexedFixedPoints.full_middle_repeat": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.full_strata_iterations": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.generator_stable": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.greatest_of_last_repeat": [
+    "propext"
+  ],
+  "IndexedFixedPoints.join_mono": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.join_monotone": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.join_reindex": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.join_true": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.least_of_last_repeat": [
+    "propext"
+  ],
+  "IndexedFixedPoints.meet_mono": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.meet_monotone": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.meet_reindex": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.meet_true": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.middle_identity_monotone": [],
+  "IndexedFixedPoints.middle_monotone_y": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.middle_monotone_z": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.nested_extremal": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.outer_monotone": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.strata_step": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.tableMiddle_eq": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.value_reindex": [
+    "Quot.sound",
+    "propext"
+  ],
+  "IndexedFixedPoints.wrong_middle_seed_counterexample": [
+    "propext"
+  ]
+}

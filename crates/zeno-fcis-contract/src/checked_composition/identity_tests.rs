@@ -7,11 +7,11 @@ use std::path::Path;
 
 use super::identity::{CHECKER_SOURCES, Identity};
 
-/// Compiled only for tests, or written by `cargo package`; none of them is
-/// part of the library.
+/// Tests and package metadata; none is linked into the library.
 const REVIEWED_FILES: &[&str] = &[
     ".cargo_vcs_info.json",
     "Cargo.toml.orig",
+    "examples/service_product.rs",
     "src/checked_composition/assembly_differential_tests.rs",
     "src/checked_composition/assembly_tests.rs",
     "src/checked_composition/compose_tests.rs",
@@ -19,12 +19,18 @@ const REVIEWED_FILES: &[&str] = &[
     "src/checked_composition/hierarchy_tests.rs",
     "src/checked_composition/identity_tests.rs",
     "src/checked_composition/joint_tests.rs",
+    "src/checked_composition/joint_differential_tests.rs",
     "src/checked_composition/journal_tests.rs",
     "src/checked_composition/obligations_tests.rs",
     "src/checked_composition/receipt_tests.rs",
     "src/checked_composition/structure_tests.rs",
+    "src/checked_composition/service_tests.rs",
     "src/checked_composition/term_tests.rs",
     "src/checked_composition/tests.rs",
+    "src/collections/reduction_differential.rs",
+    "src/collections/runtime_proof_tests.rs",
+    "src/priority_construction_controls.rs",
+    "src/two_run/tests.rs",
 ];
 /// Integration tests and their fixtures.
 const REVIEWED_PREFIXES: &[&str] = &["tests/"];
@@ -165,7 +171,13 @@ fn the_ambient_gate_finds_each_form() {
 #[test]
 fn the_library_reaches_no_ambient_effect() {
     let mut found = Vec::new();
-    for (path, bytes) in CHECKER_SOURCES {
+    // Conservatively scan every source-bound library file, including alternate
+    // verification configurations. The CLI's parsed module-closure test checks
+    // that no standalone or reviewed-out file can enter this library closure.
+    for (path, bytes) in CHECKER_SOURCES
+        .iter()
+        .filter(|(path, _)| path.starts_with("src/"))
+    {
         let text = std::str::from_utf8(bytes).unwrap_or_else(|error| panic!("{path}: {error}"));
         found.extend(
             ambient(text)
@@ -174,6 +186,61 @@ fn the_library_reaches_no_ambient_effect() {
         );
     }
     assert!(found.is_empty(), "{found:?}");
+}
+
+#[test]
+fn the_standalone_binaries_have_reviewed_ambient_uses() {
+    let manifest: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/standalone-binaries.json"))
+            .unwrap_or_else(|error| panic!("standalone manifest: {error}"));
+    assert_eq!(manifest["schema"], "zeno-fcis/standalone-binaries/1");
+    let binaries = manifest["binaries"]
+        .as_array()
+        .unwrap_or_else(|| panic!("standalone binaries"));
+    let mut reviewed = BTreeSet::new();
+    for binary in binaries {
+        let name = binary["name"]
+            .as_str()
+            .unwrap_or_else(|| panic!("standalone name"));
+        let source = binary["source"]
+            .as_str()
+            .unwrap_or_else(|| panic!("standalone source"));
+        assert_eq!(
+            source,
+            format!("examples/{name}.rs"),
+            "own Cargo example target"
+        );
+        assert!(
+            reviewed.insert(source),
+            "duplicate standalone source: {source}"
+        );
+        assert!(
+            binary["purpose"]
+                .as_str()
+                .is_some_and(|text| !text.is_empty()),
+            "review standalone purpose: {source}"
+        );
+        let bytes = CHECKER_SOURCES
+            .iter()
+            .find_map(|(path, bytes)| (*path == source).then_some(*bytes))
+            .unwrap_or_else(|| panic!("standalone source must stay identity-bound: {source}"));
+        let text = std::str::from_utf8(bytes).unwrap_or_else(|error| panic!("{source}: {error}"));
+        assert_eq!(
+            serde_json::json!(ambient(text)),
+            binary["ambient_tokens"],
+            "review each standalone ambient token occurrence: {source}"
+        );
+    }
+    let standalone: BTreeSet<_> = CHECKER_SOURCES
+        .iter()
+        .filter_map(|(path, _)| {
+            (path.ends_with(".rs") && !path.starts_with("src/")).then_some(*path)
+        })
+        .collect();
+    assert_eq!(
+        standalone, reviewed,
+        "review every source-bound standalone binary"
+    );
 }
 
 /// The checker's own files: its verdicts, tables and receipts.

@@ -1,0 +1,19 @@
+{
+  "format": "zenoui/metadata/1",
+  "title": "Numeric swap",
+  "action": "command.101.120",
+  "fields": {
+    "pre.100.110": {"label": "Token A reserve", "unit": "A"},
+    "pre.100.111": {"label": "Token B reserve", "unit": "B"},
+    "command.101.120": {"label": "Swap direction", "unit": "unitless"},
+    "command.101.121": {"label": "Input amount", "unit": "tokens"},
+    "command.101.122": {"label": "Minimum output", "unit": "tokens"},
+    "context.102": {"label": "Caller context", "unit": "unitless"}
+  },
+  "variants": {"150": "Swap A for B", "151": "Swap B for A"},
+  "commands": {
+    "150": {"label": "Swap A for B", "consequential": true},
+    "151": {"label": "Swap B for A", "consequential": true}
+  },
+  "reasons": {"300": "The amount, available reserves, minimum output or product check does not permit this swap."}
+}

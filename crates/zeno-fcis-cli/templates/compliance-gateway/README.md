@@ -1,566 +1,88 @@
-# Generated compliance gateway
+# Compliance gateway
 
-Normal decisions use the checked original schema and complete V2 policy over all
-2,880 original inputs, with mandatory genuine publication for committing outcomes.
-The reviewed rule parser is a build-time producer and grants no runtime authority.
-Original native programs, law checkers, factories and all 27 original regressions
-are retained only in the repository’s nonpublished private template oracle.
+This finite example screens transfers under a declared policy. It is not a claim
+of compliance with any jurisdiction's regulations. The checked V2 Authority reads
+`v2/policy.json` and independently evaluates the laws in `project.zeno` before
+publishing. The original `rules.txt` and synthesis artifacts retain the same rule
+order and historical behavior; their LLM-generated runtime is retained in the
+private verification oracle, rather than used by the normal V2 decision.
 
+## Prioritized policy
 
-This local, non-value-moving application screens transfers for one customer
-with an expert system's rule base. It shows five patterns:
-- a rule base as the contract: `rules.txt` holds prioritized rules over
-  finite features, `synthesis.json` states them as a relation, and
-  `zeno-fcis synth` selects a decision program that satisfies it on all 2,880
-  inputs, including both actions and reviewer values;
-- every decision names the rule that fired: a blocked transfer is a committed
-  failure under that rule's reason, a held transfer queues a review ticket
-  naming it, and a rule base with a conflict, a gap, or a rule that never
-  fires fails the build;
-- a blocked transfer is a *committed failure*: the transfer is refused, but
-  the strike is recorded, and three strikes freeze the account until a
-  reviewer reinstates it;
-- notices leave through the outbox: review tickets and block alerts each stay
-  pending until the destination acknowledges them;
-- an inductive claim for `zeno-fcis prove`: every change the laws admit
-  keeps the strikes within their bounds, for every integer. CVC5 attests the
-  induction step, and the tests check the rest of the argument.
+Standing is a strike count from 0 to 3, initially zero. Inputs include region,
+amount band 0..4, risk, identity tier 0..3, and a trusted reviewer flag. `Screen`
+selects the first matching rule in the following order:
 
-`src/v2_contract.rs` declares the complete original schema, policy, branches,
-footprints and laws. The checked library binds those declarations, independently
-admits the original envelopes, and evaluates the decision and required laws
-before it can construct a private publication. `src/rules.rs` remains an
-independent rule evaluator for build-time checks and comparisons.
-
-The original native `src/program.rs` and `src/laws.rs` are retained in the
-private oracle. Their synthesized-step mapper and handwritten law checker
-describe the historical verification path below; they do not grant authority
-in the normal V2 application.
-
-`project.zeno` owns record fields, command variants, reason order, channel
-types, and relational formulas. `build.rs` supplies explicit scalar bounds and
-catalog meanings, then checks and generates the schema and project bindings.
-`profile.rs` binds the exact source, including the rule base and the synthesis
-files, and the runtime-only law manifest.
-
-## The rules
-
-The standing has one field, `strikes` (field 120), from 0 to 3: the transfers
-blocked since the last reinstatement. Every value is a valid standing, and it
-starts at zero. Each request has an `action` (field 130) and describes one
-transfer; its context describes the customer and the caller.
-
-| Field | ID | Meaning | Range |
-| --- | --- | --- | --- |
-| `region` | 131 | where the transfer goes | 160 `Allowed`, 161 `Restricted`, 162 `Sanctioned` |
-| `amount_band` | 132 | the amount, banded by the shell: in the demonstration, 0 is under 100, 1 under 1,000, 2 under 10,000, 3 under 50,000, and 4 above | 0 through 4 |
-| `counterparty_risk` | 133 | the shell's rating of the recipient | 165 `Low`, 166 `Medium`, 167 `High` |
-| `identity_tier` | 140 (context) | how far the customer's identity is verified | 0 (unverified) through 3 |
-| `reviewer` | 141 (context) | whether the caller is a compliance reviewer | 0 or 1 |
-
-| Action | ID | Effect when accepted |
+| Rule | Condition | Result |
 | --- | --- | --- |
-| `Screen` | 150 | the rule base decides the transfer: allowed, held, or blocked |
-| `Reinstate` | 151 | clears the strikes; the transfer fields are ignored |
-
-The rules apply in this order, and the first that applies decides:
-
-1. `Reinstate` without `reviewer` is rejected with `not_reviewer` (200).
-2. `Reinstate` of an account with no strikes is rejected with `no_strikes`
-   (201).
-3. `Reinstate` is accepted: `strikes` becomes 0.
-4. `Screen` is decided by the rule base below. Among the rules whose
-   conditions all hold, the one with the highest priority decides, and the
-   decision names it (variants 170 to 181 of `RuleId`, in the order of the
-   table):
-   - *block*: the transfer commits a failure under the rule's reason
-     (210 to 214, in the same order), `strikes` increases by one, up to 3, and
-     one alert is queued with the rule and the strikes now on record;
-   - *hold*: the transfer is accepted, `strikes` is unchanged, and one review
-     ticket is queued with the rule and the amount band;
-   - *allow*: the transfer is accepted; nothing changes and nothing is queued.
-
-| Priority | Rule | When | Verdict |
-| --- | --- | --- | --- |
-| 100 | `sanctioned_region` | region is sanctioned | block |
-| 90 | `frozen_account` | strikes are 3 | block |
-| 85 | `unverified_high_risk` | identity tier is 0 and counterparty risk is high | block |
-| 80 | `restricted_large` | region is restricted and amount band is at least 3 | block |
-| 80 | `unverified_large` | region is allowed, identity tier is 0, and amount band is at least 3 | block |
-| 70 | `high_risk_counterparty` | counterparty risk is high | hold |
-| 60 | `restricted_region` | region is restricted | hold |
-| 50 | `unverified_transfer` | identity tier is 0 and amount band is at least 1 | hold |
-| 40 | `partially_verified_large` | identity tier is 1 and amount band is at least 3 | hold |
-| 30 | `repeat_offender` | strikes are at least 2 and amount band is at least 2 | hold |
-| 20 | `medium_risk_large` | counterparty risk is medium and amount band is 4 | hold |
-| 0 | `default_allow` | always | allow |
-
-A rejection changes nothing and queues nothing. Review tickets go to
-`review-queue` on channel 300 and carry the rule (field 145) and the amount
-band (146). Block alerts go to `compliance-team` on channel 301 and carry the
-rule (147) and the strikes after the block (148). The shell bands the amount,
-rates the counterparty, verifies the identity tier, and authenticates the
-reviewer; the core decides only what those facts mean.
-
-## The rule base
-
-`rules.txt` is written for a compliance officer to review. It declares each
-feature with its finite range or its values, then one rule per line:
-
-```text
-rule restricted_large priority 80 when region == restricted and amount_band >= 3 then block
-```
-
-Two rules may share a priority only if no transfer matches both: the two at
-priority 80 above are separated by the region. `src/rules.rs` parses the file
-and checks it over all 720 combinations of its features:
-- *consistent*: no two rules of the same priority match the same transfer,
-  whatever they conclude, because the decision must name one rule;
-- *total*: every transfer matches some rule, which `default_allow` assures;
-- *live*: every rule decides some transfer; a rule that a higher priority
-  always covers, or whose conditions never hold together, is refused.
-
-A rule base that fails a check is refused with the transfer, or the rule,
-that shows it. A rule that never decides is either redundant or misplaced in
-the priority order; either way the officer, not the code, should resolve it,
-so the shipped rule base has no such rule, and each of its twelve rules
-decides at least one of the examples in `tests/decision-examples.txt`.
-`build.rs` loads the rule base through `src/rules.rs`, so a refused rule base
-fails `cargo build`. The normal authority binds the complete reviewed policy
-bytes and evaluates the declared rules through library-owned execution. The
-retained native law checker also loads the rule base in the private oracle.
-`tests/rule_base.rs` shows the refusal: a same-priority pair with different
-conclusions, the same pair with the same conclusion, the shipped rule base
-with one more rule at an existing priority, the shipped rule base without its
-default rule, a rule shadowed by a higher priority, and a rule whose
-conditions never hold together.
-
-## The synthesized step
-
-`synthesis.json` has two parts:
-- a contract, written from `rules.txt` and the reinstatement rules by
-  `rules_to_synthesis.py`: for every standing, transfer, action, and reviewer
-  flag, the decision, rule, and strikes after the decision;
-- a sketch: an LLM-generated decision program in priority order with three
-  holes, the freeze threshold, the boundary of a large amount, and the verdict
-  code of a hold. Its reinstatement branch has no holes.
-
-`zeno-fcis synth run` evaluates hole assignments over all 2,880 inputs and
-selects the first that satisfies the contract on every one: freeze at 3
-strikes, large from band 3, and 1 as the code of a hold. The selected program,
-its complete input and output vectors, and the emitted Rust are checked in
-under `synthesized/`. For reinstatement, the synthesized result has first
-precedence for a missing reviewer, then no strikes, then an accepted reset.
-Its rule field is set to the last rule index as a fixed placeholder; no
-screening rule fires on reinstatement, and the adapter ignores that field.
-
-That selection is exhaustive verification against the contract, for the
-program as the library's interpreter runs it. The emitted Rust carries the same
-result once `synth verify` has replayed it:
-
-```sh
-zeno-fcis synth run synthesis.json --out synthesized --check
-zeno-fcis synth verify synthesis.json --out synthesized --receipt rust-conformance.json
-zeno-fcis synth run synthesis.json --target python --out python-step
-zeno-fcis synth verify synthesis.json --target python --out python-step --receipt python-conformance.json
-zeno-fcis synth run synthesis.json --target javascript --out javascript-step
-zeno-fcis synth verify synthesis.json --target javascript --out javascript-step --receipt javascript-conformance.json
-```
-
-It is only as right as the contract, and the contract is only as right as its
-derivation from the rule base. Two evaluators of `rules.txt` that share
-nothing with `rules_to_synthesis.py` or the synthesizer check that:
-`tests/rule_base.rs` compares the selected program with `src/rules.rs` and
-the reinstatement rules on every input, and `tools/check_synthesis.py` in the
-library compares the vectors with a separate Python evaluation. The examples in
-`tests/decision-examples.txt` check the running application against this
-README.
-
-After editing `rules.txt`, regenerate the contract and the program:
-
-```sh
-python3 rules_to_synthesis.py rules.txt synthesis.json
-rm -rf synthesized
-zeno-fcis synth run synthesis.json --out synthesized
-```
-
-The sketch names the shipped rules, so a new rule needs a branch there, a
-`RuleId` variant in `project.zeno`, and, if it blocks, a committed-failure
-reason; `tests/conformance.rs` checks that those declarations match the file.
-
-## What is checked
-
-Every decision is checked at run time, before it can be published:
-- law 500: the strikes stay within their bounds. Every value is a valid
-  standing, so this law only restates the schema bounds;
-- law 501: an accepted screening, allowed or held, keeps the strikes, and,
-  whatever the rule base says, a transfer to a sanctioned region or from a
-  frozen account is never accepted;
-- law 502: only a reviewer reinstates, only an account with strikes, and
-  reinstating clears them;
-- law 503: only a screening commits a failure; a blocked transfer adds one
-  strike, and a frozen account stays at three;
-- the complete checked policy fixes the rule selected for the screening's
-  features, the kind of decision and its reason, the
-  exact ticket or alert, or the absence of both; the absence of effects; and
-  a zero genesis.
-
-Law 500's bound is also claimed by induction, for `zeno-fcis prove`:
-
-```text
-claim 600 strikes_stay_in_bounds all inductive accept [501, 502] failure [503] = pre.100.120 >= 0 && pre.100.120 <= 3;
-```
-
-The authority refuses every decision that breaks a law enforced on it, so
-laws 501 and 502 bound every accept and law 503 every committed failure.
-Each law declares that scope in `project.zeno`, so elaboration also checks
-the claim's groups against the declared scopes, and `authority()` checks the
-manifest against them before it builds the authority. The induction step
-asks whether any transition those laws admit can take a
-standing within the bound outside it. It is checked for every integer, not
-only the schema's domain. The step assumes that each enumerated field holds
-one of its declared variants, as admission guarantees; without that, a
-command that is neither a screening nor a reinstatement would satisfy both
-accept laws vacuously. CVC5 answers `unsat`, which is attested, not
-independently checked.
-
-The following claim, observer, law-manifest and detector checks describe the
-original native implementation, retained as private regression evidence.
-They are separate from the normal V2 checked-core qualification.
-
-The step says something about that implementation only together with
-`tests/claims.rs`, which checks four things:
-- the law checker's own observer, `laws::trace_step`, reads every field the
-  invariant reads, and the invariant evaluates on every admitted standing;
-- the invariant holds on the exact genesis standing that a new shell
-  stores;
-- the law manifest enforces laws 501 and 502 on accepts and law 503 on
-  committed failures, as the claim assumes;
-- the manifest enforces each law exactly on the decisions `project.zeno`
-  declares for it, and a manifest that bound law 501 to every commit, or to
-  the genesis, is reported.
-
-`tests/conformance.rs` also evaluates the invariant before and after every
-decision the application commits. The section
-[How ZenoFCIS built and checked this](#how-zenofcis-built-and-checked-this)
-quotes what each backend reported.
-
-A rejection publishes nothing by construction: a rejected decision carries no
-patch, effect, or outbox entry, and the law framework records law 509 as
-satisfied for every rejection. That law has no formula, so `profile.rs`
-registers it instead of `project.zeno` carrying an always-true placeholder.
-As a result, this passes:
-
-```sh
-zeno-fcis check project.zeno --require-substantive --require-resolved-paths
-```
-
-The tests check the running application:
-- `tests/rule_base.rs` checks that the rule base is consistent, total, and
-  live, that the synthesized step agrees with `src/rules.rs` and the
-  reinstatement rules on all 2,880 inputs, that the step refuses inputs outside
-  its domain, and that
-  conflicting, incomplete, shadowed, and malformed rule bases are refused at
-  the line, transfer, or rule that shows the fault.
-- `tests/conformance.rs` runs all 2,880 admitted inputs (every standing,
-  action, region, amount band, counterparty risk, identity tier, and reviewer
-  flag) through admission, the authority, the adapter, the law checker, the
-  committed patch, and the outbox, and compares each outcome with the rule
-  base and the reinstatement rules; the invariant of claim 600 must hold
-  before and after every committed decision. It also checks that schema admission
-  matches the finite domain in both directions, that genesis is exactly zero
-  strikes, that all 4 standings are reachable from it, that the `RuleId`
-  variants and the committed-failure reasons match `rules.txt` in name and
-  order, and that the 28 examples in `tests/decision-examples.txt` match and
-  reach every rule of the rule base.
-- `tests/claims.rs` checks claim 600's base case on the exact genesis
-  standing, its law checker's observer, its assumptions against the law
-  manifest, and the manifest against the scopes `project.zeno` declares.
-- `tests/laws.rs` gives the law checker decisions a faulty program could
-  make, such as a block under the wrong rule, a ticket for the wrong band, a
-  held transfer that adds a strike, a reinstatement without a reviewer, or
-  strikes outside their bounds, and requires it to refuse each one. Every law
-  refuses at least one of them.
-- `tests/lifecycle.rs` runs the demonstration, shows that a frozen account
-  stays frozen across a database reopen, and that rejections leave the
-  standing and the outbox unchanged.
-- `tests/determinism.rs` decides 144 inputs (strikes at 0 and 3, identity
-  tier at 0 and 3, every region, amount band at 0 and 4, and counterparty
-  risk at low and high, with each screening requested by a customer and each
-  reinstatement by a customer and by a reviewer) eight times each through
-  `execute_probed`, then again in three child processes with a changed
-  environment, and requires every decision digest to match.
-
-The conformance test's reference model and the law checker both evaluate the
-rule base through `src/rules.rs`, whose author also wrote the program and
-`rules_to_synthesis.py`. They catch binding and adapter errors, and a contract
-that departs from the file, not a misreading of the README shared by all
-three. The examples file is the check on that: its header records who wrote
-the examples and whether the project's owner has reviewed them.
-
-```sh
-zeno-fcis purity src/program.rs src/laws.rs src/rules.rs synthesized/transition.rs
-```
-
-All of these are detectors: agreement shows that these runs matched and that
-no error-level rule fired. The conformance test covers every admitted input,
-so for this finite domain it checks every decision the application can make.
-
-## How ZenoFCIS built and checked this
-
-The current command observations below were recorded on 2026-10-12 in a
-fresh CLI-generated application bound to the matching source checkout,
-using a dev build of `zeno-fcis 2.3.0`, Rust 1.97.1, Python 3.12.3, and
-Node.js v22.23.1.
-The common pinned-tool admission below was run once with the identical
-local tools manifest used by all three examples. These are local command
-observations, not release-binary qualification. Earlier native generation
-counterexamples and explanations below retain their historical scope.
-The current application uses library-owned Authority with `src/v2_contract.rs`;
-these generation and synthesis records do not qualify the whole runtime.
-Application commands run from this application's directory; tool admission
-is shared.
-
-1. **Check the authored project.** Every law and claim can constrain a
-   transition, and every path names a declared field.
-
-   ```text
-   $ zeno-fcis check project.zeno --require-substantive --require-resolved-paths
-   checked project.zeno: project=1 components=1 claims=1 unresolved_obligations=2 semantic_program_hash=e296669471dc86b7701dd1685a4ad0603dedf0bca9235b34a95d465efe13620b
-   ```
-
-   The current run also printed what each counted obligation asks for,
-   after the summary. These observed lines describe evidence this generation
-   check does not establish; they are not errors:
-
-   ```text
-   unresolved obligations: evidence this check does not establish and generated code cannot discharge; they are not errors:
-     complete-footprint: component 400 needs evidence that it reads and writes only what its footprint declares
-     sequential-parity: the merge needs evidence that the merged components decide as they would one after another
-   ```
-
-2. **Generate the bindings.** `cargo build` runs `build.rs`, which first
-   loads `rules.txt` through `src/rules.rs` and stops on a rule base that is
-   not consistent, total, and live. It then lowers `project.zeno` with the
-   scalar bounds and writes the typed schema (`generated`) and project
-   bindings (`bindings`): the record types, the reason IDs, and the
-   `read_strikes`, `update_strikes`, and `enqueue_channel_300`/`301` staging
-   methods retained for the original native adapter. `src/program.rs`
-   now records that adapter's retirement; the checked V2 application uses
-   its separate declaration and admission route.
-
-3. **Write the contract from the rule base.**
-
-   ```text
-   $ python3 rules_to_synthesis.py rules.txt synthesis.json
-   12 rules; contract 87 nodes, sketch 79 nodes
-   ```
-
-4. **Synthesize the decision.** The run selected the fourteenth of eighteen
-   hole assignments, the first that satisfies the contract on all 2,880 inputs;
-   `--check` regenerates the artifacts and compares them with the checked-in
-   ones.
-
-   ```text
-   $ zeno-fcis synth run synthesis.json --out synthesized --check
-   {"manifest":{"assignments_evaluated":14,"certificate":"c1ec63937cbfe901beeead25044c4adf9b9734e78f4f00963d71797b94d507b3","input_coverage":2880,"status":"selected"},"runtime_conformance":"not-run","semantic":"complete-finite","status":"current"}
-   ```
-
-5. **Replay the emitted source in three languages.** Each target ran all 2,880
-   inputs and produced the same output bytes under the same certificate.
-
-   ```text
-   $ zeno-fcis synth verify synthesis.json --out synthesized --receipt rust-conformance.json
-   {"certificate":"c1ec63937cbfe901beeead25044c4adf9b9734e78f4f00963d71797b94d507b3","inputs_checked":2880,"status":"passed","stdout_sha256":"098d314653a890b5e323f58ba9225726f6096298684a2ac436b99478916f365d","tool":{"version":"rustc 1.97.1 (8bab26f4f 2026-07-14)"}}
-   $ zeno-fcis synth run synthesis.json --target python --out python-step
-   $ zeno-fcis synth verify synthesis.json --target python --out python-step --receipt python-conformance.json
-   {"certificate":"c1ec63937cbfe901beeead25044c4adf9b9734e78f4f00963d71797b94d507b3","inputs_checked":2880,"status":"passed","stdout_sha256":"098d314653a890b5e323f58ba9225726f6096298684a2ac436b99478916f365d","tool":{"version":"Python 3.12.3"}}
-   $ zeno-fcis synth run synthesis.json --target javascript --out javascript-step
-   $ zeno-fcis synth verify synthesis.json --target javascript --out javascript-step --receipt javascript-conformance.json
-   {"certificate":"c1ec63937cbfe901beeead25044c4adf9b9734e78f4f00963d71797b94d507b3","inputs_checked":2880,"status":"passed","stdout_sha256":"098d314653a890b5e323f58ba9225726f6096298684a2ac436b99478916f365d","tool":{"version":"v22.23.1"}}
-   ```
-
-6. **Observe the static detector in the generated package context.**
-
-   The 2.3.0 command refused the compiler-tool attribute `rustfmt::skip`
-   because the application's source-binding Cargo manifest replaces
-   dependency sources. No current purity pass is claimed:
-
-   ```text
-   $ zeno-fcis purity src/program.rs src/laws.rs src/rules.rs synthesized/transition.rs
-   purity: violations (1 errors, 0 warnings) in 4 files
-   (exit 1)
-   ```
-
-   The earlier 1.1.0 native run recorded the following clean result,
-   retained as historical evidence:
-
-   ```text
-   $ zeno-fcis purity src/program.rs src/laws.rs src/rules.rs synthesized/transition.rs
-   purity: clean (0 errors, 0 warnings) in 4 files
-   ```
-
-7. **Check the induction step.** The solvers and Lean are not part of the default
-   gate. They need a tools manifest naming the installed binaries, their
-   versions and hashes, and Lean's distribution root and tree hash; the
-   library's `docs/FORMAL_TOOLS_RC3.md` gives its schema. The
-   pinned tools were CVC5 1.3.3, Z3 4.16.0, and Lean 4.30.0 (the qualified
-   Linux x86-64 distribution). `prove` keeps every run's exact input and
-   output under `.zeno-fcis/evidence/` next to the project.
-
-   ```text
-   $ zeno-fcis doctor --tools zeno-fcis.tools.json
-   cvc5 1.3.3 e8d7870d57ab55e81619d2373b043da05ea1d37ca393931bdb5d8b9788cd64c4
-   z3 4.16.0 e583c4186a45e72411fa2cb2048401eed03f0f8e5f24694676a8f6271a50b765
-   lean 4.30.0 3e0d0d3d801675359f2d4cf9815bfdb417b20b92fdd9d48b3b14c95bbae28bbf
-   ```
-
-   CVC5 answered `unsat` for the induction step of claim 600. ZenoFCIS
-   classifies that as a proposal and returns exit code 2, because the proof
-   output is not checked independently: the step is attested, not
-   kernel-checked. The scope line says what else the application must check.
-
-   ```text
-   $ zeno-fcis prove project.zeno --claim 600 --backend cvc5 --tools zeno-fcis.tools.json
-   cvc5 claim 600: UNSAT proposal retained; proof output was not independently checked
-   cvc5 claim 600 assumes laws [] on every commit, [501, 502] on accepts, [503] on committed failures
-   cvc5 claim 600 scope: every transition that satisfies the assumed laws preserves the invariant; it holds on every committed state only when the application also observes every value the invariant reads, checks the invariant on its exact genesis state, and enforces each assumed law on the decisions the claim assumes it on
-   (exit 2)
-   ```
-
-   Z3 also answered `unsat`. Z3 proof checking is unsupported for these inductive claims, so the run is
-   recorded as blocked evidence, with exit code 2. There is no Lean export for
-   inductive claims yet, so `--backend lean` selects nothing.
-
-   ```text
-   $ zeno-fcis prove project.zeno --claim 600 --backend z3 --tools zeno-fcis.tools.json
-   z3 claim 600 blocked: UnsupportedEvidence
-   z3 claim 600 assumes laws [] on every commit, [501, 502] on accepts, [503] on committed failures
-   (exit 2)
-   $ zeno-fcis prove project.zeno --claim 600 --backend lean --tools zeno-fcis.tools.json
-   claim 600 does not select compatible lean
-   no compatible claim/backend pair was selected
-   (exit 2)
-   ```
-
-   The step alone says nothing about this application. The original
-   `tests/claims.rs` checks of the base case, observer and law manifest are
-   retained in the nonpublished reference suite; these fresh generated-app
-   commands do not record a run of that suite.
-
-8. **Test the generated application.** `cargo +1.97.1 test --locked --offline`
-   completed with 6 tests passed and no failures. This does not run the
-   original full native oracle grids. The library's gate,
-   `python3 tools/check_generated_application.py`, repeats steps 4, 5, and 8
-   on a fresh copy, with a separate Python evaluation of `rules.txt` as the
-   oracle for the vectors, and compares the demonstration's summary.
-
-9. **Draw the project.** `zeno-fcis graph project.zeno --format mermaid`
-   prints one node, `c400[gateway]`: the project has a single component, so
-   no diagram is included here.
-
-## A second judge: the rule base in Tau Language
-
-`tau/rule-base.tau` states the priority ladder of `rules.txt` and the
-reinstatement precedence independently, as a Tau Language specification over
-seven bitvector inputs (five features, action, reviewer) and three outputs
-(decision, screening rule or reinstatement placeholder, post-decision strikes).
-`tau/check.py` checks that the vectors cover the complete 2,880-input domain,
-then can run the specification in the Tau REPL on every vector and compare all
-three outputs. This is a separate LLM-generated statement of the policy, with
-nothing in common with `src/rules.rs`, `rules_to_synthesis.py`, or the
-synthesizer. The vector coverage preflight runs in the library's gates. Tau
-execution needs the IDNI binary (<https://github.com/IDNI/tau-lang>) under
-IDNI's license and remains optional:
-
-```sh
-python3 tau/check.py --check-vectors
-python3 tau/check.py --tau PATH/TO/tau --smoke
-python3 tau/check.py --tau PATH/TO/tau --jobs 4
-```
-
-`--smoke` runs one input for each of the six decision codes; it is only a
-syntax and wiring check. On 2026-09-27, the full run with Tau 0.7.0-alpha
-(`7625580`, binary SHA-256
-`19794e2579d9ecd3d61b19411375bba7d78bc8c0b4cbd541a75bc48de2d0a79c`)
-reported `tau: 2880 inputs of the decision table, 0 disagreements`. This is
-exhaustive agreement over the admitted finite domain, relative to this
-independent Tau specification; it does not prove that the policy requirements
-are complete or that external inputs are truthful. Tau execution is not part
-of the default gate.
-
-## Run this development candidate
-
-This template depends on the current ZenoFCIS checkout. From that checkout,
-run:
-
-```sh
-python3 tools/check_generated_application.py
-```
-
-That gate creates a fresh application using the CLI, checks its synthesis in
-Rust, Python, and JavaScript against a separate evaluation of `rules.txt`,
-checks the dependency binding `zeno-fcis new` wrote to the exact checkout,
-checks dependency versions against the workspace lock, then compiles and runs
-its tests and demonstration as an isolated package.
-`zeno-fcis new` binds the application to a ZenoFCIS source tree, the one it
-was built from or the one `--source` names: `Cargo.toml` ends with a
-`[patch.crates-io]` section, and the tree's `Cargo.lock` and
-`rust-toolchain.toml` are copied. From the application's directory:
-
-```sh
-cargo +1.97.1 test --offline
-cargo +1.97.1 run --offline -- new-gateway.sqlite
-```
-
-The first build adds the application to its lock, so `--locked` works only
-after it.
-
-The SQLite shell is the `sqlite` feature, on by default. Without it,
-`cargo +1.97.1 build --no-default-features` builds the core alone: the
-generated bindings, the program, the law checker, the profile, the delivery
-adapter, and `authority()`, with no database; the gate checks that it also
-compiles for `wasm32-unknown-unknown`. `create`, `invoke`, `journey`, and the demonstration
-binary need the feature.
-
-The demonstration requires a new database path. It follows one customer
-through twelve requests:
-
-1. A verified customer (tier 2) sends under 1,000 (band 1) to an allowed
-   region, low risk: allowed by `default_allow`.
-2. The same customer sends under 10,000 (band 2) to a restricted region:
-   held by `restricted_region`; a review ticket is queued.
-3. A fully verified customer (tier 3) sends a small amount to a sanctioned
-   region: blocked by `sanctioned_region`; one strike, and an alert.
-4. Someone who is not a reviewer asks to reinstate: rejected, `not_reviewer`.
-5. An unverified customer (tier 0) sends under 50,000 (band 3) to a high-risk
-   counterparty: blocked by `unverified_high_risk`; two strikes.
-6. A verified customer sends under 10,000 to an allowed region, low risk: with
-   two strikes on record, held by `repeat_offender`.
-7. A fully verified customer sends over 50,000 (band 4) to a restricted
-   region, medium risk: blocked by `restricted_large`; three strikes, and the
-   account is frozen.
-8. The same customer sends under 100 (band 0) to an allowed region, low
-   risk: blocked by `frozen_account`; the strikes stay at three.
-9. A reviewer reinstates the account: accepted, no strikes.
-10. The reviewer reinstates again: rejected, `no_strikes`.
-11. An unverified customer sends over 50,000 to an allowed region, low risk:
-    blocked by `unverified_large`; one strike.
-12. A fully verified customer sends over 50,000 to an allowed region, medium
-    risk: held by `medium_risk_large`; a review ticket is queued.
-
-It then interrupts notice delivery, reopens the database, finishes delivery,
-and prints a JSON summary: the twelve decisions in order (`Accept`,
-`Reject`, or `CommittedFailure`), then `strikes` 1, `allowed` 1, `held` 3,
-`blocked` 5, `bundles` 10 (the committed decisions), `pending` 0, and
-`deliveries` 8 (three tickets and five alerts).
-
-The destination keeps an in-memory idempotency ledger, which survives the
-database reopen only within one process. A real destination must persist its
-delivery IDs and entry hashes. The context's `identity_tier` and `reviewer`,
-the transfer's band and risk rating, and the principal are trusted tutorial
-inputs, not remote authentication or a real risk model: a deployment must
-establish them before admission. Source hashes identify reviewed example
-policy, not certified binaries or release evidence. Changing the source,
-including `rules.txt` and the synthesis files, changes policy identity and
-requires a new database unless a separately reviewed migration is implemented.
+| SanctionedRegion | Sanctioned region | Block |
+| FrozenAccount | Three strikes | Block |
+| UnverifiedHighRisk | Tier 0 and high risk | Block |
+| RestrictedLarge | Restricted region and band >=3 | Block |
+| UnverifiedLarge | Allowed region, tier 0 and band >=3 | Block |
+| HighRiskCounterparty | High risk | Hold |
+| RestrictedRegion | Restricted region | Hold |
+| UnverifiedTransfer | Tier 0 and band >=1 | Hold |
+| PartiallyVerifiedLarge | Tier 1 and band >=3 | Hold |
+| RepeatOffender | At least two strikes and band >=2 | Hold |
+| MediumRiskLarge | Medium risk and band 4 | Hold |
+| DefaultAllow | Otherwise | Allow |
+
+A Block is a committed failure: it adds a strike, capped at three, and queues
+one alert naming the selected rule and new strike count to `compliance-team`
+on channel 301. A Hold accepts without changing strikes and queues one ticket
+naming the selected rule and amount band to `review-queue` on channel 300.
+An Allow accepts without changing strikes or queuing anything; it does not
+report a selected rule in an outbox message. These are screening decisions and
+not actual transfer authorizations to a bank or settlement service.
+
+`Reinstate` accepts only for a trusted reviewer and an account with at least one
+strike. It clears strikes and queues nothing. Wrong reviewer rejects with 200;
+an authorized reviewer with no strikes rejects with 201. Screen cannot be
+arbitrarily rejected. Every rejection changes nothing and queues nothing.
+
+## Independent laws
+
+Original laws 500–503 retain strike bounds, accepted-state preservation,
+reinstatement authority and block accounting. Law 504 excludes every required
+block from acceptance. Law 505 requires the first blocking rule's failure reason;
+506 permits rejection only for the documented failed reinstatement guards.
+Laws 510–513 bind the exact ticket or alert count, channel, rule variant, amount
+band or post-strike count, and recipient, including absence of unrelated notices.
+The generated structural reject law 909 checks unchanged state and no effects
+alongside project law 506; policy-conformance law 991 also remains mandatory.
+Claim 600 retains the inductive strike bound.
+
+The policy is finite: 2,880 admitted input tuples and 28 shipped examples. Native
+contract review checks all of them. Counterpolicy tests separately require refusal
+of block-to-allow, deny-all, missing-ticket and wrong-rule outcomes. A law-removal
+control demonstrates that a valid screening can be wrongly rejected if law 506
+is removed, then verifies its exact restoration.
+
+## Boundaries and checks
+
+Identity tier and reviewer status are host-authenticated context, not claims a
+remote user may choose. There is no custody ledger or persistent held-transfer
+record. Ticket resolution, review staffing, transfer execution and message delivery
+are external responsibilities. The example does not guarantee timely review,
+privacy of screening inputs, or eventual movement of money. The demonstration
+receiver's idempotency ledger lasts only within one process.
+
+Use `zeno-fcis generate contract <directory>` and its `--check` mode to reproduce
+the V2 declaration. `contract review` compares decisions with the examples;
+`contract lemma` checks the strike invariant; `tools/test_template_rules.py`
+exercises independent counterpolicies. Earlier native conformance, determinism,
+and synthesis tests remain historical reference checks of the same policy.
+
+Generate with `zeno-fcis new --template compliance-gateway <directory>` and run
+`cargo +1.97.1 test --offline` in that application. The default `sqlite` feature
+supplies the durable demonstration; the checked declarations also build without
+it. Source identity changes require a new database or a reviewed migration.
+
+## Lineage
+
+Prioritized decision rules and guarded transitions are established techniques.
+For guarded commands see E. W. Dijkstra, “Guarded Commands, Nondeterminacy and
+Formal Derivation of Programs,” Communications of the ACM 18(8), 1975,
+[doi:10.1145/360933.360975](https://doi.org/10.1145/360933.360975).
+Prior-art search pending; no novelty claim is made.

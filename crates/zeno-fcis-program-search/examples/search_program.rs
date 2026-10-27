@@ -68,6 +68,10 @@ fn options(arguments: &[String]) -> Result<Options, String> {
     let mut output = 0;
     let mut rest = arguments.iter();
     while let Some(flag) = rest.next() {
+        if flag == "--indexed-branches" {
+            settings.proposers.indexed_branches = true;
+            continue;
+        }
         let value = rest.next().ok_or_else(|| format!("{flag} needs a value"))?;
         let number = || {
             value

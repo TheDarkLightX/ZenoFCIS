@@ -3,11 +3,18 @@
 An application contract is three files:
 
 - `project.zeno` declares the types, fields, variants, reasons, channels
-  and laws;
+  and laws; the [`.zeno` language reference](ZENO_LANGUAGE_V1.md) gives its
+  syntax;
 - `v2/policy.json`, described here, holds the decision rules, the genesis
   state and the kind of every law;
 - `tests/decision-examples.txt`, optional, lists decisions the owner
   expects.
+
+An application built with `new --app` also needs `ui.json`, the labels its
+interface shows; see [UI metadata](#ui-metadata-uijson). The
+[library loans](../examples/apps/library-loans/README.md) and
+[escrow](../examples/apps/escrow-deal/README.md) examples are complete
+contracts with all four files.
 
 `zeno-fcis generate contract` turns the first two into `v2/schema.zcve`,
 `src/v2_contract.rs` and `v2/policy.zcve`, and `zeno-fcis new <dir>
@@ -29,7 +36,7 @@ sign or leading zero.
 <!-- policy-keys: file -->
 | Key | Required | Value |
 |---|---|---|
-| `schema` | yes | `"zeno-fcis/template-declarative-policy/2"` for historical declarations, or `/3` for declarations with units and scales. |
+| `schema` | yes | `"zeno-fcis/template-declarative-policy/2"` for historical declarations, `/3` for declarations with units and scales, or `/4` for typed U128 contracts. |
 | `template` | yes | The application's name. `new --contract` uses it as the Cargo package name, so there it must be at most 64 lowercase letters, digits and `-`, starting with a letter. |
 | `roots` | yes | Always `{"state": 100, "command": 101, "context": 102}`; see [Roots](#roots). |
 | `leaf_bindings` | yes | Type ID to leaf; see [Leaf bindings](#leaf-bindings). May be `{}`. |
@@ -37,11 +44,12 @@ sign or leading zero.
 | `cases` | yes | The ordered decision table; see [Cases](#cases). |
 | `genesis` | yes | State field ID to its value in the genesis state, for every state field: a JSON boolean, an integer, or a variant ID for a sum field. |
 | `law_kinds` | yes | Law ID to [law kind](#law-kinds), for exactly the laws `project.zeno` declares. |
-| `delivery_laws` | no | Law ID to bounded channel counts and numeric payload observations; see [Delivery laws](#delivery-laws). |
+| `delivery_laws` | no | Law ID to bounded channel counts, numeric or variant payload observations and destination filters; see [Delivery laws](#delivery-laws). |
 | `framework_failure_law` | no | Nonzero ID of the [framework committed-failure law](#framework-laws); default 908. |
 | `framework_reject_law` | no | Nonzero ID of the [framework reject law](#framework-laws); default 909. |
 | `adoptions` | no | Written by `zeno-fcis contract adopt`; see [Adoptions](#adoptions). |
 | `evolutions` | no | Written by `zeno-fcis contract evolve`; see [Evolutions](#evolutions). |
+| `clock` | no | The context field the application server sets to the current time; see [Server clock](#server-clock). |
 | `idempotency` | no | A note for reviewers, text. Generation ignores it. |
 | `original_domain` | no | A note for reviewers, text. Generation ignores it. |
 
@@ -121,7 +129,7 @@ integer, or expression text. Expression text has:
 | `>=` | at least |
 | `+` | add |
 | `-` | subtract; also prefix negation |
-| `*` | checked signed i128 multiply in rules and signed laws |
+| `*` | checked multiply of matching integer kinds in rules and laws |
 
   Prefix `!` negates a boolean. Other binary operators group to the left.
 
@@ -131,9 +139,12 @@ integer, or expression text. Expression text has:
 | Function | Meaning |
 |---|---|
 | `choose` | `choose(c, a, b)` is `a` when `c` holds, else `b`. |
+| `u128` | `u128(0)` writes an unsigned decimal literal in 0..=2^128-1, with no sign or leading zero. |
+| `to_i128` | `to_i128(a)` explicitly converts U128 to I128, refusing above 2^127-1. |
+| `to_u128` | `to_u128(a)` explicitly converts I128 to U128, refusing negative values. |
 | `div_floor` | `div_floor(a, b)`: mathematical division rounded down, including negative divisors. |
 | `div_ceil` | `div_ceil(a, b)`: mathematical division rounded up, including negative divisors. |
-| `mul_div_floor` | `mul_div_floor(a, b, d)`: explicit fused floor in rules, with nonnegative i128 factors, positive denominator, exact intermediate product and final i128 fit. |
+| `mul_div_floor` | `mul_div_floor(a, b, d)`: explicit fused floor in rules, with nonnegative matching I128 or U128 factors, positive denominator, exact intermediate product and final result-kind fit. |
 | `signed_mul_div_floor` | `signed_mul_div_floor(a, b, d)`: signed exact-product floor division with a positive denominator and a final i128 fit check. |
 | `mul_div_ceil` | `mul_div_ceil(a, b, d)`: the same fused rule operation rounded up. |
 | `products_ge` | `products_ge(a, b, c, d)` compares `a*b >= c*d`. Every factor is nonnegative; products are exact, with no intermediate narrowing. Rules and laws support this predicate. |
@@ -168,8 +179,13 @@ using an arithmetic extension has profile `zeno-fcis/finite-i128/3` within the
 original 256-node, 16-output, 32-input caps, or `/4` beyond those caps. Old
 operation-only graphs keep `/1` or `/2` and their canonical program bytes.
 Program-file commands admit `/1` and `/3`; they refuse the larger `/2` and `/4`
-profiles. Legacy search, optimizer, migration and linear certificate consumers
-refuse the arithmetic extension. See
+profiles. Admission does not imply proposal support: `optimize` can admit `/3`
+then exit 2 as `no-checked-improvement`, with `detail.search.stopped` equal to
+`original-not-typable` and zero search phases. Loop check/replay can compare
+these programs while a selected proposer or rule miner cannot type their nodes.
+In particular, `loop rules` can qualify the unchanged original using only its
+baseline check/replay, with no rule checks and `improved: false`. Migration
+expressions and linear certificate consumers have narrower operation sets. See
 [Contract program export](CLI_REFERENCE.md#contract-program-export).
 
 Units and scales are development specification features, with source-proof
@@ -207,6 +223,29 @@ Those policies also bound source alias expansion to 65,536 visits and depth
 256. Policy/3 may be used without quantity annotations to select these limits.
 Historical policy/2 contracts using only historical syntax retain their
 original admission, canonical bytes, eager traps and resource budgets.
+
+Policy/4 supports `type 105 u128 Amount in 0..=340282366920938463463374607431768211455;`.
+It also permits explicit opt-in for a signed-only contract. Strict kinds then
+apply to every expression binding, including unused variables. The selected
+profile is bound in the policy identity.
+Bounds are mandatory. Genesis values use `"u128(0)"` expression strings.
+Bool, I128 and U128 are distinct kinds: arithmetic, comparisons and select
+arms require matching kinds; conversions are explicit. Unsigned add, subtract
+and multiply check the full U128 range. Fused unsigned floor and ceiling use
+an exact wide product and check the final quotient, including ceiling's
+increment. Quantity rules above also apply to U128 with unsigned fit bounds;
+casts preserve units and scales. Arithmetic traps refuse the whole decision,
+including in unused eager branches. Laws and delivery sums retain full-width
+unsigned values and refuse overflow. The schema uses its existing U128 kind
+and canonical value tag. Prior policy/2 and policy/3 bytes are retained.
+
+The supported typed path is contract build, new, review, gaps and lemma,
+through the original library Authority and catalog. Review of a large domain
+reports bounded probes rather than exhaustive coverage. U128 tables, scalar
+program exports, emitters, symbolic/Tau exports, search, optimizer, loop
+doors, composition, SQLite migration and kernel-law oracles refuse U128
+subjects at binding. Source-proof qualification is deferred to the 2.5.1
+freeze; native checks alone do not qualify these changes for release.
 
 ## Cases
 
@@ -271,11 +310,23 @@ law 500 funds_conserved on commit, genesis = post.100.111 + post.100.113 == post
 ```
 
 The scope is `on any`, `on accept`, `on reject`, `on failure` (committed
-failures) or `on commit` (accepts and committed failures), and `, genesis`
-adds the genesis state. A law that applies at genesis reads only `post`
+failures) or `on commit` (accepts and committed failures). `on reject:ID`
+selects a declared rejection reason; failure-only reasons cannot label that
+scope. Its formula reads only the original input (`pre`, `command`, `context`).
+The law-only numeric term `decision_reason` is available with `on reject` or
+`on failure`, without genesis, for example
+`law 9000 selected_reason on reject = decision_reason != 201;`.
+The optional `, genesis` suffix adds the genesis state. A law that applies at genesis reads only `post`
 fields: genesis has no pre-state, command or context. Law formulas read
 `pre.100.F`, `post.100.F`, `command.101[.F]` and `context.102[.F]`, and may
 use `*`, `div_floor`, `div_ceil` and the built-in `products_ge` predicate.
+[Contract tables](CONTRACT_TABLES.md) expand while `project.zeno` is parsed,
+so a law written with `forall i in table T`, `count` or `sum` over a table
+reaches generation as the ordinary formula it stands for; the rules here name
+each table entry by its field ID. [Keyed collections](COLLECTIONS.md) lower
+the same way: the rules read and write a named entry through its view
+fields, by ID, compare keys only with `==` and `!=`, and may write a key into
+a stored key field.
 Signed law multiplication/division retains its existing checked i128 meaning.
 Product predicates explicitly convert nonnegative values to U128 and use the
 existing exact wide comparison, including the constant-one factors of a
@@ -337,8 +388,13 @@ deliveries. Funding increases held funds without paying out, so a bare
 
 `outbox.P` counts deliveries on its explicitly bound channel, whose payload
 type must be `P`. `outbox.P.F` sums field `F` of that channel's payloads as
-checked signed 128-bit integers. `F` must be an I128 field of payload record
-`P`; boolean, sum, text, nested and unsigned amounts are unsupported. Root
+checked integers in the field's signed or unsigned domain. A declared sum field
+contributes its stable variant ID as an I128 integer, after checking both the
+type ID and the variant; a numeric atom cannot impersonate a variant. Boolean,
+text and nested fields are unsupported. An observation may add
+`"destination": "seller"` to count or sum only deliveries whose actual destination
+is that exact text. Use an unfiltered count law as well when all other deliveries
+must be absent. Root
 paths use payload **type** IDs, while the JSON mapping supplies **channel**
 IDs. Multiple distinct payload types/channels can appear in one law. Channels
 sharing a payload type need separate laws; ambiguous mappings are refused.
@@ -354,7 +410,8 @@ The usual law-kind scope requirements still apply; delivery laws bearing
 
 The compiler conjoins `actual_outbox_length <= max_deliveries` with the
 formula. For each bounded slot it guards the channel read by actual length,
-and guards a payload read by both length and channel equality. Missing slots
+and guards a payload read by length, channel equality and any declared destination
+filter. Missing slots
 and nonmatching channels contribute zero; their absent fields are not read.
 A matching missing field, wrong atom type or checked addition overflow
 refuses the whole decision. A false bound never authorizes truncating a
@@ -409,6 +466,86 @@ IDs.
   idempotency value and payload. Each `when` is computed from the inputs
   again, not taken from the decision program. Adoption relies on this law;
   see [Contract adoption](CLI_REFERENCE.md#contract-adoption-and-store-upgrades).
+
+## Server clock
+
+“After day 7 the operator may refund.” A rule can read the time when the
+contract declares one context field as the server clock:
+
+```json
+"clock": {"field": 131, "unit": "days", "epoch": "2026-11-01"}
+```
+
+<!-- policy-keys: clock -->
+| Key | Value |
+|---|---|
+| `field` | A context field of integer type with a declared range, such as `type 115 int Day in 0..=14;`. |
+| `unit` | `days` or `minutes`. |
+| `epoch` | The UTC date, `YYYY-MM-DD` from 1970-01-01, at which the field counts 0. |
+| `after_max` | Optional: `refuse` (default) refuses time above the range; `hold` keeps the maximum value as a terminal phase so deadline recovery remains available. Time below the minimum is still refused. |
+
+Rules and laws read the field like any other context field, for example
+`action == 163 && context.102.131 <= 7`. The field's declared range bounds
+the context values a store accepts. With `after_max: hold`, later wall time
+maps to the same final phase; use this only when that phase admits recovery
+and new obligations cannot require a later time. Because that range is already part of the finite
+input domain, `contract review`, the judges and the interface build check
+every time without change. Generation checks only the key's form; the
+application build checks that the field is a context integer with a
+declared range. The key is not part of the canonical policy, so it leaves
+the contract identity unchanged. The [build guide](BUILD_AN_APP.md#a-server-clock-for-deadlines)
+describes how the server sets the field.
+
+## UI metadata: `ui.json`
+
+`zeno-fcis new --app` reads `ui.json` beside `project.zeno`. It supplies
+labels, units, command names and refusal messages, never rules: the native
+contract supplies every field, domain, command and reason. The build refuses
+a missing or unknown key, a repeated key, metadata for an input, command or
+reason the contract does not declare, and any label that is empty, longer
+than 300 characters or contains `<`, `>` or a control character.
+No string in `ui.json`, key or value, may hold a character that changes how
+text reads without showing itself: C0 and C1 controls, bidirectional
+controls such as U+202E, zero-width and other default-ignorable characters
+such as U+200B and U+FEFF, line and paragraph separators, surrogates and
+private-use characters. The build names the first one, as in
+`UiInvisibleCharacter:ui.json.commands.160.label:U+202E`.
+
+| Key | Required | Value |
+|---|---|---|
+| `format` | yes | `"zenoui/metadata/1"`. |
+| `title` | yes | The application's title. |
+| `action` | yes | The sum input that selects the command: `command.101.F` for a command record, or `command.101` when the command is itself a sum. |
+| `fields` | yes | Input path to [field metadata](#field-metadata), for every input: `pre.100.F`, `command.101.F` or `command.101`, and `context.102.F` or `context.102`. |
+| `variants` | yes | Variant ID to its label, for every variant of every sum input. Boolean inputs are shown as No and Yes. |
+| `commands` | yes | Each command variant's ID to its [command metadata](#command-metadata). |
+| `reasons` | yes | Each reason's ID to the message shown when a decision is refused for it. |
+
+### Field metadata
+
+| Key | Required | Value |
+|---|---|---|
+| `label` | yes | The field's label, such as `Held in escrow`. |
+| `unit` | yes | The unit shown after a number, such as `units`. `unitless` shows no unit. |
+| `values` | no | For an integer input only: a decimal value to its label, such as `{"0": "on the shelf"}`. 1 to 64 entries, each within the input's declared range. A labelled value is shown by its label alone. |
+
+### Command metadata
+
+| Key | Required | Value |
+|---|---|---|
+| `label` | yes | The command's name on its form and button. |
+| `consequential` | yes | `true`: the command is sent only after the user confirms the reviewed inputs, and an edit voids that confirmation. `false`: it is sent without the confirmation step. |
+
+For example, in the library loans example a copy's holder is an integer from
+0 to 3:
+
+```json
+"pre.100.110": {"label": "Copy 1", "unit": "unitless",
+  "values": {"0": "on the shelf", "1": "with member 1"}}
+```
+
+The state line then reads "Copy 1: on the shelf." Labels change only what
+the interface shows; the contract's decisions and checks are unchanged.
 
 ## Adoptions
 
@@ -565,3 +702,34 @@ delivery, law or channel without which the library admits the contract, if
 one does. Passing generation does not show that the rules say what the owner
 means: the decision examples, `zeno-fcis contract review` and the laws check
 that, each within its own scope.
+
+## Background and scope of determination reporting
+
+Edmund M. Clarke, E. Allen Emerson and A. Prasad Sistla, “Automatic Verification
+of Finite-State Concurrent Systems Using Temporal Logic Specifications,”
+*ACM Transactions on Programming Languages and Systems* 8(2), 1986, is
+background for the exhaustive finite checks described here. Shared determination
+reporting covers the declared finite domains and retains the runtime Authority;
+its comparative prior-art search is pending.
+
+## Method background and scope
+
+C. A. R. Hoare, “An Axiomatic Basis for Computer Programming”, Communications
+of the ACM, 1969 ([paper](https://doi.org/10.1145/363235.363259)), supplies the
+background for explicit program assertions. The contract syntax and finite
+compiler are implementation choices; no new proof method is claimed here.
+Generation checks supported declarations and binding. Exhaustive review and
+transform checks cover only their declared finite domains and limits.
+
+### Background for delivery observations
+
+These checks apply design-by-contract assertions to the actual output record
+(Bertrand Meyer, “Applying Design by Contract”, IEEE Computer 25(10), 1992,
+DOI 10.1109/2.161279). Variant validation and optional destination filtering
+extend the existing bounded projection compiler; they add no new evaluator or
+publication authority. Prior-art search pending; no novelty claim is made.
+
+Terminal clock phases use the standard finite-state abstraction of times beyond
+the last relevant bound; see Baier and Katoen,
+[*Principles of Model Checking*](https://mitpress.mit.edu/9780262026499/principles-of-model-checking/).
+The configured terminal phase still needs checked recovery rules.

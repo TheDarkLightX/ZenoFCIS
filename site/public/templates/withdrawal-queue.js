@@ -14,8 +14,9 @@ const tick = (alarm, expect, note) => ({ request: { command: "Tick", caller: "Ke
 export const template = {
   name: "withdrawal-queue",
   fields: ["balance", "lane_a", "amount_a", "lane_b", "amount_b", "pause", "must_serve", "priority"],
-  help: "Deposit as the operator, request a withdrawal as a lane's owner, then tick as the keeper. Raise the alarm and keep ticking: an honored alarm pauses payouts for its own tick and two more, then must-serve pays a due lane whatever the alarm says. A recorded request is paid within 8 ticks: delayed, never frozen.",
+  help: "Deposit as the operator, request a withdrawal as a lane's owner, then tick as the keeper. Raise the alarm and keep ticking: an honored alarm pauses payouts for its own tick and two more, then must-serve pays a due lane whatever the alarm says. With keeper ticks a request is paid within 8 ticks. At day 2 its owner can instead recover it directly, even during an alarm.",
   context: [
+    { name: "now", label: "Current day (0 to 2)", kind: "integer", min: 0, max: 2, initial: 0 },
     { name: "caller", label: "Caller", kind: "choice", options: [["Operator", "Operator"], ["OwnerA", "Owner of lane A"], ["OwnerB", "Owner of lane B"], ["Keeper", "Keeper"]], initial: "Operator" },
     { name: "alarm", label: "Alarm raised", kind: "flag", initial: false },
   ],
@@ -30,6 +31,9 @@ export const template = {
       ],
     },
     { name: "Tick", label: "Tick", fields: [] },
+    { name: "TimeoutWithdrawal", label: "Recover expired withdrawal", fields: [
+      { name: "lane", label: "Lane", kind: "choice", options: [["A", "A"], ["B", "B"]], initial: "A" },
+    ] },
   ],
   genesis: "no balance, both lanes empty, no pause, lane A first, nothing queued",
   outbox: "Payout requests to settlement on channel 300 (payout), with the paid lane and amount. Nothing delivers in this page, so each stays pending with its delivery identity.",
@@ -37,7 +41,7 @@ export const template = {
     const alarm = request.alarm ? ", alarm raised" : "";
     if (request.command === "Deposit") return `Deposit ${request.amount} from ${request.caller}${alarm}`;
     if (request.command === "RequestWithdrawal") return `RequestWithdrawal on lane ${request.lane} for ${request.amount} from ${request.caller}${alarm}`;
-    return `Tick from ${request.caller}${alarm}`;
+    return `${request.command} from ${request.caller}${alarm}`;
   },
   demonstration: [
     deposit(2, "Operator", "Accept", "the operator deposits 2"),

@@ -1,0 +1,40 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/4",
+  "template": "numeric-overflow",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "102": [
+      "Bool"
+    ]
+  },
+  "variables": {},
+  "cases": [
+    {
+      "when": false,
+      "class": "Reject",
+      "reason": 300,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "command.101.120"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": "u128(0)"
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "FeeAndRounding"
+  }
+}

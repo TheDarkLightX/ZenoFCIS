@@ -58,14 +58,24 @@ fn kind(op: NumericOp, inputs: &[Domain<'_>], previous: &[Kind]) -> Result<Kind,
             }
         }
         Instruction::Literal(_, kind) => Ok(kind),
+        Instruction::Cast(signed, a) => {
+            require_kind(
+                previous,
+                a,
+                if signed { Kind::Unsigned } else { Kind::Signed },
+            )?;
+            Ok(if signed { Kind::Signed } else { Kind::Unsigned })
+        }
         // Width-explicit D1 adapters preserve the historical i64 route.
         Instruction::ScalarMul(w, a, b) | Instruction::ScalarDiv(w, _, a, b) => {
-            if matches!(w, IntegerWidth::Unsigned128) {
-                return Err(AdmissionFailure::TypeMismatch);
-            }
-            require_kind(previous, a, Kind::Signed)?;
-            require_kind(previous, b, Kind::Signed)?;
-            Ok(Kind::Signed)
+            let kind = if matches!(w, IntegerWidth::Unsigned128) {
+                Kind::Unsigned
+            } else {
+                Kind::Signed
+            };
+            require_kind(previous, a, kind)?;
+            require_kind(previous, b, kind)?;
+            Ok(kind)
         }
         Instruction::ScalarMulDiv(w, _, a, b, d) => {
             if matches!(w, IntegerWidth::Unsigned128) {

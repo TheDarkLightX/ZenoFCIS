@@ -120,7 +120,7 @@ mod formula;
 mod hierarchy;
 #[cfg(test)]
 mod hierarchy_tests;
-mod identity;
+pub(crate) mod identity;
 #[cfg(test)]
 mod identity_tests;
 pub mod joint;
@@ -138,6 +138,10 @@ mod receipt;
 #[cfg(test)]
 mod receipt_tests;
 mod refusal;
+mod resolve;
+pub mod service;
+#[cfg(test)]
+mod service_tests;
 mod structure;
 #[cfg(test)]
 mod structure_tests;
@@ -160,7 +164,7 @@ use assembly::Assembly;
 pub use compose::{CheckedAssumeGuarantee, ComposeRefusal, require_checked};
 pub use domain::{DOMAIN_CHECKER, FieldDomain, MAX_OBLIGATION, MAX_TOTAL, domain_paths};
 pub use hierarchy::{ClaimKind, Condition};
-use identity::Identity;
+pub(crate) use identity::Identity;
 pub use joint::{
     JointComposition, JointInputError, JointOutcome, JointRow, OutcomeKind, RefusedClass,
     RequestSlot, StateSlot,

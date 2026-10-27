@@ -214,7 +214,7 @@ def check(directory: Path, positive_only: bool = False) -> dict:
     if '6 passed; 0 failed' not in native.stdout:
         raise ValueError('native output oracle corpus did not run')
     no_std = run(['rustc', '+1.97.1', '--edition=2024', '--crate-type=lib', '--emit=metadata',
-        '--check-cfg', 'cfg(verus_keep_ghost)', '--check-cfg', 'cfg(test)', str(source / HARNESS), '-o', str(directory / 'native/no-std.rmeta')],
+        '--check-cfg', 'cfg(verus_keep_ghost)', '--check-cfg', 'cfg(test)', str(source / HARNESS), '-o', str(directory / 'native/no-std.rmeta'), *arguments],
         source, env, directory / 'native', 'no-std')
     verifier.require_success(no_std)
     public_test = run(['cargo', '+1.97.1', 'test', '--locked', '--offline', '-p', 'zeno-fcis-synthesis',
@@ -321,5 +321,12 @@ def main() -> int:
     if receipt['status'] == 'failed': print(receipt['error'])
     return 1 if receipt['status'] == 'failed' else 0
 
-if __name__ == '__main__':
-    raise SystemExit(main())
+if __name__ == "__main__":
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

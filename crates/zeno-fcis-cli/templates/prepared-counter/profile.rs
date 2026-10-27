@@ -122,6 +122,11 @@ pub fn manifest() -> LawManifest {
                     DecisionScope::Accept,
                     no_genesis(),
                 ),
+                510 | 511 => (
+                    LawKind::AuthoritySubjectRecipient,
+                    DecisionScope::Committing,
+                    no_genesis(),
+                ),
                 502 => (
                     LawKind::CommittedFailureEffects,
                     DecisionScope::CommittedFailure,

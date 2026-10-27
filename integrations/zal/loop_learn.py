@@ -179,7 +179,7 @@ def validate_snapshot(state):
 def run(cli, path):
     code, report = doors.run(cli, ["loop", "learn", "--spec", path])
     status, detail = report.get("status"), report.get("detail", {})
-    expected_exit = {"determined": 0, "question": 3, "outside-vocabulary": 1, "ambiguous": 1, "inconclusive": 2}
+    expected_exit = {"determined": 0, "question": 2, "outside-vocabulary": 1, "ambiguous": 1, "inconclusive": 2}
     if status not in expected_exit or code != expected_exit[status] or report.get("authority") != "none":
         raise Refusal("learn-command-refused:" + str(detail.get("reason", status)))
     if status == "inconclusive":

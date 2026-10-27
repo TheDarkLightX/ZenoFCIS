@@ -87,7 +87,7 @@ pub enum Domain<'a> {
 }
 /// Arithmetic width is independent of the original wire atom.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum IntegerWidth {
     /// Checked signed 64-bit arithmetic, represented by I128 atoms.
     Signed64,
@@ -229,6 +229,50 @@ pub(crate) fn contains(values: &[u16], id: u16) -> bool {
             return true;
         }
         i += 1;
+    }
+    false
+}
+
+/// Admit a nonempty, strictly increasing table of declared variant codes.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result == (variants@.len() > 0 &&
+        forall|j:int| 0 < j < variants@.len() ==> variants@[j-1] < #[trigger] variants@[j]),
+))]
+pub(crate) fn validate_variant_codes(variants: &[u16]) -> bool {
+    if variants.is_empty() {
+        return false;
+    }
+    let mut index = 1usize;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant 1 <= index <= variants.len(),
+            forall|j:int| 0 < j < index ==> variants@[j-1] < #[trigger] variants@[j],
+        decreases variants.len() - index,
+    ))]
+    while index < variants.len() {
+        if variants[index - 1] >= variants[index] {
+            return false;
+        }
+        index += 1;
+    }
+    true
+}
+
+/// Test membership without changing the declared variant-code domain.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result == (exists|j:int| 0 <= j < variants@.len() && variants@[j] == variant),
+))]
+pub(crate) fn contains_variant_code(variants: &[u16], variant: u16) -> bool {
+    let mut index = 0usize;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant index <= variants.len(),
+            forall|j:int| 0 <= j < index ==> variants@[j] != variant,
+        decreases variants.len() - index,
+    ))]
+    while index < variants.len() {
+        if variants[index] == variant {
+            return true;
+        }
+        index += 1;
     }
     false
 }

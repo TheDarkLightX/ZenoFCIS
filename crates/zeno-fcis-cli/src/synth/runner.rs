@@ -10,7 +10,10 @@ use std::{
 };
 use zeno_fcis_synthesis::finite::{Case, Contract};
 
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 use std::{
     ffi::OsStr,
     fs::OpenOptions,
@@ -19,7 +22,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 const MAX_OUTPUT: u64 = 32 * 1024 * 1024;
 
 /// Starts `command`, retrying a bounded number of times while its executable
@@ -32,7 +38,10 @@ const MAX_OUTPUT: u64 = 32 * 1024 * 1024;
 /// including the first: an exhausted budget, or a wait that would reach its
 /// end, gives an error of kind `TimedOut`. Every other error, and a file that
 /// stays busy through the last attempt, fails closed.
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 pub(super) fn spawn_unless_busy(
     command: &mut Command,
     started: Instant,
@@ -66,7 +75,10 @@ pub(super) fn spawn_unless_busy(
         retries -= 1;
     }
 }
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 const TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(super) struct RunError {
@@ -418,7 +430,10 @@ fn recheck(path: &Path, identity: &Value) -> Result<(), RunError> {
 /// execution. The `NODE_` prefix covers `NODE_OPTIONS` preloads, `NODE_PATH`
 /// resolution, and every analogous Node switch, including later additions.
 /// Dynamic linker and library premises remain outside this scope.
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 const SCRUBBED: [&str; 7] = [
     "RUSTC_BOOTSTRAP",
     "RUSTFLAGS",
@@ -428,7 +443,10 @@ const SCRUBBED: [&str; 7] = [
     "PYTHONPATH",
     "PYTHONHOME",
 ];
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 fn scrubbed(key: &OsStr) -> bool {
     let key = key.as_encoded_bytes();
     key.starts_with(b"NODE_") || SCRUBBED.iter().any(|name| name.as_bytes() == key)
@@ -449,7 +467,13 @@ fn write_source(path: &Path, source: &str) -> Result<(), RunError> {
 pub(super) struct Temp(PathBuf);
 impl Temp {
     /// Owned 0700 directory for tests that need a disposable executable.
-    #[cfg(all(test, target_os = "linux", not(target_env = "uclibc")))]
+    #[cfg(all(
+        test,
+        any(
+            target_os = "macos",
+            all(target_os = "linux", not(target_env = "uclibc"))
+        )
+    ))]
     pub(super) fn path(&self) -> &Path {
         &self.0
     }
@@ -482,13 +506,20 @@ impl Drop for Temp {
 }
 
 fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<Vec<u8>, RunError> {
-    #[cfg(not(all(target_os = "linux", not(target_env = "uclibc"))))]
+    #[cfg(not(any(
+        target_os = "macos",
+        all(target_os = "linux", not(target_env = "uclibc"))
+    )))]
     {
         let _ = (path, args, input, cwd);
         Err(error(
             "unsupported-runtime-platform",
-            "target execution currently requires Linux waitid and process-group cleanup",
+            "target execution requires a supported Linux or macOS process-group supervisor",
         ))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        execute_macos(path, args, input, cwd, TIMEOUT, MAX_OUTPUT)
     }
     #[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
     {
@@ -596,7 +627,174 @@ fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<V
     }
 }
 
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+// Unlike Linux waitid(WNOWAIT), Child::try_wait reaps the target. A separate
+// owned group leader therefore retains the group identity until cleanup.
+// Keeping it live also avoids Darwin's EPERM for zombie-only groups. This is
+// process supervision of regenerated code, not a sandbox for hostile tools.
+#[cfg(target_os = "macos")]
+struct MacGroup(std::process::Child);
+#[cfg(target_os = "macos")]
+impl MacGroup {
+    fn new(cwd: &Path, started: Instant, budget: Duration) -> Result<Self, RunError> {
+        use std::os::unix::process::CommandExt;
+
+        let mut command = Command::new("/bin/cat");
+        command
+            .env_clear()
+            .current_dir(cwd)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(0);
+        // The parent's held stdin keeps the helper live; EOF ends it if the
+        // parent dies. Both starts use the same original operation deadline.
+        spawn_unless_busy(&mut command, started, budget)
+            .map(Self)
+            .map_err(start_error)
+    }
+
+    fn pid(&self) -> Result<nix::unistd::Pid, RunError> {
+        i32::try_from(self.0.id())
+            .map(nix::unistd::Pid::from_raw)
+            .map_err(|_| error("tool-pid", "PID overflow"))
+    }
+}
+#[cfg(target_os = "macos")]
+impl Drop for MacGroup {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+#[cfg(target_os = "macos")]
+struct MacChild {
+    child: std::process::Child,
+    group: MacGroup,
+    armed: bool,
+}
+#[cfg(target_os = "macos")]
+impl MacChild {
+    fn cleanup(&mut self) -> Result<(), RunError> {
+        let result = nix::sys::signal::killpg(self.group.pid()?, nix::sys::signal::Signal::SIGKILL);
+        let _ = self.child.kill();
+        let reaped = self.child.wait();
+        self.armed = false;
+        // An owned live anchor makes ESRCH/EPERM unexpected. Neither may be
+        // waived as successful cleanup on Darwin.
+        result.map_err(|e| error("tool-cleanup", e))?;
+        reaped.map_err(io)?;
+        Ok(())
+    }
+}
+#[cfg(target_os = "macos")]
+impl Drop for MacChild {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = self.cleanup();
+        }
+    }
+}
+#[cfg(target_os = "macos")]
+fn start_error(e: std::io::Error) -> RunError {
+    if e.kind() == std::io::ErrorKind::TimedOut {
+        error("timeout", "target operation deadline ended during startup")
+    } else {
+        error("tool-start", e)
+    }
+}
+#[cfg(target_os = "macos")]
+fn execute_macos(
+    path: &Path,
+    args: &[OsString],
+    input: &[u8],
+    cwd: &Path,
+    timeout: Duration,
+    max_output: u64,
+) -> Result<Vec<u8>, RunError> {
+    use std::os::unix::process::CommandExt;
+
+    let sequence = crate::TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let stdin = cwd.join(format!("stdin-{sequence}"));
+    let stdout = cwd.join(format!("stdout-{sequence}"));
+    let stderr = cwd.join(format!("stderr-{sequence}"));
+    let mut stream = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&stdin)
+        .map_err(io)?;
+    stream.write_all(input).map_err(io)?;
+    drop(stream);
+    let out = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&stdout)
+        .map_err(io)?;
+    let err = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&stderr)
+        .map_err(io)?;
+    // Include helper and target startup/retries in the operation deadline.
+    let started = Instant::now();
+    let group = MacGroup::new(cwd, started, timeout)?;
+    let mut command = Command::new(path);
+    command
+        .args(args)
+        .current_dir(cwd)
+        .stdin(Stdio::from(File::open(&stdin).map_err(io)?))
+        .stdout(Stdio::from(out))
+        .stderr(Stdio::from(err))
+        .process_group(group.pid()?.as_raw());
+    for (key, _) in std::env::vars_os() {
+        if scrubbed(&key) {
+            command.env_remove(&key);
+        }
+    }
+    command.env("LC_ALL", "C");
+    let child = spawn_unless_busy(&mut command, started, timeout).map_err(start_error)?;
+    let mut child = MacChild {
+        child,
+        group,
+        armed: true,
+    };
+    let terminal = loop {
+        let too_large = fs::metadata(&stdout)
+            .map(|m| m.len() > max_output)
+            .unwrap_or(true)
+            || fs::metadata(&stderr)
+                .map(|m| m.len() > max_output)
+                .unwrap_or(true);
+        if too_large {
+            break Err(error("output-limit", max_output));
+        }
+        if started.elapsed() > timeout {
+            break Err(error("timeout", "target operation deadline ended"));
+        }
+        match child.child.try_wait() {
+            Ok(None) => std::thread::sleep(Duration::from_millis(5)),
+            Ok(Some(status)) => break Ok(status),
+            Err(e) => break Err(error("tool-wait", e)),
+        }
+    };
+    // Retain the group leader through signalling, even if try_wait reaped the
+    // target. Final reads are bounded again after killing ordinary descendants.
+    child.cleanup()?;
+    let status = terminal?;
+    let output = read_output(&stdout, max_output)?;
+    let diagnostics = read_output(&stderr, max_output)?;
+    if !status.success() {
+        return Err(error(
+            "tool-exit",
+            format!("{status:?}: {}", String::from_utf8_lossy(&diagnostics)),
+        ));
+    }
+    Ok(output)
+}
+
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 fn read_output(path: &Path, limit: u64) -> Result<Vec<u8>, RunError> {
     let mut bytes = Vec::new();
     File::open(path)
@@ -608,6 +806,202 @@ fn read_output(path: &Path, limit: u64) -> Result<Vec<u8>, RunError> {
         return Err(error("output-limit", limit));
     }
     Ok(bytes)
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod macos_tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+    use nix::{
+        errno::Errno,
+        sys::{signal::kill, wait::waitpid},
+        unistd::Pid,
+    };
+    use std::os::unix::{
+        fs::{PermissionsExt, symlink},
+        process::CommandExt,
+    };
+
+    fn temp() -> Temp {
+        Temp::new().unwrap_or_else(|e| panic!("{}: {}", e.code, e.message))
+    }
+    fn run(script: &str, timeout: Duration, limit: u64, cwd: &Path) -> Result<Vec<u8>, RunError> {
+        execute_macos(
+            Path::new("/bin/sh"),
+            &["-c".into(), script.into()],
+            b"",
+            cwd,
+            timeout,
+            limit,
+        )
+    }
+    fn code(result: Result<Vec<u8>, RunError>) -> &'static str {
+        match result {
+            Err(e) => e.code,
+            Ok(_) => panic!("unexpected success"),
+        }
+    }
+    fn gone(pid: Pid) {
+        for _ in 0..200 {
+            if kill(pid, None) == Err(Errno::ESRCH) {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        panic!("owned descendant survived cleanup: {pid}");
+    }
+
+    #[test]
+    fn macos_deadlines_output_exit_and_failed_setup_refuse() {
+        let temp = temp();
+        assert_eq!(
+            code(run("sleep 30", Duration::from_millis(30), 1024, &temp.0)),
+            "timeout"
+        );
+        assert_eq!(
+            code(run("printf 123456789", TIMEOUT, 8, &temp.0)),
+            "output-limit"
+        );
+        assert_eq!(
+            code(run("printf 123456789 >&2", TIMEOUT, 8, &temp.0)),
+            "output-limit"
+        );
+        assert_eq!(
+            code(run("exit 23", TIMEOUT, MAX_OUTPUT, &temp.0)),
+            "tool-exit"
+        );
+        assert_eq!(
+            code(run(
+                "echo should-not-start",
+                Duration::ZERO,
+                MAX_OUTPUT,
+                &temp.0
+            )),
+            "timeout"
+        );
+        assert_eq!(
+            code(execute_macos(
+                Path::new("/zeno-fcis-missing-tool"),
+                &[],
+                b"",
+                &temp.0,
+                TIMEOUT,
+                MAX_OUTPUT
+            )),
+            "tool-start"
+        );
+        assert!(MacGroup::new(&temp.0.join("missing-directory"), Instant::now(), TIMEOUT).is_err());
+        let path = temp.0.join("output");
+        fs::write(&path, "123456789").unwrap();
+        assert_eq!(code(read_output(&path, 8)), "output-limit");
+    }
+
+    #[test]
+    fn macos_exited_leader_cannot_leave_an_ordinary_descendant_running() {
+        let temp = temp();
+        let bytes = run("sleep 30 & echo $!; exit 0", TIMEOUT, MAX_OUTPUT, &temp.0)
+            .unwrap_or_else(|e| panic!("{}: {}", e.code, e.message));
+        let pid = String::from_utf8(bytes)
+            .unwrap()
+            .trim()
+            .parse::<i32>()
+            .unwrap();
+        gone(Pid::from_raw(pid));
+        assert_eq!(
+            run("printf 12345678", TIMEOUT, 8, &temp.0).ok().unwrap(),
+            b"12345678"
+        );
+    }
+
+    #[test]
+    fn macos_group_cleanup_survives_target_reaping_and_cancellation() {
+        let temp = temp();
+        for cancel in [false, true] {
+            let group = MacGroup::new(&temp.0, Instant::now(), TIMEOUT)
+                .unwrap_or_else(|e| panic!("{}", e.message));
+            let group_pid = group.pid().unwrap_or_else(|_| unreachable!());
+            let child = Command::new(if cancel { "/bin/cat" } else { "/usr/bin/true" })
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .process_group(group_pid.as_raw())
+                .spawn()
+                .unwrap();
+            let pid = Pid::from_raw(i32::try_from(child.id()).unwrap());
+            let mut guard = MacChild {
+                child,
+                group,
+                armed: true,
+            };
+            if !cancel {
+                assert!(guard.child.wait().unwrap().success());
+                guard
+                    .cleanup()
+                    .unwrap_or_else(|e| panic!("{}: {}", e.code, e.message));
+            }
+            drop(guard);
+            assert_eq!(waitpid(pid, None), Err(Errno::ECHILD));
+            assert_eq!(waitpid(group_pid, None), Err(Errno::ECHILD));
+        }
+    }
+
+    #[test]
+    fn macos_missing_owned_group_is_a_cleanup_failure() {
+        let temp = temp();
+        let group = MacGroup::new(&temp.0, Instant::now(), TIMEOUT)
+            .unwrap_or_else(|e| panic!("{}", e.message));
+        let child = Command::new("/usr/bin/true")
+            .process_group(group.pid().unwrap_or_else(|_| unreachable!()).as_raw())
+            .spawn()
+            .unwrap();
+        let mut guard = MacChild {
+            child,
+            group,
+            armed: true,
+        };
+        guard.child.wait().unwrap();
+        guard.group.0.kill().unwrap();
+        guard.group.0.wait().unwrap();
+        let Err(failure) = guard.cleanup() else {
+            panic!("missing group was accepted");
+        };
+        assert_eq!(failure.code, "tool-cleanup");
+    }
+
+    #[test]
+    fn macos_private_sources_environment_and_tool_drift_remain_checked() {
+        let temp = temp();
+        assert_eq!(
+            fs::metadata(&temp.0).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        let original = temp.0.join("original");
+        write_source(&original, "keep").unwrap_or_else(|_| unreachable!());
+        assert!(write_source(&original, "replace").is_err());
+        symlink(&original, temp.0.join("source")).unwrap();
+        assert!(write_source(&temp.0.join("source"), "replace").is_err());
+        assert_eq!(fs::read(&original).unwrap(), b"keep");
+        for key in [
+            "NODE_OPTIONS",
+            "NODE_PATH",
+            "NODE_COMPILE_CACHE",
+            "RUSTC_WRAPPER",
+            "PYTHONPATH",
+            "PYTHONHOME",
+        ] {
+            assert!(scrubbed(OsStr::new(key)));
+        }
+        for key in ["PATH", "HOME", "RUSTUP_HOME"] {
+            assert!(!scrubbed(OsStr::new(key)));
+        }
+        let identity =
+            json!({"binary_sha256":binary_hash(&original).unwrap_or_else(|_| unreachable!())});
+        fs::write(&original, "changed").unwrap();
+        let Err(failure) = recheck(&original, &identity) else {
+            panic!("tool drift was accepted");
+        };
+        assert_eq!(failure.code, "tool-drift");
+    }
 }
 
 #[cfg(all(test, target_os = "linux", not(target_env = "uclibc")))]

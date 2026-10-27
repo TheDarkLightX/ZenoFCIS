@@ -25,8 +25,9 @@ WORKFLOW = ROOT / ".github" / "workflows" / "miri.yml"
 FORMAT = "zeno-fcis/miri-exclusions/1"
 ENTRY_KEYS = {"group", "package", "test_binary", "test", "reason", "native"}
 NATIVE_KEYS = {"workflow", "job", "command"}
-ROW_KEYS = {"group", "packages", "target", "test", "command", "miri_skip"}
+ROW_KEYS = {"group", "packages", "target", "test", "command", "miri_skip", "part", "parts"}
 NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+TEST_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*")
 
 
 class ExclusionError(RuntimeError):
@@ -45,8 +46,10 @@ def load_exclusions(path: Path = EXCLUSIONS) -> list[dict]:
             raise ExclusionError(f"{path.name}: malformed exclusion entry")
         if not isinstance(entry["native"], dict) or set(entry["native"]) != NATIVE_KEYS:
             raise ExclusionError(f"{path.name}: malformed native job for {entry.get('test')}")
-        if NAME.fullmatch(entry["test"]) is None or NAME.fullmatch(entry["test_binary"]) is None:
-            raise ExclusionError(f"{path.name}: exclusion names must be plain identifiers")
+        if (TEST_NAME.fullmatch(entry["test"]) is None
+                or NAME.fullmatch(entry["test_binary"]) is None
+                or (entry["test_binary"] != "lib" and "::" in entry["test"])):
+            raise ExclusionError(f"{path.name}: invalid exact test name")
         if not entry["reason"].strip():
             raise ExclusionError(f"{path.name}: {entry['test']} has no measured reason")
     keys = [(entry["group"], entry["test"]) for entry in entries]
@@ -122,6 +125,11 @@ def check_native(root: Path, entry: dict) -> None:
 
 
 def check_static(root: Path, entries: list[dict], rows: list[dict]) -> None:
+    from miri_shards import logical_rows
+    try:
+        rows = logical_rows(rows)
+    except ValueError as error:
+        raise ExclusionError(str(error)) from error
     listed = {(entry["group"], entry["test"]) for entry in entries}
     skipped = workflow_skips(rows)
     if listed != skipped:
@@ -133,14 +141,23 @@ def check_static(root: Path, entries: list[dict], rows: list[dict]) -> None:
         row = groups.get(entry["group"])
         if row is None or entry["package"] not in shlex.split(row["packages"]):
             raise ExclusionError(f"{entry['test']}: group {entry['group']} does not test {entry['package']}")
-        definitions = test_definitions(root, entry["test"])
-        expected = root / "crates" / entry["package"] / "tests" / f"{entry['test_binary']}.rs"
-        if definitions != [expected]:
+        leaf_name = entry["test"].rsplit("::", 1)[-1]
+        definitions = test_definitions(root, leaf_name)
+        package = root / "crates" / entry["package"]
+        expected = package / "tests" / f"{entry['test_binary']}.rs"
+        if entry["test_binary"] == "lib":
+            # A compiled Miri listing below checks the full module-qualified
+            # name. The source check separately requires one native definition
+            # in this package, with no ignored/conditional test attributes.
+            if len(definitions) != 1 or not definitions[0].is_relative_to(package / "src"):
+                raise ExclusionError(f"{entry['test']}: expected one library test in {entry['package']}")
+            expected = definitions[0]
+        elif definitions != [expected]:
             raise ExclusionError(
                 f"{entry['test']} must name exactly one test, in {expected.relative_to(root)}; "
                 f"found {[str(path.relative_to(root)) for path in definitions]}")
         # An ignored or conditionally compiled exclusion would run nowhere.
-        if re.search(r"#\[\s*(?:ignore|cfg|cfg_attr)\b", test_attributes(expected, entry["test"])):
+        if re.search(r"#\[\s*(?:ignore|cfg|cfg_attr)\b", test_attributes(expected, leaf_name)):
             raise ExclusionError(f"{entry['test']} must run natively, not ignored or conditionally compiled")
         check_native(root, entry)
 
@@ -225,6 +242,21 @@ def self_test() -> None:
         refused(lambda: check_listing([entry], "values", "huge_case: test\nhuge_case: test\n"),
                 "a skip that matches two listed tests")
         (tests / "other.rs").unlink()
+        source = root / "crates" / "demo" / "src"
+        source.mkdir()
+        (source / "cases.rs").write_text("#[test]\nfn exhaustive_product() {}\n")
+        qualified = "cases::exhaustive_product"
+        unit = dict(entry, test_binary="lib", test=qualified)
+        unit_row = dict(row, miri_skip=[qualified])
+        check_static(root, [unit], [unit_row])
+        check_listing([unit], "values", qualified + ": test\n")
+        refused(lambda: check_listing([unit], "values", "other::exhaustive_product: test\n"),
+                "a different module-qualified test")
+        refused(lambda: check_static(root, [dict(unit, test_binary="big")], [unit_row]),
+                "a library test labelled as an integration test")
+        (source / "cases.rs").write_text("#[test]\n#[ignore]\nfn exhaustive_product() {}\n")
+        refused(lambda: check_static(root, [unit], [unit_row]), "an ignored native library test")
+        (source / "cases.rs").unlink()
         for attributes in ("#[test]\n#[ignore]\n", "#[cfg_attr(not(miri), ignore)]\n#[test]\n"):
             (tests / "big.rs").write_text(f"{attributes}fn huge_case() {{}}\n#[test]\nfn small_case() {{}}\n")
             refused(lambda: check_static(root, [entry], [row]), "a native-only test that does not run natively")
@@ -247,7 +279,7 @@ def main() -> int:
     try:
         if arguments.mode == "self-test":
             self_test()
-            print("miri-exclusions: self-test PASS (11 planted controls refused)")
+            print("miri-exclusions: self-test PASS (14 planted controls refused)")
             return 0
         selected = json.loads(arguments.selected) if arguments.selected else None
         test_arguments = check(selected)

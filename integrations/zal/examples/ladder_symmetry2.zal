@@ -1,0 +1,24 @@
+zal 2;
+# Three borrowers pledge collateral on the integer ladder 0, 1, 2.
+# Alice is observed; Bob and Carol are interchangeable rivals.
+machine collateral_ladder;
+states borrowers, lender;
+events pledge_alice, pledge_bob, pledge_carol, reopen;
+context none;
+var alice in 0..=2 initially 0;
+var bob in 0..=2 initially 0;
+var carol in 0..=2 initially 0;
+initial borrowers;
+step atomic; frame control_and_variables;
+default reject unavailable unchanged;
+rule alice_pledges: borrowers + pledge_alice [alice < 2] -> accept lender, alice += 1;
+rule bob_pledges: borrowers + pledge_bob [bob < 2] -> accept lender, bob += 1;
+rule carol_pledges: borrowers + pledge_carol [carol < 2] -> accept lender, carol += 1;
+rule lender_reopens: lender + reopen [true] -> accept borrowers;
+invariant collateral_bound: alice + bob + carol <= 6;
+require no_collateral_loss: accepted => (alice' >= alice & bob' + carol' >= bob + carol);
+player borrowers_move moves in borrowers;
+player lender_moves moves in lender;
+fairness reopened: infinitely often (state' == borrowers);
+property alice_funded: borrowers_move can force eventually (alice == 2);
+symmetry rivals: swap (bob carol) (pledge_bob pledge_carol);

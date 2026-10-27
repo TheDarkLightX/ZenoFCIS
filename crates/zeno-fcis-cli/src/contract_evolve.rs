@@ -268,8 +268,12 @@ fn plan(
         review_sha256: sha256_hex(review.as_bytes()),
         kind,
     };
-    let rules = with_evolution(&new.rules, &listed_evolutions(&app.rules)?, &evolution)
-        .map_err(new_side)?;
+    let rules = with_evolution(
+        &new.rules,
+        &listed_evolutions(&app.project, &app.rules)?,
+        &evolution,
+    )
+    .map_err(new_side)?;
     let mut planned_evolutions = app_evolutions.clone();
     planned_evolutions.push(EvolutionSources {
         project: &app.project,

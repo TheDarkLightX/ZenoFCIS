@@ -2,6 +2,18 @@
 
 pub(crate) const FILES: &[(&str, &[u8])] = &[
     (
+        "src/shell_effects.rs",
+        include_bytes!("../templates/withdrawal-queue/src/shell_effects.rs"),
+    ),
+    (
+        "tests/shell_effects.rs",
+        include_bytes!("../templates/withdrawal-queue/tests/shell_effects.rs"),
+    ),
+    (
+        "ui.json",
+        include_bytes!("../templates/withdrawal-queue/ui.json"),
+    ),
+    (
         "src/v2_contract.rs",
         include_bytes!("../templates/withdrawal-queue/src/v2_contract.rs"),
     ),
@@ -148,5 +160,13 @@ pub(crate) const FILES: &[(&str, &[u8])] = &[
     (
         "tests/lifecycle.rs",
         include_bytes!("../templates/withdrawal-queue/tests/lifecycle.rs"),
+    ),
+    (
+        "tests/decision-scenarios.txt",
+        include_bytes!("../templates/withdrawal-queue/tests/decision-scenarios.txt"),
+    ),
+    (
+        "v2/run-properties.json",
+        include_bytes!("../templates/withdrawal-queue/v2/run-properties.json"),
     ),
 ];

@@ -11,3 +11,16 @@ Feature: Finite behavior dialogue with deterministic meaning help
     And separate truth-table and bit-mask oracles replay their stated finite families
     And the actual generated factory Authority matches every sample-domain tuple
     And realization, human agreement, inference access and publication remain distinct
+    And the experimental ladder preserves M0 and checks every temporal rung
+    And independent finite-word truth tables and planted temporal defects run
+    And unbounded targets and execution membership remain explicit obligations
+    And why-not, what-if and narrative explanations match independent oracles and their planted defects are killed
+    And registry help and revision-bound ladder tools refuse drift and stale revisions without new authority
+    And machine-profile temporal verdicts match an independent lasso and finite-word oracle
+    And every planted machine-profile checker defect fails its named test
+    And the withdrawal pilot checks its contract adapter, every tick history through length 12 and its planted defects
+    And the shipped shell ports written in ZAL lower byte for byte to the built shell registry and drift fails
+    And finite types count their values exactly and typed machines elaborate to unchanged profile 2 machines
+    And every planted types, typed-machine and effects defect fails its named test
+    And context-free profile 2 lowering and safety-property laws pass native refinement while a buildable weakened contract fails its named assertion
+    And ten recurring source mistakes report a reason, physical location and suggested fix in both syntaxes

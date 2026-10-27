@@ -12,7 +12,7 @@
     {
       "family": "versioned-register",
       "instance": "components/register/core-instance.json",
-      "instance_sha256": "6a94811b7421f3c094d90c650a76d0ccab23d03a21710604d93ed3ec5d668114",
+      "instance_sha256": "69d6234a28145e69ef703ce7694e88bd958e4c4ce221bf1263560fc2b660df04",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "register",
       "owns_fields": [
@@ -22,7 +22,7 @@
       "parameters": {
         "C": 2
       },
-      "source_set_sha256": "463a813825e18c9c592e19e79dbc5dcfbbc0d3183e5298551b832395e751cd5b",
+      "source_set_sha256": "3c1ba2480d016a696da5f015922d2b3fdd0c5a09232606f150c3246d138f0c0d",
       "views": {
         "command": [
           "expected_version",
@@ -40,7 +40,7 @@
     {
       "family": "approval-queue",
       "instance": "components/review/core-instance.json",
-      "instance_sha256": "18896898700ef9a504c3e1fc3207e3e3e2512293de894a9578dbd61883705e00",
+      "instance_sha256": "79e71d7a83975aaaeb474722e6c91764b84ddded3f3d9173259553fc4432d2b4",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "review",
       "owns_fields": [
@@ -52,7 +52,7 @@
       "parameters": {
         "K": 2
       },
-      "source_set_sha256": "a2b329091913bbb427c9fff92c2fc9f9fa718103ec63e00a7f2836eb910f0dc7",
+      "source_set_sha256": "196d2c838546820890f645786787f10724a49250ad21cda07525c27c7352a653",
       "views": {
         "command": [
           "action - 1"

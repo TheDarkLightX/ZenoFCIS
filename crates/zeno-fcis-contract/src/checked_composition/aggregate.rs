@@ -265,6 +265,10 @@ impl Layout {
 
     fn renamed(&self, leaf: usize, ast: &Ast) -> Result<Ast, String> {
         Ok(match ast {
+            Ast::Circuit(c) => Ast::Circuit(Box::new(c.try_map(|f| self.renamed(leaf, f))?)),
+            Ast::U128(_) | Ast::ToI128(_) | Ast::ToU128(_) => {
+                return Err("U128SubjectUnsupported".into());
+            }
             Ast::Name(name) => match self.rename(leaf, name) {
                 Some(renamed) => Ast::Name(renamed),
                 None if ["pre.", "post.", "command.", "context.", "outbox."]
@@ -324,6 +328,7 @@ pub(crate) fn same_type(compiled: &[Compiled], left: u32, right: u32) -> bool {
 /// compares by its fields.
 fn form_key(form: &Form) -> String {
     match form {
+        Form::Leaf(Scalar::U128 { .. }) => "U128SubjectUnsupported".to_owned(),
         Form::Leaf(Scalar::Bool) => "bool".to_owned(),
         Form::Leaf(Scalar::I128 { min, max }) => format!("int {min} {max}"),
         Form::Leaf(Scalar::Text { min, max }) => format!("text {min} {max}"),
@@ -413,6 +418,14 @@ pub(crate) fn generate(
     for (type_id, (type_name, form)) in &types {
         let type_name = names.unique(type_name, *type_id);
         match form {
+            Form::Leaf(Scalar::U128 { .. }) => {
+                return Err(Refusal::new(
+                    Stage::Binding,
+                    Obligation::AssemblyProfile,
+                    "unsigned type",
+                    "U128SubjectUnsupported",
+                ));
+            }
             Form::Leaf(Scalar::Bool) => {
                 project.push_str(&format!("type {type_id} bool {type_name};\n"))
             }
@@ -646,6 +659,14 @@ pub(crate) fn generate(
         genesis.insert(
             state_field(slot).to_string(),
             match value {
+                Constant::U128(_) => {
+                    return Err(Refusal::new(
+                        Stage::Binding,
+                        Obligation::AssemblyProfile,
+                        "genesis",
+                        "U128SubjectUnsupported",
+                    ));
+                }
                 Constant::Bool(value) => GenesisValue::Bool(*value),
                 Constant::Int(value) => GenesisValue::Int(*value),
             },
@@ -726,12 +747,14 @@ fn class_name(class: Class) -> &'static str {
     }
 }
 
-fn scope(scope: LawScope) -> &'static str {
+fn scope(scope: LawScope) -> String {
     match scope {
         LawScope::Always => "any",
         LawScope::Accept => "accept",
         LawScope::Reject => "reject",
         LawScope::CommittedFailure => "failure",
         LawScope::Committing => "commit",
+        LawScope::RejectReason(reason) => return format!("reject:{reason}"),
     }
+    .to_owned()
 }

@@ -12,20 +12,68 @@ permissions:
 
 jobs:
   interpret:
-    name: interpret (${{ matrix.group }})
+    name: interpret (${{ matrix.group }}${{ matrix.parts && format(' part {0}/{1}', matrix.part, matrix.parts) || '' }})
     runs-on: ubuntu-24.04
-    timeout-minutes: ${{ matrix.group == 'synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-20-24' && 360 || 240 }}
+    timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
         # JSON is also YAML; the preflight reads these exact rows without a YAML dependency.
         include: [
-          {"group": "values", "packages": "-p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec -p zeno-fcis-secret", "miri_skip": ["legal_leaf_above_default_payload_remains_constructible_and_encodable"]},
+          {"group": "values", "packages": "-p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec -p zeno-fcis-secret", "miri_skip": ["legal_leaf_above_default_payload_remains_constructible_and_encodable", "all_long_prefix_subsets_and_insert_remove_orders_are_canonical", "every_subset_root_matches_independent_sha256_vectors", "providers::tests::rustcrypto_fixed_vectors_and_streaming_boundaries"], "part": 1, "parts": 4, "target": "--lib --tests"},
+          {"group": "values", "packages": "-p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec -p zeno-fcis-secret", "miri_skip": ["legal_leaf_above_default_payload_remains_constructible_and_encodable", "all_long_prefix_subsets_and_insert_remove_orders_are_canonical", "every_subset_root_matches_independent_sha256_vectors", "providers::tests::rustcrypto_fixed_vectors_and_streaming_boundaries"], "part": 2, "parts": 4, "target": "--lib --tests"},
+          {"group": "values", "packages": "-p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec -p zeno-fcis-secret", "miri_skip": ["legal_leaf_above_default_payload_remains_constructible_and_encodable", "all_long_prefix_subsets_and_insert_remove_orders_are_canonical", "every_subset_root_matches_independent_sha256_vectors", "providers::tests::rustcrypto_fixed_vectors_and_streaming_boundaries"], "part": 3, "parts": 4, "target": "--lib --tests"},
+          {"group": "values", "packages": "-p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec -p zeno-fcis-secret", "miri_skip": ["legal_leaf_above_default_payload_remains_constructible_and_encodable", "all_long_prefix_subsets_and_insert_remove_orders_are_canonical", "every_subset_root_matches_independent_sha256_vectors", "providers::tests::rustcrypto_fixed_vectors_and_streaming_boundaries"], "part": 4, "parts": 4, "target": "--lib --tests"},
+          {"group": "values-docs", "packages": "-p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec -p zeno-fcis-secret", "target": "--doc"},
           {"group": "schemas", "packages": "-p zeno-fcis-project -p zeno-fcis-catalog -p zeno-fcis-schema -p zeno-fcis-refine"},
           {"group": "plans", "packages": "-p zeno-fcis-patch -p zeno-fcis-plan -p zeno-fcis-receipt -p zeno-fcis-security"},
-          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain"},
-          {"group": "specification", "packages": "-p zeno-fcis-spec -p zeno-fcis-backend"},
-          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib"},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product", "resumed_search_matches_uninterrupted_closure", "effects::handler_tests::policy_fault_invocation_reports_match_world"], "part": 1, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product", "resumed_search_matches_uninterrupted_closure", "effects::handler_tests::policy_fault_invocation_reports_match_world"], "part": 2, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product", "resumed_search_matches_uninterrupted_closure", "effects::handler_tests::policy_fault_invocation_reports_match_world"], "part": 3, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product", "resumed_search_matches_uninterrupted_closure", "effects::handler_tests::policy_fault_invocation_reports_match_world"], "part": 4, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product", "resumed_search_matches_uninterrupted_closure", "effects::handler_tests::policy_fault_invocation_reports_match_world"], "part": 5, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product", "resumed_search_matches_uninterrupted_closure", "effects::handler_tests::policy_fault_invocation_reports_match_world"], "part": 6, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product", "resumed_search_matches_uninterrupted_closure", "effects::handler_tests::policy_fault_invocation_reports_match_world"], "part": 7, "parts": 8},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain", "miri_skip": ["effects::durable::explore::bounded_process_loss_profile_covers_every_cut_and_outcome", "effects::durable::explore::process_loss_explorer", "effects::explore_tests::simulation_laws", "effects::explore_tests::explore_frozen_profile", "effects::explore_tests::late_replies_refused", "effects::policy_tests::policy_retry_product", "resumed_search_matches_uninterrupted_closure", "effects::handler_tests::policy_fault_invocation_reports_match_world"], "part": 8, "parts": 8},
+          {"group": "specification", "packages": "-p zeno-fcis-spec -p zeno-fcis-backend", "miri_skip": ["small_algebras_match_independent_boolean_lifts_exhaustively", "table_count_sizes_before_and_after_linear_values", "tables_count_matches_direct_counting_on_every_assignment"], "part": 1, "parts": 4, "target": "--lib --tests"},
+          {"group": "specification", "packages": "-p zeno-fcis-spec -p zeno-fcis-backend", "miri_skip": ["small_algebras_match_independent_boolean_lifts_exhaustively", "table_count_sizes_before_and_after_linear_values", "tables_count_matches_direct_counting_on_every_assignment"], "part": 2, "parts": 4, "target": "--lib --tests"},
+          {"group": "specification", "packages": "-p zeno-fcis-spec -p zeno-fcis-backend", "miri_skip": ["small_algebras_match_independent_boolean_lifts_exhaustively", "table_count_sizes_before_and_after_linear_values", "tables_count_matches_direct_counting_on_every_assignment"], "part": 3, "parts": 4, "target": "--lib --tests"},
+          {"group": "specification", "packages": "-p zeno-fcis-spec -p zeno-fcis-backend", "miri_skip": ["small_algebras_match_independent_boolean_lifts_exhaustively", "table_count_sizes_before_and_after_linear_values", "tables_count_matches_direct_counting_on_every_assignment"], "part": 4, "parts": 4, "target": "--lib --tests"},
+          {"group": "specification-docs", "packages": "-p zeno-fcis-spec -p zeno-fcis-backend", "target": "--doc"},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 1, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 2, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 3, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 4, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 5, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 6, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 7, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 8, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 9, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 10, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 11, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 12, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 13, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 14, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 15, "parts": 16},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "miri_skip": ["finite::execution_v2::oracle::finite_account_tests::oracle_finite_bond_all_command_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_account_tests::oracle_finite_two_beneficiary_rewards_all_phases_have_unique_exact_outcomes", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_quorum_permutations_source_patterns_and_all_epoch_time_reductions", "finite::execution_v2::oracle::finite_price_tests::oracle_finite_two_round_price_slots_have_complete_outcomes_including_unavailable_security"], "part": 16, "parts": 16},
+          {"group": "synthesis-library-long-keys", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::oracle_native_lifecycle_binds_actual_keys_complete_rounds_reservations_and_rotation"},
+          {"group": "synthesis-library-long-flat-schema", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::oracle_native_flat_schema_preserves_high_bits_options_old_snapshots_and_refusal_usage"},
+          {"group": "synthesis-library-long-complete-laws", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::oracle_native_lifecycle_complete_laws_refuse_reject_all_extra_writes_and_wrong_reasons"},
+          {"group": "synthesis-library-long-dispute", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::oracle_native_dispute_inconclusive_never_unlocks_and_rejected_resolution_restores_evidence"},
+          {"group": "synthesis-library-long-ingress", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::oracle_native_canonical_ingress_scope_unknowns_malformed_crypto_and_refusal_retry"},
+          {"group": "synthesis-library-long-quorum", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::oracle_native_time_quorum_survives_spread_failure_and_security_uses_exclusive_remaining_locks"},
+          {"group": "synthesis-library-long-port-laws", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::oracle_native_port_laws_reject_all_wrong_frames_and_borrowed_rewards"},
+          {"group": "synthesis-library-long-slash", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::round3_slash_and_clawback_after_unregister"},
+          {"group": "synthesis-library-long-scope", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::round3_report_scope_and_dual_rotation_negative_controls"},
+          {"group": "synthesis-library-long-fallback", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::round3_lex_first_diverse_and_no_spread_fallback"},
+          {"group": "synthesis-library-long-repeated-slash", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::round3_native_repeated_slash_preserves_custody_and_punishment_history"},
+          {"group": "synthesis-library-long-expired-rounds", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::round3_missed_opening_skips_only_expired_rounds"},
+          {"group": "synthesis-library-long-custody", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::round3_zdex_rewards_and_slash_conserve_one_custody_domain"},
+          {"group": "synthesis-library-long-publication-time", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::oracle_native_publication_time_reward_exit_and_the_oracle_never_blocks_a_genuine_price_fall"},
+          {"group": "synthesis-library-long-missed-opening", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::round3_native_missed_opening_recovers_on_the_fixed_schedule"},
+          {"group": "synthesis-library-long-held-claim", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::oracle::lifecycle_tests::oracle_native_held_claim_clawback_is_atomic_with_slash_and_resolution_retains_proofs"},
+          {"group": "synthesis-library-long-legacy-genesis", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::historical_i64::execution_v2::authority::bound::publication_tests::genuine_genesis_retains_initial_laws_identity_and_every_byte"},
+          {"group": "synthesis-library-long-legacy-replay", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::historical_i64::execution_v2::authority::bound::tests::methods_recompute_before_exact_replay_for_every_class_and_changed_byte"},
           {"group": "synthesis-library-choice-closing", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::choice_tests::closing_every_choice_matches_the_previous_value_comparison"},
           {"group": "synthesis-library-schema-bytes", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::canonical_v2::schema::tests::every_original_schema_byte_and_truncation_is_bound"},
           {"group": "synthesis-library-publication-genesis-bytes", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::authority::bound::publication_tests::genuine_genesis_retains_initial_laws_identity_and_every_byte"},
@@ -37,7 +85,15 @@ jobs:
           {"group": "synthesis-library-law-count", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::laws::tests::no_law_count_cap_and_structural_frame_refusals"},
           {"group": "synthesis-documentation", "packages": "-p zeno-fcis-synthesis", "target": "--doc"},
           {"group": "synthesis-example-checked-continuation", "packages": "-p zeno-fcis-synthesis", "target": "--example checked_continuation", "command": "run"},
-          {"group": "synthesis-finite", "packages": "-p zeno-fcis-synthesis", "target": "--test finite"},
+          {"group": "generated-code-tests-example-withdrawal-queue-decisions", "packages": "-p zeno-fcis-generated-code-tests", "target": "--example withdrawal_queue_decisions", "command": "run"},
+          {"group": "synthesis-finite", "packages": "-p zeno-fcis-synthesis", "target": "--test finite", "miri_skip": ["a_trapped_candidate_does_not_disturb_the_next_candidate", "distinguishes_unrealizable_contract_from_insufficient_grammar", "synthesizes_a_generic_relation_and_refutes_identity"], "part": 1, "parts": 2},
+          {"group": "synthesis-finite", "packages": "-p zeno-fcis-synthesis", "target": "--test finite", "miri_skip": ["a_trapped_candidate_does_not_disturb_the_next_candidate", "distinguishes_unrealizable_contract_from_insufficient_grammar", "synthesizes_a_generic_relation_and_refutes_identity"], "part": 2, "parts": 2},
+          {"group": "synthesis-oracle-accounts", "packages": "-p zeno-fcis-synthesis", "target": "--test oracle_accounts"},
+          {"group": "synthesis-oracle-arithmetic", "packages": "-p zeno-fcis-synthesis", "target": "--test oracle_arithmetic"},
+          {"group": "synthesis-oracle-prices", "packages": "-p zeno-fcis-synthesis", "target": "--test oracle_prices"},
+          {"group": "synthesis-historical-copy", "packages": "-p zeno-fcis-synthesis", "target": "--test historical_copy"},
+          {"group": "synthesis-historical-i64", "packages": "-p zeno-fcis-synthesis", "target": "--test historical_i64"},
+          {"group": "synthesis-historical-context", "packages": "-p zeno-fcis-synthesis", "target": "--test historical_context", "miri_skip": ["every_retained_publication_field_is_bound"]},
           {"group": "synthesis-scalar-arithmetic", "packages": "-p zeno-fcis-synthesis", "target": "--test scalar_arithmetic"},
           {"group": "synthesis-scalar-routes", "packages": "-p zeno-fcis-synthesis", "target": "--test scalar_routes"},
           {"group": "synthesis-signed-arithmetic", "packages": "-p zeno-fcis-synthesis", "target": "--test signed_arithmetic"},
@@ -59,7 +115,7 @@ jobs:
           {"group": "synthesis-v2-original-compound", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_original_compound"},
           {"group": "synthesis-v2-original-compound-patch-replay", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_original_compound", "test": "original_compounds_patch_carry_forward_and_replay_without_reencoding_loss"},
           {"group": "synthesis-v2-original-compound-parser-refusals", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_original_compound", "test": "original_parser_denied_reads_and_steps_remain_refusals"},
-          {"group": "synthesis-v2-template-contracts", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "miri_skip": ["all_original_small_domains_and_unlawful_order_states", "account_complete_clock_boundaries_without_domain_narrowing", "withdrawal_complete_raw_domain_and_certified_controller", "treasury_guard_arithmetic_callbacks_and_unlawful_prestates"]},
+          {"group": "synthesis-v2-template-contracts", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "miri_skip": ["all_original_small_domains_and_unlawful_order_states", "account_complete_clock_boundaries_without_domain_narrowing", "withdrawal_complete_raw_domain_and_certified_controller", "treasury_guard_arithmetic_callbacks_and_unlawful_prestates", "retained_examples_and_replay_agent_treasury_guard_00_04", "retained_examples_and_replay_agent_treasury_guard_05_09", "retained_examples_and_replay_agent_treasury_guard_10_14", "retained_examples_and_replay_agent_treasury_guard_15_19", "retained_examples_and_replay_agent_treasury_guard_20_24", "retained_examples_and_replay_agent_treasury_guard_25_29", "retained_examples_and_replay_withdrawal_queue_00_04", "retained_examples_and_replay_withdrawal_queue_05_09", "retained_examples_and_replay_withdrawal_queue_10_14", "retained_examples_and_replay_withdrawal_queue_15_19", "retained_examples_and_replay_withdrawal_queue_20_24", "retained_genesis_and_replay_withdrawal_queue"]},
           {"group": "synthesis-v2-template-retained-durable-counter", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_durable_counter"},
           {"group": "synthesis-v2-template-retained-inventory-reservation", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_inventory_reservation"},
           {"group": "synthesis-v2-template-retained-examples-and-replay-order-fulfillment-00-04", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_order_fulfillment_00_04"},
@@ -69,19 +125,7 @@ jobs:
           {"group": "synthesis-v2-template-retained-examples-and-replay-order-fulfillment-20-22", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_order_fulfillment_20_22"},
           {"group": "synthesis-v2-template-retained-genesis-and-replay-order-fulfillment", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_genesis_and_replay_order_fulfillment"},
           {"group": "synthesis-v2-template-retained-account-lockout", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_account_lockout"},
-          {"group": "synthesis-v2-template-retained-examples-and-replay-withdrawal-queue-00-04", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_withdrawal_queue_00_04"},
-          {"group": "synthesis-v2-template-retained-examples-and-replay-withdrawal-queue-05-09", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_withdrawal_queue_05_09"},
-          {"group": "synthesis-v2-template-retained-examples-and-replay-withdrawal-queue-10-14", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_withdrawal_queue_10_14"},
-          {"group": "synthesis-v2-template-retained-examples-and-replay-withdrawal-queue-15-19", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_withdrawal_queue_15_19"},
-          {"group": "synthesis-v2-template-retained-examples-and-replay-withdrawal-queue-20-24", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_withdrawal_queue_20_24"},
           {"group": "synthesis-v2-template-retained-examples-and-replay-withdrawal-queue-25-25", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_withdrawal_queue_25_25"},
-          {"group": "synthesis-v2-template-retained-genesis-and-replay-withdrawal-queue", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_genesis_and_replay_withdrawal_queue"},
-          {"group": "synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-00-04", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_agent_treasury_guard_00_04"},
-          {"group": "synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-05-09", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_agent_treasury_guard_05_09"},
-          {"group": "synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-10-14", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_agent_treasury_guard_10_14"},
-          {"group": "synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-15-19", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_agent_treasury_guard_15_19"},
-          {"group": "synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-20-24", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_agent_treasury_guard_20_24"},
-          {"group": "synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-25-29", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_agent_treasury_guard_25_29"},
           {"group": "synthesis-v2-template-retained-genesis-and-replay-agent-treasury-guard", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_genesis_and_replay_agent_treasury_guard"},
           {"group": "synthesis-v2-template-profile-durable-counter", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_profile_durable_counter"},
           {"group": "synthesis-v2-template-profile-inventory-reservation", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_profile_inventory_reservation"},
@@ -102,12 +146,20 @@ jobs:
           {"group": "synthesis-graphs-16-to-19", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_16_to_19"},
           {"group": "synthesis-graphs-20-to-23", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_20_to_23"},
           {"group": "synthesis-graphs-24-to-27", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_24_to_27"},
-          {"group": "synthesis-graphs-28-to-31", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_28_to_31"}
+          {"group": "synthesis-graphs-28-to-31", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_28_to_31"},
+          {"group": "synthesis-v2-template-focused-treasury-replay", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_retained_treasury_examples"},
+          {"group": "synthesis-historical-runtime-separation", "packages": "-p zeno-fcis-synthesis", "target": "--test historical_context", "test": "current_runtime_cannot_impersonate_history"},
+          {"group": "synthesis-historical-publication-replay", "packages": "-p zeno-fcis-synthesis", "target": "--test historical_context", "test": "publication_subject_uses_checked_context"}
         ]
     env:
       # The spec and compose source-identity tests read the checked-out crates.
       # Keep them interpreted; only their groups need host filesystem access.
-      MIRIFLAGS: -Zmiri-strict-provenance ${{ (matrix.group == 'specification' || matrix.group == 'publication') && '-Zmiri-disable-isolation' || '' }}
+      # Large byte/snapshot workloads use Tree Borrows to keep alias tracking
+      # tractable. Every group retains strict provenance and memory checks.
+      MIRIFLAGS: >-
+        -Zmiri-strict-provenance
+        ${{ (contains(fromJSON('["publication","values","values-docs","specification","specification-docs","synthesis-library","synthesis-finite","synthesis-v2-template-contracts","synthesis-v2-template-focused-treasury-replay","synthesis-historical-context","synthesis-historical-runtime-separation","synthesis-historical-publication-replay","synthesis-v2-template-retained-inventory-reservation","synthesis-v2-template-retained-examples-and-replay-withdrawal-queue-25-25","synthesis-library-long-publication-time","synthesis-library-long-missed-opening","synthesis-library-long-held-claim","synthesis-library-long-legacy-genesis","synthesis-library-long-legacy-replay"]'), matrix.group) || startsWith(matrix.group, 'synthesis-library-long-') || startsWith(matrix.group, 'synthesis-v2-template-retained-examples-and-replay-order-fulfillment-')) && '-Zmiri-tree-borrows' || '' }}
+        ${{ (matrix.group == 'specification' || matrix.group == 'specification-docs' || matrix.group == 'publication') && '-Zmiri-disable-isolation' || '' }}
       MIRI_TEST_ARGS: ""
     steps:
       - name: Checkout exact source
@@ -141,15 +193,22 @@ jobs:
           import re
           import shlex
           import subprocess
+          import sys
+
+          sys.path.insert(0, str(Path('tools').resolve()))
+          from miri_shards import logical_row, logical_rows
 
           def run(arguments):
               return subprocess.run(arguments, check=True, text=True, stdout=subprocess.PIPE).stdout
 
           source = Path('.github/workflows/miri.yml').read_text()
-          rows = json.loads(source.split('        include: ', 1)[1].split('    env:', 1)[0])
+          raw_rows = json.loads(source.split('        include: ', 1)[1].split('    env:', 1)[0])
+          selected_raw = json.loads(os.environ['SELECTED_GROUP'])
+          assert selected_raw in raw_rows, 'selected part is absent from the checked matrix'
+          rows = logical_rows(raw_rows)
           assert len({row['group'] for row in rows}) == len(rows), 'duplicate Miri group'
           rows = [row for row in rows if row['packages'] == '-p zeno-fcis-synthesis']
-          selected = json.loads(os.environ['SELECTED_GROUP'])
+          selected = logical_row(selected_raw)
           assert selected in rows, 'selected group is absent from the checked matrix'
           cargo = ['cargo', '+nightly-2026-07-21']
           metadata = json.loads(run(cargo + ['metadata', '--locked', '--offline', '--no-deps', '--format-version', '1']))
@@ -239,6 +298,24 @@ jobs:
                   'retained_genesis_and_replay_withdrawal_queue',
                   'retained_genesis_and_replay_agent_treasury_guard',
               }
+              omitted_replays = {
+                  'retained_examples_and_replay_agent_treasury_guard_00_04',
+                  'retained_examples_and_replay_agent_treasury_guard_05_09',
+                  'retained_examples_and_replay_agent_treasury_guard_10_14',
+                  'retained_examples_and_replay_agent_treasury_guard_15_19',
+                  'retained_examples_and_replay_agent_treasury_guard_20_24',
+                  'retained_examples_and_replay_agent_treasury_guard_25_29',
+                  'retained_examples_and_replay_withdrawal_queue_00_04',
+                  'retained_examples_and_replay_withdrawal_queue_05_09',
+                  'retained_examples_and_replay_withdrawal_queue_10_14',
+                  'retained_examples_and_replay_withdrawal_queue_15_19',
+                  'retained_examples_and_replay_withdrawal_queue_20_24',
+                  'retained_genesis_and_replay_withdrawal_queue',
+              }
+              native_only |= omitted_replays
+              retained_examples = (retained_examples - omitted_replays) | {
+                  'miri_bounded_retained_treasury_examples',
+              }
               retained = retained_examples | {
                   'compiled_contracts_reproduce_their_committed_policy_bytes',
                   'policy_schema_law_and_meter_mutations_refuse',
@@ -254,7 +331,7 @@ jobs:
               isolated = [row['test'] for row in template_rows if 'test' in row]
               assert collections.Counter(isolated) == collections.Counter(profile | retained_examples), 'template exact-test groups differ'
               # The exclusion step's arguments, as this step receives them, skip
-              # exactly the four native-only corpora in the remainder and nothing
+              # exactly the pinned native-only workloads in the remainder and nothing
               # in an exact-test group.
               effective = shlex.split(os.environ.get('MIRI_TEST_ARGS', ''))
               if 'test' in selected:
@@ -299,8 +376,26 @@ jobs:
                   output.write('MIRI_TEST_ARGS=-- ' + shlex.join(arguments(selected)) + '\n')
           PY
 
+      - name: Interpret a complete compiled-test partition
+        if: matrix.parts
+        env:
+          SELECTED_GROUP: ${{ toJSON(matrix) }}
+        run: |
+          python3 tools/test_miri_shards.py
+          python3 tools/miri_shards.py
+
       - name: Interpret semantic boundary tests
+        if: ${{ !matrix.parts }}
         run: cargo +nightly-2026-07-21 miri ${{ matrix.command || 'test' }} --locked ${{ matrix.packages }} ${{ matrix.target }} ${MIRI_TEST_ARGS:-}
+
+      - name: Retain the compiled-test partition result
+        if: ${{ always() && matrix.parts }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: miri-test-part-${{ github.sha }}-${{ matrix.group }}-${{ matrix.part }}
+          path: ${{ runner.temp }}/miri-test-part.json
+          if-no-files-found: warn
+          retention-days: 30
 
   semantic-core:
     name: semantic-core

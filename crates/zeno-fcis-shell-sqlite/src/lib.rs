@@ -6,8 +6,28 @@
 
 #![forbid(unsafe_code)]
 
+/// Existing SQLite storage primitives for generated service shells; no decision or publication authority.
+pub use rusqlite as sqlite;
+
+/// Keyed-entry storage under incremental Merkle roots and a chained journal.
+pub mod collections;
+
 /// Durable consumer of the mandatory library-owned V2 publication capability.
 pub mod v2;
+
+/// Binds shell-effects publication data to the V2 Authority.
+pub mod effects;
+
+/// How an explicitly selected simulation crash point interrupts a commit.
+#[cfg(feature = "crash-injection")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum CrashMode {
+    /// Return an injected error and allow transaction rollback.
+    #[default]
+    Error,
+    /// Abort the process without running destructors.
+    Abort,
+}
 
 mod crash {
     /// Fault-injection point in the concrete commit protocol.
@@ -22,6 +42,9 @@ mod crash {
         AfterStateWrite,
         /// Fail after replay, bundle, and receipt publication.
         AfterReplayWrite,
+        /// Interrupt after the first outbox INSERT, for per-statement abort tests.
+        #[cfg(feature = "crash-injection")]
+        AfterFirstOutboxWrite,
         /// Fail after every outbox row is written.
         AfterOutboxWrite,
         /// Fail immediately before SQLite commit.

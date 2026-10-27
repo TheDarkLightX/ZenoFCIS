@@ -13,189 +13,144 @@ use zeno_fcis_codec::{CanonicalEncode, DecodeLimits, Hash32, decode_value};
 use zeno_fcis_value::{Value, ValueLimits, ValueRef};
 
 mod legacy {
-    //! Immutable historical scalar data adapted to the existing Signed64 engine.
-    use super::{
-        I64_ARITHMETIC_EXTENDED_PROFILE, I64_ARITHMETIC_PROFILE, I64_EXTENDED_PROFILE, I64_PROFILE,
-        program_value,
-    };
+    //! Owned historical data evaluated by the frozen released interpreter.
     use crate::finite::{
-        ARITHMETIC_EXTENDED_PROFILE, ARITHMETIC_PROFILE, Domain, EXTENDED_PROFILE, Error, Op,
-        Program, V2ExecutionFailure as Failure, V2IntegerWidth as Width, V2Limits,
-        V2NumericAtom as Atom, V2NumericDomain as NumericDomain, V2NumericFailure,
-        V2NumericOp as NumericOp, V2NumericProgram, V2Resource, V2Usage, execute_numeric_v2,
-        v2_zero_limits,
+        Domain, Error, Op, Program, V2Limits, V2Usage, historical_i64 as released,
     };
     use alloc::vec::Vec;
     use zeno_fcis_codec::EncodeError;
     use zeno_fcis_value::Value;
 
-    /// A historical i64 program. Its owned graph is never exposed as an i128 Program.
+    /// A historical i64 program, with no decision or publication capability.
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct LegacyProgram {
-        program: Program,
+        program: released::Program,
     }
 
-    /// Owned legacy results and usage computed by the library's numeric evaluator.
-    /// This reporting value grants no transition or publication authority.
+    /// Owned historical scalar results and actual library-computed usage.
     #[derive(Debug, Eq, PartialEq)]
     pub struct LegacyOutcome {
-        result: Result<Vec<i64>, Failure>,
+        result: Result<Vec<i64>, crate::finite::V2ExecutionFailure>,
         usage: V2Usage,
     }
 
     impl LegacyOutcome {
-        /// Actual usage, also retained on arithmetic, domain and budget refusal.
+        /// Actual measured usage, also retained on refusal.
         #[must_use]
         pub fn usage(&self) -> V2Usage {
             self.usage
         }
 
-        /// Consumes the immutable report.
-        pub fn into_parts(self) -> (Result<Vec<i64>, Failure>, V2Usage) {
+        /// Consumes the immutable report; this supplies no invocation authority.
+        pub fn into_parts(self) -> (Result<Vec<i64>, crate::finite::V2ExecutionFailure>, V2Usage) {
             (self.result, self.usage)
         }
     }
 
     impl LegacyProgram {
         pub(super) fn try_from_program(program: Program) -> Result<Self, Error> {
-            for domain in program.inputs().iter().chain(program.outputs()) {
-                let (min, max) = domain.bounds();
-                if i64::try_from(min).is_err() || i64::try_from(max).is_err() {
-                    return Err(Error::Invalid("program-encoding"));
-                }
-            }
-            for op in program.nodes() {
-                if matches!(op, Op::SignedMulDivFloor(..)) {
-                    return Err(Error::Invalid("program-encoding"));
-                }
-                if let Op::Int(value) = op
-                    && i64::try_from(*value).is_err()
-                {
-                    return Err(Error::Invalid("program-encoding"));
-                }
-            }
-            Ok(Self { program })
+            let invalid = || Error::Invalid("program-encoding");
+            let domain = |d: &Domain| {
+                Ok(match *d {
+                    Domain::Bool => released::Domain::Bool,
+                    Domain::Int { min, max } => released::Domain::Int {
+                        min: i64::try_from(min).map_err(|_| invalid())?,
+                        max: i64::try_from(max).map_err(|_| invalid())?,
+                    },
+                })
+            };
+            let inputs = program
+                .inputs()
+                .iter()
+                .map(domain)
+                .collect::<Result<Vec<_>, Error>>()?;
+            let outputs = program
+                .outputs()
+                .iter()
+                .map(domain)
+                .collect::<Result<Vec<_>, Error>>()?;
+            let nodes = program
+                .nodes()
+                .iter()
+                .map(|op| {
+                    Ok(match *op {
+                        Op::Input(a) => released::Op::Input(a),
+                        Op::Int(a) => released::Op::Int(i64::try_from(a).map_err(|_| invalid())?),
+                        Op::Bool(a) => released::Op::Bool(a),
+                        Op::Add(a, b) => released::Op::Add(a, b),
+                        Op::Sub(a, b) => released::Op::Sub(a, b),
+                        Op::Eq(a, b) => released::Op::Eq(a, b),
+                        Op::Lt(a, b) => released::Op::Lt(a, b),
+                        Op::And(a, b) => released::Op::And(a, b),
+                        Op::Not(a) => released::Op::Not(a),
+                        Op::Select(a, b, c) => released::Op::Select(a, b, c),
+                        Op::Mul(a, b) => released::Op::Mul(a, b),
+                        Op::DivFloor(a, b) => released::Op::DivFloor(a, b),
+                        Op::DivCeil(a, b) => released::Op::DivCeil(a, b),
+                        Op::MulDivFloor(a, b, c) => released::Op::MulDivFloor(a, b, c),
+                        Op::MulDivCeil(a, b, c) => released::Op::MulDivCeil(a, b, c),
+                        Op::ProductsGe(a, b) => released::Op::ProductsGe(a, b),
+                        Op::SignedMulDivFloor(..) => return Err(invalid()),
+                    })
+                })
+                .collect::<Result<Vec<_>, Error>>()?;
+            Ok(Self {
+                program: released::Program::try_new_extended(
+                    inputs,
+                    outputs,
+                    nodes,
+                    program.roots().to_vec(),
+                )?,
+            })
+        }
+
+        #[cfg(test)]
+        pub(super) fn into_released_for_test(self) -> released::Program {
+            self.program
         }
 
         /// The original shape-selected i64 profile.
         #[must_use]
         pub fn profile(&self) -> &'static str {
-            match self.program.profile() {
-                ARITHMETIC_PROFILE => I64_ARITHMETIC_PROFILE,
-                ARITHMETIC_EXTENDED_PROFILE => I64_ARITHMETIC_EXTENDED_PROFILE,
-                EXTENDED_PROFILE => I64_EXTENDED_PROFILE,
-                _ => I64_PROFILE,
-            }
+            self.program.profile()
         }
 
-        /// Canonical program data retaining the original profile and signed atoms.
+        /// Canonical bytes retain the released profile and signed atom encoding.
         pub fn value(&self) -> Result<Value, EncodeError> {
-            program_value(&self.program, true)
+            self.program.value()
         }
 
-        /// Eager checked-i64 evaluation, including unused nodes and both select arms.
+        /// Released eager evaluation, including unused nodes and both Select arms.
         pub fn evaluate(&self, input: &[i64]) -> Result<Vec<i64>, Error> {
-            self.execute_v2(
-                input,
-                v2_zero_limits().with_limit(V2Resource::Step, u64::MAX),
-            )
-            .into_parts()
-            .0
-            .map_err(|error| match error {
-                Failure::InputDomain => Error::Invalid("input-domain"),
-                Failure::Reference => Error::Invalid("node-reference"),
-                Failure::Arithmetic => Error::Arithmetic,
-                Failure::OutputDomain => Error::Invalid("output-domain"),
-                Failure::Budget(_) => Error::Limit("step-budget"),
-            })
+            self.program.evaluate(input)
         }
 
-        /// Executes using the existing typed evaluator and a fresh private meter.
-        /// Adapter construction and allocation are outside logical Step accounting.
-        /// No application precondition or caller-supplied usage is accepted.
+        /// The copied released driver owns scratch and charges every node attempt.
         #[must_use]
         pub fn execute_v2(&self, input: &[i64], limits: V2Limits) -> LegacyOutcome {
-            let domain = |d: &Domain| match *d {
-                Domain::Bool => NumericDomain::Bool,
-                Domain::Int { min, max } => NumericDomain::I128 { min, max },
-            };
-            let inputs: Vec<_> = self.program.inputs().iter().map(domain).collect();
-            let outputs: Vec<_> = self.program.outputs().iter().map(domain).collect();
-            let nodes: Vec<_> = self
-                .program
-                .nodes()
-                .iter()
-                .map(|op| match *op {
-                    Op::Input(i) => NumericOp::Input(i),
-                    Op::Int(v) => NumericOp::I128(v),
-                    Op::Bool(v) => NumericOp::Bool(v),
-                    Op::Add(a, b) => NumericOp::Add(Width::Signed64, a, b),
-                    Op::Sub(a, b) => NumericOp::Sub(Width::Signed64, a, b),
-                    Op::Eq(a, b) => NumericOp::Eq(a, b),
-                    Op::Lt(a, b) => NumericOp::Lt(a, b),
-                    Op::And(a, b) => NumericOp::And(a, b),
-                    Op::Not(a) => NumericOp::Not(a),
-                    Op::Select(c, a, b) => NumericOp::Select(c, a, b),
-                    Op::Mul(a, b) => NumericOp::Mul(Width::Signed64, a, b),
-                    Op::DivFloor(a, b) => NumericOp::DivFloor(Width::Signed64, a, b),
-                    Op::DivCeil(a, b) => NumericOp::DivCeil(Width::Signed64, a, b),
-                    Op::MulDivFloor(a, b, d) => {
-                        NumericOp::NonnegativeMulDivFloor(Width::Signed64, a, b, d)
-                    }
-                    Op::MulDivCeil(a, b, d) => {
-                        NumericOp::NonnegativeMulDivCeil(Width::Signed64, a, b, d)
-                    }
-                    Op::ProductsGe(a, b) => NumericOp::NonnegativeProductsGe(a, b),
-                    // Private construction rejects this; the importer also refuses tag 16.
-                    Op::SignedMulDivFloor(a, b, d) => NumericOp::SignedMulDivFloor(a, b, d),
-                })
-                .collect();
-            let values: Vec<_> = input
-                .iter()
-                .enumerate()
-                .map(|(i, value)| match (self.program.inputs().get(i), *value) {
-                    (Some(Domain::Bool), 0) => Atom::Bool(false),
-                    (Some(Domain::Bool), 1) => Atom::Bool(true),
-                    _ => Atom::I128(i128::from(*value)),
-                })
-                .collect();
-            let (result, usage) = execute_numeric_v2(
-                V2NumericProgram {
-                    inputs: &inputs,
-                    outputs: &outputs,
-                    nodes: &nodes,
-                    roots: self.program.roots(),
-                },
-                &values,
-                limits,
-            )
-            .into_parts();
-            let result = result
-                .map_err(|error| match error {
-                    V2NumericFailure::InputDomain => Failure::InputDomain,
-                    V2NumericFailure::Reference => Failure::Reference,
-                    V2NumericFailure::Kind | V2NumericFailure::Arithmetic => Failure::Arithmetic,
-                    V2NumericFailure::OutputDomain => Failure::OutputDomain,
-                    V2NumericFailure::Budget(error) => Failure::Budget(error),
-                })
-                .and_then(|values| {
-                    values
-                        .into_iter()
-                        .map(|value| match value {
-                            Atom::Bool(value) => Ok(i64::from(value)),
-                            Atom::I128(value) => {
-                                i64::try_from(value).map_err(|_| Failure::Arithmetic)
-                            }
-                            _ => Err(Failure::Arithmetic),
-                        })
-                        .collect()
-                });
+            use crate::finite::V2ExecutionFailure as Current;
+            let (result, usage) = self.program.execute_v2(input, limits).into_parts();
+            let result = result.map_err(|error| match error {
+                released::Failure::InputDomain => Current::InputDomain,
+                released::Failure::Reference => Current::Reference,
+                released::Failure::Arithmetic => Current::Arithmetic,
+                released::Failure::OutputDomain => Current::OutputDomain,
+                released::Failure::Budget(error) => Current::Budget(error),
+            });
             LegacyOutcome { result, usage }
         }
     }
 }
 
 pub use legacy::{LegacyOutcome, LegacyProgram};
+
+/// Canonical released scalar data for historical evidence reconstruction.
+/// Range and instruction admission precede encoding; this grants no authority.
+pub fn i64_program_value(program: &Program) -> Result<Value, Error> {
+    LegacyProgram::try_from_program(program.clone())?
+        .value()
+        .map_err(|_| Error::Invalid("program-encoding"))
+}
 
 /// Historical checked-i64 profile; its integer atoms already have 16-byte payloads.
 pub const I64_PROFILE: &str = "zeno-fcis/finite-i64/1";
@@ -253,6 +208,22 @@ pub fn import_scalar_program(bytes: &[u8]) -> Result<ImportedScalarProgram, Erro
 pub fn import_i64_program(bytes: &[u8]) -> Result<LegacyProgram, Error> {
     let (program, _) = decode_program(bytes, Some(ScalarWidth::Signed64), true)?;
     LegacyProgram::try_from_program(program)
+}
+
+/// Decode released scalar data for current authoring and metadata comparison.
+/// This data-only conversion grants no historical execution or replay authority.
+pub fn import_i64_program_data(bytes: &[u8]) -> Result<Program, Error> {
+    let (program, _) = decode_program(bytes, Some(ScalarWidth::Signed64), false)?;
+    LegacyProgram::try_from_program(program.clone())?;
+    Ok(program)
+}
+
+#[cfg(test)]
+pub(crate) fn import_released_profile_one_for_test(
+    bytes: &[u8],
+) -> Result<crate::finite::historical_i64::Program, Error> {
+    let (program, _) = decode_program(bytes, Some(ScalarWidth::Signed64), false)?;
+    Ok(LegacyProgram::try_from_program(program)?.into_released_for_test())
 }
 
 fn decode_program(

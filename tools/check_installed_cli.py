@@ -28,8 +28,8 @@ tool or an unexpected result fails the journey, and nothing is skipped:
    with a receipt, its replay, and the same receipt path again refused with its bytes kept.
 7. Platform routes. macOS: `--offline-parallel` and `loop open` print the exact
    inconclusive result, exit 2 and write nothing; the durable counter's README
-   `synth verify` exits 2 with `conformance-unknown` (`unsupported-runtime-platform`) and
-   writes no receipt. Linux, inside the contained runtime: the `--offline-parallel`
+   `synth verify` passes with a separately bound finite-conformance receipt.
+   Linux, inside the contained runtime: the `--offline-parallel`
    receipt equals the serial one and replays, and `synth verify` passes.
 """
 
@@ -440,14 +440,12 @@ class Journey:
                 raise JourneyError(f"loop open on macOS: {loop}, acquisition {acquisition}")
             if files_under(root) or session.exists():
                 raise JourneyError(f"an unavailable contained route wrote {files_under(root)}")
-            blocked = self.run("synth-verify", verify, cwd=counter, expected=2)
-            text = (blocked.stdout + blocked.stderr).decode(errors="replace")
-            if "conformance-unknown" not in text or "unsupported-runtime-platform" not in text:
-                raise JourneyError("synth verify on macOS did not report the unsupported runtime platform")
-            if conformance.exists():
-                raise JourneyError("a blocked synth verify wrote a receipt")
+            self.expect(self.report_of("synth-verify", verify, cwd=counter),
+                        {"status": "passed", "authority": "none", "runtime_platform": "macos"}, "synth verify")
+            if not conformance.is_file():
+                raise JourneyError("synth verify wrote no receipt")
             return {"offline_parallel": result, "loop_open": {**loop, "acquisition": acquisition},
-                    "synth_verify": "conformance-unknown: unsupported-runtime-platform"}
+                    "synth_verify": "passed"}
         self.expect(self.report_of("offline-parallel", command, cwd=root), {"status": "equivalent", "backend": "systemd"},
                     "offline-parallel")
         if parallel.read_bytes() != serial["receipt"].read_bytes():
@@ -508,4 +506,11 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

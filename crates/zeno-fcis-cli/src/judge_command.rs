@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use zeno_fcis_contract::internals::review::evaluate::{digest, hex};
 
 use crate::contract::review::{
-    self, DEFAULT_MAX_TUPLES, Inconclusive, lemma, probe, profile, scenario,
+    self, DEFAULT_MAX_TUPLES, Inconclusive, lemma, probe, profile, run_properties, scenario,
 };
 use crate::contract_files::read_input;
 use crate::{
@@ -24,9 +24,9 @@ const PROJECT: &str = "project.zeno";
 const RULES: &str = "v2/policy.json";
 
 const ADVISORY: &str = "Advisory only. This packet grants no authority and changes no \
-application file. Every decision in it is the library Authority's on the contract bound as \
-the application binds it, and every law verdict is the library's law evaluator's. Results \
-hold over the declared domain only, and an inconclusive result claims nothing.";
+application file. Native decisions and replayed violations use the bound library Authority \
+and law evaluator. Symbolic results state their solver evidence separately. Results hold \
+only within the packet's stated scope and premises; UNKNOWN and inconclusive claim nothing.";
 
 /// What every judge reads and writes.
 #[derive(Args)]
@@ -37,7 +37,7 @@ pub(super) struct Common {
     /// Write the packet to this file. Without it the packet goes to stdout and the summary to stderr.
     #[arg(long)]
     out: Option<PathBuf>,
-    /// Largest declared domain, in tuples, to enumerate; a larger one is inconclusive (exit 2).
+    /// Largest declared domain to enumerate. Lemmas use dual-solver checking above this cap; the other finite judges remain inconclusive.
     #[arg(long, default_value_t = DEFAULT_MAX_TUPLES)]
     max_tuples: u64,
     /// Summary format, used with --out.
@@ -47,12 +47,101 @@ pub(super) struct Common {
 
 #[derive(Subcommand)]
 pub(super) enum Command {
-    /// Profile a contract's states, memory and robustness exactly over its declared domain: valid, reachable and Moore-minimal states, and what happens on pre-states that break a state law. Advisory; the application is not changed.
-    Profile {
+    /// Compare two runs by order independence or noninterference. Advisory; exit 0 checked, 1 refuted, 2 UNKNOWN.
+    TwoRun {
+        #[arg(
+            long,
+            required_unless_present = "noninterference",
+            conflicts_with = "noninterference"
+        )]
+        commute: bool,
+        #[arg(long, required_unless_present = "commute", conflicts_with = "commute")]
+        noninterference: bool,
+        #[arg(long, required_if_eq("commute", "true"), requires = "commute")]
+        first: Option<String>,
+        #[arg(long, required_if_eq("commute", "true"), requires = "commute")]
+        second: Option<String>,
+        #[arg(
+            long,
+            value_delimiter = ',',
+            required_if_eq("commute", "true"),
+            requires = "commute"
+        )]
+        observe: Vec<String>,
+        #[arg(long, requires = "commute")]
+        within: Option<u128>,
+        #[arg(
+            long,
+            value_delimiter = ',',
+            required_if_eq("noninterference", "true"),
+            requires = "noninterference"
+        )]
+        secret: Vec<String>,
+        #[arg(
+            long,
+            value_delimiter = ',',
+            required_if_eq("noninterference", "true"),
+            requires = "noninterference"
+        )]
+        public: Vec<String>,
         #[command(flatten)]
         common: Common,
     },
-    /// Judge state invariants by induction, or --transition relations on actual before/after decisions. Exit 0 when every invariant is inductive or relation is checked, 1 when refuted, 2 when incomplete, undefined or vacuous, 65 for a formula with no contract form. Advisory, finite-domain results only.
+
+    /// Check keyed collections by data independence: every admissible view of the named entries, with alias merges and summary deltas. Exit 0 checked, 1 refuted, 2 UNKNOWN; advisory only.
+    Collections {
+        #[command(flatten)]
+        common: Common,
+    },
+    /// Check declared bounded observers and safety properties over runs of any length. Exhaustive finite domains only; advisory.
+    Runs {
+        /// Observer and property declarations; defaults to v2/run-properties.json.
+        #[arg(long)]
+        file: Option<PathBuf>,
+        #[command(flatten)]
+        common: Common,
+    },
+    /// Check finite distribution laws exactly, given uniform independent random bits. Exit 0 checked, 1 refuted, 2 UNKNOWN; advisory only.
+    Distribution {
+        /// Invocations plus outcome projection/fold operations; a stop is UNKNOWN.
+        #[arg(long, default_value_t = zeno_fcis_contract::distribution::MAX_WORK)]
+        max_work: u64,
+        #[command(flatten)]
+        common: Common,
+    },
+    /// Count declared inputs or bounded reachable states, or find both accumulated reward extremes. Exact finite domains only; no runtime authority.
+    Risk {
+        /// Property on input decisions, or a state property with --states.
+        #[arg(
+            long = "where",
+            required_unless_present = "reward",
+            conflicts_with = "reward"
+        )]
+        condition: Option<String>,
+        /// Count distinct reachable states instead of complete declared input tuples.
+        #[arg(long, requires = "steps", conflicts_with = "reward")]
+        states: bool,
+        /// Declared reward ID; find min and max sums, including the empty run.
+        #[arg(long, requires = "steps")]
+        reward: Option<u32>,
+        /// Inclusive number of commands from genesis (0..=64).
+        #[arg(long)]
+        steps: Option<u32>,
+        /// Maximum charged work; stops are UNKNOWN with consumed work retained.
+        #[arg(long, default_value_t = zeno_fcis_contract::risk::MAX_WORK)]
+        max_work: u64,
+        #[command(flatten)]
+        common: Common,
+    },
+    /// Profile scalar states over their declared domains, or concrete map reachability over --map-keys keys per type. A map profile states its finite universe and grants no all-size reachability claim. Advisory.
+    Profile {
+        /// Concrete keys per opaque key type for map reachability (1..=4); scalar profiles ignore this.
+        #[arg(long, default_value_t = 2)]
+        map_keys: u8,
+        #[command(flatten)]
+        common: Common,
+    },
+    /// Judge state invariants by induction, or --transition relations. Maps use the collections reduction with its all-size premises; scalar results use finite declared domains. Exit 0 inductive/checked, 1 refuted, 2 incomplete or not-inductive, 65 for an unsupported formula. Advisory.
     Lemma {
         /// A project.zeno state formula, or with --transition a before/after relation. Repeat for more lemmas.
         #[arg(long = "lemma", required = true)]
@@ -65,7 +154,7 @@ pub(super) enum Command {
         #[command(flatten)]
         common: Common,
     },
-    /// Replay scenarios, runs of decision examples under `# scenario NAME` headers, through the contract and, when every scenario passes on it, through every mutant of the extended catalog and the reject-everything core. Exit 1 when a scenario fails on the contract, 65 for a malformed scenario file. Advisory.
+    /// Replay scalar decision examples under `# scenario NAME` headers, or collection-scenarios/1 JSON with concrete keys and expected map entries. Map scenarios start at empty genesis and receive no view-mutant score. Exit 1 for a mismatch, 65 for malformed input. Advisory.
     Scenario {
         /// The scenario file; by default tests/decision-scenarios.txt in the application.
         #[arg(long)]
@@ -73,7 +162,10 @@ pub(super) enum Command {
         #[command(flatten)]
         common: Common,
     },
-    /// Ask an exact question about a contract's decisions over its declared domain. Advisory.
+    /// Ask an exact question about a contract's decisions over its declared domain. Exit 0 answered/yes, 1 no, 2 vacuous/inconclusive; advisory.
+    #[command(
+        after_help = "Example (exit 1, with a counterexample):\nzeno-fcis contract probe implies examples/guide-counter --if true --then false"
+    )]
     Probe {
         #[command(subcommand)]
         question: ProbeCommand,
@@ -90,7 +182,7 @@ pub(super) enum ProbeCommand {
         #[command(flatten)]
         common: Common,
     },
-    /// A shortest trace from genesis to a state satisfying a state formula, or that no reachable state does.
+    /// A shortest trace from genesis to a state satisfying a state formula. Exit 0 reachable, 1 unreachable, 2 inconclusive.
     Reachable {
         /// A state formula, written as a state law over post. state fields.
         #[arg(long)]
@@ -106,7 +198,7 @@ pub(super) enum ProbeCommand {
         #[command(flatten)]
         common: Common,
     },
-    /// The first input where one condition holds on the contract's decision and another does not.
+    /// Check an implication and report the first counterexample. Exit 0 holds, 1 fails, 2 vacuous/inconclusive.
     Implies {
         /// The condition that must imply the other.
         #[arg(long = "if")]
@@ -125,7 +217,7 @@ pub(super) enum ProbeCommand {
         #[command(flatten)]
         common: Common,
     },
-    /// Two inputs that differ only in one position and are decided differently, or that none are.
+    /// Two inputs that differ only in one position and are decided differently. Exit 0 depends, 1 independent, 2 vacuous/inconclusive.
     Depends {
         /// The input position, as the review names it: pre.100.110, command.101 or context.102.130.
         #[arg(long)]
@@ -140,15 +232,198 @@ pub(super) enum ProbeCommand {
 
 pub(super) fn run(command: Command) -> u8 {
     match command {
-        Command::Profile { common } => judge(
+        Command::TwoRun {
+            commute,
+            noninterference: _,
+            first,
+            second,
+            observe,
+            within,
+            secret,
+            public,
+            common,
+        } => {
+            use zeno_fcis_contract::two_run::{self, Property, Verdict};
+            let property = if commute {
+                Property::Commute {
+                    first: first.unwrap_or_default(),
+                    second: second.unwrap_or_default(),
+                    observe,
+                    within: within.unwrap_or(0),
+                }
+            } else {
+                Property::Noninterference { secret, public }
+            };
+            judge(&common, "zeno-fcis/two-run/1", None, true, |sources| {
+                let result =
+                    two_run::check(sources.project, sources.rules, &property, common.max_tuples)?;
+                let exit = match result.verdict() {
+                    Verdict::Checked => OK,
+                    Verdict::Refuted => INVALID,
+                    Verdict::Unknown => BLOCKED,
+                };
+                Ok(Judged::Done(
+                    result.packet().clone(),
+                    exit,
+                    result.verdict().name(),
+                ))
+            })
+        }
+
+        Command::Collections { common } => judge(
+            &common,
+            "zeno-fcis/collections-check/1",
+            None,
+            true,
+            |sources| {
+                use zeno_fcis_contract::collections::{self, Limits, Verdict};
+                let result = collections::check(
+                    sources.project,
+                    sources.rules,
+                    Limits {
+                        max_tuples: common.max_tuples,
+                    },
+                )?;
+                let exit = match result.verdict() {
+                    Verdict::Checked => OK,
+                    Verdict::Refuted => INVALID,
+                    Verdict::Unknown => BLOCKED,
+                };
+                Ok(Judged::Done(
+                    result.packet().clone(),
+                    exit,
+                    result.verdict().name(),
+                ))
+            },
+        ),
+        Command::Runs { file, common } => {
+            let path = file.unwrap_or_else(|| common.dir.join(run_properties::FILE));
+            judge(
+                &common,
+                "zeno-fcis/contract-run-properties/1",
+                Some(&path),
+                true,
+                |sources| {
+                    Ok(
+                        match run_properties::judge(
+                            sources.project,
+                            sources.rules,
+                            sources.extra.unwrap_or_default(),
+                            common.max_tuples,
+                        )? {
+                            lemma::Lemmas::Inconclusive(stop) => Judged::Inconclusive(stop),
+                            lemma::Lemmas::NoStartingState(value) => {
+                                Judged::Done(value, INVALID, "no-admissible-starting-state")
+                            }
+                            lemma::Lemmas::Judged(properties) => {
+                                let (exit, status) =
+                                    if properties.iter().any(|p| p["verdict"] == "false") {
+                                        (INVALID, "refuted")
+                                    } else if properties.iter().any(|p| p["verdict"] != "inductive")
+                                    {
+                                        (BLOCKED, "inconclusive")
+                                    } else {
+                                        (OK, "inductive")
+                                    };
+                                Judged::Done(json!({"properties":properties}), exit, status)
+                            }
+                        },
+                    )
+                },
+            )
+        }
+        Command::Distribution { max_work, common } => judge(
+            &common,
+            "zeno-fcis/distribution-laws/1",
+            None,
+            true,
+            |sources| {
+                use zeno_fcis_contract::distribution::{self, Limits, Verdict};
+                let result = distribution::check(
+                    sources.project,
+                    sources.rules,
+                    Limits {
+                        max_tuples: common.max_tuples,
+                        max_work,
+                    },
+                )?;
+                let exit = match result.verdict() {
+                    Verdict::Checked => OK,
+                    Verdict::Refuted => INVALID,
+                    Verdict::Unknown => BLOCKED,
+                };
+                Ok(Judged::Done(
+                    result.packet().clone(),
+                    exit,
+                    result.verdict().name(),
+                ))
+            },
+        ),
+        Command::Risk {
+            condition,
+            states,
+            reward,
+            steps,
+            max_work,
+            common,
+        } => {
+            use zeno_fcis_contract::risk::{self, Limits, Question};
+            let question = match (condition, states, reward, steps) {
+                (Some(condition), false, None, None) => Question::Inputs { condition },
+                (Some(condition), true, None, Some(steps)) => Question::States { condition, steps },
+                (None, false, Some(reward), Some(steps)) => Question::Extremes { reward, steps },
+                _ => {
+                    eprintln!(
+                        "risk requires --where, --states --where --steps, or --reward --steps"
+                    );
+                    return USAGE;
+                }
+            };
+            judge(
+                &common,
+                "zeno-fcis/contract-risk/1",
+                None,
+                true,
+                |sources| {
+                    let result = risk::check(
+                        sources.project,
+                        sources.rules,
+                        &question,
+                        Limits {
+                            max_tuples: common.max_tuples,
+                            max_work,
+                        },
+                    )?;
+                    let (exit, status) = if result.complete() {
+                        (OK, "checked")
+                    } else {
+                        (BLOCKED, "UNKNOWN")
+                    };
+                    Ok(Judged::Done(result.packet().clone(), exit, status))
+                },
+            )
+        }
+        Command::Profile { common, map_keys } => judge(
             &common,
             "zeno-fcis/contract-profile/2",
             None,
             true,
             |sources| {
                 Ok(
-                    match profile::profile(sources.project, sources.rules, common.max_tuples)? {
+                    match if map_keys == 2 {
+                        profile::profile(sources.project, sources.rules, common.max_tuples)?
+                    } else {
+                        profile::profile_with_keys(
+                            sources.project,
+                            sources.rules,
+                            map_keys,
+                            common.max_tuples,
+                        )?
+                    } {
                         profile::Profile::Measured(value) => Judged::Done(value, OK, "measured"),
+                        profile::Profile::NoStartingState(value) => {
+                            Judged::Done(value, INVALID, "no-admissible-starting-state")
+                        }
                         profile::Profile::Inconclusive(inconclusive) => {
                             Judged::Inconclusive(inconclusive)
                         }
@@ -170,6 +445,40 @@ pub(super) fn run(command: Command) -> u8 {
             None,
             true,
             |sources| {
+                if review::numeric_symbolic::over_cap(
+                    sources.project,
+                    sources.rules,
+                    common.max_tuples,
+                )? {
+                    let report = match crate::symbolic_command::Solvers::from_environment() {
+                        Ok(solvers) => {
+                            let mut result = review::numeric_symbolic::lemma::check(
+                                sources.project,
+                                sources.rules,
+                                &lemmas,
+                                transition,
+                                &mut |q| solvers.solve(q),
+                            )?;
+                            result["solver_identities"] = solvers.identities();
+                            if let Some(reason) = solvers.retention_failure() {
+                                result["status"] = json!("UNKNOWN");
+                                result["evidence"] = json!("none");
+                                result["reason"] = json!(reason);
+                            }
+                            result
+                        }
+                        Err(reason) => {
+                            json!({"mode":"symbolic","status":"UNKNOWN","reason":reason,"authority":"none"})
+                        }
+                    };
+                    let (exit, status) = match report["status"].as_str() {
+                        Some("solver-checked") => (OK, "solver-checked"),
+                        Some("refuted") => (INVALID, "refuted"),
+                        Some("not-inductive") => (BLOCKED, "not-inductive"),
+                        _ => (BLOCKED, "UNKNOWN"),
+                    };
+                    return Ok(Judged::Done(report, exit, status));
+                }
                 Ok(
                     match if transition {
                         lemma::judge_transitions(
@@ -183,6 +492,9 @@ pub(super) fn run(command: Command) -> u8 {
                     } {
                         lemma::Lemmas::Inconclusive(inconclusive) => {
                             Judged::Inconclusive(inconclusive)
+                        }
+                        lemma::Lemmas::NoStartingState(value) => {
+                            Judged::Done(value, INVALID, "no-admissible-starting-state")
                         }
                         lemma::Lemmas::Judged(verdicts) => {
                             let any = |name: &str| {
@@ -253,11 +565,17 @@ pub(super) fn run(command: Command) -> u8 {
                                     "vacuous",
                                 )
                             }
-                            probe::Answer::Answered(value) => Judged::Done(
-                                json!({"question": question.name(), "result": value}),
-                                OK,
-                                "answered",
-                            ),
+                            probe::Answer::Answered(value) => {
+                                let exit = if value["answer"] == "no" { INVALID } else { OK };
+                                Judged::Done(
+                                    json!({"question": question.name(), "result": value}),
+                                    exit,
+                                    "answered",
+                                )
+                            }
+                            probe::Answer::NoStartingState(value) => {
+                                Judged::Done(value, INVALID, "no-admissible-starting-state")
+                            }
                             probe::Answer::Inconclusive(inconclusive) => {
                                 Judged::Inconclusive(inconclusive)
                             }
@@ -358,7 +676,7 @@ fn judge(
             place: error.place().to_owned(),
             reason: error.reason().to_owned(),
         };
-        let application = review::application(&rules).map_err(invalid)?;
+        let application = review::application(&project, &rules).map_err(invalid)?;
         let judged = work(&sources).map_err(invalid)?;
         let sha256 = |text: &str| hex(&digest(text.as_bytes()));
         Ok((
@@ -383,13 +701,15 @@ fn judge(
         "schema": schema,
         "integer_encoding": crate::report_numbers::ENCODING,
         "authority": "none",
-        "advisory": ADVISORY,
+        "advisory": if schema == "zeno-fcis/distribution-laws/1" {
+            "Advisory only; no runtime or publication authority. Exactly checked only on complete finite-domain results, given uniform independent random bits. UNKNOWN claims nothing."
+        } else { ADVISORY },
         "application": application,
         "tool": {"crate": "zeno-fcis-cli", "version": env!("CARGO_PKG_VERSION")},
         "sources": sources,
         "status": status,
     });
-    if enumerates {
+    if enumerates && body.get("max_tuples").is_none() {
         packet["max_tuples"] = json!(common.max_tuples);
     }
     if let (Value::Object(packet), Value::Object(body)) = (&mut packet, body) {
@@ -397,8 +717,13 @@ fn judge(
             packet.entry(key).or_insert(value);
         }
     }
+    crate::telemetry::observe(&packet);
     let text = crate::transform::canonical_json(&packet);
-    let line = format!("{status} {application}: {schema}");
+    let premise = packet.get("premise").or_else(|| packet.get("reason"));
+    let line = match premise.and_then(Value::as_str) {
+        Some(premise) => format!("{status} {application}: {schema}; {premise}"),
+        None => format!("{status} {application}: {schema}"),
+    };
     match &common.out {
         Some(path) => {
             let written = path
@@ -411,14 +736,22 @@ fn judge(
                 return report_failure(dir, Failure::Read(message), common.format);
             }
             match common.format {
-                OutputFormat::Json => print_json(&json!({
-                    "schema": JSON_SCHEMA, "status": status, "path": dir.display().to_string(),
-                    "authority": "none", "packet": path.display().to_string(),
-                    "packet_schema": schema,
-                })),
+                OutputFormat::Json => {
+                    let mut summary = json!({
+                        "schema": JSON_SCHEMA, "status": status, "path": dir.display().to_string(),
+                        "authority": "none", "packet": path.display().to_string(),
+                        "packet_schema": schema,
+                    });
+                    if let Some(premise) = premise {
+                        summary["premise"] = premise.clone();
+                    }
+                    print_json(&summary);
+                }
                 OutputFormat::Human => {
                     println!("{line}");
-                    println!("packet: {}", path.display());
+                    if schema != "zeno-fcis/two-run/1" {
+                        println!("packet: {}", path.display());
+                    }
                 }
             }
         }

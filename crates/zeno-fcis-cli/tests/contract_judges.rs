@@ -64,6 +64,9 @@ fn counter(root: &TempRoot) -> PathBuf {
 fn zeno(args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_zeno-fcis"))
         .args(args)
+        .env_remove("ZENO_FCIS_Z3")
+        .env_remove("ZENO_FCIS_CVC5")
+        .env_remove("ZENO_FCIS_SYMBOLIC_QUERIES")
         .output()
         .unwrap_or_else(|error| panic!("run zeno-fcis: {error}"))
 }
@@ -135,7 +138,8 @@ fn transition_lemma_cli_checks_actual_swaps_and_refutes_a_decreasing_step() {
         ],
         2,
     );
-    assert_eq!(stop["status"], "inconclusive");
+    assert_eq!(stop["status"], "UNKNOWN");
+    assert_eq!(stop["mode"], "symbolic");
     write(3, 0, true);
     let refuted = run(
         &[
@@ -176,10 +180,10 @@ fn review_with_gaps_is_packet_version_three_and_repeats_byte_for_byte() {
         serde_json::from_slice(&first.stdout).unwrap_or_else(|error| panic!("{error}"));
     assert_eq!(packet["schema"], "zeno-fcis/contract-review/4");
     assert_eq!(packet["authority"], "none");
-    assert_eq!(packet["gaps"]["admissible"]["full"]["determined"], 0);
+    assert_eq!(packet["gaps"]["admissible"]["full"]["determined"], 12);
     let stderr = String::from_utf8_lossy(&first.stderr);
     assert!(
-        stderr.contains("gaps: 0 of 12 tuples determined"),
+        stderr.contains("gaps: 12 of 12 tuples determined"),
         "{stderr}"
     );
     assert!(
@@ -261,6 +265,169 @@ fn review_with_gaps_is_packet_version_three_and_repeats_byte_for_byte() {
             .code(),
         Some(64)
     );
+}
+
+#[test]
+fn proposal_summary_retains_both_measures_and_prints_the_effect() {
+    let root = TempRoot::new("proposal-summary");
+    let app = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/guide-counter");
+    let project_before =
+        fs::read(app.join("project.zeno")).unwrap_or_else(|error| panic!("{error}"));
+    let policy_before =
+        fs::read(app.join("v2/policy.json")).unwrap_or_else(|error| panic!("{error}"));
+    let laws = root.path().join("proposed.zeno");
+    fs::write(&laws, "law 9000 rejects_only_when_needed on reject = context.102.130 == 0 || (command.101.120 == 150 && pre.100.110 == 2) || (command.101.120 == 151 && pre.100.110 == 0);\n").unwrap_or_else(|error| panic!("{error}"));
+    let out = root.path().join("review.json");
+    let args = [
+        "contract",
+        "review",
+        text(&app),
+        "--gaps",
+        "--gaps-laws",
+        text(&laws),
+        "--out",
+        text(&out),
+    ];
+    let human = zeno(&args);
+    assert_eq!(human.status.code(), Some(0));
+    let terminal = String::from_utf8_lossy(&human.stdout);
+    assert!(
+        terminal.contains("gaps: 0 of 12 tuples determined"),
+        "{terminal}"
+    );
+    assert!(
+        terminal.contains("gaps with proposals: 4 of 12 tuples determined"),
+        "assertion failed: missing proposal effect\n{terminal}"
+    );
+    let mut json_args = args.to_vec();
+    json_args.extend(["--format", "json"]);
+    let summary = run(&json_args, 0);
+    let packet: Value =
+        serde_json::from_slice(&fs::read(&out).unwrap_or_else(|error| panic!("{error}")))
+            .unwrap_or_else(|error| panic!("{error}"));
+    let base = &summary["summary"]["gaps"];
+    let after = &base["with_proposals"];
+    assert_eq!(base["full"]["determined"], 0);
+    assert_eq!(base["full"]["mutants_admitted"], 9);
+    assert_eq!(after["full"]["determined"], 4);
+    assert_eq!(after["full"]["mutants_admitted"], 3);
+    for (counts, measure) in [
+        (base, &packet["gaps"]),
+        (after, &packet["gaps"]["proposals"]["after"]),
+    ] {
+        for domain in ["full", "valid"] {
+            assert_eq!(
+                counts[domain]["tuples"],
+                measure["admissible"][domain]["tuples"]
+            );
+            assert_eq!(
+                counts[domain]["determined"],
+                measure["admissible"][domain]["determined"]
+            );
+            assert_eq!(
+                counts[domain]["mutants_admitted"],
+                measure["mutation"][domain]["admitted"]
+            );
+            assert_eq!(
+                counts[domain]["mutants_caught"],
+                measure["mutation"][domain]["caught"]
+            );
+        }
+        assert_eq!(counts["inactive_laws"], measure["activation"]["inactive"]);
+        assert_eq!(
+            counts["reject_everything_admitted"],
+            measure["reject_everything"]["admitted_where_the_contract_decides"]
+        );
+    }
+    assert_eq!(packet["authority"], "none");
+    assert_eq!(
+        project_before,
+        fs::read(app.join("project.zeno")).unwrap_or_else(|error| panic!("{error}"))
+    );
+    assert_eq!(
+        policy_before,
+        fs::read(app.join("v2/policy.json")).unwrap_or_else(|error| panic!("{error}"))
+    );
+    let plain = run(
+        &[
+            "contract",
+            "review",
+            text(&app),
+            "--gaps",
+            "--out",
+            text(&out),
+            "--format",
+            "json",
+        ],
+        0,
+    );
+    assert!(plain["summary"]["gaps"].get("with_proposals").is_none());
+    fs::write(&laws, "law 9000 false_proposal on any = false;\n")
+        .unwrap_or_else(|error| panic!("{error}"));
+    let alarm = run(&json_args, 1);
+    assert_eq!(alarm["summary"]["gaps"]["status"], "proposal-false-alarm");
+    assert!(alarm["summary"]["gaps"].get("with_proposals").is_none());
+}
+
+#[test]
+fn failure_only_reasons_cannot_keep_fully_specified_rejects_ambiguous() {
+    let root = TempRoot::new("reason-classes");
+    let app = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval");
+    let laws = root.path().join("closing.zeno");
+    // A failure-only reason remains unavailable in a rejection law. Fixing
+    // the judge must not weaken the language's independent scope check.
+    fs::write(&laws, "law 9000 wrong_scope on reject:202 = false;\n")
+        .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
+    let invalid = run(
+        &[
+            "contract",
+            "review",
+            text(&app),
+            "--gaps",
+            "--gaps-laws",
+            text(&laws),
+            "--format",
+            "json",
+        ],
+        1,
+    );
+    assert_eq!(invalid["status"], "error");
+    assert!(
+        invalid["error"]["message"]
+            .as_str()
+            .unwrap_or_else(|| panic!("expected refusal message"))
+            .contains("declared Reject reason")
+    );
+    fs::write(
+        &laws,
+        fs::read(app.join("proposed-laws.txt"))
+            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
+    let out = root.path().join("review.json");
+    let report = run(
+        &[
+            "contract",
+            "review",
+            text(&app),
+            "--gaps",
+            "--gaps-laws",
+            text(&laws),
+            "--out",
+            text(&out),
+            "--format",
+            "json",
+        ],
+        0,
+    );
+    let gaps = &report["summary"]["gaps"];
+    assert_eq!(gaps["full"]["determined"], 0);
+    // 32 non-pending states * 8 inputs, 16 pending states * 2
+    // unauthorized inputs, plus 12 repeated-officer approvals: 300.
+    assert_eq!(gaps["with_proposals"]["full"]["determined"], 300);
+    // Ten invalid Approved states remove 10*8 closed rejects.
+    assert_eq!(gaps["with_proposals"]["valid"]["determined"], 220);
+    assert_eq!(report["authority"], "none");
 }
 
 #[test]
@@ -358,8 +525,56 @@ fn every_judge_writes_an_advisory_packet_and_exits_by_its_verdict() {
         ],
     ] {
         let over = run(&args, 2);
-        assert_eq!(over["status"], "inconclusive", "{args:?}");
-        assert_eq!(over["reason"], "domain-over-limit", "{args:?}");
+        if args[1] == "lemma" {
+            assert_eq!(over["status"], "UNKNOWN", "{args:?}");
+            assert_eq!(over["mode"], "symbolic", "{args:?}");
+        } else {
+            assert_eq!(over["status"], "inconclusive", "{args:?}");
+            assert_eq!(over["reason"], "domain-over-limit", "{args:?}");
+        }
+    }
+}
+
+#[test]
+fn probe_verdict_exits_distinguish_yes_no_and_unknown() {
+    let root = TempRoot::new("probe-exits");
+    let app = counter(&root);
+    let app = text(&app);
+    for (question, positive, negative) in [
+        (
+            "implies",
+            vec!["--if", "true", "--then", "true"],
+            vec!["--if", "true", "--then", "false"],
+        ),
+        (
+            "reachable",
+            vec!["--state", "true"],
+            vec!["--state", "false"],
+        ),
+        (
+            "depends",
+            vec!["--position", "pre.100.110"],
+            vec![
+                "--position",
+                "pre.100.110",
+                "--where",
+                "context.102.130 == 0",
+            ],
+        ),
+    ] {
+        for (options, exit, answer) in [(&positive, 0, "yes"), (&negative, 1, "no")] {
+            let args = [vec!["contract", "probe", question, app], options.clone()].concat();
+            let report = run(&args, exit);
+            assert_eq!(report["result"]["answer"], answer, "{report}");
+            assert_eq!(report["authority"], "none");
+        }
+        let args = [
+            vec!["contract", "probe", question, app],
+            positive,
+            vec!["--max-tuples", "1"],
+        ]
+        .concat();
+        assert_eq!(run(&args, 2)["status"], "inconclusive");
     }
 }
 
@@ -386,13 +601,26 @@ fn every_judge_is_described_with_its_effects() {
         let description = run(&args, 0);
         let effects = &description["command"]["effects"];
         assert_eq!(effects["classification"], "declared", "{path:?}");
+        let symbolic = path.as_slice() == ["contract", "lemma"];
+        let mut reads = reads;
+        if symbolic {
+            reads.push("optional-pinned-solvers");
+        }
         assert_eq!(effects["reads"], serde_json::json!(reads), "{path:?}");
         assert_eq!(
             effects["writes"],
-            serde_json::json!(["optional-judge-packet"]),
+            if symbolic {
+                serde_json::json!([
+                    "optional-judge-packet",
+                    "optional-query-directory",
+                    "temporary-files"
+                ])
+            } else {
+                serde_json::json!(["optional-judge-packet"])
+            },
             "{path:?}"
         );
-        assert_eq!(effects["executes_tools"], false, "{path:?}");
+        assert_eq!(effects["executes_tools"], symbolic, "{path:?}");
     }
     let group = run(&["describe", "contract", "probe"], 0);
     assert_eq!(

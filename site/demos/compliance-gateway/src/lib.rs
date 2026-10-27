@@ -206,11 +206,14 @@ mod tests {
         let failure = demo
             .step(&screening("Sanctioned", 0, "Low", 3, false))
             .unwrap();
-        assert_eq!(law_ids(&failure), [500, 503, 991]);
+        assert_eq!(law_ids(&failure), [500, 503, 505, 510, 511, 512, 513, 991]);
         let accept = demo.step(&reinstatement(3, true)).unwrap();
-        assert_eq!(law_ids(&accept), [500, 501, 502, 991]);
+        assert_eq!(
+            law_ids(&accept),
+            [500, 501, 502, 504, 510, 511, 512, 513, 991]
+        );
         let reject = demo.step(&reinstatement(3, true)).unwrap();
-        assert_eq!(law_ids(&reject), [509, 991]);
+        assert_eq!(law_ids(&reject), [506, 909, 991]);
     }
 
     #[test]

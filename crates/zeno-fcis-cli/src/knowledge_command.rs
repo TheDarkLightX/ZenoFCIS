@@ -7,6 +7,96 @@ use zeno_fcis_loop_doors::strategy_knowledge as K;
 
 #[derive(Subcommand)]
 pub(crate) enum Operation {
+    /// Create an empty private assessment layer.
+    Init {
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Preserve legacy curator knowledge as pending, without blessing strategy advice.
+    Migrate {
+        #[arg(long)]
+        source: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Normalise and deduplicate explicit candidate records; never promotes.
+    Curate {
+        #[arg(long)]
+        source: PathBuf,
+    },
+    /// Replay candidate ON/OFF, or all promoted lessons against none.
+    Assess {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        candidate: Option<String>,
+        #[arg(long, default_value_t = 100_000_000)]
+        total_budget: u64,
+        #[arg(long, default_value_t = 0)]
+        minimum_effect_bps: u16,
+        #[arg(long)]
+        annotations: Option<PathBuf>,
+    },
+    /// Re-execute a source-pinned assessment without changing the layer.
+    ReplayAssessment {
+        #[arg(long)]
+        assessment: String,
+        #[arg(long)]
+        suite: PathBuf,
+    },
+    /// Pending candidates ordered by observational value; no promotion authority.
+    AssessmentQueue {
+        #[arg(long)]
+        suite: Option<PathBuf>,
+    },
+    /// Read-only assessment and retraction history.
+    AssessmentView,
+    /// Propose only declared inheritance lifts and episode-guided narrower scopes.
+    Grow,
+    /// Import bounded private episode records as observations, never as advice.
+    IngestEpisodes {
+        #[arg(long)]
+        source: PathBuf,
+    },
+    /// Persist minimal pending retractions after dependency or version changes.
+    Refresh,
+    /// Summarise private outcome records; observations never promote.
+    Telemetry,
+    /// Descriptive loop value profiles. Points carry no promotion authority.
+    Leaderboard {
+        #[arg(long,default_value="held-out",value_parser=["held-out","observational"])]
+        population: String,
+    },
+    /// Replay an exact finite proof or counterexample; no assessment is needed for this fact.
+    Certify {
+        #[arg(long)]
+        original: PathBuf,
+        #[arg(long)]
+        candidate: PathBuf,
+        #[arg(long, default_value = "{}")]
+        scope: String,
+        #[arg(long)]
+        refutes: Option<String>,
+    },
+    /// Exact-subject certified results. Receipt replay is required before reuse.
+    Facts {
+        #[arg(long)]
+        subject: String,
+    },
+    /// Recheck a recorded equivalence receipt for exactly this subject.
+    Reuse {
+        #[arg(long)]
+        fact: String,
+        #[arg(long)]
+        subject: PathBuf,
+    },
+    #[command(hide = true)]
+    AssessmentTask {
+        #[arg(long)]
+        request: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// All current lessons matching the structured task facts.
     Advise {
         #[arg(long)]
@@ -35,7 +125,7 @@ pub(crate) enum Operation {
     /// A query and its complete finite derivation in this task context.
     Explain {
         query: String,
-        #[arg(long)]
+        #[arg(long, default_value = "")]
         task: String,
     },
     /// Check the catalog, lesson evidence and unresolved conflicts.
@@ -58,6 +148,8 @@ pub(crate) struct Loaded {
     pub(crate) validations: Vec<K::Validation>,
     pub(crate) validation_problems: Vec<Value>,
     pub(crate) preparation_work: u64,
+    pub(crate) assessed: Vec<crate::knowledge_store::Layer>,
+    pending_legacy: Vec<(usize, String)>,
 }
 fn fail(code: &'static str) -> Value {
     json!({"schema":K::USAGE_SCHEMA,"status":if code.ends_with("budget"){"inconclusive"}else{"refused"},"authority":"none","reason":code})
@@ -75,7 +167,7 @@ pub(crate) fn paths(given: &[PathBuf]) -> Result<Vec<PathBuf>, Value> {
     }
     Ok(out)
 }
-fn checkout(path: &Path) -> bool {
+pub(crate) fn checkout(path: &Path) -> bool {
     path.ancestors().any(|p| {
         p.join("crates/zeno-fcis-cli/Cargo.toml").is_file()
             && p.join("crates/zeno-fcis-loop-doors/Cargo.toml").is_file()
@@ -104,6 +196,8 @@ fn load_with_checker(
         validations: Vec::new(),
         validation_problems: Vec::new(),
         preparation_work: 0,
+        assessed: Vec::new(),
+        pending_legacy: Vec::new(),
     };
     let (public_validations, preparation_work) = public_validation(limits)?;
     loaded.validations = public_validations;
@@ -137,6 +231,46 @@ fn load_with_checker(
                 .bindings
                 .push(json!({"path":resolved,"sha256":sha256_hex(&data)}));
             let text = if data.iter().find(|b| !b.is_ascii_whitespace()) == Some(&b'{') {
+                if serde_json::from_slice::<Value>(&data)
+                    .ok()
+                    .is_some_and(|v| v["schema"] == "zeno-fcis/kb-layer/2")
+                {
+                    let (layer, _) = crate::knowledge_store::live_with_checker(
+                        &resolved,
+                        checker_sha.as_deref(),
+                    )
+                    .map_err(fail)?;
+                    loaded.preparation_work = loaded.preparation_work.saturating_add(
+                        serde_json::to_vec(&layer)
+                            .map_err(|_| fail("kb-encoding"))?
+                            .len() as u64,
+                    );
+                    if let Some(binding) = loaded.bindings.last_mut() {
+                        binding["effective_sha256"] =
+                            json!(crate::knowledge_store::hash(&layer).map_err(fail)?);
+                    }
+                    let hierarchy = layer
+                        .isa
+                        .iter()
+                        .map(|(c, p)| {
+                            Ok(format!(
+                                "isa({},{}).",
+                                serde_json::to_string(c).map_err(|_| fail("kb-encoding"))?,
+                                serde_json::to_string(p).map_err(|_| fail("kb-encoding"))?
+                            ))
+                        })
+                        .collect::<Result<Vec<_>, Value>>()?
+                        .join("\n");
+                    if let Some(legacy) = &layer.legacy {
+                        loaded
+                            .pending_legacy
+                            .push((loaded.sources.len(), format!("{hierarchy}\n{legacy}")));
+                    }
+                    loaded.assessed.push(layer);
+                    loaded.paths.push(resolved);
+                    loaded.sources.push(hierarchy);
+                    continue;
+                }
                 #[derive(serde::Deserialize)]
                 #[serde(deny_unknown_fields)]
                 struct Layer {
@@ -171,7 +305,9 @@ fn load_with_checker(
                     }
                     match crate::knowledge_evidence::load(root, &validation, checker_sha.as_deref())
                     {
-                        Ok(v) => loaded.validations.push(v),
+                        Ok(_) => loaded
+                            .validation_problems
+                            .push(json!({"reason":"kb-strategy-assessment-required"})),
                         Err(e) => loaded.validation_problems.push(e),
                     }
                 }
@@ -207,21 +343,51 @@ pub(crate) fn run(
             trace: Vec::new(),
         });
     }
+    if crate::knowledge_workflow::layer_conflict(&loaded.assessed)
+        && !matches!(
+            request,
+            K::Request::Check
+                | K::Request::Query(_)
+                | K::Request::Advise(_)
+                | K::Request::Explain { .. }
+        )
+    {
+        return Err(zeno_fcis_loop_doors::strategy_algebra::Stop {
+            code: "kb-assessed-layer-conflict",
+            inconclusive: false,
+            work: loaded.preparation_work,
+            trace: Vec::new(),
+        });
+    }
     let mut remaining = limits;
     remaining.work -= loaded.preparation_work;
-    let result = K::run_with_evidence(
-        &loaded
-            .sources
-            .iter()
-            .map(String::as_str)
-            .collect::<Vec<_>>(),
-        request,
-        remaining,
-        &loaded.validations,
-    );
+    let mut sources = loaded
+        .sources
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    if matches!(request, K::Request::Query(_) | K::Request::Explain { .. }) {
+        for (index, legacy) in &loaded.pending_legacy {
+            sources[*index] = legacy;
+        }
+    }
+    let result = K::run_with_evidence(&sources, request, remaining, &loaded.validations);
     result
         .map(|mut r| {
             r.work = r.work.saturating_add(loaded.preparation_work);
+            if crate::knowledge_workflow::layer_conflict(&loaded.assessed) {
+                match &mut r.outcome {
+                    K::Outcome::Checked(problems) => problems.push("kb-assessed-layer-conflict"),
+                    K::Outcome::Advised(advice) => {
+                        advice.problems.push("kb-assessed-layer-conflict");
+                        advice.lessons.clear();
+                        advice.facts.clear();
+                        advice.exclusions.clear();
+                        advice.defeated.clear();
+                    }
+                    _ => {}
+                }
+            }
             r
         })
         .map_err(|mut e| {
@@ -280,7 +446,10 @@ pub(crate) fn report(
             );
         }
     };
-    let mut v = json!({"schema":K::USAGE_SCHEMA,"authority":"none","implementation_sha256":implementation(),"work":r.work,"rows":r.rows,"states":r.states,"layers":loaded.bindings,"layer_conflicts":r.layer_conflicts,"overrides":r.overrides.iter().map(|o|json!({"key":o.key,"earlier_layer":o.earlier_layer,"later_layer":o.later_layer,"earlier":o.earlier.iter().map(fact).collect::<Vec<_>>(),"later":o.later.iter().map(fact).collect::<Vec<_>>()})).collect::<Vec<_>>(),"validation_problems":loaded.validation_problems,"validations":loaded.validations.iter().map(|e|json!({"lesson":e.lesson,"recipe_sha256":e.recipe_sha256,"dependency_sha256":e.dependency_sha256,"validation_sha256":e.validation_sha256,"last_validation":e.last_validation,"status":format!("{:?}",e.status)})).collect::<Vec<_>>(),"explanations":r.explanations.iter().map(explanation).collect::<Vec<_>>()});
+    let mut v = json!({"schema":K::USAGE_SCHEMA,"authority":"none","implementation_sha256":implementation(),"work":r.work,"rows":r.rows,"states":r.states,"layers":loaded.bindings,"layer_conflicts":r.layer_conflicts,"overrides":r.overrides.iter().map(|o|json!({"key":o.key,"earlier_layer":o.earlier_layer,"later_layer":o.later_layer,"earlier":o.earlier.iter().map(fact).collect::<Vec<_>>(),"later":o.later.iter().map(fact).collect::<Vec<_>>()})).collect::<Vec<_>>(),"pending_legacy_layers":loaded.pending_legacy.len(),"validation_problems":loaded.validation_problems,"validations":loaded.validations.iter().map(|e|json!({"lesson":e.lesson,"recipe_sha256":e.recipe_sha256,"dependency_sha256":e.dependency_sha256,"validation_sha256":e.validation_sha256,"last_validation":e.last_validation,"status":format!("{:?}",e.status)})).collect::<Vec<_>>(),"explanations":r.explanations.iter().map(explanation).collect::<Vec<_>>()});
+    if crate::knowledge_workflow::layer_conflict(&loaded.assessed) {
+        v["assessed_layer_records"]=json!(loaded.assessed.iter().enumerate().map(|(layer,state)|json!({"layer":layer,"candidates":state.candidates,"isa":state.isa})).collect::<Vec<_>>());
+    }
     let code = match r.outcome {
         K::Outcome::Query(rows) => {
             v["status"] = json!("proposed-query");
@@ -305,7 +474,19 @@ pub(crate) fn report(
         }
         K::Outcome::Advised(a) => {
             v["status"] = json!("advised");
-            v["lessons"] = json!(a.lessons.iter().map(constant).collect::<Vec<_>>());
+            let assessed = if a.problems.is_empty() {
+                crate::knowledge_workflow::advice(&loaded.assessed, &a.task_facts)
+            } else {
+                vec![]
+            };
+            v["assessed_advice"] = json!(assessed);
+            v["lessons"] = json!(
+                a.lessons
+                    .iter()
+                    .map(constant)
+                    .chain(assessed.iter().map(|c| json!(c.id)))
+                    .collect::<Vec<_>>()
+            );
             v["facts"] = json!(a.facts.iter().map(fact).collect::<Vec<_>>());
             v["task_facts"] = json!(a.task_facts.iter().map(fact).collect::<Vec<_>>());
             v["explanations"] = json!(a.explanations.iter().map(explanation).collect::<Vec<_>>());
@@ -356,6 +537,9 @@ fn invoke_with_identity(
     op: Operation,
     identity: impl FnOnce() -> Result<String, Value>,
 ) -> (u8, Value) {
+    if crate::knowledge_workflow::handles(&op) {
+        return crate::knowledge_workflow::invoke(given, op);
+    }
     if let Operation::Replay { recipe, out } = op {
         return crate::knowledge_evidence::replay(&recipe, &out);
     }
@@ -415,6 +599,7 @@ fn invoke_with_identity(
         Operation::Check => K::Request::Check,
         Operation::Query { query } => K::Request::Query(query),
         Operation::Replay { .. } => return (1, fail("kb-replay-routing")),
+        _ => return (1, fail("kb-assessment-routing")),
     };
     let result = run(&loaded, &request, K::Limits::default());
     if started.elapsed() >= CHECK_WINDOW {

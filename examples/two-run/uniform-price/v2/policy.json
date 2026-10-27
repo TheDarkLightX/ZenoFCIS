@@ -1,0 +1,42 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "uniform-price",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "102": [
+      "I128",
+      0,
+      0
+    ]
+  },
+  "variables": {},
+  "cases": [
+    {
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "111": "choose(command.101.120 == 0, command.101.121 * pre.100.110, pre.100.111)",
+        "112": "choose(command.101.120 == 1, command.101.121 * pre.100.110, pre.100.112)",
+        "113": "choose(command.101.120 == 0, command.101.121, pre.100.113)",
+        "114": "choose(command.101.120 == 1, command.101.121, pre.100.114)"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 1,
+    "111": 0,
+    "112": 0,
+    "113": 0,
+    "114": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DecisionConformance"
+  }
+}

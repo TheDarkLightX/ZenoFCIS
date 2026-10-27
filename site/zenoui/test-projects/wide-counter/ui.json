@@ -1,0 +1,44 @@
+{
+  "format": "zenoui/metadata/1",
+  "title": "Exact credit counter",
+  "action": "command.101",
+  "fields": {
+    "pre.100.110": {
+      "label": "Balance",
+      "unit": "credits"
+    },
+    "command.101": {
+      "label": "Command",
+      "unit": "unitless"
+    },
+    "context.102": {
+      "label": "Caller",
+      "unit": "unitless"
+    }
+  },
+  "variants": {
+    "120": "Increase",
+    "121": "Decrease",
+    "122": "Keep balance",
+    "130": "Operator",
+    "131": "Visitor"
+  },
+  "commands": {
+    "120": {
+      "label": "Increase",
+      "consequential": true
+    },
+    "121": {
+      "label": "Decrease",
+      "consequential": true
+    },
+    "122": {
+      "label": "Keep balance",
+      "consequential": true
+    }
+  },
+  "reasons": {
+    "200": "Only the operator can change this balance. Choose the operator context.",
+    "201": "The balance is at its declared bound. Choose another command."
+  }
+}

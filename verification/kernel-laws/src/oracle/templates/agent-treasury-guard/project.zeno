@@ -59,6 +59,7 @@ variant 174 110 SellBase none;
 variant 175 115 ProposeSwap none;
 variant 176 115 SwapSettled none;
 variant 177 115 SwapFailed none;
+variant 185 115 RefundExpired none;
 variant 178 116 Agent none;
 variant 179 116 Dex none;
 variant 180 118 TreasuryAgentV2 none;
@@ -79,6 +80,8 @@ reason 209 over_daily_budget precedence 9;
 reason 210 slippage_too_wide precedence 10;
 reason 211 below_reserve precedence 11;
 reason 212 swap_failed precedence 12;
+reason 213 deadline_outside_clock precedence 13;
+reason 214 before_swap_deadline precedence 14;
 channel 300 swap_request destination 103 payload 104;
 component 400 treasury {
   owns 100;
@@ -135,5 +138,21 @@ law 508 failure_refunds_the_swap on failure = command.101.140 == 177 && context.
 // before a decision. Claim 601 states the budget's part on its own, from the
 // clock, the day accounting, the proposal's debit and limits, and the refund.
 // tests/claims.rs checks the base case, the observer, and the manifest.
-claim 600 treasury_stays_within_limits all inductive assume [501, 502] accept [503, 504, 505, 506, 507] failure [508] = pre.100.130 >= 2 && pre.100.131 >= 0 && pre.100.132 >= 0 && pre.100.132 <= 4 && (pre.100.134 == 170 -> pre.100.135 == 0 && pre.100.136 == 0) && (pre.100.134 != 170 -> pre.100.135 >= 1 && pre.100.136 >= 0);
+claim 600 treasury_stays_within_limits all inductive assume [501, 502] accept [503, 504, 505, 506, 507, 511] failure [508] = pre.100.130 >= 2 && pre.100.131 >= 0 && pre.100.132 >= 0 && pre.100.132 <= 4 && (pre.100.134 == 170 -> pre.100.135 == 0 && pre.100.136 == 0) && (pre.100.134 != 170 -> pre.100.135 >= 1 && pre.100.136 >= 0);
 claim 601 budget_never_exceeded all inductive assume [501, 502] accept [505, 507] failure [508] = pre.100.132 >= 0 && pre.100.132 <= 4;
+
+// Reserve two ticks for the deadline; a terminal-clock proposal is inadmissible.
+law 510 pending_swap_has_a_reachable_deadline on commit, genesis = post.100.134 != 170 -> post.100.133 <= 9;
+// The agent can recover an unsettled intent without a callback. Its identity
+// and deadline are the original proposal tick, which no pending step changes.
+law 511 timeout_refunds_exactly on accept = command.101.140 == 185 -> context.102.150 == 178 && pre.100.134 != 170 && command.101.144 == pre.100.133 && context.102.151 >= pre.100.133 + 2 && post.100.134 == 170 && post.100.135 == 0 && post.100.136 == 0 && (pre.100.134 == 171 -> post.100.130 == pre.100.130 + pre.100.135 && post.100.131 == pre.100.131) && (pre.100.134 == 172 -> post.100.131 == pre.100.131 + pre.100.135 && post.100.130 == pre.100.130);
+law 512 eligible_timeout_cannot_be_rejected on reject = command.101.140 == 185 -> context.102.150 != 178 || pre.100.134 == 170 || command.101.144 != pre.100.133 || context.102.151 < pre.100.133 + 2;
+// Exact request count, identity, amount, minimum and expiry. No other
+// action may publish a swap request.
+law 513 proposal_delivers_the_recorded_intent on commit = (command.101.140 == 175 -> outbox.104 == 1 && outbox.104.160 == context.102.151 && outbox.104.163 == command.101.142 && outbox.104.164 == command.101.143 && outbox.104.165 == context.102.151 + 2) && (command.101.140 != 175 -> outbox.104 == 0);
+// A held asset always fits back into its source balance on recovery.
+law 514 held_asset_remains_refundable on commit, genesis = (post.100.134 == 171 -> post.100.130 + post.100.135 <= 20) && (post.100.134 == 172 -> post.100.131 + post.100.135 <= 20);
+
+// Stable enum variants and exact destination are independent delivery observations.
+law 515 proposal_delivers_the_sold_and_bought_assets on commit = command.101.140 == 175 -> (command.101.141 == 173 -> outbox.104.161 == 183 && outbox.104.162 == 184) && (command.101.141 == 174 -> outbox.104.161 == 184 && outbox.104.162 == 183);
+law 516 proposal_delivers_to_the_swap_service on commit = command.101.140 == 175 -> outbox.104 == 1;

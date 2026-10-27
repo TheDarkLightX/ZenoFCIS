@@ -141,6 +141,19 @@ pub fn failed(intent: i128) -> TreasuryCommand {
     )
 }
 
+/// The Agent's recovery of the exact held asset when the intent has expired.
+#[must_use]
+pub fn refund_expired(intent: i128) -> TreasuryCommand {
+    command(
+        TreasuryAction::RefundExpired,
+        Direction::BuyBase,
+        1,
+        0,
+        intent,
+        0,
+    )
+}
+
 /// The context a request carries: who sent it, the current tick, the oracle
 /// price and the tick it was observed at, and the model the agent runs.
 #[must_use]

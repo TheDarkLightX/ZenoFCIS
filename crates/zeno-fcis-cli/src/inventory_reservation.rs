@@ -2,6 +2,10 @@
 
 pub(crate) const FILES: &[(&str, &[u8])] = &[
     (
+        "ui.json",
+        include_bytes!("../templates/inventory-reservation/ui.json"),
+    ),
+    (
         "src/v2_contract.rs",
         include_bytes!("../templates/inventory-reservation/src/v2_contract.rs"),
     ),

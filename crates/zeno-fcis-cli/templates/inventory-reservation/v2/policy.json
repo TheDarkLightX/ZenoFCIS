@@ -120,9 +120,35 @@
   "law_kinds": {
     "500": "StateInvariant",
     "501": "AssetConservation",
-    "502": "DebitCreditEffectEquality"
+    "502": "DebitCreditEffectEquality",
+    "503": "RejectNoAuthority",
+    "510": "DebitCreditEffectEquality",
+    "511": "DebitCreditEffectEquality"
   },
   "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes.",
   "framework_reject_law": 509,
-  "framework_failure_law": 508
+  "framework_failure_law": 508,
+  "delivery_laws": {
+    "510": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.140": {
+          "channel": 300,
+          "field": 140
+        }
+      }
+    },
+    "511": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300,
+          "destination": "warehouse"
+        }
+      }
+    }
+  }
 }

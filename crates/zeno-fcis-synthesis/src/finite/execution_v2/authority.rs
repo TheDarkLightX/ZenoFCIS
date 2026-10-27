@@ -1,6 +1,9 @@
 //! Exact canonical artifacts and replay comparison. Pure helpers do not authorize.
 pub mod candidate;
 pub mod canonical;
+/// Owned table-profile execution; finite checked separately from scalar proofs.
+#[cfg(not(verus_keep_ghost))]
+pub use super::tables;
 mod evaluator;
 pub mod framing;
 pub mod observations;

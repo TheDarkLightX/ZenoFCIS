@@ -92,7 +92,14 @@ impl<'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'_, 'p, D> {
             if checked != Some(sequence) {
                 let row = load_commit(&tx, sequence)?;
                 let state = previous_state(&tx, sequence)?;
-                check_commit(&tx, self.members.authorities(), &segments, &row, &state)?;
+                check_commit(
+                    &tx,
+                    self.members.authorities(),
+                    &segments,
+                    &row,
+                    &state,
+                    self.members.lineage(),
+                )?;
                 checked = Some(sequence);
             }
             deliveries.push(load_delivery(&tx, sequence, lane, ordinal)?);

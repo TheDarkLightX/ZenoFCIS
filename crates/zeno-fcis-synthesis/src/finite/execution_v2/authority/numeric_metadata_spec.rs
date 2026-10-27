@@ -14,6 +14,8 @@ verus! {
 pub(super) open spec fn width(w:IntegerWidth)->u128 {match w{IntegerWidth::Signed64=>0,IntegerWidth::Signed128=>1,IntegerWidth::Unsigned128=>2}}
 pub(super) open spec fn op<'a>(op:NumericOp)->Seq<Part<'a>> {
     match op {
+        NumericOp::ToI128(i)=>seq![Part::Word(21),Part::Word(i as u128)],
+        NumericOp::ToU128(i)=>seq![Part::Word(22),Part::Word(i as u128)],
         NumericOp::Input(i)=>seq![Part::Word(0),Part::Word(i as u128)],
         NumericOp::Bool(v)=>seq![Part::Word(1),Part::Word(if v{1}else{0})],
         NumericOp::I128(v)=>seq![Part::Word(2),Part::Word(v as u128)],

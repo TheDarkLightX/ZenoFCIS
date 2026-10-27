@@ -1,0 +1,352 @@
+{
+  "profile": "zal/ladder-temporal/1",
+  "theory": "ordered-events-over-integers/1",
+  "id": "alarm_withdrawal_bounded",
+  "kind": "law",
+  "authority": {
+    "status": "DECIDED",
+    "source": "Owner decision 2026-10-19: a bounded checked claim and an unbounded kernel-checked obligation; every definition is recovered from the withdrawal-queue contract."
+  },
+  "scope": "Accepted keeper ticks in the withdrawal-queue controller pilot: deposits, requests and ticks at now = 0; timeout withdrawals are outside this statement.",
+  "trace": {
+    "domain": "Traces",
+    "mode": "finite",
+    "horizon": 12,
+    "source_revision": "withdrawal-queue contract sources, sha256 fbd0447eadda802edeb03b49837425d7cdc17b5a2c4b07543872f5f3366136e7",
+    "event_schema": "withdrawal-queue tick/1: pre-vault after the decisions since the previous tick, alarm, payout and post-vault",
+    "order": "authoritative commit order of the accepted keeper ticks",
+    "projection": "one event per accepted keeper tick; deposits, requests and rejections between two ticks are hidden and reach the next tick only through its pre-vault",
+    "model": "the generated withdrawal-queue V2 contract evaluated by its checked Authority over every vault reachable from its genesis within the pilot domain: actions 160, 161 and 162, lanes 170 and 171, amounts 1 and 2, callers 190 through 193, either alarm value, and now fixed at 0; timeout withdrawals are excluded",
+    "environment": "any pilot commands from any caller between two ticks, and either alarm value at each tick; now is fixed at 0, timeout withdrawals are excluded, and the alarm is taken as given",
+    "initialization": "the contract genesis commits, a changed genesis is refused, and no request is pending at genesis, so a history before its first tick holds no presented request",
+    "transitions": "every event is a keeper tick decided by the checked Authority on a vault reachable from the genesis",
+    "continuity": "hidden decisions leave the controller part unchanged except that an accepted request turns its own empty lane arrived; every tick leaves no lane arrived, so each accepted request is presented by exactly one tick",
+    "arithmetic": "checked-i128",
+    "evidence": "obligation"
+  },
+  "assumptions": {
+    "formula": "true",
+    "definition": "Unconditional requirement over recorded keeper ticks; provided true.",
+    "version": "1"
+  },
+  "domains": {
+    "Traces": {
+      "member": "trace",
+      "plural": "traces",
+      "noun": "admitted traces",
+      "trace": true
+    },
+    "Requests": {
+      "member": "request",
+      "plural": "requests",
+      "noun": "lane-held request identities",
+      "values": [
+        "lane_a",
+        "lane_b"
+      ]
+    }
+  },
+  "symbols": {
+    "R": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Requests"
+      ],
+      "clause": "{0} is a legitimate submitted withdrawal",
+      "version": "withdrawal-queue/1",
+      "observation": "event",
+      "definition": "the tick presents lane r's request: the lane is arrived before the tick because its owner's request was accepted after the previous tick (rule 6 presents every arrived lane, so each accepted request is presented exactly once).",
+      "native": [
+        {
+          "args": [
+            "lane_a"
+          ],
+          "before": "pre.100.110"
+        },
+        {
+          "args": [
+            "lane_b"
+          ],
+          "before": "pre.100.112"
+        }
+      ]
+    },
+    "C": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Requests"
+      ],
+      "clause": "{0} has its matching assets returned",
+      "version": "withdrawal-queue/1",
+      "observation": "event",
+      "definition": "the decision is a keeper tick that pays lane r (rule 6, law 501): it queues one settlement payout of lane r with the amount that lane's request recorded, and empties the lane.",
+      "native": [
+        {
+          "args": [
+            "lane_a"
+          ],
+          "before": "pre.100.111"
+        },
+        {
+          "args": [
+            "lane_b"
+          ],
+          "before": "pre.100.113"
+        }
+      ]
+    },
+    "Tick": {
+      "kind": "predicate",
+      "arity": 0,
+      "args": [],
+      "clause": "the event is a keeper tick",
+      "version": "withdrawal-queue/1",
+      "observation": "event",
+      "definition": "the event is an accepted keeper tick; every event of this projection is one, so it only requires that recorded events exist.",
+      "native": [
+        {
+          "args": [],
+          "before": "pre.100.114"
+        }
+      ]
+    }
+  },
+  "definitions": [
+    {
+      "name": "Ahead",
+      "params": [],
+      "body": "next(next(next(next(next(next(next(Tick())))))))",
+      "clause": "at least seven further keeper ticks are recorded",
+      "version": "withdrawal-queue/1"
+    }
+  ],
+  "readings": [
+    {
+      "version": "withdrawal-queue/1",
+      "body": "forall sigma in Traces: forall r in Requests: always((R(r) and Ahead()) => within(7, C(r)))",
+      "intuitive": "every withdrawal request is paid by the eighth keeper tick that sees it, counting the tick that first presents it, whenever those ticks are recorded",
+      "plain": "once seven further keeper ticks have followed the tick that presents a withdrawal, it has been paid, alarms included",
+      "mode": "finite",
+      "horizon": 12
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "worst_case_bound",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113",
+        "pre.100.114"
+      ],
+      "events": [
+        [
+          1,
+          0,
+          1,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          1
+        ]
+      ],
+      "expected": true,
+      "note": "Contract tick history: both lanes are presented under a sustained alarm; lane A is paid at the fourth tick and lane B at the eighth, exactly at the bound."
+    },
+    {
+      "id": "late_presentation",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113",
+        "pre.100.114"
+      ],
+      "events": [
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1
+        ]
+      ],
+      "expected": true,
+      "note": "Contract tick history: the alarm defers lane A at the last recorded tick. Its window is not recorded, so the finite target asks nothing of it; the unbounded obligation keeps it."
+    },
+    {
+      "id": "no_request",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113",
+        "pre.100.114"
+      ],
+      "events": [
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      ],
+      "expected": true,
+      "note": "Contract tick history: vacuous without a request; the pilot separately requires presented requests under active alarms."
+    },
+    {
+      "id": "eight_ticks_unpaid",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113",
+        "pre.100.114"
+      ],
+      "events": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      ],
+      "expected": false,
+      "note": "Not a contract history (the pilot checks that the contract excludes it): lane A stays unpaid for eight recorded ticks."
+    }
+  ],
+  "formula": "forall sigma in Traces: forall r in Requests: always((R(r) and Ahead()) => within(7, C(r)))",
+  "native_schema": {
+    "state": 100,
+    "fields": [
+      {
+        "id": 110,
+        "kind": "bool"
+      },
+      {
+        "id": 111,
+        "kind": "bool"
+      },
+      {
+        "id": 112,
+        "kind": "bool"
+      },
+      {
+        "id": 113,
+        "kind": "bool"
+      },
+      {
+        "id": 114,
+        "kind": "bool"
+      }
+    ]
+  }
+}

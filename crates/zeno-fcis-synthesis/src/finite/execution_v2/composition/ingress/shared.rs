@@ -51,6 +51,17 @@ pub(in super::super) fn reify(leaf: LeafView<'_>, code: Atom<'static>) -> Option
             Atom::I128(v) => super::reify(l, v),
             _ => None,
         },
+        LeafView::Numeric(Domain::Sum { type_id, variants }) => match code {
+            Atom::I128(v) => {
+                let variant = u16::try_from(v).ok()?;
+                if super::super::super::super::value::contains_variant_code(variants, variant) {
+                    Some(Atom::Sum { type_id, variant })
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        },
         LeafView::Numeric(d) => {
             if super::super::schema_validation::atom(d, code) {
                 Some(code)
@@ -76,12 +87,27 @@ fn reify_fields(fields: FieldsView<'_>, codes: &[Atom<'static>]) -> Option<Vec<F
             }
             let mut result = Vec::new();
             let mut i = 0usize;
-            #[cfg_attr(verus_keep_ghost,verus_spec(invariant i<=fs.len(),fs.len()==codes.len(),result@==spec::numeric_fields(fs@,codes@,i as nat),decreases fs.len()-i,))]
+            #[cfg_attr(verus_keep_ghost,verus_spec(invariant i<=fs.len(),fields==FieldsView::Numeric(fs),fs.len()==codes.len(),result@==spec::numeric_fields(fs@,codes@,i as nat),forall|j:int|0<=j<i ==> spec::reify(LeafView::Numeric(fs@[j].leaf),codes@[j]).is_some(),decreases fs.len()-i,))]
             while i < fs.len() {
+                let Some(value) = reify(LeafView::Numeric(fs[i].leaf), codes[i]) else {
+                    #[cfg(verus_keep_ghost)]
+                    proof! {
+                        assert(fields == FieldsView::Numeric(fs));
+                        assert(!(forall|j:int|0<=j<codes@.len() ==> spec::reify(LeafView::Numeric(fs@[j].leaf),codes@[j]).is_some())) by {
+                            if forall|j:int|0<=j<codes@.len() ==> spec::reify(LeafView::Numeric(fs@[j].leaf),codes@[j]).is_some() {
+                                assert(spec::reify(LeafView::Numeric(fs@[i as int].leaf),codes@[i as int]).is_some());
+                            }
+                        }
+                        assert(spec::fields(fields,codes@).is_none());
+                    }
+                    return None;
+                };
                 result.push(Field {
                     id: fs[i].id,
-                    value: codes[i],
+                    value,
                 });
+                #[cfg(verus_keep_ghost)]
+                proof! { assert(result@ =~= spec::numeric_fields(fs@,codes@,(i+1) as nat)); }
                 i += 1;
             }
             Some(result)

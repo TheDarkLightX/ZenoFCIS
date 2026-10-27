@@ -1,0 +1,23 @@
+# Decision examples for the escrow-deal example contract.
+#
+# Provenance: LLM-generated on 2026-10-21 together with the rules, so they
+# are not an independent oracle. Not yet reviewed by the owner.
+#
+# Inputs: status held paid_to_seller refunded_to_buyer | action amount | party day
+# Status 150 Open, 151 Funded, 152 Shipped, 153 Released, 154 Refunded.
+# Action 160 Deposit, 161 MarkShipped, 162 Release, 163 Refund.
+# Party 170 Buyer, 171 Seller, 172 Operator. The server sets the day.
+# Deliveries: channel 300 seller payout or 301 buyer refund, then units.
+150 0 0 0 | 160 2 | 170 1 | accept - 151 2 0 0 | -
+150 0 0 0 | 160 2 | 171 1 | reject 200 150 0 0 0 | -
+151 2 0 0 | 161 1 | 171 3 | accept - 152 2 0 0 | -
+151 2 0 0 | 162 1 | 170 3 | reject 201 151 2 0 0 | -
+152 2 0 0 | 162 1 | 170 4 | accept - 153 0 2 0 | 300 2
+152 2 0 0 | 163 1 | 172 8 | accept - 154 0 0 2 | 301 2
+152 2 0 0 | 163 1 | 172 7 | reject 202 152 2 0 0 | -
+151 3 0 0 | 163 1 | 172 8 | accept - 154 0 0 3 | 301 3
+151 3 0 0 | 163 1 | 172 0 | reject 202 151 3 0 0 | -
+152 2 0 0 | 163 1 | 170 9 | reject 200 152 2 0 0 | -
+153 0 2 0 | 162 1 | 170 9 | reject 201 153 0 2 0 | -
+154 0 0 2 | 160 1 | 170 14 | reject 201 154 0 0 2 | -
+153 0 2 0 | 163 1 | 172 5 | reject 201 153 0 2 0 | -

@@ -1,0 +1,37 @@
+{
+  "format": "zenoui/metadata/1",
+  "title": "Clock counter",
+  "action": "command.101",
+  "fields": {
+    "pre.100.110": {
+      "label": "Value",
+      "unit": "units"
+    },
+    "command.101": {
+      "label": "Command",
+      "unit": "unitless"
+    },
+    "context.102.140": {
+      "label": "Caller",
+      "unit": "unitless"
+    },
+    "context.102.141": {
+      "label": "Day",
+      "unit": "days"
+    }
+  },
+  "variants": {
+    "120": "Keep value",
+    "130": "Operator",
+    "131": "Visitor"
+  },
+  "commands": {
+    "120": {
+      "label": "Keep value",
+      "consequential": true
+    }
+  },
+  "reasons": {
+    "200": "Only the operator may keep this value."
+  }
+}

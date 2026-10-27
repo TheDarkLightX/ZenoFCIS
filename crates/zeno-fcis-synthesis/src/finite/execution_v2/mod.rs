@@ -15,12 +15,17 @@ pub mod continuation;
 mod decision;
 mod input_view;
 pub mod laws;
-mod meter;
+pub(super) mod meter;
 #[cfg(verus_keep_ghost)]
 pub(crate) mod nonbinding_step;
 pub(crate) mod numeric;
+/// Nonpublishing native oracle relations; authenticated integration is separately gated.
+#[cfg(not(verus_keep_ghost))]
+pub mod oracle;
 #[cfg(verus_keep_ghost)]
 mod spec;
+#[cfg(not(verus_keep_ghost))]
+pub mod tables;
 pub(crate) mod util;
 
 pub use input_view::{

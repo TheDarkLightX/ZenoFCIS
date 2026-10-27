@@ -1,0 +1,65 @@
+{
+  "theory": "steps-over-integers",
+  "id": "dex_k",
+  "kind": "law",
+  "authority": {
+    "status": "DECIDED",
+    "source": "LADDERS.md §1; Spot owner policy Swap k. New rendering is proposed."
+  },
+  "scope": "Valid candidate Spot steps. S is accepted SwapExactIn or SwapExactOut; no frame or price claim.",
+  "domains": {
+    "T": {
+      "member": "step",
+      "plural": "steps",
+      "noun": "steps"
+    }
+  },
+  "symbols": {
+    "S": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "T"
+      ],
+      "clause": "{0} is an accepted swap",
+      "noun": "accepted swap"
+    },
+    "x": {
+      "kind": "function",
+      "arity": 1,
+      "args": [
+        "T"
+      ],
+      "noun": "reserve x",
+      "state": true
+    },
+    "y": {
+      "kind": "function",
+      "arity": 1,
+      "args": [
+        "T"
+      ],
+      "noun": "reserve y",
+      "state": true
+    }
+  },
+  "definitions": [
+    {
+      "name": "k",
+      "params": [
+        {
+          "name": "t",
+          "domain": "T"
+        }
+      ],
+      "body": "x(t)*y(t)",
+      "noun": "the reserve product"
+    }
+  ],
+  "formula": "forall t in T: S(t) => x'(t)*y'(t) >= x(t)*y(t)",
+  "fixtures": [
+    {"id":"K1","domains":{"T":["t0"]},"symbols":{"S":{"rows":[[["t0"],true]]},"x":{"rows":[[["t0"],10000]]},"x'":{"rows":[[["t0"],11000]]},"y":{"rows":[[["t0"],10000]]},"y'":{"rows":[[["t0"],9094]]}},"expected":true,"note":"Accepted exact-in arithmetic; other acceptance premises assumed."},
+    {"id":"K2","domains":{"T":["t0"]},"symbols":{"S":{"rows":[[["t0"],true]]},"x":{"rows":[[["t0"],10000]]},"x'":{"rows":[[["t0"],11000]]},"y":{"rows":[[["t0"],10000]]},"y'":{"rows":[[["t0"],9090]]}},"expected":false,"note":"Alleged accepted post-state violates the reserve-product law."},
+    {"id":"K3","domains":{"T":["t0"]},"symbols":{"S":{"rows":[[["t0"],false]]},"x":{"rows":[[["t0"],10000]]},"x'":{"rows":[[["t0"],9000]]},"y":{"rows":[[["t0"],10000]]},"y'":{"rows":[[["t0"],9000]]}},"expected":true,"note":"RemoveLiquidity is outside the swap guard; vacuous satisfaction."}
+  ]
+}

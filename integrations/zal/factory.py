@@ -15,10 +15,45 @@ import subprocess
 import tempfile
 
 from behavior import Formula, Model, Refusal, check
+import behavior2
 from workflow import checker_identity
 
 
+CORRESPONDENCE_TEST = '''//! ZAL initial state and finite reference decisions versus the library Authority.
+#[test]
+fn zal_whole_declared_domain_matches_authority() {
+    let contract = application::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = application::authority(&descriptor).unwrap_or_else(|e| panic!("{e}"));
+    let expected_initial: &[i128] = &@INITIAL@;
+    assert_eq!(application::genesis_numbers().unwrap_or_else(|e| panic!("{e}")),
+               expected_initial, "contract genesis differs from the ZAL initial state");
+    // This literal comes from the ZAL interpreter, independently of the contract emitter.
+    // Bind the entire table, including refusals, before claiming whole-domain coverage.
+    let reference = @REFERENCE@;
+    assert_eq!(include_str!("zal-authority-examples.txt"), reference,
+               "ZAL reference table changed: missing, repeated or altered decisions");
+    let rows = application::examples(reference)
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert!(!rows.is_empty());
+    for row in &rows {
+        let checked = application::check(&authority, row);
+        assert!(checked.is_ok(), "ZAL decision differs at inputs {:?}: {:?}", row.inputs, checked);
+    }
+    println!("ZAL whole-domain tuples checked: {}", rows.len());
+}
+'''
+
+
+def correspondence_test(table, initial):
+    """Bind owned reference text and initial values; no contract policy is read here."""
+    return (CORRESPONDENCE_TEST.replace("@INITIAL@", json.dumps(initial))
+            .replace("@REFERENCE@", json.dumps("\n".join(table) + "\n")))
+
+
 def lower(model: Model) -> dict[str, str]:
+    if isinstance(model, behavior2.Machine):
+        return lower_machine(model)
     report = check(model, checker_identity())
     if report["status"] != "pass-with-scope":
         raise Refusal("Lowering needs passing finite-profile checks and no unresolved obligations")
@@ -42,11 +77,13 @@ def lower(model: Model) -> dict[str, str]:
 
     project = ["zeno 1;", f"project 1 {model.name};", "namespace 2 dialogue;",
                "type 100 state ControlState;", "type 101 command Event;",
-               "type 102 context Observations;" if facts else "type 102 int UnitContext in 0..=0;",
+               "type 102 context Observations;",
                "type 105 data ControlLabel;", "field 110 100 control 105;"]
     if facts:
         project.append("type 106 bool ContextFact;")
         project.extend(f"field {fid} 102 observed_{name} 106;" for name, fid in facts.items())
+    else:
+        project.extend(["type 106 int UnitContext in 0..=0;", "field 160 102 unit 106;"])
     project.extend(f"variant {sid} 105 state_{name} none;" for name, sid in states.items())
     project.extend(f"variant {eid} 101 event_{name} none;" for name, eid in events.items())
     project.extend(f"reason {rid} refused_{name} precedence {i};" for i, (name, rid) in enumerate(reasons.items()))
@@ -102,21 +139,7 @@ def lower(model: Model) -> dict[str, str]:
                if s == state and model.decide(s, event, context)["class"] == "Reject"]
     if rejects:
         journey.append(example(state, *rejects[0]))
-    correspondence = '''//! Exhaustive ZAL reference decisions versus the actual library Authority.
-#[test]
-fn zal_whole_declared_domain_matches_authority() {
-    let contract = application::v2_contract::Contract::new();
-    let descriptor = contract.descriptor();
-    let authority = application::authority(&descriptor).unwrap_or_else(|e| panic!("{e}"));
-    let rows = application::examples(include_str!("zal-authority-examples.txt"))
-        .unwrap_or_else(|e| panic!("{e}"));
-    assert!(!rows.is_empty());
-    for row in &rows {
-        application::check(&authority, row).unwrap_or_else(|e| panic!("{e}"));
-    }
-    println!("ZAL whole-domain tuples checked: {}", rows.len());
-}
-'''
+    correspondence = correspondence_test(table, [states[model.initial]])
     mapping = {"schema": "zal/factory-source-map/1", "revision": model.revision,
                "states": states, "events": events, "context_fields": facts, "reasons": reasons,
                "case_ids": [r.id for r in model.rules] + ["default"],
@@ -125,6 +148,269 @@ fn zal_whole_declared_domain_matches_authority() {
             "tests/decision-examples.txt": "\n".join(journey) + "\n",
             "tests/zal-authority-examples.txt": "\n".join(table) + "\n",
             "tests/zal_correspondence.rs": correspondence, "zal-source-map.json": json.dumps(mapping, indent=2) + "\n"}
+
+
+def _partial(node, accepted):
+    """Fold the step's outcome class into a requirement; return a Python bool when it is constant."""
+    op = node.op
+    if op == "accepted":
+        return accepted
+    if op in {"true", "false"}:
+        return op == "true"
+    if op == "not":
+        inner = _partial(node.args[0], accepted)
+        return not inner if isinstance(inner, bool) else behavior2.Expr("not", (inner,))
+    if op in {"and", "or"}:
+        parts = [_partial(a, accepted) for a in node.args]
+        if (False if op == "and" else True) in parts:
+            return op == "or"
+        kept = tuple(p for p in parts if not isinstance(p, bool))
+        return op == "and" if not kept else kept[0] if len(kept) == 1 else behavior2.Expr(op, kept)
+    if op == "implies":
+        premise, conclusion = (_partial(a, accepted) for a in node.args)
+        if premise is False or conclusion is True:
+            return True
+        if premise is True:
+            return conclusion
+        return behavior2.Expr("not", (premise,)) if conclusion is False else behavior2.Expr("implies", (premise, conclusion))
+    if op == "iff":
+        left, right = (_partial(a, accepted) for a in node.args)
+        if isinstance(left, bool) and isinstance(right, bool):
+            return left == right
+        if isinstance(left, bool) or isinstance(right, bool):
+            constant, other = (left, right) if isinstance(left, bool) else (right, left)
+            return other if constant else behavior2.Expr("not", (other,))
+        return behavior2.Expr("iff", (left, right))
+    return node
+
+
+def profile2_expressions(model):
+    """Pure syntax lowering shared by export and advisory law proposals.
+
+    No model execution or law verdict occurs here. Returned closures own only
+    fresh name maps; the caller cannot mutate them or the immutable model.
+    """
+    states = {name: 150 + i for i, name in enumerate(model.states)}
+    events = {name: 120 + i for i, name in enumerate(model.events)}
+    facts = {name: 160 + i for i, name in enumerate(model.facts)}
+    inputs = {item.name: 164 + i for i, item in enumerate(model.inputs)}
+    variables = {item.name: 170 + i for i, item in enumerate(model.variables)}
+
+    def term(node, root):
+        """root names where variables are read: pre, post, or the requirement law's pre/post pair."""
+        op = node.op
+        if op == "int":
+            return str(node.args[0]) if node.args[0] >= 0 else f"({node.args[0]})"
+        if op == "input":
+            return f"context.102.{inputs[node.args[0]]}"
+        if op in {"var", "var_next"}:
+            return f"{root[op == 'var_next']}.100.{variables[node.args[0]]}"
+        return f"({term(node.args[0], root)} {'+' if op == 'add' else '-'} {term(node.args[1], root)})"
+
+    def expression(node, root, law=False):
+        """Case guards read a Boolean fact directly; a law formula's atoms must be comparisons."""
+        op = node.op
+        if op in {"true", "false"}:
+            return op
+        if op == "fact":
+            return f"context.102.{facts[node.args[0]]}" + (" == 1" if law else "")
+        if op in {"state", "state_next"}:
+            return f"{root[op == 'state_next']}.100.110 == {states[node.args[0]]}"
+        if op == "event":
+            return f"command.101 == {events[node.args[0]]}"
+        if op == "not":
+            return f"!({expression(node.args[0], root, law)})"
+        if op in {"and", "or"}:
+            return "(" + (" && " if op == "and" else " || ").join(expression(a, root, law) for a in node.args) + ")"
+        if op == "implies":
+            return f"({expression(node.args[0], root, law)} -> {expression(node.args[1], root, law)})"
+        if op == "iff":
+            left, right = expression(node.args[0], root, law), expression(node.args[1], root, law)
+            return f"(({left} -> {right}) && ({right} -> {left}))"
+        if op == "cmp":
+            return f"({term(node.args[1], root)} {node.args[0]} {term(node.args[2], root)})"
+        raise Refusal(f"unsupported lowering: {op}")
+
+    return term, expression
+
+
+def profile2_proposal(model, kind, name, formula, first_id):
+    """Lower an invariant/requirement without checking whether it is true.
+
+    Export uses these same expressions and outcome folding. The binary must
+    check the returned laws; even a false proposal must reach that checker.
+    """
+    _, expression = profile2_expressions(model)
+    if kind == "invariant":
+        return (f"law {first_id} invariant_{name} on commit, genesis = "
+                f"{expression(formula, ('post', 'post'), True)};",)
+    laws = []
+    for scope, accepted, roots in [("accept", True, ("pre", "post")),
+                                   ("reject", False, ("pre", "pre"))]:
+        folded = _partial(formula, accepted)
+        if folded is True:
+            continue
+        body = "false" if folded is False else expression(folded, roots, True)
+        laws.append(f"law {first_id + len(laws)} require_{name}_{scope} on {scope} = {body};")
+    return tuple(laws)
+
+
+def lower_machine(model: behavior2.Machine) -> dict[str, str]:
+    """Lower profile 2 to the contract; constructs without a contract form refuse by name."""
+    if model.players or model.games:
+        raise Refusal("unsupported lowering: game players and properties; use export-game")
+    safety = []
+    for name, formula in model.properties:
+        shape = behavior2.property_shape(formula)
+        if shape["kind"] != "safety":
+            raise Refusal(f"unsupported lowering: temporal property {name}")
+        safety.append((name, shape["goal"]))
+    for name, _ in model.fairness:
+        raise Refusal(f"unsupported lowering: fairness assumption {name}")
+    for kind, _ in model.obligations:
+        raise Refusal(f"unsupported lowering: unresolved {kind}")
+    report = behavior2.check(model, checker_identity())
+    if report["status"] != "pass-with-scope":
+        raise Refusal("Lowering needs passing finite-profile checks and no unresolved obligations")
+    if len(model.states) < 2:
+        raise Refusal("This factory-qualified subset requires at least two states for its independent rejected-genesis check")
+    states = {name: 150 + i for i, name in enumerate(model.states)}
+    events = {name: 120 + i for i, name in enumerate(model.events)}
+    facts = {name: 160 + i for i, name in enumerate(model.facts)}
+    inputs = {item.name: 164 + i for i, item in enumerate(model.inputs)}
+    variables = {item.name: 170 + i for i, item in enumerate(model.variables)}
+    reasons = {name: 200 + i for i, name in enumerate(sorted({model.default, *[r.reason for r in model.rules if r.reason]}))}
+
+    term, expression = profile2_expressions(model)
+
+    observed = bool(facts or inputs)
+    project = ["zeno 1;", f"project 1 {model.name};", "namespace 2 dialogue;",
+               "type 100 state ControlState;", "type 101 command Event;",
+               "type 102 context Observations;",
+               "type 105 data ControlLabel;"]
+    if facts:
+        project.append("type 106 bool ContextFact;")
+    if not observed:
+        project.extend(["type 106 int UnitContext in 0..=0;", "field 160 102 unit 106;"])
+    project.extend(f"type {107 + i} int Variable{i} in {v.low}..={v.high};" for i, v in enumerate(model.variables))
+    project.extend(f"type {111 + i} int Input{i} in {v.low}..={v.high};" for i, v in enumerate(model.inputs))
+    project.append("field 110 100 control 105;")
+    project.extend(f"field {fid} 100 var_{name} {107 + i};" for i, (name, fid) in enumerate(variables.items()))
+    project.extend(f"field {fid} 102 observed_{name} 106;" for name, fid in facts.items())
+    project.extend(f"field {fid} 102 input_{name} {111 + i};" for i, (name, fid) in enumerate(inputs.items()))
+    project.extend(f"variant {sid} 105 state_{name} none;" for name, sid in states.items())
+    project.extend(f"variant {eid} 101 event_{name} none;" for name, eid in events.items())
+    project.extend(f"reason {rid} refused_{name} precedence {i};" for i, (name, rid) in enumerate(reasons.items()))
+    project.extend(["component 400 control {", "  owns 100;", "  reads pre.100;", "  writes post.100;",
+                    "  contexts context.102;", "  budget steps 64;", "}", "merge [400];"])
+    shape = " || ".join(f"post.100.110 == {sid}" for sid in states.values())
+    project.append(f"law 500 declared_control_domain on commit, genesis = {shape};")
+    kinds = {"500": "StateInvariant"}
+    for i, (name, formula) in enumerate(model.invariants, 501):
+        project.append(f"law {i} invariant_{name} on commit, genesis = {expression(formula, ('post', 'post'), True)};")
+        kinds[str(i)] = "StateInvariant"
+    property_laws = {name: [] for name, _ in safety}
+    for prefix, claims, first_law in [("require", model.requirements, 520), ("property", safety, 540)]:
+        law = first_law
+        for name, formula in claims:
+            # A rejection keeps every field, so its post-state reads are the pre-state.
+            for scope, accepted, root, kind in [("accept", True, ("pre", "post"), "AuthoritySubjectRecipient"),
+                                                ("reject", False, ("pre", "pre"), "RejectNoAuthority")]:
+                folded = _partial(formula, accepted)
+                if folded is True:
+                    continue
+                body = "false" if folded is False else expression(folded, root, True)
+                project.append(f"law {law} {prefix}_{name}_{scope} on {scope} = {body};")
+                kinds[str(law)] = kind
+                if prefix == "property":
+                    property_laws[name].append(law)
+                law += 1
+
+    def update(item):
+        value = term(item.term, ("pre", "post"))
+        if item.op == "=":
+            return item.term.args[0] if item.term.op == "int" else value
+        return f"pre.100.{variables[item.variable]} {'+' if item.op == '+=' else '-'} {value}"
+
+    cases = []
+    for rule in model.rules:
+        post = {"110": states[rule.target], **{str(variables[u.variable]): update(u) for u in rule.updates}} if rule.target else {}
+        cases.append({"rule": rule.id,
+                      "when": f"pre.100.110 == {states[rule.source]} && command.101 == {events[rule.event]} && ({expression(rule.guard, ('pre', 'pre'))})",
+                      "class": "Accept" if rule.target else "Reject",
+                      "reason": reasons[rule.reason] if rule.reason else None, "post": post, "outbox": []})
+    # The factory's ordered cases are equivalent only because check() proved
+    # these guards disjoint over the declared finite domain.
+    cases.append({"rule": "default", "when": "true", "class": "Reject",
+                  "reason": reasons[model.default], "post": {}, "outbox": []})
+    policy = {"schema": "zeno-fcis/template-declarative-policy/2", "template": model.name.replace("_", "-"),
+              "roots": {"state": 100, "command": 101, "context": 102},
+              "leaf_bindings": {"106": ["Bool"]} if facts else {}, "variables": {},
+              "cases": cases,
+              "genesis": {"110": states[model.initial], **{str(variables[v.name]): v.initial for v in model.variables}},
+              "law_kinds": kinds}
+    names = [v.name for v in model.variables]
+
+    def admissible(state, values):
+        probe = behavior2._Step(state, values, None, {})
+        return all(behavior2.holds(f, probe) for _, f in model.invariants)
+
+    def example(state, values, event, context):
+        result = model.decide(state, values, event, context)
+        inputs_row = [states[state], *[values[n] for n in names], events[event],
+                      *[int(context[n]) for n in facts], *[context[n] for n in inputs]]
+        if not observed:
+            inputs_row.append(0)
+        reason = str(reasons[result["reason"]]) if result["reason"] else "-"
+        post = [states[result["state"]], *[result["variables"][n] for n in names]]
+        return f"{' '.join(map(str, inputs_row))} | {result['class'].lower()} {reason} {' '.join(map(str, post))} | -"
+
+    domain = [row for row in model.inputs_domain() if admissible(row[0], row[1])]
+    # ZAL safety ranges over reachable executions; contract laws cover every
+    # admissible pre-state. Refuse a strengthening that would change decisions
+    # on unreachable inputs instead of silently changing the reference model.
+    for row in domain:
+        step = model.outcome(*row)[1]
+        for name, goal in safety:
+            if not behavior2.holds(goal, step):
+                raise Refusal(f"unsupported lowering: temporal property {name} does not hold on every admissible step")
+    table = [example(*row) for row in domain]
+    # One deterministic persistent journey from genesis, stopping on a repeated configuration.
+    journey, seen = [], set()
+    state, values = model.initial, model.initial_values()
+    contexts = list(model.contexts())
+    while (state, tuple(values[n] for n in names)) not in seen:
+        seen.add((state, tuple(values[n] for n in names)))
+        options = [(event, context) for event in model.events for context in contexts
+                   if model.decide(state, values, event, context)["class"] == "Accept"]
+        if not options:
+            break
+        event, context = options[0]
+        journey.append(example(state, values, event, context))
+        result = model.decide(state, values, event, context)
+        state, values = result["state"], result["variables"]
+    rejects = [(event, context) for event in model.events for context in contexts
+               if model.decide(state, values, event, context)["class"] == "Reject"]
+    if rejects:
+        journey.append(example(state, values, *rejects[0]))
+    mapping = {"schema": "zal/factory-source-map/2", "profile": behavior2.PROFILE, "revision": model.revision,
+               "states": states, "events": events, "context_fields": facts, "input_fields": inputs,
+               "variable_fields": variables, "reasons": reasons,
+               "case_ids": [r.id for r in model.rules] + ["default"],
+               "laws": {k: v for k, v in kinds.items()},
+               "property_laws": property_laws,
+               "reference_domain": {"admissible_tuples": len(table), "declared_tuples": report["input_tuples"],
+                                    "excluded": "pre-states that break a declared invariant; the contract's genesis "
+                                                "and commit laws keep every held state admissible"},
+               "correspondence": "tested correspondence, not a theorem",
+               "scope": "class, reason, successor control state and variables, and empty deliveries; "
+                        "not Step or publication identity equivalence"}
+    return {"project.zeno": "\n".join(project) + "\n", "v2/policy.json": json.dumps(policy, indent=2) + "\n",
+            "tests/decision-examples.txt": "\n".join(journey) + "\n",
+            "tests/zal-authority-examples.txt": "\n".join(table) + "\n",
+            "tests/zal_correspondence.rs": correspondence_test(
+                table, [states[model.initial], *[v.initial for v in model.variables]]),
+            "zal-source-map.json": json.dumps(mapping, indent=2) + "\n"}
 
 
 def write_new(files: dict[str, str], destination: Path):
@@ -137,6 +423,51 @@ def write_new(files: dict[str, str], destination: Path):
         path.write_text(contents, encoding="ascii")
 
 
+def refine_check(model, contract: Path, cli: Path, max_checks=262144):
+    """Compare a contract to the existing ZAL lowering through the native checker.
+
+    The identity abstraction keeps the lowered state and input layouts. This
+    shell grants no authority and implements no decisions or refinement verdict.
+    """
+    files = lower(model)
+    states = len(model.states)
+    if isinstance(model, behavior2.Machine):
+        for variable in model.variables:
+            states *= variable.high - variable.low + 1
+    pins = {"schema": "zeno-fcis/contract-refinement/1", "abstraction": list(range(states)),
+            "invalid_state_law": 500}
+
+    def bounded_source(path):
+        # The native refinement profile admits at most 1 MiB per source.
+        with path.open("rb") as stream:
+            data = stream.read((1 << 20) + 1)
+        if len(data) > 1 << 20:
+            raise Refusal("Contract refinement source exceeds 1 MiB")
+        return data
+
+    for side, project, policy in [("abstract", files["project.zeno"].encode("ascii"), files["v2/policy.json"].encode("ascii")),
+                                  ("concrete", bounded_source(contract / "project.zeno"), bounded_source(contract / "v2/policy.json"))]:
+        pins[f"{side}_project_sha256"] = hashlib.sha256(project).hexdigest()
+        pins[f"{side}_policy_sha256"] = hashlib.sha256(policy).hexdigest()
+    with tempfile.TemporaryDirectory(prefix="zal-refinement-") as temporary:
+        work = Path(temporary)
+        write_new(files, work / "abstract")
+        mapping = work / "abstraction.json"
+        mapping.write_text(json.dumps(pins), encoding="ascii")
+        command = [str(cli.resolve()), "contract", "refine-check", str(work / "abstract"), str(contract.resolve()),
+                   "--abstraction", str(mapping), "--max-checks", str(max_checks), "--format", "json"]
+        try:
+            checked = subprocess.run(command, capture_output=True, text=True, timeout=120, check=False)
+        except subprocess.TimeoutExpired as error:
+            raise Refusal("Native refinement did not finish within 120 seconds; no refinement result") from error
+    result = json.loads(checked.stdout)
+    return {"schema": "zal/contract-refinement/1", "revision": model.revision, "checker": checker_identity(),
+            "status": result.get("verdict", result.get("status")), "contract_check": result,
+            "scope": "native finite refinement of the existing lowering, with identical state and input layouts; "
+                     "ZAL correspondence is tested separately by the generated Authority examples",
+            "authority": "none"}, checked.returncode
+
+
 def qualify(model: Model, root: Path, cli: Path, output: Path | None = None):
     files = lower(model)
     if not cli.is_file():
@@ -145,7 +476,8 @@ def qualify(model: Model, root: Path, cli: Path, output: Path | None = None):
               "checker": checker_identity(),
               "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
               "authoring_hashes": {name: hashlib.sha256((Path(__file__).parent / name).read_bytes()).hexdigest()
-                                   for name in ["behavior.py", "factory.py", "workflow.py"]},
+                                   for name in ["behavior.py", "factory.py", "workflow.py",
+                                                *(["behavior2.py"] if isinstance(model, behavior2.Machine) else [])]},
               "cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest(),
               "declaration_hashes": {name: hashlib.sha256(text.encode()).hexdigest() for name, text in files.items()},
               "authority": "none", "checks": [], "status": "unfinished"}
@@ -190,7 +522,8 @@ def qualify(model: Model, root: Path, cli: Path, output: Path | None = None):
         report["checks"].append({"command": [public(arg) for arg in command],
                                  "exit_code": result.returncode, "stdout": public(result.stdout[-10000:]), "stderr": public(result.stderr[-3000:])})
         report["status"] = "pass-with-scope" if result.returncode == 0 else "unfinished"
-        report["input_tuples"] = sum(1 for _ in model.inputs())
+        report["input_tuples"] = (sum(1 for _ in model.inputs()) if isinstance(model, Model)
+                                  else files["tests/zal-authority-examples.txt"].count("\n"))
     if output:
         output.write_text(json.dumps(report, indent=2) + "\n")
     return report

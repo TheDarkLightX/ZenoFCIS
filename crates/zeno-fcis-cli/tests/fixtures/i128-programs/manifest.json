@@ -1,42 +1,42 @@
 {
-  "profile": "zeno-fcis/finite-i128/1",
-  "derivation": "Fresh main-route test graphs from the unchanged historical graph fields. These are not i64 replay artifacts. Unconstrained scalar output bounds follow the i128 compiler; finite input domains remain unchanged.",
   "artifacts": {
-    "retained-controller-candidate.zcve": {
-      "bytes": 3791,
-      "sha256": "26e20553625ab15106712106d8646499b26bd66bfd7df73fee85bb2a6e06d58a"
-    },
     "boolean-kernel-candidate.zcve": {
       "bytes": 764,
       "sha256": "763464cc4efe962b0e091a2c6dc990935300ea5e4e01daaab1e510227b9a9829"
-    },
-    "retained-controller-padded.zcve": {
-      "bytes": 4142,
-      "sha256": "a22a2d57a5fddcc76c20dc1a90429f5fb152edb54510ed2af48ff43cb84fa85b"
-    },
-    "current-decision-scalars-original.zcve": {
-      "bytes": 6687,
-      "sha256": "5fc777b54fcd0ee7b489ec873253fa0c153c049fb40b43ae607c73f22d467996"
     },
     "boolean-kernel-original.zcve": {
       "bytes": 1064,
       "sha256": "71deb3a256b2ccb9beb4dcb20d202a9fa674ff40380a03d62b6c8c9e08d9e82a"
     },
-    "current-decision-scalars-candidate.zcve": {
-      "bytes": 6487,
-      "sha256": "467e570f1c82afe073aded99d6a7a89d7f5f9e7d5b236f82997705d7add094e0"
-    },
     "boolean-kernel-padded.zcve": {
       "bytes": 1115,
       "sha256": "e56da0bffaa35df704ab2e78a3bbb9ed70f873977e18a60398dc584f98dc5173"
+    },
+    "current-decision-scalars-candidate.zcve": {
+      "bytes": 7929,
+      "sha256": "b8b51e2b2647831cc685d38bec838090210716c0a9c3f5945479d751d857e3e2"
+    },
+    "current-decision-scalars-original.zcve": {
+      "bytes": 8229,
+      "sha256": "3a565aeb9ff60de413cc9842191c37d54f1c412a6c0bb680eeda2eab74dc63af"
+    },
+    "current-decision-scalars-padded.zcve": {
+      "bytes": 8280,
+      "sha256": "887f31f2c873c38cceaca67a687e3f0add0148a0bd56b93e66d72065cd461ff5"
+    },
+    "retained-controller-candidate.zcve": {
+      "bytes": 3791,
+      "sha256": "26e20553625ab15106712106d8646499b26bd66bfd7df73fee85bb2a6e06d58a"
     },
     "retained-controller-original.zcve": {
       "bytes": 4091,
       "sha256": "321a3099672a26a05126d0d4d6f4228f703c4b856435098954873d552fbc843b"
     },
-    "current-decision-scalars-padded.zcve": {
-      "bytes": 6721,
-      "sha256": "b7bfbe6148ec9cabdfac4583458de55d6ac926dba501c518ac535c482a4c61b0"
+    "retained-controller-padded.zcve": {
+      "bytes": 4142,
+      "sha256": "a22a2d57a5fddcc76c20dc1a90429f5fb152edb54510ed2af48ff43cb84fa85b"
     }
-  }
+  },
+  "derivation": "Current decision scalars come from the current withdrawal template descriptor and the retained benchmark Boolean-only rewrite; retained-controller and Boolean-kernel fixtures preserve their historical graph fields.",
+  "profile": "zeno-fcis/finite-i128/1"
 }

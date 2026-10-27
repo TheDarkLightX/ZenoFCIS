@@ -1,0 +1,37 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "payout-tie",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "101": [
+      "I128",
+      0,
+      0
+    ]
+  },
+  "variables": {},
+  "cases": [
+    {
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "1 - context.102.130",
+        "111": "context.102.130"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 1
+  },
+  "law_kinds": {
+    "500": "AuthoritySubjectRecipient",
+    "501": "StateInvariant"
+  }
+}

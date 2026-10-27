@@ -85,6 +85,24 @@ impl ProjectSpecBuilder {
         self.declarations.push(Declaration::Law(value));
         self
     }
+    /// Adds a random-bit premise.
+    #[must_use]
+    pub fn random_input(mut self, value: crate::RandomInputDecl) -> Self {
+        self.declarations.push(Declaration::Random(value));
+        self
+    }
+    /// Adds a finite distribution law.
+    #[must_use]
+    pub fn distribution(mut self, value: crate::DistributionDecl) -> Self {
+        self.declarations.push(Declaration::Distribution(value));
+        self
+    }
+    /// Adds a finite reward declaration.
+    #[must_use]
+    pub fn reward(mut self, value: crate::RewardDecl) -> Self {
+        self.declarations.push(Declaration::Reward(value));
+        self
+    }
     /// Adds a formal claim.
     #[must_use]
     pub fn claim(mut self, value: ClaimDecl) -> Self {
@@ -112,6 +130,7 @@ impl ProjectSpecBuilder {
                     .collect(),
                 merge_order: self.merge_order,
                 diagnostic_limit: crate::MAX_RETAINED_DIAGNOSTICS,
+                collections: crate::CollectionsSpec::default(),
             },
             limits,
         )

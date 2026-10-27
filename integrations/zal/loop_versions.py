@@ -185,9 +185,10 @@ def _run_question(cli, path, limits):
     for flag, value in sorted(limits.items()):
         arguments.extend(["--" + flag.replace("_", "-"), str(value)])
     code, report = doors.run(cli, arguments)
-    if code == 2 or report.get("status") == "inconclusive":
+    if report.get("status") == "inconclusive" or (code == 2 and report.get("status") != "question"):
         return {"status": "inconclusive", "authority": "none", "detail": report.get("detail", {})}
-    if code != 0 or report.get("status") not in ("question", "determined", "no-completion"):
+    expected_exit = {"determined": 0, "question": 2, "no-completion": 1}
+    if report.get("status") not in expected_exit or code != expected_exit[report["status"]]:
         raise Refusal("requirements-only question refused: " + str((report.get("detail") or {}).get("reason", report.get("status"))))
     return report
 

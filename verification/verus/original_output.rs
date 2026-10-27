@@ -19,6 +19,7 @@ pub mod evaluation;
 #[path = "../../crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs"]
 pub mod execution_v2;
 pub mod finite {
+    pub(crate) use crate::value;
     #[cfg(test)]
     pub use crate::execution_v2::order_fixture_transition as v2_order_fixture_transition; pub use crate::{canonical_v2, evaluation, execution_v2}; }
 pub use canonical_v2::output;

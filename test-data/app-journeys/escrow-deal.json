@@ -1,0 +1,190 @@
+{
+  "parties": [
+    {
+      "name": "buyer",
+      "context": [
+        "170"
+      ]
+    },
+    {
+      "name": "seller",
+      "context": [
+        "171"
+      ],
+      "view": [
+        "status",
+        "held",
+        "paid_to_seller"
+      ]
+    },
+    {
+      "name": "operator",
+      "context": [
+        "172"
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "party": "buyer",
+      "clock": "1",
+      "command": [
+        "160",
+        "2"
+      ],
+      "class": "Accept"
+    },
+    {
+      "party": "seller",
+      "clock": "2",
+      "command": [
+        "163",
+        "1"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "buyer",
+      "clock": "2",
+      "command": [
+        "161",
+        "1"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "seller",
+      "clock": "3",
+      "command": [
+        "161",
+        "1"
+      ],
+      "class": "Accept"
+    },
+    {
+      "party": "operator",
+      "clock": "5",
+      "command": [
+        "163",
+        "1"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "operator",
+      "clock": "6",
+      "command": [
+        "162",
+        "1"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "operator",
+      "clock": "8",
+      "command": [
+        "163",
+        "1"
+      ],
+      "class": "Accept"
+    }
+  ],
+  "deliveries": 1,
+  "terminal_time": "14",
+  "terminal_recoveries": [
+    {
+      "steps": [
+        {
+          "party": "buyer",
+          "clock": "1",
+          "command": [
+            "160",
+            "2"
+          ],
+          "post": [
+            "151",
+            "2",
+            "0",
+            "0"
+          ]
+        },
+        {
+          "party": "buyer",
+          "clock": "1000000",
+          "command": [
+            "164",
+            "1"
+          ],
+          "post": [
+            "154",
+            "0",
+            "0",
+            "2"
+          ]
+        }
+      ],
+      "deliveries": 1
+    },
+    {
+      "steps": [
+        {
+          "party": "buyer",
+          "clock": "1",
+          "command": [
+            "160",
+            "2"
+          ],
+          "post": [
+            "151",
+            "2",
+            "0",
+            "0"
+          ]
+        },
+        {
+          "party": "seller",
+          "clock": "2",
+          "command": [
+            "161",
+            "1"
+          ],
+          "post": [
+            "152",
+            "2",
+            "0",
+            "0"
+          ]
+        },
+        {
+          "party": "buyer",
+          "clock": "3",
+          "command": [
+            "165",
+            "1"
+          ],
+          "post": [
+            "155",
+            "2",
+            "0",
+            "0"
+          ]
+        },
+        {
+          "party": "seller",
+          "clock": "1000000",
+          "command": [
+            "166",
+            "1"
+          ],
+          "post": [
+            "153",
+            "0",
+            "2",
+            "0"
+          ]
+        }
+      ],
+      "deliveries": 1
+    }
+  ]
+}

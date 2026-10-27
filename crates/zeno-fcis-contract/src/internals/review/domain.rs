@@ -13,43 +13,29 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
+use zeno_fcis_spec::TableIndexRange;
 
 use super::super::ContractError;
 use super::super::declarations::{Declarations, Kind as TypeKind, Source};
 use super::super::expr::{self, Ast, Binary};
 use super::super::rules::{Constant, Rules};
 
-/// An admitted leaf domain, as the schema declares it.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum LeafDomain {
-    Bool,
-    Int { min: i128, max: i128 },
-    Sum { type_id: u32, variants: Vec<u16> },
-}
+mod leaf;
+pub use leaf::{LeafDomain, Position};
+#[cfg(verus_keep_ghost)]
+pub use leaf::{least_or_zero, least_spec};
 
 impl LeafDomain {
     /// Values in the domain; `None` when the count exceeds `u128`.
     pub fn size(&self) -> Option<u128> {
         match self {
             Self::Bool => Some(2),
-            Self::Int { min, max } => {
-                if min > max {
-                    return None;
-                }
-                min.abs_diff(*max).checked_add(1)
+            Self::Int { min, max } => TableIndexRange::Signed {
+                min: *min,
+                max: *max,
             }
+            .cardinality(),
             Self::Sum { variants, .. } => Some(variants.len() as u128),
-        }
-    }
-
-    /// The first value in enumeration order, in constant time and space for
-    /// every domain; `None` for an empty domain. It equals the first element
-    /// of [`Self::values_within`] whenever that returns a list.
-    pub fn least(&self) -> Option<i128> {
-        match self {
-            Self::Bool => Some(0),
-            Self::Int { min, max } => (min <= max).then_some(*min),
-            Self::Sum { variants, .. } => variants.first().map(|id| i128::from(*id)),
         }
     }
 
@@ -84,6 +70,9 @@ impl LeafDomain {
 /// The domain of a scalar type; text has none.
 pub fn leaf_domain(declarations: &Declarations, type_id: u32) -> Result<LeafDomain, ContractError> {
     Ok(match declarations.kind(type_id)? {
+        TypeKind::U128 { .. } => {
+            return Err(ContractError::new("review", "U128ReviewRequiresTypedPath"));
+        }
         TypeKind::Bool => LeafDomain::Bool,
         TypeKind::I128 { min, max } => LeafDomain::Int { min, max },
         TypeKind::Sum(variants) => LeafDomain::Sum {
@@ -97,17 +86,6 @@ pub fn leaf_domain(declarations: &Declarations, type_id: u32) -> Result<LeafDoma
             ));
         }
     })
-}
-
-/// One program input position: a root field, or a whole scalar root.
-#[derive(Clone, Debug)]
-pub struct Position {
-    /// The rules name: `pre.100.110`, `command.101`, `context.102.130`.
-    pub name: String,
-    pub source: Source,
-    pub field: Option<u16>,
-    pub type_id: u32,
-    pub domain: LeafDomain,
 }
 
 impl Position {
@@ -129,6 +107,7 @@ impl Position {
 /// The program input positions in the order the program, and every decision
 /// example, reads them.
 pub fn positions(declarations: &Declarations) -> Result<Vec<Position>, ContractError> {
+    declarations.refuse_unsigned("scalar consumer binding")?;
     declarations
         .inputs()?
         .into_iter()
@@ -224,6 +203,8 @@ pub fn input_set(
     examples: &[&[i128]],
     max_tuples: u64,
 ) -> Result<InputSet, ContractError> {
+    rules.refuse_unsigned("scalar review binding")?;
+    declarations.refuse_unsigned("scalar review binding")?;
     let width = positions.len();
     let domain_size = domain_size(positions);
     let limit = u128::from(max_tuples);
@@ -284,14 +265,18 @@ pub fn input_set(
         .map(
             |(index, position)| match (position.source, position.field) {
                 (Source::State, Some(field)) => match rules.genesis.get(&field) {
-                    Some(Constant::Bool(value)) => i128::from(*value),
-                    Some(Constant::Int(value)) => *value,
-                    None => values[index][0],
+                    Some(Constant::Bool(value)) => Ok(i128::from(*value)),
+                    Some(Constant::U128(_)) => Err(ContractError::new(
+                        "scalar genesis binding",
+                        "U128SubjectUnsupported",
+                    )),
+                    Some(Constant::Int(value)) => Ok(*value),
+                    None => Ok(values[index][0]),
                 },
-                _ => values[index][0],
+                _ => Ok(values[index][0]),
             },
         )
-        .collect();
+        .collect::<Result<_, _>>()?;
     bases.push(("genesis".to_owned(), genesis));
     for (index, example) in examples.iter().enumerate() {
         if example.len() == width && !bases.iter().any(|(_, base)| base == example) {
@@ -533,6 +518,13 @@ fn collect(
         hints
     };
     match ast {
+        Ast::Circuit(c) => {
+            for f in c.formulas() {
+                collect(f, expected, positions, found);
+            }
+        }
+        Ast::U128(_) => {}
+        Ast::ToI128(v) | Ast::ToU128(v) => collect(v, expected, positions, found),
         Ast::Int(value) => {
             for type_id in expected {
                 found.entry(*type_id).or_default().insert(*value);

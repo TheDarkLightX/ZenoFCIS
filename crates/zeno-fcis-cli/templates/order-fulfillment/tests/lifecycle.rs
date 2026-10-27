@@ -225,3 +225,102 @@ fn cancelling_while_awaiting_payment_voids_that_attempt() {
     assert_eq!(order.status, OrderStatus::Cancelled);
     assert_eq!((snapshot.version(), snapshot.pending()), (2, 2));
 }
+
+#[test]
+fn customer_recovery_and_confirmed_release_remain_available_after_the_horizon() {
+    use order_fulfillment::invoke_at;
+    for stage in 0..=3 {
+        let temp = Temp::new();
+        let contract = order_fulfillment::v2_contract::Contract::new();
+        let descriptor = contract.descriptor();
+        let authority = authority(&descriptor).unwrap();
+        let shell = &mut create(&temp.0.join("recovery.sqlite"), &authority).unwrap();
+        assert_eq!(
+            invoke_at(
+                shell,
+                &authority,
+                command(OrderAction::Checkout, 0),
+                Caller::Customer,
+                0,
+                "checkout"
+            )
+            .unwrap(),
+            "Accept"
+        );
+        for (index, (action, caller, day)) in [
+            (OrderAction::PaymentCaptured, Caller::PaymentProvider, 1),
+            (OrderAction::ParcelDispatched, Caller::Carrier, 3),
+            (OrderAction::ParcelDelivered, Caller::Carrier, 5),
+        ]
+        .into_iter()
+        .enumerate()
+        .take(stage)
+        {
+            assert_eq!(
+                invoke_at(
+                    shell,
+                    &authority,
+                    command(action, 1),
+                    caller,
+                    day,
+                    &format!("stage-{index}")
+                )
+                .unwrap(),
+                "Accept"
+            );
+        }
+        let before = shell.snapshot().unwrap();
+        let action = if stage == 3 {
+            OrderAction::ReleaseDelivered
+        } else {
+            OrderAction::TimeoutOrder
+        };
+        assert!(
+            invoke_at(
+                shell,
+                &authority,
+                command(action.clone(), 1),
+                Caller::Customer,
+                -1,
+                "negative-time"
+            )
+            .is_err()
+        );
+        assert_eq!(shell.snapshot().unwrap(), before);
+        assert_eq!(
+            invoke_at(
+                shell,
+                &authority,
+                command(action.clone(), 1),
+                Caller::Customer,
+                1_000_000,
+                "late-recovery"
+            )
+            .unwrap(),
+            "Accept"
+        );
+        let recovered = shell.snapshot().unwrap();
+        let order = order_fulfillment::decode_state(recovered.state()).unwrap();
+        assert_eq!(
+            order.status,
+            if stage == 3 {
+                OrderStatus::Settled
+            } else {
+                OrderStatus::Cancelled
+            }
+        );
+        assert_eq!(
+            invoke_at(
+                shell,
+                &authority,
+                command(action, 1),
+                Caller::Customer,
+                i128::MAX,
+                "repeat-recovery"
+            )
+            .unwrap(),
+            "Reject"
+        );
+        assert_eq!(shell.snapshot().unwrap(), recovered);
+    }
+}

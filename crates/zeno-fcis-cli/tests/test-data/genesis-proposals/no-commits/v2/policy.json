@@ -1,0 +1,27 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "no-commits",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {},
+  "cases": [
+    {
+      "rule": "default",
+      "when": "true",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 150
+  },
+  "law_kinds": {
+    "500": "StateInvariant"
+  }
+}

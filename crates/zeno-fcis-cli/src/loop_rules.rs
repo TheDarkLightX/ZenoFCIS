@@ -8,6 +8,55 @@ use zeno_fcis_program_search::concrete::{self, Rule};
 
 const SCHEMA: &str = "zeno-fcis/loop-rule-bank/1";
 
+/// Derived reporting only: retain the first counterexample/refusal per rule.
+/// A term rule can qualify and later have a refuted whole-program application.
+fn rules_summary(considered: usize, qualified: usize, checks: &[Value]) -> Value {
+    use std::collections::{BTreeMap, BTreeSet};
+    let mut examined = BTreeSet::new();
+    let mut refutations = BTreeMap::new();
+    let mut refusals = BTreeMap::new();
+    let mut incomplete = BTreeSet::new();
+    for row in checks {
+        let Some(index) = row["rule"].as_u64() else {
+            continue;
+        };
+        if row["stage"] == "target-rule" {
+            examined.insert(index);
+        }
+        let check = row.get("check").unwrap_or(row);
+        match check["verdict"].as_str() {
+            Some("counterexample") => {
+                refutations.entry(index).or_insert_with(|| {
+                    json!({
+                        "rule":index,"stage":row["stage"],"verdict":"counterexample",
+                        "ordinal":check["ordinal"],"input":check["input"],
+                        "original":check["original"],"candidate":check["candidate"]
+                    })
+                });
+            }
+            Some("refused") => {
+                refusals.entry(index).or_insert_with(|| {
+                    json!({
+                        "rule":index,"stage":row["stage"],"code":check["reason"]
+                    })
+                });
+            }
+            Some("inconclusive") => {
+                incomplete.insert(index);
+            }
+            Some("equivalent") if !accepted(check) => {
+                incomplete.insert(index);
+            }
+            _ => {}
+        }
+    }
+    json!({"considered":considered,"qualified":qualified,
+        "refuted":refutations.len(),"refused":refusals.len(),
+        "inconclusive":incomplete.len(),"unexamined":considered.saturating_sub(examined.len()),
+        "refutations":refutations.into_values().collect::<Vec<_>>(),
+        "refusals":refusals.into_values().collect::<Vec<_>>()})
+}
+
 fn program(value: &Value) -> Result<Program, String> {
     crate::neural_loop::program_json::program_from_json(value)
         .map_err(|_| "rule-program-not-admitted".into())
@@ -349,15 +398,27 @@ pub(super) fn command(
         reason = json!("invocation-deadline");
     }
     let improved = pipeline::decreasing_cost(measured_cost(&current), measured_cost(&original));
+    let summary = rules_summary(rules.len(), qualified.len(), &checks);
     let report = json!({"schema":"zeno-fcis/loop-rules-result/1","status":status,"authority":"none",
         "original": program_json(&original),
         "binding":{"original_sha256":sha256_hex(&bytes),"implementation_sha256":pipeline::implementation(),
             "scope":"full-declared-cartesian-domain"},"bank":bank_json,"baseline_check":baseline,
-        "checks":checks,"rules_requalified":qualified.len(),"applied":applied,
+        "checks":checks,"rules_requalified":qualified.len(),"applied":applied,"rules_summary":summary,
         "best":program_json(&current),"best_check":best_check,"work":budget.work(),"limits":limits.data(),
         "reason":reason,"attempts_spent":0,"improved":improved,
         "result_kind":if improved { "improved-program" } else { "unchanged-original" },
         "claim":if improved { "target-domain-concrete-rules-and-whole-program-equivalence-only" }
             else { "original-equivalence-only; no improving rewrite checked" }});
-    pipeline::finish("rules", report, status, out, Some(&bytes), Some(&current))
+    for row in summary["refutations"].as_array().into_iter().flatten() {
+        eprintln!(
+            "rules: rule {} refuted at {} input={}",
+            row["rule"],
+            row["stage"].as_str().unwrap_or("unknown"),
+            row["input"]
+        );
+    }
+    let (exit, mut response) =
+        pipeline::finish("rules", report, status, out, Some(&bytes), Some(&current));
+    response["rules_summary"] = summary;
+    (exit, response)
 }

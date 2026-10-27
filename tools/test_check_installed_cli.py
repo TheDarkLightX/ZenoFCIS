@@ -77,7 +77,7 @@ class BlockTest(unittest.TestCase):
                 self.assertEqual(environment, {"VERSION": version})
                 self.assertIn(f'ARCHIVE="zeno-fcis-$VERSION-{host}"', script)
                 self.assertTrue(script.rstrip().endswith("zeno-fcis describe"))
-        self.assertIn("sha256sum --ignore-missing --check DOWNLOADS.sha256", installed.install_block(markdown, LINUX))
+        self.assertIn("sha256sum --check -", installed.install_block(markdown, LINUX))
         self.assertIn("shasum -a 256 -c -", installed.install_block(markdown, MAC))
 
     def test_block_controls(self):
@@ -160,7 +160,7 @@ class PlatformRoutesTest(unittest.TestCase):
         loop["acquisition"] = {"observed_intake": None, "accounting_complete": False}
         return {"offline-parallel": parallel, "loop-open": loop}
 
-    def run_routes(self, reports, *, writes=False):
+    def run_routes(self, reports, *, writes=False, conformance_status="passed", receipt=True):
         with tempfile.TemporaryDirectory(prefix="zeno-fcis-platform-test-") as directory:
             work = Path(directory)
             journey = object.__new__(installed.Journey)
@@ -170,6 +170,11 @@ class PlatformRoutesTest(unittest.TestCase):
             def report(name, command, *, cwd, expected=0):
                 if name == "synth-run":
                     return {"status": "current"}
+                if name == "synth-verify":
+                    self.assertEqual(expected, 0)
+                    if receipt:
+                        Path(command[-1]).write_text("conformance receipt")
+                    return {"status": conformance_status, "authority": "none", "runtime_platform": "macos"}
                 self.assertEqual(expected, 2)
                 self.assertEqual(command[-2:], ["--containment-backend", "systemd" if name == "offline-parallel" else "auto"])
                 if writes and name == "offline-parallel":
@@ -177,13 +182,20 @@ class PlatformRoutesTest(unittest.TestCase):
                 return copy.deepcopy(reports[name])
 
             journey.report_of = report
-            journey.run = lambda *args, **kwargs: subprocess.CompletedProcess([], 2,
-                stdout=b"conformance-unknown: unsupported-runtime-platform", stderr=b"")
             return journey.platform_routes(Path("zeno-fcis"),
                                            {"check": ["zeno-fcis", "transform", "check"], "original": work / "original"})
 
     def test_typed_macos_refusals_remain_inconclusive_without_writes(self):
-        self.assertIn("offline_parallel", self.run_routes(self.reports()))
+        result = self.run_routes(self.reports())
+        self.assertIn("offline_parallel", result)
+        self.assertEqual(result["synth_verify"], "passed")
+
+    def test_macos_synthesis_requires_a_successful_check_and_receipt(self):
+        for status in ("conformance-unknown", "conformance-failed"):
+            with self.subTest(status=status), self.assertRaises(installed.JourneyError):
+                self.run_routes(self.reports(), conformance_status=status)
+        with self.assertRaisesRegex(installed.JourneyError, "wrote no receipt"):
+            self.run_routes(self.reports(), receipt=False)
 
     def test_misleading_admission_execution_or_authority_is_rejected(self):
         mutations = [
@@ -269,6 +281,10 @@ class DocumentedInstallTest(unittest.TestCase):
             "tampered archive": lambda downloads, archive: archive.write_bytes(archive.read_bytes() + b"\0"),
             "missing line": lambda downloads, archive: (downloads / "DOWNLOADS.sha256").write_text(
                 f"{'0' * 64}  zeno-fcis-rustdoc-{self.version}.tar.gz\n"),
+            "another valid asset only": lambda downloads, archive: (
+                (downloads / "another-asset").write_bytes(b"another asset"),
+                (downloads / "DOWNLOADS.sha256").write_text(
+                    f"{rc_package.sha256(downloads / 'another-asset')}  another-asset\n")),
         }
         for host in (LINUX, MAC):
             for label, change in controls.items():

@@ -1,0 +1,48 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "delegation",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "member": "command.101.120",
+    "target": "command.101.121",
+    "cycle": "circuit { false; true; formula { 0 == command.101.120 }; formula { command.101.121 == 0 + 1 }; and 2 3; formula { 0 != command.101.120 }; formula { pre.100.110 == 0 + 1 }; and 5 6; or 4 7; and 0 0; or 9 9; or 10 9; or 8 11; select 1 12 0; formula { command.101.121 == 1 + 1 }; and 2 14; formula { pre.100.110 == 1 + 1 }; and 5 16; or 15 17; or 18 11; select 1 19 0; formula { command.101.121 == 2 + 1 }; and 2 21; formula { pre.100.110 == 2 + 1 }; and 5 23; or 22 24; or 25 11; select 1 26 0; formula { 1 == command.101.120 }; and 28 3; formula { 1 != command.101.120 }; formula { pre.100.111 == 0 + 1 }; and 30 31; or 29 32; or 33 11; select 1 34 0; and 28 14; formula { pre.100.111 == 1 + 1 }; and 30 37; or 36 38; or 39 11; select 1 40 0; and 28 21; formula { pre.100.111 == 2 + 1 }; and 30 43; or 42 44; or 45 11; select 1 46 0; formula { 2 == command.101.120 }; and 48 3; formula { 2 != command.101.120 }; formula { pre.100.112 == 0 + 1 }; and 50 51; or 49 52; or 53 11; select 1 54 0; and 48 14; formula { pre.100.112 == 1 + 1 }; and 50 57; or 56 58; or 59 11; select 1 60 0; and 48 21; formula { pre.100.112 == 2 + 1 }; and 50 63; or 62 64; or 65 11; select 1 66 0; and 13 13; and 20 35; or 68 69; and 27 55; or 70 71; or 8 72; select 1 73 0; and 13 20; and 20 41; or 75 76; and 27 61; or 77 78; or 18 79; select 1 80 0; and 13 27; and 20 47; or 82 83; and 27 67; or 84 85; or 25 86; select 1 87 0; and 35 13; and 41 35; or 89 90; and 47 55; or 91 92; or 33 93; select 1 94 0; and 35 20; and 41 41; or 96 97; and 47 61; or 98 99; or 39 100; select 1 101 0; and 35 27; and 41 47; or 103 104; and 47 67; or 105 106; or 45 107; select 1 108 0; and 55 13; and 61 35; or 110 111; and 67 55; or 112 113; or 53 114; select 1 115 0; and 55 20; and 61 41; or 117 118; and 67 61; or 119 120; or 59 121; select 1 122 0; and 55 27; and 61 47; or 124 125; and 67 67; or 126 127; or 65 128; select 1 129 0; and 74 74; and 81 95; or 131 132; and 88 116; or 133 134; or 8 135; select 1 136 0; and 74 81; and 81 102; or 138 139; and 88 123; or 140 141; or 18 142; select 1 143 0; and 74 88; and 81 109; or 145 146; and 88 130; or 147 148; or 25 149; select 1 150 0; and 95 74; and 102 95; or 152 153; and 109 116; or 154 155; or 33 156; select 1 157 0; and 95 81; and 102 102; or 159 160; and 109 123; or 161 162; or 39 163; select 1 164 0; and 95 88; and 102 109; or 166 167; and 109 130; or 168 169; or 45 170; select 1 171 0; and 116 74; and 123 95; or 173 174; and 130 116; or 175 176; or 53 177; select 1 178 0; and 116 81; and 123 102; or 180 181; and 130 123; or 182 183; or 59 184; select 1 185 0; and 116 88; and 123 109; or 187 188; and 130 130; or 189 190; or 65 191; select 1 192 0; and 137 137; and 144 158; or 194 195; and 151 179; or 196 197; or 8 198; select 1 199 0; and 137 144; and 144 165; or 201 202; and 151 186; or 203 204; or 18 205; select 1 206 0; and 137 151; and 144 172; or 208 209; and 151 193; or 210 211; or 25 212; select 1 213 0; and 158 137; and 165 158; or 215 216; and 172 179; or 217 218; or 33 219; select 1 220 0; and 158 144; and 165 165; or 222 223; and 172 186; or 224 225; or 39 226; select 1 227 0; and 158 151; and 165 172; or 229 230; and 172 193; or 231 232; or 45 233; select 1 234 0; and 179 137; and 186 158; or 236 237; and 193 179; or 238 239; or 53 240; select 1 241 0; and 179 144; and 186 165; or 243 244; and 193 186; or 245 246; or 59 247; select 1 248 0; and 179 151; and 186 172; or 250 251; and 193 193; or 252 253; or 65 254; select 1 255 0; and 200 200; and 207 221; or 257 258; and 214 242; or 259 260; or 8 261; select 1 262 0; and 200 207; and 207 228; or 264 265; and 214 249; or 266 267; or 18 268; select 1 269 0; and 200 214; and 207 235; or 271 272; and 214 256; or 273 274; or 25 275; select 1 276 0; and 221 200; and 228 221; or 278 279; and 235 242; or 280 281; or 33 282; select 1 283 0; and 221 207; and 228 228; or 285 286; and 235 249; or 287 288; or 39 289; select 1 290 0; and 221 214; and 228 235; or 292 293; and 235 256; or 294 295; or 45 296; select 1 297 0; and 242 200; and 249 221; or 299 300; and 256 242; or 301 302; or 53 303; select 1 304 0; and 242 207; and 249 228; or 306 307; and 256 249; or 308 309; or 59 310; select 1 311 0; and 242 214; and 249 235; or 313 314; and 256 256; or 315 316; or 65 317; select 1 318 0; and 263 263; and 270 284; or 320 321; and 277 305; or 322 323; or 8 324; select 1 325 0; and 263 270; and 270 291; or 327 328; and 277 312; or 329 330; or 18 331; select 1 332 0; and 263 277; and 270 298; or 334 335; and 277 319; or 336 337; or 25 338; select 1 339 0; and 284 263; and 291 284; or 341 342; and 298 305; or 343 344; or 33 345; select 1 346 0; and 284 270; and 291 291; or 348 349; and 298 312; or 350 351; or 39 352; select 1 353 0; and 284 277; and 291 298; or 355 356; and 298 319; or 357 358; or 45 359; select 1 360 0; and 305 263; and 312 284; or 362 363; and 319 305; or 364 365; or 53 366; select 1 367 0; and 305 270; and 312 291; or 369 370; and 319 312; or 371 372; or 59 373; select 1 374 0; and 305 277; and 312 298; or 376 377; and 319 319; or 378 379; or 65 380; select 1 381 0; and 326 326; and 333 347; or 383 384; and 340 368; or 385 386; or 8 387; select 1 388 0; and 326 333; and 333 354; or 390 391; and 340 375; or 392 393; or 18 394; select 1 395 0; and 326 340; and 333 361; or 397 398; and 340 382; or 399 400; or 25 401; select 1 402 0; and 347 326; and 354 347; or 404 405; and 361 368; or 406 407; or 33 408; select 1 409 0; and 347 333; and 354 354; or 411 412; and 361 375; or 413 414; or 39 415; select 1 416 0; and 347 340; and 354 361; or 418 419; and 361 382; or 420 421; or 45 422; select 1 423 0; and 368 326; and 375 347; or 425 426; and 382 368; or 427 428; or 53 429; select 1 430 0; and 368 333; and 375 354; or 432 433; and 382 375; or 434 435; or 59 436; select 1 437 0; and 368 340; and 375 361; or 439 440; and 382 382; or 441 442; or 65 443; select 1 444 0; and 389 389; and 396 410; or 446 447; and 403 431; or 448 449; or 8 450; select 1 451 0; and 389 396; and 396 417; or 453 454; and 403 438; or 455 456; or 18 457; select 1 458 0; and 389 403; and 396 424; or 460 461; and 403 445; or 462 463; or 25 464; select 1 465 0; and 410 389; and 417 410; or 467 468; and 424 431; or 469 470; or 33 471; select 1 472 0; and 410 396; and 417 417; or 474 475; and 424 438; or 476 477; or 39 478; select 1 479 0; and 410 403; and 417 424; or 481 482; and 424 445; or 483 484; or 45 485; select 1 486 0; and 431 389; and 438 410; or 488 489; and 445 431; or 490 491; or 53 492; select 1 493 0; and 431 396; and 438 417; or 495 496; and 445 438; or 497 498; or 59 499; select 1 500 0; and 431 403; and 438 424; or 502 503; and 445 445; or 504 505; or 65 506; select 1 507 0; and 452 452; and 459 473; or 509 510; and 466 494; or 511 512; or 8 513; select 1 514 0; and 452 459; and 459 480; or 516 517; and 466 501; or 518 519; or 18 520; select 1 521 0; and 452 466; and 459 487; or 523 524; and 466 508; or 525 526; or 25 527; select 1 528 0; and 473 452; and 480 473; or 530 531; and 487 494; or 532 533; or 33 534; select 1 535 0; and 473 459; and 480 480; or 537 538; and 487 501; or 539 540; or 39 541; select 1 542 0; and 473 466; and 480 487; or 544 545; and 487 508; or 546 547; or 45 548; select 1 549 0; and 494 452; and 501 473; or 551 552; and 508 494; or 553 554; or 53 555; select 1 556 0; and 494 459; and 501 480; or 558 559; and 508 501; or 560 561; or 59 562; select 1 563 0; and 494 466; and 501 487; or 565 566; and 508 508; or 567 568; or 65 569; select 1 570 0; or 515 543; or 572 571; } output 573"
+  },
+  "cases": [
+    {
+      "rule": "refuse a prospective delegation cycle",
+      "when": "cycle",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "record the selected delegation",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "choose(member == 0, target, pre.100.110)",
+        "111": "choose(member == 1, target, pre.100.111)",
+        "112": "choose(member == 2, target, pre.100.112)"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0,
+    "112": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AssetConservation",
+    "502": "DebitCreditEffectEquality",
+    "550": "RejectNoAuthority"
+  }
+}

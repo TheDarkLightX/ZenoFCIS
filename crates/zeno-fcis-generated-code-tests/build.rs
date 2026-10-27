@@ -4,7 +4,7 @@
 //! Runs the deterministic generator at build time and writes the generated Rust
 //! adapter file into `OUT_DIR` so the `generated` module can include it
 //! verbatim. The Python adapter and ZCVE codec modules are written into a
-//! `python/` subdirectory of `CARGO_MANIFEST_DIR` for replay by the Python
+//! `python/` subdirectory of `OUT_DIR` for replay by the Python
 //! integration test.
 
 use std::env;
@@ -69,10 +69,7 @@ fn main() {
         "bootstrap_runtime.rs",
     );
 
-    let manifest_dir = PathBuf::from(
-        env::var_os("CARGO_MANIFEST_DIR").unwrap_or_else(|| panic!("CARGO_MANIFEST_DIR not set")),
-    );
-    let python_dir = manifest_dir.join("python");
+    let python_dir = out_dir.join("python");
     fs::create_dir_all(&python_dir).unwrap_or_else(|_| panic!("create python output dir"));
 
     for file in bundle.files() {

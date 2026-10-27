@@ -11,7 +11,7 @@
     {
       "family": "reservation-pool",
       "instance": "components/pool/core-instance.json",
-      "instance_sha256": "225e4c490210fa1ffbf74927a102225e43597de9e2f73ab5e931666b8254dc4b",
+      "instance_sha256": "2e3b12de330a9cdb552f4f3bb0698b7ab25ef5c308614161ac5a00820e7a3bf2",
       "local_evidence": "Identified; replay required",
       "name": "pool",
       "owns_fields": [
@@ -22,7 +22,7 @@
         "C": 4,
         "Q": 3
       },
-      "source_set_sha256": "d2eddbf724c85e626f47793e5c0da4a827dc8feda281b258902319da45fb313c",
+      "source_set_sha256": "59cacaec2108ce9895064b1e5d2e20663c039c8afca9f823964e6be57d3ef9e2",
       "views": {
         "command": [
           "choose(action == 150, 150, 152)",
@@ -40,7 +40,7 @@
     {
       "family": "idempotency-slot",
       "instance": "components/memo/core-instance.json",
-      "instance_sha256": "5ab6cc2507c4e28587e69222029287c65b88a6fc62385f6d02c4706e388310e5",
+      "instance_sha256": "392a65d33f7cd801581e6127373e154df901d1c68969f6d98f166ffd2c4a4a67",
       "local_evidence": "Identified; replay required",
       "name": "memo",
       "owns_fields": [
@@ -50,7 +50,7 @@
       "parameters": {
         "C": 3
       },
-      "source_set_sha256": "16006ce29ea7d91a5e0b2e3e68373fd0018a68d585861679d05749f4e0721d25",
+      "source_set_sha256": "12b8eb44bc928aa7e1fa057885ac3fb45a66f153c751828a0e9985f93190daf4",
       "views": {
         "command": [
           "request_key",
@@ -69,7 +69,7 @@
     {
       "family": "finite-phase-machine",
       "instance": "components/phase/core-instance.json",
-      "instance_sha256": "1804741d9e892f3121bc84afb675eb2dcb0682a6f3ff522538936481ddb695e1",
+      "instance_sha256": "7e7ffcd2c0f6cf8d39eeafbc29e3ad28cc8bf3c217df44292b4d68be175013a6",
       "local_evidence": "Identified; replay required",
       "name": "phase",
       "owns_fields": [
@@ -78,7 +78,7 @@
       "parameters": {
         "C": 2
       },
-      "source_set_sha256": "920a526465fd382df456e42086b7250020d85b9d8a96f7bb32aba60d9a2bad7c",
+      "source_set_sha256": "ee88afe2b3175493773681c20a324e19a1b3690e821b6c90091fbdea3b659783",
       "views": {
         "command": [
           "false"

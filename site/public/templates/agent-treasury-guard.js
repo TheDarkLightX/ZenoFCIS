@@ -47,9 +47,10 @@ export const template = {
       fields: [intent, { name: "amount_out", label: "Amount delivered (0 to 3)", kind: "integer", min: 0, max: 3, initial: 2 }],
     },
     { name: "SwapFailed", label: "Report the swap failed", fields: [intent] },
+    { name: "RefundExpired", label: "Reclaim expired swap", fields: [intent] },
   ],
   genesis: "6 quote, 1 base, nothing spent, tick 0, no swap outstanding, nothing queued",
-  outbox: "Swap requests to zenodex on channel 300 (swap_request), shaped after ZenoDEX's SwapIntent: the intent number, the assets in and out, the amount in, the least amount out, and the deadline. Nothing delivers in this page, so each stays pending with its delivery identity.",
+  outbox: "Swap requests to zenodex on the swap_request channel, containing the intent number, the assets in and out, the amount in, the least amount out, and the deadline. Nothing delivers in this page, so each stays pending with its delivery identity.",
   // The scripted agent's proposals, shown on their own: the guard refuses
   // most of them.
   proposer: {
@@ -61,7 +62,7 @@ export const template = {
     const where = `from ${request.caller} at tick ${request.now}, price ${request.price} seen at tick ${request.price_time}${request.model === V2 ? "" : `, model ${request.model}`}`;
     if (request.command === "ProposeSwap") return `ProposeSwap ${request.direction} ${request.amount} for at least ${request.min_out}, ${where}`;
     if (request.command === "SwapSettled") return `SwapSettled intent ${request.intent} with ${request.amount_out}, ${where}`;
-    return `SwapFailed intent ${request.intent}, ${where}`;
+    return `${request.command} intent ${request.intent}, ${where}`;
   },
   demonstration: [
     // Day 0: a good buy, then answers and proposals the guard refuses.

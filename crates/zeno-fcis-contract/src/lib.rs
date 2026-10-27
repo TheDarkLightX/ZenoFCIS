@@ -9,7 +9,8 @@
 //! core: it reads and writes files, renders application source, replays
 //! program adoptions and runs the reviews.
 //!
-//! The supported API is [`checked_composition`] and [`ContractError`].
+//! The supported API includes [`checked_composition`], [`refinement`],
+//! [`distribution`], [`risk`] and [`ContractError`].
 //! [`checked_composition::check`] takes the source bytes of a composition of
 //! separately bound contracts, its manifest and each leaf's two files, and
 //! compiles and checks them itself. Its result, a
@@ -32,42 +33,16 @@
 #![forbid(unsafe_code)]
 
 pub mod checked_composition;
+pub mod collections;
+pub mod distribution;
 #[doc(hidden)]
 pub mod internals;
+pub mod refinement;
+pub mod risk;
+pub mod two_run;
 
-use std::fmt;
+#[cfg(test)]
+mod priority_construction_controls;
 
-/// Why no contract was generated: the file and entry, and the reason.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ContractError {
-    place: String,
-    reason: String,
-}
-
-impl ContractError {
-    /// The error about `place`, a file and an entry within it.
-    pub fn new(place: impl Into<String>, reason: impl Into<String>) -> Self {
-        Self {
-            place: place.into(),
-            reason: reason.into(),
-        }
-    }
-
-    /// The file, and entry within it, that the reason is about.
-    pub fn place(&self) -> &str {
-        &self.place
-    }
-
-    /// What is wrong there.
-    pub fn reason(&self) -> &str {
-        &self.reason
-    }
-}
-
-impl fmt::Display for ContractError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}: {}", self.place, self.reason)
-    }
-}
-
-impl std::error::Error for ContractError {}
+mod contract_error;
+pub use contract_error::ContractError;

@@ -1,0 +1,145 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "library",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "action": "command.101.130",
+    "member": "command.101.131",
+    "desk": "context.102",
+    "member_exists": "pre.100.160",
+    "loans": "pre.100.161",
+    "copy_exists": "pre.100.170",
+    "on_loan": "pre.100.171",
+    "holder_is_member": "pre.100.172 == command.101.131"
+  },
+  "cases": [
+    {
+      "rule": "only the librarian records changes",
+      "when": "desk != 180",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "a member joins once",
+      "when": "action == 150 && member_exists == 1",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "join",
+      "when": "action == 150",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "160": "1",
+        "161": "0"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "a copy is added once",
+      "when": "action == 151 && copy_exists == 1",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "add a copy to the shelf",
+      "when": "action == 151",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "170": "1",
+        "171": "0",
+        "172": "member"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "only members borrow and return",
+      "when": "member_exists == 0",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "the copy must exist",
+      "when": "copy_exists == 0",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "a copy on loan is not lent again",
+      "when": "action == 152 && on_loan == 1",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "a member holds at most two copies",
+      "when": "action == 152 && loans == 2",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "borrow",
+      "when": "action == 152",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "161": "loans + 1",
+        "171": "1",
+        "172": "member"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "only the holder returns a copy",
+      "when": "on_loan == 0 || !holder_is_member",
+      "class": "Reject",
+      "reason": 206,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "return",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "161": "loans - 1",
+        "171": "0"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "160": 0,
+    "161": 0,
+    "170": 0,
+    "171": 0,
+    "172": 0
+  },
+  "law_kinds": {
+    "500": "AuthoritySubjectRecipient",
+    "501": "StateInvariant",
+    "502": "DebitCreditEffectEquality",
+    "503": "DebitCreditEffectEquality"
+  }
+}

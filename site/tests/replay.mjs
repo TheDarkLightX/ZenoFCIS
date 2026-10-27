@@ -9,7 +9,6 @@
 // Usage: node site/tests/replay.mjs [TEMPLATE...]   (default: every module in site/public)
 
 import { readFileSync, readdirSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { instantiate } from "../public/demo-module.js";
@@ -17,9 +16,6 @@ import { fail } from "./examples.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PUBLIC = path.join(ROOT, "site/public");
-const GATE_SUMMARIES = "import json, sys; sys.path.insert(0, 'tools'); "
-  + "import check_generated_application as gate; print(json.dumps(gate.EXAMPLE_TEMPLATES))";
-
 function same(actual, expected, label) {
   const a = JSON.stringify(actual);
   const e = JSON.stringify(expected);
@@ -122,7 +118,7 @@ async function replay(name, gate) {
     + `${template.demonstration.length} demonstration steps, ${laws} law statuses: all matched${unreachable}`);
 }
 
-const gates = JSON.parse(execFileSync("python3", ["-c", GATE_SUMMARIES], { cwd: ROOT, encoding: "utf8" }));
+const gates = JSON.parse(readFileSync(new URL("gate-native.json", import.meta.url), "utf8"));
 const names = process.argv.length > 2
   ? process.argv.slice(2)
   : readdirSync(PUBLIC).filter((file) => file.endsWith(".wasm")).map((file) => file.slice(0, -".wasm".length)).sort();

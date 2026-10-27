@@ -14,16 +14,19 @@ pub mod bindings {
 pub mod delivery;
 #[path = "../profile.rs"]
 pub mod profile;
+/// Explicit opt-in shell; default entry points continue to use V2 directly.
+#[cfg(feature = "shell-effects")]
+pub mod shell_effects;
 
 #[cfg(feature = "sqlite")]
 use bindings::GeneratedProject;
 #[cfg(feature = "sqlite")]
 use delivery::Destination;
 use generated::{
-    Amount, Flag, Lane, LaneStatus, Money, PauseTicks, Vault, VaultAction, VaultCommand,
+    Amount, Flag, Lane, LaneStatus, Money, PauseTicks, Reserved, Vault, VaultAction, VaultCommand,
 };
 #[cfg(feature = "sqlite")]
-use generated::{Caller, TickContext};
+use generated::{Caller, Day, TickContext};
 #[cfg(feature = "sqlite")]
 use std::path::Path;
 #[cfg(feature = "sqlite")]
@@ -59,9 +62,9 @@ pub fn genesis_state() -> Vault {
     Vault {
         balance: Money(0),
         lane_a: LaneStatus::Empty,
-        amount_a: Money(0),
+        amount_a: Reserved(0),
         lane_b: LaneStatus::Empty,
-        amount_b: Money(0),
+        amount_b: Reserved(0),
         pause: PauseTicks(0),
         must_serve: Flag(false),
         priority: Lane::A,
@@ -141,6 +144,21 @@ pub fn invoke(
     alarm: bool,
     replay: &str,
 ) -> AppResult<&'static str> {
+    invoke_at(shell, authority, command, caller, alarm, 0, replay)
+}
+
+/// Invoke using the host-authenticated day; the original helper uses day zero.
+/// Days above 2 stay in the terminal recovery phase; negative days still refuse.
+#[cfg(feature = "sqlite")]
+pub fn invoke_at(
+    shell: &mut Shell<'_, '_>,
+    authority: &Authority<'_>,
+    command: VaultCommand,
+    caller: Caller,
+    alarm: bool,
+    now: i128,
+    replay: &str,
+) -> AppResult<&'static str> {
     let project = checked(GeneratedProject::try_new::<RustCryptoSha256>())?;
     let snapshot = checked(shell.snapshot())?;
     let command =
@@ -149,6 +167,7 @@ pub fn invoke(
         &TickContext {
             caller,
             alarm: Flag(alarm),
+            now: Day(now.min(2)),
         },
         ValidationLimits::default(),
     ))?;

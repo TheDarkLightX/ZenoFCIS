@@ -1,0 +1,100 @@
+{
+  "schema": "zeno-fcis/game/1",
+  "contract": "escrow-safe",
+  "actors": [
+    {
+      "id": "buyer",
+      "compromised": false,
+      "command": {
+        "command.101.120": [
+          160,
+          162
+        ],
+        "command.101.121": [
+          1
+        ]
+      },
+      "context": {
+        "context.102.130": [
+          170
+        ],
+        "context.102.131": [
+          0,
+          8
+        ]
+      }
+    },
+    {
+      "id": "seller",
+      "compromised": false,
+      "command": {
+        "command.101.120": [
+          161
+        ],
+        "command.101.121": [
+          1
+        ]
+      },
+      "context": {
+        "context.102.130": [
+          171
+        ],
+        "context.102.131": [
+          0,
+          8
+        ]
+      }
+    },
+    {
+      "id": "operator",
+      "compromised": false,
+      "command": {
+        "command.101.120": [
+          163
+        ],
+        "command.101.121": [
+          1
+        ]
+      },
+      "context": {
+        "context.102.130": [
+          172
+        ],
+        "context.102.131": [
+          8
+        ]
+      }
+    },
+    {
+      "id": "outsider",
+      "compromised": true,
+      "command": {
+        "command.101.120": [
+          160,
+          161,
+          162,
+          163
+        ],
+        "command.101.121": [
+          1
+        ]
+      },
+      "context": {
+        "context.102.130": [
+          173
+        ],
+        "context.102.131": [
+          0,
+          8
+        ]
+      }
+    }
+  ],
+  "coalition_bound": 4,
+  "compromised_actor_bound": 1,
+  "objective": {
+    "kind": "safety",
+    "formula": "context.102.130 == 173 && (post.100.111 != pre.100.111 || post.100.112 != pre.100.112 || post.100.113 != pre.100.113)"
+  },
+  "K": 4
+}

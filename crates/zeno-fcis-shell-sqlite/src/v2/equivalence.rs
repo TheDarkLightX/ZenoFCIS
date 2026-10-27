@@ -68,6 +68,8 @@ impl Equal {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum Unestablished {
+    /// The released 2.4.0 evaluator did not establish the bounded comparison.
+    Released24,
     /// Input count, order or domains differ.
     InputAbi,
     /// Output count, order or domains differ.

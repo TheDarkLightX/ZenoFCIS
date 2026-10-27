@@ -225,7 +225,7 @@ def native_commands(out, env, cwd, name, filtered=False, exact=None, *, prepared
     return saved_run(command, cwd, native_env, out, name + '.native', 240)
 
 
-def custody_checks(out, env):
+def custody_checks(out, env, dependencies=()):
     # Exact four external-consumer refusals retained from the original laws gate.
     specimens = {
         'private_meter': ('fn main(){let _=laws::execution_v2::meter::new;}', 'E0603'),
@@ -238,7 +238,7 @@ def custody_checks(out, env):
         path = out / (name + '.rs')
         path.write_text(source)
         proc = saved_run(['rustc', '+1.97.1', '--edition=2024', '--extern',
-            'laws=' + str(out / 'libguarded_laws.rlib'), str(path), '-o', str(out / name)],
+            'laws=' + str(out / 'libguarded_laws.rlib'), str(path), '-o', str(out / name), *dependencies],
             ROOT, env, out, name, 240)
         if proc.returncode == 0 or ('error[' + error + ']') not in proc.stderr:
             raise ValueError(f'custody refusal missing intended diagnostic: {name}')
@@ -324,10 +324,11 @@ def check(out, refresh=False, positive_only=False, selected=None):
     dependencies = prepare_native_dependencies(ROOT, out / 'common-native', env)
     native = native_commands(out, env, ROOT, 'positive', prepared=dependencies)
     verifier.require_success(native)
+    arguments = native_dependency_args(ROOT, out / 'custody-binding', env, prepared=dependencies)
     no_std = saved_run(['rustc', '+1.97.1', '--edition=2024', '--check-cfg', 'cfg(verus_keep_ghost)',
-        '--check-cfg', 'cfg(test)', '--crate-type=rlib', str(HARNESS), '-o', str(out / 'libguarded_laws.rlib')], ROOT, env, out, 'no-std', 240)
+        '--check-cfg', 'cfg(test)', '--crate-type=rlib', str(HARNESS), '-o', str(out / 'libguarded_laws.rlib'), *arguments], ROOT, env, out, 'no-std', 240)
     verifier.require_success(no_std)
-    custody = custody_checks(out, env)
+    custody = custody_checks(out, env, arguments)
     results = []
     if not positive_only:
         mutations = controls()
@@ -429,5 +430,12 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
-    raise SystemExit(main())
+if __name__ == "__main__":
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

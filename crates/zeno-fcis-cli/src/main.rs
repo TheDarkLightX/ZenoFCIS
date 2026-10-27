@@ -3,10 +3,14 @@
 
 mod account_lockout;
 mod agent_treasury_guard;
+mod app_factory;
 mod binding;
 mod checker_process;
 mod compliance_gateway;
 mod composition_command;
+#[path = "../examples/construction_pilot.rs"]
+mod construction;
+use construction::build_tree;
 mod containment_policy;
 mod contract;
 mod contract_adopt;
@@ -16,10 +20,20 @@ mod contract_files;
 mod draft_command;
 mod durable_counter;
 mod effects;
+mod guide;
+mod integral_json;
 mod inventory_reservation;
 mod judge_command;
+mod knowledge_assessment;
 mod knowledge_command;
 mod knowledge_evidence;
+mod knowledge_growth;
+#[cfg(test)]
+mod knowledge_growth_tests;
+mod knowledge_metrics;
+mod knowledge_replay;
+mod knowledge_store;
+mod knowledge_workflow;
 mod loop_command;
 mod loop_knowledge;
 mod loop_proposers;
@@ -29,32 +43,36 @@ mod optimize_command;
 mod order_fulfillment;
 mod prepared_counter;
 mod purity;
+mod refine_command;
 mod report_numbers;
 mod review_command;
 mod shell_v2;
 mod symbolic;
 mod symbolic_command;
 mod synth;
+mod table_expansion;
 mod tau_command;
+mod telemetry;
 mod transform;
 mod transform_command;
 mod transform_parallel;
 mod transform_plan;
 mod withdrawal_queue;
 
+use std::ffi::OsString;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
 use serde_json::{Value, json};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_formal_tools::{
     CVC5_VERSION, LEAN_VERSION, ToolBackend, ToolFailure, ToolRunStatus, Z3_VERSION, doctor,
-    execute_tool, export_inductive_smt, export_smt, inspect_lean_toolchain, load_tools_manifest,
-    retain_run, verify_tool,
+    execute_tool, export_inductive_lean, export_inductive_smt, export_smt, inspect_lean_toolchain,
+    load_tools_manifest, retain_run, verify_tool,
 };
 pub(crate) use zeno_fcis_shell_sqlite::v2::equivalence::finite_checker;
 use zeno_fcis_spec::{
@@ -93,8 +111,8 @@ component 300 machine {
   budget steps 1024;
 }
 merge [300];
-law 400 identity = pre.100 == pre.100;
-claim 500 identity cvc5 relational = pre.100 == pre.100;
+law 400 reject_no_authority on reject = context.102 != 1;
+claim 500 identity cvc5 relational = pre.100 == post.100;
 "#;
 
 const MINI: &str = r#"zeno 1;
@@ -124,9 +142,9 @@ component 301 worker_space {
   budget nodes 256;
 }
 merge [300, 301];
-law 400 worker_isolation = pre.100 == pre.100;
-claim 500 finite_state_reflexivity all finite 4 = always atom(pre.100 == pre.100);
-claim 501 unbounded_state_reflexivity lean unbounded = always atom(pre.100 == pre.100);
+law 400 reject_no_authority on reject = context.103 != 1;
+claim 500 finite_state_reflexivity all finite 4 = always atom(pre.100 == post.100);
+claim 501 unbounded_state_reflexivity lean unbounded = always atom(pre.100 == post.100);
 "#;
 
 #[derive(Parser)]
@@ -168,6 +186,8 @@ enum ContractCommand {
     #[command(flatten)]
     Judge(judge_command::Command),
     #[command(flatten)]
+    Refine(refine_command::Command),
+    #[command(flatten)]
     Composition(composition_command::Command),
     #[command(flatten)]
     Draft(draft_command::Command),
@@ -196,6 +216,18 @@ enum ContractCommand {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Shared coordination and knowledge store.
+    Commons {
+        /// Commons subcommand and arguments.
+        #[arg(
+            value_name = "ARGS",
+            trailing_var_arg = true,
+            allow_hyphen_values = true
+        )]
+        args: Vec<OsString>,
+    },
+    /// Construct a checked priority collection from approved frozen requirements.
+    Construct(construction::Construct),
     /// Read-only structured usage knowledge operations.
     Kb {
         #[command(subcommand)]
@@ -207,17 +239,22 @@ enum Command {
         #[arg(value_name = "COMMAND")]
         command: Vec<String>,
     },
+    /// Look up an offline public command card for the task.
+    Guide {
+        #[command(subcommand)]
+        command: guide::Command,
+    },
     /// Synthesize language-neutral finite contracts and check target conformance.
     Synth {
         #[command(subcommand)]
         command: synth::Command,
     },
-    /// Check a supplied replacement for a finite scalar program on every input tuple.
+    /// Exact program equivalence and evidence: compare a supplied replacement on every input, replay receipts, or independently recheck symbolic certificates. See also: guide show transform.
     Transform {
         #[command(subcommand)]
         command: transform_command::Command,
     },
-    /// Find a smaller finite program without changing its behavior on the declared input domain.
+    /// E-graph equality saturation with exact per-class tables and a default portfolio of three strategies; transform checking alone accepts results. Supplied candidates can be fused with --with-candidate. See also: guide show program-search.
     #[command(
         after_help = "Workflow:\n  contract export-program APP --out original.zcve\n  optimize --program original.zcve --candidate-out smaller.zcve --receipt receipt.json\n  transform replay --original original.zcve --candidate smaller.zcve --receipt receipt.json\n\nEvery accepted candidate passes the full-domain transform check. Optimization does not adopt the result; contract adopt is a separate step. Unsupported instructions are reported explicitly; increasing search limits does not add instruction support."
     )]
@@ -225,10 +262,14 @@ enum Command {
         #[command(flatten)]
         arguments: optimize_command::Arguments,
     },
-    /// Learn, complete or improve finite programs through bounded proposals and checker feedback.
-    #[command(
-        after_help = "Choose by task:\n  Check a known replacement: transform check\n  Find a smaller program in one run: optimize\n  Keep a resumable proposal history: loop open, then candidate or run, then resume\n  Learn from finite examples: loop learn\n  Complete holes in an expression: loop sketch\n  Ask about decisions left open by contract laws: loop question\n\nA loop is propose, check, read feedback, revise. Read each command's checked scope: fitting examples alone does not establish equivalence over the full domain. Results do not adopt a program or authorize application effects."
-    )]
+    /// Propose, capture, learn, search, and inspect finite programs and contract decisions.
+    #[command(help_template = guide::LOOP_HELP, long_about = r#"Propose, capture, learn, search, and inspect finite programs and contract decisions.
+
+Use each subcommand's --help for inputs, schemas, hard limits, statuses and exit codes. Session commands use a fixed admitted reference and full-domain transform checks. Capture freezes executable observations; learning and search propose candidates. Meaning/evaluate inspect observations. Questions, restated rules and component simulation have separate scopes. No report grants application or publication authority.
+
+Terms used in reports: an attempt is one proposal submitted to a session driver, including malformed and duplicate proposals. Typed feedback is structured JSON describing the checker outcome and its witness/reason. The incumbent is the retained best checked program (initially the original). Finite-program JSON, historically called fixture vocabulary, has exactly inputs, outputs, nodes and roots; Int bounds/literals are canonical decimal strings. A bound proposal names the exact reference and implementation hashes. Guarded stages run only when their input conditions hold. No session means no persistent ordinary loop directory or attempt ledger is created; a command may still write explicitly requested evidence.
+
+All commands are bounded. The contained loop worker has a 64 MiB memory limit and a 25-second whole-run cap, plus a 1 MiB stdout cap. Search stages request at most five seconds of CPU and checks two, clipped by remaining wall allowance; stateless doors allow 22 seconds inside the worker cap. Session work/deadlines are frozen by open; stateless program doors have at most 131,072 tuples, 65,536-byte files and bounded search/check stages, with narrower caps documented by each command. Containment can return inconclusive before work starts. Help exits 0; invalid command-line usage exits 64. Operation-specific exits 0/1/2/3 differ: read status and detail, especially for run, meaning, teach-back, strategy and learn. See guide show loop-workspace and docs/CLI_REFERENCE.md."#)]
     Loop {
         #[command(subcommand)]
         command: loop_command::Command,
@@ -243,12 +284,18 @@ enum Command {
         dir: PathBuf,
         #[arg(long, value_enum, default_value_t = Template::Minimal)]
         template: Template,
-        /// Build the application from this directory's project.zeno, v2/policy.json and optional tests/decision-examples.txt.
+        /// Build the application from this directory's project.zeno, v2/policy.json and optional tests/decision-examples.txt and ui.json.
         #[arg(long, conflicts_with = "template")]
         contract: Option<PathBuf>,
-        /// ZenoFCIS source tree a Cargo application's ZenoFCIS packages resolve to. Default: the tree this CLI was built from, while it exists.
+        /// Build the checked UI and authenticated SQLite application using the pinned Python generator.
+        #[arg(long, requires = "contract")]
+        app: bool,
+        /// Read-only ZenoFCIS source tree a Cargo application's packages resolve to. Default: the tree this CLI was built from, while it exists. App build files go to temporary scratch, never this tree.
         #[arg(long)]
         source: Option<PathBuf>,
+        /// Parent for temporary app build files, including the six demonstration libraries. Default: the system temporary directory. Must be outside --source. Temporary build directories are removed; the parent remains. CARGO_TARGET_DIR, when set, is retained outside --source.
+        #[arg(long, requires = "app")]
+        scratch: Option<PathBuf>,
     },
     /// Parse and elaborate a .zeno project with accumulated diagnostics.
     Check {
@@ -262,6 +309,9 @@ enum Command {
         /// Compatibility option: unresolved paths always fail in V2.
         #[arg(long)]
         require_resolved_paths: bool,
+        /// Print the exact expansion of the project's tables and the size of its input domain, instead of the check summary.
+        #[arg(long)]
+        expand: bool,
     },
     /// Generate deterministic Rust and manifest artifacts, or check for drift.
     #[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
@@ -304,7 +354,7 @@ enum Command {
         #[arg(long, default_value = "zeno-fcis.tools.json")]
         tools: PathBuf,
     },
-    /// Request and replay a bounded SMT counterexample.
+    /// Request and replay a bounded SMT counterexample. Exit 1 when the claim is refuted; 2 for UNKNOWN, 3 for tool failure.
     Counterexample {
         #[arg(default_value = "project.zeno")]
         project: PathBuf,
@@ -413,19 +463,51 @@ enum SmtBackend {
 }
 
 fn main() -> ExitCode {
-    if let Some(code) = checker_process::bootstrap() {
-        return ExitCode::from(code);
+    let telemetry = telemetry::Invocation::start();
+    let code = execute();
+    if let Some(telemetry) = telemetry {
+        telemetry.finish(code);
     }
-    match Cli::try_parse() {
+    ExitCode::from(code)
+}
+
+fn run_commons(args: &[OsString]) -> u8 {
+    zeno_fcis_commons::cli::run_with_mcp(args, |directory, actor| {
+        zeno_fcis_commons::mcp::serve_with_tools(
+            directory,
+            actor,
+            &guide::mcp_tools(),
+            guide::mcp_call,
+        )
+    })
+}
+
+fn execute() -> u8 {
+    if let Some(code) = checker_process::bootstrap() {
+        return code;
+    }
+    match cli_command()
+        .try_get_matches()
+        .and_then(|matches| Cli::from_arg_matches(&matches))
+    {
         Ok(cli) => {
-            if let Command::Kb { operation } = cli.command {
-                return ExitCode::from(knowledge_command::execute(&cli.kb, operation));
+            if let Command::Commons { args } = &cli.command {
+                return run_commons(args);
+            }
+            if !matches!(
+                &cli.command,
+                Command::Kb {
+                    operation: knowledge_command::Operation::AssessmentTask { .. }
+                }
+            ) && let Command::Kb { operation } = cli.command
+            {
+                return knowledge_command::execute(&cli.kb, operation);
             }
             let admission = match checker_process::preflight(&cli.command, cli.containment_backend)
             {
                 Ok(admission) => admission,
                 Err(failure) => {
-                    return ExitCode::from(checker_process::refuse(&cli.command, failure));
+                    return checker_process::refuse(&cli.command, failure);
                 }
             };
             let resolved_kb =
@@ -434,7 +516,7 @@ fn main() -> ExitCode {
                         Ok(paths) => Some(paths),
                         Err(report) => {
                             print_json(&report);
-                            return ExitCode::from(INVALID);
+                            return INVALID;
                         }
                     }
                 } else {
@@ -454,7 +536,7 @@ fn main() -> ExitCode {
                     print_json(
                         &json!({"authority":"none","status":"inconclusive","reason":"kb-snapshot-changed"}),
                     );
-                    return ExitCode::from(BLOCKED);
+                    return BLOCKED;
                 }
                 Err(_) => {
                     eprintln!(
@@ -515,14 +597,30 @@ fn main() -> ExitCode {
                 code
             };
             checker_process::shutdown(code);
-            ExitCode::from(code)
+            code
         }
         Err(error) => {
             let exit = clap_error_exit(&error);
             let _ = error.print();
-            ExitCode::from(exit)
+            if Cli::command()
+                .find_subcommand("kb")
+                .is_some_and(|kb| kb.find_subcommand("assess").is_none())
+                && std::env::args_os()
+                    .collect::<Vec<_>>()
+                    .windows(2)
+                    .any(|pair| pair[0] == "kb" && pair[1] == "assess")
+            {
+                eprintln!(
+                    "next: kb assess is unavailable in this build; run zeno-fcis kb --help for supported operations and zeno-fcis guide show knowledge for the assessment boundary"
+                );
+            }
+            exit
         }
     }
+}
+
+fn cli_command() -> clap::Command {
+    guide::with_help(Cli::command())
 }
 
 fn clap_error_exit(error: &clap::Error) -> u8 {
@@ -531,6 +629,9 @@ fn clap_error_exit(error: &clap::Error) -> u8 {
 
 fn run(command: Command) -> u8 {
     match command {
+        Command::Guide { command } => guide::run(command),
+        Command::Commons { args } => run_commons(&args),
+        Command::Construct(args) => construction::construct(args),
         Command::Kb { operation } => knowledge_command::execute(&[], operation),
         Command::Describe { command } => describe(&command),
         Command::Synth { command } => synth::run(command),
@@ -540,6 +641,7 @@ fn run(command: Command) -> u8 {
         Command::Contract { command } => match command {
             ContractCommand::Review(command) => review_command::run(command),
             ContractCommand::Judge(command) => judge_command::run(command),
+            ContractCommand::Refine(command) => refine_command::run(command),
             ContractCommand::Composition(command) => composition_command::run(command),
             ContractCommand::Draft(command) => draft_command::run(command),
             ContractCommand::Adopt(command) => contract_adopt::run(command),
@@ -555,13 +657,33 @@ fn run(command: Command) -> u8 {
             dir,
             template,
             contract,
+            app,
             source,
-        } => new_project(&dir, template, contract.as_deref(), source.as_deref()),
+            scratch,
+        } => {
+            if app {
+                app_factory::scaffold(
+                    &dir,
+                    contract.as_deref().unwrap_or(&dir),
+                    source.as_deref(),
+                    scratch.as_deref(),
+                )
+            } else {
+                new_project(&dir, template, contract.as_deref(), source.as_deref())
+            }
+        }
+        Command::Check {
+            project,
+            format,
+            expand: true,
+            ..
+        } => table_expansion::expand(&project, format),
         Command::Check {
             project,
             format,
             require_substantive,
             require_resolved_paths,
+            expand: false,
         } => check(
             &project,
             format,
@@ -621,7 +743,7 @@ fn run(command: Command) -> u8 {
 }
 
 fn describe(path: &[String]) -> u8 {
-    let mut root = Cli::command();
+    let mut root = cli_command();
     root.build();
     let mut selected = &root;
     for name in path {
@@ -741,13 +863,11 @@ fn new_project(
     result
 }
 
-/// Writes a new project into the empty directory `dir`.
-fn new_files(dir: &Path, template: Template, contract: Option<&Path>, source: Option<&Path>) -> u8 {
-    if let Some(contract) = contract {
-        return contract_files::scaffold(dir, contract, source);
-    }
+fn application_template_files(
+    template: Template,
+) -> Option<&'static [(&'static str, &'static [u8])]> {
     // Exhaustive, so a new template cannot compile without choosing its files.
-    let application = match template {
+    match template {
         Template::Minimal | Template::MiniDeterminator => None,
         Template::DurableCounter => Some(durable_counter::FILES),
         Template::PreparedCounter => Some(prepared_counter::FILES),
@@ -757,7 +877,15 @@ fn new_files(dir: &Path, template: Template, contract: Option<&Path>, source: Op
         Template::ComplianceGateway => Some(compliance_gateway::FILES),
         Template::WithdrawalQueue => Some(withdrawal_queue::FILES),
         Template::AgentTreasuryGuard => Some(agent_treasury_guard::FILES),
-    };
+    }
+}
+
+/// Writes a new project into the empty directory `dir`.
+fn new_files(dir: &Path, template: Template, contract: Option<&Path>, source: Option<&Path>) -> u8 {
+    if let Some(contract) = contract {
+        return contract_files::scaffold(dir, contract, source);
+    }
+    let application = application_template_files(template);
     if let Some(files) = application {
         let manifest = files
             .iter()
@@ -804,11 +932,11 @@ fn new_files(dir: &Path, template: Template, contract: Option<&Path>, source: Op
     let (project, readme) = match template {
         Template::Minimal => (
             MINIMAL,
-            "# ZenoFCIS minimal project\n\nRun `zeno-fcis check`.\n",
+            "# ZenoFCIS minimal project\n\nRun `zeno-fcis check --require-substantive`.\n\nThis declaration sketch states unproved transition obligations. Author finite type bindings and v2/policy.json before executable contract review.\n",
         ),
         Template::MiniDeterminator => (
             MINI,
-            "# Mini Determinator\n\nA pure shared-nothing semantic example. Run `zeno-fcis check`.\n",
+            "# Mini Determinator\n\nA pure shared-nothing semantic example. Run `zeno-fcis check --require-substantive`.\n\nThis declaration sketch states unproved transition obligations. Author finite type bindings and v2/policy.json before executable contract review.\n",
         ),
         Template::DurableCounter
         | Template::PreparedCounter
@@ -1344,19 +1472,28 @@ fn prove(
 ) -> u8 {
     let spec = match project_or_report(path, OutputFormat::Human) {
         Ok(value) => value,
-        Err(code) => return code,
+        Err(code) => {
+            eprintln!(
+                "next: run zeno-fcis check PROJECT --format json and repair its diagnostics before retrying prove"
+            );
+            return code;
+        }
     };
     let claims = match select_claims(&spec, selector) {
         Ok(values) => values,
         Err(message) => {
-            eprintln!("{message}");
+            eprintln!(
+                "{message}; next: select a declared claim ID from PROJECT, or use --claim all"
+            );
             return INVALID;
         }
     };
     let manifest = match load_tools_manifest(tools) {
         Ok(value) => value,
         Err(error) => {
-            eprintln!("tools manifest blocked: {error:?}");
+            eprintln!(
+                "tools manifest blocked: {error:?}; next: supply a readable --tools manifest, then run zeno-fcis doctor --tools FILE"
+            );
             return BLOCKED;
         }
     };
@@ -1376,14 +1513,15 @@ fn prove(
         for tool_backend in requested.iter().copied() {
             let compatible = match claim.mode() {
                 ClaimMode::UnboundedProof => tool_backend == ToolBackend::Lean,
-                ClaimMode::Relational | ClaimMode::Finite { .. } | ClaimMode::Inductive => {
+                ClaimMode::Inductive => true,
+                ClaimMode::Relational | ClaimMode::Finite { .. } => {
                     tool_backend != ToolBackend::Lean
                 }
             } && claim.backends().contains(&tool_backend.spec_backend());
             if !compatible {
                 if !matches!(choice, BackendChoice::All) {
                     eprintln!(
-                        "claim {} does not select compatible {}",
+                        "claim {} does not select compatible {}; next: select a backend declared by this claim; unbounded proofs require Lean, finite and relational claims require an SMT backend",
                         claim.id().get(),
                         backend_name(tool_backend)
                     );
@@ -1394,7 +1532,7 @@ fn prove(
             ran += 1;
             let Some(config) = manifest.tool(tool_backend) else {
                 eprintln!(
-                    "{} is absent from tools manifest",
+                    "{} is absent from tools manifest; next: configure this backend in --tools FILE, then run zeno-fcis doctor --tools FILE",
                     backend_name(tool_backend)
                 );
                 exit = exit.max(BLOCKED);
@@ -1404,13 +1542,17 @@ fn prove(
                 (ToolBackend::Cvc5 | ToolBackend::Z3, ClaimMode::Inductive) => {
                     export_inductive_smt(claim, &spec, tool_backend)
                 }
+                (ToolBackend::Lean, ClaimMode::Inductive) => export_inductive_lean(claim, &spec),
                 (ToolBackend::Cvc5 | ToolBackend::Z3, _) => export_smt(claim, tool_backend),
                 (ToolBackend::Lean, _) => Err(zeno_fcis_formal_tools::ExportError::UnsupportedMode),
             };
             let obligation = match obligation {
                 Ok(value) => value,
                 Err(error) => {
-                    eprintln!("claim {} export blocked: {error:?}", claim.id().get());
+                    eprintln!(
+                        "claim {} export blocked: {error:?}; next: use a claim in the backend's supported fragment; inspect zeno-fcis guide show prove",
+                        claim.id().get()
+                    );
                     exit = exit.max(BLOCKED);
                     continue;
                 }
@@ -1420,16 +1562,19 @@ fn prove(
                 Ok(value) => value,
                 Err(error) => {
                     eprintln!(
-                        "{} claim {} blocked: {error:?}",
+                        "{} claim {} blocked: {error:?}; next: {}",
                         backend_name(tool_backend),
-                        claim.id().get()
+                        claim.id().get(),
+                        formal_next_step(&error)
                     );
                     exit = exit.max(failure_exit(&error));
                     continue;
                 }
             };
             if let Err(error) = retain_run(&evidence, &run) {
-                eprintln!("retain run failed: {error:?}");
+                eprintln!(
+                    "retain run failed: {error:?}; next: preserve existing evidence, check evidence-directory permissions and available space, then retry in a fresh project copy"
+                );
                 exit = exit.max(FAILURE);
                 continue;
             }
@@ -1441,7 +1586,7 @@ fn prove(
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::ProposedUnsat => {
                     println!(
@@ -1449,15 +1594,15 @@ fn prove(
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::KernelChecked if counterexample => {
                     eprintln!(
-                        "{} claim {}: kernel-checked theorem does not provide a counterexample",
+                        "{} claim {}: kernel-checked theorem does not provide a counterexample; next: use an SMT backend on a compatible claim to request a replayable counterexample",
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::KernelChecked => {
                     println!(
@@ -1465,7 +1610,7 @@ fn prove(
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::Refuted => {
                     println!(
@@ -1473,7 +1618,7 @@ fn prove(
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::Undefined(reason) => {
                     println!(
@@ -1482,27 +1627,29 @@ fn prove(
                         claim.id().get(),
                         reason.name()
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::Blocked(error) => {
                     eprintln!(
-                        "{} claim {} blocked: {error:?}",
+                        "{} claim {} blocked: {error:?}; next: {}",
                         backend_name(tool_backend),
-                        claim.id().get()
+                        claim.id().get(),
+                        formal_next_step(error)
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 ToolRunStatus::Failed(error) => {
                     eprintln!(
-                        "{} claim {} failed: {error:?}",
+                        "{} claim {} failed: {error:?}; next: {}",
                         backend_name(tool_backend),
-                        claim.id().get()
+                        claim.id().get(),
+                        formal_next_step(error)
                     );
-                    tool_run_exit(run.status(), counterexample)
+                    tool_run_exit(run.status())
                 }
                 _ => {
                     eprintln!(
-                        "claim {} blocked: unsupported formal outcome",
+                        "claim {} blocked: unsupported formal outcome; next: retain the tool output and inspect guide show prove before retrying",
                         claim.id().get()
                     );
                     BLOCKED
@@ -1537,10 +1684,53 @@ fn prove(
         }
     }
     if ran == 0 {
-        eprintln!("no compatible claim/backend pair was selected");
+        eprintln!(
+            "no compatible claim/backend pair was selected; next: select a declared claim and one of its compatible backends; inspect guide show prove"
+        );
         BLOCKED
     } else {
         exit
+    }
+}
+
+fn formal_next_step(error: &ToolFailure) -> &'static str {
+    match error {
+        ToolFailure::Missing | ToolFailure::NotFile | ToolFailure::Io(_) => {
+            "Check the configured executable and file permissions, then run zeno-fcis doctor --tools FILE."
+        }
+        ToolFailure::HashMismatch
+        | ToolFailure::VersionMismatch
+        | ToolFailure::ToolchainHashMismatch
+        | ToolFailure::ToolchainIncomplete
+        | ToolFailure::ToolchainUnsupported => {
+            "Restore the qualified toolchain matching the manifest and run doctor; do not weaken the pinned identity."
+        }
+        ToolFailure::BinaryTooLarge | ToolFailure::ToolchainTooLarge => {
+            "Use a qualified runtime within the declared size limits; inspect doctor before retrying."
+        }
+        ToolFailure::Timeout | ToolFailure::OutputLimit | ToolFailure::Unknown => {
+            "Inspect retained output and declared limits; simplify the obligation or choose a compatible backend. No proof was established."
+        }
+        ToolFailure::ProcessContainmentUnavailable | ToolFailure::ProcessContainmentFailed => {
+            "Restore the documented process-containment prerequisites and run doctor before retrying."
+        }
+        ToolFailure::Crash(_) => {
+            "Retain the tool log, run doctor, and reproduce the crash on the smallest obligation before retrying."
+        }
+        ToolFailure::RetentionConflict => {
+            "Preserve existing evidence and retry from a fresh project copy after checking its identity."
+        }
+        ToolFailure::ModelReplayFailed | ToolFailure::InconsistentResult => {
+            "Retain the model and replay diagnostic; repair the mismatch before treating it as a counterexample."
+        }
+        ToolFailure::UnsupportedEvidence
+        | ToolFailure::LeanAxiomReport
+        | ToolFailure::DisallowedLeanAxiom(_) => {
+            "Inspect the retained proof and axiom report; provide supported independently checkable evidence without widening the axiom policy."
+        }
+        _ => {
+            "Retain the tool diagnostic and inspect guide show prove before retrying an unsupported formal result."
+        }
     }
 }
 
@@ -1758,6 +1948,7 @@ fn diagnostic_json(path: &Path, diagnostics: &[&Diagnostic], truncated: bool) ->
 }
 
 fn print_json(value: &Value) {
+    telemetry::observe(value);
     let mut value = value.clone();
     checker_process::label_public_result(&mut value);
     match serde_json::to_string(&value) {
@@ -1785,12 +1976,10 @@ fn failure_exit(error: &ToolFailure) -> u8 {
     }
 }
 
-fn tool_run_exit(status: &ToolRunStatus, counterexample: bool) -> u8 {
+fn tool_run_exit(status: &ToolRunStatus) -> u8 {
     match status {
         ToolRunStatus::ProposedUnsat | ToolRunStatus::Blocked(_) => BLOCKED,
-        ToolRunStatus::KernelChecked if counterexample => BLOCKED,
         ToolRunStatus::KernelChecked => OK,
-        ToolRunStatus::Refuted | ToolRunStatus::Undefined(_) if counterexample => OK,
         ToolRunStatus::Refuted | ToolRunStatus::Undefined(_) => INVALID,
         ToolRunStatus::Failed(_) => FAILURE,
         _ => BLOCKED,
@@ -1839,6 +2028,42 @@ mod tests {
     use super::*;
 
     #[test]
+    fn formal_refusals_have_specific_recovery_steps() {
+        for (failure, action) in [
+            (ToolFailure::Missing, "executable"),
+            (ToolFailure::NotFile, "permissions"),
+            (ToolFailure::Io("unreadable".into()), "doctor"),
+            (ToolFailure::HashMismatch, "do not weaken"),
+            (ToolFailure::VersionMismatch, "qualified toolchain"),
+            (ToolFailure::ToolchainHashMismatch, "pinned identity"),
+            (ToolFailure::ToolchainIncomplete, "Restore"),
+            (ToolFailure::ToolchainUnsupported, "doctor"),
+            (ToolFailure::BinaryTooLarge, "size limits"),
+            (ToolFailure::ToolchainTooLarge, "size limits"),
+            (ToolFailure::Timeout, "No proof was established"),
+            (ToolFailure::OutputLimit, "declared limits"),
+            (ToolFailure::Unknown, "compatible backend"),
+            (
+                ToolFailure::ProcessContainmentUnavailable,
+                "process-containment",
+            ),
+            (ToolFailure::ProcessContainmentFailed, "prerequisites"),
+            (ToolFailure::Crash(Some(1)), "smallest obligation"),
+            (ToolFailure::RetentionConflict, "Preserve existing evidence"),
+            (ToolFailure::ModelReplayFailed, "repair the mismatch"),
+            (ToolFailure::InconsistentResult, "replay diagnostic"),
+            (ToolFailure::UnsupportedEvidence, "independently checkable"),
+            (ToolFailure::LeanAxiomReport, "axiom report"),
+            (
+                ToolFailure::DisallowedLeanAxiom("Classical.choice".into()),
+                "without widening",
+            ),
+        ] {
+            assert!(formal_next_step(&failure).contains(action), "{failure:?}");
+        }
+    }
+
+    #[test]
     fn every_described_command_has_explicit_effect_metadata() {
         fn visit(command: &Value) {
             assert_ne!(
@@ -1853,7 +2078,7 @@ mod tests {
                 visit(child);
             }
         }
-        let mut root = Cli::command();
+        let mut root = cli_command();
         root.build();
         visit(&describe_tree(&root, &[]));
         for arguments in [
@@ -1925,7 +2150,7 @@ mod tests {
             line.extend(positionals.into_iter().map(|(_, value)| value));
             found.push((line, command["effects"].clone()));
         }
-        let mut root = Cli::command();
+        let mut root = cli_command();
         root.build();
         let tree = describe_tree(&root, &[]);
         let mut found = Vec::new();
@@ -1954,6 +2179,7 @@ mod tests {
                     "run" => &["--session", "s", "--proposer", "local"],
                     "resume" => &["--session", "s"],
                     "encode" => &["--program", "p.json", "--out", "p.zcve"],
+                    "print" => &["--program", "p.zcve"],
                     "sketch" => &["--session", "s", "--sketch", "k.json"],
                     "family" => &["--instances", "m.json", "--program", "p.json"],
                     "transfer" => &["--from", "p.json", "--to-instances", "m.json"],
@@ -1992,6 +2218,26 @@ mod tests {
                     };
                     let mut arguments = line[..prefix].to_vec();
                     arguments.extend_from_slice(example(&line[..prefix]));
+                    (parsed(&arguments), false)
+                }
+                ["contract", "two-run", ..] => {
+                    // Its mode and field lists are conditionally required,
+                    // so the individually-required arguments omit them.
+                    let mut arguments = line.clone();
+                    arguments.extend([
+                        "--noninterference",
+                        "--secret",
+                        "pre.100.120",
+                        "--public",
+                        "post.100.120",
+                    ]);
+                    (parsed(&arguments), false)
+                }
+                ["contract", "risk", ..] => {
+                    // Its query selector is conditionally required, so it is
+                    // absent from the individually-required argument list.
+                    let mut arguments = line.clone();
+                    arguments.extend(["--where", "true"]);
                     (parsed(&arguments), false)
                 }
                 ["transform", "check", ..] => {
@@ -2036,8 +2282,8 @@ mod tests {
             .count();
         assert_eq!(
             contained,
-            loop_commands + 1,
-            "every loop command and the parallel check"
+            loop_commands + 2,
+            "every loop command, parallel check and assessment task"
         );
         // Leaves whose required arguments alone do not parse; none is a loop
         // command or a check, so none can be contained.
@@ -2065,6 +2311,17 @@ mod tests {
                 panic!("bundled template did not parse");
             };
             assert!(elaborate_project(parsed, ProjectLimits::default()).is_ok());
+        }
+    }
+
+    #[test]
+    fn every_application_template_file_list_has_unique_paths() {
+        for template in Template::value_variants() {
+            if let Some(files) = application_template_files(*template) {
+                let names: std::collections::BTreeSet<_> =
+                    files.iter().map(|(name, _)| *name).collect();
+                assert_eq!(names.len(), files.len(), "duplicate path in {template:?}");
+            }
         }
     }
 
@@ -2256,11 +2513,12 @@ mod tests {
                 _ => None,
             })
             .unwrap_or_else(|| panic!("{directory}: missing REQUIRED"));
-        let required: Vec<_> = declared_array(&required.expr)
+        let mut required: Vec<_> = declared_array(&required.expr)
             .elems
             .iter()
             .map(literal_law_id)
             .collect();
+        required.sort_unstable();
         assert_eq!(
             required,
             laws.keys().copied().collect::<Vec<_>>(),
@@ -2380,13 +2638,11 @@ mod tests {
             failure_exit(&ToolFailure::ProcessContainmentFailed),
             FAILURE
         );
-        assert_eq!(tool_run_exit(&ToolRunStatus::ProposedUnsat, false), BLOCKED);
-        assert_eq!(tool_run_exit(&ToolRunStatus::KernelChecked, false), OK);
-        assert_eq!(tool_run_exit(&ToolRunStatus::Refuted, false), INVALID);
-        assert_eq!(tool_run_exit(&ToolRunStatus::Refuted, true), OK);
+        assert_eq!(tool_run_exit(&ToolRunStatus::ProposedUnsat), BLOCKED);
+        assert_eq!(tool_run_exit(&ToolRunStatus::KernelChecked), OK);
+        assert_eq!(tool_run_exit(&ToolRunStatus::Refuted), INVALID);
         let undefined = ToolRunStatus::Undefined(zeno_fcis_formal_tools::UndefinedReason::Overflow);
-        assert_eq!(tool_run_exit(&undefined, false), INVALID);
-        assert_eq!(tool_run_exit(&undefined, true), OK);
+        assert_eq!(tool_run_exit(&undefined), INVALID);
     }
 
     #[test]
@@ -2406,8 +2662,7 @@ mod tests {
 
     #[test]
     fn hostile_source_is_inert() {
-        let source =
-            "zeno 1; project 1 inert; claim 2 x cvc5 relational = $(touch /tmp/pwned) == 1;";
+        let source = "zeno 1; project 1 inert; claim 2 x cvc5 relational = $(touch pwned) == 1;";
         assert!(parse_project(source, SourceLimits::default()).is_err());
     }
 }

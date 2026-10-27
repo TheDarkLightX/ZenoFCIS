@@ -1,6 +1,6 @@
 # `.zeno` language version 1
 
-This is the implemented language contract for ZenoFCIS `1.1.0`.
+This is the implemented language contract for ZenoFCIS `2.6.0`.
 `ZENO_DSL_VERSION`, `PROJECT_SPEC_FORMAT_VERSION`, and
 `TEMPORAL_SPEC_FORMAT_VERSION` are all `1`.
 
@@ -14,7 +14,11 @@ ASCII hyphens. Commitments accepted by tool manifests are lowercase hexadecimal.
 The language has no import, include, macro, interpolation, filesystem path,
 embedded command, implicit stable-ID allocation, or recursion construct.
 Shell syntax and traversal text are either invalid tokens or ordinary inert
-identifier data.
+identifier data. [Contract tables](CONTRACT_TABLES.md) and
+[keyed collections](COLLECTIONS.md) are the expanding forms: a table's
+entries and a named entry's fields take the IDs that follow an explicit
+stable ID, by a fixed rule, and their formulas expand to ordinary ones while
+the file is parsed.
 
 ## Resource limits
 
@@ -35,6 +39,13 @@ namespace ID name;
 type ID KIND name;
 type ID int name in MIN..=MAX;
 field ID OWNER_TYPE name FIELD_TYPE;
+table ID OWNER_TYPE name FIELD_TYPE size N;
+type ID index name of TABLE;
+type ID key name;
+map ID OWNER_TYPE name KEY_TYPE VALUE_TYPE capacity N;
+entry ID name of MAP at ROOT.TYPE.FIELD;
+summary ID OWNER_TYPE name TYPE sum MAP.FIELD;
+summary ID OWNER_TYPE name TYPE count MAP;
 variant ID OWNER_TYPE name PAYLOAD_TYPE|none;
 reason ID name precedence RANK;
 effect ID name destination TYPE payload TYPE;
@@ -44,6 +55,7 @@ wire COMPONENT.PORT -> COMPONENT.PORT;
 merge [COMPONENT, ...];
 law ID name = RELATIONAL_FORMULA;
 law ID name on any|accept|reject|failure|commit[, genesis] = RELATIONAL_FORMULA;
+law ID name on reject:REASON_ID = INPUT_FORMULA;
 claim ID name BACKEND MODE = FORMULA;
 claim ID name BACKEND inductive [assume [LAW, ...]] [accept [LAW, ...]] [failure [LAW, ...]] = STATE_FORMULA;
 ```
@@ -68,7 +80,13 @@ not see.
 A law may declare the decisions its runtime law manifest enforces it on:
 - `on accept`, `on reject`, or `on failure` (committed failures);
 - `on commit`, for accepts and committed failures;
-- `on any`, for every decision.
+- `on any`, for every decision;
+- `on reject:REASON_ID`, for rejects with that declared reason. Contract
+  compilation restricts this formula to pre-state, command and context.
+
+The contract law term `decision_reason` is numeric and is available with
+`on reject` or `on failure`, without genesis; see
+[contract laws](CONTRACT_RULES.md#laws).
 
 `, genesis` marks a law that also constrains the genesis state. The scopes
 mirror the manifest's `DecisionScope` and `GenesisApplicability`. A declared
@@ -118,6 +136,10 @@ through the same validation path.
 
 ## Relational formulas
 
+Contract reject and failure laws may read the numeric `decision_reason` term.
+`on reject:REASON_ID` selects that declared reject reason; a failure-only reason
+is not a valid reject scope. See [contract laws](CONTRACT_RULES.md#laws).
+
 Boolean syntax is `!`, `not`, `&&`, `||`, and `->`. Comparisons are `==`,
 `!=`, `<`, `<=`, `>`, and `>=`. Scalar syntax includes checked `+`, `-`, `*`,
 `div_exact(a,b)`, `div_floor(a,b)`, `div_ceil(a,b)`, bounded
@@ -127,6 +149,17 @@ Bounded predicates use `forall x in START..END { FORMULA }` and
 `exists x in START..END { FORMULA }`. A call such as `host_rule(a, b)` is a
 typed named predicate supplied by the host. A missing predicate, overflow,
 division error, or exhausted evaluation limit is `Indeterminate`.
+
+Table forms range over a table's entries instead: `ROOT.OWNER.T[k]`,
+`forall i in table T [where C] { FORMULA }`, `exists i in table T [where C]
+{ FORMULA }`, `sum i in table T [where C] { VALUE }` and
+`count i in table T { FORMULA } OP K`. They expand exactly into the forms
+above while the file is parsed; [contract tables](CONTRACT_TABLES.md) gives
+the rule. `ROOT.OWNER.ENTRY.FIELD` and `forall e in entries MAP [where C]
+{ FORMULA }` range over the named entries of a map, and keys compare only
+with `==` and `!=`; [keyed collections](COLLECTIONS.md) gives the view.
+A project with collections encodes as project-spec format 5, which adds the
+key types, maps, entries and summaries after any format-4 sections.
 
 ## Diagnostics
 
@@ -142,3 +175,19 @@ trace/evaluation failure.
 The accumulated-diagnostic UX reports independent actionable failures in one
 run. Recovery never invents semantic acceptance; any retained error makes
 parsing or elaboration fail.
+
+## Background and scope of determination reporting
+
+Edmund M. Clarke, E. Allen Emerson and A. Prasad Sistla, “Automatic Verification
+of Finite-State Concurrent Systems Using Temporal Logic Specifications,”
+*ACM Transactions on Programming Languages and Systems* 8(2), 1986, is
+background for the exhaustive finite checks described here. Shared determination
+reporting covers the declared finite domains and retains the runtime Authority;
+its comparative prior-art search is pending.
+
+## Method background and scope
+
+C. A. R. Hoare, “An Axiomatic Basis for Computer Programming”, Communications
+of the ACM, 1969, is background for explicit program assertions. This language
+reference describes the implemented finite declarations and admission rules;
+no new proof method or unbounded program guarantee is claimed.

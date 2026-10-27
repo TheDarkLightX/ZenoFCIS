@@ -10,8 +10,11 @@
 extern crate alloc;
 
 mod ast;
+mod bool_circuit;
 mod builder;
+mod collections;
 mod diagnostic;
+mod distribution;
 mod elaborate;
 mod induction;
 mod lexer;
@@ -20,12 +23,22 @@ mod parser;
 mod paths;
 mod source;
 mod substance;
+mod tables;
 mod views;
 
 pub use ast::*;
+pub use bool_circuit::{BoolCircuit, BoolNode};
 pub use builder::{CompositionAstBuilder, ProjectSpecBuilder};
+pub use collections::{
+    CollectionsSpec, EntryDecl, KeyTypeDecl, MapDecl, OrderReadDecl, OrderReadKind, SummaryDecl,
+    SummaryKind, TallyDecl,
+};
 pub use diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan,
+};
+pub use distribution::{
+    DistributionDecl, DistributionOutcome, Probability, RandomInputDecl, Rational,
+    RewardComparison, RewardDecl, RewardKind, RewardMeasure,
 };
 pub use elaborate::elaborate_project;
 pub use induction::invariant_at;
@@ -33,15 +46,20 @@ pub use mini_determinator::{
     MergeConflict, MiniBlocker, MiniBudget, MiniCommand, MiniDecision, MiniDeterminator, MiniRun,
     MiniState, PrivateWork, WorkerInstruction, WorkerProgram, WorkerTrace, WorkspaceCell,
 };
-pub use parser::parse_project;
+pub use parser::{
+    TableReadExpression, expand_tables, parse_formula, parse_law_formula, parse_project,
+    parse_table_expression, parse_table_read, table_index_sets,
+};
 pub use paths::{
-    DeclaredDomain, PathResolution, claim_paths, declared_domain, law_paths, resolve_path,
+    DeclaredDomain, PathResolution, TableIndexRange, claim_paths, declared_domain,
+    declared_table_index_range, law_paths, resolve_path,
 };
 pub use source::{SOURCE_FILES, source_digest};
 pub use substance::{
     Substance, claim_substance, invariant_substance, law_substance, relation_substance,
     temporal_substance,
 };
+pub use tables::{CountInfo, MAX_TABLE_ENTRIES, TableExpansion, TableInfo};
 pub use views::{
     DerivedComposition, GeneratedProject, GraphFormat, ObligationKind, UnresolvedObligation,
     derive_composition, generate_project, render_graph,

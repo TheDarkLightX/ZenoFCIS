@@ -466,3 +466,130 @@ fn operator_corpus_checks_with_existing_lean() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+// Exports one lowered unbounded ladder claim for an external kernel check.
+// The exported proposition is an obligation; this test proves nothing.
+#[test]
+#[ignore = "set ZENO_FCIS_LADDER_LEAN_CLAIM and ZENO_FCIS_LADDER_LEAN_OUT"]
+fn ladder_claim_lean_export_from_environment() {
+    let input = std::env::var_os("ZENO_FCIS_LADDER_LEAN_CLAIM")
+        .unwrap_or_else(|| panic!("set ZENO_FCIS_LADDER_LEAN_CLAIM to a lowered claim"));
+    let output = std::env::var_os("ZENO_FCIS_LADDER_LEAN_OUT")
+        .unwrap_or_else(|| panic!("set ZENO_FCIS_LADDER_LEAN_OUT to a new file"));
+    let source = fs::read_to_string(input).unwrap_or_else(|error| panic!("read claim: {error}"));
+    let parsed = zeno_fcis_spec::parse_project(&source, zeno_fcis_spec::SourceLimits::default())
+        .unwrap_or_else(|error| panic!("parse claim: {error:?}"));
+    let project =
+        zeno_fcis_spec::elaborate_project(parsed, zeno_fcis_spec::ProjectLimits::default())
+            .unwrap_or_else(|error| panic!("elaborate claim: {error:?}"));
+    let [claim] = project.claims() else {
+        panic!("exactly one claim required")
+    };
+    let exported = export_lean(claim).unwrap_or_else(|error| panic!("export: {error:?}"));
+    fs::write(output, exported.source()).unwrap_or_else(|error| panic!("write: {error}"));
+}
+
+// Temporal ladder macros are expanded before reaching this unchanged grammar.
+// These are translation fixtures, never evidence of an unbounded theorem.
+#[test]
+fn ladder_temporal_operator_and_window_translation_fixtures() {
+    let p = atom();
+    let window0 = p.clone();
+    let window1 = TemporalFormula::Or(
+        Box::new(p.clone()),
+        Box::new(TemporalFormula::Next(Box::new(window0.clone()))),
+    );
+    let window2 = TemporalFormula::Or(
+        Box::new(p.clone()),
+        Box::new(TemporalFormula::Next(Box::new(window1.clone()))),
+    );
+    let formulas = [
+        TemporalFormula::Always(Box::new(p.clone())),
+        TemporalFormula::Eventually(Box::new(p.clone())),
+        TemporalFormula::Next(Box::new(p.clone())),
+        TemporalFormula::Until(
+            Box::new(p.clone()),
+            Box::new(TemporalFormula::Not(Box::new(p.clone()))),
+        ),
+        TemporalFormula::Always(Box::new(TemporalFormula::Not(Box::new(p)))),
+        window0,
+        window1,
+        window2,
+    ];
+    for formula in &formulas {
+        let proposition = rendered(formula);
+        assert!(proposition.term.contains("observe"));
+        assert!(!proposition.defined.is_empty());
+        let claim = ClaimDecl::new(
+            StableId::new(2).unwrap_or_else(|| unreachable!()),
+            Identifier::try_new("ladder_window").unwrap_or_else(|| unreachable!()),
+            vec![BackendId::Cvc5],
+            ClaimMode::Finite { horizon: 4 },
+            ClaimFormula::Temporal(formula.clone()),
+        );
+        let export = export_smt(&claim, ToolBackend::Cvc5)
+            .unwrap_or_else(|error| panic!("finite translation: {error:?}"));
+        let text = std::str::from_utf8(export.source())
+            .unwrap_or_else(|error| panic!("SMT UTF-8: {error}"));
+        assert!(text.contains("(<= 1 zeno_trace_len)"));
+        assert!(text.contains("(<= zeno_trace_len 4)"));
+    }
+    let source = rendered(&formulas[7]).term;
+    assert!(source.contains("(0 + 1)"));
+    assert!(source.contains("((0 + 1) + 1)"));
+    // Keep explicit negation of strong next: the finite endpoint is different.
+    let not_next = TemporalFormula::Not(Box::new(TemporalFormula::Next(Box::new(atom()))));
+    let next_not = TemporalFormula::Next(Box::new(TemporalFormula::Not(Box::new(atom()))));
+    let steps = [ModelStep::try_new(vec![]).unwrap_or_else(|| unreachable!())];
+    assert_eq!(
+        check_trace(
+            &not_next,
+            ClaimMode::Finite { horizon: 1 },
+            &steps,
+            DiagnosticLimits::default()
+        ),
+        TemporalDiagnosis::Satisfied,
+    );
+    assert_eq!(
+        check_trace(
+            &next_not,
+            ClaimMode::Finite { horizon: 1 },
+            &steps,
+            DiagnosticLimits::default()
+        ),
+        TemporalDiagnosis::Counterexample { step: 0 },
+    );
+}
+
+#[test]
+fn select_smt_requires_condition_and_both_arms_to_be_defined() {
+    let value = ValueExpr::Select(
+        Box::new(RelExpr::Bool(true)),
+        Box::new(ValueExpr::Int(7)),
+        Box::new(ValueExpr::Add(
+            Box::new(ValueExpr::Int(i128::MAX)),
+            Box::new(ValueExpr::Int(1)),
+        )),
+    );
+    let rendered = render_value_smt(
+        &value,
+        0,
+        &BTreeMap::new(),
+        &mut SmtRenderBudget::new(ExportLimits::default()),
+    )
+    .unwrap_or_else(|error| panic!("render: {error:?}"));
+    assert!(rendered.term.starts_with("(ite true 7 "));
+    assert!(rendered.defined.contains(&i128::MAX.to_string()));
+    let formula = equal(value, 7);
+    let step = model_diagnostics::ModelStep::try_new(Vec::new()).unwrap_or_else(|| panic!("step"));
+    let result = model_diagnostics::check_relation(
+        &formula,
+        model_diagnostics::ModelContext::new(&step, model_diagnostics::DiagnosticLimits::default()),
+    );
+    assert_eq!(
+        result,
+        model_diagnostics::DiagnosticOutcome::Indeterminate(
+            model_diagnostics::ModelReason::Overflow
+        )
+    );
+}

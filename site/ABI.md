@@ -56,3 +56,21 @@ buffers, checked access and private memory. Browser termination, resource
 exhaustion outside these bounds, and compiler or library defects remain
 outside this argument. Decisions that are LLM-generated rather than
 synthesized keep their documented determinism contract.
+
+## Factory module
+
+The factory module uses these same seven scalar exports and capacities. Reset
+installs an owned stateless request handler through `reset_instance`; it does
+not authorize a decision. Each factory request builds fresh local preparation
+data and invokes immutable library checker APIs. Reports own their JSON data,
+and no authority, bound contract, frame or candidate reference escapes.
+Synthesis candidate requests and the final synthesis call are separate bounded
+messages so the worker can send real progress. The worker resets transport
+before each act; the same 64-request limit includes parsing refusals.
+Inventory progress uses `inventory_rows` with a checked start and count
+(1–48 rows, wholly inside the 864-input domain), followed by the existing
+complete review. `inventory_detail` accepts one checked ordinal and evaluates
+both authorities afresh. Preparation is exclusively owned within each call;
+neither request retains a model or checked-result alias. These requests add
+no exports and preserve all byte, session and refusal limits.
+The factory creates no publication, durable state or receipt.

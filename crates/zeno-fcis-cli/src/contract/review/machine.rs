@@ -19,6 +19,7 @@ use super::super::{policy, schema, schema_commitment};
 use super::domain::{self, Position};
 use super::evaluate::{self, Framer, Outcome, RefusalClass};
 use super::parallel;
+use zeno_fcis_contract::internals::genesis;
 use zeno_fcis_synthesis::finite::v2_authority::Authority;
 
 /// A contract read and compiled, ready to bind.
@@ -37,7 +38,7 @@ impl Loaded {
     /// # Errors
     /// The first declaration or rule with no contract form.
     pub(super) fn read(project: &str, rules: &str) -> Result<Self, ContractError> {
-        let rules = Rules::read(rules)?;
+        let rules = Rules::read_for_project(project, rules)?;
         Self::with(project, rules)
     }
 
@@ -46,6 +47,7 @@ impl Loaded {
     /// # Errors
     /// The first declaration with no contract form.
     pub(super) fn with(project: &str, rules: Rules) -> Result<Self, ContractError> {
+        rules.refuse_unsigned("scalar review consumer binding")?;
         let declarations = Declarations::read(project, &rules.leaf_bindings)?;
         let schema = schema::encode(&declarations)?;
         let commitment = schema_commitment(&schema)?;
@@ -134,9 +136,8 @@ impl Space {
             size: domain::domain_size(positions),
             limit: max_tuples,
         };
-        match domain::domain_size(positions) {
-            Some(size) if size <= u128::from(max_tuples) => {}
-            _ => return Err(too_large()),
+        if !super::probe_kernel::within_limit(domain::domain_size(positions), max_tuples) {
+            return Err(too_large());
         }
         let values: Vec<Vec<i128>> = positions
             .iter()
@@ -301,8 +302,11 @@ pub(super) struct Machine {
     /// SHA-256 of each decision's outbox, as the review digests it; zero for
     /// a refusal.
     pub(super) outboxes: Vec<[u8; 32]>,
+    deliveries: BTreeMap<usize, Vec<evaluate::Delivery>>,
     /// The index of the genesis state.
     pub(super) genesis: usize,
+    /// The Authority's admission of the declared starting state.
+    pub(super) starting_state: Result<(), genesis::Refusal>,
 }
 
 impl Machine {
@@ -319,19 +323,27 @@ impl Machine {
         rules: &Rules,
     ) -> Result<Self, ContractError> {
         let genesis = genesis(&space, positions, rules)?;
+        let starting_state = genesis::admit(
+            authority,
+            &framer.frame(&space.at(genesis * space.inputs))[0],
+        );
         let results = parallel(space.tuples(), |ordinal| {
             let tuple = space.at(ordinal);
-            observe(
-                &space,
-                positions,
-                &evaluate::evaluate(authority, framer, &tuple),
-                ordinal,
-            )
+            let outcome = evaluate::evaluate(authority, framer, &tuple);
+            let deliveries = match &outcome {
+                Outcome::Decision(d) => d.outbox.clone(),
+                Outcome::Refused(_) => Vec::new(),
+            };
+            observe(&space, positions, &outcome, ordinal).map(|(a, b)| (a, b, deliveries))
         });
         let mut observed = Vec::with_capacity(results.len());
         let mut outboxes = Vec::with_capacity(results.len());
-        for result in results {
-            let (outcome, outbox) = result?;
+        let mut deliveries = BTreeMap::new();
+        for (ordinal, result) in results.into_iter().enumerate() {
+            let (outcome, outbox, full) = result?;
+            if !full.is_empty() {
+                deliveries.insert(ordinal, full);
+            }
             observed.push(outcome);
             outboxes.push(outbox);
         }
@@ -339,13 +351,37 @@ impl Machine {
             space,
             observed,
             outboxes,
+            deliveries,
             genesis,
+            starting_state,
         })
+    }
+
+    pub(super) fn outbox_at(&self, ordinal: usize) -> &[evaluate::Delivery] {
+        self.deliveries
+            .get(&ordinal)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
     }
 
     /// The outcome of `state` on `input`.
     pub(super) fn of(&self, state: usize, input: usize) -> Observed {
         self.observed[state * self.space.inputs + input]
+    }
+
+    /// Complete immutable-table projection, states then inputs ascending.
+    /// Each returned vector is exclusively owned by this invocation's caller.
+    pub(super) fn kernel_tables(&self) -> (Vec<usize>, Vec<bool>) {
+        let mut after = Vec::with_capacity(self.observed.len());
+        let mut commits = Vec::with_capacity(self.observed.len());
+        for state in 0..self.space.states {
+            for input in 0..self.space.inputs {
+                let outcome = self.of(state, input);
+                after.push(outcome.after(state));
+                commits.push(outcome.commits());
+            }
+        }
+        (after, commits)
     }
 
     /// Every state reachable from genesis through committed decisions, and
@@ -354,6 +390,9 @@ impl Machine {
     pub(super) fn reachable(&self) -> (Vec<bool>, Vec<Option<(usize, usize)>>) {
         let mut seen = vec![false; self.space.states];
         let mut parent = vec![None; self.space.states];
+        if self.starting_state.is_err() {
+            return (seen, parent);
+        }
         let mut queue = std::collections::VecDeque::from([self.genesis]);
         seen[self.genesis] = true;
         while let Some(state) = queue.pop_front() {
@@ -391,6 +430,10 @@ fn genesis(space: &Space, positions: &[Position], rules: &Rules) -> Result<usize
                 ContractError::new("project.zeno", "a scalar state root has no genesis field")
             })?;
             match rules.genesis.get(&field) {
+                Some(Constant::U128(_)) => Err(ContractError::new(
+                    "legacy machine",
+                    "U128SubjectUnsupported",
+                )),
                 Some(Constant::Bool(value)) => Ok(i128::from(*value)),
                 Some(Constant::Int(value)) => Ok(*value),
                 None => Err(ContractError::new(
@@ -558,16 +601,12 @@ pub(super) fn valid_states(space: &Space, test: impl Fn(&[i128]) -> bool + Sync)
     })
 }
 
-/// Text a formula may not contain: it is placed inside one law declaration
-/// and must not end it, start another or hide text in a comment.
-const FORBIDDEN: [&str; 7] = [";", "\n", "\r", "//", "/*", "{", "}"];
-
 /// The contract with one more law, `law ID NAME on SCOPE = FORMULA;`,
 /// appended to `project.zeno` and given `kind`, and the law's ID: an ID
 /// above every number `project.zeno` holds and every framework law's.
 ///
 /// # Errors
-/// A formula with forbidden text, or one with no contract form, named as
+/// A formula with trailing text, undeclared paths or no contract form, named as
 /// `what`.
 pub(super) fn with_law(
     project: &str,
@@ -581,12 +620,6 @@ pub(super) fn with_law(
     if formula.trim().is_empty() {
         return Err(invalid("is empty".to_owned()));
     }
-    if let Some(text) = FORBIDDEN.iter().find(|text| formula.contains(**text)) {
-        return Err(invalid(format!(
-            "may not contain `{}`",
-            text.escape_debug()
-        )));
-    }
     let highest = project
         .split(|character: char| !character.is_ascii_digit())
         .filter_map(|digits| digits.parse::<u32>().ok())
@@ -596,23 +629,35 @@ pub(super) fn with_law(
     let id = highest
         .checked_add(1)
         .ok_or_else(|| invalid("has no free law ID".to_owned()))?;
-    let mut source = project.to_owned();
-    if !source.ends_with('\n') {
-        source.push('\n');
-    }
-    source.push_str(&format!(
-        "law {id} judged_formula_{id} on {scope} = {formula};\n"
-    ));
+    let (scope, genesis) = match scope {
+        "commit, genesis" => (zeno_fcis_spec::LawScope::Committing, true),
+        "commit" => (zeno_fcis_spec::LawScope::Committing, false),
+        "any" => (zeno_fcis_spec::LawScope::Always, false),
+        _ => return Err(invalid("unsupported formula scope".to_owned())),
+    };
+    let applicability = zeno_fcis_spec::LawApplicability::new(scope, genesis);
+    let parsed = zeno_fcis_spec::parse_law_formula(
+        project,
+        formula,
+        applicability,
+        zeno_fcis_spec::SourceLimits::default(),
+    )
+    .map_err(|diagnostics| invalid(diagnostics.to_string()))?;
+    let formula = super::super::expr::law(&parsed).map_err(invalid)?;
     let mut extended = rules.clone();
     extended.law_kinds.insert(id, kind);
-    let before = Declarations::read(project, &rules.leaf_bindings)?
-        .laws
-        .len();
-    let loaded = Loaded::with(&source, extended)
+    let mut loaded = Loaded::with(project, extended)
         .map_err(|error| invalid(format!("{}: {}", error.place(), error.reason())))?;
-    if loaded.declarations.laws.len() != before + 1 {
-        return Err(invalid("must be one formula".to_owned()));
-    }
+    loaded
+        .declarations
+        .laws
+        .push(super::super::declarations::Law {
+            id,
+            name: format!("judged_formula_{id}"),
+            scope,
+            genesis,
+            formula,
+        });
     Ok((loaded, id))
 }
 

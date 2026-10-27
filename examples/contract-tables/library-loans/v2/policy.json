@@ -1,0 +1,86 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "library-loans",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "action": "command.101.120",
+    "copy": "command.101.121",
+    "member": "command.101.122",
+    "desk": "context.102",
+    "holder": "pre.100.110[command.101.121]",
+    "held": "sum j in table 110 { choose(pre.100.110[j] == member, 1, 0) }"
+  },
+  "cases": [
+    {
+      "rule": "only the librarian records loans",
+      "when": "desk != 130",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "a copy on loan cannot be lent again",
+      "when": "action == 150 && holder != 0",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "a member holds at most two copies",
+      "when": "action == 150 && held >= 2",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "only the holder returns a copy",
+      "when": "action == 151 && holder != member",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "borrow",
+      "when": "action == 150",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110[command.101.121]": "member"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "return",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110[command.101.121]": 0
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0,
+    "112": 0,
+    "113": 0,
+    "114": 0,
+    "115": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AssetConservation",
+    "503": "DebitCreditEffectEquality"
+  }
+}

@@ -16,7 +16,10 @@ usage_topic(L,S) :- lesson(L,S).
 usage_topic(L,S) :- lesson(L,C), isa(S,C).
 usage_unknown_environment(L) :- usage_topic(L,S), usage_known(subject,S), blocker(L,_), not usage_known(environment,_).
 usage_scope(L,S) :- usage_topic(L,S), usage_known(subject,S), not usage_missing(L,_,_).
-usage_ready(L) :- record(L,promoted,usage-v1,_,_,_), usage_validated(L).
+usage_tier_one(L) :- strength(L,proved).
+usage_tier_one(L) :- strength(L,refuted).
+usage_tier_one(L) :- strength(L,certified).
+usage_ready(L) :- record(L,promoted,usage-v1,_,_,_), usage_validated(L), not usage_tier_one(L).
 usage_active_replace(N,O) :- supersedes(N,O), usage_ready(N).
 usage_active_replace(N,O) :- supersedes(N,M), usage_ready(N), usage_active_replace(M,O).
 usage_defeated(O,S) :- usage_active_replace(N,O), usage_scope(N,S), usage_scope(O,S).
@@ -431,7 +434,16 @@ pub(super) fn check(db: &Database, w: &mut Work) -> Result<Vec<&'static str>, St
                 "strength" => {
                     if !matches!(
                         string(&row[1]),
-                        Some("declared" | "observed" | "measured" | "preregistered" | "proposed")
+                        Some(
+                            "declared"
+                                | "observed"
+                                | "measured"
+                                | "preregistered"
+                                | "proposed"
+                                | "proved"
+                                | "refuted"
+                                | "certified"
+                        )
                     ) {
                         problems.insert("kb-strength");
                     }
@@ -469,13 +481,29 @@ pub(super) fn check(db: &Database, w: &mut Work) -> Result<Vec<&'static str>, St
                     ) || string(&row[2]) != Some("usage-v1")
                         || !matches!(
                             string(&row[4]),
-                            Some("observation" | "exact-precondition" | "reproduced-blocker")
+                            Some(
+                                "observation"
+                                    | "exact-precondition"
+                                    | "reproduced-blocker"
+                                    | "proved"
+                                    | "refuted"
+                                    | "certified"
+                            )
                         ) =>
                 {
                     problems.insert("kb-record-schema");
                 }
                 _ => {}
             }
+        }
+    }
+    for row in db.get("strength").into_iter().flatten() {
+        if matches!(
+            row.get(1).and_then(string),
+            Some("proved" | "refuted" | "certified")
+        ) && !has(db, "usage_validated", &[row[0].clone()])
+        {
+            problems.insert("kb-fact-replay-required");
         }
     }
     for row in db.get("lesson").into_iter().flatten() {

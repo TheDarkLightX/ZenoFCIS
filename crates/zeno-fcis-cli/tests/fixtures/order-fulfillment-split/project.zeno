@@ -16,14 +16,17 @@ type 108 data PaymentAction;
 type 109 destination CarrierDestination;
 type 110 payload ShippingRequest;
 type 111 data OrderAction;
-type 112 bool Flag;
-type 113 int Progress in 0..=2;
-field 122 100 paid 112;
-field 123 100 progress 113;
+type 112 int Day in 0..=8;
+type 113 bool PaidFlag;
+type 114 int Progress in 0..=3;
+field 122 100 paid 113;
+field 123 100 progress 114;
 field 121 100 payment_attempts 106;
 field 130 102 caller 107;
+field 131 102 now 112;
 field 140 104 request_attempt 106;
-field 142 104 capture 112;
+type 115 int RequestKind in 0..=3;
+field 142 104 request_kind 115;
 field 145 110 paid_attempt 106;
 field 125 101 action 111;
 field 126 101 callback_attempt 106;
@@ -33,22 +36,30 @@ variant 152 111 PaymentDeclined none;
 variant 153 111 ParcelDispatched none;
 variant 154 111 ParcelDelivered none;
 variant 155 111 CancelOrder none;
+variant 156 111 TimeoutOrder none;
+variant 157 111 ReleaseDelivered none;
+variant 158 111 DisputeDelivery none;
 variant 160 105 Placed none;
 variant 161 105 AwaitingPayment none;
 variant 162 105 Paid none;
 variant 163 105 Shipped none;
 variant 164 105 Delivered none;
 variant 165 105 Cancelled none;
+variant 166 105 Settled none;
 variant 170 107 Customer none;
 variant 171 107 PaymentProvider none;
 variant 172 107 Carrier none;
 variant 175 108 Capture none;
 variant 176 108 Void none;
+variant 177 108 Refund none;
+variant 178 108 Release none;
 reason 200 wrong_caller precedence 0;
 reason 201 invalid_transition precedence 1;
 reason 202 stale_callback precedence 2;
 reason 203 attempts_exhausted precedence 3;
 reason 204 payment_declined precedence 4;
+reason 205 after_stage_deadline precedence 5;
+reason 206 before_stage_deadline precedence 6;
 channel 300 payment_request destination 103 payload 104;
 channel 301 shipping_request destination 109 payload 110;
 component 400 order {
@@ -63,7 +74,7 @@ component 400 order {
 merge [400];
 // An order awaiting payment, paid, shipped, or delivered has made at least
 // one payment attempt.
-law 500 order_state_consistent on commit, genesis = (post.100.122 == 1 || post.100.123 == 1) -> post.100.121 >= 1;
+law 500 order_state_consistent on commit, genesis = (post.100.122 == 0 && post.100.123 == 1) || (post.100.122 == 1 && post.100.123 == 0) || (post.100.122 == 1 && post.100.123 == 1) || (post.100.122 == 1 && post.100.123 == 2) -> post.100.121 >= 1;
 // The customer checks out a placed order, starting a new payment attempt. A
 // declined payment is never accepted.
 law 501 checkout_requests_payment on accept = command.101.125 != 152 && (command.101.125 == 150 -> context.102.130 == 170 && (pre.100.122 == 0 && pre.100.123 == 0) && pre.100.121 < 3 && (post.100.122 == 0 && post.100.123 == 1) && post.100.121 == pre.100.121 + 1);
@@ -79,3 +90,14 @@ law 505 cancel_before_payment on accept = command.101.125 == 155 -> context.102.
 // A decline of the current attempt returns the order to placed and keeps the
 // attempt count.
 law 506 declined_payment_reopens_order on failure = command.101.125 == 152 && context.102.130 == 171 && (pre.100.122 == 0 && pre.100.123 == 1) && command.101.126 == pre.100.121 && (post.100.122 == 0 && post.100.123 == 0) && post.100.121 == pre.100.121;
+
+// Fixed calendar cutoffs: payment 2, dispatch 4, delivery 6, dispute 8.
+law 507 recovery_and_final_release on accept = (command.101.125 == 156 -> context.102.130 == 170 && ((pre.100.122 == 0 && pre.100.123 == 1) || (pre.100.122 == 1 && pre.100.123 == 0) || (pre.100.122 == 1 && pre.100.123 == 1)) && !((command.101.125 == 156 && (((pre.100.122 == 0 && pre.100.123 == 1) && context.102.131 < 2) || ((pre.100.122 == 1 && pre.100.123 == 0) && context.102.131 < 4) || ((pre.100.122 == 1 && pre.100.123 == 1) && context.102.131 < 6))) || (command.101.125 == 157 && context.102.131 < 8)) && (post.100.122 == 0 && post.100.123 == 2) && post.100.121 == pre.100.121) && (command.101.125 == 157 -> (pre.100.122 == 1 && pre.100.123 == 2) && context.102.131 >= 8 && (post.100.122 == 1 && post.100.123 == 3) && post.100.121 == pre.100.121) && (command.101.125 == 158 -> context.102.130 == 170 && (pre.100.122 == 1 && pre.100.123 == 2) && context.102.131 < 8 && (post.100.122 == 0 && post.100.123 == 2) && post.100.121 == pre.100.121);
+law 508 settled_order_has_an_attempt on commit, genesis = (post.100.122 == 1 && post.100.123 == 3) -> post.100.121 >= 1;
+law 510 reject_only_for_first_failed_guard on reject = ((((command.101.125 == 150 || command.101.125 == 155 || command.101.125 == 156 || command.101.125 == 158) && context.102.130 != 170) || ((command.101.125 == 151 || command.101.125 == 152) && context.102.130 != 171) || ((command.101.125 == 153 || command.101.125 == 154) && context.102.130 != 172)) && decision_reason == 200) || (!(((command.101.125 == 150 || command.101.125 == 155 || command.101.125 == 156 || command.101.125 == 158) && context.102.130 != 170) || ((command.101.125 == 151 || command.101.125 == 152) && context.102.130 != 171) || ((command.101.125 == 153 || command.101.125 == 154) && context.102.130 != 172)) && (!((command.101.125 == 150 && (pre.100.122 == 0 && pre.100.123 == 0)) || ((command.101.125 == 151 || command.101.125 == 152) && (pre.100.122 == 0 && pre.100.123 == 1)) || (command.101.125 == 153 && (pre.100.122 == 1 && pre.100.123 == 0)) || (command.101.125 == 154 && (pre.100.122 == 1 && pre.100.123 == 1)) || (command.101.125 == 155 && ((pre.100.122 == 0 && pre.100.123 == 0) || (pre.100.122 == 0 && pre.100.123 == 1))) || (command.101.125 == 156 && ((pre.100.122 == 0 && pre.100.123 == 1) || (pre.100.122 == 1 && pre.100.123 == 0) || (pre.100.122 == 1 && pre.100.123 == 1))) || ((command.101.125 == 157 || command.101.125 == 158) && (pre.100.122 == 1 && pre.100.123 == 2)))) && decision_reason == 201) || (!(((command.101.125 == 150 || command.101.125 == 155 || command.101.125 == 156 || command.101.125 == 158) && context.102.130 != 170) || ((command.101.125 == 151 || command.101.125 == 152) && context.102.130 != 171) || ((command.101.125 == 153 || command.101.125 == 154) && context.102.130 != 172)) && !(!((command.101.125 == 150 && (pre.100.122 == 0 && pre.100.123 == 0)) || ((command.101.125 == 151 || command.101.125 == 152) && (pre.100.122 == 0 && pre.100.123 == 1)) || (command.101.125 == 153 && (pre.100.122 == 1 && pre.100.123 == 0)) || (command.101.125 == 154 && (pre.100.122 == 1 && pre.100.123 == 1)) || (command.101.125 == 155 && ((pre.100.122 == 0 && pre.100.123 == 0) || (pre.100.122 == 0 && pre.100.123 == 1))) || (command.101.125 == 156 && ((pre.100.122 == 0 && pre.100.123 == 1) || (pre.100.122 == 1 && pre.100.123 == 0) || (pre.100.122 == 1 && pre.100.123 == 1))) || ((command.101.125 == 157 || command.101.125 == 158) && (pre.100.122 == 1 && pre.100.123 == 2)))) && ((command.101.125 == 151 || command.101.125 == 152) && command.101.126 != pre.100.121) && decision_reason == 202) || (!(((command.101.125 == 150 || command.101.125 == 155 || command.101.125 == 156 || command.101.125 == 158) && context.102.130 != 170) || ((command.101.125 == 151 || command.101.125 == 152) && context.102.130 != 171) || ((command.101.125 == 153 || command.101.125 == 154) && context.102.130 != 172)) && !(!((command.101.125 == 150 && (pre.100.122 == 0 && pre.100.123 == 0)) || ((command.101.125 == 151 || command.101.125 == 152) && (pre.100.122 == 0 && pre.100.123 == 1)) || (command.101.125 == 153 && (pre.100.122 == 1 && pre.100.123 == 0)) || (command.101.125 == 154 && (pre.100.122 == 1 && pre.100.123 == 1)) || (command.101.125 == 155 && ((pre.100.122 == 0 && pre.100.123 == 0) || (pre.100.122 == 0 && pre.100.123 == 1))) || (command.101.125 == 156 && ((pre.100.122 == 0 && pre.100.123 == 1) || (pre.100.122 == 1 && pre.100.123 == 0) || (pre.100.122 == 1 && pre.100.123 == 1))) || ((command.101.125 == 157 || command.101.125 == 158) && (pre.100.122 == 1 && pre.100.123 == 2)))) && !((command.101.125 == 151 || command.101.125 == 152) && command.101.126 != pre.100.121) && (command.101.125 == 150 && pre.100.121 == 3) && decision_reason == 203) || (!(((command.101.125 == 150 || command.101.125 == 155 || command.101.125 == 156 || command.101.125 == 158) && context.102.130 != 170) || ((command.101.125 == 151 || command.101.125 == 152) && context.102.130 != 171) || ((command.101.125 == 153 || command.101.125 == 154) && context.102.130 != 172)) && !(!((command.101.125 == 150 && (pre.100.122 == 0 && pre.100.123 == 0)) || ((command.101.125 == 151 || command.101.125 == 152) && (pre.100.122 == 0 && pre.100.123 == 1)) || (command.101.125 == 153 && (pre.100.122 == 1 && pre.100.123 == 0)) || (command.101.125 == 154 && (pre.100.122 == 1 && pre.100.123 == 1)) || (command.101.125 == 155 && ((pre.100.122 == 0 && pre.100.123 == 0) || (pre.100.122 == 0 && pre.100.123 == 1))) || (command.101.125 == 156 && ((pre.100.122 == 0 && pre.100.123 == 1) || (pre.100.122 == 1 && pre.100.123 == 0) || (pre.100.122 == 1 && pre.100.123 == 1))) || ((command.101.125 == 157 || command.101.125 == 158) && (pre.100.122 == 1 && pre.100.123 == 2)))) && !((command.101.125 == 151 || command.101.125 == 152) && command.101.126 != pre.100.121) && !(command.101.125 == 150 && pre.100.121 == 3) && ((command.101.125 == 151 && context.102.131 >= 2) || (command.101.125 == 153 && context.102.131 >= 4) || (command.101.125 == 154 && context.102.131 >= 6) || (command.101.125 == 158 && context.102.131 >= 8)) && decision_reason == 205) || (!(((command.101.125 == 150 || command.101.125 == 155 || command.101.125 == 156 || command.101.125 == 158) && context.102.130 != 170) || ((command.101.125 == 151 || command.101.125 == 152) && context.102.130 != 171) || ((command.101.125 == 153 || command.101.125 == 154) && context.102.130 != 172)) && !(!((command.101.125 == 150 && (pre.100.122 == 0 && pre.100.123 == 0)) || ((command.101.125 == 151 || command.101.125 == 152) && (pre.100.122 == 0 && pre.100.123 == 1)) || (command.101.125 == 153 && (pre.100.122 == 1 && pre.100.123 == 0)) || (command.101.125 == 154 && (pre.100.122 == 1 && pre.100.123 == 1)) || (command.101.125 == 155 && ((pre.100.122 == 0 && pre.100.123 == 0) || (pre.100.122 == 0 && pre.100.123 == 1))) || (command.101.125 == 156 && ((pre.100.122 == 0 && pre.100.123 == 1) || (pre.100.122 == 1 && pre.100.123 == 0) || (pre.100.122 == 1 && pre.100.123 == 1))) || ((command.101.125 == 157 || command.101.125 == 158) && (pre.100.122 == 1 && pre.100.123 == 2)))) && !((command.101.125 == 151 || command.101.125 == 152) && command.101.126 != pre.100.121) && !(command.101.125 == 150 && pre.100.121 == 3) && !((command.101.125 == 151 && context.102.131 >= 2) || (command.101.125 == 153 && context.102.131 >= 4) || (command.101.125 == 154 && context.102.131 >= 6) || (command.101.125 == 158 && context.102.131 >= 8)) && ((command.101.125 == 156 && (((pre.100.122 == 0 && pre.100.123 == 1) && context.102.131 < 2) || ((pre.100.122 == 1 && pre.100.123 == 0) && context.102.131 < 4) || ((pre.100.122 == 1 && pre.100.123 == 1) && context.102.131 < 6))) || (command.101.125 == 157 && context.102.131 < 8)) && decision_reason == 206);
+law 511 forward_callbacks_meet_their_stage_deadline on accept = (command.101.125 == 151 -> context.102.131 < 2) && (command.101.125 == 153 -> context.102.131 < 4) && (command.101.125 == 154 -> context.102.131 < 6);
+law 512 payment_request_matches_the_transition on commit = ((command.101.125 == 150) -> outbox.104 == 1 && outbox.104.140 == post.100.121 && outbox.104.142 == 0) && (((command.101.125 == 155 || command.101.125 == 156) && (pre.100.122 == 0 && pre.100.123 == 1)) -> outbox.104 == 1 && outbox.104.140 == pre.100.121 && outbox.104.142 == 1) && (((command.101.125 == 156 && ((pre.100.122 == 1 && pre.100.123 == 0) || (pre.100.122 == 1 && pre.100.123 == 1))) || command.101.125 == 158) -> outbox.104 == 1 && outbox.104.140 == pre.100.121 && outbox.104.142 == 2) && ((command.101.125 == 157) -> outbox.104 == 1 && outbox.104.140 == pre.100.121 && outbox.104.142 == 3) && (!((command.101.125 == 150) || ((command.101.125 == 155 || command.101.125 == 156) && (pre.100.122 == 0 && pre.100.123 == 1)) || ((command.101.125 == 156 && ((pre.100.122 == 1 && pre.100.123 == 0) || (pre.100.122 == 1 && pre.100.123 == 1))) || command.101.125 == 158) || (command.101.125 == 157)) -> outbox.104 == 0);
+law 513 captured_payment_requests_shipping on commit = (command.101.125 == 151 -> outbox.110 == 1 && outbox.110.145 == pre.100.121) && (command.101.125 != 151 -> outbox.110 == 0);
+law 514 payment_destination on commit = ((command.101.125 == 150) || ((command.101.125 == 155 || command.101.125 == 156) && (pre.100.122 == 0 && pre.100.123 == 1)) || ((command.101.125 == 156 && ((pre.100.122 == 1 && pre.100.123 == 0) || (pre.100.122 == 1 && pre.100.123 == 1))) || command.101.125 == 158) || (command.101.125 == 157)) -> outbox.104 == 1;
+law 515 shipping_destination on commit = command.101.125 == 151 -> outbox.110 == 1;
+law 516 failure_names_payment_declined on failure = decision_reason == 204;

@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import tempfile
 
@@ -85,9 +86,13 @@ class CaptureWorkspace:
             code, report = D.run(self.cli(), ["loop", "capture", "open", "--spec", Path(spec).absolute(),
                 "--reference", Path(reference).absolute(), "--session", Path(session).absolute(),
                 "--reference-format", reference_format])
-            packet = report.get("detail", {}).get("packet")
+            detail = report.get("detail")
+            packet = detail.get("packet") if isinstance(detail, dict) else None
             if code != 0 or report.get("status") != "opened" or not isinstance(packet, dict):
-                raise Refusal("capture-reference-refused")
+                reason = detail.get("reason") if report.get("status") == "refused" and isinstance(detail, dict) else None
+                if not isinstance(reason, str) or re.fullmatch(r"[a-z][a-z0-9-]{0,95}", reason) is None:
+                    reason = "capture-reference-refused"
+                raise Refusal(reason)
             saved = {"schema": SCHEMA, "session": str(Path(session).absolute()), "tag": "capture",
                      "revision": secrets.token_hex(32), "abi": packet["abi"], "events": []}
             self.save(saved)
@@ -212,6 +217,18 @@ def terminal(argv):
             if options.command == "init" else workspace.public_packet()
         print(json.dumps(result, indent=1))
         return 0
-    except (Refusal, OSError, ValueError):
-        print(json.dumps({"status": "refused", "reason": "capture-workspace-operation", "authority": "none"}))
+    except (Refusal, OSError, ValueError) as error:
+        detail_reason = str(error) if isinstance(error, Refusal) else "capture-setup-input-error"
+        if re.fullmatch(r"[a-z][a-z0-9-]{0,95}", detail_reason) is None:
+            detail_reason = "capture-setup-input-error"
+        if detail_reason == "capture-containment-unavailable":
+            message = "Capture cannot start because reference containment is unavailable. Use the systemd backend on a supported Linux host with a running systemd user manager, then retry."
+        elif detail_reason == "capture-workspace-exists":
+            message = "This capture workspace already exists. Choose another --workspace path before starting a new capture."
+        elif detail_reason == "capture-reference-refused":
+            message = "The CLI refused the capture specification or reference. Check those files, then run the command again."
+        else:
+            message = f"Capture setup was refused ({detail_reason}). Check the specification and reference files, then retry."
+        print(json.dumps({"status": "refused", "reason": "capture-workspace-operation",
+                          "detail_reason": detail_reason, "message": message, "authority": "none"}))
         return 1

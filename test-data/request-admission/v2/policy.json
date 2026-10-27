@@ -1,0 +1,169 @@
+{
+ "schema": "zeno-fcis/template-declarative-policy/2",
+ "template": "request-admission",
+ "roots": {
+  "state": 100,
+  "command": 101,
+  "context": 102
+ },
+ "leaf_bindings": {},
+ "variables": {
+  "method": "command.101.120",
+  "route": "command.101.121",
+  "target": "command.101.122",
+  "hosts": "command.101.123",
+  "origin": "command.101.124",
+  "fetch": "command.101.125",
+  "credential": "command.101.126",
+  "framing": "command.101.127",
+  "body": "command.101.128"
+ },
+ "cases": [
+  {
+   "rule": "two lengths, or a length and chunked, close the connection before parsing",
+   "when": "framing == 183",
+   "class": "Reject",
+   "reason": 200,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "a GET for anything but /state is an asset, served only when every header and body check passes",
+   "when": "method == 150 && route != 155 && (target != 160 || hosts != 1 || origin == 168 || framing == 184 || origin == 167 || fetch == 171 || framing == 182 || framing == 184 || (framing == 181 && body != 185) || route != 158)",
+   "class": "Reject",
+   "reason": 201,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "an asset is public",
+   "when": "method == 150 && route != 155",
+   "class": "Accept",
+   "reason": null,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "/state: a query, an absolute target, a missing or repeated Host or Origin, or a coding",
+   "when": "method == 150 && (target != 160 || hosts != 1 || origin == 168 || framing == 184)",
+   "class": "Reject",
+   "reason": 201,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "/state: another origin or a cross-site fetch",
+   "when": "method == 150 && (origin == 167 || fetch == 171)",
+   "class": "Reject",
+   "reason": 203,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "/state: a missing or unknown credential",
+   "when": "method == 150 && credential != 178",
+   "class": "Reject",
+   "reason": 202,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "/state: a body",
+   "when": "method == 150 && (framing == 182 || framing == 184 || (framing == 181 && body != 185))",
+   "class": "Reject",
+   "reason": 201,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "/state is read",
+   "when": "method == 150",
+   "class": "Accept",
+   "reason": null,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "only POST /preview and /command, in origin form without a query",
+   "when": "method != 151 || (route != 156 && route != 157) || target != 160",
+   "class": "Reject",
+   "reason": 201,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "a missing or repeated Host or Origin, or a coding",
+   "when": "target != 160 || hosts != 1 || origin == 168 || framing == 184",
+   "class": "Reject",
+   "reason": 201,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "another origin or a cross-site fetch",
+   "when": "origin == 167 || fetch == 171",
+   "class": "Reject",
+   "reason": 203,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "a missing or unknown credential",
+   "when": "credential != 178",
+   "class": "Reject",
+   "reason": 202,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "no framing is an empty body",
+   "when": "framing == 180",
+   "class": "Reject",
+   "reason": 201,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "more than 64 KiB",
+   "when": "body == 190",
+   "class": "Reject",
+   "reason": 204,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "shorter than the layout, or another format version",
+   "when": "body == 185 || body == 186 || body == 187",
+   "class": "Reject",
+   "reason": 201,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "another contract",
+   "when": "body == 188",
+   "class": "Reject",
+   "reason": 205,
+   "post": {},
+   "outbox": []
+  },
+  {
+   "rule": "the request reaches the core",
+   "when": "true",
+   "class": "Accept",
+   "reason": null,
+   "post": {},
+   "outbox": []
+  }
+ ],
+ "genesis": {
+  "110": 0
+ },
+ "law_kinds": {
+  "500": "StateInvariant",
+  "501": "AuthoritySubjectRecipient",
+  "502": "AuthoritySubjectRecipient",
+  "503": "AuthoritySubjectRecipient",
+  "504": "AuthoritySubjectRecipient"
+ }
+}

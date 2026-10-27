@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 import tempfile
+import shutil
 
 cli, contract, backend = sys.argv[1:]
 cpu = min(os.sched_getaffinity(0))
@@ -91,6 +92,21 @@ try:
                                         stderr=subprocess.DEVNULL))
     temporary = tempfile.TemporaryDirectory(prefix="zeno-startup-contention-")
     fixture = Path(temporary.name)
+    # Keep the counter's complete 64-input scalar domain for the startup test.
+    # Delivery-law gap enumeration is separately tested and is not this test's
+    # subject. Use an owned fixture rather than changing the shipped contract.
+    scalar_contract = fixture / "scalar-counter"
+    shutil.copytree(contract, scalar_contract)
+    policy_path = scalar_contract / "v2" / "policy.json"
+    policy = json.loads(policy_path.read_text())
+    delivery_ids = set(policy["delivery_laws"])
+    project = scalar_contract / "project.zeno"
+    project.write_text("\n".join(line for line in project.read_text().splitlines()
+        if not any(line.startswith(f"law {law_id} ") for law_id in delivery_ids)) + "\n")
+    policy["law_kinds"] = {key: value for key, value in policy["law_kinds"].items()
+                           if key not in delivery_ids}
+    policy["delivery_laws"] = {}
+    policy_path.write_text(json.dumps(policy))
     spec = fixture / "spec.json"
     reference = fixture / "reference.py"
     spec.write_text(json.dumps({"inputs": [{"kind": "Int", "min": "0", "max": "3"}], "outputs": [{"kind": "Bool"}]}))
@@ -99,7 +115,7 @@ try:
         started = time.monotonic()
         args = [cli, "--no-kb", "--containment-backend", backend, "loop"]
         if backend == "posix":
-            args += ["question", "--contract", contract]
+            args += ["question", "--contract", str(scalar_contract)]
         else:
             args += ["capture", "open", "--spec", str(spec), "--reference", str(reference),
                      "--session", str(fixture / f"session-{ordinal}")]

@@ -694,6 +694,10 @@ pub(super) fn law_scope<'a>(parts: &mut Vec<Part<'a>>, value: &laws::Scope) {
         laws::Scope::Committing => {
             parts.push(Part::Word(4));
         }
+        laws::Scope::RejectReason(reason) => {
+            parts.push(Part::Word(5));
+            parts.push(Part::Word(*reason as u128));
+        }
     }
 }
 

@@ -1,0 +1,84 @@
+zeno 1;
+project 1 release_pipeline_fair;
+namespace 2 permissions;
+type 100 state Roles;
+type 101 command Request;
+type 102 context Session;
+type 105 int Parent in 0..=5;
+type 106 index Role of 110;
+type 107 int Grant in 0..=1;
+// Release pipeline with a fair reviewer: changes may be requested, but approvals keep coming
+// States: 0 draft, 1 in_review, 2 changes_requested, 3 approved, 4 released
+// Guarantee (goal): a change is released, infinitely often.
+// Assumption (fair): the reviewer approves, infinitely often.
+// from_<state> holds when the controller wins from that state under the assumption.
+// The strata are the solver's proposal; the stable law must expand to true, or the answer is refused.
+// Who moves: 0 = controller, 1 = environment.
+const table 110 mover 107 size 5 [0,1,0,0,0];
+const table 800 next0 105 size 5 [2,3,2,5,1];
+const table 801 next1 105 size 5 [0,4,0,0,0];
+const table 840 goal 107 size 5 [0,0,0,0,1];
+const table 860 fair 107 size 5 [0,0,0,1,0];
+table 210 100 grants 107 size 5;
+field 120 101 role 106;
+variant 130 102 Session none;
+reason 200 permission_required precedence 0;
+component 400 inheritance {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+derived table 1000 w1_0_1_0[s] in table 110 rounds 5 {
+  when true then ((goal[s] == 0 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || false }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && false })))) && ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || true }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && true })))) && (fair[s] == 1 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || w1_0_1_0[t] }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && w1_0_1_0[t] }))));
+  default false;
+};
+derived table 1001 w1_0_2_0[s] in table 110 rounds 5 {
+  when true then ((goal[s] == 0 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || false }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && false })))) && ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || (w1_0_1_0[t]) }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && (w1_0_1_0[t]) })))) && (fair[s] == 1 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || w1_0_2_0[t] }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && w1_0_2_0[t] }))));
+  default false;
+};
+derived table 1002 w1_0_3_0[s] in table 110 rounds 5 {
+  when true then ((goal[s] == 0 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || false }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && false })))) && ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || (w1_0_2_0[t]) }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && (w1_0_2_0[t]) })))) && (fair[s] == 1 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || w1_0_3_0[t] }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && w1_0_3_0[t] }))));
+  default false;
+};
+derived table 1003 w2_0_1_0[s] in table 110 rounds 5 {
+  when true then ((goal[s] == 0 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || ((w1_0_3_0[t])) }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && ((w1_0_3_0[t])) })))) && ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || true }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && true })))) && (fair[s] == 1 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || w2_0_1_0[t] }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && w2_0_1_0[t] }))));
+  default false;
+};
+derived table 1004 w2_0_2_0[s] in table 110 rounds 5 {
+  when true then ((goal[s] == 0 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || ((w1_0_3_0[t])) }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && ((w1_0_3_0[t])) })))) && ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || (w2_0_1_0[t]) }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && (w2_0_1_0[t]) })))) && (fair[s] == 1 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || w2_0_2_0[t] }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && w2_0_2_0[t] }))));
+  default false;
+};
+derived table 1005 w2_0_3_0[s] in table 110 rounds 5 {
+  when true then ((goal[s] == 0 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || ((w1_0_3_0[t])) }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && ((w1_0_3_0[t])) })))) && ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || (w2_0_2_0[t]) }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && (w2_0_2_0[t]) })))) && (fair[s] == 1 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || w2_0_3_0[t] }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && w2_0_3_0[t] }))));
+  default false;
+};
+derived table 1006 w3_0_1_0[s] in table 110 rounds 5 {
+  when true then ((goal[s] == 0 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || ((w2_0_3_0[t])) }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && ((w2_0_3_0[t])) })))) && ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || true }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && true })))) && (fair[s] == 1 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || w3_0_1_0[t] }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && w3_0_1_0[t] }))));
+  default false;
+};
+derived table 1007 w3_0_2_0[s] in table 110 rounds 5 {
+  when true then ((goal[s] == 0 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || ((w2_0_3_0[t])) }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && ((w2_0_3_0[t])) })))) && ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || (w3_0_1_0[t]) }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && (w3_0_1_0[t]) })))) && (fair[s] == 1 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || w3_0_2_0[t] }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && w3_0_2_0[t] }))));
+  default false;
+};
+derived table 1008 w3_0_3_0[s] in table 110 rounds 5 {
+  when true then ((goal[s] == 0 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || ((w2_0_3_0[t])) }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && ((w2_0_3_0[t])) })))) && ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || (w3_0_2_0[t]) }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && (w3_0_2_0[t]) })))) && (fair[s] == 1 || ((mover[s] == 0 && forall t in table 110 { !(next0[s] == t + 1 || next1[s] == t + 1) || w3_0_3_0[t] }) || (mover[s] == 1 && (!(next0[s] != 0 || next1[s] != 0) || exists t in table 110 { (next0[s] == t + 1 || next1[s] == t + 1) && w3_0_3_0[t] }))));
+  default false;
+};
+derived table 1009 win[s] in table 110 rounds 5 {
+  when true then !((w3_0_3_0[s]));
+  default false;
+};
+derived table 1010 stable[s] in table 110 rounds 5 {
+  when true then forall t in table 110 { ((((w3_0_3_0[t])) && ((w2_0_3_0[t]))) || (!((w3_0_3_0[t])) && !((w2_0_3_0[t])))) && (((w1_0_3_0[t]) && (w1_0_2_0[t])) || (!(w1_0_3_0[t]) && !(w1_0_2_0[t]))) && (((w2_0_3_0[t]) && (w2_0_2_0[t])) || (!(w2_0_3_0[t]) && !(w2_0_2_0[t]))) && (((w3_0_3_0[t]) && (w3_0_2_0[t])) || (!(w3_0_3_0[t]) && !(w3_0_2_0[t]))) };
+  default false;
+};
+law 500 domains on commit, genesis = forall s in table 110 { post.100.210[s] >= 0 && post.100.210[s] <= 1 };
+law 510 stable on commit = stable[0];
+law 600 from_draft on commit = win[0];
+law 601 from_in_review on commit = win[1];
+law 602 from_changes_requested on commit = win[2];
+law 603 from_approved on commit = win[3];
+law 604 from_released on commit = win[4];

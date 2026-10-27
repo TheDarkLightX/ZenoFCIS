@@ -27,7 +27,15 @@ merge [400];
 law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 4 && 0 <= post.100.111 && post.100.111 <= 4;
 law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 4 && 0 <= post.100.111 && post.100.111 <= 4;
 law 502 exact_deadline on accept = command.101.120 >= pre.100.111 && command.101.120 >= pre.100.110 && post.100.110 == pre.100.110 && post.100.111 == command.101.120 && post.100.112 == 1;
+// Independent complete relation; ordered guards exclude earlier reasons.
+law 520 reason_200 on reject:200 = (true) && (context.102.130 == 0);
+law 521 reason_201 on reject:201 = ((true) && !(context.102.130 == 0)) && (command.101.120 < pre.100.111);
+law 522 reason_202 on reject:202 = (((true) && !(context.102.130 == 0)) && !(command.101.120 < pre.100.111)) && (pre.100.112 == 1);
+law 523 reason_203 on reject:203 = ((((true) && !(context.102.130 == 0)) && !(command.101.120 < pre.100.111)) && !(pre.100.112 == 1)) && (command.101.120 < pre.100.110);
+law 540 legitimate_acceptance on reject = !(((((true) && !(context.102.130 == 0)) && !(command.101.120 < pre.100.111)) && !(pre.100.112 == 1)) && !(command.101.120 < pre.100.110));
+law 541 acceptance_eligibility on accept = ((((true) && !(context.102.130 == 0)) && !(command.101.120 < pre.100.111)) && !(pre.100.112 == 1)) && !(command.101.120 < pre.100.110);
+law 542 no_committed_failure on failure = false;
 // Core seed logical-deadline/1; parameters {"C": 4}.
-// Instance source-set SHA256 2ac884840b84984bb672007de032a8558698e7dae511c029763fae18900a22ca.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/logical-deadline.json SHA256 964ab5064232359feb9f740d1331f73d3e8b83d633daa64a28383e64aa8a9142; replay required; no KernelChecked claim.
+// Instance source-set SHA256 925c6d27c558dce61bbd0b2f675c44a47b9b9eecf46248a6e107dba3ae76d1d1.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/logical-deadline.json SHA256 c1106d30c3729a68de3e8b520e8f5eb8ac598eed4ddcf9659943cad50f2c4345; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

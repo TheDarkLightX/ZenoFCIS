@@ -1,0 +1,9 @@
+zeno 1; project 1 invalid_payload; namespace 2 review;
+type 100 state State; type 101 command Command; type 102 context Context;
+type 105 int Low in 0..=1; type 106 int Bit in 0..=1;
+field 110 100 low 105;
+field 111 100 bit1 106;
+field 120 101 input 106;
+component 400 decide { owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 256; }
+merge [400]; law 500 invariant on commit, genesis = true;
+type 103 destination Desk; type 104 payload Notice; field 130 104 value 105; channel 300 output destination 103 payload 104;

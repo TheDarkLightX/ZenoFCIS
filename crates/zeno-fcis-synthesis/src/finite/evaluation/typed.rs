@@ -10,11 +10,15 @@ pub(crate) mod spec;
 
 /// Numeric graph instruction; operands name earlier nodes when admitted.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[non_exhaustive]
 pub enum NumericOp {
     /// Read an input in declared ABI order.
     Input(u16),
+    /// Explicit U128 to I128 conversion.
+    ToI128(u16),
+    /// Explicit I128 to U128 conversion.
+    ToU128(u16),
     /// Boolean literal with Boolean static provenance.
     Bool(bool),
     /// Full signed literal.
@@ -44,11 +48,11 @@ pub enum NumericOp {
     ProductsGe([u16; 3], [u16; 3]),
     /// Signed full-product floor with a positive signed divisor.
     SignedMulDivFloor(u16, u16, u16),
-    /// Checked signed product at the declared width.
+    /// Checked product at the declared signed or unsigned width.
     Mul(IntegerWidth, u16, u16),
-    /// Signed floor division at the declared width.
+    /// Checked floor division at the declared width.
     DivFloor(IntegerWidth, u16, u16),
-    /// Signed ceiling division at the declared width.
+    /// Checked ceiling division at the declared width.
     DivCeil(IntegerWidth, u16, u16),
     /// Nonnegative fused floor at the declared signed width.
     NonnegativeMulDivFloor(IntegerWidth, u16, u16, u16),
@@ -98,6 +102,7 @@ pub(crate) enum Instruction {
     Input(u16),
     // Kind retains Op::Bool provenance even when its legacy wire atom is I128.
     Literal(Atom<'static>, Kind),
+    Cast(bool, u16),
     Arithmetic(IntegerWidth, ArithmeticOp, u16, u16),
     Eq(BooleanEncoding, u16, u16),
     Lt(BooleanEncoding, u16, u16),
@@ -192,6 +197,8 @@ pub(crate) fn typed_instruction(op: NumericOp) -> Instruction {
     use BooleanEncoding::TypedBool as T;
     match op {
         NumericOp::Input(i) => Instruction::Input(i),
+        NumericOp::ToI128(i) => Instruction::Cast(true, i),
+        NumericOp::ToU128(i) => Instruction::Cast(false, i),
         NumericOp::I128(v) => Instruction::Literal(Atom::I128(v), Kind::Signed),
         NumericOp::U128(v) => Instruction::Literal(Atom::U128(v), Kind::Unsigned),
         NumericOp::Bool(v) => Instruction::Literal(Atom::Bool(v), Kind::Bool),
@@ -291,10 +298,60 @@ pub(crate) fn node<'a>(
             }
         },
         Instruction::Literal(v, _) => Ok(v),
+        Instruction::Cast(signed, a) => {
+            let Some(v) = values.get(a as usize) else {
+                return Err(Failure::Reference);
+            };
+            match (signed, v) {
+                (true, Atom::U128(v)) => {
+                    if v <= i128::MAX as u128 {
+                        Ok(Atom::I128(v as i128))
+                    } else {
+                        Err(Failure::Arithmetic)
+                    }
+                }
+                (false, Atom::I128(v)) => {
+                    if v >= 0 {
+                        Ok(Atom::U128(v as u128))
+                    } else {
+                        Err(Failure::Arithmetic)
+                    }
+                }
+                _ => Err(Failure::Kind),
+            }
+        }
         Instruction::ScalarMul(w, a, b) | Instruction::ScalarDiv(w, _, a, b) => {
             let (Some(a), Some(b)) = (values.get(a as usize), values.get(b as usize)) else {
                 return Err(Failure::Reference);
             };
+            if matches!(w, IntegerWidth::Unsigned128)
+                && matches!((a, b), (Atom::U128(_), Atom::U128(_)))
+            {
+                return match (a, b) {
+                    (Atom::U128(a), Atom::U128(b)) => {
+                        let result = match op {
+                            Instruction::ScalarMul(..) => a.checked_mul(b),
+                            Instruction::ScalarDiv(_, up, _, _) => {
+                                if let Some(q) = a.checked_div(b) {
+                                    if up && a % b != 0 {
+                                        q.checked_add(1)
+                                    } else {
+                                        Some(q)
+                                    }
+                                } else {
+                                    None
+                                }
+                            }
+                            _ => None,
+                        };
+                        match result {
+                            Some(value) => Ok(Atom::U128(value)),
+                            None => Err(Failure::Arithmetic),
+                        }
+                    }
+                    _ => Err(Failure::Kind),
+                };
+            }
             if !matches!((a, b), (Atom::I128(_), Atom::I128(_))) {
                 return Err(Failure::Kind);
             }

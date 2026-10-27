@@ -145,7 +145,11 @@ impl CompiledAggregate {
     /// The route's refusal, or adoptions and evolutions, which the
     /// aggregate does not have.
     pub(crate) fn read(aggregate: &AggregateSources) -> Result<Self, Refusal> {
-        let rules = Rules::read(&aggregate.rules).map_err(route_error)?;
+        let rules =
+            Rules::read_for_project(&aggregate.project, &aggregate.rules).map_err(route_error)?;
+        rules
+            .refuse_unsigned("checked composition")
+            .map_err(route_error)?;
         if !rules.adoptions.is_empty() || !rules.evolutions.is_empty() {
             return Err(refuse(
                 Obligation::AssemblyProfile,
@@ -155,6 +159,9 @@ impl CompiledAggregate {
         }
         let declarations =
             Declarations::read(&aggregate.project, &rules.leaf_bindings).map_err(route_error)?;
+        declarations
+            .refuse_unsigned("checked assembly")
+            .map_err(route_error)?;
         if crate::internals::quantity::typed(&declarations) {
             return Err(refuse(
                 Obligation::AssemblyProfile,
@@ -266,6 +273,13 @@ pub(crate) fn validate_contract(
 
 fn node(op: &ScalarOp) -> Result<Node, Refusal> {
     Ok(match *op {
+        ScalarOp::Numeric(_) => {
+            return Err(refuse(
+                Obligation::AssemblyProfile,
+                "numeric graph",
+                "U128SubjectUnsupported",
+            ));
+        }
         ScalarOp::Input(index) => Node::Input(index),
         ScalarOp::Int(value) => Node::Int(value),
         ScalarOp::Bool(value) => Node::Bool(value),
@@ -473,20 +487,33 @@ fn constant(value: Option<&Constant>) -> String {
     match value {
         Some(Constant::Bool(value)) => value.to_string(),
         Some(Constant::Int(value)) => value.to_string(),
+        Some(Constant::U128(value)) => format!("u128({value})"),
         None => "absent".to_owned(),
     }
 }
 
 /// No node of the aggregate program can trap on an input in its domains.
 fn eager(contract: &Contract<'_>, nodes: &[Node]) -> Result<(), Refusal> {
+    if contract.unsigned {
+        return Err(refuse(
+            Obligation::AssemblyProfile,
+            "binding",
+            "U128SubjectUnsupported",
+        ));
+    }
     let domains: Vec<(i128, i128)> = contract
         .input_domains
         .iter()
         .map(|domain| match domain {
-            ScalarDomain::Bool => (0, 1),
-            ScalarDomain::Int { min, max } => (*min, *max),
+            ScalarDomain::Unsigned { .. } => Err(refuse(
+                Obligation::AssemblyProfile,
+                "input domain",
+                "U128SubjectUnsupported",
+            )),
+            ScalarDomain::Bool => Ok((0, 1)),
+            ScalarDomain::Int { min, max } => Ok((*min, *max)),
         })
-        .collect();
+        .collect::<Result<_, _>>()?;
     let intervals = term::intervals(nodes, &domains);
     if let Some(index) = intervals.iter().position(Option::is_none) {
         return Err(refuse(
@@ -998,6 +1025,13 @@ fn split<'a>(ast: &'a Ast, out: &mut Vec<&'a Ast>) {
 
 fn collect_names(ast: &Ast, out: &mut Vec<String>) {
     match ast {
+        Ast::Circuit(c) => {
+            for f in c.formulas() {
+                collect_names(f, out);
+            }
+        }
+        Ast::U128(_) => {}
+        Ast::ToI128(v) | Ast::ToU128(v) => collect_names(v, out),
         Ast::Name(name) => out.push(name.clone()),
         Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => {}
         Ast::Not(inner) | Ast::Neg(inner) => collect_names(inner, out),
@@ -1029,6 +1063,10 @@ fn collect_names(ast: &Ast, out: &mut Vec<String>) {
 fn rename(ast: &Ast, names: &BTreeMap<String, String>) -> Ast {
     let recurse = |ast: &Ast| Box::new(rename(ast, names));
     match ast {
+        Ast::Circuit(c) => Ast::Circuit(Box::new(c.map(|f| rename(f, names)))),
+        Ast::U128(v) => Ast::U128(*v),
+        Ast::ToI128(v) => Ast::ToI128(recurse(v)),
+        Ast::ToU128(v) => Ast::ToU128(recurse(v)),
         Ast::Name(name) => Ast::Name(names.get(name).cloned().unwrap_or_else(|| name.clone())),
         Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => ast.clone(),
         Ast::Not(inner) => Ast::Not(recurse(inner)),
@@ -1157,6 +1195,13 @@ fn observe(
         let value = match (position.source, position.field) {
             (Source::State, Some(field)) => match rules.genesis.get(&field) {
                 Some(Constant::Bool(value)) => i128::from(*value),
+                Some(Constant::U128(_)) => {
+                    return Err(refuse(
+                        Obligation::AssemblyProfile,
+                        "genesis",
+                        "U128SubjectUnsupported",
+                    ));
+                }
                 Some(Constant::Int(value)) => *value,
                 None => position.domain.least().unwrap_or(0),
             },

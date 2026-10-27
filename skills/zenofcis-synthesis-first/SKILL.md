@@ -34,6 +34,15 @@ Keep separately authored examples or a reference model to challenge the
 requirements. Do not narrow the domain or replace success with rejection to
 make a check pass.
 
+Standalone finite synthesis remains useful. Assess the Cartesian spaces with
+`assess_finite_problem` or the CLI. `zeno-fcis/finite-i128/1` has 16 fields per side, 256 nodes
+per graph, 65,536 inputs, 4,096 outputs and 100 million graph-node work units.
+When the complete reviewed relation fits, use `synthesize_finite_core`/`synth run`,
+`synth run --check` and `verify_finite_core`/`synth verify` on the exact target.
+Retain independent full-decision/state/reason/delivery comparisons over every
+admitted input. Finite target evidence does not authorize arbitrary generated Rust
+or replace checked Program binding, laws or complete raw-input correspondence.
+
 The generated V2 path uses `v2/policy.json`, schema declarations and generated
 `v2_contract.rs`. Its descriptor binds through `catalog::bind_original` and
 `authority::bind`. The library's `v2_authority::Authority` evaluates decisions,
@@ -41,6 +50,37 @@ laws and resource usage and issues publication capabilities. The generated
 `v2::V2SqliteShell` accepts those capabilities for durable commits. Follow the
 generated template's imports and ownership; do not supply a decision callback,
 law verdict, claimed usage or publication constructor.
+
+To shrink an admitted finite program, use `transform_request`,
+`transform_candidate` and `transform_replay` (or `zeno-fcis loop`). Propose
+complete programs with exactly the original's inputs and outputs; the loop
+checks each one against the original on every input tuple and keeps a
+replacement only when it is equivalent and smaller in nodes or bytes within the
+original's bounds. Read the typed feedback as checker facts and your own
+reasoning as advisory: a replayed counterexample names the first differing
+tuple, a refusal names the admission rule, and `best-checked-so-far` means
+equal on the declared domain and no larger, not optimal and not adopted by any
+application. At most eight attempts and eight checks are available per session;
+duplicates and malformed proposals consume attempts but do not necessarily use a
+full checker call. Replay and preparation use their own retained work reservations.
+`checked-improvement` and `equivalent-without-improvement:<reason>` exit 0;
+`different`, `refused` and canonical/JSON duplicate outcomes exit 1. Expression
+and sketch duplicates with independent check/replay confirmation exit 0; failed
+expression/sketch proposals exit 1. Incomplete or closed sessions
+exit 2; I/O errors exit 3. `loop run` returning 0 means the driver completed,
+including runs with no improvement or failed proposals.
+
+Run `zeno-fcis loop --help`, `zeno-fcis loop COMMAND --help` and
+`zeno-fcis guide show loop-workspace` to choose the exact surface. The CLI
+reference's “Which loop to use” table distinguishes capture, learning, session
+checks, pipelines, rules, strategy modes, family/transfer, meaning/evaluate,
+questions, restated rules and decomposition. Capture owner `whole`/`open`/`status`
+are separate from public `packet` and proposer `candidate`; keep owner evidence
+private. Example fit, meaning hashes, structural knowledge and simulation do not
+supply a transform verdict. `learn --original` and split-by-cases additionally
+need complete-reference capture and original-bound check/replay. `loop duel`
+does not exist; the duel guide describes a protocol and a small-model solver
+example, not an executable alternating driver.
 
 `check --format json` diagnoses the specification; it does not admit a runtime
 program. `publish` and `publish_genesis` perform the checked execution. Supplied

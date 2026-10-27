@@ -18,6 +18,11 @@ mutant classifications, the measures repeated with proposed laws, or the
 probes `count`, `implies` and `reachable`, so those are not compared. Both
 sides must also equal the recorded known answers.
 
+The 77 complete core instances must refuse the reject-everything candidate.
+The failure and refusal variants retain their original partial laws and must
+admit that candidate; a scenario must kill it in both groups. The variants
+are diagnostic contracts and carry no core-family certificate.
+
 `--controls` adds fault controls, each routed through the check it targets:
 every compared field, perturbed in the CLI's measured answers, must make
 `compare()` report it; every recorded field, perturbed, must make the
@@ -38,6 +43,7 @@ import argparse
 import concurrent.futures
 import copy
 import json
+import os
 import random
 import subprocess
 import sys
@@ -50,6 +56,9 @@ import instantiate_core as core
 KNOWN = core.ROOT / "tools/test_data/contract_judges/known-answers.json"
 KNOWN_SCHEMA = "zeno-fcis/contract-judges-known-answers/2"
 SEED = 20261012
+# The complete C=8 idempotency instance requires 153684864 declared law checks.
+# This qualification budget preserves the CLI default and all low-limit controls.
+CORE_GAP_WORK = 160_000_000
 
 
 class Mismatch(AssertionError):
@@ -73,6 +82,13 @@ def counter_variant(capacity: int, failure: bool, refusal: bool, determining: bo
     """A bounded counter with a committed failure, a law the table breaks, a determining law."""
     files = core_files("bounded-counter", {"C": capacity}, examples=False)
     policy = json.loads(files["v2/policy.json"])
+    # These controls exercise the original partial contracts. Complete-family
+    # laws would forbid the planted failure or refer to its former Reject code.
+    partial, marker, _ = files["project.zeno"].partition("// Independent complete relation")
+    require(bool(marker), "counter template is missing its complete-relation boundary")
+    files["project.zeno"] = partial
+    policy["law_kinds"] = {key: value for key, value in policy["law_kinds"].items()
+                           if int(key) < 520}
     laws = []
     if failure:
         # Dec at zero commits a failure that keeps the state, instead of rejecting.
@@ -199,17 +215,18 @@ def reference_answers(directory: Path) -> dict:
     findings = any(machine.refusals[(state, x)][0] == "law" and contract.valid(state)
                    for state in contract.states for x in contract.inputs
                    if machine.table[(state, x)] is None)
-    answers["review_exit"] = 1 if findings else 0
+    answers["review_exit"] = 1 if findings or answers["case_coverage"]["findings"] else 0
     return answers
 
 
 # --- the CLI's answers ---------------------------------------------------------------------------
 
-def cli(binary: Path, arguments: list[str], expected: int | None, log: Path) -> dict | None:
+def cli(binary: Path, arguments: list[str], expected: int | None, log: Path,
+        *, environment: dict[str, str] | None = None) -> dict | None:
     with log.open("ab") as stream:
         stream.write(f"$ zeno-fcis {' '.join(arguments)}\n".encode())
         result = subprocess.run([str(binary), *arguments], stdout=subprocess.PIPE,
-                                stderr=stream, check=False)
+                                stderr=stream, check=False, env=environment)
         stream.write(f"exit {result.returncode}\n".encode())
     if expected is not None:
         require(result.returncode == expected,
@@ -221,8 +238,10 @@ def cli_answers(binary: Path, directory: Path, known: dict, log: Path, strict: b
     """Every compared answer from the CLI; with `strict`, each exit is the one `known` implies."""
     exit_of = lambda code: code if strict else None
     app = str(directory)
-    review = cli(binary, ["contract", "review", app, "--gaps"], exit_of(known["review_exit"]), log)
-    require(review["schema"] == "zeno-fcis/contract-review/4", "review packet is not version 4")
+    review = cli(binary, ["contract", "review", app, "--gaps", "--max-work", str(CORE_GAP_WORK)],
+                 exit_of(known["review_exit"]), log)
+    require(isinstance(review, dict) and review.get("schema") == "zeno-fcis/contract-review/4",
+            "review packet is not version 4")
     require(review["integer_encoding"] == "safe-number-or-decimal-string/1",
             "review packet has an unsupported integer encoding")
     profile = cli(binary, ["contract", "profile", app], exit_of(0), log)
@@ -236,9 +255,9 @@ def cli_answers(binary: Path, directory: Path, known: dict, log: Path, strict: b
     decisions = cli(binary, ["contract", "probe", "decisions", app], exit_of(0), log)
     depends = {}
     for position in known["positions"]:
-        vacuous = known["probes"]["depends"].get(position) == "vacuous"
+        expected = known["probes"]["depends"].get(position)
         answer = cli(binary, ["contract", "probe", "depends", app, "--position", position],
-                     exit_of(2 if vacuous else 0), log)
+                     exit_of({"yes": 0, "no": 1, "vacuous": 2}[expected]), log)
         depends[position] = answer["result"]["answer"]
     first = " ".join(map(str, known["first_input"]))
     explain = cli(binary, ["contract", "probe", "explain", app, "--input", first], exit_of(0), log)
@@ -253,7 +272,8 @@ def synthesized(known: dict) -> dict:
     return {
         "profile": {**{key: copy.deepcopy(known["profile"][key])
                        for key in ("states", "memory_bits", "state_laws", "robustness", "tables")}},
-        "review": {"gaps": {
+        "review": {"case_coverage": copy.deepcopy(known["case_coverage"]),
+                   "findings": copy.deepcopy(known["case_coverage"]["findings"]), "gaps": {
             "admissible": copy.deepcopy(gaps["admissible"]),
             "activation": copy.deepcopy(gaps["activation"]),
             "tables": {"admissible_sha256": gaps["admissible_sha256"]},
@@ -284,6 +304,15 @@ def compare(name: str, known: dict, measured: dict) -> list[str]:
         same(f"profile {key}", known["profile"][key], profile[key])
     for key in ("decisions_sha256", "states_sha256"):
         same(f"profile {key}", known["profile"]["tables"][key], profile["tables"][key])
+    review = measured["review"]
+    coverage = review["case_coverage"]
+    same("case coverage", known["case_coverage"], {
+        "status": coverage["status"], "tuples": coverage["tuples"],
+        "cases": [{key: row[key] for key in ("case", "guard_true", "decided", "law_consistent")}
+                  for row in coverage["cases"]],
+        "findings": [{key: finding.get(key) for key in ("case", "kind", "cause")}
+                     for finding in review["findings"] if finding["kind"].startswith("case-")],
+    })
     gaps = measured["review"]["gaps"]
     for domain in ("full", "valid"):
         mine = gaps["admissible"][domain]
@@ -416,6 +445,7 @@ def field_faults(known: dict, lines: dict[str, list[str]], rng: random.Random):
     first_position = known["positions"][0]
     first_decision = sorted(known["probes"]["decisions"])[0]
     faults = [
+        ("case coverage", at("review", "case_coverage", "cases", 0, "decided")),
         ("profile states", at("profile", "states", "reachable")),
         ("profile memory_bits", at("profile", "memory_bits", "declared")),
         ("profile state_laws", at("profile", "state_laws")),
@@ -457,7 +487,7 @@ def recorded_paths(known: dict) -> list[tuple]:
             ("lemmas", 0, "verdict"), ("lemmas", 1, "holds_sha256"),
             ("scenario", "scenarios", 0, "verdict"), ("scenario", "reject_everything_killed"),
             ("probes", "decisions"), ("probes", "depends"), ("probes", "explain_first_input_case"),
-            ("lemma_formulas",), ("review_exit",)]
+            ("case_coverage",), ("lemma_formulas",), ("review_exit",)]
 
 
 def comparison_controls(work: Path, answers: dict, measured: dict, recorded: dict) -> list[dict]:
@@ -554,19 +584,30 @@ def contract_controls(binary: Path, work: Path, answers: dict) -> list[dict]:
     bad.write_text("law 65001 a on any = true; law 65002 b on any = true;\n")
     for arguments, code, status in (
             (["contract", "profile", app, "--max-tuples", "1"], 2, "inconclusive"),
-            (["contract", "lemma", app, "--lemma", "true", "--max-tuples", "1"], 2, "inconclusive"),
+            (["contract", "lemma", app, "--lemma", "true", "--max-tuples", "1"], 2, "UNKNOWN"),
             (["contract", "probe", "decisions", app, "--max-tuples", "1"], 2, "inconclusive"),
-            (["contract", "review", app, "--gaps", "--max-tuples", "1"], 2, "inconclusive"),
+            (["contract", "review", app, "--gaps", "--max-tuples", "1"], 2, "UNKNOWN"),
             (["contract", "review", app, "--gaps", "--max-work", "1"], 2, "inconclusive"),
             (["contract", "review", app, "--gaps", "--gaps-laws", str(bad)], 65, "invalid-proposals"),
             (["contract", "lemma", app, "--lemma", "pre.100.110 == 0"], 65, None),
             (["contract", "probe", "implies", app, "--if", "false", "--then", "true"], 2, "vacuous")):
-        packet = cli(binary, arguments, code, log)
-        found = None if packet is None else (packet["gaps"]["status"] if arguments[1] == "review"
+        # Above the enumeration cap, lemma uses the symbolic route. Make its
+        # missing-tool control independent of the caller's solver setup.
+        environment = None
+        if arguments[1] == "lemma" and "--max-tuples" in arguments:
+            environment = {key: value for key, value in os.environ.items()
+                           if key not in {"ZENO_FCIS_Z3", "ZENO_FCIS_CVC5"}}
+        packet = cli(binary, arguments, code, log, environment=environment)
+        found = None if packet is None else (packet["gaps"]["status"]
+                                             if arguments[1] == "review" and "gaps" in packet
                                              else packet["status"])
+        coverage_scoped = (arguments[1] != "review" or "--max-tuples" not in arguments
+                           or (packet is not None
+                               and packet["case_coverage"]["status"] == "not checked"
+                               and packet["case_coverage"]["cases"] is None))
         controls.append({"control": "a limit or a malformed input gets its own verdict",
                          "arguments": arguments[1:2] + arguments[3:], "exit": code,
-                         "caught": found == status})
+                         "caught": found == status and coverage_scoped})
     # The repeat measure with proposals has its own work: just over the declared work, it
     # is inconclusive.
     measured = cli(binary, ["contract", "review", app, "--gaps"], 0, log)
@@ -670,13 +711,25 @@ def check(arguments, work: Path) -> int:
             print(f"{'PASS' if not found else 'FAIL'} {name}", flush=True)
     vacuity = {name: (results[name] is not None
                       and results[name]["review"]["gaps"]["reject_everything"].get(
-                          "admitted_where_the_contract_decides") is True
+                          "admitted_where_the_contract_decides") is False
+                      and results[name]["review"]["gaps"]["reject_everything"].get(
+                          "refused_where_the_contract_decides", 0) > 0
                       and results[name]["scenario"]["reject_everything"].get("killed") is True)
                for name in answers if not name.startswith("variant-")}
     problems += [f"{name}: vacuity control failed" for name, held in vacuity.items() if not held]
+    partial_vacuity = {name: (results[name] is not None
+                             and results[name]["review"]["gaps"]["reject_everything"].get(
+                                 "admitted_where_the_contract_decides") is True
+                             and results[name]["scenario"]["reject_everything"].get("killed") is True)
+                      for name in ("variant-bounded-counter-c2-failure",
+                                   "variant-bounded-counter-c2-refusal")}
+    problems += [f"{name}: partial-contract vacuity control failed"
+                 for name, held in partial_vacuity.items() if not held]
     report = {"subjects": len(answers), "agreeing": sum(
         1 for name in answers if results[name] and not any(p.startswith(name + ":") for p in problems)),
         "vacuity_controls_held": sum(vacuity.values()), "vacuity_subjects": len(vacuity),
+        "partial_vacuity_controls_held": sum(partial_vacuity.values()),
+        "partial_vacuity_subjects": len(partial_vacuity),
         "problems": problems}
     if arguments.controls and all(results.values()):
         controls = comparison_controls(work, answers, results, recorded or answers)
@@ -699,7 +752,8 @@ def check(arguments, work: Path) -> int:
         print(problem, file=sys.stderr)
     summary = (f"contract judges: {report['agreeing']}/{report['subjects']} subjects agree on the "
                f"compared fields; vacuity held on {report['vacuity_controls_held']}/"
-               f"{report['vacuity_subjects']} core instances")
+               f"{report['vacuity_subjects']} complete core instances and "
+               f"{report['partial_vacuity_controls_held']}/{report['partial_vacuity_subjects']} partial controls")
     if "controls" in report:
         summary += f"; controls caught {report['controls_caught']}/{len(report['controls'])}"
     print(summary)
@@ -707,4 +761,11 @@ def check(arguments, work: Path) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

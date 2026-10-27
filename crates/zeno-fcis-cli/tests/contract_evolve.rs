@@ -44,7 +44,7 @@ impl Drop for TempRoot {
 fn manifest(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
         if relative == "tests/fixtures/withdrawal-queue-adopted" {
-            "tests/fixtures/i128-contracts/withdrawal-queue-adopted"
+            "tests/fixtures/withdrawal-queue-adopted-2.5"
         } else {
             relative
         },

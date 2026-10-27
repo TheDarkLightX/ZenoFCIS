@@ -553,8 +553,13 @@ fn capture_zal_real_cli_expression_grammar_round_trips() {
         .output()
         .unwrap_or_else(|e| panic!("paired CLI probe: {e}"));
     assert!(done.status.success(), "{done:?}");
+    // The real grammar case must run and pass; the file also holds a refusal case.
+    let stderr = String::from_utf8_lossy(&done.stderr);
     assert!(
-        String::from_utf8_lossy(&done.stderr).contains("Ran 1 test"),
+        stderr.contains("Ran 2 tests")
+            && stderr.contains(
+                "test_real_cli_accepts_paired_int_bool_equality_and_conditionals) ... ok"
+            ),
         "no real grammar test: {done:?}"
     );
     assert!(!String::from_utf8_lossy(&done.stderr).contains("skipped"));

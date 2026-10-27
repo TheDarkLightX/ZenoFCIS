@@ -50,7 +50,7 @@ const STOCK_COMMAND: &[(u16, Leaf)] = &[(120, Sum(107)), (121, Int)];
 const STOCK_CONTEXT: &[(u16, Leaf)] = &[(130, Bool)];
 const ORDER_STATE: &[(u16, Leaf)] = &[(120, Sum(105)), (121, Int)];
 const ORDER_COMMAND: &[(u16, Leaf)] = &[(125, Sum(111)), (126, Int)];
-const ORDER_CONTEXT: &[(u16, Leaf)] = &[(130, Sum(107))];
+const ORDER_CONTEXT: &[(u16, Leaf)] = &[(130, Sum(107)), (131, Int)];
 const ACCOUNT_STATE: &[(u16, Leaf)] = &[(110, Int), (111, Int), (112, Int)];
 const ACCOUNT_CONTEXT: &[(u16, Leaf)] = &[(130, Int), (131, Bool)];
 const VAULT_STATE: &[(u16, Leaf)] = &[
@@ -64,7 +64,7 @@ const VAULT_STATE: &[(u16, Leaf)] = &[
     (127, Sum(108)),
 ];
 const VAULT_COMMAND: &[(u16, Leaf)] = &[(130, Sum(107)), (131, Sum(108)), (132, Int)];
-const VAULT_CONTEXT: &[(u16, Leaf)] = &[(140, Sum(112)), (141, Bool)];
+const VAULT_CONTEXT: &[(u16, Leaf)] = &[(140, Sum(112)), (141, Bool), (142, Int)];
 const TREASURY_STATE: &[(u16, Leaf)] = &[
     (130, Int),
     (131, Int),
@@ -417,6 +417,10 @@ fn reference(app: usize, s: &[i128], cmd: &[i128], ctx: &[i128]) -> Expected {
             }
         }
         4 => {
+            if s[2] > 2 || s[4] > 2 {
+                out.refusal = Some("ingress");
+                return out;
+            }
             let (action, lane, amount, caller, alarm) =
                 (cmd[0], cmd[1], cmd[2], ctx[0], ctx[1] != 0);
             let sender = match action {
@@ -491,7 +495,18 @@ fn reference(app: usize, s: &[i128], cmd: &[i128], ctx: &[i128]) -> Expected {
             if out.post[0] < 0 {
                 out.refusal = Some("schema")
             }
-            if out.refusal.is_none() && !vault_invariant(&out.post) {
+            // A decrease in either reservation must publish exactly that
+            // lane's payout, including malformed raw pre-states whose empty
+            // lane incorrectly carried an amount.
+            let payment_matches = |position: usize, lane: i128| {
+                out.post[position] >= s[position]
+                    || (out.outbox.len() == 1 && out.outbox[0].1[0] == lane)
+            };
+            if out.refusal.is_none()
+                && (!vault_invariant(&out.post)
+                    || !payment_matches(2, 170)
+                    || !payment_matches(4, 171))
+            {
                 out.refusal = Some("law500")
             }
         }
@@ -547,6 +562,9 @@ fn reference(app: usize, s: &[i128], cmd: &[i128], ctx: &[i128]) -> Expected {
                 }
             {
                 return reject(211);
+            }
+            if proposes && now > 9 {
+                return reject(213);
             }
             out.post[3] = now;
             out.post[2] = spent;
@@ -634,6 +652,10 @@ fn check_report(
         match refusal {
             "law500" => assert!(
                 matches!(error, a::Refusal::Core(c::Failure::Law(_))),
+                "{error:?}; {expected:?}"
+            ),
+            "ingress" => assert!(
+                matches!(error, a::Refusal::Core(c::Failure::Ingress(..))),
                 "{error:?}; {expected:?}"
             ),
             "schema" => assert!(
@@ -1188,7 +1210,11 @@ const ORDER_CORPUS: Corpus = Corpus {
         ("callback", &[0, 1, 2, 3]),
         ("caller", &[170, 171, 172]),
     ],
-    input: |d| d.to_vec(),
+    input: |d| {
+        let mut all = d.to_vec();
+        all.push(0);
+        all
+    },
     outcomes: &[
         "accept",
         "failure 204",
@@ -1309,10 +1335,16 @@ const WITHDRAWAL_CORPUS: Corpus = Corpus {
         ("caller", &[190, 191, 192, 193]),
         ("alarm", &[0, 1]),
     ],
-    input: |d| d.to_vec(),
+    input: |d| {
+        let mut all = d.to_vec();
+        all.push(0);
+        all
+    },
     outcomes: &[
         "accept",
         "refused Core(Decision(Domain))",
+        "refused Core(Ingress(0, Record(Field(122))))",
+        "refused Core(Ingress(0, Record(Field(124))))",
         "refused Core(Law(Violated))",
         "refused Core(Schema)",
         "reject 200",
@@ -1349,13 +1381,17 @@ const WITHDRAWAL_CORPUS: Corpus = Corpus {
         }),
     ],
     profile: &[
+        &[0, 180, 0, 180, 0, 0, 0, 170, 160, 170, 1, 191, 0],
+        &[0, 180, 0, 180, 0, 0, 0, 170, 161, 170, 1, 191, 0],
         &[0, 180, 0, 180, 1, 0, 0, 170, 162, 170, 1, 193, 0],
+        &[0, 180, 0, 181, 0, 0, 0, 170, 162, 170, 1, 193, 0],
         &[0, 180, 0, 181, 1, 0, 0, 170, 162, 170, 1, 193, 0],
         &[0, 180, 4, 180, 0, 0, 0, 170, 160, 170, 1, 191, 0],
         &[1, 180, 0, 180, 0, 0, 0, 170, 161, 170, 1, 191, 0],
         &[1, 180, 0, 180, 0, 0, 1, 170, 161, 170, 1, 191, 0],
         &[1, 182, 2, 182, 2, 2, 0, 170, 161, 170, 1, 191, 0],
         &[2, 181, 1, 181, 0, 1, 1, 171, 160, 171, 2, 190, 1],
+        &[3, 180, 0, 180, 0, 0, 0, 170, 160, 170, 2, 190, 0],
         &[3, 180, 0, 180, 3, 0, 0, 170, 161, 171, 1, 192, 0],
         &[3, 180, 3, 180, 0, 0, 0, 170, 160, 170, 2, 190, 0],
         &[4, 180, 0, 181, 4, 0, 0, 170, 162, 170, 1, 193, 0],
@@ -1389,6 +1425,7 @@ const TREASURY_PROPOSALS: Corpus = Corpus {
         "reject 208",
         "reject 209",
         "reject 210",
+        "reject 213",
     ],
     boundaries: &[
         ("clock equals last seen", |d| d[2] == d[1]),
@@ -1429,6 +1466,7 @@ const TREASURY_PROPOSALS: Corpus = Corpus {
         &[0, 7, 3, 173, 1, 0, 1, 170],
         &[0, 8, 8, 173, 1, 0, 1, 170],
         &[0, 9, 9, 173, 1, 0, 1, 170],
+        &[0, 9, 10, 173, 1, 1, 1, 170],
         &[0, 10, 10, 173, 1, 0, 1, 170],
         &[0, 11, 11, 173, 1, 0, 1, 170],
         &[1, 0, 1, 173, 3, 1, 2, 170],
@@ -1803,6 +1841,17 @@ fn retained_examples_and_replay_agent_treasury_guard_20_24() {
 fn retained_examples_and_replay_agent_treasury_guard_25_29() {
     retained_examples_batch!(treasury, 5, 30, 25, 30);
 }
+// The complete thirty-example replay stays in the native tests above.
+// This interpreted profile uses the same checker on two fixed corpus endpoints.
+#[test]
+fn miri_bounded_retained_treasury_examples() {
+    assert_eq!(example_count(5), 30);
+    let count = with_app!(treasury, |a, f| {
+        examples_range(5, a, f, 0, 1) + examples_range(5, a, f, 29, 30)
+    });
+    assert_eq!(count, 2);
+}
+
 #[test]
 fn retained_genesis_and_replay_agent_treasury_guard() {
     retained_genesis!(treasury, 5);
@@ -2070,7 +2119,7 @@ fn treasury_guard_arithmetic_callbacks_and_unlawful_prestates() {
 }
 
 /// Checks one corpus's bounded profile against its pins and its pinned count.
-/// The eight profile tests below together run 92 cases: 5, 7, 11, 9, 10, 12, 22
+/// The eight profile tests below together run 97 cases: 5, 7, 11, 9, 14, 13, 22
 /// and 16. The 131 retained examples run under Miri in their exact groups; they are
 /// not drawn from these corpora and are not counted against them.
 fn check_bounded(observed: Observation<'_>, cases: usize) {
@@ -2109,14 +2158,14 @@ fn miri_bounded_profile_account_lockout() {
 fn miri_bounded_profile_withdrawal_queue() {
     check_bounded(
         with_app!(vault, |a, f| bounded(&WITHDRAWAL_CORPUS, a, f)),
-        10,
+        14,
     );
 }
 #[test]
 fn miri_bounded_profile_treasury_proposals() {
     check_bounded(
         with_app!(treasury, |a, f| bounded(&TREASURY_PROPOSALS, a, f)),
-        12,
+        13,
     );
 }
 #[test]
@@ -2289,7 +2338,8 @@ fn original_conservation_and_required_delivery_checks_remain_independent() {
     let core = c::bind(&d).unwrap();
     let out = core.frame(c::Kind::Transition, input, &stock::FRAMING);
     assert!(matches!(out.result(), Err(c::Failure::Law(_))));
-    assert_eq!(out.diagnostics().last().unwrap().id, 991);
+    assert_eq!(out.diagnostics().last().unwrap().id, 510);
+    assert!(out.diagnostics().iter().all(|law| law.id != 991));
     d = contract.descriptor();
     d.laws = &stock::LAWS[1..];
     assert!(matches!(

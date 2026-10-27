@@ -130,14 +130,19 @@ pub fn manifest() -> LawManifest {
                     DecisionScope::Accept,
                     no_genesis(),
                 ),
-                502 => (
+                502 | 505 => (
                     LawKind::CommittedFailureEffects,
                     DecisionScope::CommittedFailure,
                     no_genesis(),
                 ),
-                503 => (
+                503 | 504 => (
                     LawKind::RejectNoAuthority,
                     DecisionScope::Reject,
+                    no_genesis(),
+                ),
+                510 | 511 => (
+                    LawKind::AuthoritySubjectRecipient,
+                    DecisionScope::Committing,
                     no_genesis(),
                 ),
                 _ => panic!("a new law needs a reviewed runtime binding"),

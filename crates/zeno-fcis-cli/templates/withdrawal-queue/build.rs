@@ -87,7 +87,7 @@ fn main() {
         .iter()
         .map(|reason| {
             let disposition = match reason.id().get() {
-                200..=203 => ReasonDisposition::Reject,
+                200..=206 => ReasonDisposition::Reject,
                 _ => panic!("new reason needs a reviewed disposition"),
             };
             ReasonDefinition::try_new(

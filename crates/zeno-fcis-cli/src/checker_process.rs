@@ -1856,6 +1856,9 @@ mod linux {
         // Acceptance/publication is final. An output transport failure cannot
         // change it into an inconclusive result after a receipt was linked.
         let diagnostic = std::io::stderr().write_all(&stderr.bytes);
+        if let Ok(value) = serde_json::from_slice(&stdout.bytes) {
+            crate::telemetry::observe(&value);
+        }
         let output = std::io::stdout().write_all(&stdout.bytes);
         if let Err(error) = diagnostic.and(output) {
             let _ = writeln!(
@@ -2237,7 +2240,10 @@ pub(crate) fn contained_profile(command: &crate::Command) -> Option<(bool, u64)>
                     ..
                 },
         } => Some((true, workers.unwrap_or(4))),
-        crate::Command::Loop { .. } => loop_profile(),
+        crate::Command::Loop { .. }
+        | crate::Command::Kb {
+            operation: crate::knowledge_command::Operation::AssessmentTask { .. },
+        } => loop_profile(),
         _ => None,
     }
 }
@@ -2317,8 +2323,11 @@ fn required_profile(command: &crate::Command) -> Result<Profile, String> {
     use crate::loop_command::doors::capture::Command as C;
     use crate::loop_command::{Command as L, doors::DoorCommand as D};
     match command {
+        crate::Command::Kb {
+            operation: crate::knowledge_command::Operation::AssessmentTask { .. },
+        } => Ok(Profile::FiniteData),
         crate::Command::Loop { command } => match command {
-            L::Open { .. } | L::Encode { .. } => Ok(Profile::FiniteData),
+            L::Open { .. } | L::Encode { .. } | L::Print { .. } => Ok(Profile::FiniteData),
             L::Candidate { session, .. } | L::Run { session, .. } | L::Resume { session } => {
                 session_profile(session)
             }
@@ -2609,7 +2618,10 @@ pub(crate) fn dispatch(
             },
             Err(error) => {
                 // The supervisor quotes the child's stderr in its refusal.
-                eprintln!("zeno-fcis: contained child refused: {error}");
+                let _ = std::io::Write::write_fmt(
+                    &mut std::io::stderr(),
+                    format_args!("zeno-fcis: contained child refused: {error}\n"),
+                );
                 Err(error.into())
             }
         }
@@ -2639,7 +2651,8 @@ pub(crate) fn refuse(command: &crate::Command, failure: SupervisorFailure) -> u8
             use crate::neural_loop::acquisition::{Acquisition, Mode};
             Some(Acquisition::reserve(match command {
                 crate::loop_command::Command::Open { .. } => Mode::Open,
-                crate::loop_command::Command::Encode { .. } => Mode::Encode,
+                crate::loop_command::Command::Encode { .. }
+                | crate::loop_command::Command::Print { .. } => Mode::Encode,
                 _ => Mode::Resume,
             }))
         }

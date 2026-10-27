@@ -1,0 +1,55 @@
+zeno 1;
+project 1 example_mail_mailbox_keyed;
+namespace 2 mailboxkeyed;
+// The mailbox as the key directory sees it: two slots, each with the account
+// key generation its message is encrypted to. A delivery uses the current
+// generation. A device reads a message only while it is active and holds
+// that generation's key; the device's status and generation come from the
+// key directory, as context.
+type 100 state KeyedMailbox;
+type 101 command KeyedCommand;
+type 102 context Reader;
+type 103 data SlotStatus;
+type 104 int Generation in 0..=3;
+type 105 data KeyedAction;
+type 106 int SlotNumber in 1..=2;
+type 107 data DeviceStatus;
+field 110 100 slot_1_status 103;
+field 111 100 slot_1_generation 104;
+field 112 100 slot_2_status 103;
+field 113 100 slot_2_generation 104;
+field 120 101 action 105;
+field 121 101 slot 106;
+field 130 102 reader_status 107;
+field 131 102 reader_generation 104;
+field 132 102 current_generation 104;
+variant 140 103 Empty none;
+variant 141 103 Unread none;
+variant 142 103 Read none;
+variant 143 107 Absent none;
+variant 144 107 Active none;
+variant 145 107 Revoked none;
+variant 150 105 Deliver none;
+variant 151 105 ReadMessage none;
+variant 152 105 Purge none;
+reason 200 no_current_key precedence 0;
+reason 201 mailbox_full precedence 1;
+reason 202 empty_slot precedence 2;
+reason 203 device_not_active precedence 3;
+reason 204 no_key_for_message precedence 4;
+component 400 mailbox {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 256;
+}
+merge [400];
+// A slot holds a generation exactly when it holds a message, and a message
+// is always encrypted to an issued generation.
+law 500 slots_well_formed on commit, genesis = (post.100.110 == 140 -> post.100.111 == 0) && (post.100.110 != 140 -> post.100.111 >= 1) && (post.100.112 == 140 -> post.100.113 == 0) && (post.100.112 != 140 -> post.100.113 >= 1);
+// Only an active device reads or purges, and it reads only a message whose
+// generation it holds.
+law 501 reader_holds_key on accept = (command.101.120 != 150 -> context.102.130 == 144) && (command.101.120 == 151 -> (command.101.121 == 1 -> pre.100.111 <= context.102.131) && (command.101.121 == 2 -> pre.100.113 <= context.102.131));
+// A delivery encrypts to the current generation.
+law 502 delivery_uses_current_key on accept = command.101.120 == 150 -> ((pre.100.110 == 140 -> post.100.111 == context.102.132) && (pre.100.110 != 140 -> post.100.113 == context.102.132));

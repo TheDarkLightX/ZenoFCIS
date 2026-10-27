@@ -57,7 +57,7 @@ must preserve the same assurance whoever produced them. Each guarantee names
 the exact implementation, specification, full supported input domain and
 trusted-base assumptions.
 
-**What is checked today.** The 2.5.0 release uses the supported checked
+**What is checked today.** The 2.6.0 release uses the supported checked
 program and mandatory Authority route. Its assurance is executable conformance to a
 reviewed contract across the supported domain, under named trusted
 assumptions. [Release assurance](docs/RELEASE_ASSURANCE.md) states the
@@ -74,13 +74,15 @@ the imperative shell. A passing stage check is not a release receipt.
 
 ## Release status
 
-**[2.5.0 is released](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.5.0).**
-It builds on the first stable V2 line, 2.3.0; the
-[2.5.0 release notes](docs/RELEASE_NOTES.md) describe the new arithmetic,
-search, loop and contract-judge features. The initial release provides the
-**Linux x86_64 GNU CLI** (glibc 2.39 or later). A **macOS on Apple silicon**
-(`aarch64-apple-darwin`) binary will follow native platform validation.
-Every published archive must pass its build, custody and installed-binary checks. See
+**2.6.0** is the current release source. It builds on the first stable V2
+line, 2.3.0; the [2.6.0 release notes](docs/RELEASE_NOTES.md) describe the
+new arithmetic, search, loop and contract-judge features. Final qualification
+and publication remain separate release gates. The previous release,
+[2.5.0](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.5.0), is
+published. The release set provides the **Linux x86_64 GNU CLI** (glibc 2.39
+or later). A **macOS on Apple silicon** (`aarch64-apple-darwin`) binary will
+follow native platform validation. Every published archive must pass its
+build, custody and installed-binary checks. See
 [installation](docs/INSTALLATION.md) and the
 [workflow qualification scope](docs/FEATURE_MATRIX.md#host-platforms).
 
@@ -94,15 +96,15 @@ and [2.3.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.3.0-r
 prereleases keep their exact sources and limits in the
 [candidate record](docs/RELEASE_CANDIDATES.md). The historical `1.1.0` release
 and its [release notes](docs/V1_1_RELEASE_NOTES.md) have their own scope;
-The 2.3.0 cutover changed the public execution API; 2.5.0 retains that boundary.
+The 2.3.0 cutover changed the public execution API; 2.6.0 retains that boundary.
 
 ## Install and run a first example
 
 The normal V2 library route declares a complete checked program. It is
-available in the 2.5.0 release, both with default features and with
+available in the 2.6.0 release, both with default features and with
 `default-features = false`. The historical `1.1.0` package has its own V1 API.
 
-Check out the `v2.5.0` tag as the [installation guide](docs/INSTALLATION.md)
+After qualification and publication, check out the `v2.6.0` tag as the [installation guide](docs/INSTALLATION.md)
 describes, then bind the dependency to that source:
 
 ```toml
@@ -128,7 +130,7 @@ original schema + complete ProgramDefinition + reviewed policy + framing/channel
 Run the smallest example with
 `cargo +1.97.1 run --locked --offline -p zeno-fcis --example minimal_core`.
 
-The root and prelude cutover was introduced in 2.3.0 and remains in 2.5.0.
+The root and prelude cutover was introduced in 2.3.0 and remains in 2.6.0.
 Native transition callbacks, public candidate sealing and caller-supplied
 usage have been retired. `zeno_fcis::legacy` retains inert compatibility data
 and standalone evidence utilities. The
@@ -152,7 +154,7 @@ The [documentation index](docs/INDEX.md) lists every guide by task. Common
 starting points:
 
 - **Build an application:** the [installation guide](docs/INSTALLATION.md),
-  [quickstart](docs/QUICKSTART.md), [2.5.0 release notes](docs/RELEASE_NOTES.md),
+  [quickstart](docs/QUICKSTART.md), [2.6.0 release notes](docs/RELEASE_NOTES.md),
   [API reference](docs/API_REFERENCE.md), [crate map](docs/CRATE_MAP.md) and
   [feature matrix](docs/FEATURE_MATRIX.md). The
   [CLI reference](docs/CLI_REFERENCE.md) describes the supported generation,
@@ -568,7 +570,7 @@ The guarantee depends on four things:
 - **The checker must be correct.** The V1 end-to-end synthesis path trusts its
   interpreter and enumeration. The V2 route has source-bound executable
   interpreter, admission, decision and authority evidence, with the scope and
-  trusted assumptions recorded in the [2.5.0 release notes](docs/RELEASE_NOTES.md).
+  trusted assumptions recorded in the [2.6.0 release notes](docs/RELEASE_NOTES.md).
 - **The code around the program needs its own check.** In the durable-counter
   template, `tests/conformance.rs` runs all 64 admitted inputs through the real
   application: admission, the authority, the adapter that turns outputs into
@@ -613,7 +615,7 @@ bytes alone are not publication authority. See the
 Existing package names and optional compatibility data do not enlarge the
 supported V2 execution scope, and historical mounted comparisons do not qualify
 wider compound-value execution. Consult the
-[2.5.0 release notes](docs/RELEASE_NOTES.md) and the API migration guide
+[2.6.0 release notes](docs/RELEASE_NOTES.md) and the API migration guide
 before you choose an execution profile.
 
 ## Verification
@@ -624,7 +626,7 @@ covers admission, original-byte interpretation, scalar execution, complete
 decisions, laws/genesis and mandatory authority/replay. Per-stage proof runs
 are provisional; final source-bound profiles, controls and integration checks
 must pass together. See [release assurance](docs/RELEASE_ASSURANCE.md) and the
-[2.5.0 release notes](docs/RELEASE_NOTES.md) for scope and qualification
+[2.6.0 release notes](docs/RELEASE_NOTES.md) for scope and qualification
 limits.
 
 The main local gate is:

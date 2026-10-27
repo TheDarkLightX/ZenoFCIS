@@ -251,6 +251,31 @@ def _int_value(subject: dict, name: str, value) -> int:
     raise Refusal(f"Unreadable input value for {name}")
 
 
+
+def _report_judgements(state: dict, channel: str, events: list) -> None:
+    """Tell Zeno Commons, when it is configured, what the judge decided for this subject revision.
+
+    Other agents then see who is looping on which subject and what was already accepted or refuted.
+    Reporting never changes the workspace or its verdicts.
+    """
+    if not os.environ.get("ZENO_FCIS_COMMONS"):
+        return
+    hook = Path(__file__).resolve().parents[1] / "commons"
+    if str(hook) not in sys.path:
+        sys.path.insert(0, str(hook))
+    try:
+        from emit import emit
+    except Exception:  # noqa: BLE001 - reporting is advisory
+        return
+    verdicts = []
+    for event in events:
+        act = event.get("act") if isinstance(event, dict) else None
+        if event.get("author") == "judge" and isinstance(act, dict):
+            verdicts.append(str(act.get("kind") or act.get("act") or next(iter(act), "judgement")))
+    subject = state.get("subject") or {}
+    emit("loop", "judged", str(subject.get("revision") or subject.get("tag") or "unknown-subject"),
+         {"channel": channel, "tag": subject.get("tag"), "verdicts": verdicts[:64], "events": len(events)})
+
 class LoopWorkspace:
     def __init__(self, path: str | os.PathLike, cli: str | os.PathLike | None = None):
         self.path = Path(path).absolute()
@@ -411,6 +436,7 @@ class LoopWorkspace:
                 raise Refusal(f"author {doc.author} cannot submit on the {channel} channel")
             events = self._submit(state, ctx, doc)
             self.save(state)
+            _report_judgements(state, channel, events)
             return events
 
     def _submit(self, state: dict, ctx: Z.Context, doc: Z.Document) -> list:
@@ -556,7 +582,7 @@ class LoopWorkspace:
         original = self.data / state.get("original_program", "original.zcve")
         code, report = doors.meaning(self.cli(state), original, path)
         detail = report.get("detail") or {}
-        if code != 0 or report.get("status") != "keyed" or detail.get("same_as_original"):
+        if code != 1 or report.get("status") != "keyed" or detail.get("same_as_original") is not False:
             return None
         key = detail.get("key")
         return key if isinstance(key, str) and re.fullmatch(r"[0-9a-f]{64}", key) else None
@@ -1322,6 +1348,7 @@ class LoopWorkspace:
             doc = Z.parse(self._owner_document(state, ctx, statement, False), ctx)
             events = self._submit(state, ctx, doc)
             self.save(state)
+            _report_judgements(state, "owner-answer", events)
             return events
 
     def say(self, statement: str) -> list:
@@ -1336,6 +1363,7 @@ class LoopWorkspace:
             doc = Z.parse(self._owner_document(state, ctx, statement, statement[:1].isupper()), ctx)
             events = self._submit(state, ctx, doc)
             self.save(state)
+            _report_judgements(state, "owner-rule", events)
             return events
 
     def next_question(self) -> list:

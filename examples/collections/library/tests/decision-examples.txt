@@ -1,0 +1,17 @@
+# Decision examples for the library view. LLM-generated with the rules, so
+# they are not an independent oracle.
+#
+# Inputs: member present, loans, copy present, on loan, holder class |
+# action (150 Join, 151 AddCopy, 152 Borrow, 153 Return), member class,
+# copy class | desk (180 Librarian, 181 Visitor). With a copy present its
+# holder is class 0, so member class 0 is the holder and 1 someone else.
+# Decision: class reason, then the five state fields after | deliveries
+0 0 0 0 0 | 150 0 0 | 180 | accept - 1 0 0 0 0 | -
+1 0 0 0 0 | 150 0 0 | 180 | reject 201 1 0 0 0 0 | -
+1 0 0 0 0 | 151 0 0 | 180 | accept - 1 0 1 0 0 | -
+1 0 1 0 0 | 152 1 0 | 180 | accept - 1 1 1 1 1 | -
+1 0 1 1 0 | 152 1 0 | 180 | reject 204 1 0 1 1 0 | -
+1 2 1 0 0 | 152 1 0 | 180 | reject 205 1 2 1 0 0 | -
+1 1 1 1 0 | 153 0 0 | 180 | accept - 1 0 1 0 0 | -
+1 1 1 1 0 | 153 1 0 | 180 | reject 206 1 1 1 1 0 | -
+0 0 0 0 0 | 150 0 0 | 181 | reject 200 0 0 0 0 0 | -

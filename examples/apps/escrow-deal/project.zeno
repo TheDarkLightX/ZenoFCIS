@@ -1,0 +1,85 @@
+zeno 1;
+project 1 escrow_deal;
+namespace 2 escrow;
+// One escrow deal. The buyer deposits 1..3 units, the seller marks the goods
+// shipped, then the buyer releases or confirms delivery. Any party can
+// refund an unconfirmed deal after day 7 or release a confirmed deal after
+// its dispute cutoff at day 9; the original operator refund remains available. Every
+// deposited unit is either held or paid out once, by a delivery on the
+// payee's channel. The server sets the day, counted from the policy's epoch.
+type 100 state Deal;
+type 101 command DealCommand;
+type 102 context Caller;
+type 103 destination Payee;
+type 104 payload Payment;
+type 105 int Units in 0..=3;
+type 106 int DepositUnits in 1..=3;
+type 107 data DealStatus;
+type 108 data DealAction;
+type 109 data Party;
+type 115 int Day in 0..=14;
+field 110 100 status 107;
+field 111 100 held 105;
+field 112 100 paid_to_seller 105;
+field 113 100 refunded_to_buyer 105;
+field 120 101 action 108;
+field 121 101 amount 106;
+field 130 102 party 109;
+field 131 102 day 115;
+field 140 104 units 105;
+variant 150 107 Open none;
+variant 151 107 Funded none;
+variant 152 107 Shipped none;
+variant 153 107 Released none;
+variant 154 107 Refunded none;
+variant 155 107 DeliveryConfirmed none;
+variant 160 108 Deposit none;
+variant 161 108 MarkShipped none;
+variant 162 108 Release none;
+variant 163 108 Refund none;
+variant 164 108 TimeoutRefund none;
+variant 165 108 ConfirmDelivery none;
+variant 166 108 ReleaseConfirmed none;
+variant 167 108 DisputeDelivery none;
+variant 170 109 Buyer none;
+variant 171 109 Seller none;
+variant 172 109 Operator none;
+reason 200 wrong_party precedence 0;
+reason 201 wrong_stage precedence 1;
+reason 202 before_deadline precedence 2;
+reason 203 no_dispute_time precedence 3;
+channel 300 seller_payout destination 103 payload 104;
+channel 301 buyer_refund destination 103 payload 104;
+component 400 deal {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  outbox outbox.301;
+  budget steps 64;
+}
+merge [400];
+// Each stage holds exactly the money it should.
+law 500 stage_holds_money on commit, genesis = (post.100.110 == 150 -> post.100.111 == 0 && post.100.112 == 0 && post.100.113 == 0) && ((post.100.110 == 151 || post.100.110 == 152) -> post.100.111 > 0 && post.100.112 == 0 && post.100.113 == 0) && (post.100.110 == 153 -> post.100.111 == 0 && post.100.112 > 0 && post.100.113 == 0) && (post.100.110 == 154 -> post.100.111 == 0 && post.100.112 == 0 && post.100.113 > 0);
+// Money is never created or lost: only a deposit adds to the total.
+law 501 money_conserved on commit = (command.101.120 == 160 -> post.100.111 + post.100.112 + post.100.113 == pre.100.111 + pre.100.112 + pre.100.113 + command.101.121) && (command.101.120 != 160 -> post.100.111 + post.100.112 + post.100.113 == pre.100.111 + pre.100.112 + pre.100.113);
+law 502 right_party on commit = (command.101.120 == 160 -> context.102.130 == 170) && (command.101.120 == 161 -> context.102.130 == 171) && (command.101.120 == 162 -> context.102.130 == 170) && (command.101.120 == 163 -> context.102.130 == 172);
+// The operator refunds only after day 7.
+law 503 refund_after_deadline on commit = command.101.120 == 163 -> context.102.131 > 7;
+// Every unit paid out is actually delivered to that payee.
+law 510 seller_paid_by_delivery on commit = outbox.104 <= 1 && outbox.104.140 == post.100.112 - pre.100.112;
+law 511 buyer_refunded_by_delivery on commit = outbox.104 <= 1 && outbox.104.140 == post.100.113 - pre.100.113;
+
+// Stage changes and payout actions are independent obligations, even when a
+// different policy also preserves balances and delivery totals.
+law 512 exact_original_stages on commit = (command.101.120 == 160 -> pre.100.110 == 150 && post.100.110 == 151 && post.100.111 == command.101.121) && (command.101.120 == 161 -> pre.100.110 == 151 && post.100.110 == 152 && post.100.111 == pre.100.111 && post.100.112 == pre.100.112 && post.100.113 == pre.100.113) && (command.101.120 == 162 -> pre.100.110 == 152 && post.100.110 == 153 && post.100.112 == pre.100.111) && (command.101.120 == 163 -> (pre.100.110 == 151 || pre.100.110 == 152) && post.100.110 == 154 && post.100.113 == pre.100.111);
+// Any authenticated party may execute a timed payout; its beneficiary is fixed by
+// delivery status, never selected by that caller. Confirmation belongs to Buyer.
+law 513 exact_recovery_and_confirmation on commit = (command.101.120 == 164 -> (pre.100.110 == 151 || pre.100.110 == 152) && context.102.131 > 7 && post.100.110 == 154 && post.100.113 == pre.100.111) && (command.101.120 == 165 -> context.102.130 == 170 && pre.100.110 == 152 && context.102.131 <= 7 && post.100.110 == 155 && post.100.111 == pre.100.111) && (command.101.120 == 166 -> pre.100.110 == 155 && context.102.131 >= 9 && post.100.110 == 153 && post.100.112 == pre.100.111) && (command.101.120 == 167 -> context.102.130 == 170 && pre.100.110 == 155 && context.102.131 < 9 && post.100.110 == 154 && post.100.113 == pre.100.111);
+law 514 confirmed_money on commit, genesis = post.100.110 == 155 -> post.100.111 > 0 && post.100.112 == 0 && post.100.113 == 0;
+law 515 reject_only_for_the_first_failed_guard on reject = (((command.101.120 == 160 && context.102.130 != 170) || (command.101.120 == 161 && context.102.130 != 171) || (command.101.120 == 162 && context.102.130 != 170) || (command.101.120 == 163 && context.102.130 != 172) || ((command.101.120 == 165 || command.101.120 == 167) && context.102.130 != 170)) && decision_reason == 200) || (!((command.101.120 == 160 && context.102.130 != 170) || (command.101.120 == 161 && context.102.130 != 171) || (command.101.120 == 162 && context.102.130 != 170) || (command.101.120 == 163 && context.102.130 != 172) || ((command.101.120 == 165 || command.101.120 == 167) && context.102.130 != 170)) && ((command.101.120 == 160 && pre.100.110 != 150) || (command.101.120 == 161 && pre.100.110 != 151) || (command.101.120 == 162 && pre.100.110 != 152) || ((command.101.120 == 163 || command.101.120 == 164) && pre.100.110 != 151 && pre.100.110 != 152) || (command.101.120 == 165 && pre.100.110 != 152) || ((command.101.120 == 166 || command.101.120 == 167) && pre.100.110 != 155)) && decision_reason == 201) || (!((command.101.120 == 160 && context.102.130 != 170) || (command.101.120 == 161 && context.102.130 != 171) || (command.101.120 == 162 && context.102.130 != 170) || (command.101.120 == 163 && context.102.130 != 172) || ((command.101.120 == 165 || command.101.120 == 167) && context.102.130 != 170)) && !((command.101.120 == 160 && pre.100.110 != 150) || (command.101.120 == 161 && pre.100.110 != 151) || (command.101.120 == 162 && pre.100.110 != 152) || ((command.101.120 == 163 || command.101.120 == 164) && pre.100.110 != 151 && pre.100.110 != 152) || (command.101.120 == 165 && pre.100.110 != 152) || ((command.101.120 == 166 || command.101.120 == 167) && pre.100.110 != 155)) && (((command.101.120 == 163 || command.101.120 == 164) && context.102.131 <= 7) || (command.101.120 == 166 && context.102.131 < 9) || (command.101.120 == 167 && (context.102.131 >= 9))) && decision_reason == 202) || (!((command.101.120 == 160 && context.102.130 != 170) || (command.101.120 == 161 && context.102.130 != 171) || (command.101.120 == 162 && context.102.130 != 170) || (command.101.120 == 163 && context.102.130 != 172) || ((command.101.120 == 165 || command.101.120 == 167) && context.102.130 != 170)) && !((command.101.120 == 160 && pre.100.110 != 150) || (command.101.120 == 161 && pre.100.110 != 151) || (command.101.120 == 162 && pre.100.110 != 152) || ((command.101.120 == 163 || command.101.120 == 164) && pre.100.110 != 151 && pre.100.110 != 152) || (command.101.120 == 165 && pre.100.110 != 152) || ((command.101.120 == 166 || command.101.120 == 167) && pre.100.110 != 155)) && !(((command.101.120 == 163 || command.101.120 == 164) && context.102.131 <= 7) || (command.101.120 == 166 && context.102.131 < 9) || (command.101.120 == 167 && (context.102.131 >= 9))) && (command.101.120 == 165 && context.102.131 > 7) && decision_reason == 203);
+law 516 seller_exact_delivery_count on commit = (post.100.112 > pre.100.112 -> outbox.104 == 1) && (post.100.112 == pre.100.112 -> outbox.104 == 0);
+law 517 seller_destination on commit = post.100.112 > pre.100.112 -> outbox.104 == 1;
+law 518 buyer_exact_delivery_count on commit = (post.100.113 > pre.100.113 -> outbox.104 == 1) && (post.100.113 == pre.100.113 -> outbox.104 == 0);
+law 519 buyer_destination on commit = post.100.113 > pre.100.113 -> outbox.104 == 1;

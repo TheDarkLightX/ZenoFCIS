@@ -1,0 +1,56 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "wide-counter",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "105": [
+      "I128",
+      9007199254740993,
+      9007199254740995
+    ]
+  },
+  "variables": {
+    "balance": "pre.100.110",
+    "action": "command.101",
+    "caller": "context.102"
+  },
+  "cases": [
+    {
+      "when": "caller != 130",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "(action == 120 && balance == 9007199254740995) || (action == 121 && balance == 9007199254740993)",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "choose(action == 120, balance + 1, choose(action == 121, balance - 1, balance))"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 9007199254740994
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AssetConservation"
+  },
+  "framework_reject_law": 509,
+  "framework_failure_law": 508
+}

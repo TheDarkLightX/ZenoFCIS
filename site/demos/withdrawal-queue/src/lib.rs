@@ -10,7 +10,7 @@ use withdrawal_queue::{
     authority,
     bindings::GeneratedProject,
     deposit,
-    generated::{Caller, Flag, Lane, TickContext, Vault, VaultCommand},
+    generated::{Caller, Day, Flag, Lane, TickContext, Vault, VaultAction, VaultCommand},
     genesis_state, profile, request, tick, v2_contract,
 };
 use zeno_fcis_site_common::{
@@ -62,17 +62,28 @@ impl Application for WithdrawalQueue {
     /// its `lane` and `amount`, or `Tick`, which carries neither. The
     /// context is `caller` and `alarm`.
     fn parse(fields: &Map<String, Json>) -> Result<(VaultCommand, TickContext), String> {
+        let has_now = fields.contains_key("now");
         let mut fields = Request::new(fields);
         let command = match fields.choice(
             "command",
-            &[("Deposit", 0), ("RequestWithdrawal", 1), ("Tick", 2)],
+            &[
+                ("Deposit", 0),
+                ("RequestWithdrawal", 1),
+                ("Tick", 2),
+                ("TimeoutWithdrawal", 3),
+            ],
         )? {
             0 => deposit(fields.integer("amount")?),
             1 => request(
                 fields.choice("lane", &[("A", Lane::A), ("B", Lane::B)])?,
                 fields.integer("amount")?,
             ),
-            _ => tick(),
+            2 => tick(),
+            _ => withdrawal_queue::command(
+                VaultAction::TimeoutWithdrawal,
+                fields.choice("lane", &[("A", Lane::A), ("B", Lane::B)])?,
+                1,
+            ),
         };
         let caller = fields.choice(
             "caller",
@@ -84,8 +95,9 @@ impl Application for WithdrawalQueue {
             ],
         )?;
         let alarm = Flag(fields.flag("alarm")?);
+        let now = Day(if has_now { fields.integer("now")? } else { 0 });
         fields.finish()?;
-        Ok((command, TickContext { caller, alarm }))
+        Ok((command, TickContext { caller, alarm, now }))
     }
 
     fn admit(
@@ -197,16 +209,38 @@ mod tests {
     }
 
     #[test]
+    fn the_owner_can_recover_at_day_two_despite_an_alarm_and_silent_keeper() {
+        let mut demo = Demo::<WithdrawalQueue>::new().unwrap();
+        demo.step(&deposit_of(2, "Operator")).unwrap();
+        demo.step(&withdrawal("A", 2, "OwnerA")).unwrap();
+        let input =
+            r#"{"command":"TimeoutWithdrawal","lane":"A","caller":"OwnerA","alarm":true,"now":2}"#;
+        let report = demo.step(input).unwrap();
+        assert_eq!(report["decision"], "Accept");
+        assert_eq!(report["after"]["balance"], 0);
+        assert_eq!(report["after"]["amount_a"], 0);
+        assert_eq!(report["outbox"][0]["destination"], "settlement");
+        assert_eq!(
+            report["outbox"][0]["payload"],
+            json!({"paid_lane":"A", "paid_amount":2})
+        );
+        assert_eq!(demo.step(input).unwrap()["decision"], "Reject");
+    }
+
+    #[test]
     fn law_statuses_follow_the_manifest_scopes() {
         let mut demo = Demo::<WithdrawalQueue>::new().unwrap();
         let accept = demo.step(&deposit_of(1, "Operator")).unwrap();
-        assert_eq!(law_ids(&accept), [500, 501, 502, 503, 991]);
+        assert_eq!(
+            law_ids(&accept),
+            [500, 501, 502, 503, 504, 505, 506, 510, 511, 512, 991]
+        );
         assert_eq!(accept["laws"][3]["name"], "tick_follows_the_controller");
         demo.step(&deposit_of(2, "Operator")).unwrap();
         // A fourth unit fits the capacity of 4; a fifth is rejected.
         let reject = demo.step(&deposit_of(2, "Operator")).unwrap();
         assert_eq!(reject["reason"]["name"], "over_capacity");
-        assert_eq!(law_ids(&reject), [509, 991]);
+        assert_eq!(law_ids(&reject), [513, 909, 991]);
     }
 
     #[test]

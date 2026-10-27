@@ -53,6 +53,7 @@ struct Scope {
     root: ScopeId,
     source: SourceId,
     directory: PathBuf,
+    attribute_directory: PathBuf,
     canonical: Vec<String>,
     names: BTreeMap<String, Vec<Binding>>,
     globs: Vec<(Vec<String>, bool)>,
@@ -166,6 +167,7 @@ impl<'a> Graph<'a> {
             module: id,
             root: id,
             source,
+            attribute_directory: directory.clone(),
             directory,
             canonical: vec![name.clone()],
             names: BTreeMap::new(),
@@ -219,6 +221,7 @@ impl<'a> Graph<'a> {
             root: p.root,
             source,
             directory: p.directory.clone(),
+            attribute_directory: p.attribute_directory.clone(),
             canonical: p.canonical.clone(),
             names: BTreeMap::new(),
             globs: Vec::new(),
@@ -317,40 +320,99 @@ impl<'a> Graph<'a> {
         }
     }
 
+    /// Find only a source already admitted by the bounded, symlink-free reader.
+    fn declared_source(&self, path: &Path) -> Result<Option<SourceId>, String> {
+        let requested = compiler_context_path(path)?;
+        let mut found = None;
+        for (loaded, source) in &self.source_paths {
+            if compiler_context_path(loaded)? == requested && found.replace(*source).is_some() {
+                return Err("module source has multiple loaded path identities".to_string());
+            }
+        }
+        Ok(found)
+    }
+
+    fn external_module_source(
+        &self,
+        parent: ScopeId,
+        name: &str,
+        path: Option<&Path>,
+    ) -> Result<SourceId, String> {
+        let candidates = match path {
+            Some(path) => vec![self.scopes[parent].attribute_directory.join(path)],
+            None => vec![
+                self.scopes[parent].directory.join(format!("{name}.rs")),
+                self.scopes[parent].directory.join(name).join("mod.rs"),
+            ],
+        };
+        let mut matches = Vec::new();
+        for candidate in candidates {
+            if let Some(child) = self.declared_source(&candidate)? {
+                matches.push(child);
+            }
+        }
+        if matches.len() != 1 {
+            return Err(format!(
+                "expected one readable declared module file, found {}",
+                matches.len()
+            ));
+        }
+        let child = matches[0];
+        // Source-position keys must never be silently reused in a second
+        // module context. This also bounds recursive path declarations.
+        if self
+            .modules
+            .keys()
+            .any(|id| self.scopes[*id].source == child)
+        {
+            return Err("cyclic or repeated source module context is unsupported".to_string());
+        }
+        Ok(child)
+    }
+
     fn module(&mut self, parent: ScopeId, source: SourceId, item: &'a syn::ItemMod) {
         let name = item.ident.unraw().to_string();
-        let directory = self.scopes[parent].directory.join(&name);
-        if item.attrs.iter().any(has_module_path) {
-            self.report(
-                source,
-                item.ident.span(),
-                "resolution-module-path",
-                format!("module {name}: path attribute is unsupported"),
-            );
-            return;
-        }
-        let (child_source, items) = if let Some((_, items)) = &item.content {
-            (source, items.as_slice())
-        } else {
-            let flat = self.scopes[parent].directory.join(format!("{name}.rs"));
-            let nested = directory.join("mod.rs");
-            let matches: Vec<_> = [flat, nested]
-                .into_iter()
-                .filter_map(|p| self.source_paths.get(&p).copied())
-                .collect();
-            if matches.len() != 1 {
-                self.report(
-                    source,
-                    item.ident.span(),
-                    "resolution-module",
-                    format!(
-                        "module {name}: expected one readable declared module file, found {}",
-                        matches.len()
-                    ),
-                );
+        let path = match module_path(&item.attrs) {
+            Ok(path) => path,
+            Err(message) => {
+                self.report(source, item.ident.span(), "resolution-module-path", message);
                 return;
             }
-            let child = matches[0];
+        };
+        let attributed = path.is_some();
+        let mut directory = self.scopes[parent].directory.join(&name);
+        let mut attribute_directory = directory.clone();
+        let (child_source, items) = if let Some((_, items)) = &item.content {
+            if let Some(path) = path {
+                directory = self.scopes[parent].attribute_directory.join(path);
+                attribute_directory = directory.clone();
+            }
+            (source, items.as_slice())
+        } else {
+            let rule = if path.is_some() {
+                "resolution-module-path"
+            } else {
+                "resolution-module"
+            };
+            let child = match self.external_module_source(parent, &name, path.as_deref()) {
+                Ok(child) => child,
+                Err(message) => {
+                    self.report(
+                        source,
+                        item.ident.span(),
+                        rule,
+                        format!("module {name}: {message}"),
+                    );
+                    return;
+                }
+            };
+            let file = &self.sources[child].path;
+            attribute_directory = file.parent().unwrap_or(Path::new(".")).to_path_buf();
+            directory = if attributed || file.file_name().is_some_and(|name| name == "mod.rs") {
+                attribute_directory.clone()
+            } else {
+                file.with_extension("")
+            };
             (child, self.sources[child].syntax.items.as_slice())
         };
         if child_source != source
@@ -363,6 +425,7 @@ impl<'a> Graph<'a> {
         let id = self.nested(parent, child_source, item.ident.span(), 1);
         self.scopes[id].module = id;
         self.scopes[id].directory = directory;
+        self.scopes[id].attribute_directory = attribute_directory;
         self.scopes[id].canonical.push(name.clone());
         self.bind(
             parent,
@@ -436,6 +499,30 @@ fn inactive_cfg(attribute: &syn::Attribute) -> bool {
         && attribute
             .parse_args::<syn::Meta>()
             .is_ok_and(|m| meta_inactive(&m))
+}
+
+/// Only an unambiguous literal module path has established source semantics.
+fn module_path(attributes: &[syn::Attribute]) -> Result<Option<PathBuf>, String> {
+    let mut path = None;
+    for attribute in attributes {
+        if attribute.path().is_ident("path") {
+            let syn::Meta::NameValue(value) = &attribute.meta else {
+                return Err("module path must be a string literal".to_string());
+            };
+            let syn::Expr::Lit(literal) = &value.value else {
+                return Err("module path must be a string literal".to_string());
+            };
+            let syn::Lit::Str(value) = &literal.lit else {
+                return Err("module path must be a string literal".to_string());
+            };
+            if value.value().is_empty() || path.replace(PathBuf::from(value.value())).is_some() {
+                return Err("module path must be nonempty and unique".to_string());
+            }
+        } else if has_module_path(attribute) {
+            return Err("conditional module paths are unsupported".to_string());
+        }
+    }
+    Ok(path)
 }
 
 fn has_module_path(attribute: &syn::Attribute) -> bool {
@@ -2127,7 +2214,10 @@ impl<'ast> Visit<'ast> for Scan<'_, '_> {
     }
     fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
         for attr in &item.attrs {
-            self.visit_attribute(attr)
+            // Literal module paths are validated and traversed by Graph::module.
+            if !attr.path().is_ident("path") {
+                self.visit_attribute(attr)
+            }
         }
         let old = self.scope;
         let source = self.source;

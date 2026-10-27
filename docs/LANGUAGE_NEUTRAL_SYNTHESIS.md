@@ -157,9 +157,8 @@ neither installs a runtime. `--tool PATH` selects an explicit
 compiler/interpreter and is still subject to that version check.
 `synth discover` publishes each target's extension, emitted call ABI, and exact
 conformance invocation, so an agent does not have to guess the harness.
-Automatic target execution currently requires Linux process-group cleanup and
-non-reaping exit observation. Pure emission and the semantic library have no
-such platform dependency.
+Automatic target execution supports Linux and macOS process-group supervision.
+Pure emission and the semantic library have no such platform dependency.
 
 ## Problem format and semantics
 
@@ -305,6 +304,23 @@ version, and compiler/interpreter executable hash.
 Dynamic runtime dependencies and compiler correctness remain external premises.
 Each subprocess has a 30-second limit and a 32-MiB bound per output stream;
 missing, timed-out, oversized, crashed, or malformed runs cannot pass.
+
+The runner supports Linux and macOS. Linux retains the exited child with
+`waitid(WNOWAIT)` until it signals the owned process group. macOS retains a
+separate live group leader while `try_wait` observes and reaps the target.
+That leader also avoids Darwin's permission error when signalling a group
+containing only zombies. The helper and target share the original startup
+deadline, and owned children are reaped on ordinary guard cancellation.
+Unexpected group cleanup errors remain failures. Discovery lists both hosts;
+receipts identify the actual host and the process-supervision scope.
+
+This runner supervises trusted tools and the closed regenerated emitter
+subset; it does not enforce a security sandbox, network denial, a memory cap
+or a process-count cap. A process can escape a process group deliberately,
+and abrupt supervisor termination does not guarantee descendant cleanup.
+These are limits of the Linux runner model too. The separate contained
+checker runtime has its own platform and resource requirements; a conformance
+receipt does not qualify that runtime or grant production authority.
 
 The existing certificate's `reference_claim` names complete finite contract
 coverage. Its `composition_claim` names closure, typing, and totality on the

@@ -31,6 +31,39 @@ class SharedCheckerGate(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'independent evaluator'):
                 gate.check_routes(root)
 
+    def test_released_24_route_is_admitted_only_as_the_closed_replay(self):
+        source = (gate.ROOT / gate.CLI).read_text()
+        start = source.index(gate.RELEASED_24_ROUTE)
+        route = source[start:source.index('\n}\n', start) + 3]
+        current = source.split('pub(crate) fn check(', 1)[1].split('fn admit(', 1)[0]
+        widened = current.replace('{', '{\n    let _ = check_released_24(original, candidate, limits);', 1)
+        for name, edited, reason in (
+            ('called from the current check', source.replace(current, widened, 1), 'reachable outside'),
+            ('current constructor claims release', source.replace('released_24: false,', 'released_24: true,', 1),
+             'claims released'),
+            ('current import', source.replace(route, route.replace(
+                'import_i64_program(original)', 'import_program(original)', 1), 1), 'closed historical replay'),
+            ('second evaluation', source.replace(route, route.replace(
+                'let (original, candidate) = (observe(&left), observe(&right));',
+                'let (original, candidate) = (observe(&left), observe(&right));\n'
+                '        let _ = left.execute_v2(&input, zeno_fcis_synthesis::finite::v2_zero_limits());', 1), 1),
+             'closed historical replay'),
+            ('duplicated route', source + '\n' + route, 'missing or duplicated'),
+            ('missing route', source.replace(route, '', 1), 'missing or duplicated'),
+        ):
+            with self.subTest(name):
+                self.assertNotEqual(edited, source)
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    for relative in gate.ROUTE_INPUTS:
+                        target = root / relative
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_bytes((gate.ROOT / relative).read_bytes())
+                    gate.check_routes(root)
+                    (root / gate.CLI).write_text(edited)
+                    with self.assertRaisesRegex(ValueError, reason):
+                        gate.check_routes(root)
+
     def test_library_route_rejects_missing_proof_and_wrong_package_order(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -718,7 +751,7 @@ class LoggedDeadlines(unittest.TestCase):
             self.assertEqual((root / 'run/stdout.json').read_text(), 'partial')
             self.assertEqual((root / 'run/stderr.log').read_text(), 'deadline')
 
-    def test_only_default_upgrade_suite_gets_extended_native_deadline(self):
+    def test_cold_cli_build_and_default_upgrade_suite_get_extended_native_deadlines(self):
         calls = []
         def logged(command, cwd, environment, output, *, timeout=600):
             calls.append((output.name, command, timeout))
@@ -731,7 +764,7 @@ class LoggedDeadlines(unittest.TestCase):
                 gate.native(Path(temporary), {'runtime_rust': '1.97.1'}, {})
         self.assertEqual({name: timeout for name, _, timeout in calls},
                          {'compiler': 600, 'native-compile': 600, 'direct_source': 600,
-                          'cli_f3': 600, 'cli_process': 600, 'shell_core': 600, 'shell_upgrade': 3600})
+                          'cli_f3': 3600, 'cli_process': 600, 'shell_core': 600, 'shell_upgrade': 3600})
         upgrade = next(command for name, command, _ in calls if name == 'shell_upgrade')
         self.assertEqual(upgrade, ['cargo', '+1.97.1', 'test', '--locked', '--offline', '-p',
                                    'zeno-fcis-shell-sqlite', '--test', 'upgrade'])

@@ -178,6 +178,7 @@ fn record_fields(
 /// Every value of a scalar kind as a number, when there are at most `limit`.
 fn values(kind: Kind<'_>, limit: u128) -> Option<Vec<i128>> {
     match kind {
+        Kind::U128 { .. } => None,
         Kind::Bool => Some(vec![0, 1]),
         Kind::I128 { min, max } => {
             let width = u128::try_from(max.checked_sub(min)?).ok()?;
@@ -247,6 +248,8 @@ pub(super) fn compile(
     new: &Declarations,
     place: &str,
 ) -> Result<Compiled, ContractError> {
+    old.refuse_unsigned("SQLite migration")?;
+    new.refuse_unsigned("SQLite migration")?;
     let fields = compile_fields(
         &file.state,
         &file.dropped,
@@ -410,6 +413,13 @@ fn expression(
 ) -> Result<(Vec<u16>, Program), String> {
     fn names(ast: &Ast, found: &mut std::collections::BTreeSet<String>) {
         match ast {
+            Ast::Circuit(c) => {
+                for f in c.formulas() {
+                    names(f, found);
+                }
+            }
+            Ast::U128(_) => {}
+            Ast::ToI128(v) | Ast::ToU128(v) => names(v, found),
             Ast::Name(name) => {
                 found.insert(name.clone());
             }
@@ -496,6 +506,7 @@ fn expression(
 
 fn scalar_domain(kind: Kind<'_>) -> Result<ScalarDomain, String> {
     let (min, max) = match kind {
+        Kind::U128 { .. } => return Err("U128SubjectUnsupported".into()),
         Kind::Bool => return Ok(ScalarDomain::Bool),
         Kind::I128 { min, max } => (min, max),
         Kind::Sum(variants) => (

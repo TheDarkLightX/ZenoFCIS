@@ -21,6 +21,9 @@ use crate::ast::{ProjectionPath, ProjectionRoot, RelExpr, ValueExpr};
 #[must_use]
 pub fn invariant_at(invariant: &RelExpr, root: ProjectionRoot) -> Option<RelExpr> {
     Some(match invariant {
+        RelExpr::Circuit(c) => RelExpr::Circuit(Box::new(
+            c.try_map(|f| invariant_at(f, root).ok_or(())).ok()?,
+        )),
         RelExpr::Bool(value) => RelExpr::Bool(*value),
         RelExpr::Not(value) => RelExpr::Not(Box::new(invariant_at(value, root)?)),
         RelExpr::And(left, right) => RelExpr::And(
@@ -73,6 +76,14 @@ pub fn invariant_at(invariant: &RelExpr, root: ProjectionRoot) -> Option<RelExpr
 
 fn value_at(value: &ValueExpr, root: ProjectionRoot) -> Option<ValueExpr> {
     Some(match value {
+        ValueExpr::Select(c, a, b) => ValueExpr::Select(
+            Box::new(invariant_at(c, root)?),
+            Box::new(value_at(a, root)?),
+            Box::new(value_at(b, root)?),
+        ),
+        ValueExpr::U128(v) => ValueExpr::U128(*v),
+        ValueExpr::ToI128(v) => ValueExpr::ToI128(Box::new(value_at(v, root)?)),
+        ValueExpr::ToU128(v) => ValueExpr::ToU128(Box::new(value_at(v, root)?)),
         ValueExpr::Int(value) => ValueExpr::Int(*value),
         ValueExpr::Var(name) => ValueExpr::Var(name.clone()),
         ValueExpr::Projection(path) if path.root() == ProjectionRoot::Pre => {

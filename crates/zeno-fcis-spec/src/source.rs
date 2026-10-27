@@ -21,8 +21,16 @@ const VERSION: u32 = 1;
 pub const SOURCE_FILES: &[(&str, &[u8])] = &[
     ("Cargo.toml", include_bytes!("../Cargo.toml")),
     ("src/ast.rs", include_bytes!("ast.rs")),
+    ("src/bits.rs", include_bytes!("bits.rs")),
+    ("src/bool_circuit.rs", include_bytes!("bool_circuit.rs")),
     ("src/builder.rs", include_bytes!("builder.rs")),
+    ("src/collections.rs", include_bytes!("collections.rs")),
+    (
+        "src/constant_tables.rs",
+        include_bytes!("constant_tables.rs"),
+    ),
     ("src/diagnostic.rs", include_bytes!("diagnostic.rs")),
+    ("src/distribution.rs", include_bytes!("distribution.rs")),
     ("src/elaborate.rs", include_bytes!("elaborate.rs")),
     ("src/induction.rs", include_bytes!("induction.rs")),
     ("src/lexer.rs", include_bytes!("lexer.rs")),
@@ -33,8 +41,14 @@ pub const SOURCE_FILES: &[(&str, &[u8])] = &[
     ),
     ("src/parser.rs", include_bytes!("parser.rs")),
     ("src/paths.rs", include_bytes!("paths.rs")),
+    (
+        "src/recursive_tables.rs",
+        include_bytes!("recursive_tables.rs"),
+    ),
     ("src/source.rs", include_bytes!("source.rs")),
     ("src/substance.rs", include_bytes!("substance.rs")),
+    ("src/table_lookup.rs", include_bytes!("table_lookup.rs")),
+    ("src/tables.rs", include_bytes!("tables.rs")),
     ("src/views.rs", include_bytes!("views.rs")),
 ];
 

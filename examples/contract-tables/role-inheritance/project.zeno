@@ -1,0 +1,49 @@
+zeno 1;
+project 1 role_inheritance;
+namespace 2 permissions;
+type 100 state Roles;
+type 101 command Request;
+type 102 context Session;
+type 105 int Parent in 0..=3;
+type 106 index Role of 110;
+type 107 int Grant in 0..=1;
+table 110 100 parents 105 size 3;
+table 210 100 grants 107 size 3;
+field 120 101 role 106;
+variant 130 102 Session none;
+reason 200 permission_required precedence 0;
+component 400 inheritance {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+// Zero means no parent; j+1 names role j. There is one permission.
+derived table 700 permission[i] in table 110 rounds 3 {
+  when true then pre.100.210[i] == 1 || exists j in table 110 {
+    pre.100.110[i] == j + 1 && permission[j]
+  };
+  default false;
+};
+// A state lemma observes the same closure on the post-state, including genesis.
+derived table 701 post_permission[i] in table 110 rounds 3 {
+  when true then post.100.210[i] == 1 || exists j in table 110 {
+    post.100.110[i] == j + 1 && post_permission[j]
+  };
+  default false;
+};
+law 500 domains on commit, genesis = forall i in table 110 {
+  post.100.110[i] >= 0 && post.100.110[i] <= 3 &&
+  post.100.210[i] >= 0 && post.100.210[i] <= 1
+};
+law 501 frame on commit = forall i in table 110 {
+  post.100.110[i] == pre.100.110[i] && post.100.210[i] == pre.100.210[i]
+};
+law 502 permission_required on commit = exists i in table 110 where i == command.101.120 {
+  permission[i]
+};
+law 503 no_permission on reject = !(exists i in table 110 where i == command.101.120 {
+  permission[i]
+});

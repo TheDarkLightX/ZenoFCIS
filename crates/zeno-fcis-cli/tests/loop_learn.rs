@@ -276,7 +276,7 @@ fn learn_question_partition_is_a_deterministic_proposal() {
     let d = Directory::new();
     let path = d.document("declaration.json", &declaration());
     let out = run(&["loop", "learn", "--spec", text(&path)]);
-    assert_eq!(out.status.code(), Some(3));
+    assert_eq!(out.status.code(), Some(2));
     let r = report(&out);
     assert_eq!(r["status"], "question");
     assert_eq!(r["detail"]["counts"], json!([16]));

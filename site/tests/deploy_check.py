@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -104,10 +105,10 @@ def find_chrome(requested: str | None) -> str:
     raise DeployCheckError("no Chrome binary found; pass --chrome PATH")
 
 
-def dump_dom(chrome: str, profile: Path, url: str, timeout_ms: int = BROWSER_TIMEOUT_MS) -> str:
+def dump_dom(chrome: str, profile: Path, url: str, timeout_ms: int = BROWSER_TIMEOUT_MS, *, environment=None) -> str:
     command = ["node", str(ROOT / "site" / "tests" / "browser.mjs"), chrome,
                str(profile), url, str(timeout_ms)]
-    result = subprocess.run(command, capture_output=True, text=True, timeout=timeout_ms / 1000 + 15, check=False)
+    result = subprocess.run(command, capture_output=True, text=True, timeout=timeout_ms / 1000 + 15, check=False, env=environment)
     if result.returncode != 0 or not result.stdout:
         raise DeployCheckError(f"chrome could not dump {url}: exit {result.returncode}: {result.stderr[-2000:]}")
     return result.stdout
@@ -154,6 +155,10 @@ def check_harness(dom: str, subpath: str, templates: list[str]) -> None:
             require(step["error"] is None, f"{name}: demonstration step {index} was refused: {step['error']}")
             require(all(status == "Satisfied" for _, status in step["laws"]),
                     f"{name}: demonstration step {index} evaluated a law as other than Satisfied: {step['laws']}")
+        if name == "agent-treasury-guard":
+            refused = expected["decisions"].count("Reject")
+            require(f"{refused} refused" in result["challenge"] and "0 observed law violations" in result["challenge"],
+                    "treasury challenge counters disagree with real demonstration")
         summary = result["summary"]
         require(summary == {key: expected[key] for key in summary},
                 f"{name}: the demonstration's end differs from the gate's summary: {summary}")
@@ -210,7 +215,7 @@ def main() -> None:
     args = parser.parse_args()
     subpath = args.subpath if args.subpath.endswith("/") else args.subpath + "/"
     require(subpath.startswith("/") and subpath != "/" and subpath != HARNESS_PREFIX, f"bad subpath {subpath!r}")
-    templates = args.templates or sorted(path.stem for path in PUBLIC.glob("*.wasm"))
+    templates = args.templates or sorted(path.stem for path in PUBLIC.glob("*.wasm") if path.stem != "factory")
     require(bool(templates), "no module in site/public; run site/build.py")
     for name in templates:
         require((PUBLIC / f"{name}.wasm").is_file(), f"site/public/{name}.wasm is missing; run site/build.py")
@@ -227,6 +232,18 @@ def main() -> None:
             for name in templates:
                 harness_url = f"{origin}{HARNESS_PREFIX}?base={subpath}&templates={name}"
                 check_harness(dump_dom(chrome, Path(profile), harness_url), subpath, [name])
+            factory_url = f"{origin}{HARNESS_PREFIX}factory.html?base={subpath}"
+            expected_acts = json.loads((HARNESS / "factory-native.json").read_text())
+            for width, theme, motion in ((1440,"light","reduce"),(1440,"dark","reduce"),(390,"light","reduce"),(390,"dark","reduce"),(1440,"light","no-preference")):
+                environment = {**os.environ, "SITE_VIEWPORT_WIDTH":str(width), "SITE_THEME":theme, "SITE_MOTION":motion}
+                factory = json.loads(element_text(dump_dom(chrome, Path(profile), factory_url, environment=environment), "results"))
+                require(factory["errors"] == [], f"factory artifact {width}px/{theme}/{motion}: {factory['errors']}")
+                require(set(factory["results"]) == set(expected_acts), "factory did not run every act")
+                print(f"factory browser {width}px/{theme}/{motion}: PASS: " + json.dumps(factory["results"], sort_keys=True))
+            stale = json.loads(element_text(dump_dom(chrome, Path(profile), factory_url + "&control=stale-grid"), "results"))
+            require(len(stale["errors"]) == 1 and stale["errors"][0].startswith("grid_matches_native_result: cell"),
+                    "stale_grid_colours_fail_native_grid_check: the planted stale canvas was not caught")
+            print("stale_grid_colours_fail_native_grid_check: PASS (planted control refused)")
             page_start = len(served)
             check_page(dump_dom(chrome, Path(profile), f"{origin}{subpath}"), first)
             page_end = len(served)

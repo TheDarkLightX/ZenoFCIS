@@ -1,0 +1,30 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/4",
+  "template": "numeric-swap",
+  "roots": {"state": 100, "command": 101, "context": 102},
+  "leaf_bindings": {"102": ["Bool"]},
+  "variables": {
+    "ra": "pre.100.110",
+    "rb": "pre.100.111",
+    "amount": "command.101.121",
+    "minimum": "command.101.122",
+    "fee_input": "amount * u128(997)",
+    "den_a": "ra * u128(1000) + fee_input",
+    "den_b": "rb * u128(1000) + fee_input",
+    "out_b": "mul_div_floor(rb, fee_input, choose(den_a == u128(0), u128(1), den_a))",
+    "out_a": "mul_div_floor(ra, fee_input, choose(den_b == u128(0), u128(1), den_b))",
+    "limited_a": "choose(out_a <= ra, out_a, ra)",
+    "limited_b": "choose(out_b <= rb, out_b, rb)",
+    "room_a": "ra <= u128(1000000000000000000000000) - amount",
+    "room_b": "rb <= u128(1000000000000000000000000) - amount",
+    "new_a": "choose(room_a, ra + amount, ra)",
+    "new_b": "choose(room_b, rb + amount, rb)"
+  },
+  "cases": [
+    {"when": "command.101.120 == 150 && room_a && amount > u128(0) && limited_b > u128(0) && limited_b >= minimum && products_ge(new_a, rb - limited_b, ra, rb)", "class": "Accept", "reason": null, "post": {"110": "new_a", "111": "rb - limited_b"}, "outbox": []},
+    {"when": "command.101.120 == 151 && room_b && amount > u128(0) && limited_a > u128(0) && limited_a >= minimum && products_ge(ra - limited_a, new_b, ra, rb)", "class": "Accept", "reason": null, "post": {"110": "ra - limited_a", "111": "new_b"}, "outbox": []},
+    {"when": true, "class": "Reject", "reason": 300, "post": {}, "outbox": []}
+  ],
+  "genesis": {"110": "u128(1000000000000000000)", "111": "u128(1000000000000000000)"},
+  "law_kinds": {"500": "StateInvariant", "501": "FeeAndRounding", "502": "FeeAndRounding", "503": "FeeAndRounding"}
+}

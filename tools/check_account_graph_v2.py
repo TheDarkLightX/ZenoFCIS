@@ -157,7 +157,14 @@ def check(out):
     print(json.dumps(result))
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--out', required=True, type=Path)
-    check(parser.parse_args().out)
+if __name__ == "__main__":
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        parser = argparse.ArgumentParser(description=__doc__)
+        parser.add_argument('--out', required=True, type=Path)
+        check(parser.parse_args().out)
+    run_cli(_entrypoint)

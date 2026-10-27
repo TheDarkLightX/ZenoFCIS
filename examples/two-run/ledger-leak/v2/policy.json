@@ -1,0 +1,40 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "ledger-leak",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "102": [
+      "I128",
+      0,
+      0
+    ],
+    "106": [
+      "Bool"
+    ]
+  },
+  "variables": {},
+  "cases": [
+    {
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "choose(pre.100.112, 1, 0)",
+        "111": "1 - pre.100.111"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0,
+    "112": false
+  },
+  "law_kinds": {
+    "500": "StateInvariant"
+  }
+}

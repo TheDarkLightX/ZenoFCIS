@@ -90,6 +90,7 @@ pub enum TypeKind {
     Data,
     Bool,
     Int,
+    U128,
 }
 
 impl TypeKind {
@@ -104,6 +105,7 @@ impl TypeKind {
             Self::Data => 6,
             Self::Bool => 7,
             Self::Int => 8,
+            Self::U128 => 10,
         }
     }
 }
@@ -202,6 +204,7 @@ pub struct TypeDecl {
     pub(crate) kind: TypeKind,
     pub(crate) name: Identifier,
     pub(crate) range: Option<IntRange>,
+    pub(crate) unsigned_range: Option<(u128, u128)>,
     pub(crate) quantity: Option<Quantity>,
 }
 impl TypeDecl {
@@ -213,6 +216,7 @@ impl TypeDecl {
             kind,
             name,
             range: None,
+            unsigned_range: None,
             quantity: None,
         }
     }
@@ -226,9 +230,21 @@ impl TypeDecl {
         self.range = Some(range);
         Some(self)
     }
+    /// Sets the mandatory inclusive unsigned bounds.
+    pub fn with_unsigned_range(mut self, min: u128, max: u128) -> Option<Self> {
+        if self.kind != TypeKind::U128 || min > max {
+            return None;
+        }
+        self.unsigned_range = Some((min, max));
+        Some(self)
+    }
+    /// Inclusive unsigned bounds, distinct from the signed range.
+    pub fn unsigned_range(&self) -> Option<(u128, u128)> {
+        self.unsigned_range
+    }
     /// Adds a quantity annotation only to an integer declaration.
     pub fn with_quantity(mut self, quantity: Quantity) -> Option<Self> {
-        if self.kind != TypeKind::Int {
+        if !matches!(self.kind, TypeKind::Int | TypeKind::U128) {
             return None;
         }
         self.quantity = Some(quantity);
@@ -851,8 +867,13 @@ pub enum DivisionMode {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ValueExpr {
     Int(i128),
+    U128(u128),
+    ToI128(Box<ValueExpr>),
+    ToU128(Box<ValueExpr>),
     Var(Identifier),
     Projection(ProjectionPath),
+    /// Eager condition and both arms, lowered to the library Select operation.
+    Select(Box<RelExpr>, Box<ValueExpr>, Box<ValueExpr>),
     Add(Box<ValueExpr>, Box<ValueExpr>),
     Sub(Box<ValueExpr>, Box<ValueExpr>),
     Mul(Box<ValueExpr>, Box<ValueExpr>),
@@ -896,6 +917,8 @@ pub enum CompareOp {
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RelExpr {
+    /// An acyclic Boolean graph with explicit sharing between fixed-point rounds.
+    Circuit(Box<crate::BoolCircuit<RelExpr>>),
     Bool(bool),
     Not(Box<RelExpr>),
     And(Box<RelExpr>, Box<RelExpr>),
@@ -1059,6 +1082,8 @@ pub enum LawScope {
     CommittedFailure,
     /// Accepts and committed failures: `on commit`.
     Committing,
+    /// Rejections carrying this reason only: `on reject:ID`.
+    RejectReason(u32),
 }
 impl LawScope {
     pub(crate) const fn tag(self) -> u8 {
@@ -1068,6 +1093,7 @@ impl LawScope {
             Self::Reject => 2,
             Self::CommittedFailure => 3,
             Self::Committing => 4,
+            Self::RejectReason(_) => 5,
         }
     }
     /// Returns true when the scope includes every accept.
@@ -1255,6 +1281,7 @@ pub struct ParsedProject {
     pub(crate) declarations: Vec<SpannedDeclaration>,
     pub(crate) merge_order: Vec<StableId>,
     pub(crate) diagnostic_limit: usize,
+    pub(crate) collections: crate::CollectionsSpec,
 }
 impl ParsedProject {
     /// Returns the source language version.
@@ -1293,6 +1320,9 @@ pub(crate) enum Declaration {
     Wiring(WiringDecl),
     Law(LawDecl),
     Claim(ClaimDecl),
+    Random(crate::RandomInputDecl),
+    Distribution(crate::DistributionDecl),
+    Reward(crate::RewardDecl),
 }
 
 /// Canonical typed project specification.
@@ -1311,6 +1341,10 @@ pub struct ProjectSpec {
     pub(crate) composition: CompositionAst,
     pub(crate) laws: Box<[LawDecl]>,
     pub(crate) claims: Box<[ClaimDecl]>,
+    pub(crate) random_inputs: Box<[crate::RandomInputDecl]>,
+    pub(crate) distributions: Box<[crate::DistributionDecl]>,
+    pub(crate) rewards: Box<[crate::RewardDecl]>,
+    pub(crate) collections: crate::CollectionsSpec,
 }
 
 impl ProjectSpec {
@@ -1379,6 +1413,32 @@ impl ProjectSpec {
     pub const fn claims(&self) -> &[ClaimDecl] {
         &self.claims
     }
+    /// Declared random-bit premises in stable-ID order.
+    pub const fn random_inputs(&self) -> &[crate::RandomInputDecl] {
+        &self.random_inputs
+    }
+    /// Finite distribution laws in stable-ID order.
+    pub const fn distributions(&self) -> &[crate::DistributionDecl] {
+        &self.distributions
+    }
+    /// Finite reward declarations in stable-ID order.
+    pub const fn rewards(&self) -> &[crate::RewardDecl] {
+        &self.rewards
+    }
+    /// Keyed collections: key types, maps, named entries and summaries.
+    pub const fn collections(&self) -> &crate::CollectionsSpec {
+        &self.collections
+    }
+    /// The view contract: this project without its collection declarations,
+    /// whose maps it already holds as named entries and summaries. It is the
+    /// project `expand_tables` prints.
+    #[must_use]
+    pub fn view(&self) -> Self {
+        Self {
+            collections: crate::CollectionsSpec::default(),
+            ..self.clone()
+        }
+    }
     /// Finds a claim by stable identifier.
     #[must_use]
     pub fn claim(&self, id: StableId) -> Option<&ClaimDecl> {
@@ -1395,10 +1455,32 @@ impl ProjectSpec {
 }
 
 impl ProjectSpec {
+    /// Whether the project declares the unsigned scalar kind.
+    pub fn uses_u128(&self) -> bool {
+        self.types.iter().any(|t| t.kind == TypeKind::U128)
+            || self.laws.iter().any(|l| l.formula.uses_u128())
+            || self.claims.iter().any(|c| match &c.formula {
+                ClaimFormula::Relational(v) => v.uses_u128(),
+                ClaimFormula::Temporal(v) => v.uses_u128(),
+            })
+    }
     /// Appends this protocol type's exact canonical encoding.
     pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-PROJECT-SPEC\0");
-        let format = if self.types.iter().any(|t| t.quantity.is_some()) {
+        let format = if !self.collections.tallies().is_empty() {
+            7u16
+        } else if self.collections.has_ordered_keys() {
+            6u16
+        } else if !self.collections.is_empty() {
+            5u16
+        } else if !self.random_inputs.is_empty()
+            || !self.distributions.is_empty()
+            || !self.rewards.is_empty()
+        {
+            4u16
+        } else if self.uses_u128() {
+            3u16
+        } else if self.types.iter().any(|t| t.quantity.is_some()) {
             2u16
         } else {
             PROJECT_SPEC_FORMAT_VERSION
@@ -1409,7 +1491,7 @@ impl ProjectSpec {
         put_slice(output, &self.namespaces, encode_namespace)?;
         put_length(output, self.types.len())?;
         for declared in &self.types {
-            if format == 2 {
+            if format >= 2 {
                 output.push(u8::from(declared.quantity.is_some()));
             }
             encode_type(declared, output)?;
@@ -1423,7 +1505,72 @@ impl ProjectSpec {
         put_slice(output, &self.composition.wirings, encode_wiring)?;
         put_ids(output, &self.composition.merge_order)?;
         put_slice(output, &self.laws, encode_law)?;
-        put_slice(output, &self.claims, encode_claim)
+        put_slice(output, &self.claims, encode_claim)?;
+        if format >= 4 {
+            put_length(output, self.random_inputs.len())?;
+            for input in &self.random_inputs {
+                input.id.encode_to(output)?;
+                input.name.encode_to(output)?;
+                encode_path(&input.input, output)?;
+                output.extend_from_slice(&input.bits.to_be_bytes());
+                output.push(1); // uniform independent bits, conditional on the non-random tuple
+            }
+            put_length(output, self.distributions.len())?;
+            for law in &self.distributions {
+                law.id.encode_to(output)?;
+                law.name.encode_to(output)?;
+                encode_path(&law.outcome, output)?;
+                put_length(output, law.target.len())?;
+                for (outcome, p) in &law.target {
+                    match outcome {
+                        crate::DistributionOutcome::Value(value) => {
+                            output.push(0);
+                            output.extend_from_slice(&value.to_be_bytes());
+                        }
+                        crate::DistributionOutcome::CommittedFailure => output.push(1),
+                    }
+                    output.extend_from_slice(&p.numerator().to_be_bytes());
+                    output.extend_from_slice(&p.denominator().to_be_bytes());
+                }
+            }
+            put_length(output, self.rewards.len())?;
+            for reward in &self.rewards {
+                reward.id.encode_to(output)?;
+                reward.name.encode_to(output)?;
+                put_ids(output, &reward.random)?;
+                encode_path(&reward.outcome, output)?;
+                output.push(u8::from(reward.failure.is_some()));
+                if let Some(value) = reward.failure {
+                    output.extend_from_slice(&value.to_be_bytes());
+                }
+                put_length(output, reward.measures.len())?;
+                for measure in &reward.measures {
+                    match measure.kind {
+                        crate::RewardKind::Expectation => output.push(0),
+                        crate::RewardKind::Variance => output.push(1),
+                        crate::RewardKind::Threshold(t) => {
+                            output.push(2);
+                            output.extend_from_slice(&t.to_be_bytes());
+                        }
+                        crate::RewardKind::Excess(b) => {
+                            output.push(3);
+                            output.extend_from_slice(&b.to_be_bytes());
+                        }
+                    }
+                    output.push(match measure.comparison {
+                        crate::RewardComparison::AtMost => 0,
+                        crate::RewardComparison::AtLeast => 1,
+                        crate::RewardComparison::Equal => 2,
+                    });
+                    output.extend_from_slice(&measure.bound.numerator().to_be_bytes());
+                    output.extend_from_slice(&measure.bound.denominator().to_be_bytes());
+                }
+            }
+        }
+        if format >= 5 {
+            crate::collections::encode(&self.collections, output)?;
+        }
+        Ok(())
     }
 
     /// Returns this protocol type's exact canonical bytes.
@@ -1434,7 +1581,7 @@ impl ProjectSpec {
     }
 }
 
-fn put_length(output: &mut Vec<u8>, length: usize) -> Result<(), EncodeError> {
+pub(crate) fn put_length(output: &mut Vec<u8>, length: usize) -> Result<(), EncodeError> {
     let length = u32::try_from(length).map_err(|_| EncodeError::LengthOverflow)?;
     output.extend_from_slice(&length.to_be_bytes());
     Ok(())
@@ -1473,12 +1620,18 @@ const RANGED_INT_TAG: u8 = 9;
 
 fn encode_type(value: &TypeDecl, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     value.id.encode_to(out)?;
-    match value.range {
-        None => out.push(value.kind.tag()),
-        Some(range) => {
-            out.push(RANGED_INT_TAG);
-            out.extend_from_slice(&range.min.to_be_bytes());
-            out.extend_from_slice(&range.max.to_be_bytes());
+    if let Some((min, max)) = value.unsigned_range {
+        out.push(10);
+        out.extend_from_slice(&min.to_be_bytes());
+        out.extend_from_slice(&max.to_be_bytes());
+    } else {
+        match value.range {
+            None => out.push(value.kind.tag()),
+            Some(range) => {
+                out.push(RANGED_INT_TAG);
+                out.extend_from_slice(&range.min.to_be_bytes());
+                out.extend_from_slice(&range.max.to_be_bytes());
+            }
         }
     }
     value.name.encode_to(out)?;
@@ -1540,7 +1693,7 @@ fn encode_port(value: &PortDecl, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     value.name.encode_to(out)?;
     value.payload_type.encode_to(out)
 }
-fn encode_path(value: &ProjectionPath, out: &mut Vec<u8>) -> Result<(), EncodeError> {
+pub(crate) fn encode_path(value: &ProjectionPath, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     out.push(value.root.tag());
     put_ids(out, &value.segments)
 }
@@ -1581,6 +1734,25 @@ fn encode_wiring(value: &WiringDecl, out: &mut Vec<u8>) -> Result<(), EncodeErro
 }
 fn encode_value(value: &ValueExpr, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     match value {
+        ValueExpr::Select(c, a, b) => {
+            out.push(15);
+            encode_rel(c, out)?;
+            encode_value(a, out)?;
+            encode_value(b, out)
+        }
+        ValueExpr::U128(v) => {
+            out.push(12);
+            out.extend_from_slice(&v.to_be_bytes());
+            Ok(())
+        }
+        ValueExpr::ToI128(v) => {
+            out.push(13);
+            encode_value(v, out)
+        }
+        ValueExpr::ToU128(v) => {
+            out.push(14);
+            encode_value(v, out)
+        }
         ValueExpr::Int(v) => {
             out.push(0);
             out.extend_from_slice(&v.to_be_bytes());
@@ -1674,6 +1846,44 @@ fn encode_value(value: &ValueExpr, out: &mut Vec<u8>) -> Result<(), EncodeError>
 }
 fn encode_rel(value: &RelExpr, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     match value {
+        RelExpr::Circuit(circuit) => {
+            use crate::BoolNode;
+            out.push(10);
+            put_length(out, circuit.nodes().len())?;
+            out.extend_from_slice(&circuit.output().to_be_bytes());
+            for node in circuit.nodes() {
+                match node {
+                    BoolNode::Formula(f) => {
+                        out.push(0);
+                        encode_rel(f, out)?;
+                    }
+                    BoolNode::Literal(v) => {
+                        out.push(1);
+                        out.push(u8::from(*v));
+                    }
+                    BoolNode::Not(a) => {
+                        out.push(2);
+                        out.extend_from_slice(&a.to_be_bytes());
+                    }
+                    BoolNode::And(a, b) | BoolNode::Or(a, b) => {
+                        out.push(if matches!(node, BoolNode::And(..)) {
+                            3
+                        } else {
+                            4
+                        });
+                        out.extend_from_slice(&a.to_be_bytes());
+                        out.extend_from_slice(&b.to_be_bytes());
+                    }
+                    BoolNode::Select(c, a, b) => {
+                        out.push(5);
+                        for n in [c, a, b] {
+                            out.extend_from_slice(&n.to_be_bytes());
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
         RelExpr::Bool(v) => {
             out.push(if *v { 1 } else { 0 });
             Ok(())
@@ -1796,6 +2006,9 @@ fn encode_law(value: &LawDecl, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     if let Some(applicability) = value.applicability {
         out.push(SCOPED_LAW_TAG);
         out.push(applicability.scope.tag());
+        if let LawScope::RejectReason(reason) = applicability.scope {
+            out.extend_from_slice(&reason.to_be_bytes());
+        }
         out.push(u8::from(applicability.genesis));
     }
     encode_rel(&value.formula, out)
@@ -1840,7 +2053,56 @@ fn encode_claim(value: &ClaimDecl, out: &mut Vec<u8>) -> Result<(), EncodeError>
     }
 }
 
-fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
+impl ValueExpr {
+    /// Unsigned syntax anywhere in this expression, including explicit casts.
+    pub fn uses_u128(&self) -> bool {
+        match self {
+            Self::U128(_) | Self::ToI128(_) | Self::ToU128(_) => true,
+            Self::Add(a, b) | Self::Sub(a, b) | Self::Mul(a, b) | Self::Div(_, a, b) => {
+                a.uses_u128() || b.uses_u128()
+            }
+            Self::MulDiv(_, a, b, d)
+            | Self::SignedMulDivFloor(a, b, d)
+            | Self::ScaledMulDiv(_, _, a, b, d, _)
+            | Self::RepeatMulDiv(_, a, b, d, _) => a.uses_u128() || b.uses_u128() || d.uses_u128(),
+            Self::Select(c, a, b) => c.uses_u128() || a.uses_u128() || b.uses_u128(),
+            Self::Sum { body, .. } => body.uses_u128(),
+            _ => false,
+        }
+    }
+}
+impl RelExpr {
+    /// Whether this formula uses an unsigned literal or explicit conversion.
+    pub fn uses_u128(&self) -> bool {
+        match self {
+            Self::Circuit(c) => c
+                .nodes()
+                .iter()
+                .any(|n| matches!(n, crate::BoolNode::Formula(f) if f.uses_u128())),
+            Self::Not(a) | Self::ForAll { body: a, .. } | Self::Exists { body: a, .. } => {
+                a.uses_u128()
+            }
+            Self::And(a, b) | Self::Or(a, b) | Self::Implies(a, b) => {
+                a.uses_u128() || b.uses_u128()
+            }
+            Self::Compare(_, a, b) => a.uses_u128() || b.uses_u128(),
+            Self::Predicate { arguments, .. } => arguments.iter().any(ValueExpr::uses_u128),
+            Self::Bool(_) => false,
+        }
+    }
+}
+impl TemporalFormula {
+    /// Whether any relational atom uses unsigned syntax.
+    pub fn uses_u128(&self) -> bool {
+        match self {
+            Self::Atom(a) => a.uses_u128(),
+            Self::Not(a) | Self::Next(a) | Self::Always(a) | Self::Eventually(a) => a.uses_u128(),
+            Self::And(a, b) | Self::Or(a, b) | Self::Until(a, b) => a.uses_u128() || b.uses_u128(),
+        }
+    }
+}
+
+pub(crate) fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
     let mut stack = Vec::new();
     stack.push((value, 1usize));
     let mut nodes = 0usize;
@@ -1849,6 +2111,13 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
         nodes = nodes.saturating_add(1);
         depth = depth.max(current_depth);
         match current {
+            ValueExpr::Select(c, a, b) => {
+                let (condition_nodes, condition_depth) = formula_shape_rel(c);
+                nodes = nodes.saturating_add(condition_nodes);
+                depth = depth.max(current_depth.saturating_add(condition_depth));
+                stack.push((a, current_depth.saturating_add(1)));
+                stack.push((b, current_depth.saturating_add(1)));
+            }
             ValueExpr::Add(left, right)
             | ValueExpr::Sub(left, right)
             | ValueExpr::Mul(left, right)
@@ -1856,7 +2125,7 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
                 stack.push((left, current_depth.saturating_add(1)));
                 stack.push((right, current_depth.saturating_add(1)));
             }
-            ValueExpr::Sum { body, .. } => {
+            ValueExpr::ToI128(body) | ValueExpr::ToU128(body) | ValueExpr::Sum { body, .. } => {
                 stack.push((body, current_depth.saturating_add(1)));
             }
             ValueExpr::MulDiv(_, a, b, d)
@@ -1867,7 +2136,10 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
                     stack.push((child, current_depth.saturating_add(1)));
                 }
             }
-            ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
+            ValueExpr::Int(_)
+            | ValueExpr::U128(_)
+            | ValueExpr::Var(_)
+            | ValueExpr::Projection(_) => {}
         }
     }
     (nodes, depth)
@@ -1904,6 +2176,15 @@ pub(crate) fn formula_shape_rel(value: &RelExpr) -> (usize, usize) {
         nodes = nodes.saturating_add(1);
         depth = depth.max(current_depth);
         match current {
+            RelExpr::Circuit(c) => {
+                nodes = nodes.saturating_add(c.nodes().len());
+                for node in c.nodes() {
+                    if let crate::BoolNode::Formula(f) = node {
+                        stack.push((f, current_depth.saturating_add(1)));
+                    }
+                }
+            }
+
             RelExpr::Not(inner) => {
                 stack.push((inner, current_depth.saturating_add(1)));
             }

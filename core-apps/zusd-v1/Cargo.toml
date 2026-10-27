@@ -1,0 +1,29 @@
+[package]
+name = "zenofcis-zusd-v1"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[workspace]
+
+[features]
+default = []
+std = []
+
+[dependencies]
+zeno-fcis-value = { path = "../../crates/zeno-fcis-value", default-features = false }
+zeno-fcis-codec = { path = "../../crates/zeno-fcis-codec", default-features = false }
+zeno-fcis-schema = { path = "../../crates/zeno-fcis-schema", default-features = false }
+zeno-fcis-collections = { path = "../../crates/zeno-fcis-collections", default-features = false }
+
+zeno-fcis-synthesis = { path = "../../crates/zeno-fcis-synthesis", default-features = false }
+
+[profile.dev]
+debug = 0
+overflow-checks = true
+
+[profile.test]
+debug = 0
+overflow-checks = true

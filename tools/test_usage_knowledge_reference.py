@@ -22,6 +22,14 @@ class UsageTests(unittest.TestCase):
         for id in expected:
             for trace in u.explain(id):u.verify_trace(trace)
 
+    def test_exact_facts_do_not_become_general_strategy_advice(self):
+        for strength in ("proved", "refuted", "certified"):
+            source = self.public.replace("strength(check-inputs,declared).", f"strength(check-inputs,{strength}).")
+            usage = U.Usage([source], "task(subject,check-program).", U.validation_inputs(source))
+            self.assertNotIn("check-inputs", usage.advise())
+            unvalidated = U.Usage([source], "task(subject,check-program).")
+            self.assertIn("kb-fact-replay-required", unvalidated.check())
+
     def test_three_exact_public_tasks_and_every_answer_has_trace(self):
         cases=[('task(subject,check-program).',['check-inputs']),
                ('task(subject,observe).task(tool,zeno-fcis).task(version,v241).task(environment,sandbox).',['containment','diagnostic-order']),

@@ -22,7 +22,9 @@
     "seen": "pre.100.112",
     "action": "command.101",
     "now": "context.102.130",
-    "admin": "context.102.131"
+    "admin": "context.102.131",
+    "computed.increment": "failed + 1",
+    "computed.deadline": "now + 900"
   },
   "cases": [
     {
@@ -122,7 +124,39 @@
     "500": "StateInvariant",
     "501": "AuthoritySubjectRecipient",
     "502": "AuthoritySubjectRecipient",
-    "503": "CommittedFailureEffects"
+    "503": "CommittedFailureEffects",
+    "504": "RejectNoAuthority",
+    "505": "CommittedFailureEffects",
+    "510": "AuthoritySubjectRecipient",
+    "511": "AuthoritySubjectRecipient"
   },
-  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes."
+  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes.",
+  "framework_reject_law": 509,
+  "delivery_laws": {
+    "510": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.140": {
+          "channel": 300,
+          "field": 140
+        },
+        "outbox.104.141": {
+          "channel": 300,
+          "field": 141
+        }
+      }
+    },
+    "511": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300,
+          "destination": "security-team"
+        }
+      }
+    }
+  }
 }

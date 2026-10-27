@@ -26,7 +26,30 @@ struct Core {
 }
 
 impl Core {
+    // Historical incomplete-law specimens remain intentional gap controls.
     fn new(family: &str, parameters: &[(&str, i128)]) -> Self {
+        let mut core = Self::complete(family, parameters);
+        core.project = core
+            .project
+            .split("// Independent complete relation")
+            .next()
+            .unwrap_or_else(|| panic!("required value missing"))
+            .to_owned();
+        let mut rules: Value = serde_json::from_str(&core.rules)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        rules["law_kinds"]
+            .as_object_mut()
+            .unwrap_or_else(|| panic!("required value missing"))
+            .retain(|id, _| {
+                id.parse::<u32>()
+                    .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                    < 520
+            });
+        core.rules = rules.to_string();
+        core
+    }
+
+    fn complete(family: &str, parameters: &[(&str, i128)]) -> Self {
         let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../core-components")
             .join(family);
@@ -78,6 +101,7 @@ impl Core {
             .unwrap_or_else(|error| panic!("{error}"))
         {
             Profile::Measured(value) => value,
+            Profile::NoStartingState(value) => panic!("no starting state {value}"),
             Profile::Inconclusive(inconclusive) => panic!("inconclusive {inconclusive:?}"),
         }
     }
@@ -89,6 +113,7 @@ impl Core {
         {
             Lemmas::Judged(verdicts) => verdicts,
             Lemmas::Inconclusive(inconclusive) => panic!("inconclusive {inconclusive:?}"),
+            Lemmas::NoStartingState(value) => panic!("no starting state {value}"),
         }
     }
 
@@ -98,6 +123,7 @@ impl Core {
         {
             Answer::Answered(value) => value,
             Answer::Inconclusive(inconclusive) => panic!("inconclusive {inconclusive:?}"),
+            Answer::NoStartingState(value) => panic!("no starting state {value}"),
         }
     }
 }
@@ -113,6 +139,94 @@ fn count(value: &Value) -> u64 {
     value
         .as_u64()
         .unwrap_or_else(|| panic!("{value} is not a count"))
+}
+
+/// Profile-2 lowerings of the two minimal machines and context_free2.zal.
+fn genesis_proposal_core(name: &str) -> Core {
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/test-data/genesis-proposals")
+        .join(name);
+    Core {
+        project: fs::read_to_string(base.join("project.zeno"))
+            .unwrap_or_else(|error| panic!("{error}")),
+        rules: fs::read_to_string(base.join("v2/policy.json"))
+            .unwrap_or_else(|error| panic!("{error}")),
+    }
+}
+
+fn assert_genesis_alarm(core: &Core, formula: &str, state: Value) {
+    let result = core.gaps(Some(&format!(
+        "law 9000 proposed_invariant on commit, genesis = {formula};\n"
+    )));
+    assert_eq!(
+        result.status(),
+        "proposal-false-alarm",
+        "genesis_scoped_proposal_requires_initiation"
+    );
+    let packet = result.json();
+    assert_eq!(
+        packet["false_alarm"],
+        json!({"law":9000,"at":"genesis","state":state})
+    );
+    assert_eq!(packet["proposals"][0]["applies_on"], 0);
+    assert!(packet["proposals"].get("after").is_none());
+}
+
+#[test]
+fn genesis_proposals_reject_false_without_commits() {
+    assert_genesis_alarm(&genesis_proposal_core("no-commits"), "false", json!([150]));
+}
+
+#[test]
+fn genesis_proposals_reject_running_at_idle_genesis() {
+    assert_genesis_alarm(
+        &genesis_proposal_core("start-once"),
+        "post.100.110 == 151",
+        json!([150]),
+    );
+}
+
+#[test]
+fn genesis_proposals_reject_shipped_running_invariant() {
+    assert_genesis_alarm(
+        &genesis_proposal_core("context-free"),
+        "post.100.110 == 151",
+        json!([150, 0]),
+    );
+}
+
+#[test]
+fn genesis_proposals_reject_undefined_at_genesis() {
+    assert_genesis_alarm(
+        &genesis_proposal_core("context-free"),
+        "div_floor(1, post.100.170) == 1",
+        json!([150, 0]),
+    );
+}
+
+#[test]
+fn genesis_proposals_accept_true_invariant() {
+    let core = genesis_proposal_core("context-free");
+    let result = core.gaps(Some(
+        "law 9000 initial_idle_count on commit, genesis = post.100.110 == 151 || post.100.170 == 0;\n",
+    ));
+    let packet = measured(&result);
+    assert!(count(&packet["proposals"]["laws"][0]["applies_on"]) > 0);
+    assert!(
+        count(&packet["proposals"]["after"]["mutation"]["full"]["admitted"])
+            < count(&packet["mutation"]["full"]["admitted"])
+            || count(&packet["proposals"]["after"]["admissible"]["full"]["determined"])
+                > count(&packet["admissible"]["full"]["determined"])
+    );
+}
+
+#[test]
+fn genesis_proposals_leave_transition_only_scope_unchanged() {
+    let core = genesis_proposal_core("no-commits");
+    let result = core.gaps(Some("law 9000 transition_only on commit = false;\n"));
+    let packet = measured(&result);
+    assert_eq!(packet["proposals"]["laws"][0]["applies_on"], 0);
+    assert_eq!(packet["proposals"]["determined"]["full"], json!([0, 2]));
 }
 
 #[test]
@@ -165,7 +279,7 @@ fn the_declared_laws_of_a_bounded_counter_determine_no_tuple_and_admit_rejecting
 }
 
 #[test]
-fn a_contract_that_delivers_is_outside_the_gap_judge() {
+fn a_delivery_contract_is_measured_when_its_universe_is_complete() {
     let app = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval");
     let read = |file: &str| {
         fs::read_to_string(app.join(file)).unwrap_or_else(|error| panic!("{file}: {error}"))
@@ -176,7 +290,7 @@ fn a_contract_that_delivers_is_outside_the_gap_judge() {
         Core::options(None),
     )
     .unwrap_or_else(|error| panic!("{error}"));
-    assert_eq!(gaps.status(), "out-of-scope");
+    assert_eq!(gaps.status(), "measured");
 }
 
 #[test]
@@ -186,6 +300,9 @@ fn dual_approval_reason_classes_allow_the_cancel_decision_to_be_determined() {
     let app = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval");
     let mut project =
         fs::read_to_string(app.join("project.zeno")).unwrap_or_else(|error| panic!("{error}"));
+    // This control isolates reason classes. A declared delivery channel would
+    // also leave delivery choices open, independently of the empty case outboxes.
+    project = project.replace("channel 300 release destination 103 payload 104;\n", "");
     let mut rules: Value = serde_json::from_str(
         &fs::read_to_string(app.join("v2/policy.json")).unwrap_or_else(|error| panic!("{error}")),
     )
@@ -502,7 +619,7 @@ fn a_lemma_must_be_one_state_formula() {
     let counter = Core::new("bounded-counter", &[("C", 2)]);
     for formula in [
         "true; law 9 x on any = false",
-        "post.100.110 == 0 // comment",
+        "post.100.110 == 0 // comment\nlaw 999 x on any = true",
         "pre.100.110 == 0",
         "command.101.120 == 150",
         "",
@@ -696,4 +813,63 @@ fn probes_answer_exactly_over_the_declared_domain() {
     )
     .unwrap_or_else(|error| panic!("{error}"));
     assert!(matches!(over, Answer::Inconclusive(_)));
+}
+
+#[test]
+fn complete_relations_and_contradictions_are_separate_from_execution() {
+    for family in ["bounded-counter", "consumable-budget"] {
+        let core = Core::complete(family, &[("C", 2)]);
+        let positive = core.gaps(None);
+        assert_eq!(
+            measured(&positive)["completeness"]["status"],
+            "complete-finite"
+        );
+        let mut contradiction = core;
+        contradiction
+            .project
+            .push_str("law 550 contradiction on accept = false;\n");
+        let mut rules: Value = serde_json::from_str(&contradiction.rules)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        rules["law_kinds"]["550"] = json!("AuthoritySubjectRecipient");
+        contradiction.rules = rules.to_string();
+        let negative = contradiction.gaps(None);
+        let c = &measured(&negative)["completeness"];
+        assert_eq!(c["status"], "incomplete");
+        assert!(count(&c["zero_outcome"]) > 0);
+        assert!(count(&c["execution_refusals"]) > 0);
+        assert!(
+            !c["residual_witnesses"]
+                .as_array()
+                .unwrap_or_else(|| panic!("required value missing"))
+                .is_empty()
+        );
+    }
+}
+
+#[test]
+fn rejecting_all_wrong_reasons_and_unconstrained_frames_cannot_complete() {
+    let core = Core::complete("bounded-counter", &[("C", 1)]);
+    for changed in [
+        core.with_rules(|r| r["cases"][0]["when"] = json!("true")),
+        core.with_rules(|r| {
+            r["cases"][0]["reason"] = json!(201);
+            r["cases"][1]["reason"] = json!(200);
+        }),
+    ] {
+        let g = changed.gaps(None);
+        assert_eq!(measured(&g)["completeness"]["status"], "incomplete");
+        assert!(count(&measured(&g)["completeness"]["execution_refusals"]) > 0);
+    }
+    let mut extra = core;
+    extra.project = extra.project.replace(
+        "field 110 100 value 105;",
+        "field 110 100 value 105;\nfield 111 100 extra 108;",
+    );
+    let mut r: Value = serde_json::from_str(&extra.rules)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    r["genesis"]["111"] = json!(false);
+    extra.rules = r.to_string();
+    let g = extra.gaps(None);
+    assert_eq!(measured(&g)["completeness"]["status"], "incomplete");
+    assert!(count(&measured(&g)["admissible"]["full"]["freedom"]["successor"]) > 0);
 }

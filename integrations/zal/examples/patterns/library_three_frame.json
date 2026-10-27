@@ -1,0 +1,347 @@
+{
+  "profile": "zal/ladder/0",
+  "theory": "steps-over-integers",
+  "id": "library_three_frame",
+  "kind": "law",
+  "authority": {
+    "status": "OPEN",
+    "source": "Finite reading of the cited example contract; no runtime authority."
+  },
+  "scope": "One committed-step observation; all declared copies; holders 0..3. The chosen copy is the command's copy field. No rule, role or rejection guarantee is added.",
+  "contract_source": {
+    "path": "examples/apps/library-loans/project.zeno",
+    "sha256": "6c5e734363ad828452462aec603b2600a9d9a79dd3c70c4912b7a8f526d4b6e8",
+    "law": 502,
+    "name": "other_copies_unchanged",
+    "when": "commit",
+    "body": "(command.101.121 == 1 -> post.100.111 == pre.100.111 && post.100.112 == pre.100.112) && (command.101.121 == 2 -> post.100.110 == pre.100.110 && post.100.112 == pre.100.112) && (command.101.121 == 3 -> post.100.110 == pre.100.110 && post.100.111 == pre.100.111)"
+  },
+  "domains": {
+    "T": {
+      "member": "step",
+      "plural": "steps",
+      "noun": "steps",
+      "integer": true,
+      "values": [
+        0
+      ]
+    },
+    "C": {
+      "member": "copy",
+      "plural": "copies",
+      "noun": "copies",
+      "integer": true,
+      "values": [
+        1,
+        2,
+        3
+      ]
+    }
+  },
+  "symbols": {
+    "Committed": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "T"
+      ],
+      "clause": "{0} commits"
+    },
+    "chosen": {
+      "kind": "function",
+      "arity": 1,
+      "args": [
+        "T"
+      ],
+      "noun": "the chosen copy",
+      "state": false
+    },
+    "holder": {
+      "kind": "function",
+      "arity": 2,
+      "args": [
+        "T",
+        "C"
+      ],
+      "noun": "the holder",
+      "state": true
+    }
+  },
+  "definitions": [
+    {
+      "name": "OnlyChosenChanges",
+      "params": [
+        {
+          "name": "t",
+          "domain": "T"
+        }
+      ],
+      "body": "forall c in C: c != chosen(t) => holder'(t, c) = holder(t, c)",
+      "clause": "{0} changes only the chosen copy"
+    }
+  ],
+  "formula": "forall t in T: Committed(t) => (forall c in C: c != chosen(t) => holder'(t, c) = holder(t, c))",
+  "fixtures": [
+    {
+      "id": "chosen_changes",
+      "domains": {
+        "T": [
+          0
+        ],
+        "C": [
+          1,
+          2,
+          3
+        ]
+      },
+      "symbols": {
+        "Committed": {
+          "rows": [
+            [
+              [
+                0
+              ],
+              true
+            ]
+          ]
+        },
+        "chosen": {
+          "rows": [
+            [
+              [
+                0
+              ],
+              1
+            ]
+          ]
+        },
+        "holder": {
+          "rows": [
+            [
+              [
+                0,
+                1
+              ],
+              0
+            ],
+            [
+              [
+                0,
+                2
+              ],
+              0
+            ],
+            [
+              [
+                0,
+                3
+              ],
+              0
+            ]
+          ]
+        },
+        "holder'": {
+          "rows": [
+            [
+              [
+                0,
+                1
+              ],
+              1
+            ],
+            [
+              [
+                0,
+                2
+              ],
+              0
+            ],
+            [
+              [
+                0,
+                3
+              ],
+              0
+            ]
+          ]
+        }
+      },
+      "expected": true,
+      "note": "Only committed steps are constrained by this law; rejection framing is separate."
+    },
+    {
+      "id": "other_changes",
+      "domains": {
+        "T": [
+          0
+        ],
+        "C": [
+          1,
+          2,
+          3
+        ]
+      },
+      "symbols": {
+        "Committed": {
+          "rows": [
+            [
+              [
+                0
+              ],
+              true
+            ]
+          ]
+        },
+        "chosen": {
+          "rows": [
+            [
+              [
+                0
+              ],
+              1
+            ]
+          ]
+        },
+        "holder": {
+          "rows": [
+            [
+              [
+                0,
+                1
+              ],
+              0
+            ],
+            [
+              [
+                0,
+                2
+              ],
+              0
+            ],
+            [
+              [
+                0,
+                3
+              ],
+              0
+            ]
+          ]
+        },
+        "holder'": {
+          "rows": [
+            [
+              [
+                0,
+                1
+              ],
+              0
+            ],
+            [
+              [
+                0,
+                2
+              ],
+              1
+            ],
+            [
+              [
+                0,
+                3
+              ],
+              0
+            ]
+          ]
+        }
+      },
+      "expected": false,
+      "note": "Only committed steps are constrained by this law; rejection framing is separate."
+    },
+    {
+      "id": "outside_commit_scope",
+      "domains": {
+        "T": [
+          0
+        ],
+        "C": [
+          1,
+          2,
+          3
+        ]
+      },
+      "symbols": {
+        "Committed": {
+          "rows": [
+            [
+              [
+                0
+              ],
+              false
+            ]
+          ]
+        },
+        "chosen": {
+          "rows": [
+            [
+              [
+                0
+              ],
+              1
+            ]
+          ]
+        },
+        "holder": {
+          "rows": [
+            [
+              [
+                0,
+                1
+              ],
+              0
+            ],
+            [
+              [
+                0,
+                2
+              ],
+              0
+            ],
+            [
+              [
+                0,
+                3
+              ],
+              0
+            ]
+          ]
+        },
+        "holder'": {
+          "rows": [
+            [
+              [
+                0,
+                1
+              ],
+              0
+            ],
+            [
+              [
+                0,
+                2
+              ],
+              1
+            ],
+            [
+              [
+                0,
+                3
+              ],
+              0
+            ]
+          ]
+        }
+      },
+      "expected": true,
+      "note": "Only committed steps are constrained by this law; rejection framing is separate."
+    }
+  ]
+}

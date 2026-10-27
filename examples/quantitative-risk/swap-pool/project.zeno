@@ -1,0 +1,29 @@
+zeno 1;
+project 1 swap_pool;
+namespace 2 pool;
+type 100 state Pool;
+type 101 command Swap;
+type 102 context Context;
+type 103 int Reserve in 0..=4;
+type 104 int Fee in 0..=2;
+type 105 int Amount in 0..=3;
+type 106 bool Flag;
+field 110 100 reserve 103;
+field 111 100 fee 104;
+field 112 100 slippage_limit 106;
+field 120 101 amount 105;
+reason 200 slippage precedence 0;
+component 400 pool {
+ owns 100; reads pre.100; writes post.100; contexts context.102;
+ budget steps 256;
+}
+merge [400];
+law 500 range on commit, genesis = post.100.110 >= 0;
+// Amount above reserve commits a failure with no reserve change and zero reward; otherwise reserve
+// falls by amount and the fee is 1 for amount 0 or 2 for a positive amount.
+law 501 documented_success_outputs on commit = command.101.120 <= pre.100.110 -> post.100.110 == pre.100.110 - command.101.120 && post.100.111 == choose(command.101.120 == 0, 1, 2);
+law 502 failure on failure = post.100.110 == pre.100.110;
+random 600 amount on command.101.120 bits 2 independent uniform;
+reward 610 fees random {600} on post.100.111 failure 0 {
+ expectation >= 0;
+}

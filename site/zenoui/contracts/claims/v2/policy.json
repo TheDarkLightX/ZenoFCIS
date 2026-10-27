@@ -1,0 +1,64 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "scope",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "105": [
+      "I128",
+      0,
+      1
+    ],
+    "106": [
+      "I128",
+      0,
+      2
+    ],
+    "107": [
+      "I128",
+      1,
+      2
+    ]
+  },
+  "variables": {
+    "verdict": "pre.100.110",
+    "checked": "command.101.120",
+    "total": "command.101.121",
+    "complete": "command.101.122",
+    "timeout": "command.101.123",
+    "scope": "context.102.130"
+  },
+  "cases": [
+    {
+      "when": "complete == 1 && timeout == 0 && checked == total && scope == 1",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "1"
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "0"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0
+  },
+  "law_kinds": {
+    "499": "StateInvariant",
+    "500": "DecisionConformance"
+  },
+  "idempotency": "No external effects.",
+  "framework_reject_law": 509,
+  "framework_failure_law": 508
+}

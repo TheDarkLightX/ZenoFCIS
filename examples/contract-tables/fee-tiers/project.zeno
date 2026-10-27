@@ -1,0 +1,24 @@
+zeno 1;
+project 1 fee_tiers;
+namespace 2 quoting;
+type 100 state Charge;
+type 101 command Quote;
+type 102 context Session;
+type 105 int BasisPoints in 0..=30;
+type 106 int Tier in 0..=3;
+const table 110 fee_bps 105 size 4 [30,25,20,10];
+field 120 101 tier 106;
+field 130 100 charged_bps 105;
+variant 140 102 Session none;
+component 400 quote {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 256;
+}
+merge [400];
+law 500 charged_tier on commit =
+  post.100.130 == fee_bps[command.101.120];
+law 501 fee_in_schedule on commit, genesis =
+  exists i in table 110 { post.100.130 == fee_bps[i] };

@@ -1,6 +1,6 @@
 # Temporal logic version 1
 
-ZenoFCIS `1.1.0` gives every temporal claim an explicit mode.
+ZenoFCIS `2.6.0` gives every temporal claim an explicit mode.
 
 ## Modes
 

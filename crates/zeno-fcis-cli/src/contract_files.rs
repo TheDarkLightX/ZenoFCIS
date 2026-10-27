@@ -66,6 +66,67 @@ const APPLICATION: &[(&str, &str)] = &[
         include_str!("../contract-app/tests/decisions.rs"),
     ),
 ];
+const COLLECTION_APPLICATION: &[(&str, &str)] = &[
+    ("src/lib.rs", include_str!("../contract-app/src/lib.rs")),
+    (
+        "src/examples.rs",
+        include_str!("../contract-app/src/examples.rs"),
+    ),
+    ("src/main.rs", include_str!("../collection-app/main.rs")),
+    ("src/app.rs", include_str!("../collection-app/app.rs")),
+    (
+        "src/app/operations.rs",
+        include_str!("../collection-app/app/operations.rs"),
+    ),
+    (
+        "src/app/journal.rs",
+        include_str!("../collection-app/app/journal.rs"),
+    ),
+    (
+        "src/app/previous.rs",
+        include_str!("../collection-app/app/previous.rs"),
+    ),
+    (
+        "www/index.html",
+        include_str!("../collection-app/index.html"),
+    ),
+    ("www/form.js", include_str!("../collection-app/form.js")),
+    (
+        "tests/decisions.rs",
+        include_str!("../collection-app/decisions.rs"),
+    ),
+    (
+        "tests/collection_journey.rs",
+        include_str!("../collection-app/journey.rs"),
+    ),
+    (
+        "tests/collection_history.rs",
+        include_str!("../collection-app/history.rs"),
+    ),
+    (
+        "tests/support/mod.rs",
+        include_str!("../source-snapshots/zeno-fcis-ingress/tests/support/mod.rs.txt"),
+    ),
+];
+const COLLECTION_MANIFEST: &str = include_str!("../collection-app/Cargo.toml.in");
+const COLLECTION_README: &str = include_str!("../collection-app/README.in");
+const NUMERIC_APPLICATION: &[(&str, &str)] = &[
+    ("src/lib.rs", include_str!("../contract-app/numeric/lib.rs")),
+    (
+        "src/main.rs",
+        include_str!("../contract-app/numeric/main.rs"),
+    ),
+    (
+        "src/examples.rs",
+        include_str!("../contract-app/src/numeric_examples.rs"),
+    ),
+    (
+        "tests/decisions.rs",
+        include_str!("../contract-app/numeric/decisions.rs"),
+    ),
+];
+const NUMERIC_MANIFEST: &str = include_str!("../contract-app/numeric/Cargo.toml.in");
+const NUMERIC_README: &str = include_str!("../contract-app/numeric/README.md.in");
 const MANIFEST: &str = include_str!("../contract-app/Cargo.toml.in");
 const README: &str = include_str!("../contract-app/README.md.in");
 /// The examples file of an application whose contract supplies none.
@@ -211,6 +272,7 @@ impl Inputs {
                 })
             })
             .collect::<Result<_, Failure>>()?;
+        crate::contract::genesis_domain::check(&project, &rules)?;
         Ok(Self {
             project,
             rules,
@@ -389,18 +451,48 @@ pub(crate) fn write_output(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 /// `zeno-fcis new <dir> --contract <contract>`: an application built from
 /// `project.zeno`, `v2/policy.json`, the adoptions and evolutions it lists
 /// and, when
-/// present, `tests/decision-examples.txt` in `contract`, and bound to the
+/// present, `tests/decision-examples.txt` and `ui.json` in `contract`, and bound to the
 /// ZenoFCIS source tree `source`, or the tree this CLI was built from. `dir`
 /// exists and is empty.
 pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8 {
     let result = (|| {
         let inputs = Inputs::read(contract)?;
+        if zeno_fcis_contract::internals::tables::recognizes(&inputs.rules)? {
+            return Err(invalid(
+                "tables/1",
+                "the SQLite application scaffold is scalar-only; use generate contract and the owned table Authority binding",
+            ));
+        }
         let examples = match read_input(&contract.join(EXAMPLES)) {
             Ok(bytes) => text(EXAMPLES, bytes)?,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => NO_EXAMPLES.to_owned(),
             Err(error) => return Err(Failure::Read(format!("read {EXAMPLES}: {error}"))),
         };
-        let generated = inputs.generate()?;
+        // UI metadata is shipped verbatim. The UI generator validates its closed
+        // schema against the generated contract before emitting an interface.
+        let ui_metadata = match read_input(&contract.join("ui.json")) {
+            Ok(bytes) => Some(bytes),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(Failure::Read(format!("read ui.json: {error}"))),
+        };
+        let adoptions = inputs.adoption_sources();
+        let evolutions = inputs.evolution_sources();
+        let generated = crate::contract::generate_startable_contract(inputs.sources(
+            &inputs.rules,
+            &adoptions,
+            &evolutions,
+        ))?;
+        let spec = zeno_fcis_spec::parse_project(&inputs.project, Default::default())
+            .and_then(|p| zeno_fcis_spec::elaborate_project(p, Default::default()))
+            .map_err(|e| invalid(PROJECT, e))?;
+        let collection = if spec.collections().maps().is_empty() {
+            None
+        } else {
+            Some(zeno_fcis_contract::collections::runtime::Layout::read(
+                &inputs.project,
+                &inputs.rules,
+            )?)
+        };
         // The contract version is part of the package name, so two versions
         // of one application never share a cached build of its library.
         let package = format!(
@@ -421,15 +513,28 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
                 ),
             ));
         }
-        let manifest = MANIFEST
-            .replace("{package}", &package)
-            .replace("{version}", env!("CARGO_PKG_VERSION"));
+        let manifest = if collection.is_some() {
+            COLLECTION_MANIFEST
+        } else if generated.program().is_none() {
+            NUMERIC_MANIFEST
+        } else {
+            MANIFEST
+        }
+        .replace("{package}", &package)
+        .replace("{version}", env!("CARGO_PKG_VERSION"));
         let binding = binding::bind(&manifest, source).map_err(Failure::Binding)?;
         let manifest = format!("{manifest}{}", binding.patch);
         let lock = binding
             .application_lock(&manifest)
             .map_err(Failure::Binding)?;
-        let readme = README.replace("{package}", &package);
+        let readme = if collection.is_some() {
+            COLLECTION_README
+        } else if generated.program().is_none() {
+            NUMERIC_README
+        } else {
+            README
+        }
+        .replace("{package}", &package);
         let mut files: Vec<(String, Vec<u8>)> = vec![
             ("Cargo.toml".to_owned(), manifest.into_bytes()),
             ("Cargo.lock".to_owned(), lock),
@@ -438,20 +543,72 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
             (RULES.to_owned(), inputs.rules.clone().into_bytes()),
             (EXAMPLES.to_owned(), examples.into_bytes()),
         ];
+        if let Some(layout) = &collection {
+            let interface = serde_json::to_vec_pretty(&layout.interface())
+                .map_err(|e| invalid("interface", e))?;
+            files.push(("www/interface.json".into(), interface));
+            let description = layout.interface();
+            let context: Vec<String> = description["fields"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|f| f["source"] == "context")
+                .map(|field| {
+                    if field["domain"]["kind"] == "key" {
+                        "00".repeat(32)
+                    } else {
+                        layout
+                            .positions()
+                            .iter()
+                            .find(|p| field["name"].as_str().is_some_and(|name| p.name == name))
+                            .and_then(|p| p.domain.least())
+                            .unwrap_or(0)
+                            .to_string()
+                    }
+                })
+                .collect();
+            files.push((
+                "context.json".into(),
+                serde_json::to_vec(&context).map_err(|e| invalid("context", e))?,
+            ));
+            if let Ok(bytes) = read_input(&contract.join("tests/collection-journey.json")) {
+                files.push(("tests/collection-journey.json".into(), bytes));
+            } else {
+                files.push((
+                    "tests/collection-journey.json".into(),
+                    b"{\"steps\":[]}".to_vec(),
+                ));
+            }
+        }
+        if let Some(metadata) = ui_metadata {
+            files.push(("ui.json".to_owned(), metadata));
+        }
         files.extend(inputs.retained());
         files.extend(
             outputs(&generated)
                 .into_iter()
                 .map(|(name, bytes)| (name, bytes.to_vec())),
         );
-        files.extend(APPLICATION.iter().map(|(name, source)| {
-            (
-                (*name).to_owned(),
-                source
-                    .replace("{zeno_fcis_version}", env!("CARGO_PKG_VERSION"))
-                    .into_bytes(),
-            )
-        }));
+        files.extend(
+            if collection.is_some() { COLLECTION_APPLICATION } else if generated.program().is_none() {
+                NUMERIC_APPLICATION
+            } else {
+                APPLICATION
+            }
+            .iter()
+            .map(|(name, source)| {
+                let source = if collection.is_some() && *name == "src/lib.rs" {
+                    let end = source.find("use zeno_fcis_codec::{CanonicalEncode").ok_or_else(|| invalid("application", "missing library core boundary"))?;
+                    format!("//! A checked collection contract, pure view helpers and its storage shell.\n#![forbid(unsafe_code)]\n/// Checked schema, policy, laws and genesis.\npub mod v2_contract;\nmod examples;\n/// Authenticated collection application and local recovery operations.\npub mod app;\n\n{}", &source[end..])
+                } else if *name == "src/session.rs" && generated.source().contains("pub fn with_released_24_lineage") {
+                    source.replace("    f(&[]) // released predecessor contexts", "    v2_contract::with_released_24_lineage(f).map_err(|error| format!(\"catalog: {error:?}\"))?")
+                } else { (*source).to_owned() };
+                Ok((
+                    (*name).to_owned(),
+                    source.replace("{zeno_fcis_version}", env!("CARGO_PKG_VERSION")).into_bytes(),
+                ))
+            }).collect::<Result<Vec<_>,Failure>>()?,
+        );
         if let Some(toolchain) = binding.toolchain {
             files.push(("rust-toolchain.toml".to_owned(), toolchain));
         }
@@ -507,7 +664,13 @@ pub(crate) fn export_program(dir: &Path, out: &Path, format: OutputFormat) -> u8
         Ok(generated) => generated,
         Err(failure) => return report_failure(dir, failure, format),
     };
-    let program = generated.program();
+    let Some(program) = generated.program() else {
+        return refuse(
+            "U128SubjectUnsupported",
+            "raw program export does not support U128".to_owned(),
+            INVALID,
+        );
+    };
     if let Err(error) = atomic_create(out, program) {
         let message = format!("write {}: {error}", out.display());
         return refuse("program-write-failed", message, FAILURE);
@@ -705,4 +868,34 @@ pub(crate) fn read_input(path: &Path) -> std::io::Result<Vec<u8>> {
         ));
     }
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn contract_template_file_lists_have_unique_paths() {
+        for (name, files) in [("scalar", APPLICATION), ("numeric", NUMERIC_APPLICATION)] {
+            let mut names = std::collections::BTreeSet::new();
+            for path in [
+                "Cargo.toml",
+                "Cargo.lock",
+                "README.md",
+                PROJECT,
+                RULES,
+                EXAMPLES,
+                "ui.json",
+                SCHEMA,
+                SOURCE,
+                POLICY,
+                "rust-toolchain.toml",
+            ] {
+                assert!(names.insert(path), "duplicate contract path {path}");
+            }
+            for (path, _) in files {
+                assert!(names.insert(path), "duplicate {name} template path {path}");
+            }
+        }
+    }
 }

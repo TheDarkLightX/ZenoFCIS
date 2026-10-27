@@ -7,6 +7,8 @@ from pathlib import Path
 import sys
 
 from behavior import Refusal, check, explain, help_topic, parse, replay, semantic_diff
+from constructs import guide
+import explain as explanations
 from shared import SharedWorkspace
 from workflow import checker_identity
 
@@ -70,6 +72,47 @@ TOOLS += [
 ]
 
 
+# Deterministic explanation tools on the same exact FSM revision, and revision-bound
+# ladder statements. Read-only; rendering and lowering keep authority none.
+CONTEXT = {"type": "object", "additionalProperties": {"type": "boolean"}}
+EXPLAIN_NOTE = " Deterministic typed-model logic, no LLM; read-only and no agreement."
+LADDER_NOTE = " Pass the exact revision from zal_ladder_read; a stale revision is refused. Authority: none; no acceptance."
+RUNG = {"type": "string", "enum": ["formula", "typed", "formal", "precise", "intuitive", "plain", "question"]}
+LADDER_TEXT = {"type": "string", "maxLength": 2000}
+TOOLS += [
+    {"name": "zal_why_not", "description": "Find the fewest input changes that give a wanted outcome, searching a stated finite scope: context (state and event fixed) or every declared input. Says plainly when no input gives it." + EXPLAIN_NOTE,
+     "inputSchema": schema({"revision": STRING, "state": STRING, "event": STRING, "context": CONTEXT,
+                            "want": schema({"class": {"type": "string", "enum": ["Accept", "Reject"]}, "state": STRING,
+                                            "reason": STRING, "rule": STRING}, []),
+                            "scope": {"type": "string", "enum": ["context", "input"]}},
+                           ["revision", "state", "event", "context", "want"])},
+    {"name": "zal_what_if", "description": "Apply named changes to one exact input and compare the two decisions rule by rule. Every named change is applied and reported; undeclared names are refused." + EXPLAIN_NOTE,
+     "inputSchema": schema({"revision": STRING, "state": STRING, "event": STRING, "context": CONTEXT,
+                            "change": schema({"state": STRING, "event": STRING, "context": CONTEXT}, [])},
+                           ["revision", "state", "event", "context", "change"])},
+    {"name": "zal_narrate", "description": "Tell a checker counterexample (current model or pending candidate) or an assumed trace as a numbered controlled-English story paired with symbolic lines. Every sentence is a template filled from the witness and re-derived from the model." + EXPLAIN_NOTE,
+     "inputSchema": schema({"revision": STRING, "source": {"type": "string", "enum": ["check", "candidate", "trace"]},
+                            "inputs": {"type": "array", "maxItems": 64, "items": schema({"event": STRING, "context": CONTEXT}, ["event", "context"])}},
+                           ["revision", "source"])},
+    {"name": "zal_guide", "description": "Construct guide (zal/help/2) generated from the construct registry and the parser's statement patterns: meaning, symbolic and English forms, uses in this model. Same topics and typed IDs as zal_help." + EXPLAIN_NOTE,
+     "inputSchema": schema({"revision": STRING, "topic": {"type": "string", "maxLength": 128}}, ["revision", "topic"])},
+    {"name": "zal_ladder_read", "description": "List the ladder and temporal ladder statements with their exact revisions, profiles and scope identities. Refresh before other ladder calls." + LADDER_NOTE,
+     "inputSchema": schema({}, [])},
+    {"name": "zal_ladder_render", "description": "Render one statement on all seven rungs (or one), with its scope strip, legend, definitions and evidence status." + LADDER_NOTE,
+     "inputSchema": schema({"statement": STRING, "revision": STRING, "rung": RUNG}, ["statement", "revision"])},
+    {"name": "zal_ladder_parse", "description": "Parse text at one rung in a statement's context: exactly one expanded normalized tree with its uniqueness counts, or a named refusal." + LADDER_NOTE,
+     "inputSchema": schema({"statement": STRING, "revision": STRING, "rung": RUNG, "text": LADDER_TEXT},
+                           ["statement", "revision", "rung", "text"])},
+    {"name": "zal_ladder_same", "description": "Whether two statements, or a statement and a text at a rung, have the same meaning: identical normal forms and identical scope, with the evidence. Different normal forms are not a proof of different meaning." + LADDER_NOTE,
+     "inputSchema": schema({"statement": STRING, "revision": STRING, "other_statement": STRING, "other_revision": STRING,
+                            "rung": RUNG, "text": LADDER_TEXT}, ["statement", "revision"])},
+    {"name": "zal_ladder_lower", "description": "Lower a temporal statement to its inert .zeno claim for the existing Rust parser, with its obligations. Evaluates and admits nothing." + LADDER_NOTE,
+     "inputSchema": schema({"statement": STRING, "revision": STRING}, ["statement", "revision"])},
+    {"name": "zal_ladder_explain", "description": "Explain which rung admits a text (or the statement's own formula), why its parse is unique, and what each scope strip field means." + LADDER_NOTE,
+     "inputSchema": schema({"statement": STRING, "revision": STRING, "rung": RUNG, "text": LADDER_TEXT}, ["statement", "revision"])},
+]
+
+
 def validate(value, specification, path="arguments"):
     """Enforce the small published tool-schema vocabulary before any action."""
     kind = specification["type"]
@@ -98,6 +141,26 @@ def validate(value, specification, path="arguments"):
             validate(item, field, path + "." + key)
 
 
+def explain_call(session, name, arguments, identity):
+    E, a = explanations, arguments
+    if name == "zal_why_not":
+        return E.why_not(session.model, a["state"], a["event"], a["context"], a["want"], a.get("scope", "context"), identity)
+    if name == "zal_what_if":
+        return E.what_if(session.model, a["state"], a["event"], a["context"], a["change"], identity)
+    if name == "zal_guide":
+        return guide(session.model, a["topic"], identity)
+    if a["source"] == "trace":
+        return E.narrate_trace(session.model, a.get("inputs", []), identity)
+    if "inputs" in a:
+        raise Refusal("Only a trace narrative takes inputs")
+    if a["source"] == "candidate":
+        if not session.proposal:
+            raise Refusal("No pending candidate to narrate")
+        candidate = session.proposal["model"]
+        return {**E.narrate_check(candidate, check(candidate, identity), identity), "candidate_revision": candidate.revision}
+    return E.narrate_check(session.model, check(session.model, identity), identity)
+
+
 def valid_request_id(value):
     return type(value) is int or isinstance(value, str) and len(value) <= 256
 
@@ -116,6 +179,9 @@ class Bridge:
             from loop_doors import disable_automatic_knowledge
             with disable_automatic_knowledge():
                 return capture_call(name, arguments)
+        if name.startswith("zal_ladder_"):
+            from ladder_tools import mcp_call as ladder_call
+            return ladder_call(name, arguments, checker_identity())
         if name.startswith("zal_loop_"):
             from loop_workspace import mcp_call
             from loop_doors import disable_automatic_knowledge
@@ -134,6 +200,8 @@ class Bridge:
                 return explain(session.model, arguments["state"], arguments["event"], arguments["context"], checker_identity())
             if name == "zal_help":
                 return help_topic(session.model, arguments["topic"], checker_identity())
+            if name in {"zal_why_not", "zal_what_if", "zal_narrate", "zal_guide"}:
+                return explain_call(session, name, arguments, checker_identity())
             if name == "zal_trace":
                 trace = replay(session.model, arguments["inputs"])
                 return {"revision": revision, "trace": trace,

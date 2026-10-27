@@ -24,6 +24,7 @@ mod value;
 mod owned_ir;
 
 pub mod finite {
+    pub(crate) use crate::value;
     pub use crate::owned_ir::Program;
     pub use crate::evaluation::{Domain, Op};
     pub use crate::{canonical_v2, evaluation, execution_v2};

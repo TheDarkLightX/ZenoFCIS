@@ -1,0 +1,19 @@
+{
+  "schema": "zeno-fcis/standalone-binaries/1",
+  "binaries": [
+    {
+      "name": "recursive_table_vectors",
+      "source": "examples/recursive_table_vectors.rs",
+      "ambient_tokens": ["std::env", "std::fs", "std::fs"],
+      "ambient_modules": ["std::env", "std::fs", "std::io"],
+      "purpose": "Read project and rules paths from arguments, read those files and stream diagnostic vectors over standard I/O."
+    },
+    {
+      "name": "trace_game_input",
+      "source": "examples/trace_game_input.rs",
+      "ambient_tokens": ["std::process"],
+      "ambient_modules": ["std::io", "std::process", "std::time"],
+      "purpose": "Read a bounded acquisition request from standard input, measure elapsed work, print the result and exit on refusal."
+    }
+  ]
+}

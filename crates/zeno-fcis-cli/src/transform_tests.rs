@@ -340,7 +340,7 @@ fn domain_size_is_exact_and_overflow_safe() {
     assert_eq!(domain_size(&[FULL, FULL, empty]), Err(2));
     assert_eq!(domain_size(&[Domain::Bool, empty, FULL]), Err(1));
     let current = import(artifact("current-decision-scalars-original"));
-    assert_eq!(domain_size(current.inputs()), Ok(Some(1_296_000)));
+    assert_eq!(domain_size(current.inputs()), Ok(Some(1_866_240)));
 }
 
 #[test]
@@ -424,7 +424,7 @@ fn receipt_is_canonical_and_deterministic() {
             "{{\"authority\":\"none\",",
             "\"candidate\":{{\"bytes\":{},\"nodes\":1,\"sha256\":\"{}\"}},",
             "\"checker\":{{\"evaluator_identity\":\"{}\",",
-            "\"semantics\":\"zeno-fcis/transform-check/4\"}},",
+            "\"semantics\":\"zeno-fcis/transform-check/5\"}},",
             "\"claim\":\"Functionally equal on the full declared input domain: every tuple ",
             "gives identical outputs or identical failures. The Step limit never binds: no ",
             "tuple needs more Steps than the limit in either program.\",",
@@ -465,6 +465,66 @@ fn receipt_is_canonical_and_deterministic() {
         equivalent(check(&original, &other, GENEROUS)).receipt(),
         first
     );
+}
+
+#[test]
+fn every_receipt_field_is_bound() {
+    let original = include_bytes!("../tests/fixtures/transform-check/3/program-3.zcve");
+    let candidate = include_bytes!("../tests/fixtures/transform-check/3/program-4.zcve");
+    let receipt =
+        include_bytes!("../tests/fixtures/transform-check/3/equivalent-usage-differs.receipt.json");
+    let cap = DEFAULT_MAX_INPUT_TUPLES;
+    assert_eq!(replay(receipt, original, candidate, cap), Replay::Matched);
+    let value = parse(receipt);
+    for field in value
+        .as_object()
+        .unwrap_or_else(|| panic!("receipt object"))
+        .keys()
+    {
+        let mut changed = value.clone();
+        changed[field] = Value::Null;
+        assert_ne!(
+            replay(&reencode(&changed), original, candidate, cap),
+            Replay::Matched,
+            "{field}"
+        );
+    }
+    for pointer in [
+        "/checker/evaluator_identity",
+        "/checker/semantics",
+        "/usage/max_steps/candidate",
+        "/usage/max_steps/original",
+        "/usage/usage_preserved",
+        "/usage/candidate_uses_more",
+        "/original/sha256",
+        "/candidate/sha256",
+        "/profile/execution",
+        "/profile/program",
+        "/domain/enumeration",
+        "/domain/inputs",
+    ] {
+        let mut changed = value.clone();
+        *changed
+            .pointer_mut(pointer)
+            .unwrap_or_else(|| panic!("missing {pointer}")) = Value::Null;
+        assert_ne!(
+            replay(&reencode(&changed), original, candidate, cap),
+            Replay::Matched,
+            "{pointer}"
+        );
+    }
+    for pointer in ["/limits/steps", "/limits/input_tuples"] {
+        let mut changed = value.clone();
+        *changed
+            .pointer_mut(pointer)
+            .unwrap_or_else(|| panic!("missing {pointer}")) = json!(0);
+        assert_ne!(
+            replay(&reencode(&changed), original, candidate, cap),
+            Replay::Matched,
+            "{pointer}"
+        );
+    }
+    assert_eq!(replay(receipt, original, candidate, cap), Replay::Matched);
 }
 
 #[test]
@@ -960,17 +1020,17 @@ fn withdrawal_kernel_and_controller_pairs_are_equivalent_and_replay() {
 }
 
 #[test]
-fn withdrawal_current_decision_scalars_are_equivalent_on_all_1296000_tuples() {
+fn withdrawal_current_decision_scalars_are_equivalent_on_all_1866240_tuples() {
     let original = artifact("current-decision-scalars-original");
     let candidate = artifact("current-decision-scalars-candidate");
     let equivalence = equivalent(check(original, candidate, GENEROUS));
     let receipt = equivalence.receipt_value();
-    assert_eq!(receipt["inputs_checked"], 1_296_000);
-    assert_eq!(receipt["domain"]["size"], 1_296_000);
+    assert_eq!(receipt["inputs_checked"], 1_866_240);
+    assert_eq!(receipt["domain"]["size"], 1_866_240);
     assert_eq!(
         receipt["usage"],
         json!({
-            "max_steps": {"original": 106, "candidate": 100},
+            "max_steps": {"original": 132, "candidate": 123},
             "candidate_uses_more": 0, "usage_preserved": false
         })
     );
@@ -1516,18 +1576,18 @@ fn the_shells_comparison_agrees_with_the_checker_on_planted_defects() {
 }
 
 /// The committed adoption: the withdrawal queue's version 1 program and the
-/// adopted 100-node candidate, on all 1,296,000 tuples, and the candidate
+/// adopted 123-node candidate, on all 1,866,240 tuples, and the candidate
 /// with its decision output's selection arms swapped.
 #[test]
 fn the_shells_comparison_agrees_with_the_checker_on_the_adoption_fixture() {
     let original = artifact("current-decision-scalars-original");
-    let candidate_bytes = main_fixture(include_bytes!(
-        "../tests/fixtures/withdrawal-queue-adopted/v2/adoptions/1/program.zcve"
-    ));
-    let candidate = candidate_bytes.as_slice();
+    let candidate = include_bytes!(
+        "../tests/fixtures/withdrawal-queue-adopted-2.5/v2/adoptions/1/program.zcve"
+    )
+    .as_slice();
     assert_eq!(
         agreed(original, candidate, DEFAULT_MAX_INPUT_TUPLES),
-        Some(Verdict::Equal { tuples: 1_296_000 })
+        Some(Verdict::Equal { tuples: 1_866_240 })
     );
     let adopted = import(candidate);
     let mut nodes = adopted.nodes().to_vec();
@@ -1545,3 +1605,153 @@ fn the_shells_comparison_agrees_with_the_checker_on_the_adoption_fixture() {
 
 #[path = "transform_legacy_tests.rs"]
 mod legacy;
+
+// Reuse the recorded benchmark's Boolean-only rewrite producer. It preserves
+// every arithmetic instruction and makes a same-length padded control.
+mod withdrawal_fixture_producer {
+    use super::*;
+    fn operands(op: &Op) -> Vec<u16> {
+        match *op {
+            Op::Input(_) | Op::Int(_) | Op::Bool(_) => vec![],
+            Op::Not(a) => vec![a],
+            Op::Add(a, b) | Op::Sub(a, b) | Op::Eq(a, b) | Op::Lt(a, b) | Op::And(a, b) => {
+                vec![a, b]
+            }
+            Op::Select(c, a, b) => vec![c, a, b],
+            _ => panic!("unsupported new instruction; update the offline experiment"),
+        }
+    }
+
+    fn remap(op: &Op, ids: &[u16]) -> Op {
+        match *op {
+            Op::Input(a) => Op::Input(a),
+            Op::Int(a) => Op::Int(a),
+            Op::Bool(a) => Op::Bool(a),
+            Op::Not(a) => Op::Not(ids[a as usize]),
+            Op::Add(a, b) => Op::Add(ids[a as usize], ids[b as usize]),
+            Op::Sub(a, b) => Op::Sub(ids[a as usize], ids[b as usize]),
+            Op::Eq(a, b) => Op::Eq(ids[a as usize], ids[b as usize]),
+            Op::Lt(a, b) => Op::Lt(ids[a as usize], ids[b as usize]),
+            Op::And(a, b) => Op::And(ids[a as usize], ids[b as usize]),
+            Op::Select(c, a, b) => Op::Select(ids[c as usize], ids[a as usize], ids[b as usize]),
+            _ => panic!("unsupported new instruction; update the offline experiment"),
+        }
+    }
+
+    fn rebuild(
+        p: &Program,
+        nodes: Vec<Op>,
+        roots: Vec<u16>,
+    ) -> Result<Program, Box<dyn std::error::Error>> {
+        Ok(Program::try_new(
+            p.inputs().to_vec(),
+            p.outputs().to_vec(),
+            nodes,
+            roots,
+        )?)
+    }
+
+    /// Only contiguous four-node ORs whose three intermediates have no other users.
+    /// Does not prune arithmetic, constants, inputs, roots or unrelated instructions.
+    fn propose(p: &Program) -> Result<(Program, Program, usize), Box<dyn std::error::Error>> {
+        let mut reduced = Vec::new();
+        let mut padded = p.nodes().to_vec();
+        let mut ids = vec![0; p.nodes().len()];
+        let mut i = 0;
+        let mut replacements = 0;
+        while i < p.nodes().len() {
+            let pattern = match p.nodes().get(i..i + 4) {
+                Some([Op::Not(a), Op::Not(b), Op::And(x, y), Op::Not(z)])
+                    if (*a as usize) < i
+                        && (*b as usize) < i
+                        && *x as usize == i
+                        && *y as usize == i + 1
+                        && *z as usize == i + 2 =>
+                {
+                    Some((*a, *b))
+                }
+                _ => None,
+            };
+            let private = !(0..3).any(|offset| {
+                let id = (i + offset) as u16;
+                p.roots().contains(&id)
+                    || p.nodes()
+                        .iter()
+                        .enumerate()
+                        .any(|(j, op)| !(i..i + 4).contains(&j) && operands(op).contains(&id))
+            });
+            if let Some((a, b)) = pattern.filter(|_| private) {
+                // Preserve exact instruction positions in the padded control.
+                padded[i..i + 3].fill(Op::Bool(false));
+                padded[i + 3] = Op::Select(a, a, b);
+                ids[i + 3] = reduced.len() as u16;
+                reduced.push(Op::Select(
+                    ids[a as usize],
+                    ids[a as usize],
+                    ids[b as usize],
+                ));
+                i += 4;
+                replacements += 1;
+            } else {
+                ids[i] = reduced.len() as u16;
+                reduced.push(remap(&p.nodes()[i], &ids));
+                i += 1;
+            }
+        }
+        let roots = p.roots().iter().map(|id| ids[*id as usize]).collect();
+        Ok((
+            rebuild(p, reduced, roots)?,
+            rebuild(p, padded, p.roots().to_vec())?,
+            replacements,
+        ))
+    }
+
+    #[test]
+    #[ignore = "regenerates current withdrawal scalar fixtures through the descriptor and checked rewrite"]
+    fn regenerate_current_withdrawal_programs() {
+        let contract = withdrawal_contract::Contract::new();
+        let d = contract.descriptor();
+        let original = program(
+            d.program.inputs.to_vec(),
+            d.program.outputs.to_vec(),
+            d.program.nodes.to_vec(),
+            d.program.roots.to_vec(),
+        );
+        let (candidate, padded, count) = propose(&original).unwrap_or_else(|e| panic!("{e}"));
+        assert!(count > 0);
+        let original_bytes = encode(&original);
+        let candidate_bytes = encode(&candidate);
+        let padded_bytes = encode(&padded);
+        let reduced = equivalent(check(&original_bytes, &candidate_bytes, GENEROUS));
+        let retained = equivalent(check(&original_bytes, &padded_bytes, GENEROUS));
+        assert_eq!(reduced.receipt_value()["usage"]["usage_preserved"], false);
+        assert_eq!(retained.receipt_value()["usage"]["usage_preserved"], true);
+        let root =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/i128-programs");
+        let path = root.join("manifest.json");
+        let mut manifest: Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap_or_else(|error| panic!("{error}")))
+                .unwrap_or_else(|error| panic!("{error}"));
+        manifest["derivation"] = json!(
+            "Current decision scalars come from the current withdrawal template descriptor and the retained benchmark Boolean-only rewrite; retained-controller and Boolean-kernel fixtures preserve their historical graph fields."
+        );
+        for (tag, bytes) in [
+            ("original", original_bytes),
+            ("candidate", candidate_bytes),
+            ("padded", padded_bytes),
+        ] {
+            let name = format!("current-decision-scalars-{tag}.zcve");
+            manifest["artifacts"][&name] = json!({"bytes":bytes.len(),"sha256":sha256(&bytes)});
+            std::fs::write(root.join(name), bytes).unwrap_or_else(|error| panic!("{error}"));
+        }
+        std::fs::write(
+            path,
+            format!(
+                "{}\n",
+                serde_json::to_string_pretty(&manifest).unwrap_or_else(|error| panic!("{error}"))
+            ),
+        )
+        .unwrap_or_else(|error| panic!("{error}"));
+        eprintln!("fixture receipt: {}", reduced.receipt_value());
+    }
+}

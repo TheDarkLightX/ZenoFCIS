@@ -305,5 +305,12 @@ def main():
         options.report.write_text(json.dumps(check.report, indent=2, sort_keys=True) + '\n')
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        main()
+    run_cli(_entrypoint)

@@ -22,7 +22,8 @@ class PublicationGate(unittest.TestCase):
     def test_source_inventory_and_approved_evaluator(self):
         self.assertEqual(set(gate.snapshot()),set(map(str,gate.SOURCES)))
         generation=gate.authority.check_generated_sources()
-        self.assertEqual((generation['paths'],generation['pins']),(120,3))
+        # The approved 2.6 evaluator source membership (verification/verus/authority_v2_sources.json).
+        self.assertEqual((generation['paths'],generation['pins']),(267,3))
         for path in [gate.SUBJECT,gate.SPEC,gate.PUBLIC_TEST,gate.HARNESS,gate.authority.EVALUATOR]:
             self.assertIn(path,gate.UNIT_SOURCES)
         for package in ['zeno-fcis-codec','zeno-fcis-value']:

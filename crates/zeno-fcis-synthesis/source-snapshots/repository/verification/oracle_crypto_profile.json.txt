@@ -1,0 +1,17 @@
+{
+  "schema": "zeno-fcis/oracle-crypto-profile/2",
+  "backend": "zeno-fcis-bls",
+  "version": "0.3.17",
+  "features": [
+    "portable",
+    "no-threads"
+  ],
+  "api": "safe min_pk",
+  "key_validation": "every key",
+  "signature_groupcheck": true,
+  "pk_validate": true,
+  "possession": "mandatory before retained admission",
+  "signature_domain": "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_",
+  "possession_domain": "BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_",
+  "message_limit": 4096
+}

@@ -36,6 +36,7 @@ pub(crate) mod diff;
 pub(crate) mod draft;
 #[cfg(test)]
 mod draft_tests;
+pub(crate) mod genesis_domain;
 mod layout;
 mod migration;
 mod render;
@@ -44,9 +45,12 @@ pub(crate) mod symbolic;
 pub(crate) mod tau;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod u128_tests;
 
 // The compiler core lives in the `zeno-fcis-contract` library; these
 // re-exports keep its modules at their former paths for this module's files.
+use zeno_fcis_codec::CanonicalEncode;
 pub(crate) use zeno_fcis_contract::ContractError;
 use zeno_fcis_contract::internals::{
     declarations, expr, graph, model, policy, program_bytes, rules, schema, schema_commitment,
@@ -73,8 +77,11 @@ pub(crate) use rules::{
 ///
 /// # Errors
 /// The rules' refusal.
-pub(crate) fn listed_evolutions(rules: &str) -> Result<Vec<Evolution>, ContractError> {
-    Ok(Rules::read(rules)?.evolutions)
+pub(crate) fn listed_evolutions(
+    project: &str,
+    rules: &str,
+) -> Result<Vec<Evolution>, ContractError> {
+    Ok(Rules::read_for_project(project, rules)?.evolutions)
 }
 
 /// The directory of adoption `n`'s retained files, relative to the
@@ -200,7 +207,7 @@ pub(crate) struct GeneratedContract {
     policy: Vec<u8>,
     previous: Vec<PreviousContract>,
     summary: ContractSummary,
-    program: Vec<u8>,
+    program: Option<Vec<u8>>,
     replayed: Vec<Replayed>,
     /// The inductive claims compiled for a behaviour change or migration into this
     /// contract; computed only when generation needs them.
@@ -235,8 +242,8 @@ impl GeneratedContract {
 
     /// The current decision program's canonical bytes: what the next
     /// adoption's receipt names as its original.
-    pub(crate) fn program(&self) -> &[u8] {
-        &self.program
+    pub(crate) fn program(&self) -> Option<&[u8]> {
+        self.program.as_deref()
     }
 
     /// Every adoption's replayed receipt, oldest first.
@@ -366,7 +373,8 @@ fn with_current<R>(
     generated: &GeneratedContract,
     use_current: impl FnOnce(Current<'_>) -> Result<R, ContractError>,
 ) -> Result<R, ContractError> {
-    let rules = Rules::read(sources.rules)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
+    rules.refuse_unsigned("contract evolution binding")?;
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     let mut contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
@@ -405,7 +413,79 @@ fn with_current<R>(
 pub(crate) fn generate_contract(
     sources: ContractSources<'_>,
 ) -> Result<GeneratedContract, ContractError> {
+    if zeno_fcis_contract::internals::tables::recognizes(sources.rules)? {
+        if !sources.adoptions.is_empty()
+            || !sources.evolutions.is_empty()
+            || sources.schema_origin.is_some()
+        {
+            return Err(ContractError::new(
+                "tables/1",
+                "adoption, evolution and schema-origin bridges are not qualified",
+            ));
+        }
+        let c = zeno_fcis_contract::internals::tables::compile(sources.project, sources.rules)?;
+        let d = &c.descriptor;
+        return Ok(GeneratedContract {
+            schema: c.schema,
+            source: c.source,
+            program: Some(c.policy.clone()),
+            policy: c.policy,
+            previous: Vec::new(),
+            replayed: Vec::new(),
+            claims: Vec::new(),
+            summary: ContractSummary {
+                application: String::from_utf8_lossy(&d.profile).into_owned(),
+                version: 1,
+                program_nodes: d.cases.len(),
+                outputs: 0,
+                law_nodes: d.laws.len(),
+                law_ids: d.laws.iter().map(|l| l.id()).collect(),
+                schema_types: d.types.len(),
+                read_budget: d
+                    .limits
+                    .limit(zeno_fcis_synthesis::finite::V2Resource::Read),
+                step_budget: d
+                    .limits
+                    .limit(zeno_fcis_synthesis::finite::V2Resource::Step),
+                byte_budget: d
+                    .limits
+                    .limit(zeno_fcis_synthesis::finite::V2Resource::Byte),
+                adoptions: Vec::new(),
+                evolutions: Vec::new(),
+            },
+        });
+    }
     generate(sources, Receipts::Replay)
+}
+
+/// Generate an application only when the exact current contract can start.
+/// Compilation alone remains available for diagnosing contracts whose genesis
+/// is refused. This gate belongs to the pure factory path, before any file write.
+pub(crate) fn generate_startable_contract(
+    sources: ContractSources<'_>,
+) -> Result<GeneratedContract, ContractError> {
+    let generated = generate_contract(sources)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
+    if rules.unsigned {
+        // Numeric generation already refuses lineage. Rebuild that same model
+        // and check its identity before invoking the numeric runtime Authority.
+        let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
+        let schema = schema::encode(&declarations)?;
+        let contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
+        if schema != generated.schema() || policy::encode(&contract, &schema)? != generated.policy()
+        {
+            return Err(ContractError::new(
+                "v2/policy.zcve",
+                "the startup contract differs from the generated one",
+            ));
+        }
+        policy::check_genesis(&contract, &schema)?;
+    } else {
+        with_current(sources, &generated, |current| {
+            policy::check_genesis(current.contract, current.schema)
+        })?;
+    }
+    Ok(generated)
 }
 
 /// How generation treats each adoption's retained receipt.
@@ -471,7 +551,7 @@ pub(crate) fn refresh_receipts(
         .iter()
         .zip(&receipts)
         .all(|(files, receipt)| files.receipt == receipt.as_slice());
-    let bound = Rules::read(sources.rules)?
+    let bound = Rules::read_for_project(sources.project, sources.rules)?
         .adoptions
         .iter()
         .map(|adoption| &adoption.receipt_sha256)
@@ -539,7 +619,14 @@ fn generate(
     sources: ContractSources<'_>,
     receipts: Receipts,
 ) -> Result<GeneratedContract, ContractError> {
-    let rules = Rules::read(sources.rules)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
+    if rules.unsigned && (!rules.adoptions.is_empty() || !rules.evolutions.is_empty()) {
+        return Err(ContractError::new(
+            "lineage binding",
+            "U128SubjectUnsupported",
+        ));
+    }
+
     if sources.evolutions.len() != rules.evolutions.len() {
         return Err(ContractError::new(
             "v2/policy.json evolutions",
@@ -580,7 +667,7 @@ fn generate(
         let within = |error: ContractError| {
             ContractError::new(format!("{directory}/{}", error.place()), error.reason())
         };
-        if !Rules::read(era.rules)
+        if !Rules::read_for_project(era.project, era.rules)
             .map_err(within)?
             .evolutions
             .is_empty()
@@ -903,7 +990,7 @@ fn checked_shortcut(
         ));
     }
     let declarations = |sources: &ContractSources<'_>| {
-        let rules = Rules::read(sources.rules)?;
+        let rules = Rules::read_for_project(sources.project, sources.rules)?;
         Declarations::read(sources.project, &rules.leaf_bindings)
     };
     let (Some(first), Some(last)) = (contracts.first(), contracts.last()) else {
@@ -1100,7 +1187,7 @@ fn generate_era(
     placement: &Placement<'_>,
 ) -> Result<GeneratedContract, ContractError> {
     let offset = placement.offset;
-    let rules = Rules::read(sources.rules)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     // A version a migration or rename superseded keeps its own schema.
@@ -1132,6 +1219,17 @@ fn generate_era(
     let mut previous = Vec::new();
     let mut adoptions = Vec::new();
     let mut replays = Vec::new();
+    let mut historical_versions = placement
+        .previous
+        .iter()
+        .enumerate()
+        .filter(|(_, previous)| previous.source.contains("pub fn with_released_24<R>"))
+        .map(|(index, _)| {
+            u32::try_from(index + 1)
+                .map_err(|_| ContractError::new("lineage", "too many historical versions"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut released_compilation = false;
     for (index, (adoption, files)) in rules.adoptions.iter().zip(sources.adoptions).enumerate() {
         let version = index + 1;
         let place = format!("v2/policy.json adoptions[{index}]");
@@ -1149,23 +1247,38 @@ fn generate_era(
         // Stores may run the superseded version, so it is retained exactly:
         // its policy, regenerated from these declarations and rules, must be
         // the one this adoption superseded.
-        let policy = policy::encode(&contract, &schema)?;
+        let released_receipt = serde_json::from_slice::<serde_json::Value>(files.receipt)
+            .is_ok_and(|value| transform::is_released_24_receipt(&value));
+        let mut policy = policy::encode(&contract, &schema)?;
+        if index == 0 && released_receipt {
+            let released = Contract::build_released_24(&declarations, &rules, commitment)?;
+            let retained = policy::encode(&released, &schema)?;
+            if transform::sha256_hex(&retained) == adoption.superseded_policy_sha256 {
+                contract = released;
+                policy = retained;
+                released_compilation = true;
+            }
+        }
         if transform::sha256_hex(&policy) != adoption.superseded_policy_sha256 {
             return Err(ContractError::new(
                 format!("{place}.superseded_policy_sha256"),
                 format!(
                     "differs from version {version}'s policy as these declarations and rules \
-                     produce it: version {version} was edited after adoption, or this contract \
-                     was adopted by ZenoFCIS 2.4.x, whose integer encoding changed in 2.5. \
-                     Restore any edits to superseded versions. For a 2.4-adopted contract, \
-                     operate the app with the ZenoFCIS 2.4.0 CLI, or re-adopt it under 2.5 \
-                     from the original pre-adoption contract with a newly checked candidate \
-                     and receipt. Compatibility is planned for 2.5.1"
+                     produce it: version {version} was edited after adoption. Restore the \
+                     original declarations and rules of superseded versions and retain their \
+                     adoption evidence unchanged"
                 ),
             ));
         }
         let current = contract.program()?;
-        let current_bytes = program_bytes(&current)?;
+        let current_bytes = if released_compilation && released_receipt {
+            zeno_fcis_synthesis::finite_runtime::i64_program_value(&current)
+                .map_err(|e| ContractError::new(&place, format!("released program: {e}")))?
+                .canonical_bytes()
+                .map_err(|e| ContractError::new(&place, format!("released encoding: {e}")))?
+        } else {
+            program_bytes(&current)?
+        };
         if files.candidate == current_bytes.as_slice() {
             return Err(unchanged(&place, &directory, version));
         }
@@ -1230,22 +1343,32 @@ fn generate_era(
         replays.push(replayed);
         let version_number = u32::try_from(offset + version)
             .map_err(|_| ContractError::new("v2/policy.json adoptions", "too many adoptions"))?;
+        let mut retained_source = render::source(
+            &contract,
+            render::Options {
+                schema: &schema_file(version_number),
+                policy: &format!("../v2/policy_v{version_number}.zcve"),
+                version: version_number,
+                receipts: &[],
+                evolutions: &[],
+            },
+        )?;
+        if released_compilation && released_receipt {
+            render::attach_released_24(&mut retained_source);
+            historical_versions.push(version_number);
+        }
         previous.push(PreviousContract {
-            source: render::source(
-                &contract,
-                render::Options {
-                    schema: &schema_file(version_number),
-                    policy: &format!("../v2/policy_v{version_number}.zcve"),
-                    version: version_number,
-                    receipts: &[],
-                    evolutions: &[],
-                },
-            )?,
+            source: retained_source,
             policy,
             schema: own_schema.then(|| schema.clone()),
         });
         // Replay admitted the candidate; this import gives its nodes.
-        let candidate = import_program(files.candidate).map_err(|error| {
+        let candidate = if released_compilation && released_receipt {
+            zeno_fcis_synthesis::finite_runtime::import_i64_program_data(files.candidate)
+        } else {
+            import_program(files.candidate)
+        }
+        .map_err(|error| {
             ContractError::new(
                 &place,
                 format!("the library refuses the candidate: {error}"),
@@ -1300,7 +1423,7 @@ fn generate_era(
         .collect();
     let leaf = format!("../v2/policy_v{version}.zcve");
     let leaf_schema = schema_file(version);
-    let source = render::source(
+    let mut source = render::source(
         &contract,
         if placement.superseded {
             render::Options {
@@ -1320,6 +1443,9 @@ fn generate_era(
             }
         },
     )?;
+    if !historical_versions.is_empty() && !placement.superseded {
+        render::released_24_lineage(&mut source, &historical_versions, version);
+    }
     let policy = policy::encode(&contract, &schema)?;
     // An identity binds the policy, so a repeated policy is a repeated
     // identity, which no store could tell apart from the earlier version.
@@ -1353,7 +1479,11 @@ fn generate_era(
             ));
         }
     }
-    let program = program_bytes(&contract.program()?)?;
+    let program = if contract.unsigned {
+        None
+    } else {
+        Some(program_bytes(&contract.program()?)?)
+    };
     let claims = if placement.claims {
         model::compiled_claims(&declarations, &rules, &contract.laws)?
     } else {

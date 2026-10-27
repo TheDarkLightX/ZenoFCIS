@@ -11,6 +11,13 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
         nodes = nodes.saturating_add(1);
         depth = depth.max(current_depth);
         match current {
+            ValueExpr::Select(c, a, b) => {
+                let (n, d) = formula_shape_rel(c);
+                nodes = nodes.saturating_add(n);
+                depth = depth.max(current_depth.saturating_add(d));
+                stack.push((a, current_depth.saturating_add(1)));
+                stack.push((b, current_depth.saturating_add(1)));
+            }
             ValueExpr::MulDiv(_, a, b, d)
             | ValueExpr::SignedMulDivFloor(a, b, d)
             | ValueExpr::ScaledMulDiv(_, _, a, b, d, _)
@@ -26,10 +33,13 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
                 stack.push((left, current_depth.saturating_add(1)));
                 stack.push((right, current_depth.saturating_add(1)));
             }
-            ValueExpr::Sum { body, .. } => {
+            ValueExpr::ToI128(body) | ValueExpr::ToU128(body) | ValueExpr::Sum { body, .. } => {
                 stack.push((body, current_depth.saturating_add(1)));
             }
-            ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
+            ValueExpr::U128(_)
+            | ValueExpr::Int(_)
+            | ValueExpr::Var(_)
+            | ValueExpr::Projection(_) => {}
         }
     }
     (nodes, depth)
@@ -44,6 +54,7 @@ pub(crate) fn formula_shape_rel(value: &RelExpr) -> (usize, usize) {
         nodes = nodes.saturating_add(1);
         depth = depth.max(current_depth);
         match current {
+            RelExpr::Circuit(_) => return (usize::MAX, usize::MAX),
             RelExpr::Not(inner) => {
                 stack.push((inner, current_depth.saturating_add(1)));
             }

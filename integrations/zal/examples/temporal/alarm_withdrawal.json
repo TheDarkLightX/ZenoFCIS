@@ -1,0 +1,255 @@
+{
+  "profile": "zal/ladder-temporal/1",
+  "theory": "ordered-events-over-integers/1",
+  "id": "alarm_withdrawal",
+  "kind": "law",
+  "authority": {
+    "status": "DECIDED",
+    "source": "Owner decision 2026-10-19: a bounded checked claim and an unbounded kernel-checked obligation; every definition is recovered from the withdrawal-queue contract."
+  },
+  "scope": "Every decision in the withdrawal-queue controller pilot: deposits, requests and ticks at now = 0; timeout withdrawals are outside this statement.",
+  "trace": {
+    "domain": "Traces",
+    "mode": "unbounded",
+    "horizon": null,
+    "source_revision": "withdrawal-queue contract sources, sha256 fbd0447eadda802edeb03b49837425d7cdc17b5a2c4b07543872f5f3366136e7",
+    "event_schema": "withdrawal-queue decision/1: pre-vault, command, context, outcome, post-vault and outbox",
+    "order": "authoritative commit order of the vault decisions, including rejections",
+    "projection": "retain every decision of the vault, accepted or rejected, without sorting, merging or deduplication",
+    "model": "the generated withdrawal-queue V2 contract evaluated by its checked Authority over the pilot domain: actions 160, 161 and 162, lanes 170 and 171, amounts 1 and 2, callers 190 through 193, either alarm value, and now fixed at 0; timeout withdrawals are excluded. The Lean model is its controller part (lanes, pause, must-serve, priority) under the actions tick, accepted request and other, checked row by row against the contract",
+    "environment": "any pilot command from any caller in any order: operator deposits, owner requests, keeper ticks with either alarm value, and rejected commands; now is fixed at 0, timeout withdrawals are excluded, and the alarm is taken as given",
+    "initialization": "the contract genesis (empty vault, both lanes empty, no pause, lane A first) commits and a changed genesis is refused; no request is pending at genesis, so a zero-operation execution holds no request",
+    "transitions": "every decision is an output of the checked Authority on a vault reachable from the genesis; each Lean model row equals the contract row it abstracts",
+    "continuity": "each post-vault is the next pre-vault; deposits and rejections leave the controller part unchanged, and an accepted request changes only its own empty lane, to arrived",
+    "arithmetic": "checked-i128",
+    "evidence": "obligation"
+  },
+  "assumptions": {
+    "formula": "A(sigma)",
+    "definition": "A(sigma): the keeper's tick, which the contract accepts from every reachable vault, is taken infinitely often in sigma (weak fairness of exit processing). A assumes nothing about alarms, requests, deposits or other callers, and assumes neither completion nor alarm clearance. Delivery by the settlement rail is outside the contract.",
+    "version": "withdrawal-queue/1"
+  },
+  "domains": {
+    "Traces": {
+      "member": "trace",
+      "plural": "traces",
+      "noun": "admitted traces",
+      "trace": true
+    },
+    "Requests": {
+      "member": "request",
+      "plural": "requests",
+      "noun": "lane-held request identities",
+      "values": [
+        "lane_a",
+        "lane_b"
+      ]
+    }
+  },
+  "symbols": {
+    "A": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Traces"
+      ],
+      "clause": "{0} meets the response assumptions",
+      "definition": "A(sigma): the keeper's tick, which the contract accepts from every reachable vault, is taken infinitely often in sigma (weak fairness of exit processing). A assumes nothing about alarms, requests, deposits or other callers, and assumes neither completion nor alarm clearance. Delivery by the settlement rail is outside the contract.",
+      "version": "withdrawal-queue/1",
+      "observation": "trace",
+      "native": []
+    },
+    "R": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Requests"
+      ],
+      "clause": "{0} is a legitimate submitted withdrawal",
+      "definition": "the decision accepts the lane owner's RequestWithdrawal on lane r (rule 5, laws 501 and 502): the lane was empty and the amount is covered by the unreserved balance; a rejected request is no submission. A lane holds one request until its payout, so r names the request then occupying lane r, and the first lane-r payout after it is its own (checked).",
+      "version": "withdrawal-queue/1",
+      "observation": "event",
+      "native": [
+        {
+          "args": [
+            "lane_a"
+          ],
+          "before": "pre.100.110"
+        },
+        {
+          "args": [
+            "lane_b"
+          ],
+          "before": "pre.100.112"
+        }
+      ]
+    },
+    "C": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Requests"
+      ],
+      "clause": "{0} has its matching assets returned",
+      "definition": "the decision is a keeper tick that pays lane r (rule 6, law 501): it queues one settlement payout of lane r with the amount that lane's request recorded, and empties the lane.",
+      "version": "withdrawal-queue/1",
+      "observation": "event",
+      "native": [
+        {
+          "args": [
+            "lane_a"
+          ],
+          "before": "pre.100.111"
+        },
+        {
+          "args": [
+            "lane_b"
+          ],
+          "before": "pre.100.113"
+        }
+      ]
+    }
+  },
+  "definitions": [],
+  "readings": [
+    {
+      "version": "withdrawal-queue/1",
+      "body": "forall sigma in Traces: A(sigma) => (forall r in Requests: always(R(r) => eventually(C(r))))",
+      "intuitive": "provided A, every legitimate submitted withdrawal eventually returns its matching assets, even when alarms occur",
+      "plain": "provided A, an alarm may delay a withdrawal but never freeze it",
+      "mode": "unbounded"
+    },
+    {
+      "version": "finite-demonstration/1",
+      "body": "forall sigma in Traces: A(sigma) => (forall r in Requests: always(R(r) => eventually(C(r))))",
+      "mode": "finite",
+      "horizon": 4,
+      "plain": "an alarm may delay a withdrawal, but the withdrawal still completes before this trace ends",
+      "question": "Does every delayed withdrawal still complete before this trace ends?"
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "finite_pending",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113"
+      ],
+      "events": [
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0
+        ]
+      ],
+      "expected": false,
+      "note": "Decision word, horizon 4: a deposit, then an accepted request on lane A still unpaid when the recorded word ends. It fails the finite target; the unbounded run obligation remains with the Lean theorem."
+    },
+    {
+      "id": "alarm_exit",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113"
+      ],
+      "events": [
+        [
+          1,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          0
+        ]
+      ],
+      "expected": true,
+      "note": "Decision word, horizon 4: the request on lane A is paid two decisions later. A is stipulated for this finite replay, not certified fairness."
+    },
+    {
+      "id": "wrong_request",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113"
+      ],
+      "events": [
+        [
+          1,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1
+        ]
+      ],
+      "expected": false,
+      "note": "Decision word, horizon 4: a payout of lane B does not complete the request on lane A."
+    },
+    {
+      "id": "no_request",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113"
+      ],
+      "events": [
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "expected": true,
+      "note": "Decision word, horizon 4: vacuous response without a request; the pilot separately checks requests during active alarms and a reject-everything control."
+    }
+  ],
+  "formula": "forall sigma in Traces: A(sigma) => (forall r in Requests: always(R(r) => eventually(C(r))))",
+  "native_schema": {
+    "state": 100,
+    "fields": [
+      {
+        "id": 110,
+        "kind": "bool"
+      },
+      {
+        "id": 111,
+        "kind": "bool"
+      },
+      {
+        "id": 112,
+        "kind": "bool"
+      },
+      {
+        "id": 113,
+        "kind": "bool"
+      }
+    ]
+  }
+}

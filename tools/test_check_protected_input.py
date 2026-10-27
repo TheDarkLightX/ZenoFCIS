@@ -16,8 +16,9 @@ class ProtectedInputCoverage(unittest.TestCase):
     def test_complete_shared_closure_and_real_mutation_anchors(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
         runtime = {name for name, record in profile['functions'].items() if record['mode'] == 'Exec'}
-        self.assertEqual(len(profile['functions']), 1599)
-        self.assertEqual(len(runtime), 647)
+        self.assertEqual(len(profile['functions']), 1609)
+        # Six checked helpers for payload-free sums and reason-scoped laws joined in 2.6.
+        self.assertEqual(len(runtime), 653)
         self.assertEqual(set(profile['body_covered_functions']), runtime)
         self.assertTrue(all(record['requires'] == 0 and record['ensures'] > 0
                             for record in profile['functions'].values() if record['mode'] == 'Exec'))
@@ -245,7 +246,7 @@ class NativeProtectedInputs(unittest.TestCase):
         pin = json.loads((gate.ROOT / verifier.PIN).read_text())
         with tempfile.TemporaryDirectory(prefix='zeno-protected-native-') as temporary:
             evidence = gate.native_checks(Path(temporary), pin, dict(os.environ))
-        self.assertIn('test result: ok. 161 passed; 0 failed', evidence['test_output'])
+        self.assertIn('test result: ok. 195 passed; 0 failed', evidence['test_output'])
         # Exact 2.5 corpus: retain the three additional independent checks.
         for test in ('independent_wide_oracle_matches_fraction_corpora',
                      'variant_oracle_rejects_unrepresentable_cardinalities_without_overflow',

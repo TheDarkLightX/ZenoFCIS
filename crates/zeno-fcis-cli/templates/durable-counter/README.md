@@ -1,6 +1,6 @@
 # Generated durable counter
 
-This local, non-value-moving application connects authored shapes, generated
+This local, non-value-moving application connects declared shapes, generated
 Rust types, the library V2 decision and law interpreter, SQLite publication,
 and an idempotent demonstration destination.
 
@@ -16,12 +16,38 @@ committed failure 202. A false context rejects with reason 200; a full selected
 counter rejects with reason 201. Denial takes precedence over capacity. Each
 committing result queues exactly one notification of the new state.
 
-The law checker evaluates the authored formulas against the exact pre-state,
+The law checker evaluates the declared formulas against the exact pre-state,
 post-state, numeric command tag (120 or 121), and Boolean context (0 or 1).
-It separately checks the complete notification, empty commit effects, failure
-reason, rejection conditions, and zero genesis. Missing predicates and
+Law 503 still forbids rejection of an eligible request. New law 504 pins the
+rejection reason and precedence: denial (200) before selected-counter capacity
+(201). Law 505 requires committed failure 202. Law 510 requires exactly one
+notification on channel 300 containing both post-decision counters, and law
+511 requires destination `local-observer`. These laws read the actual candidate
+outbox and also constrain separately compiled replacement policies. The schema
+and framework separately check empty effects, rejection without publication,
+and zero genesis. Missing predicates and
 indeterminate evaluation fail closed. External proof submissions receive no
 authority.
+
+## Policy for the owner
+
+- Each counter retains its independent capacity of 3; neither consumes the
+  other's capacity. Denial keeps precedence even when the selected counter is full.
+- `RecordFailure` commits the failure count and notifies even though the
+  operation reports failure; a rejection changes neither counter and sends nothing.
+- The Boolean context remains a trusted authorization input. The notification
+  is a local request, with remote durable delivery supplied by the destination.
+
+## Background and scope
+
+The relational obligations follow C. A. R. Hoare, "An Axiomatic Basis for
+Computer Programming," Communications of the ACM, 1969. Finite-domain checking
+follows E. M. Clarke, E. A. Emerson and A. P. Sistla, "Automatic Verification of
+Finite-State Concurrent Systems Using Temporal Logic Specifications," ACM
+Transactions on Programming Languages and Systems, 1986. This example applies
+the existing library interpreter; it claims no new verification method.
+Decision and notification regressions cover the 64 declared input tuples and
+named counterpolicies, not arbitrary external receivers or owner intent.
 
 ## V2 execution and retained legacy evidence
 
@@ -86,7 +112,8 @@ must persist its delivery IDs and entry hashes. The local Boolean context and
 principal are trusted tutorial inputs, not remote authentication. Source hashes
 identify reviewed example policy, not certified binaries or release evidence.
 Changing the source changes policy identity and requires a new database unless
-a separately reviewed migration is implemented. No Lean installation is used.
+a separately reviewed migration is implemented. The demonstration uses no Lean
+installation.
 
 ## Check the application against its model
 
@@ -132,6 +159,24 @@ It prints `UNSAT proposal retained` and exits 2, as it does for every solver
 result: a solver's `unsat` is attested, not independently checked. Run it on a
 copy, because `prove` keeps its records in `.zeno-fcis/evidence` next to the
 project file.
+
+The development candidate also exports claim 600 through `--backend lean`
+for the restricted linear fragment. Its finite-history theorem assumes the
+initial state satisfies the invariant; it does not infer a genesis value from
+`project.zeno`. The 2026-10-19 run used the pinned Lean 4.30.0 runtime
+and an explicit manifest allowing exactly `propext` and `Quot.sound`.
+Its recorded output includes:
+
+```text
+$ zeno-fcis prove project.zeno --claim 600 --backend lean --tools zeno-fcis.tools.json
+lean claim 600: generated theorem kernel checked
+(exit 0)
+```
+
+Both `step_preserves` and `history_holds` report exactly those two axioms;
+neither depends on `Classical.choice`. The ignored
+`pinned_lean_kernel_checks_both_inductive_pilots_through_prove` test checks this
+CLI route and its retained source-bound evidence.
 
 The step says something about this application only with more checks,
 which `tests/induction.rs` runs:

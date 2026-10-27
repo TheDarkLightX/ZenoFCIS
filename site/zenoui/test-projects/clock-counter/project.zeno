@@ -1,0 +1,27 @@
+zeno 1;
+project 1 clock_counter;
+namespace 2 counter;
+type 100 state Counter;
+type 101 command Action;
+type 102 context Caller;
+type 105 int Count in 0..=1;
+type 106 int Day in 7..=9;
+type 107 data Role;
+field 110 100 value 105;
+field 140 102 role 107;
+field 141 102 day 106;
+variant 120 101 Hold none;
+variant 130 107 Operator none;
+variant 131 107 Visitor none;
+reason 200 permission_required precedence 0;
+component 400 counter {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+law 500 within_bounds on commit, genesis = post.100.110 >= 0 && post.100.110 <= 1;
+law 501 permission_checked on commit = context.102.140 == 130;
+law 502 value_preserved on commit = post.100.110 == pre.100.110;

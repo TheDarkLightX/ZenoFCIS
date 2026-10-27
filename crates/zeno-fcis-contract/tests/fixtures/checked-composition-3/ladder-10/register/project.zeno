@@ -25,7 +25,14 @@ merge [400];
 law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 8 && 0 <= post.100.111 && post.100.111 <= 8;
 law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 8 && 0 <= post.100.111 && post.100.111 <= 8;
 law 502 exact_write on accept = command.101.120 == pre.100.111 && post.100.110 == command.101.121 && post.100.111 == pre.100.111 + 1;
+// Independent complete relation; ordered guards exclude earlier reasons.
+law 520 reason_200 on reject:200 = (true) && (context.102.130 == 0);
+law 521 reason_201 on reject:201 = ((true) && !(context.102.130 == 0)) && (command.101.120 != pre.100.111);
+law 522 reason_202 on reject:202 = (((true) && !(context.102.130 == 0)) && !(command.101.120 != pre.100.111)) && (pre.100.111 == 8);
+law 540 legitimate_acceptance on reject = !((((true) && !(context.102.130 == 0)) && !(command.101.120 != pre.100.111)) && !(pre.100.111 == 8));
+law 541 acceptance_eligibility on accept = (((true) && !(context.102.130 == 0)) && !(command.101.120 != pre.100.111)) && !(pre.100.111 == 8);
+law 542 no_committed_failure on failure = false;
 // Core seed versioned-register/1; parameters {"C": 8}.
-// Instance source-set SHA256 888a04788d260f84980ded71c32ae715d8cd108aefa8467c4791a12b6e9532c1.
+// Instance source-set SHA256 75c14373f7c21c3d5089110bd92dd55921db8d4ccb38b298f5b77c68d6845218.
 // Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

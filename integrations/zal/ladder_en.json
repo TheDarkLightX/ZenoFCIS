@@ -1,0 +1,463 @@
+{
+  "profile": "zal/ladder/0",
+  "experimental": true,
+  "authority": "none",
+  "templates": {
+    "formula": {
+      "forall": "∀{v} ∈ {domain} : {body}",
+      "exists": "∃{v} ∈ {domain} : {body}",
+      "exists1": "∃!{v} ∈ {domain} : {body}",
+      "not": "¬{a}",
+      "and": "{a} ∧ {b}",
+      "or": "{a} ∨ {b}",
+      "=>": "{a} ⇒ {b}",
+      "<=>": "{a} ⇔ {b}",
+      "=": "{a} = {b}",
+      "!=": "{a} ≠ {b}",
+      "<": "{a} < {b}",
+      "<=": "{a} ≤ {b}",
+      ">": "{a} > {b}",
+      ">=": "{a} ≥ {b}",
+      "+": "{a}+{b}",
+      "-": "{a}−{b}",
+      "*": "{a}·{b}",
+      "floor": "⌊{a}/{b}⌋",
+      "ceil": "⌈{a}/{b}⌉",
+      "count": "#{{{v} ∈ {domain} : {body}}}",
+      "group": "({a})",
+      "call": "{name}({args})",
+      "prime_call": "{name}′({args})",
+      "int": "{value}",
+      "var": "{name}"
+    },
+    "typed": {
+      "forall": "forall {v} in {domain}: {body}",
+      "exists": "exists {v} in {domain}: {body}",
+      "exists1": "exists1 {v} in {domain}: {body}",
+      "not": "not {a}",
+      "and": "{a} and {b}",
+      "or": "{a} or {b}",
+      "=>": "{a} => {b}",
+      "<=>": "{a} <=> {b}",
+      "=": "{a} = {b}",
+      "!=": "{a} != {b}",
+      "<": "{a} < {b}",
+      "<=": "{a} <= {b}",
+      ">": "{a} > {b}",
+      ">=": "{a} >= {b}",
+      "+": "{a}+{b}",
+      "-": "{a}-{b}",
+      "*": "{a}*{b}",
+      "floor": "floor({a} / {b})",
+      "ceil": "ceil({a} / {b})",
+      "count": "#{{{v} in {domain}: {body}}}",
+      "group": "({a})",
+      "call": "{name}({args})",
+      "prime_call": "{name}'({args})",
+      "int": "{value}",
+      "var": "{name}"
+    },
+    "precise": {
+      "forall": "for every {member} {v}, {body}",
+      "exists": "there exists {article} {member} {v} such that {body}",
+      "exists1": "there exists exactly one {member} {v} such that {body}",
+      "not": "not {a}",
+      "and": "{a} and {b}",
+      "or": "{a} or {b}",
+      "=>": "if {a}, then {b}",
+      "<=>": "{a} if and only if {b}",
+      "=": "{a} equals {b}",
+      "!=": "{a} does not equal {b}",
+      "<": "{a} is less than {b}",
+      "<=": "{a} is at most {b}",
+      ">": "{a} is greater than {b}",
+      ">=": "{a} is at least {b}",
+      "+": "{a} plus {b}",
+      "-": "{a} minus {b}",
+      "*": "{a} times {b}",
+      "floor": "{a} over {b} rounded down",
+      "ceil": "{a} over {b} rounded up",
+      "count": "the number of {plural} {v} such that {body}",
+      "group": "({a})",
+      "call": "{name} of {args}",
+      "prime_call": "{name} prime of {args}",
+      "atom": "{name} of {args} is true",
+      "zero_call": "{name} of no arguments",
+      "zero_atom": "{name} of no arguments is true",
+      "int": "{value}",
+      "var": "{name}",
+      "state": "{noun} before {args}",
+      "prime_state": "{noun} after {args}",
+      "function": "{noun} of {args}",
+      "zero_function": "{noun}"
+    },
+    "formal": {
+      "forall": "for every {v} in {domain}, {body}",
+      "exists": "there exists {article} {v} in {domain} such that {body}",
+      "exists1": "there exists exactly one {v} in {domain} such that {body}",
+      "not": "not {a}",
+      "and": "{a} and {b}",
+      "or": "{a} or {b}",
+      "=>": "{a} implies {b}",
+      "<=>": "{a} if and only if {b}",
+      "=": "{a} equals {b}",
+      "!=": "{a} does not equal {b}",
+      "<": "{a} is less than {b}",
+      "<=": "{a} is at most {b}",
+      ">": "{a} is greater than {b}",
+      ">=": "{a} is at least {b}",
+      "+": "{a} plus {b}",
+      "-": "{a} minus {b}",
+      "*": "{a} times {b}",
+      "floor": "{a} over {b} rounded down",
+      "ceil": "{a} over {b} rounded up",
+      "count": "the number of {v} in {domain} such that open {body} close",
+      "group": "open {a} close",
+      "call": "{name} of {args}",
+      "prime_call": "{name} prime of {args}",
+      "atom": "{name} of {args} is true",
+      "zero_call": "{name} of no arguments",
+      "zero_atom": "{name} of no arguments is true",
+      "int": "{value}",
+      "var": "{name}"
+    }
+  },
+  "inheritance": {
+    "intuitive": "precise + exact idioms",
+    "plain": "intuitive + leftmost-outermost definition folding",
+    "question": "plain target + task"
+  },
+  "idioms": [
+    {
+      "id": 3,
+      "name": "no decrease",
+      "template": "no {noun} decreases {quantity}",
+      "shape": "forall v: P(v) => prime(E(v)) >= E(v); E uses v alone and changes under prime"
+    },
+    {
+      "id": 4,
+      "name": "every does",
+      "template": "every {noun} {phrase}",
+      "shape": "forall v: P(v) => C(v); unary clauses"
+    },
+    {
+      "id": 5,
+      "name": "no does",
+      "template": "no {noun} {phrase}",
+      "shape": "forall v: P(v) => not C(v); unary clauses"
+    },
+    {
+      "id": 6,
+      "name": "at most one",
+      "template": "there is at most one {member} {v} such that {body}",
+      "shape": "count v: F <= 1"
+    },
+    {
+      "id": 6,
+      "name": "exactly one",
+      "template": "there is exactly one {member} {v} such that {body}",
+      "shape": "count v: F = 1"
+    },
+    {
+      "id": 7,
+      "name": "merged universals",
+      "template": "for every {member} {v} and every {member2} {w}, {body}",
+      "shape": "forall v: forall w: F"
+    },
+    {
+      "id": 1,
+      "name": "restricted universal",
+      "template": "for every {noun} {v}, {body}",
+      "shape": "forall v: P(v) => B"
+    },
+    {
+      "id": 2,
+      "name": "restricted existential",
+      "template": "there exists {article} {noun} {v} such that {body}",
+      "shape": "exists v: P(v) and B"
+    },
+    {
+      "id": 8,
+      "name": "owner's existential",
+      "template": "there exists {article} {member} in {domain_noun} that {phrase}",
+      "shape": "exists v in D: P(v); unary clause"
+    }
+  ],
+  "questions": {
+    "target": "Is it true that {plain}?",
+    "exists": "Does there exist {tail}?",
+    "counter": "Counterexample search: {task}.",
+    "witness": "Witness search: propose {article} {member} {v} in {domain_noun}; the checker decides whether {condition}.",
+    "general_witness": "Witness search: propose {article} {member} {v} in {domain_noun}; the checker evaluates it.",
+    "find": "find {article} {member} {v} such that {body}",
+    "find_restricted": "find {article} {noun} {v} such that {body}",
+    "evaluate": "evaluate {body}"
+  },
+  "kind_prefix": {
+    "law": "Law (holds over the declared domains)",
+    "invariant": "Invariant (holds in every reachable state)"
+  },
+  "theories": {
+    "steps-over-integers": {
+      "label": "steps over integers (state transitions with integer and Boolean values)",
+      "legend_header": "Theory: steps over integers (state transitions with integer and Boolean values). x′ is x after the step; ¬ is negation. The prime is not negation or a derivative; Boolean algebra uses x′ for \"not x\".",
+      "symbols": {
+        "forall": [
+          "for every {v} in {domain},",
+          "the statement after the colon holds for each {v} in {domain}; true if {domain} is empty"
+        ],
+        "exists": [
+          "there exists {article} {v} in {domain} such that",
+          "the statement after the colon holds for some {v} in {domain}; false if {domain} is empty"
+        ],
+        "exists1": [
+          "there exists exactly one",
+          "one and no more member satisfies the statement; false if the domain is empty"
+        ],
+        "=>": [
+          "implies",
+          "when the left side is true the right side must be; when it is false there is no demand"
+        ],
+        "<=>": [
+          "if and only if",
+          "both sides have the same truth value"
+        ],
+        "not": [
+          "not",
+          "true exactly when the following statement is false"
+        ],
+        "and": [
+          "and",
+          "both statements must hold"
+        ],
+        "or": [
+          "or",
+          "at least one statement must hold; both may hold"
+        ],
+        "=": [
+          "equals",
+          "equal values"
+        ],
+        "!=": [
+          "does not equal",
+          "unequal values"
+        ],
+        "<": [
+          "is less than",
+          "strictly less than"
+        ],
+        "<=": [
+          "is at most",
+          "less than or equal to"
+        ],
+        ">": [
+          "is greater than",
+          "strictly greater than"
+        ],
+        ">=": [
+          "is at least",
+          "greater than or equal to"
+        ],
+        "*": [
+          "times",
+          "integer multiplication"
+        ],
+        "+": [
+          "plus",
+          "integer addition"
+        ],
+        "-": [
+          "minus",
+          "integer subtraction"
+        ],
+        "ceil": [
+          "u over v rounded up",
+          "the least integer at or above u/v; v must be positive"
+        ],
+        "floor": [
+          "u over v rounded down",
+          "the greatest integer at or below u/v; v must be positive"
+        ],
+        "count": [
+          "the number of",
+          "the number of distinct members that satisfy the condition"
+        ],
+        "group": [
+          "open ... close",
+          "explicit grouping; the enclosed expression is one operand"
+        ],
+        "prime": {
+          "read": "{name} prime of {args}",
+          "meaning": "{noun} after {step}",
+          "first_suffix": " (the prime marks \"after\"; it is not negation, which is ¬)"
+        }
+      }
+    },
+    "ordered-events-over-integers/1": {
+      "label": "ordered logical events over checked integers",
+      "legend_header": "Theory: ordered logical events over checked integers. sigma is the declared trace, i its zero-based active position. A prime reads after this event; it is neither negation nor a derivative. Boolean algebra uses a different prime convention outside this theory. Next advances one recorded event. Empty event traces are refused. Initialization is checked separately. Trace quantifiers can be vacuous over an empty execution domain; machine initialization must establish nonemptiness.",
+      "symbols": {
+        "forall": [
+          "for every {v} in {domain},",
+          "the statement after the colon holds for each {v} in {domain}; true if {domain} is empty"
+        ],
+        "exists": [
+          "there exists {article} {v} in {domain} such that",
+          "the statement after the colon holds for some {v} in {domain}; false if {domain} is empty"
+        ],
+        "exists1": [
+          "there exists exactly one",
+          "one and no more member satisfies the statement; false if the domain is empty"
+        ],
+        "=>": [
+          "implies",
+          "when the left side is true the right side must be; when it is false there is no demand"
+        ],
+        "<=>": [
+          "if and only if",
+          "both sides have the same truth value"
+        ],
+        "not": [
+          "not",
+          "true exactly when the following statement is false"
+        ],
+        "and": [
+          "and",
+          "both statements must hold"
+        ],
+        "or": [
+          "or",
+          "at least one statement must hold; both may hold"
+        ],
+        "=": [
+          "equals",
+          "equal values"
+        ],
+        "!=": [
+          "does not equal",
+          "unequal values"
+        ],
+        "<": [
+          "is less than",
+          "strictly less than"
+        ],
+        "<=": [
+          "is at most",
+          "less than or equal to"
+        ],
+        ">": [
+          "is greater than",
+          "strictly greater than"
+        ],
+        ">=": [
+          "is at least",
+          "greater than or equal to"
+        ],
+        "*": [
+          "times",
+          "checked i128 multiplication; overflow is indeterminate"
+        ],
+        "+": [
+          "plus",
+          "checked i128 addition; overflow is indeterminate"
+        ],
+        "-": [
+          "minus",
+          "checked i128 subtraction; overflow is indeterminate"
+        ],
+        "ceil": [
+          "u over v rounded up",
+          "the least integer at or above u/v; signed checked i128 arithmetic, nonzero divisor; undefined arithmetic is indeterminate"
+        ],
+        "floor": [
+          "u over v rounded down",
+          "the greatest integer at or below u/v; signed checked i128 arithmetic, nonzero divisor; undefined arithmetic is indeterminate"
+        ],
+        "count": [
+          "the number of",
+          "the number of distinct members that satisfy the condition"
+        ],
+        "group": [
+          "open ... close",
+          "explicit grouping; the enclosed expression is one operand"
+        ],
+        "prime": {
+          "read": "{name} prime of {args}",
+          "meaning": "{noun} after {step}",
+          "first_suffix": " (the prime marks \"after\"; it is not negation, which is ¬)"
+        }
+      },
+      "state_terms": {
+        "state": "{noun} of {args} before this event",
+        "prime_state": "{noun} of {args} after this event",
+        "zero_state": "{noun} before this event",
+        "zero_prime_state": "{noun} after this event"
+      }
+    }
+  },
+  "temporal_templates": {
+    "formula": {
+      "always": "□({a})",
+      "eventually": "◇({a})",
+      "next": "○({a})",
+      "until": "(({a}) U ({b}))",
+      "within": "◇[0,{k}]({a})"
+    },
+    "typed": {
+      "always": "always({a})",
+      "eventually": "eventually({a})",
+      "next": "next({a})",
+      "until": "until({a}, {b})",
+      "within": "within({k}, {a})"
+    },
+    "formal": {
+      "always": "always open {a} close",
+      "eventually": "eventually open {a} close",
+      "next": "next open {a} close",
+      "until": "open open {a} close until open {b} close close",
+      "within": "eventually within {k} further events open {a} close"
+    },
+    "precise": {
+      "always": "at every remaining event, ({a})",
+      "eventually": "at this or a later event in this trace, ({a})",
+      "next": "there is a next event and at that event ({a})",
+      "until": "at this or a later event ({b}), and at every event before that, from now, ({a})",
+      "within": "at this event or within {k} further events of this trace, ({a})"
+    },
+    "intuitive": {
+      "always": "always ({a})",
+      "eventually": "eventually ({a})",
+      "next": "at the next event, which must exist, ({a})",
+      "until": "({a}) holds until ({b}) happens, and that must happen",
+      "within": "now or within the next {k} events, ({a})",
+      "never": "never ({a})"
+    }
+  },
+  "temporal_legend": {
+    "always": [
+      "□",
+      "always",
+      "Every remaining event, including now; other traces require the visible trace quantifier."
+    ],
+    "eventually": [
+      "◇",
+      "eventually",
+      "A witness now or later; finite and unbounded modes differ."
+    ],
+    "next": [
+      "○",
+      "next",
+      "The immediately following recorded event; false at a finite endpoint."
+    ],
+    "until": [
+      "U",
+      "until",
+      "Strong until: the right operand must occur, possibly now; the left need not hold at that witness."
+    ],
+    "within": [
+      "◇[0,{k}]",
+      "eventually within further events",
+      "Offsets 0 through the displayed bound inclusive; events are not seconds."
+    ]
+  }
+}

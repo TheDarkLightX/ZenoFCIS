@@ -1,0 +1,104 @@
+{
+  "schema": "zeno-fcis/service/1",
+  "composition": {
+    "checker": "zeno-fcis/composed-domain-checker/1",
+    "components": [
+      {
+        "assume": "true",
+        "bind": {
+          "action": "choose(op <= 3, 150 + op, 154)",
+          "context": "choose(op == 3, 131, 130)",
+          "device": "target"
+        },
+        "invariant": "(device_1 == 143 -> device_1_generation == 0) && (device_1 == 144 -> device_1_generation == generation) && (device_1 == 145 -> device_1_generation < generation) && (device_2 == 143 -> device_2_generation == 0) && (device_2 == 144 -> device_2_generation == generation) && (device_2 == 145 -> device_2_generation < generation) && (generation == 0 -> device_1 == 143 && device_2 == 143)",
+        "name": "keydir",
+        "owns": [
+          "keydir.device_1",
+          "keydir.device_2",
+          "keydir.generation",
+          "keydir.device_1_generation",
+          "keydir.device_2_generation",
+          "keydir.anchor_pending"
+        ],
+        "participates": "true",
+        "path": "keydir",
+        "policy_sha256": "6bcc51fb4d5a65b84504b16b56b72a1e8448b6475d9196419a23fbec799163f9",
+        "program_sha256": "8715eadb267266439356055e202a18cc7a206b8459e318aa063ce0c4e6824575",
+        "project_sha256": "75d82315960c6986f060921194c9335b594a7a214ac570b230b441e111ee07cf"
+      },
+      {
+        "assume": "(reader_status == 143 -> reader_generation == 0) && (reader_status == 144 -> reader_generation == current_generation) && (reader_status == 145 -> reader_generation < current_generation)",
+        "bind": {
+          "action": "choose(op <= 3, 153, choose(op == 4, 150, choose(op == 7, 152, 151)))",
+          "current_generation": "keydir.generation",
+          "reader_generation": "choose(op == 6, keydir.device_2_generation, keydir.device_1_generation)",
+          "reader_status": "choose(op == 6, keydir.device_2, keydir.device_1)",
+          "slot": "target"
+        },
+        "invariant": "(slot_1_status == 140 -> slot_1_generation == 0) && (slot_1_status != 140 -> slot_1_generation >= 1) && (slot_2_status == 140 -> slot_2_generation == 0) && (slot_2_status != 140 -> slot_2_generation >= 1)",
+        "name": "mailbox",
+        "owns": [
+          "mailbox.slot_1_status",
+          "mailbox.slot_1_generation",
+          "mailbox.slot_2_status",
+          "mailbox.slot_2_generation"
+        ],
+        "participates": "true",
+        "path": "mailbox-keyed",
+        "policy_sha256": "645d334d9e358bcb37da876fea6ab52f670f39b48b89b7844b5768093c875aad",
+        "program_sha256": "6dde1ef177c9259a480b2ffc9624548fb7e1406ee9d4d889802ad9b3100a0bab",
+        "project_sha256": "fbb8b8cf178d0bab7a9d6170a31fc93d4449c2dae60d03cfa449566f08099355"
+      }
+    ],
+    "couplings": [
+      {
+        "invariant": "mailbox.slot_1_generation <= keydir.generation && mailbox.slot_2_generation <= keydir.generation",
+        "members": [
+          "keydir",
+          "mailbox"
+        ],
+        "name": "mail_uses_issued_keys"
+      },
+      {
+        "invariant": "(keydir.device_1 == 145 -> keydir.device_1_generation < keydir.generation) && (keydir.device_2 == 145 -> keydir.device_2_generation < keydir.generation)",
+        "members": [
+          "keydir",
+          "mailbox"
+        ],
+        "name": "revoked_device_lacks_new_keys"
+      }
+    ],
+    "name": "directory-and-mailbox",
+    "request": [
+      {
+        "domain": {
+          "kind": "int",
+          "max": 7,
+          "min": 0
+        },
+        "name": "op"
+      },
+      {
+        "domain": {
+          "kind": "int",
+          "max": 2,
+          "min": 1
+        },
+        "name": "target"
+      }
+    ],
+    "schema": "zeno-fcis/checked-composition/3"
+  },
+  "schemas": [
+    "01fb5616c5d70dd8d19f7d8a1397743fc5ade640b659492a08cee0702ba4198b",
+    "6cf605302186f1dc79e54a1794c354aa7ea766020100f118d7af1ff029b4d860"
+  ],
+  "laws": [
+    {
+      "name": "read-selected-device",
+      "formula": "accepted && (request.op == 5 || request.op == 6) -> choose(request.op == 6, pre.keydir.device_2, pre.keydir.device_1) == 144 && choose(request.target == 1, pre.mailbox.slot_1_generation, pre.mailbox.slot_2_generation) <= choose(request.op == 6, pre.keydir.device_2_generation, pre.keydir.device_1_generation) && choose(request.target == 1, post.mailbox.slot_1_status, post.mailbox.slot_2_status) == 142",
+      "genesis": false
+    }
+  ],
+  "max_steps": 1000000
+}

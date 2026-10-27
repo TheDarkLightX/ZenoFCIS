@@ -113,6 +113,8 @@ pub(crate) enum Source {
     Phase { run: usize, phase_index: usize },
     /// The `index`-th program supplied with the request.
     Supplied { index: usize },
+    /// Proposed by the opt-in indexed branch search, then judged by F3.
+    Indexed,
 }
 
 /// The best F3-accepted candidate.
@@ -315,9 +317,9 @@ impl Search {
                 "bytes": best.bytes.len(),
                 "nodes": best.nodes,
                 "max_steps": best.max_steps,
-                "run": match best.source { Source::Phase { run, .. } => Some(run), Source::Supplied { .. } => None },
-                "phase_index": match best.source { Source::Phase { phase_index, .. } => Some(phase_index), Source::Supplied { .. } => None },
-                "supplied": match best.source { Source::Supplied { index } => Some(index), Source::Phase { .. } => None },
+                "run": match best.source { Source::Phase { run, .. } => Some(run), Source::Supplied { .. } | Source::Indexed => None },
+                "phase_index": match best.source { Source::Phase { phase_index, .. } => Some(phase_index), Source::Supplied { .. } | Source::Indexed => None },
+                "supplied": match best.source { Source::Supplied { index } => Some(index), Source::Phase { .. } | Source::Indexed => None },
                 "receipt": best.equivalence.receipt_value(),
                 "receipt_sha256": transform::sha256_hex(&best.equivalence.receipt()),
             })),
@@ -341,7 +343,7 @@ impl Search {
                     "inconsistent-egraph" =>
                         "Retain the original, strategy and supplied programs; report the proposer inconsistency before retrying.",
                     _ =>
-                        "Retain the original and stop diagnostic; inspect optimize --help and use a separately checked candidate.",
+                        "Retain the original and stop diagnostic; inspect guide show program-search and use a separately checked candidate.",
                 });
             }
         }
@@ -594,6 +596,45 @@ pub(crate) fn optimize_plan(
         search.runs.push(run);
     }
     Outcome::Searched(Box::new(search))
+}
+
+/// Optional pure proposal lane, after all ordinary strategies. No supplied
+/// answers enter it. Its result crosses the same F3 boundary as supplied code.
+pub(crate) fn indexed_branches(search: &mut Search, original: &[u8]) -> Value {
+    use zeno_fcis_program_search::{Outcome as Proposal, Settings};
+    let mut settings = Settings::default();
+    settings.proposers.top_down = false;
+    settings.proposers.resub = false;
+    settings.proposers.fold = false;
+    settings.proposers.diagram = false;
+    settings.proposers.indexed_branches = true;
+    settings.budget.max_tuples = settings.budget.max_tuples.min(search.max_input_tuples);
+    match zeno_fcis_program_search::search(original, &[], &settings) {
+        Proposal::Stopped(stop) => json!({"status": "stopped", "reason": format!("{stop:?}")}),
+        Proposal::Unimproved(p) => json!({"status": "no-improvement", "work_units": p.work_used}),
+        Proposal::Improved(candidate) => {
+            let Ok(program) = import_program(original) else {
+                return json!({"status": "original-not-admitted"});
+            };
+            let judging = Judging {
+                original,
+                program: &program,
+                limits: Limits {
+                    steps: transform::DEFAULT_STEP_LIMIT,
+                    input_tuples: search.max_input_tuples,
+                },
+            };
+            let profile = search.plan.strategies.first().and_then(|s| s.profile);
+            let (record, accepted, _) =
+                judge_supplied(search, &judging, 0, &candidate.bytes, profile);
+            if let Some(mut accepted) = accepted {
+                accepted.source = Source::Indexed;
+                search.best = Some(accepted);
+            }
+            json!({"status": record.verdict.name(), "nodes": record.nodes,
+                "sha256": record.sha256, "work_units": candidate.provenance.work_used})
+        }
+    }
 }
 
 /// One strategy from the e-graph of the original; its phases and candidates

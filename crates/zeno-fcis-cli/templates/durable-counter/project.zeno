@@ -29,4 +29,10 @@ law 500 bounded_state on commit, genesis = post.100.110 >= 0 && post.100.110 <= 
 law 501 accepted_increment on accept = context.102 == 1 && command.101 == 120 && post.100.110 == pre.100.110 + 1 && post.100.111 == pre.100.111;
 law 502 committed_failure on failure = context.102 == 1 && command.101 == 121 && post.100.110 == pre.100.110 && post.100.111 == pre.100.111 + 1;
 law 503 reject_no_authority on reject = context.102 != 1 || (command.101 == 120 && pre.100.110 == 3) || (command.101 == 121 && pre.100.111 == 3);
+// Keep law 503's required progress; bind denial before selected-counter capacity.
+law 504 rejection_names_the_first_guard on reject = (context.102 == 0 && decision_reason == 200) || (context.102 == 1 && ((command.101 == 120 && pre.100.110 == 3) || (command.101 == 121 && pre.100.111 == 3)) && decision_reason == 201);
+law 505 failure_names_recorded_failure on failure = decision_reason == 202;
+// Both successful increments and committed failures notify the complete new state.
+law 510 notification_matches_both_post_counters on commit = outbox.104 == 1 && outbox.104.112 == post.100.110 && outbox.104.113 == post.100.111;
+law 511 notification_goes_to_the_local_observer on commit = outbox.104 == 1;
 claim 600 counters_never_negative all inductive accept [501] failure [502] = pre.100.110 >= 0 && pre.100.111 >= 0;

@@ -39,12 +39,15 @@ impl CheckedCandidate {
         let version = sources.adoptions.len() + 1;
         let place = format!("v2/policy.json adoptions[{}]", version - 1);
         let directory = adoption_directory(version);
-        if candidate == current.program() {
+        let original = current
+            .program()
+            .ok_or_else(|| ContractError::new("adoption", "U128SubjectUnsupported"))?;
+        if candidate == original {
             return Err(unchanged(&place, &directory, version));
         }
         let replayed = transform::replayed(
             &receipt,
-            current.program(),
+            original,
             &candidate,
             transform::DEFAULT_MAX_INPUT_TUPLES,
         )

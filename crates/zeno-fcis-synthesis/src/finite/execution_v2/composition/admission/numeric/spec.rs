@@ -4,12 +4,17 @@ use super::*;
 use vstd::prelude::*;
 verus! {
 pub(in super::super::super::super) open spec fn leaf(d:Domain)->bool {
-    match d {Domain::Bool=>true,Domain::I128{min,max}=>min<=max,Domain::U128{min,max}=>min<=max,_=>false}
+    match d {Domain::Sum{variants,..}=>0<variants@.len()&&(forall|i:int|0<i<variants@.len()==>variants@[i-1]< #[trigger] variants@[i]),Domain::Bool=>true,Domain::I128{min,max}=>min<=max,Domain::U128{min,max}=>min<=max,_=>false}
 }
 pub(in super::super::super) open spec fn same_domain(a:Domain,b:Domain)->bool {
-    match(a,b){(Domain::Bool,Domain::Bool)=>true,
+    match(a,b){
+        (Domain::Sum{type_id:a,variants:x},Domain::Sum{type_id:b,variants:y})=>a==b&&x@==y@,
+        (Domain::Bool,Domain::Bool)=>true,
         (Domain::I128{min:a,max:b},Domain::I128{min:c,max:d})=>a==c&&b==d,
         (Domain::U128{min:a,max:b},Domain::U128{min:c,max:d})=>a==c&&b==d,_=>false}
+}
+pub(in super::super::super) open spec fn code_matches(original:Domain,numeric:Domain)->bool {
+    match(original,numeric){(Domain::Sum{variants,..},Domain::I128{min,max})=>0<variants@.len()&&variants@[0] as int==min&&variants@[variants@.len()-1] as int==max,_=>same_domain(original,numeric)}
 }
 pub(in super::super::super) open spec fn field_valid(f:Seq<input_view::Field<Domain>>,i:int)->bool {
     leaf(f[i].leaf)&&(i==0||f[i-1].id<f[i].id)
@@ -70,7 +75,7 @@ pub(in super::super::super) open spec fn expression(d:&NumericDescriptor,e:Expr)
         Expr::Constant(a)=>Some(legacy::atom_kind(a))}
 }
 pub(in super::super::super) open spec fn binding_valid(d:&NumericDescriptor,i:int)->bool {
-    (match find(schema(d,d.bindings@[i].source),d.bindings@[i].selector){Some(v)=>same_domain(v,d.program.inputs@[i]),None=>false})
+    (match find(schema(d,d.bindings@[i].source),d.bindings@[i].selector){Some(v)=>code_matches(v,d.program.inputs@[i]),None=>false})
         &&(forall|j:int|0<=j<i==>!legacy::same_binding(d.bindings@[j],d.bindings@[i]))
 }
 pub(in super::super::super) open spec fn bindings(d:&NumericDescriptor)->bool {
@@ -79,7 +84,7 @@ pub(in super::super::super) open spec fn bindings(d:&NumericDescriptor)->bool {
         &&(forall|i:int|0<=i<d.bindings@.len()==>binding_valid(d,i))
 }
 pub(in super::super::super) open spec fn output_valid(d:&NumericDescriptor,i:int)->bool {
-    leaf(d.output_types@[i])&&same_domain(d.output_types@[i],d.program.outputs@[i])
+    leaf(d.output_types@[i])&&code_matches(d.output_types@[i],d.program.outputs@[i])
 }
 pub(in super::super::super) open spec fn outputs(d:&NumericDescriptor)->bool {
     d.output_types@.len()==d.program.outputs@.len()&&d.decision_output<d.output_types@.len()

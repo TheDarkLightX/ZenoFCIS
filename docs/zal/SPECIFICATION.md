@@ -1,7 +1,7 @@
 # ZAL: a behavior dialogue layer for ZenoFCIS (research prototype)
 
 Status: design proposal and additive research prototype, 2026-10-06.
-Executable profile: `zal/finite-fsm/1`.
+Executable profiles: `zal/finite-fsm/1` and, from 2.6, `zal/finite-fsm/2`.
 The actual source and capability map is [ZAL_SOURCE_MAP.md](../ZAL_SOURCE_MAP.md).
 
 ## Purpose and research basis
@@ -128,7 +128,8 @@ comparison exposes `pending / approve / authorized=false` changing from
 default Reject to Accept/`approved`. This demonstrates an intent gap, not a
 proof that authorization is enforced. The current state-only invariant grammar
 does not express a general transition requirement relating observations and
-outcomes. No new requirement semantics are implied by the diagnostic.
+outcomes. No new requirement semantics are implied by the diagnostic. Profile 2
+adds transition requirements, and its seed fails that weakening (see below).
 
 Comparison enumerates the complete common declared domain and compares business
 class, successor control label and rejection reason, plus the initial state as a
@@ -186,6 +187,91 @@ change no model/proposal/selection/agreement, and neither create nor invalidate
 the client's successfully displayed candidate binding. Storage adapters may
 rewrite snapshots while preserving this semantic state.
 
+## Why-not, what-if, narratives and the construct guide
+
+These read-only explanations (`explain.py`, `constructs.py`) use the admitted
+typed model only: no provider, eval or authority. Each result names its schema
+and the exact revision and checker identity.
+
+`zal/why-not/1` takes one complete input and a wanted outcome: any of `class`,
+`state`, `reason` and `rule`, all declared. It enumerates the stated scope:
+`context` keeps the state and event and tries every context valuation, and
+`input` tries every declared input. Inputs with overlapping enabled rules are
+skipped and counted. Minimality is the fewest changed inputs, where the state,
+the event and each fact count one each. The result lists every minimal input
+(capped at 32, with the full count), its changes as typed IDs, the deciding
+rule and its canonical lines, and whether its source state is reachable from
+the initial state. With nothing found, it says so for the scope and reports
+how many inputs outside a `context` scope would give the outcome. Rules whose
+own outcome matches are listed with their source and event matches and their
+guard's value at the given input.
+
+`zal/what-if/1` applies a `change` of `state`, `event` and named facts.
+Undeclared facts and empty changes are refused. Every requested change is
+reported, including changes that keep a value. The result checks that each
+one reached the second input, then compares both whole-model decisions and,
+rule by rule, source/event matches, guard value and enablement. It also names
+the changed facts each guard reads.
+
+`zal/narrative/1` tells a determinism, invariant or invariant-preservation
+counterexample, or an assumed trace, as numbered sentences. Each sentence
+records its registered template, its facts and a witness path per fact. Its
+English and symbolic text are that template filled from those facts. Before
+returning, the narrator re-derives every sentence. It checks the witness
+paths, the template text, the declared initial state, each step's decision
+and continuity, the enabled rules, the accepting rule, the invariant's
+falsity and the final state. Any mismatch refuses the whole narrative.
+Obligations without templates are refused by name; the structured witness
+remains authoritative.
+
+`zal/help/2` (`zal_guide`, terminal `guide`) resolves topics exactly as
+`zal/help/1` and assembles each answer from the construct registry. Forms for
+statements with a parser pattern are derived from `grammar_patterns`. The
+registry covers every statement kind, Boolean node, rule outcome, rule syntax
+mark and unsupported kind. A drift test requires that coverage, and requires
+the live parser to accept every registry form as that construct. `zal/help/1`
+output is unchanged.
+
+Profile 2 has its own schemas, from `explain2.py`: `zal/why-not/2`,
+`zal/what-if/2` and `zal/narrative/2`. An input adds `variables`, and context
+values include integer inputs. Why-not counts the state, the event, each
+variable, each fact and each integer input as one change each. A wanted
+outcome may name `class` `Trap`, the trapped `variable` and post-state
+`variables`. Each witness reports configuration reachability and
+admissibility. What-if applies variable and integer changes and compares rule
+updates, requirement values and admissibility. Its outcome may be a Trap.
+Narratives cover determinism, range, invariant, invariant-preservation,
+requirement and property counterexamples:
+- A range story ends with the update that would leave its range, and a
+  requirement story names the failing step. When the requirement is an
+  implication, it says that the condition holds and the conclusion does not.
+- Safety, next and within-k stories name the triggering step and the steps
+  where the goal fails.
+- A liveness story is a lasso: the prefix, the cycle that repeats forever,
+  where each fairness declaration holds on the cycle, and the trigger whose
+  goal never happens, or the step at which an until breaks first.
+
+The verifier re-derives continuity through the cycle, the cycle's return to
+its first configuration, each fairness position, the trigger and every goal
+judgment from the model. `explain.narrate_check` and `narrate_trace` dispatch
+to profile 2 by model type. `run.py story`, `why-not` and `what-if` expose
+both profiles for a model file.
+
+## Ladder statements in the tools
+
+`ladder_tools.py` exposes the shipped ladder examples and optional
+`ZAL_LADDER_DIR` statements. Each statement revision is the SHA-256 of
+`zal/ladder-statement/1`, a NUL byte and the statement's canonical JSON. Every
+render, parse, same, lower and explain call rereads the file, recomputes the
+revision and refuses a mismatch before parsing. Files must be regular, at most
+256 KiB and named by a lowercase stem; at most 64 statements are listed.
+Rendering is `ladder_text` and `render`; parsing is `ladder.parse`, with
+uniqueness counts recomputed from the same Earley grammar and cross-checked
+against admission. `same` compares expanded normal forms and the temporal scope
+identity, or the declared vocabulary for `zal/ladder/0`. Different normal forms
+are not a proof of different meaning. Lowering is the existing inert
+`temporal_lowering.lower`. All of these results have authority none.
+
 ## Dialogue, agreement and realization
 
 The client owns the current revision, selected typed ID, pending candidate,
@@ -223,8 +309,15 @@ It requires successful rendering of that exact model/checker/event cursor and
 no pending proposal. The cursor is captured with the displayed snapshot under
 the same workspace lock; an intervening event requires another display.
 Agreement records bind the candidate revision, canonical English and checker.
-The checker identity version `zal/checker/2` hashes `behavior.py`, `workflow.py`,
-`factory.py`, `shared.py`, `terminal.py`, `mcp.py` and `workspace.py`.
+The checker identity version `zal/checker/3` hashes `behavior.py`,
+`behavior2.py`, `workflow.py`, `factory.py`, `shared.py`, `terminal.py`,
+`mcp.py`, `workspace.py`, `server.py`, `workspace.html`, `explain.py`, `explain2.py`,
+`constructs.py`, `ladder_tools.py`, `ladder.py`, `ladder_en.json`,
+`temporal_lowering.py`, the withdrawal pilot's checker `withdrawal_pilot.py`
+with its Lean templates `withdrawal_pilot.lean` and
+`withdrawal_pilot_refutation.lean`, and the finite types, typed-machine and
+effects modules `adt.py`, `typed2.py`, `effects.py` and `effects_guide.py`,
+and the file CLI and source diagnostics `run.py` and `diagnostics.py`.
 
 Reviewed workspace export reruns supported-profile checks and requires the last
 human agreement to match the current revision, meaning and checker, with no
@@ -244,7 +337,9 @@ protocol and never grants agreement or factory authority.
 The primary workflow uses the human review terminal and a provider-independent
 MCP bridge against one existing `zal/shared-workspace/1` file. The bridge exposes
 `zal_read`, `zal_check`, `zal_help`, `zal_explain`, `zal_propose`, `zal_compare`
-and `zal_trace`; there is no acceptance tool. The harness must refresh the
+and `zal_trace`, the explanation tools `zal_why_not`, `zal_what_if`,
+`zal_narrate` and `zal_guide`, and the revision-bound `zal_ladder_*` tools;
+there is no acceptance tool. The harness must refresh the
 exact revision before continuing
 on changed meaning; the human separately reviews the current candidate. The bridge
 does not start inference. Setup and exact commands are in [README.md](README.md).
@@ -338,6 +433,237 @@ routes. This prototype calls no adoption/publication/upgrade/release command.
 Its correspondence scope is decisions/reasons/successors and empty deliveries,
 not sealed resource usage, budget-refusal or publication-identity equivalence.
 
+## Profile `zal/finite-fsm/2`: integers, requirements and temporal properties
+
+Profile 2 is a separate executable profile in `behavior2.py`. The header
+statement selects it: `zal 2;` or `ZAL version 2.`. Profile 1 sources keep
+their revision, admission semantics, verdicts and renderings. Both finite
+parsers attach physical source positions to common refusals; those positions
+are outside the canonical IR and do not affect model identity.
+The grammar is in [GRAMMAR.md](GRAMMAR.md#profile-zalfinite-fsm2). Both
+surfaces build one frozen typed model, with the same round-trip laws and a
+revision over its canonical AST, which now names profile 2.
+
+### Configurations and steps
+
+A configuration is the control state plus the value of every declared
+variable. A variable is a stored integer with an inclusive range and an
+initial value; the initial state and those values form the single initial
+configuration. Context facts remain fresh Booleans. An input is a fresh
+integer from its inclusive range on every step. Neither is authenticated.
+
+A rule is enabled exactly as in profile 1: its source, event and guard. The
+same determinism, no-precedence and explicit-default rules apply. An Accept
+moves to its target and applies its updates: `x = TERM`, `x += TERM` or
+`x -= TERM`, where TERM is a literal, a variable or an input. Updates read
+the pre-state and apply together; a rule updates a variable at most once. A
+Reject keeps the whole configuration. There are still no effects.
+
+Formulas compute exact integers. Every value they can read is bounded, so no
+formula can overflow. Only an update can leave a declared range. Such a step
+is refused: `decide` returns a named refusal, and `check` reports a `range`
+counterexample. A step never wraps around.
+
+### Formulas
+
+Guards read facts, inputs, the pre-state label and variables. Invariants read
+the control state and variables only. Step formulas, used by requirements,
+fairness declarations and property operands, read the whole step: the
+pre-state, `event == E`, facts and inputs, `accepted`, and the post-state as
+`state'` and `x'` ("after this event"). Comparisons are `==`, `!=`, `<`,
+`<=`, `>` and `>=` over sums and differences of literals, variables and
+inputs.
+
+Implication `A => B` ("if A, then B") is material: a false premise makes it
+true. Equivalence `A <=> B` reads "A if and only if B". Chains of either
+need parentheses. Conjunction and disjunction are canonically sorted as in
+profile 1; arithmetic keeps its written order.
+
+### Checks
+
+`check` enumerates every declared input tuple and stops at the first
+counterexample, in this order:
+
+1. determinism over every declared configuration, event and context;
+2. range traps reachable from the initial configuration, with a shortest trace;
+3. reachable invariants, with a shortest trace;
+4. range traps from admissible configurations;
+5. invariant preservation from admissible configurations;
+6. transition requirements on every admissible step, reporting a reachable
+   step with its shortest trace before an unreachable one;
+7. temporal properties.
+
+An admissible configuration is a declared configuration that satisfies every
+invariant: the states a lowered contract can hold, since its genesis and
+commit laws enforce the invariants. Profile 1 checks every raw Accept target
+instead. Profile 2 invariants read variables, so preservation is relative to
+admissible pre-states, and together with reachable invariants it makes the
+invariant inductive. A requirement counterexample carries the step, whether
+it is reachable, the trace and the requirement's truth tree.
+
+The `order2.zal` seed states "approve only if authorized" as a requirement:
+an accepted `approve` that reaches `approved` needs `authorized`. Weakening
+its approval guard to `true` now fails with a reachable requirement
+counterexample at `pending / approve / authorized=false`, which closes the
+intent gap that profile 1 can only expose by comparison.
+
+### Temporal properties
+
+An execution is an infinite sequence of steps from the initial
+configuration. Every configuration has a successor for every event, because
+the default rejection keeps it, so every execution is infinite and always has
+a next step. Positions are steps, called events as in ZAL-T. A prime reads
+after this event, and next advances one event. Events are not seconds.
+
+The operators have the ZAL-T meanings and its intuitive-rung English:
+
+| Symbolic | English | Meaning at a step |
+| --- | --- | --- |
+| `always(P)` | `always (P)` | P holds now and at every later step. |
+| `never(P)` | `never (P)` | P holds at no step from now on. |
+| `next(P)` | `at the next event, which must exist, (P)` | Strong next. |
+| `within(k, P)` | `now or within the next k events, (P)` | P holds at an offset 0 through k; `within(0, P)` means now. |
+| `eventually(P)` | `eventually (P)` | P holds now or later. |
+| `until(P, Q)` | `(P) holds until (Q) happens, and that must happen` | Strong until: Q occurs, possibly now, and P holds at every step before it. |
+
+The supported shapes are `always(P)`, `never(P)`, `always(P => T)`,
+`always(T)` and `T` from the initial configuration, where `T` is `next`,
+`within`, `eventually` or `until` over step formulas. Other shapes, such as
+nested temporal operators, are refused by name. The bound k is a literal from
+0 to 64.
+
+Safety, `next` and `within` properties are checked exactly over every
+infinite execution, by reachability and a bounded search. A counterexample is
+a shortest trace: for `within`, the triggering step and k further steps that
+all miss the goal.
+
+`eventually` and `until` are liveness. A model with such a property and no
+fairness declaration is refused: "liveness needs a fairness declaration". A
+fairness declaration `fairness ID: infinitely often (P);` assumes that P holds
+at infinitely many steps; liveness is checked only over executions that
+satisfy every declaration. Any event can be offered at any time, so weak
+fairness on an event `e` is `infinitely often (event == e)`. The check is
+exact over the finite configuration graph, using its strongly connected
+components. A counterexample is a fair lasso: a prefix and a nonempty cycle
+that returns to its start and contains a step satisfying each fairness
+declaration. A finite violation of `until` sits inside the prefix of such a
+lasso. Fairness restricts liveness only; safety and bounded properties range
+over every execution. If no reachable execution is fair, every liveness
+property holds vacuously and the `no-fair-execution` advisory says so.
+
+These results are finite checked over the declared machine. They are not
+proofs, and they say nothing about a contract or a real trace until a
+separate binding establishes that correspondence.
+
+`trace_properties` judges one supplied trace of at most 64 events with the
+ZAL-T finite-word meaning. Strong next is false at the last event; eventually
+and until need their witness before the trace ends; `within(k, P)` needs k
+less than the trace length and is refused for that trace otherwise; fairness
+does not apply to a finite word. A pending obligation at the end of a trace
+is a finite counterexample, not evidence of an infinite one.
+
+### Advisories, explanation and comparison
+
+Profile 2 keeps `guard-never-true-at-source`, `unreachable-source` and
+`invariant-domain-tautology`, over configurations. It adds:
+
+- `no-application-claims`: no invariants, requirements or properties;
+- `requirement-premise-never-true`: an implication-shaped requirement whose
+  premise is false on every admissible step;
+- `property-trigger-never-reached`: a response property whose premise is
+  false on every reachable step;
+- `no-fair-execution`: liveness holds only vacuously.
+
+`explain` evaluates one exact input: state, variables, event and every context
+value. It returns each rule's matches, guard truth tree with term values,
+enabled status and updates (before, after, in range), the outcome or a
+`Trap` outcome naming the variable and value, each requirement's value and
+tree, and each invariant before and after. Temporal properties are judged over
+executions, so a single-step explanation does not evaluate them.
+`semantic_diff` compares class, control state, variables, reason and traps on
+the common declared domain, plus the initial configuration. A changed
+variable range is a changed domain.
+
+### Limits
+
+| Item | Limit |
+| --- | --- |
+| Statements | 96 |
+| States / events / facts / inputs / variables | 1-8 / 1-8 / 0-4 / 0-2 / 0-4 |
+| Integer literals and range bounds | -32767 to 32767 |
+| Values in one range | 1-64 |
+| Configurations / input tuples | 4,096 / 16,384 |
+| Rules / invariants / requirements / fairness / properties / unresolved | 32 / 8 / 8 / 4 / 8 / 8 |
+| Formula input | 4,096 characters; 1,024 tokens |
+| Canonical formula | 128 nodes; depth 16; 4,096 characters per surface |
+| `within` bound | 0-64 |
+| Replayed or judged trace | 64 events |
+
+A domain above these limits is refused before any check; there is no
+sampling or partial pass.
+
+### Lowering
+
+`factory.lower` lowers profile 2 to `project.zeno` and `v2/policy.json`.
+Variables become integer state fields with their declared ranges; inputs
+become integer context fields. Updates become case post-state expressions.
+Invariants become `StateInvariant` laws on commit and genesis. Each
+requirement becomes an `on accept` law (kind `AuthoritySubjectRecipient`) and
+an `on reject` law (kind `RejectNoAuthority`), with the outcome class folded
+in and, for a rejection, post-state reads replaced by the unchanged
+pre-state; a side that folds to true is omitted. The law kinds are review
+categories, not inferred meaning. Safety properties `always(P)` and `never(P)`
+use the same step-law translation, with P and its negation respectively.
+The goal must also hold on every admissible step, including unreachable
+pre-states, or lowering refuses the stronger contract scope. Property IDs and
+their law IDs are retained in the source map. Other temporal properties,
+fairness declarations and unresolved obligations refuse as `unsupported
+lowering: temporal property ID`, `unsupported lowering: fairness assumption
+ID` or `unsupported lowering: unresolved KIND`.
+
+The [lowering guide](LOWERING.md) describes CLI lowering, native refinement
+and source diagnostics. Its methods follow Baier and Katoen, *Principles of
+Model Checking* (MIT Press, 2008), Abadi and Lamport, *The Existence of
+Refinement Mappings* (Theoretical Computer Science, 1991), and Aho, Lam,
+Sethi and Ullman, *Compilers: Principles, Techniques, and Tools*, second
+edition (Pearson, 2006). The finite checking scope is separate from external
+observations and application publication; prior-art search pending.
+
+The reference table covers every input tuple from an admissible
+configuration. Pre-states that break an invariant are excluded, because the
+contract's genesis and commit laws keep every state it holds admissible. The
+correspondence is a tested correspondence, not a theorem: qualification runs
+the actual generated Authority on that table.
+
+## Finite types, typed machines and effect signatures
+
+Three 2.6 profiles are separate modules with their own profile IDs:
+`zal/finite-types/1` (`adt.py`), `zal/typed-fsm/1` (`typed2.py`) and
+`zal/effects/1` (`effects.py`, with `effects_guide.py` for help and
+explanations). Profiles 1 and 2 keep their parsers, revisions, verdicts and
+renderings. [Types and effects](EFFECTS.md) has the forms, the checks and the
+evidence; the grammar is in [GRAMMAR.md](GRAMMAR.md#profiles-zalfinite-types1-zaleffects1-and-zaltyped-fsm1).
+
+A type is an alias, a record or a variant over bounded integers, Booleans,
+byte-capped and exact bytes and bounded lists. Recursion is refused, so every
+type is finite. Each type's count of values is exact: records multiply,
+variants add. A typed machine elaborates exactly to a `zal/finite-fsm/2`
+machine. A name of a non-integer type holds the index of its value in the
+type's canonical enumeration, which must have at most 64 values, and is used
+only with `==`, `!=` and assignment. Verdicts are profile 2 verdicts on the
+elaborated machine, with values decoded in witnesses.
+
+An effect signature source declares resources, capabilities, answer shapes
+and their frames, the port list, types, laws and one operation and footprint
+per port. `effects.check` runs the named checks `record_schema`,
+`port_coverage`, `frames`, `footprints`, `laws`, `v2_mapping` and
+`record_kinds`. `effects.lower` emits the `zeno-fcis/shell-effects/1` record's
+canonical bytes. The shipped source `examples/shell_effects.zal` lowers to the
+shell registry's bytes and identity; this is a tested correspondence against
+the built library, not a proof. Laws are named and checked for existence and
+use, not against any handler. These profiles have no review-terminal, MCP or
+browser surface yet; `run.py` selects them by header.
+
 ## Future profiles and release gates
 
 `unresolved effects`, `liveness`, `fairness`, `arithmetic` and `concurrency`
@@ -348,8 +674,9 @@ review. Hierarchical/concurrent state machines need an independently defined
 step/event scheduling semantics. Integer arithmetic must preserve actual widths,
 eager evaluation, traps and inactive-expression behavior before any lowering.
 
-This specification covers the Boolean control-FSM profile; it does not qualify
-a wider checked-integer application language.
+Profile 2 adds bounded integers whose only trap is leaving a declared range;
+it does not qualify a wider checked-integer application language, effects or
+concurrency.
 
 A later release gate should qualify profiles and lowering on actual source, add
 revision-bound evidence replay and test human comprehension against canonical

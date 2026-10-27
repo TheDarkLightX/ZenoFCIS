@@ -998,7 +998,7 @@ mod posix_controls {
             .collect::<String>();
         let state = json!({"schema":"zeno-fcis/capture-session/1", "spec":{"inputs":[{"kind":"Bool"}],"outputs":[{"kind":"Bool"}]},
             "source_sha256":source_hash,"table_sha256":sha(&serde_json::to_vec(&rows).unwrap_or_else(|e| panic!("{e}"))),"program_sha256":sha(&bytes),
-            "checker":{"semantics":"zeno-fcis/transform-check/4","evaluator_identity":evaluator},"rows":rows,"reference_observations":12,
+            "checker":{"semantics":"zeno-fcis/transform-check/5","evaluator_identity":evaluator},"rows":rows,"reference_observations":12,
             "budget":{"max_tuples":2,"rounds":2,"max_examples":2,"node_visits":100000},"attempts":0,"invocations":0,"reserved_visits":0,
             "examples":[],"status":"ready","events":[],"candidate":null,"receipt":null});
         fs::write(Path::new(&session).join("capture.json"), state.to_string())
@@ -1237,14 +1237,20 @@ mod posix_controls {
         assert!(e["semantic_receipt_sha256"].is_null());
     }
     fn private_directory(caller: u32) -> PathBuf {
-        let root = PathBuf::from(format!(
-            "/tmp/zeno-fcis-containment-{}",
-            nix::unistd::geteuid()
-        ));
-        fs::read_dir(root)
+        let prefix = format!("zeno-fcis-containment-{}-", nix::unistd::geteuid());
+        fs::read_dir("/tmp")
             .unwrap_or_else(|e| panic!("{e}"))
             .filter_map(|entry| {
-                let directory = entry.ok()?.path();
+                let entry = entry.ok()?;
+                if !entry.file_type().ok()?.is_dir() {
+                    return None;
+                }
+                let name = entry.file_name();
+                let suffix = name.to_str()?.strip_prefix(&prefix)?;
+                if suffix.len() != 64 || !suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
+                    return None;
+                }
+                let directory = entry.path();
                 let path = directory.join("command.json");
                 let value: Value = serde_json::from_slice(&fs::read(&path).ok()?).ok()?;
                 if value["caller_pid"] != caller {
@@ -1657,11 +1663,13 @@ mod posix_controls {
             .split(|b| *b == 0)
             .find_map(|s| s.strip_prefix(b"ZENO_FCIS_POSIX_INVOCATION="))
             .unwrap_or_else(|| panic!("guardian identity"));
+        let identity = std::str::from_utf8(identity).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(identity.len(), 64);
+        assert!(identity.bytes().all(|b| b.is_ascii_hexdigit()));
         let directory = PathBuf::from(format!(
-            "/tmp/zeno-fcis-containment-{}",
+            "/tmp/zeno-fcis-containment-{}-{identity}",
             nix::unistd::geteuid()
-        ))
-        .join(std::str::from_utf8(identity).unwrap_or_else(|e| panic!("{e}")));
+        ));
         signal(child.id(), nix::sys::signal::Signal::SIGKILL);
         let _ = wait(child, Duration::from_secs(5));
         let deadline = Instant::now() + Duration::from_secs(5);

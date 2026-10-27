@@ -12,6 +12,7 @@ fn judged(project: &str, policy: &str, formula: &str) -> Value {
     {
         Lemmas::Judged(mut results) => results.remove(0),
         Lemmas::Inconclusive(stop) => panic!("inconclusive: {stop:?}"),
+        Lemmas::NoStartingState(value) => panic!("no starting state {value}"),
     }
 }
 

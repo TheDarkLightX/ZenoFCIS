@@ -1,0 +1,41 @@
+zal 2;
+# One withdrawal lane of the withdrawal-queue template, abstracted for review:
+# an owner requests a withdrawal, the operator deposits, and a keeper's tick
+# pays the lane by the template's alarm controller. An honored alarm pauses
+# payouts for two ticks; the last paused tick sets must_serve, and a
+# must-serve tick pays whatever the alarm says.
+machine withdrawal_lane;
+states idle, waiting;
+events deposit, request, tick;
+context alarm;
+input amount in 1..=2;
+var balance in 0..=4 initially 0;
+var reserved in 0..=2 initially 0;
+var pause in 0..=2 initially 0;
+var must_serve in 0..=1 initially 0;
+initial idle;
+step atomic; frame control_and_variables;
+default reject not_enabled unchanged;
+rule deposit_idle: idle + deposit [balance + amount <= 4] -> accept idle, balance += amount;
+rule deposit_waiting: waiting + deposit [balance + amount <= 4] -> accept waiting, balance += amount;
+rule request_withdrawal: idle + request [amount <= balance] -> accept waiting, reserved = amount;
+rule request_too_large: idle + request [amount > balance] -> reject insufficient_balance unchanged;
+rule lane_occupied: waiting + request [true] -> reject lane_occupied unchanged;
+rule idle_count: idle + tick [pause > 0] -> accept idle, pause -= 1;
+rule idle_alarm: idle + tick [pause == 0 & alarm] -> accept idle, pause = 2;
+rule idle_quiet: idle + tick [pause == 0 & !alarm] -> accept idle;
+rule wait_count: waiting + tick [pause == 2] -> accept waiting, pause -= 1;
+rule wait_last: waiting + tick [pause == 1] -> accept waiting, pause = 0, must_serve = 1;
+rule wait_alarm: waiting + tick [pause == 0 & alarm & must_serve == 0] -> accept waiting, pause = 2;
+rule pay: waiting + tick [pause == 0 & (!alarm | must_serve == 1)] -> accept idle, balance -= reserved, reserved = 0, must_serve = 0;
+invariant reserve_covered: reserved <= balance;
+invariant idle_reserves_nothing: state == idle => reserved == 0;
+invariant waiting_reserves_some: state == waiting => reserved >= 1;
+invariant must_serve_only_when_due: must_serve == 1 => (pause == 0 & state == waiting);
+require payout_moves_reserved: (event == tick & state == waiting & state' == idle) => (balance' == balance - reserved & reserved' == 0);
+require paused_tick_pays_nothing: (event == tick & pause > 0) => (balance' == balance & reserved' == reserved);
+require must_serve_tick_pays: (event == tick & must_serve == 1) => state' == idle;
+require request_reserves_amount: (event == request & accepted) => (reserved' == amount & balance' == balance);
+fairness keeper_ticks: infinitely often (event == tick);
+property never_freezes: always((event == request & accepted) => eventually(state == waiting & state' == idle));
+property reserved_until_paid: always((event == request & accepted) => until(state' == waiting, state == waiting & state' == idle));

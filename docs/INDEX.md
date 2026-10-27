@@ -7,7 +7,7 @@ with [Get started](#get-started), then follow a tutorial.
 
 - [Installation](INSTALLATION.md)
 - [Quickstart](QUICKSTART.md)
-- [ZenoFCIS 2.5.0 release notes](RELEASE_NOTES.md)
+- [ZenoFCIS 2.6.0 release notes](RELEASE_NOTES.md)
 - [Earlier public release candidates](RELEASE_CANDIDATES.md)
 - [V2 normal program API migration](V2_PROGRAM_API_MIGRATION.md)
 
@@ -26,8 +26,10 @@ with [Get started](#get-started), then follow a tutorial.
 - [Packaged application qualification](PACKAGED_APPLICATION_QUALIFICATION.md)
 - [Symbolic per-case checks](SYMBOLIC_CHECKS.md)
 - [Bounded completion and preparation](BOUNDED_COMPLETION.md)
+- [Construction from requirements (unreleased pilot)](CONSTRUCTION.md)
 - [Wide values and larger decisions](WIDE_VALUE_EXECUTION.md): development
   profile support, capacity and assurance boundaries
+- [Finite trace-game certificates](TRACE_GAME.md)
 - [Determinism](DETERMINISM.md)
 - [Using ZenoFCIS with coding and reasoning models](LLM_USAGE.md)
 - [Synthesis-first skill and MCP tools](LLM_SYNTHESIS.md)
@@ -54,6 +56,8 @@ with [Get started](#get-started), then follow a tutorial.
 - [Composed-domain composition](COMPOSED_DOMAIN_COMPOSITION.md)
 - [RC3 specification contract](RC3_AUTHORING_CONTRACT.md)
 - [`.zeno` language v1](ZENO_LANGUAGE_V1.md)
+- [Contract tables: fixed-size collections expanded exactly](CONTRACT_TABLES.md)
+- [Keyed collections: maps of any size, checked by data independence](COLLECTIONS.md)
 - [Temporal logic v1](TEMPORAL_LOGIC_V1.md)
 - [Formal tools](FORMAL_TOOLS_RC3.md)
 - [Canonical bytes and admission](CANONICAL_BYTES.md)
@@ -66,6 +70,7 @@ with [Get started](#get-started), then follow a tutorial.
 - [ZAL: terminal-first behavior review](zal/README.md)
 - [ZAL specification](zal/SPECIFICATION.md)
 - [`zal/finite-fsm/1` grammar and limits](zal/GRAMMAR.md)
+- [ZAL types and effect signatures](zal/EFFECTS.md)
 - [ZAL harness integration](zal/HARNESS_INTEGRATION.md)
 - [ZAL prototype source map](ZAL_SOURCE_MAP.md)
 
@@ -161,6 +166,8 @@ supported V2 route.
 ### Persistence, shells, and mounted runtimes
 
 - [SQLite shell refinement](SQLITE_SHELL_REFINEMENT.md)
+- [SQLite shell fault simulation](SHELL_SIMULATION.md)
+- [Shell effects: ports, pure programs, simulation and replay](SHELL_EFFECTS.md)
 - [Strict artifact decoding and SQLite history](STRICT_ARTIFACT_AND_SQLITE_HISTORY.md)
 - [Outbox delivery identity](OUTBOX_DELIVERY_IDENTITY.md)
 - [Authenticated-state adapter](AUTHENTICATED_STATE_ADAPTER.md)
@@ -203,14 +210,16 @@ supported V2 route.
 
 ## Status
 
-The workspace is version `2.5.0`, the current release source, following the
+The workspace is version `2.6.0`, the current release source, following the
 first stable V2 line, 2.3.0. Final qualification and publication remain pending.
-Its V2 API differs from the historical crates.io `1.1.0` API and is used from the matching `v2.5.0` source tag; see
+Its V2 API differs from the historical crates.io `1.1.0` API and is used from the matching `v2.6.0` source tag; see
 [installation](INSTALLATION.md) and the
-[2.5.0 release notes](RELEASE_NOTES.md). The earlier public candidates
+[2.6.0 release notes](RELEASE_NOTES.md). The earlier public candidates
 `v2.2.0-rc.1` and `v2.3.0-rc.1` were prereleases; their
 [candidate record](RELEASE_CANDIDATES.md) keeps their sources and limits.
 
 The documentation describes implemented APIs and explicit boundaries. It does
 not claim general deployment qualification, a bundled concurrent runtime, or
 an end-to-end proof for arbitrary downstream projects.
+
+- [Composed-domain proof boundary](COMPOSED_DOMAIN_PROOF.md)

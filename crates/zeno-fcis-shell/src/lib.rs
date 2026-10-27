@@ -361,6 +361,9 @@ pub fn acknowledge(
 mod delivery;
 pub use delivery::{DeliveryCollision, IdempotentDestination, MemoryDestination};
 
+/// The `shell-effects/1` port registry and the pure shell step programs.
+pub mod effects;
+
 fn hash_outbox_entry<H: CommitmentHasher>(entry: &OutboxEntry) -> Result<Hash32, ShellError> {
     let domain = zeno_fcis_codec::domains::OUTBOX_ENTRY;
     let bytes = entry.canonical_bytes().map_err(ShellError::Encode)?;

@@ -1,0 +1,130 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "example_mail-keydir-no-outbox",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "109": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "d1": "pre.100.110",
+    "d2": "pre.100.111",
+    "gen": "pre.100.112",
+    "g1": "pre.100.113",
+    "g2": "pre.100.114",
+    "pending": "pre.100.115",
+    "action": "command.101.120",
+    "device": "command.101.121",
+    "party": "context.102",
+    "target": "choose(device == 1, d1, d2)",
+    "other": "choose(device == 1, d2, d1)",
+    "next_gen": "gen + 1",
+    "publish_gen": "choose(gen == 0, 1, gen)",
+    "n1": "choose(action == 150 && device == 1, 144, choose(action == 152 && device == 1, 145, d1))",
+    "n2": "choose(action == 150 && device == 2, 144, choose(action == 152 && device == 2, 145, d2))",
+    "new_gen": "choose(action == 150, publish_gen, next_gen)"
+  },
+  "cases": [
+    {
+      "rule": "the account controller changes devices and keys; the ledger reports anchors",
+      "when": "(action != 153 && party != 130) || (action == 153 && party != 131)",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "an anchor needs a pending checkpoint",
+      "when": "action == 153 && !pending",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "the next change waits for the anchor",
+      "when": "action != 153 && pending",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "publish only an absent device",
+      "when": "action == 150 && target != 143",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "revoke only an active device",
+      "when": "action == 152 && target != 144",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "a rotation needs an active device",
+      "when": "action == 151 && d1 != 144 && d2 != 144",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "the generation has a bound",
+      "when": "(action == 151 || action == 152) && gen >= 3",
+      "class": "Reject",
+      "reason": 206,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "anchor the pending checkpoint",
+      "when": "action == 153",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "115": false
+      },
+      "outbox": []
+    },
+    {
+      "rule": "publish, rotate or revoke: active devices receive the new generation",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "n1",
+        "111": "n2",
+        "112": "new_gen",
+        "113": "choose(n1 == 144, new_gen, g1)",
+        "114": "choose(n2 == 144, new_gen, g2)",
+        "115": true
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 143,
+    "111": 143,
+    "112": 0,
+    "113": 0,
+    "114": 0,
+    "115": false
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AuthoritySubjectRecipient",
+    "503": "AuthoritySubjectRecipient",
+    "504": "DebitCreditEffectEquality"
+  }
+}

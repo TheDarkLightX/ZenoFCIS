@@ -1,0 +1,1917 @@
+{
+  "abstract_declarations": {
+    "collections_runtime::runtime::Entries::contents": {
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "kind": "abstract-declaration",
+      "mode": "Spec",
+      "raw_vir": [
+        "Function",
+        [
+          "Fun",
+          ":path",
+          "collections_runtime::runtime::Entries::contents"
+        ],
+        ":mode",
+        "Spec",
+        ":typ_bounds",
+        [
+          [
+            "GenericBound",
+            "Trait",
+            [
+              "TraitId",
+              "Sizedness",
+              [
+                "Sizedness",
+                "MetaSized"
+              ]
+            ],
+            [
+              [
+                "Typ",
+                "TypParam",
+                "\"Self%\""
+              ]
+            ]
+          ],
+          [
+            "GenericBound",
+            "Trait",
+            [
+              "TraitId",
+              "Path",
+              "collections_runtime::runtime::Entries"
+            ],
+            [
+              [
+                "Typ",
+                "TypParam",
+                "\"Self%\""
+              ]
+            ]
+          ]
+        ],
+        ":params",
+        [
+          [
+            "Param",
+            ":name",
+            [
+              "VarIdent",
+              "\"self\"",
+              [
+                "VarIdentDisambiguate",
+                "RustcId",
+                "2"
+              ]
+            ],
+            ":typ",
+            [
+              "Typ",
+              "Decorate",
+              [
+                "TypDecoration",
+                "Ref"
+              ],
+              "None",
+              [
+                "Typ",
+                "TypParam",
+                "\"Self%\""
+              ]
+            ],
+            ":mode",
+            "Spec",
+            ":user_mut",
+            "false",
+            ":unwrapped_info",
+            "None"
+          ]
+        ],
+        ":ret",
+        [
+          "Param",
+          ":name",
+          [
+            "VarIdent",
+            "\"%return\"",
+            [
+              "VarIdentDisambiguate",
+              "AirLocal"
+            ]
+          ],
+          ":typ",
+          [
+            "Typ",
+            "Datatype",
+            [
+              "Dt",
+              "Path",
+              "vstd::map::Map"
+            ],
+            [
+              [
+                "Typ",
+                "Datatype",
+                [
+                  "Dt",
+                  "Tuple",
+                  "2"
+                ],
+                [
+                  [
+                    "Typ",
+                    "Int",
+                    [
+                      "IntRange",
+                      "U",
+                      "32"
+                    ]
+                  ],
+                  [
+                    "Typ",
+                    "Primitive",
+                    [
+                      "Primitive",
+                      "Array"
+                    ],
+                    [
+                      [
+                        "Typ",
+                        "Int",
+                        [
+                          "IntRange",
+                          "U",
+                          "8"
+                        ]
+                      ],
+                      [
+                        "Typ",
+                        "ConstInt",
+                        "32"
+                      ]
+                    ]
+                  ]
+                ],
+                []
+              ],
+              [
+                "Typ",
+                "Datatype",
+                [
+                  "Dt",
+                  "Path",
+                  "vstd::seq::Seq"
+                ],
+                [
+                  [
+                    "Typ",
+                    "Int",
+                    [
+                      "IntRange",
+                      "U",
+                      "8"
+                    ]
+                  ]
+                ],
+                []
+              ]
+            ],
+            []
+          ],
+          ":mode",
+          "Spec",
+          ":user_mut",
+          "false",
+          ":unwrapped_info",
+          "None"
+        ],
+        ":require",
+        [],
+        ":ensure",
+        [],
+        ":d",
+        [],
+        ":body",
+        "None"
+      ],
+      "raw_vir_sha256": "f72fa0924dd4003a0c21396a137c5c25a24cc28432165812276a32a1df624d17",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "6663a9bda0f9b41c396011df868b2b127bbbfe2f5e6cc7ee14939d5c375465ff"
+    },
+    "collections_runtime::runtime::Entries::record": {
+      "ensures": 1,
+      "ensures_sha256": "1de298561bd5326a18fc6826e023a72b8ba62b7f9811f3b56c3b864718a5c6b4",
+      "kind": "abstract-declaration",
+      "mode": "Exec",
+      "raw_vir": [
+        "Function",
+        [
+          "Fun",
+          ":path",
+          "collections_runtime::runtime::Entries::record"
+        ],
+        ":mode",
+        "Exec",
+        ":typ_bounds",
+        [
+          [
+            "GenericBound",
+            "Trait",
+            [
+              "TraitId",
+              "Sizedness",
+              [
+                "Sizedness",
+                "MetaSized"
+              ]
+            ],
+            [
+              [
+                "Typ",
+                "TypParam",
+                "\"Self%\""
+              ]
+            ]
+          ],
+          [
+            "GenericBound",
+            "Trait",
+            [
+              "TraitId",
+              "Path",
+              "collections_runtime::runtime::Entries"
+            ],
+            [
+              [
+                "Typ",
+                "TypParam",
+                "\"Self%\""
+              ]
+            ]
+          ]
+        ],
+        ":params",
+        [
+          [
+            "Param",
+            ":name",
+            [
+              "VarIdent",
+              "\"self\"",
+              [
+                "VarIdentDisambiguate",
+                "RustcId",
+                "2"
+              ]
+            ],
+            ":typ",
+            [
+              "Typ",
+              "Decorate",
+              [
+                "TypDecoration",
+                "Ref"
+              ],
+              "None",
+              [
+                "Typ",
+                "TypParam",
+                "\"Self%\""
+              ]
+            ],
+            ":mode",
+            "Exec",
+            ":user_mut",
+            "false",
+            ":unwrapped_info",
+            "None"
+          ],
+          [
+            "Param",
+            ":name",
+            [
+              "VarIdent",
+              "\"map\"",
+              [
+                "VarIdentDisambiguate",
+                "RustcId",
+                "4"
+              ]
+            ],
+            ":typ",
+            [
+              "Typ",
+              "Int",
+              [
+                "IntRange",
+                "U",
+                "32"
+              ]
+            ],
+            ":mode",
+            "Exec",
+            ":user_mut",
+            "false",
+            ":unwrapped_info",
+            "None"
+          ],
+          [
+            "Param",
+            ":name",
+            [
+              "VarIdent",
+              "\"key\"",
+              [
+                "VarIdentDisambiguate",
+                "RustcId",
+                "6"
+              ]
+            ],
+            ":typ",
+            [
+              "Typ",
+              "Decorate",
+              [
+                "TypDecoration",
+                "Ref"
+              ],
+              "None",
+              [
+                "Typ",
+                "Primitive",
+                [
+                  "Primitive",
+                  "Array"
+                ],
+                [
+                  [
+                    "Typ",
+                    "Int",
+                    [
+                      "IntRange",
+                      "U",
+                      "8"
+                    ]
+                  ],
+                  [
+                    "Typ",
+                    "ConstInt",
+                    "32"
+                  ]
+                ]
+              ]
+            ],
+            ":mode",
+            "Exec",
+            ":user_mut",
+            "false",
+            ":unwrapped_info",
+            "None"
+          ]
+        ],
+        ":ret",
+        [
+          "Param",
+          ":name",
+          [
+            "VarIdent",
+            "\"result\"",
+            [
+              "VarIdentDisambiguate",
+              "RustcId",
+              "16"
+            ]
+          ],
+          ":typ",
+          [
+            "Typ",
+            "Datatype",
+            [
+              "Dt",
+              "Path",
+              "core::option::Option"
+            ],
+            [
+              [
+                "Typ",
+                "Datatype",
+                [
+                  "Dt",
+                  "Path",
+                  "alloc::vec::Vec"
+                ],
+                [
+                  [
+                    "Typ",
+                    "Int",
+                    [
+                      "IntRange",
+                      "U",
+                      "8"
+                    ]
+                  ],
+                  [
+                    "Typ",
+                    "Datatype",
+                    [
+                      "Dt",
+                      "Path",
+                      "alloc::alloc::Global"
+                    ],
+                    [],
+                    []
+                  ]
+                ],
+                [
+                  [
+                    "ImplPath",
+                    "TraitImplPath",
+                    "alloc::alloc::impl&%1"
+                  ]
+                ]
+              ]
+            ],
+            []
+          ],
+          ":mode",
+          "Exec",
+          ":user_mut",
+          "false",
+          ":unwrapped_info",
+          "None"
+        ],
+        ":require",
+        [],
+        ":ensure",
+        [
+          [
+            ">",
+            "Binary",
+            [
+              "BinaryOp",
+              "Eq",
+              "Spec"
+            ],
+            [
+              ">",
+              "Call",
+              ":target",
+              [
+                "CallTarget",
+                "Fun",
+                [
+                  "CallTargetKind",
+                  "Static"
+                ],
+                [
+                  "Fun",
+                  ":path",
+                  "collections_runtime::runtime::record_view"
+                ],
+                [],
+                [],
+                [
+                  "CallTargetAttrs",
+                  ":autospec",
+                  [
+                    "AutospecUsage",
+                    "IfMarked"
+                  ],
+                  ":const_var",
+                  "false",
+                  ":assume_external_allowed",
+                  "false"
+                ]
+              ],
+              ":args",
+              [
+                [
+                  ">",
+                  "ReadPlace",
+                  [
+                    "Place",
+                    "Local",
+                    [
+                      "VarIdent",
+                      "\"result\"",
+                      [
+                        "VarIdentDisambiguate",
+                        "RustcId",
+                        "16"
+                      ]
+                    ]
+                  ],
+                  [
+                    "UnfinalizedReadKind",
+                    ":preliminary_kind",
+                    [
+                      "ReadKind",
+                      "Move"
+                    ],
+                    ":id",
+                    "166"
+                  ]
+                ]
+              ],
+              ":post_args",
+              "None",
+              ":body",
+              "None"
+            ],
+            [
+              ">",
+              "Call",
+              ":target",
+              [
+                "CallTarget",
+                "Fun",
+                [
+                  "CallTargetKind",
+                  "Static"
+                ],
+                [
+                  "Fun",
+                  ":path",
+                  "collections_runtime::runtime::stored"
+                ],
+                [],
+                [],
+                [
+                  "CallTargetAttrs",
+                  ":autospec",
+                  [
+                    "AutospecUsage",
+                    "IfMarked"
+                  ],
+                  ":const_var",
+                  "false",
+                  ":assume_external_allowed",
+                  "false"
+                ]
+              ],
+              ":args",
+              [
+                [
+                  ">",
+                  "Call",
+                  ":target",
+                  [
+                    "CallTarget",
+                    "Fun",
+                    [
+                      "CallTargetKind",
+                      "Dynamic"
+                    ],
+                    [
+                      "Fun",
+                      ":path",
+                      "collections_runtime::runtime::Entries::contents"
+                    ],
+                    [
+                      [
+                        "Typ",
+                        "TypParam",
+                        "\"Self%\""
+                      ]
+                    ],
+                    [],
+                    [
+                      "CallTargetAttrs",
+                      ":autospec",
+                      [
+                        "AutospecUsage",
+                        "IfMarked"
+                      ],
+                      ":const_var",
+                      "false",
+                      ":assume_external_allowed",
+                      "false"
+                    ]
+                  ],
+                  ":args",
+                  [
+                    [
+                      ">",
+                      "ReadPlace",
+                      [
+                        "Place",
+                        "Local",
+                        [
+                          "VarIdent",
+                          "\"self\"",
+                          [
+                            "VarIdentDisambiguate",
+                            "RustcId",
+                            "2"
+                          ]
+                        ]
+                      ],
+                      [
+                        "UnfinalizedReadKind",
+                        ":preliminary_kind",
+                        [
+                          "ReadKind",
+                          "ImmutBor"
+                        ],
+                        ":id",
+                        "167"
+                      ]
+                    ]
+                  ],
+                  ":post_args",
+                  "None",
+                  ":body",
+                  "None"
+                ],
+                [
+                  ">",
+                  "ReadPlace",
+                  [
+                    "Place",
+                    "Local",
+                    [
+                      "VarIdent",
+                      "\"map\"",
+                      [
+                        "VarIdentDisambiguate",
+                        "RustcId",
+                        "4"
+                      ]
+                    ]
+                  ],
+                  [
+                    "UnfinalizedReadKind",
+                    ":preliminary_kind",
+                    [
+                      "ReadKind",
+                      "Copy"
+                    ],
+                    ":id",
+                    "168"
+                  ]
+                ],
+                [
+                  ">",
+                  "ReadPlace",
+                  [
+                    "Place",
+                    "Local",
+                    [
+                      "VarIdent",
+                      "\"key\"",
+                      [
+                        "VarIdentDisambiguate",
+                        "RustcId",
+                        "6"
+                      ]
+                    ]
+                  ],
+                  [
+                    "UnfinalizedReadKind",
+                    ":preliminary_kind",
+                    [
+                      "ReadKind",
+                      "Copy"
+                    ],
+                    ":id",
+                    "169"
+                  ]
+                ]
+              ],
+              ":post_args",
+              "None",
+              ":body",
+              "None"
+            ]
+          ]
+        ],
+        ":d",
+        [],
+        ":body",
+        "None"
+      ],
+      "raw_vir_sha256": "cfd0df8fe8e730d6a5be8e6abeeb6fb4d5201ea71f6ad83500acfab4a5ec3c0d",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "0d0073d5b748317d8884cc10f7b584cfa5ec0401ff037707958e9782af21974b"
+    }
+  },
+  "functions": {
+    "collections_runtime::absent::absent_value": {
+      "body_sha256": "39cd611d9a0ff308d0fe1442cf25be53c748a6a17ad1b6382249a9632645419b",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "4692365a88a6546ceac80d76534455aef465556d1eb8e0444ca86b8b35ec511c"
+    },
+    "collections_runtime::absent::canonical_absent_view": {
+      "body_sha256": "dae62f26f3bdf42a4096c881c4e370a46ef6dd2f6d653d257a90dc30d13e2b11",
+      "ensures": 2,
+      "ensures_sha256": "cc1eb5bd7e6b01e82ab851421f814db0e90a56d351030fc6fc8a6727491057e0",
+      "mode": "Exec",
+      "requires": 3,
+      "requires_sha256": "dd9aa0338dabdebfa0099b546c2fcd6a3ece7679b32c6336689ed074337f7e5a",
+      "signature_sha256": "e4f3a20f9d1a7221a81d3cb40e08963c79139e990ae761a01110fedf3a5ac82e"
+    },
+    "collections_runtime::contract_error::impl&%0::clone": {
+      "body_sha256": "9a65f829815e8a1a6f0ca134619027ba3457d94029fc6d6ba30e8b60ecf61c65",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "7e0016935c6f38914cd16ade41e926987815f84710dce412f61ed23aac848717"
+    },
+    "collections_runtime::contract_error::impl&%5::new": {
+      "body_sha256": "dcafecab0049c10d64216ad730e819505754b102a5cc03fa191bb3336fe6712e",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "c270f6074993421e666a435363bc6b0fd14600ea9e09452d5c97a5588a225d4d"
+    },
+    "collections_runtime::contract_error::impl&%5::place": {
+      "body_sha256": "59d694c6f726ee0342b520fa45bdce86ffff08236e44bcdef42acf5f7b76cf7d",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "63226f7bd3d8f1f4dc357514acd936a3017f228a2a42b308f903e1270bf1ff79"
+    },
+    "collections_runtime::contract_error::impl&%5::reason": {
+      "body_sha256": "c2d962a2c09d284dd8d8dba29afdd67da4910ea6ed622139728539ecfac66080",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "63226f7bd3d8f1f4dc357514acd936a3017f228a2a42b308f903e1270bf1ff79"
+    },
+    "collections_runtime::leaf::impl&%0::least": {
+      "body_sha256": "4a78e7925b351b234b3cbbac3171b8480d5b423380dc09bd3b457683e79068f3",
+      "ensures": 1,
+      "ensures_sha256": "b6e98b5134e74a3c288f2da2c3a78f995f61667fbc67e9d0af066d91e9d3a808",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "e72630754baa640b097551fdb46a016b3f037fe07497b1d75c20bef009e71078"
+    },
+    "collections_runtime::leaf::impl&%1::clone": {
+      "body_sha256": "e0476bc80b2c7c8b09168ad8a5cb1359e4c6b6ed37be09ddda1ebe43a37420f9",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "acc1475b10e58c4291324f46e1dba05f49635ba4cd970ab274d40b2675520058"
+    },
+    "collections_runtime::leaf::impl&%6::clone": {
+      "body_sha256": "df22a2f6a2473d7d354431a1780b2877fbc1d9406842925d013c6614a1d9e6f9",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "ab092fd54d2475d84456df585d7cd488626d79b2bb4313ad34f42410cc3bc7bb"
+    },
+    "collections_runtime::leaf::least_or_zero": {
+      "body_sha256": "f073a581e33d91162ec326b2c50d7eb5b3b236e0c121b84eaac15ff5276e9028",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "41fcd738886123001d54c4d56b7723419db88c1ddbb1c4e539ebc4359ef724e7"
+    },
+    "collections_runtime::leaf::least_spec": {
+      "body_sha256": "f5b0197f547780ab6c4d192974f567200b71ef5ce29ffaa7fb8db8ea3af45f6c",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "cdadab4086953a3e549e55dbf4e285d223bc7fa1235b72788909e0409532edbe"
+    },
+    "collections_runtime::runtime::add_named": {
+      "body_sha256": "08f5bc08f094e12b4c7d5b83849ffcae4eb153e20d9a3b9751e85b0171a026fb",
+      "ensures": 1,
+      "ensures_sha256": "261c0136daf25bbf751a02dc7c060467aed46a41b3ee536db083c76766bc3bf7",
+      "mode": "Exec",
+      "requires": 1,
+      "requires_sha256": "93619817fc971a1cf0e3850f3232f9c922b885f9800e05e2183189fcae28692f",
+      "signature_sha256": "b20ab330ed72455cd2ee2d79ec5a73db345d0169893940e89cd5f775d87db760"
+    },
+    "collections_runtime::runtime::apply_record": {
+      "body_sha256": "7862ee11c88cb7968101b9d2d225ab1a6c08d833497462e7873e7ae9021b2e02",
+      "ensures": 1,
+      "ensures_sha256": "133bbb7e2d90e5f696a10ead78a387c9b2a1b067e2f0eb0291259254709574ca",
+      "mode": "Exec",
+      "requires": 3,
+      "requires_sha256": "fc322701fcff4f9ad0fb292d1979288c835a81aedcbf1bb7429143966710fa5c",
+      "signature_sha256": "61ed7d45567a4ac87e61af97b6c8d16c1cb095a3f7bb351db4eb6d977454c23a"
+    },
+    "collections_runtime::runtime::class_framed": {
+      "body_sha256": "df9a7841c7607b6ab12cc7941adc2a7432b62da57f8c037124a8991b3c964f9e",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "c7dc8e2e52e6837fd0330cb234bfb562f8f5e031f90e03fb9d45660f624c6b3f"
+    },
+    "collections_runtime::runtime::class_keys": {
+      "body_sha256": "e053b803ac1d747149e73906600cffd237b4ace906255a233bdf2bcaf2d2ac21",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "556127dedc28e3972e53fae58e2da38a7cd3a548d670868284fe38d94101c6bd"
+    },
+    "collections_runtime::runtime::classes_match": {
+      "body_sha256": "bf597319b08acadb6864eeed9027185b7a94eae137146b1c72d9f9f72d46bba1",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "1e9723208d6c6146b6c6201d209772d278df51678e58c4940637fb7c59a2dbf8"
+    },
+    "collections_runtime::runtime::decode_number": {
+      "body_sha256": "13dd91e0574cfb34756fc4d346fc901e5ab2fcfa02b767af9c0289a66400002a",
+      "ensures": 2,
+      "ensures_sha256": "d2f76166e92943e4010c82cfda501ec51f3393b995a45c376f18d11c6d3f2253",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "61956a4c9c277ca5eb8e2f91c593a447c4423218e6ed54c98481c78d288743b4"
+    },
+    "collections_runtime::runtime::decode_record": {
+      "body_sha256": "dd789112bb5a19b1b851b1d7a617f4b5a03c122cf09143034ed8cf25c49d9a16",
+      "ensures": 1,
+      "ensures_sha256": "9d35f0dca25a2d93ef3431852d595914e80f642ba35e2092c67c64fd8d0cf9a8",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "5fa71fbb9dbf7aed4914bace56d3344f13c90c8c6c92e01f01b799a929bd4e6d"
+    },
+    "collections_runtime::runtime::distinct_output": {
+      "body_sha256": "1af146ccd27b0aaee51f072f7cc4c7d233879fae88657b5334d711d1c5dff196",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "558162666f4d59dc152973e6ca3b61a188f29101139ec5c61d8c4a9b2883cf7b"
+    },
+    "collections_runtime::runtime::encode_number": {
+      "body_sha256": "0e2d55d3e324ac11601c58680077f28c8bb1f1ff92b5186329e5b1f572f510af",
+      "ensures": 1,
+      "ensures_sha256": "683b4c736ec0284ac4358981fc9296c2d6e9a351baf567b9d114ddab57e83c92",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "ad18a135c34343f70baf722d602119b1919b9c7d1ef524d1aee971e28c05b152"
+    },
+    "collections_runtime::runtime::encode_record": {
+      "body_sha256": "56b187f0906e9dc0608dafea2b51206ae11196d02a6b4fdc2195b66ab9fc7fdf",
+      "ensures": 1,
+      "ensures_sha256": "b32faf333f72b316b3f0b8b21262f18624fa5544fd1214197e6f574ef0e36a65",
+      "mode": "Exec",
+      "requires": 1,
+      "requires_sha256": "cc61ba1c4c2cb59d32f3a03c77d0ada2c2127e717ec83285f80b1d22f5a7fee2",
+      "signature_sha256": "f4396c11da751ee1e5a91c3038009ef9b7a77a1e22dcb088033fd99e385e5304"
+    },
+    "collections_runtime::runtime::encoded": {
+      "body_sha256": "18b419f61fa5b93afa112c9256b441a74c30efc9127f18c9b40ecfba31e99af4",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "75000f3a9592af085688a71c91d1c3dcf43cc6a91098278dbb1a94c294029a6c"
+    },
+    "collections_runtime::runtime::encoded_length": {
+      "body_sha256": "871c0cdab2a7b5d1bb50bfc9815cd5e25f2ab6523a07a89cb72373efdb06a489",
+      "ensures": 1,
+      "ensures_sha256": "b71dc6328a8613d8060fddd062d69cd1d287416bdf7306cb52e0d8c9ffcc8fd7",
+      "mode": "Proof",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "d84d6e0f2086c4f38649bfc054977d2b2ca23fdc01a4b57ead7176e6c18dc6fa"
+    },
+    "collections_runtime::runtime::encoding_models": {
+      "body_sha256": "26ff30e19b47477b19140e5e338014612fa141ca967f0862fec65caf381d82ea",
+      "ensures": 1,
+      "ensures_sha256": "4a179f77c490765164b23c466b0e4efe804cda4b21989c5feb43c05d05a19c50",
+      "mode": "Proof",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "d84d6e0f2086c4f38649bfc054977d2b2ca23fdc01a4b57ead7176e6c18dc6fa"
+    },
+    "collections_runtime::runtime::entry_image": {
+      "body_sha256": "a46b9f484e22b1de14ef9e3aca81c9379582abb5c7802eb47124c95549be2d84",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "06ee8404005421be9895e94ff48c51aa3175ae9737f7f7213644987f4159b033"
+    },
+    "collections_runtime::runtime::entry_indices": {
+      "body_sha256": "5840eea46f9197314bdc00e684179021dba33793f5ba2b7851530eb95b931ba4",
+      "ensures": 1,
+      "ensures_sha256": "91dde2ebd91b65229ec019420ed8b77bfc18b1dd28384cfb44be2f2f8e99cb76",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "33eac1e7c7600ff07f960ea5e9112085f606dbe5d12b70171646cace8fdfdf60"
+    },
+    "collections_runtime::runtime::entry_valid": {
+      "body_sha256": "decb7fd38f4bd1051eb4f0057bceab9a45ad673202dadb026a197e9bffdb5be1",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "c4be414e05647285e65ff53c5203ad46ab0efe780b1904cff699cf7b1cfe04f2"
+    },
+    "collections_runtime::runtime::entry_view": {
+      "body_sha256": "d5d39b3fb70e1facfb10369564b776a3a494c7799f5ef9877eba69f10b09f6fa",
+      "ensures": 1,
+      "ensures_sha256": "b4e9ab97060d33b654483fe5239771dd7231d0d8aac7fd306d57077d0aa0935b",
+      "mode": "Exec",
+      "requires": 2,
+      "requires_sha256": "84381d9f4e40ba92ce33ebda6b16617b689ab91ea6b4400cd0d35f1f8afe2191",
+      "signature_sha256": "30baa520171e90fee77fd89f1b0c82663ef5c453c25f4233ad7d4d79e32dab40"
+    },
+    "collections_runtime::runtime::entry_well_formed": {
+      "body_sha256": "b01a31c78bdae64e2e8819f359106c61fad0270fd22c033c004698278fb1e3c4",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "c4be414e05647285e65ff53c5203ad46ab0efe780b1904cff699cf7b1cfe04f2"
+    },
+    "collections_runtime::runtime::equal_values": {
+      "body_sha256": "3f0254c6dc3dbd2ded82f91a30f919f78f7a1935574377f0f23e91e486c5135c",
+      "ensures": 1,
+      "ensures_sha256": "6088a01ec3fa30d117a3de18a8d8a86e5cb439b01f1e1a95e8396d6cabede3f1",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "ab41a019fe8d63ebf0c0d728412bff0dfc00629fc3b1708ab99c3a5c59ca7e88"
+    },
+    "collections_runtime::runtime::field_bound": {
+      "body_sha256": "b1e132c7dbc79aede58fb9a03272bc6b30cc9109efa5f2217f58275310a62310",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "777565cb05638d2a45dc14d9e68c0262f835d7398e31bb739900ec02682fe1a6"
+    },
+    "collections_runtime::runtime::field_bytes": {
+      "body_sha256": "2a643a99cfe8bcb747e990d49fe1d2beb5419af128fa0e68120368d80244a035",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "45deda6057894d5f41a97e491ad1bfb1fb2f1f7ce54f1bdb6dcd7e25779dda39"
+    },
+    "collections_runtime::runtime::field_id": {
+      "body_sha256": "0cb92953e1b4741cb4c4b341764e8f29877d642ee7a00b9bfe517cceebb55cf9",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "5f4e3c24396979e5aec47c710c9fb3f8e31d847f4525f321a2e4cbbac9cae6db"
+    },
+    "collections_runtime::runtime::field_model": {
+      "body_sha256": "377159cccc0c3463ebae6e0f7f87f0b48302cb8f9f261f41bf4c7c7a465d6bec",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "67a02376e6be166bed0d5787b4a6e839ad6dca94b7c95d5aa4cc18f2bb3baa5d"
+    },
+    "collections_runtime::runtime::impl&%0::frame": {
+      "body_sha256": "b984338427fccd0f8aa9de59f0978fc81d5260fd249a9807787822a9148dd636",
+      "ensures": 1,
+      "ensures_sha256": "61527fcd3c40d6178dbf48973b679bb441173010656c4a635cd9c77244cc80c0",
+      "mode": "Exec",
+      "requires": 2,
+      "requires_sha256": "eab552199daf6e841b363b025638911f0934f54adb8ad991088122836a9c0079",
+      "signature_sha256": "5f40e064c9e9b2c4cd5c7f3f0e436a6885ada179107c3c9d3d516f8d7babf845"
+    },
+    "collections_runtime::runtime::impl&%0::writes": {
+      "body_sha256": "0fc661f4fe0b6e823ee193e9e58b6af78c9aa9637175b160726209389aa67da4",
+      "ensures": 1,
+      "ensures_sha256": "eac8104f832c92281284408d7bb915978206993899f895e9819902ad09e1bc41",
+      "mode": "Exec",
+      "requires": 2,
+      "requires_sha256": "9afecfca30f91c7dc884c3cda7b085e439f3191e4fd18c852014a31f6bbb84ee",
+      "signature_sha256": "b319514a840acf47a23e9cd96ba12df686b91840b086868a39cd8cd32aba4ee1"
+    },
+    "collections_runtime::runtime::impl&%10::clone": {
+      "body_sha256": "f925135c0e4f3754c3ba074a659b4341c5e571c0a2a7b89f59dc7bc0b7cc5354",
+      "ensures": 1,
+      "ensures_sha256": "18732e0bc48985beb99c44ab6a57f28b6fbddc6d87af936dbcf3eebab3a5861e",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "08e1032f540a5826219168af306ec5f0e9d29dd2f032833dc38bd4ca8d0f8b05"
+    },
+    "collections_runtime::runtime::impl&%16::clone": {
+      "body_sha256": "5bdd7a815fe95d39f40fd977f25714725806ba1bce3c69af0f15da45880567f8",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "5832eb02be4d6255fd6a2e522f09fc5be5f41cf9d795d6706b803e4b596dea46"
+    },
+    "collections_runtime::runtime::impl&%18::clone": {
+      "body_sha256": "6091e54fd9b5fb5d4cf18370db014a0436c7cfca8a213d75c4c374867a26e5ca",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "25f792fe53dc92ad5cde935553ae5cf240a90551cc393b8fa38bc16bae48327c"
+    },
+    "collections_runtime::runtime::impl&%1::merge_group": {
+      "body_sha256": "0c04602d73b924d0ca10750fd59b58982eb18f45ef571eaa228dd0fce195c0e1",
+      "ensures": 1,
+      "ensures_sha256": "210538f32300267c439efdc3ce96f40c7b319aeecb9de22d88da0a3e1e3f4fd0",
+      "mode": "Exec",
+      "requires": 2,
+      "requires_sha256": "ba833ce3b980017de79836a4ce29b6de0200606cf15ce2b43c7a62db19863524",
+      "signature_sha256": "d968b9e124437a81434e688c73b7e9362e8d5de5d0ae7a12376ebc5f1c7702b2"
+    },
+    "collections_runtime::runtime::impl&%1::same_group": {
+      "body_sha256": "8b297996d39ff080799ae9b32f4532d2b156534ef7ba83f6a4fd1e8cee998628",
+      "ensures": 1,
+      "ensures_sha256": "b662ffb4bfaf7bfcdcff987cc757ce52659ff4c95e0a39e6b5396b8e33e6b61c",
+      "mode": "Exec",
+      "requires": 3,
+      "requires_sha256": "5ce7015d0e980f4ef08dbd9531d991803a3cab81c357f4464551fc251d490c8b",
+      "signature_sha256": "b85582c44cfad65a51b5f64e5c76f0ce9f5447dac2a07fb6f2c4e0d99205288e"
+    },
+    "collections_runtime::runtime::impl&%24::candidate": {
+      "body_sha256": "22ad583d8d1e0ef84a778c6f4c22ff17fbb1d3241c0d5720f357a0381d8e0631",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "be5870ba379086992faabb8d45299e50cec822154ee5708f427a9d2d82d8c155"
+    },
+    "collections_runtime::runtime::impl&%24::changed": {
+      "body_sha256": "b7888ebe13616487405c91012eff233a56dbb5363ab2a7ed6974522569d6079c",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "26fac9f6f34db7d00e7b677cc0f1f9a02a5c4138147c717aab3aed042d0b362c"
+    },
+    "collections_runtime::runtime::impl&%24::chosen": {
+      "body_sha256": "69029f3caccfaccc2c2fe93368a23e47aeff1501310c3083e74e1b03ef5b12f3",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "d0ba9c891286060d69b81113262214924731ad339c25197d4aa5cb2e14b4c18e"
+    },
+    "collections_runtime::runtime::impl&%24::framed_valid": {
+      "body_sha256": "d958d979cea8d057270e9b3dfdd8ebccecc9bf98d37ebbcf7db40a534e429a10",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "66fda6d296b3a69bdd6c416170e08c812bf4f2e77c566948ddaf7dcd83e86e9e"
+    },
+    "collections_runtime::runtime::impl&%24::group": {
+      "body_sha256": "a8f3d29de0e070a5ec053631d2b18c2dafed96c6f887fc632bbc229f2ebffb6b",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "28e7cf5d3a14e3841a2fd54b141cfe8656e73e645516201e5fb11309f567de23"
+    },
+    "collections_runtime::runtime::impl&%24::group_changed": {
+      "body_sha256": "3b2faab978d95db0ce5b11d968c563b564fa53314495ab2580b7161f90746126",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "26fac9f6f34db7d00e7b677cc0f1f9a02a5c4138147c717aab3aed042d0b362c"
+    },
+    "collections_runtime::runtime::impl&%25::named_prefix": {
+      "body_sha256": "b686df409a8ca62768da11406f56b06aa267626403361f43354e15c4f1d468d9",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "73205ad86a4aad90f5b27fd0647951eadb8d57fed82c0cfe20f097f3ee6beebf"
+    },
+    "collections_runtime::runtime::impl&%25::named_prefix_step": {
+      "body_sha256": "13a1d1b617f11dac976548d37437cb31c95508e2b51e8d51dcc7663dd9954e83",
+      "ensures": 1,
+      "ensures_sha256": "c32c12b1894cc7406959b05083bed3382acf1e07bc7a1aba9e1f0df169c70a31",
+      "mode": "Proof",
+      "requires": 2,
+      "requires_sha256": "a500d1559322f830ef8c4919fa29f6eab775f732a4ebe5e2c813bace5aba48b8",
+      "signature_sha256": "2e264c79c1785b46b97c34e0eeba8b982a0469dda2061d4f54a5395eea239266"
+    },
+    "collections_runtime::runtime::impl&%25::output_item": {
+      "body_sha256": "3308ffa13690d9023ca960aefa0736a15c6985967ebe1085953a53c95c8a0cf4",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "53ed5ef09a5875cdc164ad97a73585e0706970d9b21f7cdf395c8c11ab3e0be3"
+    },
+    "collections_runtime::runtime::impl&%25::output_valid": {
+      "body_sha256": "5662d214ce13ccea3e196100f2b4093d83e03c673eae5a0871b6759cdcb9a002",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "f9d2c539e2eeb4520052e7e9c9070d436918af5d3d714b73e4b96b52d1b7e2a8"
+    },
+    "collections_runtime::runtime::impl&%25::pair": {
+      "body_sha256": "f282edf10fe8b4664c2c8b5fd9aa0f95a8d42b07f7e190227285df7f6ae1a970",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "62160916d54aa2a5d95695e3c4afb1a05135da34591b67705d5572c1246904a2"
+    },
+    "collections_runtime::runtime::impl&%25::scalar_output": {
+      "body_sha256": "4226bb7a3924091626cde61ea0ea4a92e4f88e3c8ec95b2fbfeeedb2fb1e89ea",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "4c6da1f7d86a17bc30fa00759351ae94640b6b0790845651e8b44126fc05eb21"
+    },
+    "collections_runtime::runtime::impl&%25::writeback": {
+      "body_sha256": "fff81108c59eeee1d19739b9a05e8dbf03df96a2cfc043a8e689d027dcae25f7",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "a9f87bb5d7042d544c57c580fd8904d2521c3a12ba9b09e889b3fd394553a28e"
+    },
+    "collections_runtime::runtime::impl&%26::input_indices": {
+      "body_sha256": "31989be02b78b7f251ac35393bac5905538cc0427057bccf8c6aba98276a6f8b",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "16ffe22062cbd02c2541d6de37b44cd42b2e3e18079d012d2cdcfbc407872599"
+    },
+    "collections_runtime::runtime::impl&%26::input_position": {
+      "body_sha256": "e582a69909ecf48ad8244ef521cf1f3e113850ba69c605a94acfcd04c41e5364",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "cea92cfc6949593652ee73fea6161b5bf6bcd2e5daeee6a20b8d477c21135b93"
+    },
+    "collections_runtime::runtime::impl&%26::inputs_bound": {
+      "body_sha256": "dfc8d714e87c9805c3827f87dacbfee5755f262836deaca3ed26c68baeef5643",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "827c9dd78ab308320c7a6ffb8a619ac20f7e7b4aa5b80be1388a142239d6d67e"
+    },
+    "collections_runtime::runtime::impl&%26::scalars_bound": {
+      "body_sha256": "4ab19f7f1544502aaaf15a6d860c2b7d45180e4ea9e48ad1e1eba0330f1811a9",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "ceac09d701cd9dbc1314b03157e580a5b08d0904c3dc00d35f726d2139ef41e9"
+    },
+    "collections_runtime::runtime::impl&%26::state_bound": {
+      "body_sha256": "446deb57fd657225e163302f63fa155d5a2d2184589ae875d75140cf795486a4",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "a0be81d9ab19cf272bd0f523e3fd64d74db536a83090a15a9f80e0feb23c5022"
+    },
+    "collections_runtime::runtime::impl&%26::well_formed": {
+      "body_sha256": "f545172489433a9dd597e4122ee10c3ad59e7f2845c70d377743807883b85510",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "b1f19152ceb2a977a251493c18fd15ff8aedb50433d811ed415eebbf312a4ca6"
+    },
+    "collections_runtime::runtime::impl&%27::actual_allowed": {
+      "body_sha256": "fdd367a6672b9e71af871c474fa8163c303f67dac92b873ee47b6173d15420ac",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "dcbbb08e0db9af1ed3ab773d215c99bc23ad9004c36b339ed0f8955175c6d92e"
+    },
+    "collections_runtime::runtime::impl&%27::framed_from": {
+      "body_sha256": "1634d0af7c3f2954bdefd8976ec0e4fc813a751b12c95baed912741835f4b77e",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "b7e1705fe29e09585a67efeddfe6632a826ce21550d91aa757d2c74223d77fe9"
+    },
+    "collections_runtime::runtime::impl&%27::names_bound": {
+      "body_sha256": "54cd596c0e0122387b03f04c4e3de5729fe9e619b32d5b45a060bb354ac4888b",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "8b086553ad0948488e8364b8f102e78a25382dcb7d43fea25f31901d700011b6"
+    },
+    "collections_runtime::runtime::impl&%27::names_step": {
+      "body_sha256": "f52bec84b327624fd13a67695cfb0a1655dffb8a5ea55ea33392542678cfef8b",
+      "ensures": 1,
+      "ensures_sha256": "b466de8a2bccc388a3d5bd432b426fabfd5b58c62cdab7cf1f61bb133cd944dd",
+      "mode": "Proof",
+      "requires": 3,
+      "requires_sha256": "e97d132f9d45cd76e8f61cb790bf705a41dfe2753a7649d7714b5a5ee61eb91f",
+      "signature_sha256": "4f12e8bed44c4e67289170ae8c9465deca7dddf815c0a12b13c37e6df5688be1"
+    },
+    "collections_runtime::runtime::impl&%27::new_entry_clear": {
+      "body_sha256": "96e2d3f5644b090c414d9c53f9622707eca9f87664ba9a466dd3696c39bedec4",
+      "ensures": 1,
+      "ensures_sha256": "b5c2ce41d121a2e1126cfd45b9c08473200d1721c108527c7b539a1928129c57",
+      "mode": "Proof",
+      "requires": 3,
+      "requires_sha256": "f32ca4a09ead07f9d23e1bc5e84d75fe3335880d1143f710f3df7e7c2488b1dd",
+      "signature_sha256": "050b337ce2cef543b936d91d42ec8f20b0c0e15d4b1c7dc4512e09ba56904102"
+    },
+    "collections_runtime::runtime::impl&%27::raw_frame": {
+      "body_sha256": "495018e04b4dff28d3410cfe9b0c5ed7a1b0e6fdbf7e271a23b5e09314d8c0c8",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "5fdd739e3c857fe7971b43d45626318d83f7e746e24add909dcfa5fe7038936b"
+    },
+    "collections_runtime::runtime::impl&%27::records_bound": {
+      "body_sha256": "761a9e00ad5865781361cd31c073b5729a0eb9acdbb0d66262635702091d4ffb",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "289f431b12b38d2f1c21d4c675259682f010aab69d23d082f759eca20313105d"
+    },
+    "collections_runtime::runtime::impl&%28::frame_is_valid": {
+      "body_sha256": "cb6f37d2ca72a60f1deac320cccf9b0d8636e58b2d81c09663c25897034d5f20",
+      "ensures": 1,
+      "ensures_sha256": "eed0e619c67f3aaf89645eab3bf3249d303696b3f8da422c3eee1c5461ea1c80",
+      "mode": "Proof",
+      "requires": 2,
+      "requires_sha256": "19c103cd33ee656df763b232f691b3b243fc3402f182a4b7b8461dd1ae114f0b",
+      "signature_sha256": "484ff128f1fc9426e231f7591ec5ca42c1d2e5dfee7ade392fc963e5329c0a28"
+    },
+    "collections_runtime::runtime::impl&%28::presence_not_key": {
+      "body_sha256": "5ef4a9f52d0d69d03cae5912bb3dacebaa51ac71b1fd6da85f34f2288b2f47cb",
+      "ensures": 1,
+      "ensures_sha256": "46768bbfd7cd3c83320d73dbb650f007ebfb733a2d918a9263c0b16e5a36b0e2",
+      "mode": "Proof",
+      "requires": 3,
+      "requires_sha256": "a68dedc960df271e3f57ba1ba1ddb45f8438b82ad7c97666ea2d4b974c108275",
+      "signature_sha256": "050b337ce2cef543b936d91d42ec8f20b0c0e15d4b1c7dc4512e09ba56904102"
+    },
+    "collections_runtime::runtime::impl&%2::frame_input_keys": {
+      "body_sha256": "a009019dc8639f9d1b75f164bc7b2c817a0e92b211fe40a7ddd50133e7f1ec0a",
+      "ensures": 1,
+      "ensures_sha256": "e1620cc2632840def1cf55a04e0e630c50a447400289764d09d550ae2728adde",
+      "mode": "Exec",
+      "requires": 1,
+      "requires_sha256": "d55fc43b094892a469b57d184629aa525f6d596ba694575a369553f10dede6c0",
+      "signature_sha256": "258561c314a83d610f761e0c3ef4544e5c4e5ecc72560bd0d437adf4a8fd2d56"
+    },
+    "collections_runtime::runtime::impl&%2::frame_scalars": {
+      "body_sha256": "78bcd38df30d7fed7e22c22914bb2107ca42e37b39da6c5344af9d49f98fc8c4",
+      "ensures": 1,
+      "ensures_sha256": "d2053a954fe5483adfe5548219012cb893a8261fc5687df7bb5eb53c092fb5bc",
+      "mode": "Exec",
+      "requires": 1,
+      "requires_sha256": "92957fd6834f335c459859f3cc46fc07748d00efc7001ee5dc651b8c2b497bdf",
+      "signature_sha256": "1f970f77414f327401fdd139227d1b1161dfcf6624013e4f71abb5fa0f3c022c"
+    },
+    "collections_runtime::runtime::impl&%2::is_key_position": {
+      "body_sha256": "34812fa325751039799ef2484521519f39262bbda58a13a22e2aa212c71d6cae",
+      "ensures": 1,
+      "ensures_sha256": "405f38f152972a346cf4c1ba39377175e73c834818718156a41682410efe76e0",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "985b1a620752ab34069869a891708537d1d5e47ca93857ddb0344948e8e938be"
+    },
+    "collections_runtime::runtime::impl&%3::clone": {
+      "body_sha256": "b3ddebd45daf76348894c97f517accadb7a7d332c505a0ba6ab21913d089705a",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "c67300b5764b1e2fe40506d05b143b6af529e7f55006f1458e3f1e94f5ff4bbf"
+    },
+    "collections_runtime::runtime::input_key": {
+      "body_sha256": "f9dc88c4f3ebb830cdc1938b3b3eabe4c2894e117d96cb6196b95b957151bb94",
+      "ensures": 1,
+      "ensures_sha256": "3b35b67fb9f414f877355d174d4062596b394899058cf23588a74f22f96c4c68",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "35b6b33f538812e041843639141a2b0769b2a3f27715342f855d25f2d72de4c3"
+    },
+    "collections_runtime::runtime::input_scalar": {
+      "body_sha256": "ae6e0a0dc1e6cfdc4dfa453e28c5b3b02d7f04e3a73fe422936454dd45606897",
+      "ensures": 1,
+      "ensures_sha256": "c57ba3fab9e2136ba16619bec538ae02faa0ce18aa30acfac0832828f90a573e",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "e550483b02ba1dc41005341715cac0796823962fa2c8b536ba880544613d81ef"
+    },
+    "collections_runtime::runtime::intern_keys": {
+      "body_sha256": "bffba14016fe252faf72f43106bb5db7e58c0f7bcc98ae1bbb60a20126f11f6f",
+      "ensures": 1,
+      "ensures_sha256": "c60c2055c5c4d8cdeeda5c8c384864b7d99fc6fed99783086e3b566a16c32914",
+      "mode": "Exec",
+      "requires": 1,
+      "requires_sha256": "cf2044d9f7721e5ff77c2bf1f37debf1cc6ee24490519d1da8c1fd2b5c680f33",
+      "signature_sha256": "d86ae84d50e436cd90a502704c970567b0c1e838472bcc6bf8bfad63edd83cc5"
+    },
+    "collections_runtime::runtime::key_binding": {
+      "body_sha256": "c2e4738fc9ef73b16d9ddd3a1dde983b8b9c269dc083727069580bb73db523eb",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "0b3fe559007b587513a19b2bc6b6d52eec33aed96f04337a5d87c847bbbed3b6"
+    },
+    "collections_runtime::runtime::key_index": {
+      "body_sha256": "a9942cdc487f48e933a73cb461cf93ba267c8b932fd8cd04b3b0f571a99adefd",
+      "ensures": 1,
+      "ensures_sha256": "f7931de9d76bbe293bb3ec31b69932571f06d0802d7a78a657d9fd97313bb535",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "c12590584f6ac9610271fc07468bf9a9b7b5a52c77b3eb30d0cced4faee64290"
+    },
+    "collections_runtime::runtime::key_prefix": {
+      "body_sha256": "38e007d5b5935dea57dd9ebc09fbb8266e135409399f40a2995e03208ad99495",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "5e24a8e0d3dad6613e8ed71c72186ad221c41b58825d6d86601cd18e925a3ed6"
+    },
+    "collections_runtime::runtime::key_prefix_length": {
+      "body_sha256": "38b23bbb3326ce7874b8cab0ef952e6d92a57289290f7d143f7a059a3942edf4",
+      "ensures": 1,
+      "ensures_sha256": "8e9f9c06fa81c8bb356f92b47d7a002fc2bd64af483031a0823f4111ad5b7930",
+      "mode": "Proof",
+      "requires": 1,
+      "requires_sha256": "52a27455ea38b94a794f1da5e8c9a57c54c8ecaf31303d95936341f4f94d7f57",
+      "signature_sha256": "0b434f6397adb68fcb67f6523902240a8475e7280162b5c13850fa42b5fe5890"
+    },
+    "collections_runtime::runtime::key_prefix_unique": {
+      "body_sha256": "829c3a87102e8550b822685c75e2441a2e11ac13c23cf7394d33856854324919",
+      "ensures": 1,
+      "ensures_sha256": "c2d8e70acd02fdfd70beaaa7a9673084eff3fb42f0f45ba55265fb21d80b328d",
+      "mode": "Proof",
+      "requires": 1,
+      "requires_sha256": "7c6da33823ba4aeae034087172a2b15d12cfad2be944f62bd5a2be930987bfd3",
+      "signature_sha256": "0b434f6397adb68fcb67f6523902240a8475e7280162b5c13850fa42b5fe5890"
+    },
+    "collections_runtime::runtime::model_encoded": {
+      "body_sha256": "88aa69e50984c39777491163fdd89bda0de13ff4532a8abaffc99a79d639112f",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "94f19a5e0e83106f494df3722f67e60bda5b12b75e8bf799906d2b553747d596"
+    },
+    "collections_runtime::runtime::model_field_bytes": {
+      "body_sha256": "4e5f95d5d3947546c0ec6e738a912cee6018c24347c8df141b78d02aa02c1b90",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "160bbe6c48e8cdaa4a344061791ce9c448c060d62968c6d557f3afdb080daeed"
+    },
+    "collections_runtime::runtime::name_added": {
+      "body_sha256": "0bc5ee4d2561e6da471f7668e5c8f8c67fe9d2429ee144cd558828f92eb4e1cd",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "965fa6f64a9ed070542b2b348fb49d3ae2946374d930672c60fcfdf88cabe3c2"
+    },
+    "collections_runtime::runtime::named_member": {
+      "body_sha256": "91c70df3495949e2230c86abacb063fd33725efa6b9230edbd8b431f938d2835",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "09c9d3e581bc0673c6572cd17f469018b592a925aee2db26714ccde19a4b2358"
+    },
+    "collections_runtime::runtime::output_pairs": {
+      "body_sha256": "2c2ab91580c88b28fe96633b78243ed07b86a9a9a49ddc5b4aa5da291b77d06d",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "65bd777c5fe1aaf600da83c3ae71a6bf585099453d558d4d5ee2c37fc721fe4a"
+    },
+    "collections_runtime::runtime::parsed": {
+      "body_sha256": "4f1257347c151b70044821bc223d7b913a853312e9fc32780bd9db20fc814a4c",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "c91436308b42404e3a5d54c579b58b52d702a61ae17209815a1f7e357e5f2f80"
+    },
+    "collections_runtime::runtime::post_map": {
+      "body_sha256": "2ab1ce857fdf7957b54f518f77f5f8ce85dc859a602910a65bebfc1854675175",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "590f533b077365a6ed0bdefeeda2be94f8afa4e772706d21985d2ca8577bf722"
+    },
+    "collections_runtime::runtime::post_value": {
+      "body_sha256": "ae3569116b3641c46408f7f5679dc1a84a25c3653d56a92c790170545c6a99de",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "4352c65e45ce0cd60ffbf2b40ac3d55e10e61d157b642b278d12210669df3145"
+    },
+    "collections_runtime::runtime::prepend": {
+      "body_sha256": "da37bd9080bbf1f09852dbb5d1cf1496510b4a263f09a993905137995d477277",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "2a2728f6c996124bf3251462718998e5888859c965f4240f0d49d5645aa32da8"
+    },
+    "collections_runtime::runtime::prepend_associative": {
+      "body_sha256": "ebdafe30edeae751869a2476c7fb17fc5c2dc2b8051ba78902e7cd902b9ba085",
+      "ensures": 1,
+      "ensures_sha256": "5bfb3b5bd52b735dbdcb622f18ebfa1bbf7c21217c913db1949f8979200cf5e0",
+      "mode": "Proof",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "e8250ca2ba84fc3dda6fec9c68e492afcd1876c02973899b701e81fb168b5dbf"
+    },
+    "collections_runtime::runtime::raw_fields": {
+      "body_sha256": "d850b592b83f3e7cdf2972b4ccafd6c66bf991566f1d33e67c8c98a191759b6c",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "58b5c2e2e9f5b70a516c09e33f5fc04e8095fc54dc20d900d8cb85207697e270"
+    },
+    "collections_runtime::runtime::raw_keys_valid": {
+      "body_sha256": "fd7f792bc3ae6f3bfa499cf40c15f79b52dad6045e7dc1f8ab315897f3490bfe",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "5a55998b43e13bfafe57f25cd713df8972307aa454310304021f81cb7cdefd16"
+    },
+    "collections_runtime::runtime::raw_record": {
+      "body_sha256": "b39ce0abfd3ef4f010411d8bc7c9aaa251d2b9b2475a3472a2ed23f9408270f5",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "5894b16360574341e2ae6e74980b816f61ef15db0bfa072254e18e7b1eabb509"
+    },
+    "collections_runtime::runtime::read_post": {
+      "body_sha256": "3fa41a6876aca8b705d5ca18b67cd5f74c23211d0b26f2a885935bb4d33ecc4d",
+      "ensures": 1,
+      "ensures_sha256": "bbc1c6d9d185a25cd0ad991f44ce9d19097b5287e2376f6dc3ca7b60b551e85f",
+      "mode": "Exec",
+      "requires": 2,
+      "requires_sha256": "e209b60b331430537cb407e6b3ae3c5c7e3e5a5c73f0500308d47c3b8322f8a6",
+      "signature_sha256": "424c59a99cd418bd121175c26489bc15eaf7abfcd0d393f50945660b9e9c172c"
+    },
+    "collections_runtime::runtime::record_alias": {
+      "body_sha256": "5f6c76aabdd147369597bb6e9e0c125a1ad6fa08adeff04e8030092cea2f81af",
+      "ensures": 1,
+      "ensures_sha256": "eee6097c4a02469f09dcffd80d9ace450d8b197a5bf4394b429200604aaac205",
+      "mode": "Proof",
+      "requires": 9,
+      "requires_sha256": "20c5ebb6e111eaa178d4debac53bb3bc6ad7a0efa7bfc863b4c737f125d5b641",
+      "signature_sha256": "e2ec36b15540bf75802bf21495b487638dd2e26a727acd3ee248bc2ef8be76f2"
+    },
+    "collections_runtime::runtime::record_bound": {
+      "body_sha256": "6f07c400bba1c120c659a4d4ecc89a2b5a4752ab240d4baa1021d6806006380d",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "bcb4a7a793a5c7bcc6b280c90e9c3dabd8d282aa39150adbe84a4621ec5b9303"
+    },
+    "collections_runtime::runtime::record_bound_preserved": {
+      "body_sha256": "39a115df8c8939900898aa75e1bb1cbd2e8ac2289b75c0e1be4af336c45e3c09",
+      "ensures": 1,
+      "ensures_sha256": "dca5ecb6a64349b2fa6797b198b65bd460f826efed2d78ce10fe5aa6692af354",
+      "mode": "Proof",
+      "requires": 5,
+      "requires_sha256": "2f3b6754d204b7a452141b504f382d34236344d4a2f13408fdbfacd3e9d83558",
+      "signature_sha256": "860ceafe1a1ef4f1a20013cd2f93e5b0e3e6ece8f93e7b9a80d0a5056a2f3463"
+    },
+    "collections_runtime::runtime::record_footprint": {
+      "body_sha256": "87cda60eee574b99c3043e8d40c86532d8a446444a014d49ad6aa0f35bfef21f",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "c11e7fd0c8fe6543fe297d6931f791ba8b9441103e06468dc64184f9663e8151"
+    },
+    "collections_runtime::runtime::record_for_view": {
+      "body_sha256": "a14eedee697576d1ac9236c3786c67ea28049e5d07b6fbfae4656f5f9297d9c4",
+      "ensures": 1,
+      "ensures_sha256": "a12c5fc10a6a58f48e2119f35872c6376d5b5530151836d8a46c480e95d84c64",
+      "mode": "Exec",
+      "requires": 2,
+      "requires_sha256": "e2bbb65f4aec8a5475874345b9b852d375e10a81b018a5971b4e7c17560c55d4",
+      "signature_sha256": "ea1e55c7056d500005af737e9fb4cec4095a8347010261cfa76f899ace33f30d"
+    },
+    "collections_runtime::runtime::record_models": {
+      "body_sha256": "cfc7250fec3ece3bf870e91c440b1759024aab0c4f2bad52a9d8b5114363da69",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "1921e539084aa1673a542632dd325d05c9575533601e9ded4bb7a9905c42ee7d"
+    },
+    "collections_runtime::runtime::record_view": {
+      "body_sha256": "4e58168d0a2f8b02c278d0cd7f15344ea2740cf64a7d4341bd43e3247e3a7381",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "60b05d3dbd959a3fe5b0d749aaca88c4ebf7e902d4a67e74badc79c5969cb7ff"
+    },
+    "collections_runtime::runtime::same_key_class": {
+      "body_sha256": "7f7def73d270fd20b6ff6f826ca88711433cb710722048b1d63e1f978a1d2e08",
+      "ensures": 1,
+      "ensures_sha256": "7b215920bca9bc59eb67cbeac61330a232830e01cc5cf71860912f59d72ec420",
+      "mode": "Proof",
+      "requires": 6,
+      "requires_sha256": "15ebd320b0000d4f0e9141b99e19ec68ffd7b9d7eee7a1683f278e789d4d3581",
+      "signature_sha256": "8ae9df32c0f46d712dfe4ddd8bd0d95c6c6190e996c211578738c09fb45268f2"
+    },
+    "collections_runtime::runtime::same_schema": {
+      "body_sha256": "6d9d715d11c768f0aa4e806f7af13976ef53a612194c72b1b838457bb085698f",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "77ac75c2f2c84ba85eef9e11c90e27ab6a11af48b5d00ee6f7e1a0483e745160"
+    },
+    "collections_runtime::runtime::selected_keys": {
+      "body_sha256": "427ac9a78dad19982267859b0e78f88b42bb78214eb92745d603710d6d8b67ba",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "36f1e44a319e84c63ea85a9bc43a3e51303f0b90815fa717a306d18ee8dfec6e"
+    },
+    "collections_runtime::runtime::selected_scalars": {
+      "body_sha256": "38ec000d279eb41fa895c3da5c96c82108f433df3753321a1b33fcf58eaf5986",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "f723f2c00f8616ef0314b068a8a1ace09841674cd30995e3fafc579ca6bdd31e"
+    },
+    "collections_runtime::runtime::stored": {
+      "body_sha256": "956f976289b0c52e4980bbfd1e8a8b87846f0d4fea210099c6d93fa5f92bc839",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "20681468c853e33795014029bcabbe2974e265e586b3e6e4e051ecb9eca9b454"
+    },
+    "collections_runtime::runtime::touches": {
+      "body_sha256": "a34a7ffd4f23fedd6b135dc04a684cc46f9b5fd323877b2fa4f09839282dcd1d",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "5a111ef12348edf2c8cef0cef66b3755f6b72e3d465abb34b5f91b558561e51c"
+    },
+    "collections_runtime::runtime::value_indices": {
+      "body_sha256": "0cafeefd88a3437227f839dcdc8e82954170a41b1744adfdab34fb1892669d69",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "44233f444eddd9d41721cec84c0b728734be8a30cff9028384bff61e7d0f06d3"
+    },
+    "collections_runtime::runtime_codec::append_byte": {
+      "body_sha256": "de1f05fcaf11a5747531e4edec44ba882a0db93d395d308919c81f74c40b94c1",
+      "ensures": 1,
+      "ensures_sha256": "6b2bf66ff116f56a9f97f62132a7b8d19d413f2dc87d190b8340c8f1f0738e44",
+      "mode": "Proof",
+      "requires": 1,
+      "requires_sha256": "bc2ad79e4dc5f43c4f444c471002c882a7fd3a3c7d40e4dcc36935a42e0d6153",
+      "signature_sha256": "ccd0b370c2ee94d2bb1ea0a4fa169b1376c9a8f4d107fecb17723163b7653ba9"
+    },
+    "collections_runtime::runtime_codec::bits": {
+      "body_sha256": "7f5cdd6846f1ba68f1365e8d5c8f76d211aad127d99a2edd6b6a301a58566f75",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "4e497e56862b65d37d5163327fff0b4ea8b5f7225df5643d53a446c04cc598d2"
+    },
+    "collections_runtime::runtime_codec::bits_contains": {
+      "body_sha256": "1bb7913295c2b7c1d6997031ca987d04b0dea16180b7e23fd8bb3a1cf5b1d061",
+      "ensures": 1,
+      "ensures_sha256": "499e9d912c060c5702289bc8ea7db5db6019c4f8f2168346eb79ee3cab537f12",
+      "mode": "Proof",
+      "requires": 1,
+      "requires_sha256": "82aef6034fffc906b9e8ec6be9be2f8f90c61bad7e2ed8a592307d31c67f9be4",
+      "signature_sha256": "2f00954ca4749d9682172da43fb05f3ec1116de132dfcadda085665144479dfc"
+    },
+    "collections_runtime::runtime_codec::byte_at": {
+      "body_sha256": "c98d5a07030d235b18eebb0761ff27bc37b7d8eb213e551db3b0787b8a6daca0",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "db0b820be8facb195ef776e75ef5c88bb95884ae8c5c38dddeb41028c9380e6e"
+    },
+    "collections_runtime::runtime_codec::decode_encode": {
+      "body_sha256": "691e482f67f9703b786ebd6ed93ae090be88a168ce73d751cfb31bac0e9a5fb1",
+      "ensures": 1,
+      "ensures_sha256": "709c5649b55a25264618a5fa41a9d540bae2f91a46dd7a9ba02127aacee4603f",
+      "mode": "Proof",
+      "requires": 1,
+      "requires_sha256": "3e02b1fd97dc7189aa298d77f0602d572a9efc1ade5f5387f3db05f2996a9862",
+      "signature_sha256": "2f00954ca4749d9682172da43fb05f3ec1116de132dfcadda085665144479dfc"
+    },
+    "collections_runtime::runtime_codec::encode_decode": {
+      "body_sha256": "24de671345087c471ac42f5a532ef894f675ab5e6f38b8f3c631c6ea12c35b4d",
+      "ensures": 1,
+      "ensures_sha256": "4d646abcd2b9c884f9db34d3c915c732ee0ffedf71eedf017d4190fd30cabe00",
+      "mode": "Proof",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "c86b368f74a69e901c5825fae544415714b5d65eb8971aea65f52bf01494e0b1"
+    },
+    "collections_runtime::runtime_codec::encoded_prefix": {
+      "body_sha256": "3a62a967b06d52c5eeeace24bc276f121d94f155f50d86f8e9475609944e9c86",
+      "ensures": 1,
+      "ensures_sha256": "b1205b7f82fad84d7f2d49798bb875a88a0046af0e8f2416a3be60dab3c85ce4",
+      "mode": "Proof",
+      "requires": 1,
+      "requires_sha256": "1c7c22e8d678cd928df8dfd376622f3d3485f74cdf31ff7372bcca510437c55f",
+      "signature_sha256": "b18ae25fdd6d68bf598402c25fe8bea7fee6b084b69f60b7f59d918419a39fdb"
+    },
+    "collections_runtime::runtime_codec::low_byte": {
+      "body_sha256": "9425c4cf8891c322bdfdb278cec557f5e92bd90f898e7d33c5c65692e336ee5a",
+      "ensures": 1,
+      "ensures_sha256": "5e27a1e542493f18a383d9d687b99224f60f896a584d396aad86aab46d91237d",
+      "mode": "Proof",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "b095711866a89820f066741a5785251bd068481a4e04ada0384e3b9dda7c9f08"
+    },
+    "collections_runtime::runtime_codec::shifted_byte": {
+      "body_sha256": "5af47cc5bd738f53e0d16211c3b093a63d624cfd6dcfb9712881d292d497e4bd",
+      "ensures": 1,
+      "ensures_sha256": "30e1f060cdfbc71097032dbce950e10158e77cd4d5a72dce2d7379c600f281af",
+      "mode": "Proof",
+      "requires": 1,
+      "requires_sha256": "6067033c066d6b1a5eefa9df4d11c34af28f21c4b8b8d47d92f3deb88f355858",
+      "signature_sha256": "fcf8d93d97463751d28b28ac8351f020a270787a09e8008d1ab2714b7c0f8bec"
+    },
+    "collections_runtime::runtime_codec::signed_bytes": {
+      "body_sha256": "7f2eca1faa6578db856de6d37a2a4ef4c8ae01fb091085214e7be6721b01ae61",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "11c73beafc77e9c7d6874958764beb0f43aaa7de7e1ef0e1e0a8970c6edcde4c"
+    },
+    "collections_runtime::source::impl&%1::clone": {
+      "body_sha256": "fee48b54079c57d7fce74d611a1a5a01360cc76f6ad93d3f43647e4f449faf94",
+      "ensures": 1,
+      "ensures_sha256": "b3837d1cb2d12530054d323c36f5aa25bcfa5c97de16ec6f26df538f123cb3e9",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "5d1f444256cc73b6c9e8a81abd567f45f4eaac11cff9dfd08c7fee9d18b70507"
+    }
+  },
+  "harness_sha256": "98e2f3a9d60add969fb05ff2d338152181cc2be28276d706e49fe51f74e69f6b",
+  "namespace": "collections_runtime::",
+  "native_tests": 6,
+  "schema": "zeno-fcis/collections-runtime-coverage/1",
+  "scope": "Well-formed equality-only layouts: named snapshot framing, canonical absence, first-occurrence key classes, and exact merged write-back.",
+  "source_functions": {
+    "crates/zeno-fcis-contract/src/collections/absent.rs": [
+      "absent_value",
+      "canonical_absent_view"
+    ],
+    "crates/zeno-fcis-contract/src/collections/runtime.rs": [
+      "stored",
+      "field_bytes",
+      "encoded",
+      "encoded_length",
+      "encode_record",
+      "field_model",
+      "record_models",
+      "prepend",
+      "parsed",
+      "prepend_associative",
+      "decode_record",
+      "frame",
+      "writes",
+      "entry_valid",
+      "post_map",
+      "post_value",
+      "entry_image",
+      "read_post",
+      "entry_view",
+      "key_index",
+      "encode_number",
+      "decode_number",
+      "framed_valid",
+      "group",
+      "candidate",
+      "changed",
+      "group_changed",
+      "chosen",
+      "equal_values",
+      "same_group",
+      "merge_group",
+      "model_field_bytes",
+      "model_encoded",
+      "encoding_models",
+      "raw_keys_valid",
+      "raw_fields",
+      "record_view",
+      "raw_record",
+      "record_for_view",
+      "output_pairs",
+      "distinct_output",
+      "pair",
+      "named_prefix",
+      "named_prefix_step",
+      "scalar_output",
+      "output_item",
+      "output_valid",
+      "writeback",
+      "value_indices",
+      "touches",
+      "entry_well_formed",
+      "field_bound",
+      "record_bound",
+      "record_footprint",
+      "entry_indices",
+      "apply_record",
+      "selected_scalars",
+      "selected_keys",
+      "field_id",
+      "input_indices",
+      "input_position",
+      "well_formed",
+      "state_bound",
+      "scalars_bound",
+      "inputs_bound",
+      "input_scalar",
+      "input_key",
+      "is_key_position",
+      "frame_scalars",
+      "frame_input_keys",
+      "key_prefix",
+      "key_prefix_length",
+      "class_keys",
+      "classes_match",
+      "key_binding",
+      "class_framed",
+      "intern_keys",
+      "named_member",
+      "name_added",
+      "names_bound",
+      "records_bound",
+      "actual_allowed",
+      "raw_frame",
+      "framed_from",
+      "new_entry_clear",
+      "names_step",
+      "record_bound_preserved",
+      "add_named",
+      "same_schema",
+      "key_prefix_unique",
+      "same_key_class",
+      "record_alias",
+      "presence_not_key",
+      "frame_is_valid"
+    ],
+    "crates/zeno-fcis-contract/src/collections/runtime_codec.rs": [
+      "byte_at",
+      "signed_bytes",
+      "bits",
+      "shifted_byte",
+      "low_byte",
+      "bits_contains",
+      "decode_encode",
+      "append_byte",
+      "encoded_prefix",
+      "encode_decode"
+    ],
+    "crates/zeno-fcis-contract/src/contract_error.rs": [
+      "new",
+      "place",
+      "reason"
+    ],
+    "crates/zeno-fcis-contract/src/internals/declarations/source.rs": [],
+    "crates/zeno-fcis-contract/src/internals/review/domain/leaf.rs": [
+      "least",
+      "least_spec",
+      "least_or_zero"
+    ]
+  },
+  "standard_library_premise": "Pinned vstd contracts, including obeys_cmp for 32-byte keys; native samples exercise ordered collections, slices, vectors, Option/Result, diagnostics, and byte encoding.",
+  "storage_premise": "Entries::record returns the stable snapshot selected by Entries::contents; storage publication, capacities, and durability are outside this unit.",
+  "verified_obligations": 89
+}

@@ -15,6 +15,14 @@ mod value;
 
 pub use evaluation::admission::AdmissionFailure as V2NumericAdmissionFailure;
 pub use evaluation::typed::NumericOp as V2NumericOp;
+#[doc(hidden)]
+// Preserve the reviewed historical source bytes during workspace formatting.
+#[rustfmt::skip]
+#[path = "evaluation/historical_i64.rs"]
+pub mod historical_i64;
+/// Closed released-evidence verification, separate from current invocation authority.
+#[path = "execution_v2/historical.rs"]
+pub mod historical;
 pub use execution_v2::composition as v2_composition;
 /// Immutable original-schema value witness; only checked ingress constructs it.
 pub use execution_v2::compound::Value as V2CanonicalValue;
@@ -24,6 +32,9 @@ pub use execution_v2::numeric::{
     Failure as V2NumericFailure, MAX_NUMERIC_INPUTS, MAX_NUMERIC_NODES, MAX_NUMERIC_OUTPUTS,
     NumericProgram as V2NumericProgram, Outcome as V2NumericOutcome, execute as execute_numeric_v2,
 };
+/// Pure, nonpublishing oracle relations and checked full-width arithmetic.
+#[cfg(not(verus_keep_ghost))]
+pub use execution_v2::oracle as v2_oracle;
 #[cfg(test)]
 /// Unchanged emitted order fixture for complete-decision test comparisons.
 pub use execution_v2::order_fixture_transition as v2_order_fixture_transition;
@@ -187,8 +198,9 @@ const SEMANTIC_SOURCES: &[(&str, &[u8])] = &[
     ("value/wide.rs", include_bytes!("value/wide.rs") as &[u8]),
 ];
 
-/// The row count, then each path and its bytes, each preceded by its u64
-/// big-endian length, so distinct source lists cannot frame the same bytes.
+/// Two source sets: the current scalar route, then the closed released verifier.
+/// Each starts with its row count, followed by paths and bytes with u64
+/// big-endian lengths, so distinct source lists cannot frame the same bytes.
 pub(crate) fn semantic_source_bytes() -> Vec<u8> {
     let mut framed = Vec::new();
     framed.extend_from_slice(&(SEMANTIC_SOURCES.len() as u64).to_be_bytes());
@@ -198,6 +210,7 @@ pub(crate) fn semantic_source_bytes() -> Vec<u8> {
         framed.extend_from_slice(&(bytes.len() as u64).to_be_bytes());
         framed.extend_from_slice(bytes);
     }
+    framed.extend_from_slice(&historical::source_bytes());
     framed
 }
 
@@ -983,8 +996,10 @@ mod semantic_source_tests {
     use std::fs;
     use std::path::Path;
 
-    /// The Authority publication route. No program admission or evaluation
-    /// path reaches these files; both identities bind them only through the
+    /// Source-bound native relations and the Authority publication route.
+    /// Oracle plans are source-bound here but have no publication constructor.
+    /// Legacy scalar program admission/evaluation does not reach these modules.
+    /// Both identities bind them through the
     /// generated `EVALUATOR` digest of the approved source closure.
     const AUTHORITY_ROUTE: &[&str] = &[
         "canonical_v2/envelope.rs",
@@ -1048,6 +1063,42 @@ mod semantic_source_tests {
         "execution_v2/laws/predicate.rs",
         "execution_v2/laws/spec.rs",
         "execution_v2/laws/types.rs",
+        "execution_v2/oracle/account_law_tests.rs",
+        "execution_v2/oracle/aggregation.rs",
+        "execution_v2/oracle/arithmetic.rs",
+        "execution_v2/oracle/bond_laws.rs",
+        "execution_v2/oracle/bonds.rs",
+        "execution_v2/oracle/finite_account_tests.rs",
+        "execution_v2/oracle/finite_price_tests.rs",
+        "execution_v2/oracle/laws.rs",
+        "execution_v2/oracle/lifecycle.rs",
+        "execution_v2/oracle/lifecycle_ingress.rs",
+        "execution_v2/oracle/lifecycle_laws.rs",
+        "execution_v2/oracle/lifecycle_schema.rs",
+        "execution_v2/oracle/lifecycle_tests.rs",
+        "execution_v2/oracle/mod.rs",
+        "execution_v2/oracle/native_ports.rs",
+        "execution_v2/oracle/native_rewards.rs",
+        "execution_v2/oracle/prices.rs",
+        "execution_v2/oracle/quorum_laws.rs",
+        "execution_v2/oracle/reports.rs",
+        "execution_v2/oracle/read.rs",
+        "execution_v2/oracle/reward_laws.rs",
+        "execution_v2/oracle/rewards.rs",
+        "execution_v2/oracle/test_verifier.rs",
+        "execution_v2/oracle/types.rs",
+        "execution_v2/oracle/verification.rs",
+        "execution_v2/oracle/wire.rs",
+        "execution_v2/tables/authority.rs",
+        "execution_v2/tables/collection.rs",
+        "execution_v2/tables/expression.rs",
+        "execution_v2/tables/mod.rs",
+        "execution_v2/tables/policy.rs",
+        "execution_v2/tables/schema.rs",
+        "execution_v2/tables/ordered.rs",
+        "execution_v2/tables/order_laws.rs",
+        "execution_v2/tables/redemption.rs",
+        "execution_v2/tables/redemption_laws.rs",
     ];
     /// Modules rooted in `AUTHORITY_ROUTE`, which hashed files must not use.
     const AUTHORITY_MODULES: &[&str] = &[
@@ -1058,6 +1109,8 @@ mod semantic_source_tests {
         "envelope",
         "laws",
         "output",
+        "tables",
+        "oracle",
     ];
     /// The generated digest, which both identities include by value.
     const GENERATED: &[&str] = &["execution_v2/authority/evaluator.rs"];
@@ -1080,6 +1133,8 @@ mod semantic_source_tests {
         "execution_v2/input_view/tests.rs",
         "execution_v2/laws/tests.rs",
         "execution_v2/numeric/tests.rs",
+        "execution_v2/tables/tests.rs",
+        "execution_v2/tables/ordered_tests.rs",
         "execution_v2/tests.rs",
         "value/tests.rs",
     ];
@@ -1124,6 +1179,13 @@ mod semantic_source_tests {
         for path in hashed.chain(AUTHORITY_ROUTE).chain(GENERATED).chain(TESTS) {
             assert!(
                 reviewed.insert((*path).to_owned()),
+                "{path} is listed twice"
+            );
+        }
+        let prefix = "crates/zeno-fcis-synthesis/src/finite/";
+        for path in super::historical::source_paths().filter_map(|path| path.strip_prefix(prefix)) {
+            assert!(
+                reviewed.insert(path.to_owned()) || path == "execution_v2/meter.rs",
                 "{path} is listed twice"
             );
         }

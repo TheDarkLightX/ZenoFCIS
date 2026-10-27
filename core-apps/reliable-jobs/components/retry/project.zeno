@@ -26,7 +26,14 @@ law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;
 law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;
 law 502 exact_finish on accept = (command.101.120 == 1 -> (post.100.110 == pre.100.110 && post.100.111 == 1));
 law 503 exact_attempt on accept = (command.101.120 == 0 -> (post.100.110 + 1 == pre.100.110 && post.100.111 == 0));
+// Independent complete relation; ordered guards exclude earlier reasons.
+law 520 reason_200 on reject:200 = (true) && (context.102.130 == 0);
+law 521 reason_201 on reject:201 = ((true) && !(context.102.130 == 0)) && (pre.100.111 == 1);
+law 522 reason_202 on reject:202 = (((true) && !(context.102.130 == 0)) && !(pre.100.111 == 1)) && (command.101.120 == 0 && pre.100.110 == 0);
+law 540 legitimate_acceptance on reject = !((((true) && !(context.102.130 == 0)) && !(pre.100.111 == 1)) && !(command.101.120 == 0 && pre.100.110 == 0));
+law 541 acceptance_eligibility on accept = (((true) && !(context.102.130 == 0)) && !(pre.100.111 == 1)) && !(command.101.120 == 0 && pre.100.110 == 0);
+law 542 no_committed_failure on failure = false;
 // Core seed retry-budget/1; parameters {"C": 3}.
-// Instance source-set SHA256 e730ad96ea84380b6cf3c9dec3479ab4a4e95b694bd53724217f28c0549cf99f.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/retry-budget.json SHA256 394d78341be97e3db7fb7c715d39e842eb8c10cdd796837fdbcee68761627057; replay required; no KernelChecked claim.
+// Instance source-set SHA256 2177a9bca22d53a84b17f40e57a12f615cc03dddae6ec3815a7c06d4422c1184.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/retry-budget.json SHA256 42e9a6ecbb7a340619dbc313ef413acc6fe6abd7f375e5261b4c0ed144429baf; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

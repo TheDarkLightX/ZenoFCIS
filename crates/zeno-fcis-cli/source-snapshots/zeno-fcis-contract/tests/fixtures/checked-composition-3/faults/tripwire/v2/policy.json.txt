@@ -1,0 +1,14 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "tripwire",
+  "roots": {"state": 100, "command": 101, "context": 102},
+  "leaf_bindings": {"106": ["Bool"], "108": ["Bool"]},
+  "variables": {"tripped": "pre.100.110", "touches": "pre.100.111", "fire": "command.101.120", "authorized": "context.102.130"},
+  "cases": [
+    {"when": "!authorized", "class": "Reject", "reason": 200, "post": {}, "outbox": []},
+    {"when": "fire", "class": "CommittedFailure", "reason": 201, "post": {"110": true}, "outbox": []},
+    {"when": "true", "class": "Accept", "reason": null, "post": {"111": "choose(touches < 2, touches + 1, touches)"}, "outbox": []}
+  ],
+  "genesis": {"110": false, "111": 0},
+  "law_kinds": {"500": "StateInvariant", "501": "CommittedFailureEffects"}
+}

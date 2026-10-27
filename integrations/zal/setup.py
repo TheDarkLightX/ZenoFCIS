@@ -17,7 +17,10 @@ ROOT = Path(__file__).resolve().parents[2]
 STATE = Path(".zeno-fcis/zal")
 SKILL = Path("skills/zal-authoring/SKILL.md")
 TOOLS = ["zal_read", "zal_check", "zal_help", "zal_explain",
-         "zal_propose", "zal_compare", "zal_trace"]
+         "zal_propose", "zal_compare", "zal_trace",
+         "zal_why_not", "zal_what_if", "zal_narrate", "zal_guide",
+         "zal_ladder_read", "zal_ladder_render", "zal_ladder_parse", "zal_ladder_same",
+         "zal_ladder_lower", "zal_ladder_explain"]
 
 
 def safe_path(project, relative):

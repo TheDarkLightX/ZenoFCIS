@@ -13,7 +13,9 @@ use zeno_fcis_spec::{ProjectLimits, ProjectSpec, SourceLimits, elaborate_project
 /// The rejection law. The framework checks it for every rejection: a
 /// rejection commits no state, effect, or outbox entry. It has no formula, so
 /// it is registered here instead of as an always-true law in `project.zeno`.
-pub const REJECT_PUBLISHES_NOTHING: u32 = 509;
+/// The project now supplies a substantive RejectNoAuthority law; generated
+/// structural law 909 accompanies it as AuthoritySubjectRecipient.
+pub const REJECT_PUBLISHES_NOTHING: u32 = 909;
 
 /// A domain-separated commitment over reviewed bytes.
 ///
@@ -214,6 +216,31 @@ pub fn manifest() -> LawManifest {
                     DecisionScope::CommittedFailure,
                     no_genesis(),
                 ),
+                510 | 514 => (
+                    LawKind::StateInvariant,
+                    DecisionScope::Committing,
+                    GenesisApplicability::Required,
+                ),
+                511 => (
+                    LawKind::AssetConservation,
+                    DecisionScope::Accept,
+                    no_genesis(),
+                ),
+                512 => (
+                    LawKind::RejectNoAuthority,
+                    DecisionScope::Reject,
+                    no_genesis(),
+                ),
+                513 => (
+                    LawKind::DebitCreditEffectEquality,
+                    DecisionScope::Committing,
+                    no_genesis(),
+                ),
+                515 | 516 => (
+                    LawKind::AuthoritySubjectRecipient,
+                    DecisionScope::Committing,
+                    no_genesis(),
+                ),
                 _ => panic!("a new law needs a reviewed runtime binding"),
             };
             let mut claim = project.canonical_bytes().expect("canonical authored AST");
@@ -235,7 +262,7 @@ pub fn manifest() -> LawManifest {
         LawDefinition::try_new(
             id(REJECT_PUBLISHES_NOTHING),
             name("reject_publishes_nothing"),
-            LawKind::RejectNoAuthority,
+            LawKind::AuthoritySubjectRecipient,
             DecisionScope::Reject,
             no_genesis(),
             digest(

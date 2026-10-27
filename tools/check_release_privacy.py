@@ -21,8 +21,10 @@ import check_knowledge_files as knowledge_files
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_FILE_BYTES = 128 * 1024 * 1024
-MAX_TOTAL_BYTES = 256 * 1024 * 1024
-MAX_FILES = 20_000
+# Resource bounds on one release-set scan. The 2.6.0 Linux set holds about 24,000 files and 331 MiB of unique
+# bytes (its bundle repeats the set); these keep about twice that headroom and still bound an archive bomb.
+MAX_TOTAL_BYTES = 768 * 1024 * 1024
+MAX_FILES = 50_000
 MAX_DEPTH = 4
 MATCH_CONTEXT_BYTES = 32
 ALLOWLIST = ROOT / "release/privacy-allowlist.json"
@@ -206,15 +208,25 @@ class Scan:
         file_hash = None
         for code, pattern in self.patterns.items():
             for match in pattern.finditer(data):
-                if code == "model-api-token" and source == "content" and self.allowlist:
+                evidence = {}
+                if code == "model-api-token" and source == "content":
                     if file_hash is None:
                         file_hash = hashlib.sha256(data).hexdigest()
-                    if (location, file_hash, match_fingerprint(data, match)) in self.allowlist:
+                    fingerprint = match_fingerprint(data, match)
+                    if (location, file_hash, fingerprint) in self.allowlist:
                         self.allowlisted_matches += 1
                         continue
+                    # Review compiled public literals without printing a possible credential.
+                    # These hashes describe a refusal; they do not approve an exception.
+                    evidence = {
+                        "file_sha256": file_hash, "fingerprint_sha256": fingerprint,
+                        "match_sha256": hashlib.sha256(match.group()).hexdigest(),
+                        "offset": match.start(), "length": match.end() - match.start(),
+                    }
                 self.findings.append({
                     "location": safe_location(location, self.patterns), "code": code,
                     "source": source, "line": data.count(b"\n", 0, match.start()) + 1,
+                    **evidence,
                 })
 
     def file(self, path: Path, location: str) -> None:
@@ -324,4 +336,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

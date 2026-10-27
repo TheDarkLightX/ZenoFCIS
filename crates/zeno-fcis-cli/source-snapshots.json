@@ -2,6 +2,17 @@
   "format": "zeno-fcis/cli-source-snapshots/1",
   "sources": [
     "zeno-fcis-contract/src/internals/expr.rs",
+    "zeno-fcis-contract/src/internals/genesis.rs",
+    "zeno-fcis-contract/src/internals/graph.rs",
+    "zeno-fcis-contract/src/internals/table_expr.rs",
+    "zeno-fcis-contract/src/internals/table_rules.rs",
+    "zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/budget/project.zeno",
+    "zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/budget/v2/policy.json",
+    "zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/counter/project.zeno",
+    "zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/counter/v2/policy.json",
+    "zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/tripwire/project.zeno",
+    "zeno-fcis-contract/tests/fixtures/checked-composition-3/faults/tripwire/v2/policy.json",
+    "zeno-fcis-ingress/tests/support/mod.rs",
     "zeno-fcis-loop-doors/examples/strategy-example.kb",
     "zeno-fcis-loop-doors/src/capture.rs",
     "zeno-fcis-loop-doors/src/expr.rs",
@@ -35,6 +46,18 @@
     "zeno-fcis-shell-sqlite/src/v2/equivalence/checker_ranges.rs",
     "zeno-fcis-shell-sqlite/src/v2/equivalence/checker_spec.rs",
     "zeno-fcis-spec/src/ast.rs",
-    "zeno-fcis-spec/src/parser.rs"
+    "zeno-fcis-spec/src/bits.rs",
+    "zeno-fcis-spec/src/bool_circuit.rs",
+    "zeno-fcis-spec/src/collections.rs",
+    "zeno-fcis-spec/src/constant_tables.rs",
+    "zeno-fcis-spec/src/parser.rs",
+    "zeno-fcis-spec/src/paths.rs",
+    "zeno-fcis-spec/src/recursive_tables.rs",
+    "zeno-fcis-spec/src/table_lookup.rs",
+    "zeno-fcis-spec/src/tables.rs"
+  ],
+  "repository_sources": [
+    "tools/app_factory.py",
+    "tools/zenoui.py"
   ]
 }

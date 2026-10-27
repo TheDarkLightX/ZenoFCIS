@@ -70,6 +70,8 @@ macro_rules! effects {
 
 effects! { crate::Command {
     leaves {
+        "construct" => Self::Construct(..) => declared((&["requirements-bundle", "owner-approval", "source-tree"], &["construction-artifacts"], true, None));
+        "commons" => Self::Commons { .. } => declared((&["commons-store"], &["commons-store"], true, None));
         "describe" => Self::Describe { .. } => declared((&[], &[], false, None));
         "optimize" => Self::Optimize { .. } => declared((
                 &[
@@ -106,6 +108,7 @@ effects! { crate::Command {
         "purity" => Self::Purity { .. } => declared((&["rust-source"], &[], false, None));
     }
     groups {
+        "guide" => Self::Guide { command } => command: crate::guide::Command;
         "synth" => Self::Synth { command } => command: crate::synth::Command;
         "transform" => Self::Transform { command } => command: crate::transform_command::Command;
         "loop" => Self::Loop { command } => command: crate::loop_command::Command;
@@ -332,6 +335,12 @@ effects! { crate::loop_command::Command {
                 checker_process::loop_profile().is_some(),
                 None,
             ));
+        "print" => Self::Print { .. } => declared((
+                &["canonical-program", "caller-cpu-limits"],
+                &["transient-user-unit"],
+                checker_process::loop_profile().is_some(),
+                None,
+            ));
     }
     groups {
     }
@@ -356,6 +365,7 @@ effects! { crate::ContractCommand {
     flat {
         Self::Review(command) => command: crate::review_command::Command;
         Self::Judge(command) => command: crate::judge_command::Command;
+        Self::Refine(command) => command: crate::refine_command::Command;
         Self::Composition(command) => command: crate::composition_command::Command;
         Self::Draft(command) => command: crate::draft_command::Command;
         Self::Adopt(command) => command: crate::contract_adopt::Command;
@@ -368,12 +378,29 @@ effects! { crate::ContractCommand {
     }
 }}
 
+effects! { crate::refine_command::Command {
+    leaves {
+        "refine-check" => Self::RefineCheck { .. } => declared((
+            &["abstract-contract", "concrete-contract", "abstraction-table"],
+            &[],
+            false,
+            None,
+        ));
+    }
+    groups {
+    }
+    flat {
+    }
+    optional {
+    }
+}}
+
 effects! { crate::review_command::Command {
     leaves {
         "review" => Self::Review { .. } => declared((
-                &["application-contract", "decision-examples", "optional-proposed-laws"],
-                &["optional-review-packet", "optional-seed-programs"],
-                false,
+                &["application-contract", "decision-examples", "optional-proposed-laws", "optional-pinned-solvers"],
+                &["optional-review-packet", "optional-seed-programs", "optional-query-directory", "temporary-files"],
+                true,
                 None,
             ));
     }
@@ -595,7 +622,7 @@ pub(super) fn describe(path: &[String]) -> Value {
                 "classification": "declared", "reads": reads, "writes": writes,
                 "executes_tools": executes_tools, "read_only_flag": read_only_flag,
             });
-            if path.first() == Some(&"loop") && path.get(1) != Some(&"encode") {
+            if path.first() == Some(&"loop") && !matches!(path.get(1), Some(&"encode" | &"print")) {
                 if let Some(reads) = result["reads"].as_array_mut() {
                     reads.push(json!("optional-knowledge-layers-and-session-binding"));
                 }
@@ -805,6 +832,31 @@ effects! { crate::loop_command::doors::capture::Command {
 
 effects! { crate::judge_command::Command {
     leaves {
+        "two-run" => Self::TwoRun { .. } => declared((&["application-contract"], &["optional-judge-packet"], false, None));
+        "collections" => Self::Collections { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
+        "risk" => Self::Risk { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
+        "distribution" => Self::Distribution { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
+        "runs" => Self::Runs { .. } => declared((
+                &["application-contract", "run-properties"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
         "profile" => Self::Profile { .. } => declared((
                 &["application-contract"],
                 &["optional-judge-packet"],
@@ -812,9 +864,9 @@ effects! { crate::judge_command::Command {
                 None,
             ));
         "lemma" => Self::Lemma { .. } => declared((
-                &["application-contract"],
-                &["optional-judge-packet"],
-                false,
+                &["application-contract", "optional-pinned-solvers"],
+                &["optional-judge-packet", "optional-query-directory", "temporary-files"],
+                true,
                 None,
             ));
         "scenario" => Self::Scenario { .. } => declared((
@@ -883,6 +935,22 @@ effects! { crate::judge_command::ProbeCommand {
 
 effects! { crate::knowledge_command::Operation {
     leaves {
+        "init" => Self::Init { .. } => declared((&[], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "migrate" => Self::Migrate { .. } => declared((&["explicit-legacy-layer"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "curate" => Self::Curate { .. } => declared((&["explicit-candidates", "explicit-knowledge-layers"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "assess" => Self::Assess { .. } => declared((&["frozen-suite", "explicit-knowledge-layers", "bound-inputs"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock", "temporary-checker-files"], true, None));
+        "replay-assessment" => Self::ReplayAssessment{..} => declared((&["explicit-knowledge-layers", "frozen-suite", "bound-inputs"], &["temporary-checker-files"], true, None));
+        "assessment-queue" => Self::AssessmentQueue{..} => declared((&["explicit-knowledge-layers"], &[], false, None));
+        "grow" => Self::Grow => declared((&["explicit-knowledge-layers", "private-case-base"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "ingest-episodes" => Self::IngestEpisodes {..} => declared((&["explicit-episode-records"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "refresh" => Self::Refresh => declared((&["explicit-knowledge-layers", "explicit-dependencies"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "leaderboard" => Self::Leaderboard{..} => declared((&["private-certified-facts"], &[], false, None));
+        "telemetry" => Self::Telemetry => declared((&["private-episode-records"], &[], false, None));
+        "certify" => Self::Certify{..} => declared((&["bound-subject", "bound-candidate"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "facts" => Self::Facts {..} => declared((&["explicit-knowledge-layers"], &[], false, None));
+        "reuse" => Self::Reuse {..} => declared((&["explicit-knowledge-layers", "bound-subject"], &[], false, None));
+        "assessment-view" => Self::AssessmentView => declared((&["explicit-knowledge-layers"], &[], false, None));
+        "assessment-task" => Self::AssessmentTask { .. } => declared((&["bound-task-request", "caller-cpu-limits"], &["new-private-task-output", "transient-user-unit"], true, None));
         "advise" => Self::Advise { .. } => declared((
                 &["explicit-knowledge-layers", "explicit-validation-records"],
                 &[],
@@ -936,5 +1004,16 @@ effects! { crate::knowledge_command::Operation {
     flat {
 
     }
+    optional {}
+}}
+
+effects! { crate::guide::Command {
+    leaves {
+        "list" => Self::List => declared((&[], &[], false, None));
+        "show" => Self::Show { .. } => declared((&[], &[], false, None));
+        "find" => Self::Find { .. } => declared((&[], &[], false, None));
+    }
+    groups {}
+    flat {}
     optional {}
 }}

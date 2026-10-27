@@ -31,40 +31,76 @@ const FILE_LIMIT: usize = 65536;
 
 #[derive(Subcommand)]
 pub(crate) enum Command {
-    /// Owner-side whole-domain arithmetic capture by a complete bounded cover.
-    /// Every piece needs the existing exact checker and receipt replay.
+    #[command(
+        about = "Owner: check a candidate against a complete paged arithmetic reference domain.",
+        long_about = r#"Read --spec ABI JSON, --reference Python source defining reference(point), and one of --candidate-json (finite program JSON) or --expressions (zeno-fcis/capture-expressions/1). Files are at most 65,536 bytes. Requires nonnegative Int input domains. Observe the reference six times per point; compare complete pages through transform check and exact receipt replay on bounded lookup pieces.
+
+--max-tuples is points per page (at most 4,096), not a total-domain cap. At most 20 pages fit the 62-frame budget; --node-visits bounds cumulative work (at most 10,000,000). Every point must be covered; partial coverage is inconclusive. Linux x86-64 contained Python runtime required.
+
+No session; report coverage and chained receipt digests, not one exported whole-program receipt. JSON: zeno-fcis/black-box-capture/2 for normal handler results. Outer unavailable containment uses zeno-fcis/black-box-capture/1, refused (1); an outer stop uses that diagnostic schema, inconclusive (2). Exit 0 captured-exact; 1 refuted/refused; 2 inconclusive. Exactness concerns the observed finite domain under the deterministic-reference assumption."#
+    )]
     Whole {
         #[command(flatten)]
         options: whole::Options,
     },
-    /// Owner-side: freeze a complete contained executable reference into a new private session.
+    #[command(
+        about = "Owner: observe a complete executable reference and create a private capture session.",
+        long_about = r#"Read --spec as exactly inputs and outputs in finite-program JSON and --reference as python-function-v1 source defining reference(point) -> list[int]. Observe all declared input tuples six times and reject inconsistent or unsuccessful labels. Freeze the complete observed table and ABI in a new private --session directory; no candidate receipt yet. Linux x86-64 contained Python runtime required.
+
+Input files: 65,536 bytes; complete table: at most 4,096 tuples and encodable in 256 nodes; stored protocol/session: 2 MiB. Bounds may be reduced: rounds default 32/max 64, examples default/max 4,096, node visits default 2,000,000/max 10,000,000.
+
+JSON: zeno-fcis/black-box-capture/2 for normal handler results. Outer unavailable containment uses zeno-fcis/black-box-capture/1, refused (1); an outer stop uses that diagnostic schema, inconclusive (2). Exit 0 opened; 1 refused (including unsupported runtime or reference-local failure); 2 outer stop or search budget inconclusive. Keep session/status private; only packet and candidate replies are proposer-facing."#
+    )]
     Open {
+        /// ABI JSON with exactly inputs and outputs in finite-program JSON; at most 65,536 bytes.
         #[arg(long)]
         spec: PathBuf,
+        /// Owner reference source defining reference(point) -> list[int]; at most 65,536 bytes.
         #[arg(long)]
         reference: PathBuf,
+        /// Reference format; only python-function-v1 is supported.
         #[arg(long, default_value = "python-function-v1")]
         reference_format: String,
+        /// Private capture directory; open requires a new path, other operations require an existing one.
         #[arg(long)]
         session: PathBuf,
+        /// Maximum complete reference input tuples, at most 4,096.
         #[arg(long, default_value_t = 4096)]
         max_tuples: u64,
+        /// Maximum decided candidate attempts, at most 64.
         #[arg(long, default_value_t = 32)]
         rounds: u64,
+        /// Maximum retained public examples, at most 4,096.
         #[arg(long, default_value_t = 4096)]
         max_examples: u64,
+        /// Reserved node visits per candidate invocation, at most 10,000,000.
         #[arg(long, default_value_t = 2_000_000)]
         node_visits: u64,
     },
-    /// Public allowlisted ABI/round/examples; no reference, hidden labels or private evidence.
+    #[command(
+        about = "Public: read the capture ABI, round, and selected examples without private evidence.",
+        long_about = r#"Load --session (zeno-fcis/capture-session/1), verify its bindings, and return the allowlisted profile, ABI, round and selected examples. No reference source, path, digest, full table or receipt enters this packet. The schema is zeno-fcis/black-box-capture/2 for normal handler results. Outer unavailable containment uses zeno-fcis/black-box-capture/1, refused (1); an outer stop uses that diagnostic schema, inconclusive (2).
+
+Exit 0 packet; 1 refused; 2 outer stop inconclusive. This operation creates no session, consumes no candidate attempt, and issues no receipt. Roles rely on callers keeping owner evidence private; they are not authenticated identities."#
+    )]
     Packet {
+        /// Private capture directory; open requires a new path, other operations require an existing one.
         #[arg(long)]
         session: PathBuf,
     },
-    /// Pre-check every exposed example, then transform check plus exact receipt replay.
+    #[command(
+        about = "Proposer: check exposed examples, then compare with the complete frozen capture table.",
+        long_about = r#"Load the existing private --session through the capture shell. Supply --candidate-json (finite-program JSON) or --expressions (zeno-fcis/capture-expressions/1: outputs over x0..xN without holes, parameters, keep or output references), at most 65,536 bytes. Match the frozen ABI.
+
+Reserve invocation work, check all exposed examples, then require full-table transform check and matching receipt replay. Malformed/ABI-mismatched proposals, example refutations and completed equivalence/counterexample verdicts consume an attempt. Setup failures, checker refusal and budget stops can return without one; invocation work reservations remain charged. A refutation can add a public counterexample; stored success keeps its receipt privately and closes further submissions. Limits come from capture open.
+
+JSON: zeno-fcis/black-box-capture/2 for normal handler results. Outer unavailable containment uses zeno-fcis/black-box-capture/1, refused (1); an outer stop uses that diagnostic schema, inconclusive (2). Exit 0 captured-exact; 1 precheck-refuted, candidate-refused, refuted or refused; 2 inconclusive. Example agreement alone is never acceptance. No new session or publication authority."#
+    )]
     Candidate {
+        /// Private capture directory; open requires a new path, other operations require an existing one.
         #[arg(long)]
         session: PathBuf,
+        /// Complete finite-program JSON (inputs, outputs, nodes, roots), at most 65,536 bytes.
         #[arg(
             long,
             conflicts_with = "expressions",
@@ -75,8 +111,14 @@ pub(crate) enum Command {
         #[arg(long)]
         expressions: Option<PathBuf>,
     },
-    /// Owner-only evidence. A previously captured program is checked and replayed afresh.
+    #[command(
+        about = "Owner: inspect private capture evidence and freshly recheck any retained success.",
+        long_about = r#"Load and validate --session. Report private identities, budgets and progress; if a captured candidate exists, repeat transform check and receipt replay and require the stored receipt to match. --full includes table rows, events, candidate and receipt only if the report fits the 1 MiB output cap. Never forward owner status to a proposer.
+
+JSON: zeno-fcis/black-box-capture/2 for normal handler results. Outer unavailable containment uses zeno-fcis/black-box-capture/1, refused (1); an outer stop uses that diagnostic schema, inconclusive (2). Exit follows stored state: opened/ready/captured-exact=0, refused/refuted/precheck-refuted/candidate-refused=1, inconclusive=2; fresh validation/replay may refuse or stop inconclusive. Creates no session, spends no candidate attempt and does not issue a new publication capability."#
+    )]
     Status {
+        /// Private capture directory; open requires a new path, other operations require an existing one.
         #[arg(long)]
         session: PathBuf,
         /// Include private table and events only if the report fits the output cap.
@@ -170,64 +212,8 @@ fn inconclusive(reason: &str) -> (u8, Value) {
 }
 
 /// JSON with no duplicate keys, nonintegral numbers, trailing bytes or deep recursion.
-pub(super) fn strict_json(bytes: &[u8]) -> Result<Value, String> {
-    struct Strict(Value);
-    impl<'de> Deserialize<'de> for Strict {
-        fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-            struct Visitor;
-            impl<'de> serde::de::Visitor<'de> for Visitor {
-                type Value = Strict;
-                fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    f.write_str("integral JSON without duplicate fields")
-                }
-                fn visit_bool<E: serde::de::Error>(self, v: bool) -> Result<Strict, E> {
-                    Ok(Strict(json!(v)))
-                }
-                fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Strict, E> {
-                    Ok(Strict(json!(v)))
-                }
-                fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Strict, E> {
-                    Ok(Strict(json!(v)))
-                }
-                fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Strict, E> {
-                    Ok(Strict(json!(v)))
-                }
-                fn visit_none<E: serde::de::Error>(self) -> Result<Strict, E> {
-                    Ok(Strict(Value::Null))
-                }
-                fn visit_unit<E: serde::de::Error>(self) -> Result<Strict, E> {
-                    Ok(Strict(Value::Null))
-                }
-                fn visit_seq<A: serde::de::SeqAccess<'de>>(
-                    self,
-                    mut a: A,
-                ) -> Result<Strict, A::Error> {
-                    let mut out = Vec::new();
-                    while let Some(Strict(v)) = a.next_element()? {
-                        out.push(v);
-                    }
-                    Ok(Strict(Value::Array(out)))
-                }
-                fn visit_map<A: serde::de::MapAccess<'de>>(
-                    self,
-                    mut a: A,
-                ) -> Result<Strict, A::Error> {
-                    let mut out = serde_json::Map::new();
-                    while let Some((key, Strict(v))) = a.next_entry::<String, Strict>()? {
-                        if out.insert(key, v).is_some() {
-                            return Err(serde::de::Error::custom("duplicate field"));
-                        }
-                    }
-                    Ok(Strict(Value::Object(out)))
-                }
-            }
-            d.deserialize_any(Visitor)
-        }
-    }
-    let mut decoder = serde_json::Deserializer::from_slice(bytes);
-    let Strict(v) = Strict::deserialize(&mut decoder).map_err(|_| "capture-json")?;
-    decoder.end().map_err(|_| "capture-json")?;
-    Ok(v)
+pub(crate) fn strict_json(bytes: &[u8]) -> Result<Value, String> {
+    crate::integral_json::parse(bytes).map_err(|_| "capture-json".into())
 }
 
 fn read(path: &Path, limit: usize) -> Result<Vec<u8>, String> {
@@ -1086,10 +1072,30 @@ fn status_loaded(
     result["detail"]["assumption"] =
         json!("reference is a pure deterministic function of all declared inputs");
     result["detail"]["exact_subject"] = json!("complete frozen observed table");
-    if serde_json::to_vec_pretty(&result).map_or(true, |bytes| bytes.len() + 1 > 1024 * 1024) {
+    // Count the pretty output instead of buffering it: near the bound, a
+    // buffer of it would itself need twice the bound inside the contained
+    // worker's address space.
+    let mut output = OutputBound(1024 * 1024 - 1);
+    if serde_json::to_writer_pretty(&mut output, &result).is_err() {
         return refused("capture-full-status-output-bound");
     }
     (code, result)
+}
+
+/// A writer that accepts at most the given number of bytes.
+struct OutputBound(usize);
+
+impl std::io::Write for OutputBound {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0 = self
+            .0
+            .checked_sub(bytes.len())
+            .ok_or_else(|| std::io::Error::other("output bound"))?;
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 pub(super) fn run(command: Command) -> (u8, Value) {

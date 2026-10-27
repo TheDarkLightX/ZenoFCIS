@@ -1,0 +1,31 @@
+{
+  "authority": "none",
+  "files": {
+    "genesis-genesis.bin": "7be7427cac5e9b64544fc720a75511053f00e476dead7f99c43c4697b10d5795",
+    "genesis-identity.bin": "5cf6e795185d57bbc6428bc5f46dd313c017a8fef105610580f2104f2023d169",
+    "genesis-initial.bin": "5bb7e02148cd457f4b4280661bf2198a02da716a7d8d7a212bce8790b95cfe91",
+    "genesis.sql": "dc80a2ea967be008f6706149de64f7302400948386f8ed195140ee167ed3e832",
+    "pending-1-command.bin": "3eddc6e4dffaf33fb2ed8435e23acb2e39e35a1561d64a72b475ba097ec3be11",
+    "pending-1-context.bin": "0b6933d69b5b19f0a83dd556f4ac43f70f77e6f928eb8b0911fa69ebeecc9161",
+    "pending-1-publication.bin": "5ab9825fe4d5a7574aad3fb156f24ba6b8935cdf3a5a65b292163b1f4ce783b7",
+    "pending-1-state.bin": "5bb7e02148cd457f4b4280661bf2198a02da716a7d8d7a212bce8790b95cfe91",
+    "pending-2-command.bin": "6121bc6bcced7ee970db2be5a8e7a775819456f34ecccb95a3902653df9b739c",
+    "pending-2-context.bin": "c05cb578a91753b895db7772ceaba51db2faa735a83e72fd546afe368523a8b7",
+    "pending-2-publication.bin": "103ee26a015e146fc934b47599acbf4398ed4f15feca47fe5f1dd32498a188a5",
+    "pending-2-state.bin": "42942181b775fa0e3e38a247b002cbdd8b2b7a7e5278cbf582a8f8bfcf00d532",
+    "pending-3-command.bin": "f39c7e362dbeed5df42b5132cc86afc5b452e0978023f0a877cf982362af58ac",
+    "pending-3-context.bin": "33bf88319c63a589bcb4dac86cc757601eee4b95884e34542e8e1d93f994f037",
+    "pending-3-publication.bin": "1777e2fd115e64c0e2ff04259b45c11df7d402418ec3a4e032af1f162c263979",
+    "pending-3-state.bin": "5963d21f8fd4aa0ca18e4783a84c51c41356e5ca9fd8ce1db5097d169af964b2",
+    "pending-genesis.bin": "7be7427cac5e9b64544fc720a75511053f00e476dead7f99c43c4697b10d5795",
+    "pending-identity.bin": "5cf6e795185d57bbc6428bc5f46dd313c017a8fef105610580f2104f2023d169",
+    "pending-initial.bin": "5bb7e02148cd457f4b4280661bf2198a02da716a7d8d7a212bce8790b95cfe91",
+    "pending.sql": "6d8dcdf4f1ee57f39b82864ec030e47bfa18c6a560385fdc16ea71499333e956"
+  },
+  "pending_ids": [
+    "91d73ae316d88cf00828318083a9b99e56c1e556258dc6a7fd74b5f47bdfad3e"
+  ],
+  "release": "2.4.0",
+  "released_cli_sha256": "92123be362417d7dedbd28b60822679261a1837ae8171e97218059ccffc4667a",
+  "schema": "zeno-fcis/released-24-test-inputs/1"
+}

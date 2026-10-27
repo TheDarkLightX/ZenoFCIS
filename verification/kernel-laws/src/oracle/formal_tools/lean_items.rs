@@ -10,6 +10,12 @@ fn preflight_export(
     kind: ExportKind,
     limits: ExportLimits,
 ) -> Result<(), ExportError> {
+    if match claim.formula() {
+        ClaimFormula::Relational(v) => v.uses_u128(),
+        ClaimFormula::Temporal(v) => v.uses_u128(),
+    } {
+        return Err(ExportError::U128SubjectUnsupported);
+    }
     let (root, multiplier, temporal_width) = match (kind, claim.mode(), claim.formula()) {
         (ExportKind::Smt, ClaimMode::Relational, ClaimFormula::Relational(value)) => {
             (ExportNode::Rel(value), 1, 1)
@@ -51,6 +57,7 @@ fn preflight_export(
         let next_depth = depth.checked_add(1).ok_or(ExportError::ResourceLimit)?;
         match node {
             ExportNode::Rel(value) => match value {
+                RelExpr::Circuit(_) => return Err(ExportError::UnsupportedMode),
                 RelExpr::Bool(_) => {}
                 RelExpr::Not(value) => push_export_node(
                     &mut stack,
@@ -121,13 +128,20 @@ fn preflight_export(
                 }
             },
             ExportNode::Value(value) => match value {
-                ValueExpr::MulDiv(..)
+                ValueExpr::ToI128(_) | ValueExpr::ToU128(_) => {
+                    return Err(ExportError::U128SubjectUnsupported);
+                }
+                ValueExpr::Select(..)
+                | ValueExpr::MulDiv(..)
                 | ValueExpr::SignedMulDivFloor(..)
                 | ValueExpr::ScaledMulDiv(..)
                 | ValueExpr::RepeatMulDiv(..) => {
                     return Err(ExportError::UnsupportedMode);
                 }
-                ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
+                ValueExpr::U128(_)
+                | ValueExpr::Int(_)
+                | ValueExpr::Var(_)
+                | ValueExpr::Projection(_) => {}
                 ValueExpr::Add(left, right)
                 | ValueExpr::Sub(left, right)
                 | ValueExpr::Mul(left, right)
@@ -435,11 +449,15 @@ fn render_value_lean(
 ) -> Result<LeanValue, ExportError> {
     budget.operation()?;
     let rendered = match value {
-        ValueExpr::MulDiv(..)
+        ValueExpr::Select(..)
+        | ValueExpr::MulDiv(..)
         | ValueExpr::SignedMulDivFloor(..)
         | ValueExpr::ScaledMulDiv(..)
         | ValueExpr::RepeatMulDiv(..) => {
             return Err(ExportError::UnsupportedMode);
+        }
+        ValueExpr::U128(_) | ValueExpr::ToI128(_) | ValueExpr::ToU128(_) => {
+            return Err(ExportError::U128SubjectUnsupported);
         }
         ValueExpr::Int(value) => LeanValue {
             term: lean_int(*value),
@@ -540,6 +558,7 @@ fn render_rel_lean(
 ) -> Result<LeanBool, ExportError> {
     budget.operation()?;
     let rendered = match value {
+        RelExpr::Circuit(_) => return Err(ExportError::UnsupportedMode),
         RelExpr::Bool(value) => LeanBool {
             term: if *value { "True" } else { "False" }.to_owned(),
             defined: "True".to_owned(),
@@ -929,6 +948,7 @@ fn original_export_inductive_smt_with_limits(
         let name = smt_path(path, 0);
         source.push_str(&format!("(declare-const {name} Int)\n"));
         source.push_str(&format!("(assert {})\n", smt_i128_range(&name)));
+        hypotheses.paths.insert(path.clone());
         if let Some(domain) = declared_domain(spec, path) {
             let member = match &domain {
                 DeclaredDomain::Values(values) => smt_or(

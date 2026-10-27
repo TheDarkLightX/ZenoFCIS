@@ -1,0 +1,25 @@
+zeno 1;
+project 1 shortfall_reward;
+namespace 2 selection;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 103 int Reward in 0..=3;
+type 104 int RandomBits in 0..=3;
+type 105 int Unit in 0..=0;
+field 110 100 shortfall 103;
+field 130 102 entropy 104;
+component 400 selection {
+ owns 100; reads pre.100; writes post.100; contexts context.102;
+ budget steps 128;
+}
+merge [400];
+law 500 range on commit, genesis = post.100.110 >= 0;
+// Scenario losses of 1, 2, 3 and 5 against reserve 2 produce shortfalls
+// R = max(0, loss - 2) of 0, 0, 1 and 3.
+law 501 shortfall_matches_scenario on any = ((context.102.130 <= 1 && post.100.110 == 0) || (context.102.130 == 2 && post.100.110 == 1) || (context.102.130 == 3 && post.100.110 == 3));
+random 600 entropy on context.102.130 bits 2 independent uniform;
+reward 610 shortfall random {600} on post.100.110 {
+ threshold 1 <= 1/2;
+ excess 1 <= 1/2;
+}

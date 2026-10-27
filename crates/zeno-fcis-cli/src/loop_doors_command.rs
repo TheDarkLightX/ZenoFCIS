@@ -92,17 +92,31 @@ mod search_limits;
 #[derive(Subcommand)]
 pub(crate) enum DoorCommand {
     // BEGIN black-box capture command (additive)
-    /// Capture an executable reference from examples, with full-domain checker acceptance.
+    #[command(
+        about = "Capture references: owner whole/open/status, public packet, proposer candidate.",
+        long_about = r#"Five operations share a bounded reference-capture protocol. The owner uses whole for one complete paged arithmetic comparison, or open to freeze an executable observation table in a private capture session. Packet exposes only the ABI, round and selected examples; the proposer submits candidate. Status returns owner-only evidence and rechecks stored success. These roles are a data-separation convention, not authenticated identities.
+
+Inputs use finite-program ABI JSON or zeno-fcis/capture-expressions/1, not the ordinary loop-expressions document. Acceptance requires the existing transform checker and matching receipt replay over the complete observed finite domain. See each child for bounds and exits. Normal handlers use zeno-fcis/black-box-capture/2. Outer unavailable containment returns refused (1) under zeno-fcis/black-box-capture/1; an outer stop returns inconclusive (2) under that diagnostic schema. No runtime publication authority."#
+    )]
     Capture {
         #[command(subcommand)]
         command: capture::Command,
     },
     // END black-box capture command
     // BEGIN composable program loop commands (no session attempts).
-    /// Complete, repair and optimize a bound proposal through fixed guarded stages.
+    #[command(
+        about = "Complete, repair, and simplify a hash-bound proposal with check and receipt replay.",
+        long_about = r#"Read --original (canonical bytes) and --proposal (zeno-fcis/loop-pipeline/1), each at most 65,536 bytes. Use --packet first to obtain original_sha256 and implementation_sha256; both must match the proposal. Supply either program JSON or an expressions document, plus optional stages (at most five; default complete,repair,canonical).
+
+Stages run only when applicable: complete holes; repair refuted complete expressions; canonical or resubstitute a qualified program. The original must have at least one successful evaluation; all-original-observations-fail returns inconclusive (2). Qualification always needs transform check over the full declared input domain and matching receipt replay. Shared limits bound tuples, check pairs, stages, work and time. --out writes evidence, and candidate/original bytes only on overall qualification.
+
+No session or attempts. JSON: zeno-fcis/loop-doors/2. Exit 0 packet or qualified; 1 refused/refuted; 2 inconclusive; 3 I/O error. Prior successful checks do not qualify a later incomplete result."#
+    )]
     Pipeline {
+        /// Canonical reference program (.zcve), at most 65,536 bytes.
         #[arg(long)]
         original: PathBuf,
+        /// Pipeline JSON (zeno-fcis/loop-pipeline/1) bound to the reference and implementation hashes.
         #[arg(long, required_unless_present = "packet")]
         proposal: Option<PathBuf>,
         /// Print binding information without running a search.
@@ -114,13 +128,24 @@ pub(crate) enum DoorCommand {
         #[command(flatten)]
         limits: pipeline::SearchLimits,
     },
-    /// Select a guarded strategy on development tasks, freeze it, then evaluate distinct tasks.
+    #[command(
+        about = "Select and evaluate stage sequences, run named strategies, or query usage knowledge.",
+        long_about = r#"Choose one mode. --tasks reads zeno-fcis/loop-strategy/1 with exactly one development and one evaluation task, distinct original bytes and hash-bound pipeline proposals. At runtime --depth must be 1: compare five sequences, freeze the development winner, then evaluate without changing it.
+
+Alternatively --kind and --problem read zeno-fcis/loop-strategy-problem/1. split-by-cases requires --original and qualifies through complete reference capture, transform check and replay. diagnose proposes weak-fault explanations/probes; ask-when-it-matters proposes answers/questions over the supplied finite readings. Neither latter mode qualifies a program.
+
+--kb-op query/check/plan/advise/explain performs bounded structural usage inference; global --kb selects external layers. It supplies no program or execution authority. Shared search limits apply; files are at most 65,536 bytes. No session or attempts.
+
+Task/named results use zeno-fcis/loop-doors/2; knowledge advice may use zeno-fcis/usage-knowledge/1. Exit 0 evaluated/qualified or completed structural inference; 1 refused/refuted; 2 inconclusive; 3 I/O error. Named question/diagnosis/answer proposals also exit 0; inconsistent knowledge exits 1 and no plan exits 2. An evaluated task report can contain unqualified programs; inspect each check."#
+    )]
     Strategy {
+        /// Task manifest (zeno-fcis/loop-strategy/1): one development task and one distinct evaluation task.
         #[arg(long, conflicts_with_all = ["problem", "kb_op"], required_unless_present_any = ["problem", "kb_op"])]
         tasks: Option<PathBuf>,
         /// Run a named strategy through the same typed plan/trace surface.
         #[arg(long, requires = "problem", value_parser = ["split-by-cases", "diagnose", "ask-when-it-matters"])]
         kind: Option<String>,
+        /// Problem JSON (zeno-fcis/loop-strategy-problem/1) for the selected --kind.
         #[arg(long, requires = "kind")]
         problem: Option<PathBuf>,
         /// Fixed full-domain reference for split-by-cases.
@@ -130,40 +155,68 @@ pub(crate) enum DoorCommand {
         /// Query, check structural code consistency, or propose a type-directed plan.
         #[arg(long, value_parser = ["query", "check", "plan", "advise", "explain"], conflicts_with_all = ["tasks", "kind", "problem", "original", "out"])]
         kb_op: Option<String>,
+        /// Query or explanation expression for --kb-op query or explain.
         #[arg(long, requires = "kb_op")]
         query: Option<String>,
+        /// Comma-separated available type names for --kb-op plan.
         #[arg(long, requires = "kb_op")]
         have: Option<String>,
+        /// Comma-separated required type names for --kb-op plan.
         #[arg(long, requires = "kb_op")]
         want: Option<String>,
+        /// Maximum plan length, at most 16; only used with --kb-op.
         #[arg(long, default_value_t = 8)]
         kb_max_steps: usize,
+        /// Maximum planning states, at most 4,096; only used with --kb-op.
         #[arg(long, default_value_t = 4096)]
         kb_max_states: usize,
         // END structural knowledge strategy options.
         /// Runtime depth is restricted to one by the invocation-wide frame budget.
         #[arg(long, default_value_t = 1)]
         depth: u8,
+        /// New directory for the result and any qualified artifacts; existing paths are refused.
         #[arg(long)]
         out: Option<PathBuf>,
         #[command(flatten)]
         limits: pipeline::SearchLimits,
     },
-    /// Propose concrete cheaper rewrites and recheck rules and whole programs on the target domain.
+    #[command(
+        about = "Mine or load concrete rewrites, then recheck rules and the target program.",
+        long_about = r#"Read --original canonical bytes and optionally --terms (zeno-fcis/loop-terms/1) or --bank (zeno-fcis/loop-rule-bank/1), each at most 65,536 bytes. Without either, mine terms from the original. Terms are single-output program JSON or kind/expression objects using the corpus vocabulary.
+
+Check proposed cheaper concrete rules on this target input domain, then transform-check and replay any whole-program replacement against the fixed original. These are finite-domain rules, not universal identities. Shared search limits bound work, cells, terms, checks, tuples and time. --out exports result/bank and, only when qualified, original/candidate bytes.
+
+An unchanged original can qualify with improved:false, including when mining cannot type its arithmetic nodes and proposes no rules. An empty detail.checks means no rule/replacement checks; detail.baseline_check still records the original-versus-itself transform check and matching replay. This qualifies only original equivalence, not search support or improvement.
+
+Top-level rules_summary counts considered/qualified/refuted/refused/inconclusive/unexamined rules and retains the first refuting stage/input per rule; detail.rules_summary and exported result.json retain it too. One stderr line per refuted rule names the witness. Counts are diagnostics, not new verdicts; a qualified term rule can have a refuted whole-program application.
+
+No session or attempts. JSON: zeno-fcis/loop-doors/2. Exit 0 qualified; 1 refused/refuted; 2 inconclusive; 3 I/O error."#
+    )]
     Rules {
+        /// Canonical reference program (.zcve), at most 65,536 bytes.
         #[arg(long)]
         original: PathBuf,
+        /// Optional term corpus (zeno-fcis/loop-terms/1); otherwise mine the original program.
         #[arg(long, conflicts_with = "bank")]
         terms: Option<PathBuf>,
+        /// Existing rule bank (zeno-fcis/loop-rule-bank/1); recheck on this target domain.
         #[arg(long)]
         bank: Option<PathBuf>,
+        /// New directory for the result and any qualified artifacts; existing paths are refused.
         #[arg(long)]
         out: Option<PathBuf>,
         #[command(flatten)]
         limits: pipeline::SearchLimits,
     },
     // END composable program loop commands.
-    /// Enumerate a declared vocabulary from examples; uniqueness stays a proposal.
+    #[command(
+        about = "Enumerate expressions fitting examples; optionally qualify against a complete reference.",
+        long_about = r#"Read --spec (ASCII zeno-fcis/loop-learn/1, at most 65,536 bytes): named Bool/Int inputs, output domains, declared vocabulary, max_size and complete examples. Integer bounds/labels here are JSON integers, unlike program JSON decimal strings. Enumerate expressions only within the declared vocabulary/size; the library evaluator independently rechecks the lowered examples. Uniqueness is an enumeration proposal.
+
+Default caps may only be reduced: 2,000,000 work, 4,096 tuples/meanings, 1,000,000 cells, 10,000 conflict subsets. With --original (canonical bytes, at most 65,536 bytes and the same ABI), every reference input must evaluate successfully within the 4,096-tuple cap. A fitting candidate must pass complete observed-table capture plus original-bound transform check and receipt replay; --out requires that reference and exports candidate bytes only when qualified. No session or attempts.
+
+JSON: zeno-fcis/loop-doors/2. Without qualification: determined=0, question=2, outside-vocabulary/ambiguous/refused=1, inconclusive=2. With a reference: qualified=0, refuted/refused=1, inconclusive=2; I/O errors can be 3. Example fit alone issues no equivalence receipt."#
+    )]
     Learn {
         /// Declaration and examples (zeno-fcis/loop-learn/1), at most 64 KiB.
         #[arg(long)]
@@ -176,19 +229,30 @@ pub(crate) enum DoorCommand {
         #[arg(long, requires = "original")]
         out: Option<PathBuf>,
         // END L2.
+        /// Enumeration work units, at most 2,000,000.
         #[arg(long, default_value_t = 2_000_000)]
         max_work: u64,
+        /// Enumerated input tuples, at most 4,096.
         #[arg(long, default_value_t = 4096)]
         max_tuples: u64,
+        /// Raw meanings per kind, at most 4,096.
         #[arg(long, default_value_t = 4096)]
         max_meanings: usize,
+        /// Cumulative enumeration table cells, at most 1,000,000.
         #[arg(long, default_value_t = 1_000_000)]
         max_cells: u64,
+        /// Example subsets examined for a conflict, at most 10,000.
         #[arg(long, default_value_t = 10_000)]
         max_conflict_subsets: u64,
     },
-    /// Spend one attempt on a sketch: solve its holes and check the completion.
+    #[command(
+        about = "Solve finite expression holes, then check one completion in an existing session.",
+        long_about = r#"Read --sketch (zeno-fcis/loop-expressions/1, at most 65,536 bytes), including named inputs and finite constant/choice holes. Load --session, replay its retained evidence, and search for a completion within the door budgets (at most 131,072 input tuples, five-second search stages). A proposed completion needs transform check and receipt replay before the session checker independently judges it on the full original domain.
+
+One submitted completion or decided empty/malformed proposal consumes an attempt; an unfinished search or confirming check can return before submission, retaining charged preparation/replay work. JSON: zeno-fcis/transform-loop/1 with detail.door diagnostics. Exit 0 equivalent (improved or not) or duplicate with independent check/replay confirmation; 1 different/refused/unconfirmed duplicate or failed proposal; 2 incomplete, failed check or closed session; 3 I/O error. Creates no session; a selected replacement retains its receipt. An unrealizable search returns top-level proposal-failed:empty (1) with detail.door.status=unrealizable and consumes an attempt. That is a search finding, not a checker proof."#
+    )]
     Sketch {
+        /// Existing session directory created by loop open.
         #[arg(long)]
         session: PathBuf,
         /// Sketch document (zeno-fcis/loop-expressions/1) with holes.
@@ -198,7 +262,14 @@ pub(crate) enum DoorCommand {
         #[arg(long)]
         provenance: Option<PathBuf>,
     },
-    /// Judge one family program on every listed instance; no session.
+    #[command(
+        about = "Check a parameterized program or sketch on each listed finite family instance.",
+        long_about = r#"Read --instances (zeno-fcis/loop-family-manifest/1) and --program (zeno-fcis/loop-expressions/1 with $PARAMETERS). Parameter values belong in the manifest; the family program must not supply its own. Files and named canonical programs are at most 65,536 bytes; the manifest lists 1 to 10 instances with relative paths and signed-64-bit JSON integer parameter values. Each instance is limited to 131,072 input tuples.
+
+Lower or solve the program per instance, then require transform check plus matching receipt replay. --fit proposes affine hole values a*$P+b from instances marked for fitting and checks the lifted program on all listed instances. This establishes no unlisted-instance claim. No session or attempts; per-instance reports include receipt digests, not exported receipt files.
+
+JSON: zeno-fcis/loop-doors/2. Exit 0 accepted summarizes the initial per-instance checks; the fitted template has a separate detail.lifted_check verdict, which does not change that exit. Exit 1 refuted or invalid input; 2 unrealizable/partial or containment inconclusive; 3 I/O error."#
+    )]
     Family {
         /// Instance manifest (zeno-fcis/loop-family-manifest/1).
         #[arg(long)]
@@ -210,7 +281,14 @@ pub(crate) enum DoorCommand {
         #[arg(long)]
         fit: bool,
     },
-    /// Move a program to every listed instance: directly, by sketch, then by repair; no session.
+    #[command(
+        about = "Try a source program directly, as a sketch, then by repair on listed instances.",
+        long_about = r#"Read --from (zeno-fcis/loop-expressions/1 with source parameters) and --to-instances (zeno-fcis/loop-family-manifest/1). Source parameter values are signed-64-bit JSON integers. Source expressions must be plain and use literal constants, not $PARAMETERS. Use the supplied source parameter values to locate constants near changed target parameters; try direct use, open those constants as choice holes, then try repair. Every successful target program needs transform check and matching receipt replay on that target reference domain.
+
+At most 10 listed instances, 131,072 tuples per instance, and 65,536 bytes per document/program; bounded search/check stages share the invocation deadline. No session or attempts; report receipt digests without exporting receipt files. Coverage is only the listed instances.
+
+JSON: zeno-fcis/loop-doors/2. Exit 0 transferred to all; 1 failed (none) or refused; 2 partial or containment inconclusive. Per-target budget stops can aggregate to failed (1) or partial (2); inspect rows; 3 I/O error."#
+    )]
     Transfer {
         /// Source program (zeno-fcis/loop-expressions/1) with its instance's parameters.
         #[arg(long)]
@@ -219,7 +297,12 @@ pub(crate) enum DoorCommand {
         #[arg(long = "to-instances")]
         to_instances: PathBuf,
     },
-    /// Key a program by its meaning: its observation on every declared input; no session.
+    #[command(
+        about = "Hash complete finite observations and compare them with the reference program.",
+        long_about = r#"Read --original and either canonical --candidate or --expressions (zeno-fcis/loop-expressions/1); each file is at most 65,536 bytes. Require identical input/output domains and at most 131,072 input tuples. The library evaluator computes every output or exact evaluation failure in enumeration order; hash these observations and domains under zeno-fcis/loop-meaning/1.
+
+Returns both digests and same_as_original. Digest equality is a meaning key, subject to hash collisions; it is not an independent transform verdict or receipt. No session or attempts. JSON: zeno-fcis/loop-doors/2. Exit 0 same meaning, 1 different or refused, 2 inconclusive, 3 I/O error."#
+    )]
     Meaning {
         /// Canonical original program (program.zcve encoding).
         #[arg(long)]
@@ -235,7 +318,12 @@ pub(crate) enum DoorCommand {
         #[arg(long)]
         candidate: Option<PathBuf>,
     },
-    /// Evaluate one expression at a declared input through the library; no verdict or receipt.
+    #[command(
+        about = "Evaluate one expression at one supplied input; produce values without an equivalence verdict.",
+        long_about = r#"Read --original for input domains and --expressions as zeno-fcis/loop-expressions/1 with vocabulary and exactly one plain output expression, no parameters or holes. Pass --input as comma-separated signed-i128 values in the original input order (use --input=-1,0 for negatives). The original domain must have at most 131,072 tuples even though this operation evaluates only one point. Files are at most 65,536 bytes.
+
+Lower the expression and use the library evaluator with a full signed-i128 or Boolean output domain. JSON: zeno-fcis/transform-loop/1, evaluated values are decimal strings. Exit 0 evaluated; 1 refused (including invalid input or arithmetic failure); 2 containment inconclusive; 3 I/O error. No session, attempts, equivalence verdict or receipt."#
+    )]
     Evaluate {
         /// Canonical program supplying the declared input domains.
         #[arg(long)]
@@ -247,7 +335,16 @@ pub(crate) enum DoorCommand {
         #[arg(long, value_delimiter = ',', allow_hyphen_values = true)]
         input: Vec<i128>,
     },
-    /// Ask about the largest region where the contract's laws leave the decision open; no session.
+    #[command(
+        about = "Find open contract decisions, or ask which finite sketch completion is intended.",
+        long_about = r#"Choose --contract (project.zeno and v2/policy.json) with optional zeno-fcis/loop-answers/1 --answers, or --specification (zeno-fcis/loop-version-space/1). Contract mode compares laws and answers with the existing core on the declared finite domain and asks about the largest ambiguous region; answers are not adopted. At most 131,072 tuples and 4,000,000 admissibility checks.
+
+Requirements-only mode enumerates finite sketch completions under laws/examples and proposes a distinguishing input or conflict. A singleton is checked using the library law evaluator, transform check and receipt replay. Defaults: 2,000,000 work, 4,096 tuples/meanings, 1,000,000 cells and 10,000 subsets. Hard caps: 100,000,000 work, 65,536 tuples, 16,384 meanings, 8,000,000 cells and 1,000,000 subsets. The five --max-* flags apply to --specification; contract mode accepts but ignores them and uses its own limits above.
+
+Contract determination includes the door's reason and delivery constraints; it need not equal a separate gaps-judge result on exported answer laws. Disagreeing answers exit 1; inspect detail.answers as well as status.
+
+No session or attempts. Contract JSON: zeno-fcis/loop-doors/2; exit 0 completed report, 1 disagreement/conflict/inconsistent/refused, 2 incomplete/inconclusive/out-of-scope, 3 I/O error. Requirements JSON: zeno-fcis/loop-version-space/2 (early input errors can use transform-loop/1); determined=0, no-completion/refused=1, question/inconclusive=2. A question or count is not a program acceptance."#
+    )]
     Question {
         /// Existing application contract (original question mode).
         #[arg(
@@ -265,7 +362,12 @@ pub(crate) enum DoorCommand {
         #[command(flatten)]
         version_limits: version_space::Arguments,
     },
-    /// Judge restated rules against the core's decisions on the whole declared domain; no session.
+    #[command(
+        about = "Compare restated rules with the core on all declared inputs and reachable states.",
+        long_about = r#"Read --contract (project.zeno and v2/policy.json), --rule (zeno-fcis/loop-rules/1), and optional --answers (zeno-fcis/loop-answers/1). Documents are at most 65,536 bytes; the supported finite core is limited to 131,072 tuples. The door evaluator classifies rules as exact, holds, wrong or vacuous, gives regions/witnesses, and computes required/open/forbidden where its admissibility budget permits.
+
+JSON: zeno-fcis/loop-doors/2. Exit 0 exact/holds, 1 wrong/refused, 2 vacuous/inconclusive/out-of-scope, 3 I/O error. No session, attempts or equivalence receipt, and no rule or owner answer is adopted."#
+    )]
     TeachBack {
         /// Application directory holding project.zeno and v2/policy.json.
         #[arg(long)]
@@ -277,7 +379,14 @@ pub(crate) enum DoorCommand {
         #[arg(long)]
         answers: Option<PathBuf>,
     },
-    /// Hold an architecture of components against the core: required behaviour, realizability, case tables (the door's own evaluation); no session.
+    #[command(
+        about = "Evaluate component interfaces and case tables; optionally check their full composition.",
+        long_about = r#"Read --contract and --architecture (zeno-fcis/loop-architecture/1, at most 65,536 bytes). Steps 1 to 3 use door simulation for required behavior, realizability and component case tables over the supported finite core (at most 131,072 tuples). Simulation findings are not composed-program acceptance.
+
+--compose compares the composition checker joint step with the core on every declared input and checks obligations; accepted requires both plus unblamed step-3 tables. --export requires --compose and a new directory; it writes generated contracts and the composition manifest even for a negative verdict.
+
+JSON: zeno-fcis/loop-doors/2. Exit 0 realizable/completed/meets-requirements/accepted; 1 unrealizable/refuted/refused; 2 inconclusive/out-of-scope; 3 I/O error. No loop session, attempts or transform receipt; only --compose invokes the independent composition checker."#
+    )]
     Decompose {
         /// Application directory holding project.zeno and v2/policy.json.
         #[arg(long)]
@@ -2212,7 +2321,12 @@ fn meaning_command(
     };
     let size = tuples(original_program.inputs());
     if size > u128::from(DOOR_MAX_TUPLES) {
-        return refused("domain over the door's budget");
+        return doors_result(
+            crate::BLOCKED,
+            "meaning",
+            "inconclusive",
+            json!({"reason": "domain over the door's budget"}),
+        );
     }
     let program = match (expressions, candidate) {
         (Some(path), _) => {
@@ -2254,7 +2368,11 @@ fn meaning_command(
             json!({"reason": reason}),
         ),
         Ok((original_key, key)) => doors_result(
-            crate::OK,
+            if key == original_key {
+                crate::OK
+            } else {
+                crate::INVALID
+            },
             "meaning",
             "keyed",
             json!({
@@ -2279,8 +2397,12 @@ fn json_document(path: &Path) -> Result<Value, (u8, Value)> {
 }
 
 /// The core table of `dir`, in a contained search stage.
-fn contract_core(dir: &Path, stages: &mut Stages) -> Result<judges::Core, (u8, Value)> {
-    match stages.run(true, || judges::Core::load(dir)) {
+fn contract_core(
+    dir: &Path,
+    stages: &mut Stages,
+    question_profile: bool,
+) -> Result<judges::Core, (u8, Value)> {
+    match stages.run(true, || judges::Core::load(dir, question_profile)) {
         Err(reason) => Err(doors_result(
             crate::BLOCKED,
             "contract",
@@ -2295,6 +2417,12 @@ fn contract_core(dir: &Path, stages: &mut Stages) -> Result<judges::Core, (u8, V
 fn stop_result(stop: judges::Stop) -> (u8, Value) {
     match stop {
         judges::Stop::Invalid(reason) => refused(&reason),
+        judges::Stop::OutOfScope(reason) => super::result(
+            crate::BLOCKED,
+            "out-of-scope",
+            json!({"reason": reason,
+                "determination": crate::contract::review::decision_space::determination_scope(true, "declared-laws-and-recorded-answers")}),
+        ),
         judges::Stop::Inconclusive(reason) => {
             super::result(crate::BLOCKED, "inconclusive", json!({"reason": reason}))
         }
@@ -2309,7 +2437,7 @@ fn question_command(dir: &Path, answers: Option<&Path>) -> (u8, Value) {
         Err(failure) => return failure,
     };
     let mut stages = Stages::new(started, STATELESS_DEADLINE, 0);
-    let core = match contract_core(dir, &mut stages) {
+    let core = match contract_core(dir, &mut stages, true) {
         Ok(core) => core,
         Err(failure) => return failure,
     };
@@ -2366,6 +2494,7 @@ fn question_command(dir: &Path, answers: Option<&Path>) -> (u8, Value) {
                     "status": "measured",
                     "determined": measured["proposals"]["determined"],
                     "inactive": measured["proposals"]["inactive"],
+                    "determination": measured["proposals"]["after"]["determination"],
                 });
             }
             Ok(Ok(Gaps::FalseAlarm(alarm))) => {
@@ -2407,8 +2536,16 @@ fn question_command(dir: &Path, answers: Option<&Path>) -> (u8, Value) {
     }
     let status = detail["status"].as_str().unwrap_or("open").to_owned();
     (
-        if status == "inconsistent" {
+        if status == "inconsistent"
+            || detail["answers"].as_array().is_some_and(|answers| {
+                answers
+                    .iter()
+                    .any(|answer| answer["status"] == "disagreement")
+            })
+        {
             crate::INVALID
+        } else if status == "incomplete" {
+            crate::BLOCKED
         } else {
             crate::OK
         },
@@ -2428,7 +2565,7 @@ fn teach_back_command(dir: &Path, rules: &Path, answers: Option<&Path>) -> (u8, 
         Err(failure) => return failure,
     };
     let mut stages = Stages::new(started, STATELESS_DEADLINE, 0);
-    let core = match contract_core(dir, &mut stages) {
+    let core = match contract_core(dir, &mut stages, false) {
         Ok(core) => core,
         Err(failure) => return failure,
     };
@@ -2449,10 +2586,30 @@ fn teach_back_command(dir: &Path, rules: &Path, answers: Option<&Path>) -> (u8, 
     match judged {
         Err(reason) => super::result(crate::BLOCKED, "inconclusive", json!({"reason": reason})),
         Ok(Err(stop)) => stop_result(stop),
-        Ok(Ok(detail)) => (
-            crate::OK,
-            json!({"status": "judged", "authority": "none", "detail": detail}),
-        ),
+        Ok(Ok(detail)) => {
+            let rules = detail["rules"]
+                .as_array()
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            let exit = if rules
+                .iter()
+                .any(|rule| matches!(rule["verdict"].as_str(), Some("wrong" | "refused")))
+            {
+                crate::INVALID
+            } else if rules.is_empty()
+                || rules
+                    .iter()
+                    .any(|rule| !matches!(rule["verdict"].as_str(), Some("exact" | "holds")))
+            {
+                crate::BLOCKED
+            } else {
+                crate::OK
+            };
+            (
+                exit,
+                json!({"status": "judged", "authority": "none", "detail": detail}),
+            )
+        }
     }
 }
 
@@ -2471,7 +2628,7 @@ fn decompose_command(
         Err(failure) => return failure,
     };
     let mut stages = Stages::new(started, STATELESS_DEADLINE, 0);
-    let core = match contract_core(dir, &mut stages) {
+    let core = match contract_core(dir, &mut stages, false) {
         Ok(core) => core,
         Err(failure) => return failure,
     };
@@ -2706,6 +2863,83 @@ pub(super) fn knowledge_session(command: &DoorCommand) -> Option<(&Path, bool)> 
         },
         _ => None,
     }
+}
+
+/// Assessment-only routing: the original exact checker and receipt replay stay in the pipeline.
+pub(crate) fn assessment_run(
+    original: &[u8],
+    specification: &Value,
+    actions: &[crate::knowledge_assessment::Action],
+    budget: &crate::knowledge_replay::TaskBudget,
+) -> Result<Value, &'static str> {
+    let mut proposal = specification.clone();
+    proposal["schema"] = json!(pipeline::PIPELINE_SCHEMA);
+    proposal["original_sha256"] = json!(sha256_hex(original));
+    proposal["implementation_sha256"] = json!(pipeline::implementation());
+    if proposal["program"] == "identity" {
+        proposal["program"] =
+            program_to_json(&import_program(original).map_err(|_| "kb-task-program")?);
+    }
+    let stages = pipeline::stages(
+        proposal
+            .get("stages")
+            .unwrap_or(&json!(["canonical", "resubstitute"])),
+    )
+    .map_err(|_| "kb-task-stages")?;
+    let task = pipeline::task(original.to_vec(), proposal).map_err(|_| "kb-task-proposal")?;
+    let limits = pipeline::SearchLimits {
+        max_tuples: budget.tuples,
+        max_gate_pairs: budget.gate_pairs,
+        max_search_work: budget.search_work,
+        max_cells: 1_048_576,
+        max_assignments: 128,
+        max_terms: 32,
+        max_checks: budget.checks,
+        deadline_ms: budget.timeout_ms,
+    };
+    if !limits.valid() {
+        return Err("kb-task-limits");
+    }
+    let mut counter = pipeline::Budget::new(limits);
+    if !actions.is_empty() {
+        counter.knowledge = Some(crate::loop_knowledge::LoopPolicy::from_actions(actions));
+    }
+    let mut run = pipeline::run(&task, &stages, &mut counter);
+    search_limits::annotate("pipeline", run.status, &mut run.report);
+    run.report["checker_limits"] = json!({"steps":crate::transform::DEFAULT_STEP_LIMIT,"input_tuples":crate::transform::DEFAULT_MAX_INPUT_TUPLES});
+    Ok(json!({"schema":"zeno-fcis/kb-task-output/1","authority":"none","detail":run.report}))
+}
+
+/// Exact finite artifact replay for tier-one facts; no strategy or publication authority.
+pub(crate) fn assessment_certificate(
+    original: &[u8],
+    candidate: &[u8],
+) -> Result<Value, &'static str> {
+    let op = import_program(original).map_err(|_| "kb-proof-original")?;
+    let cp = import_program(candidate).map_err(|_| "kb-proof-candidate")?;
+    let count = tuples(op.inputs());
+    if count > 4096 {
+        return Err("kb-proof-domain-budget");
+    }
+    let limits = crate::transform::Limits {
+        steps: crate::transform::DEFAULT_STEP_LIMIT,
+        input_tuples: 4096,
+    };
+    let check = match crate::transform::check(original, candidate, limits) {
+        Ok(eq) => {
+            let receipt = eq.receipt();
+            let replay = crate::transform::replay(&receipt, original, candidate, 4096);
+            json!({"verdict":"equivalent","replay":if replay==crate::transform::Replay::Matched{"matched"}else{"differs"},"receipt_sha256":sha256_hex(&receipt)})
+        }
+        Err(crate::transform::Rejection::Counterexample(c)) => {
+            json!({"verdict":"counterexample","ordinal":c.ordinal,"input":crate::transform::values_json(&c.input),"original":observation(&c.original),"candidate":observation(&c.candidate)})
+        }
+        Err(_) => return Err("kb-artifact-inconclusive"),
+    };
+    let accepted = check["verdict"] == "equivalent" && check["replay"] == "matched";
+    Ok(
+        json!({"schema":"zeno-fcis/kb-task-output/1","authority":"none","detail":{"status":if accepted{"qualified"}else{"refuted"},"original":program_json(&op),"best":if accepted{program_json(&cp)}else{Value::Null},"best_check":if accepted{check.clone()}else{Value::Null},"candidates":[{"candidate":program_json(&cp),"check":check}],"execution_trace":["check-program","replay-receipt"],"checker_limits":{"steps":crate::transform::DEFAULT_STEP_LIMIT,"input_tuples":4096},"trace":[],"reason":Value::Null,"work":{"check_requests":1,"gate_pairs_reserved":u64::try_from(count*2).map_err(|_|"kb-work-overflow")?,"search_stage_requests":0,"control_frames":0,"capture_work_reserved":0,"capture_cells_reserved":0}}}),
+    )
 }
 
 #[cfg(test)]

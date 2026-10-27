@@ -11,6 +11,7 @@ pub mod decision_space;
 pub mod declarations;
 pub mod delivery;
 pub mod expr;
+pub mod genesis;
 pub mod graph;
 pub mod model;
 pub mod policy;
@@ -18,6 +19,8 @@ pub mod quantity;
 pub mod review;
 pub mod rules;
 pub mod schema;
+pub mod tables;
+pub mod tables_review;
 
 pub use crate::ContractError;
 

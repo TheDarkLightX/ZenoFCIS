@@ -75,11 +75,17 @@ pub(in super::super) open spec fn channel_field_valid(f:Seq<TypedField>,i:int)->
 pub(in super::super) open spec fn channel_fields(f:Seq<TypedField>)->bool{forall|i:int|0<=i<f.len()==>channel_field_valid(f,i)}
 pub(in super::super) open spec fn channel_valid(c:Seq<Channel>,i:int)->bool{c[i].id!=0&&(i==0||c[i-1].id<c[i].id)&&domain_valid(c[i].destination)&&domain_valid(c[i].idempotency)&&channel_fields(c[i].payload@)}
 pub(in super::super) open spec fn channels(c:Seq<Channel>)->bool{forall|i:int|0<=i<c.len()==>channel_valid(c,i)}
+pub(in super::super) open spec fn reason_law(d:&Descriptor,i:int)->bool {
+    match d.laws@[i].scope { laws::Scope::RejectReason(id)=>reason(d,Class::Reject,Some(id)), _=>true }
+}
+pub(in super::super) open spec fn reason_laws(d:&Descriptor)->bool {
+    forall|i:int|0<=i<d.laws.len() ==> reason_law(d,i)
+}
 pub(in super::super) open spec fn admitted(d:&Descriptor)->bool{
     match d.state{Schema::Original{..}|Schema::Leaf(_)=>false,Schema::Record(fields)=>
     ingress::spec::schema_valid(d.state)&&ingress::spec::schema_valid(d.command)&&ingress::spec::schema_valid(d.context)&&(bindings(d)&&outputs(d))
     &&super::super::super::super::evaluation::admission::spec::extended_program(d.program.inputs@,d.program.outputs@,d.program.nodes@,d.program.roots@).is_ok()
-    &&reasons(d.reasons@)&&channels(d.channels@)&&branches(d,fields@)&&laws::spec::metadata(d.laws@,d.required@)&&schema_validation::spec::law_literals(d.laws@)}
+    &&reason_laws(d)&&reasons(d.reasons@)&&channels(d.channels@)&&branches(d,fields@)&&laws::spec::metadata(d.laws@,d.required@)&&schema_validation::spec::law_literals(d.laws@)}
 }
 }
 

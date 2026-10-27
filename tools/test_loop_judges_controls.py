@@ -17,21 +17,22 @@ import loop_judges_controls as C  # noqa: E402
 class Controls(unittest.TestCase):
     def test_question_timing_rejects_slowness_and_semantic_drift(self):
         good = {"status": "determined", "answers": 8, "tuples": 432, "determined_with_reasons": 432,
-                "inconsistent": 0, "gaps": "measured", "identical_repeat": True, "seconds": 0.5}
+                "inconsistent": 0, "answers_recorded": 8, "gaps": "measured", "identical_repeat": True, "seconds": 0.5}
         self.assertTrue(C.question_timing_passes(good))
         self.assertTrue(C.question_timing_passes(dict(good, seconds=1.8)))
         for key, value in (("seconds", 2.5), ("status", "inconclusive"), ("answers", 7), ("tuples", 431),
-                           ("determined_with_reasons", 431), ("inconsistent", 1), ("gaps", "proposal-false-alarm"),
+                           ("determined_with_reasons", 431), ("inconsistent", 1), ("answers_recorded", 7), ("gaps", "proposal-false-alarm"),
                            ("identical_repeat", False)):
             self.assertFalse(C.question_timing_passes(dict(good, **{key: value})), key)
 
     def test_question_timing_compares_complete_details_and_requires_success(self):
         import tempfile
-        report = {"status": "determined", "detail": {"answers": [{}] * 8, "stats": {
+        report = {"status": "determined", "detail": {"answers": [{"status": "recorded"}] * 8, "stats": {
             "tuples": 432, "determined_with_reasons": 432, "inconsistent": 0}, "gaps": {"status": "measured"}}}
         different = copy.deepcopy(report)
         different["detail"]["answers"][0] = {"status": "disagreement"}
         for repeats, expected in (([(0, report), (0, report)], True),
+                                  ([(0, different), (0, different)], False),
                                   ([(0, report), (0, different)], False),
                                   ([(1, report), (0, report)], False)):
             with tempfile.TemporaryDirectory() as scratch, patch.object(C, "run", side_effect=repeats), \

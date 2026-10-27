@@ -46,6 +46,15 @@ const STEP_ALLOWANCE: u64 = 5;
 pub enum ScalarDomain {
     Bool,
     Int { min: i128, max: i128 },
+    Unsigned { min: u128, max: u128 },
+}
+
+/// One expanded computed output in program-root order, owned by the caller.
+/// Ordinary builds discard this metadata before returning their contract.
+#[derive(Clone, Debug)]
+pub struct ScalarRoot {
+    pub expression: Ast,
+    pub domain: ScalarDomain,
 }
 
 /// A typed inverse map from a scalar to an original value.
@@ -53,6 +62,7 @@ pub enum ScalarDomain {
 pub enum InputLeaf {
     Bool,
     I128 { min: i128, max: i128 },
+    U128 { min: u128, max: u128 },
     Sum { type_id: u32, variants: Vec<u16> },
 }
 
@@ -61,6 +71,7 @@ pub enum InputLeaf {
 pub enum Domain {
     Bool,
     I128 { min: i128, max: i128 },
+    U128 { min: u128, max: u128 },
     Text,
     Sum { type_id: u32, variants: Vec<u16> },
 }
@@ -140,6 +151,8 @@ pub struct Budgets {
 
 #[derive(Debug)]
 pub struct Contract<'d> {
+    /// Explicit /4 profile selects the full-width typed core, even for small values.
+    pub unsigned: bool,
     pub declarations: &'d Declarations,
     pub commitment: [u8; 32],
     /// Maximum framed state, command and context bytes.
@@ -195,11 +208,100 @@ fn bounded_arithmetic(declarations: &Declarations, rules: &Rules) -> bool {
 }
 
 impl<'d> Contract<'d> {
+    /// Reconstructs the released policy/2 representation for retained evidence.
+    /// The caller must compare the complete policy with its adoption binding.
+    /// This compiler result grants no historical invocation authority.
+    pub fn build_released_24(
+        declarations: &'d Declarations,
+        rules: &Rules,
+        commitment: [u8; 32],
+    ) -> Result<Self, ContractError> {
+        if rules.unsigned || rules.quantities {
+            return Err(rules_error(
+                "schema",
+                "requires the released policy/2 revision",
+            ));
+        }
+        let mut compiled = Self::build(declarations, rules, commitment)?;
+        // The released compiler widened computed signed outputs to i64.
+        // Declared input domains, graph order, laws and budgets stay intact.
+        for leaf in &mut compiled.output_types {
+            if matches!(
+                leaf,
+                InputLeaf::I128 {
+                    min: i128::MIN,
+                    max: i128::MAX
+                }
+            ) {
+                *leaf = InputLeaf::I128 {
+                    min: i128::from(i64::MIN),
+                    max: i128::from(i64::MAX),
+                };
+            }
+        }
+        for domain in &mut compiled.output_domains {
+            if matches!(
+                domain,
+                ScalarDomain::Int {
+                    min: i128::MIN,
+                    max: i128::MAX
+                }
+            ) {
+                *domain = ScalarDomain::Int {
+                    min: i128::from(i64::MIN),
+                    max: i128::from(i64::MAX),
+                };
+            }
+        }
+        // Admission is closed to the released scalar range and instructions.
+        let program = compiled.program()?;
+        zeno_fcis_synthesis::finite_runtime::i64_program_value(&program)
+            .map_err(|error| rules_error("", format!("not a released scalar program: {error}")))?;
+        Ok(compiled)
+    }
+
     pub fn build(
         declarations: &'d Declarations,
         rules: &Rules,
         commitment: [u8; 32],
     ) -> Result<Self, ContractError> {
+        Self::build_with_roots(declarations, rules, commitment).map(|(contract, _)| contract)
+    }
+
+    /// Return the ordinary contract and its expanded computed scalar roots.
+    /// Adopted programs do not retain this source metadata.
+    pub fn build_with_roots(
+        declarations: &'d Declarations,
+        rules: &Rules,
+        commitment: [u8; 32],
+    ) -> Result<(Self, Vec<ScalarRoot>), ContractError> {
+        if rules.unsigned && (!rules.adoptions.is_empty() || !rules.evolutions.is_empty()) {
+            return Err(ContractError::new(
+                "unsigned lineage binding",
+                "U128SubjectUnsupported",
+            ));
+        }
+        let uses_unsigned = declarations.unsigned()
+            || rules.variables.values().any(expr::uses_unsigned)
+            || declarations
+                .laws
+                .iter()
+                .any(|l| expr::uses_unsigned(&l.formula))
+            || rules
+                .genesis
+                .values()
+                .any(|v| matches!(v, Constant::U128(_)))
+            || rules.cases.iter().any(|c| {
+                expr::uses_unsigned(&c.when)
+                    || c.post.values().any(expr::uses_unsigned)
+                    || c.outbox
+                        .iter()
+                        .flat_map(|d| d.payload.values())
+                        .any(expr::uses_unsigned)
+            });
+        if uses_unsigned && !rules.unsigned {
+            return Err(rules_error("schema", "U128RequiresPolicy4"));
+        }
         if super::quantity::typed(declarations) && !rules.quantities {
             return Err(rules_error(
                 "schema",
@@ -209,7 +311,11 @@ impl<'d> Contract<'d> {
         let bounded = bounded_arithmetic(declarations, rules);
         // New-feature bindings still undergo admission, and cannot hide long chains
         // or erase units. Evaluation remains the existing graph's eager order.
-        for (name, value) in rules.variables.iter().filter(|_| bounded) {
+        for (name, value) in rules
+            .variables
+            .iter()
+            .filter(|_| bounded && !rules.unsigned)
+        {
             let ast = expr::expand_with_limits(value, &rules.variables, bounded)
                 .map_err(|e| rules_error(name, e))?;
             super::quantity::lower(declarations, &ast).map_err(|e| rules_error(name, e))?;
@@ -220,6 +326,18 @@ impl<'d> Contract<'d> {
                 "",
                 format!("{} inputs exceed {MAX_INPUTS}", inputs.len()),
             ));
+        }
+        if rules.unsigned {
+            // Every /4 binding uses the live expression checker. Its graph is
+            // exclusively owned admission scratch, never retained for execution.
+            for (name, value) in &rules.variables {
+                let ast = expr::expand_with_limits(value, &rules.variables, bounded)
+                    .map_err(|e| rules_error(name, e))?;
+                ScalarGraph::new(declarations, &inputs)
+                    .with_strict(true)
+                    .compile_with_limits(&ast, bounded)
+                    .map_err(|e| rules_error(name, e))?;
+            }
         }
         let state_fields: Vec<(u16, u32)> = declarations
             .state_fields()?
@@ -392,7 +510,7 @@ impl<'d> Contract<'d> {
             });
         }
 
-        let mut program = ScalarGraph::new(declarations, &inputs);
+        let mut program = ScalarGraph::new(declarations, &inputs).with_strict(rules.unsigned);
         let mut program_roots = Vec::new();
         for (ast, _) in &outputs.entries {
             program_roots.push(
@@ -464,7 +582,17 @@ impl<'d> Contract<'d> {
                 .unwrap_or(0)
                 .max(1),
         };
-        Ok(Self {
+        let scalar_roots = outputs
+            .entries
+            .iter()
+            .zip(&outputs.domains)
+            .map(|((expression, _), domain)| ScalarRoot {
+                expression: expression.clone(),
+                domain: *domain,
+            })
+            .collect();
+        let contract = Self {
+            unsigned: rules.unsigned,
             declarations,
             commitment,
             frame_bytes,
@@ -487,12 +615,19 @@ impl<'d> Contract<'d> {
             reasons,
             budgets,
             genesis,
-        })
+        };
+        Ok((contract, scalar_roots))
     }
 
     /// The decision program as the library's admitted program, whose
     /// canonical bytes a transform receipt names.
     pub fn program(&self) -> Result<Program, ContractError> {
+        if self.unsigned {
+            return Err(ContractError::new(
+                "scalar program export/emitter/search/optimizer",
+                "U128SubjectUnsupported",
+            ));
+        }
         let nodes = self
             .nodes
             .iter()
@@ -504,8 +639,14 @@ impl<'d> Contract<'d> {
             .map(|root| small(*root))
             .collect::<Result<Vec<_>, _>>()?;
         Program::try_new_extended(
-            self.input_domains.iter().map(library_domain).collect(),
-            self.output_domains.iter().map(library_domain).collect(),
+            self.input_domains
+                .iter()
+                .map(library_domain)
+                .collect::<Result<_, _>>()?,
+            self.output_domains
+                .iter()
+                .map(library_domain)
+                .collect::<Result<_, _>>()?,
             nodes,
             roots,
         )
@@ -522,6 +663,9 @@ impl<'d> Contract<'d> {
     /// its input and output ABI is the current one; the Step budget follows
     /// its node count as it follows the rules-compiled program's.
     pub fn adopt(&mut self, candidate: &Program, place: &str) -> Result<(), ContractError> {
+        if self.unsigned {
+            return Err(ContractError::new(place, "U128SubjectUnsupported"));
+        }
         let current = self.program()?;
         if candidate.inputs() != current.inputs() || candidate.outputs() != current.outputs() {
             return Err(rules_error(
@@ -616,7 +760,7 @@ impl Outputs {
         super::quantity::assignment(declarations, ast, type_id)
             .map_err(|e| rules_error(place, e))?;
         match ast {
-            Ast::Bool(_) | Ast::Int(_) => {
+            Ast::Bool(_) | Ast::Int(_) | Ast::U128(_) => {
                 let value = atom(declarations, ast, type_id)
                     .map_err(|reason| rules_error(place, reason))?;
                 if let (Atom::I128(value), TypeKind::I128 { min, max }) =
@@ -627,6 +771,12 @@ impl Outputs {
                         place,
                         format!("{value} is outside {min}..={max}"),
                     ));
+                }
+                if let (Atom::U128(value), TypeKind::U128 { min, max }) =
+                    (&value, declarations.kind(type_id)?)
+                    && !(min..=max).contains(value)
+                {
+                    return Err(rules_error(place, "U128ConstantOutOfRange"));
                 }
                 Ok(Expr::Constant(value))
             }
@@ -658,7 +808,15 @@ impl Outputs {
                 }
                 check_program(declarations, inputs, ast, place, bounded)?;
                 let kind = declarations.kind(type_id)?;
-                let wide = matches!(kind, TypeKind::I128 { .. });
+                if let TypeKind::Sum(variants) = &kind
+                    && !variants.windows(2).all(|p| p[1].id == p[0].id + 1)
+                {
+                    return Err(rules_error(
+                        place,
+                        "computed sparse sums are unsupported; use constant branches or direct copies",
+                    ));
+                }
+                let wide = matches!(kind, TypeKind::I128 { .. } | TypeKind::U128 { .. });
                 let leaf = input_leaf(declarations, type_id, wide)?;
                 let domain = scalar_domain(declarations, type_id, wide)?;
                 self.entries.push(key);
@@ -690,6 +848,14 @@ fn laws(
     }
     let mut laws = Vec::new();
     for law in &declarations.laws {
+        if let LawScope::RejectReason(reason) = law.scope
+            && (law.genesis || !reasons(declarations, rules)?.contains(&(reason, Class::Reject)))
+        {
+            return Err(ContractError::new(
+                format!("project.zeno law {}", law.id),
+                "reason scope requires a declared Reject reason and excludes genesis",
+            ));
+        }
         let place = format!("project.zeno law {}", law.id);
         let kind = rules.law_kinds[&law.id];
         if let Some((scope, genesis, written)) = required_declaration(kind)
@@ -708,7 +874,7 @@ fn laws(
         )
         .map_err(failed)?;
         super::quantity::condition(declarations, &formula).map_err(failed)?;
-        let mut graph = LawGraph::new(declarations);
+        let mut graph = LawGraph::new(declarations).with_strict(rules.unsigned);
         let bound = rules
             .delivery_laws
             .get(&law.id)
@@ -732,6 +898,24 @@ fn laws(
         {
             return Err(failed(
                 "decision_reason requires `on reject` or `on failure`, without genesis".to_owned(),
+            ));
+        }
+        if matches!(law.scope, LawScope::RejectReason(_))
+            && graph.table.nodes.iter().any(|node| match node {
+                LawOp::Observe(o) | LawOp::ObserveWhen(_, o, _) => !matches!(
+                    o,
+                    Observation::PreRoot
+                        | Observation::CommandRoot
+                        | Observation::ContextRoot
+                        | Observation::Pre(_)
+                        | Observation::Command(_)
+                        | Observation::Context(_)
+                ),
+                _ => false,
+            })
+        {
+            return Err(failed(
+                "reason predicates may read only the original input".to_owned(),
             ));
         }
         let mut root = graph.boolean(value).map_err(failed)?;
@@ -790,7 +974,7 @@ fn laws(
                 ),
             ));
         }
-        let mut graph = LawGraph::new(declarations);
+        let mut graph = LawGraph::new(declarations).with_strict(rules.unsigned);
         let root = graph.bool(false);
         laws.push(Law {
             id: rules.failure_law,
@@ -802,7 +986,7 @@ fn laws(
         });
     }
     // A reject changes no state and delivers nothing.
-    let mut graph = LawGraph::new(declarations);
+    let mut graph = LawGraph::new(declarations).with_strict(rules.unsigned);
     let mut checks = Vec::new();
     for observation in [
         Observation::PostLength,
@@ -839,7 +1023,7 @@ fn laws(
         root: root.index,
     });
 
-    let mut graph = LawGraph::new(declarations);
+    let mut graph = LawGraph::new(declarations).with_strict(rules.unsigned);
     let mut checks = Vec::new();
     for (field, value) in genesis {
         let observed = graph
@@ -938,7 +1122,7 @@ pub fn compiled_claims(
             bounded_arithmetic(declarations, rules),
         )
         .map_err(failed)?;
-        let mut graph = LawGraph::new(declarations);
+        let mut graph = LawGraph::new(declarations).with_strict(rules.unsigned);
         let value = graph
             .compile_with_limits(&formula, bounded_arithmetic(declarations, rules))
             .map_err(failed)?;
@@ -988,7 +1172,7 @@ fn conformance(
     state_fields: &[(u16, u32)],
     genesis: &[(u16, Atom)],
 ) -> Result<Law, ContractError> {
-    let mut graph = LawGraph::new(declarations);
+    let mut graph = LawGraph::new(declarations).with_strict(rules.unsigned);
     let mut tests = Vec::new();
     let mut remaining = graph.bool(true);
     for (index, case) in rules.cases.iter().enumerate() {
@@ -1163,23 +1347,46 @@ fn observed_value(
     guard: Ref,
     default: Atom,
 ) -> Result<Ref, String> {
-    let actual = graph.observe(observation, Kind::Raw, Some(guard), default)?;
+    let mut actual = graph.observe(observation, Kind::Raw, Some(guard), default)?;
+    if matches!(
+        declarations.kind(type_id).map_err(|e| e.to_string())?,
+        TypeKind::U128 { .. }
+    ) {
+        actual.kind = Kind::Unsigned;
+    }
+    if rules.unsigned
+        && matches!(
+            declarations.kind(type_id).map_err(|e| e.to_string())?,
+            TypeKind::Bool
+        )
+    {
+        actual.kind = Kind::Bool;
+    }
     let expected = expr::expand_with_limits(
         expected,
         &rules.variables,
         bounded_arithmetic(declarations, rules),
     )?;
     let equal = match expected {
-        Ast::Bool(_) | Ast::Int(_) => {
+        Ast::Bool(_) | Ast::Int(_) | Ast::U128(_) => {
             let wanted = graph.literal(atom(declarations, &expected, type_id)?);
             graph.op(Op::Eq(actual.index, wanted.index), Kind::Bool)?
         }
         _ => {
-            let actual = graph.numeric(actual)?;
-            let value =
-                graph.compile_with_limits(&expected, bounded_arithmetic(declarations, rules))?;
-            let value = graph.numeric(value)?;
-            graph.op(Op::Eq(actual.index, value.index), Kind::Bool)?
+            if rules.unsigned && actual.kind == Kind::Bool {
+                let value = graph
+                    .compile_with_limits(&expected, bounded_arithmetic(declarations, rules))?;
+                if value.kind != Kind::Bool {
+                    return Err("U128KindMismatch".into());
+                }
+                graph.op(Op::Eq(actual.index, value.index), Kind::Bool)?
+            } else {
+                let actual = graph.numeric(actual)?;
+                let value = graph
+                    .compile_with_limits(&expected, bounded_arithmetic(declarations, rules))?;
+                let value = graph.numeric(value)?;
+                graph.op(Op::Eq(actual.index, value.index), Kind::Bool)?
+            }
         }
     };
     let otherwise = graph.bool(true);
@@ -1211,11 +1418,7 @@ fn reasons(declarations: &Declarations, rules: &Rules) -> Result<Vec<(u32, Class
                 .filter(|case| case.reason == Some(*reason))
                 .map(|case| case.class);
             match classes.next() {
-                Some(class)
-                    if classes.all(|other| super::decision_space::same_class(other, class)) =>
-                {
-                    Ok((*reason, class))
-                }
+                Some(class) if classes.all(|other| other == class) => Ok((*reason, class)),
                 Some(_) => Err(rules_error(
                     "cases",
                     format!("reason {reason} is used with two classes"),
@@ -1250,6 +1453,13 @@ fn atom(declarations: &Declarations, ast: &Ast, type_id: u32) -> Result<Atom, St
         .map_err(|error| error.to_string())?;
     match (kind, ast) {
         (TypeKind::Bool, Ast::Bool(value)) => Ok(Atom::Bool(*value)),
+        (TypeKind::U128 { min, max }, Ast::U128(value)) => {
+            if (min..=max).contains(value) {
+                Ok(Atom::U128(*value))
+            } else {
+                Err("U128ConstantOutOfRange".into())
+            }
+        }
         (TypeKind::I128 { .. }, Ast::Int(value)) => Ok(Atom::I128(*value)),
         (TypeKind::Sum(variants), Ast::Int(value)) => variants
             .iter()
@@ -1271,6 +1481,7 @@ fn constant_atom(
     let ast = match value {
         Constant::Bool(value) => Ast::Bool(value),
         Constant::Int(value) => Ast::Int(value),
+        Constant::U128(value) => Ast::U128(value),
     };
     atom(declarations, &ast, type_id)
 }
@@ -1288,6 +1499,7 @@ fn type_default(declarations: &Declarations, type_id: u32) -> Result<Atom, Strin
                 variant: variants.first().map_or(0, |variant| variant.id),
             },
             TypeKind::I128 { .. } => Atom::I128(0),
+            TypeKind::U128 { .. } => Atom::U128(0),
             TypeKind::Text => return Err(format!("text type {type_id} cannot be a payload field")),
         },
     )
@@ -1297,6 +1509,7 @@ fn domain(declarations: &Declarations, type_id: u32) -> Result<Domain, ContractE
     Ok(match declarations.kind(type_id)? {
         TypeKind::Bool => Domain::Bool,
         TypeKind::I128 { min, max } => Domain::I128 { min, max },
+        TypeKind::U128 { min, max } => Domain::U128 { min, max },
         TypeKind::Text => Domain::Text,
         TypeKind::Sum(variants) => Domain::Sum {
             type_id,
@@ -1314,26 +1527,15 @@ pub fn input_leaf(
 ) -> Result<InputLeaf, ContractError> {
     Ok(match declarations.kind(type_id)? {
         TypeKind::Bool => InputLeaf::Bool,
-        // Each variant's ID is its program code, and the library requires
-        // the codes of a sum to fill one interval.
-        TypeKind::Sum(variants)
-            if variants
-                .windows(2)
-                .all(|pair| u32::from(pair[1].id) == u32::from(pair[0].id) + 1) =>
-        {
-            InputLeaf::Sum {
-                type_id,
-                variants: variants.iter().map(|variant| variant.id).collect(),
-            }
-        }
-        TypeKind::Sum(_) => {
-            return Err(ContractError::new(
-                "project.zeno",
-                format!(
-                    "sum type {type_id} needs consecutive variant IDs to be a program input or output"
-                ),
-            ));
-        }
+        // The wire ID is stable; the scalar ABI uses a dense private code.
+        TypeKind::Sum(variants) => InputLeaf::Sum {
+            type_id,
+            variants: variants.iter().map(|variant| variant.id).collect(),
+        },
+        TypeKind::U128 { min, max } => InputLeaf::U128 {
+            min: if wide { 0 } else { min },
+            max: if wide { u128::MAX } else { max },
+        },
         TypeKind::I128 { .. } if wide => InputLeaf::I128 {
             min: i128::MIN,
             max: i128::MAX,
@@ -1355,10 +1557,11 @@ fn scalar_domain(
 ) -> Result<ScalarDomain, ContractError> {
     Ok(match input_leaf(declarations, type_id, wide)? {
         InputLeaf::Bool => ScalarDomain::Bool,
+        InputLeaf::U128 { min, max } => ScalarDomain::Unsigned { min, max },
         InputLeaf::I128 { min, max } => ScalarDomain::Int { min, max },
         InputLeaf::Sum { variants, .. } => ScalarDomain::Int {
             min: variants.first().copied().map_or(0, i128::from),
-            max: variants.last().copied().map_or(0, i128::from),
+            max: variants.first().copied().map_or(0, i128::from) + variants.len() as i128 - 1,
         },
     })
 }
@@ -1386,7 +1589,7 @@ fn value_bytes(declarations: &Declarations, type_id: u32) -> Result<u64, Contrac
             total
         }
         Form::Leaf(Leaf::Bool) => BOOL_BYTES,
-        Form::Leaf(Leaf::I128 { .. }) => I128_BYTES,
+        Form::Leaf(Leaf::I128 { .. } | Leaf::U128 { .. }) => I128_BYTES,
         Form::Sum(_) => SUM_BYTES,
         Form::Leaf(Leaf::Text { .. }) => {
             return Err(ContractError::new(
@@ -1404,6 +1607,7 @@ fn same_kind(declarations: &Declarations, left: u32, right: u32) -> Result<bool,
         match (declarations.kind(left)?, declarations.kind(right)?) {
             (TypeKind::Bool, TypeKind::Bool)
             | (TypeKind::I128 { .. }, TypeKind::I128 { .. })
+            | (TypeKind::U128 { .. }, TypeKind::U128 { .. })
             | (TypeKind::Text, TypeKind::Text) => true,
             (TypeKind::Sum(_), TypeKind::Sum(_)) => left == right,
             _ => false,

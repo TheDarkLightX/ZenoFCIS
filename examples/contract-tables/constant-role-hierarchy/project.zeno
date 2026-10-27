@@ -1,0 +1,49 @@
+zeno 1;
+project 1 constant_role_hierarchy;
+namespace 2 permissions;
+type 100 state Roles;
+type 101 command Request;
+type 102 context Session;
+type 105 int Parent in 0..=3;
+type 106 index Role of 110;
+type 107 int Grant in 0..=1;
+const table 110 parents 105 size 3 [0,1,2];
+table 210 100 grants 107 size 3;
+field 120 101 role 106;
+variant 130 102 Session none;
+reason 200 permission_required precedence 0;
+component 400 inheritance {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+// Policy data closes once, with no state or command input.
+derived table 700 ancestor[i][j] in table 110 rounds 9 {
+  when true then i == j || exists k in table 110 {
+    parents[i] == k + 1 && ancestor[k][j]
+  };
+  default false;
+};
+derived table 701 permission[i] in table 110 rounds 3 {
+  when true then exists j in table 110 { ancestor[i][j] && pre.100.210[j] == 1 };
+  default false;
+};
+derived table 702 post_permission[i] in table 110 rounds 3 {
+  when true then exists j in table 110 { ancestor[i][j] && post.100.210[j] == 1 };
+  default false;
+};
+law 500 domains on commit, genesis = forall i in table 110 {
+  post.100.210[i] >= 0 && post.100.210[i] <= 1
+};
+law 501 frame on commit = forall i in table 110 {
+  post.100.210[i] == pre.100.210[i]
+};
+law 502 permission_required on commit = exists i in table 110 where i == command.101.120 {
+  permission[i]
+};
+law 503 no_permission on reject = !(exists i in table 110 where i == command.101.120 {
+  permission[i]
+});

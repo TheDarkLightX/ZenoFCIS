@@ -46,13 +46,13 @@ CONTRACT_REJECTIONS = {
     **dict.fromkeys(("omit_signed_contract", "weaken_signed_contract"), frozenset({
         ("postcondition not satisfied", str(SCHEMA), 150),
         ("postcondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/compound.rs"), 107),
-        ("postcondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 207),
+        ("postcondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 208),
     })),
     "narrow_signed_input": frozenset({
         ("precondition not satisfied", str(SCHEMA), 153),
         ("precondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/compound.rs"), 109),
-        ("precondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 229),
-        ("precondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 267),
+        ("precondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 230),
+        ("precondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 289),
     }),
 }
 
@@ -461,4 +461,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

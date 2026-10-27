@@ -7,6 +7,9 @@ import shlex
 import unicodedata
 
 from behavior import Refusal, canonical, check, explain, help_topic, legend, replay
+import constructs
+import explain as explanations
+import ladder_tools
 from shared import SharedWorkspace
 from workflow import checker_identity
 
@@ -17,6 +20,12 @@ why (selected object's built-in meaning)
 why STATE EVENT fact=yes (exact local guard/outcome explanation)
 propose FILE [symbolic|english]
 trace submit authorized=no then approve authorized=yes
+whynot STATE EVENT fact=no want Accept [TARGET] | want Reject [REASON] | want rule ID [scope input]
+whatif STATE EVENT fact=no change fact=yes [state:NAME] [event:NAME]
+story | story candidate | story trace submit authorized=no then approve authorized=yes
+guide [TOPIC] (construct guide generated from the registry)
+ladder list | ladder render ID [RUNG] | ladder parse ID RUNG TEXT | ladder lower ID
+ladder same ID OTHER_ID | ladder same ID RUNG TEXT | ladder explain ID [[RUNG] TEXT]
 labels (retained supplied intent examples, not authenticated owner identity)
 label CASE STATE EVENT fact=yes expect Accept TARGET - "supplied provenance"
 label CASE STATE EVENT fact=no expect Reject STATE REASON "supplied provenance"
@@ -48,7 +57,96 @@ def trace_inputs(text):
     return inputs
 
 
+def is_ladder(line):
+    return line.split(None, 1)[:1] == ["ladder"]
+
+
+def ladder_command(line):
+    """Ladder statements bind the revision read at command time; text keeps its exact spelling."""
+    words = line.split(None, 2)
+    action, rest = (words[1], words[2] if len(words) > 2 else "") if len(words) > 1 else ("", "")
+    if action == "list" and not rest:
+        return ladder_tools.read_catalogue(checker_identity())
+    statement, _, rest = rest.partition(" ")
+    rest = rest.strip()
+    current = {item["id"]: item.get("revision") for item in ladder_tools.read_catalogue()["statements"]}
+    if statement not in current:
+        raise Refusal("Unknown ladder statement; type ladder list")
+    revision, identity = current[statement], checker_identity()
+    first, _, text = rest.partition(" ")
+    rung = first if first in ladder_tools.l.RUNGS else None
+    if action == "render" and (not rest or rung and not text):
+        return ladder_tools.render(statement, revision, rung, identity)
+    if action == "lower" and not rest:
+        return ladder_tools.lower(statement, revision, identity)
+    if action == "parse" and rung and text.strip():
+        return ladder_tools.parse(statement, revision, rung, text.strip(), identity)
+    if action == "same" and first in current and not text:
+        return ladder_tools.same(statement, revision, first, current[first], renderer=identity)
+    if action == "same" and rung and text.strip():
+        return ladder_tools.same(statement, revision, rung=rung, text=text.strip(), renderer=identity)
+    if action == "explain":
+        if not rest:
+            return ladder_tools.explain(statement, revision, renderer=identity)
+        return ladder_tools.explain(statement, revision, rung, text.strip() if rung else rest, identity)
+    raise Refusal("Unknown ladder command; type help")
+
+
+def input_changes(words):
+    """Parse what-if changes: fact=yes|no, state:NAME and event:NAME."""
+    change, context = {}, {}
+    for word in words:
+        kind, colon, name = word.partition(":")
+        if colon and kind in {"state", "event"} and "=" not in word:
+            if kind in change:
+                raise Refusal("Change the state or event at most once")
+            change[kind] = name
+            continue
+        name, separator, value = word.partition("=")
+        if not separator or name in context or value not in {"yes", "no", "true", "false"}:
+            raise Refusal("Use fact=yes, fact=no, state:NAME or event:NAME, each once")
+        context[name] = value in {"yes", "true"}
+    return {**change, **({"context": context} if context else {})}
+
+
+def explanation_command(session, name, args, line):
+    identity = checker_identity()
+    if name == "story":
+        if not args:
+            return explanations.narrate_check(session.model, check(session.model, identity), identity)
+        if args == ["candidate"]:
+            if not session.proposal:
+                raise Refusal("No pending candidate to narrate")
+            candidate = session.proposal["model"]
+            return explanations.narrate_check(candidate, check(candidate, identity), identity)
+        if args[0] == "trace":
+            return explanations.narrate_trace(session.model, trace_inputs(line.split(None, 2)[2] if len(args) > 1 else "[]"), identity)
+        raise Refusal("Use story, story candidate or story trace STEPS")
+    marker = "want" if name == "whynot" else "change"
+    if marker not in args[2:]:
+        raise Refusal(f"Supply {name} STATE EVENT observations {marker} ...")
+    split = args.index(marker, 2)
+    given = trace_inputs(" ".join(args[1:split]))
+    if len(given) != 1:
+        raise Refusal(f"{name} explains one explicit state/event input")
+    state, event, context, tail = args[0], given[0]["event"], given[0]["context"], args[split + 1:]
+    if name == "whatif":
+        return explanations.what_if(session.model, state, event, context, input_changes(tail), identity)
+    scope = "context"
+    if tail[-2:-1] == ["scope"]:
+        scope, tail = tail[-1], tail[:-2]
+    if len(tail) == 2 and tail[0] == "rule":
+        want = {"rule": tail[1]}
+    elif 1 <= len(tail) <= 2 and tail[0] in {"Accept", "Reject"}:
+        want = {"class": tail[0], **({("state" if tail[0] == "Accept" else "reason"): tail[1]} if len(tail) == 2 else {})}
+    else:
+        raise Refusal("Use want Accept [TARGET], want Reject [REASON] or want rule ID")
+    return explanations.why_not(session.model, state, event, context, want, scope, identity)
+
+
 def command(session, line):
+    if is_ladder(line):
+        return ladder_command(line)
     words = shlex.split(line)
     if not words:
         return None
@@ -98,6 +196,10 @@ def command(session, line):
         return explain(session.model, args[0], inputs[0]["event"], inputs[0]["context"], checker_identity())
     if name == "check" and not args:
         return check(session.model, checker_identity())
+    if name in {"whynot", "whatif"} and len(args) >= 4 or name == "story":
+        return explanation_command(session, name, args, line)
+    if name == "guide" and len(args) <= 1:
+        return constructs.guide(session.model, args[0] if args else "", checker_identity())
     if name == "candidate" and not args:
         return session.view()["proposal"] or {"status": "no candidate"}
     if name == "propose" and 1 <= len(args) <= 2:
@@ -132,7 +234,7 @@ class ReviewClient:
         self.awaiting_current = None
 
     def execute(self, line):
-        words = shlex.split(line)
+        words = line.split() if is_ladder(line) else shlex.split(line)
         self.awaiting_display = None
         self.awaiting_current = None
         if words == ["show"]:
@@ -278,6 +380,12 @@ def guard_lines(node, indent="    "):
 
 def _human_text(result):
     """Readable abstraction-level presentation; JSON is an explicit option."""
+    if isinstance(result, dict) and str(result.get("kind", "")).startswith("ladder-"):
+        return ladder_tools.human_text(result)
+    if isinstance(result, dict) and result.get("kind") in {"why-not", "what-if", "narrative"}:
+        return explanations.human_text(result)
+    if isinstance(result, dict) and result.get("schema") == constructs.GUIDE_SCHEMA:
+        return constructs.human_text(result)
     if isinstance(result, list):
         lines = ["Trace from the declared initial state (assumed inputs):"]
         lines.extend(f"{i}. {row['pre']} -- {row['event']} ({observations(row['context'])}) --> {outcome(row['outcome'])}"

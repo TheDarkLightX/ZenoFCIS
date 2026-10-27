@@ -1,0 +1,411 @@
+{
+  "profile": "zal/ladder-temporal/1",
+  "theory": "ordered-events-over-integers/1",
+  "id": "ui_discovery",
+  "kind": "law",
+  "authority": {
+    "status": "DECIDED",
+    "source": "Owner decision 2026-10-24: the definitions are confirmed as written. They were recovered from the generated-interface design and its first milestone checks; no source is bound to the model yet."
+  },
+  "scope": "Owner-confirmed definitions: recorded interface commits of the generated inventory-reservation interface.",
+  "trace": {
+    "domain": "Traces",
+    "mode": "finite",
+    "horizon": 4,
+    "source_revision": "proposed generated-interface model; no source is bound yet",
+    "event_schema": "interface-commit/1: presentation state, focus, open dialog and route exposure before and after each commit",
+    "order": "authoritative order of recorded interface commits, including opening a dialog and changing focus",
+    "projection": "retain each recorded event without sorting, merging or deduplication",
+    "model": "proposed: the generated presentation core of the inventory-reservation interface; execution membership is unproved until that model is bound",
+    "environment": "proposed: any user navigation, inferred hints and preference changes (width, theme, motion); hints may change emphasis only",
+    "initialization": "the initial view is checked separately: every declared region has data, empty or loading status",
+    "transitions": "requires exact membership in the generated presentation core",
+    "continuity": "requires post/pre correspondence of focus, dialog and exposure at every retained commit",
+    "arithmetic": "checked-i128",
+    "evidence": "obligation"
+  },
+  "assumptions": {
+    "formula": "true",
+    "definition": "Unconditional finite-word requirement; provided true.",
+    "version": "1"
+  },
+  "domains": {
+    "Traces": {
+      "member": "trace",
+      "plural": "traces",
+      "noun": "admitted traces",
+      "trace": true
+    },
+    "Actions": {
+      "member": "action",
+      "plural": "actions",
+      "noun": "required interface actions",
+      "values": [
+        "reserve",
+        "release",
+        "ship",
+        "restock"
+      ]
+    }
+  },
+  "symbols": {
+    "Required": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Actions"
+      ],
+      "clause": "{0} is required",
+      "observation": "event",
+      "version": "proposed/1",
+      "definition": "Owner-confirmed. The action is a command route of the contract (reserve, release, ship or restock): every command variant is a required task at every event, independently of what the interface shows. Busy or uncertain states may prevent invocation, not inspection.",
+      "native": [
+        {
+          "args": [
+            "reserve"
+          ],
+          "before": "pre.100.110"
+        },
+        {
+          "args": [
+            "release"
+          ],
+          "before": "pre.100.111"
+        },
+        {
+          "args": [
+            "ship"
+          ],
+          "before": "pre.100.112"
+        },
+        {
+          "args": [
+            "restock"
+          ],
+          "before": "pre.100.113"
+        }
+      ]
+    },
+    "VisualRoute": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Actions"
+      ],
+      "clause": "{0} has a visual route",
+      "observation": "event",
+      "version": "proposed/1",
+      "definition": "Owner-confirmed. A named control for the action is visible and reachable from the current focus within h=2 navigation actions by pointer or keyboard, honouring the open dialog: leave the dialog, then choose the task in the persistent task navigation. Moving focus inside one region is not counted.",
+      "native": [
+        {
+          "args": [
+            "reserve"
+          ],
+          "before": "pre.100.114"
+        },
+        {
+          "args": [
+            "release"
+          ],
+          "before": "pre.100.115"
+        },
+        {
+          "args": [
+            "ship"
+          ],
+          "before": "pre.100.116"
+        },
+        {
+          "args": [
+            "restock"
+          ],
+          "before": "pre.100.117"
+        }
+      ]
+    },
+    "AssistiveRoute": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Actions"
+      ],
+      "clause": "{0} has an assistive route",
+      "observation": "event",
+      "version": "proposed/1",
+      "definition": "Owner-confirmed. The same control is in the accessibility tree with its accessible name and reachable within h=2 keyboard navigation actions; hidden or inert elements cannot receive focus. Actual browser and screen-reader exposure is separate browser evidence.",
+      "native": [
+        {
+          "args": [
+            "reserve"
+          ],
+          "before": "pre.100.118"
+        },
+        {
+          "args": [
+            "release"
+          ],
+          "before": "pre.100.119"
+        },
+        {
+          "args": [
+            "ship"
+          ],
+          "before": "pre.100.120"
+        },
+        {
+          "args": [
+            "restock"
+          ],
+          "before": "pre.100.121"
+        }
+      ]
+    }
+  },
+  "definitions": [
+    {
+      "name": "Discoverable",
+      "params": [
+        {
+          "name": "a",
+          "domain": "Actions"
+        }
+      ],
+      "clause": "{0} is discoverable",
+      "version": "proposed/1",
+      "body": "VisualRoute(a) and AssistiveRoute(a)"
+    }
+  ],
+  "readings": [
+    {
+      "version": "proposed/1",
+      "body": "forall sigma in Traces: forall a in Actions: always(Required(a) => Discoverable(a))",
+      "intuitive": "every required action remains discoverable at every recorded UI event",
+      "plain": "a required action remains discoverable",
+      "mode": "finite"
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "review_dialog_keeps_routes",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113",
+        "pre.100.114",
+        "pre.100.115",
+        "pre.100.116",
+        "pre.100.117",
+        "pre.100.118",
+        "pre.100.119",
+        "pre.100.120",
+        "pre.100.121"
+      ],
+      "events": [
+        [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "expected": true,
+      "note": "Opening the review dialog at event 1 keeps every task within two navigation actions: leave the dialog, choose the task."
+    },
+    {
+      "id": "modal_hides_reserve",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113",
+        "pre.100.114",
+        "pre.100.115",
+        "pre.100.116",
+        "pre.100.117",
+        "pre.100.118",
+        "pre.100.119",
+        "pre.100.120",
+        "pre.100.121"
+      ],
+      "events": [
+        [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          0,
+          1,
+          1,
+          1,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "expected": false,
+      "note": "A dialog without a leave route hides the reserve task at event 1."
+    },
+    {
+      "id": "assistive_only",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113",
+        "pre.100.114",
+        "pre.100.115",
+        "pre.100.116",
+        "pre.100.117",
+        "pre.100.118",
+        "pre.100.119",
+        "pre.100.120",
+        "pre.100.121"
+      ],
+      "events": [
+        [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          0,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "expected": false,
+      "note": "The ship control is in the accessibility tree but has no visual route: discoverability needs both modes."
+    },
+    {
+      "id": "not_required",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113",
+        "pre.100.114",
+        "pre.100.115",
+        "pre.100.116",
+        "pre.100.117",
+        "pre.100.118",
+        "pre.100.119",
+        "pre.100.120",
+        "pre.100.121"
+      ],
+      "events": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "expected": true,
+      "note": "Vacuous implication; under the proposed Required every command route is required, so a real interface never shows this word."
+    }
+  ],
+  "formula": "forall sigma in Traces: forall a in Actions: always(Required(a) => Discoverable(a))",
+  "native_schema": {
+    "state": 100,
+    "fields": [
+      {
+        "id": 110,
+        "kind": "bool"
+      },
+      {
+        "id": 111,
+        "kind": "bool"
+      },
+      {
+        "id": 112,
+        "kind": "bool"
+      },
+      {
+        "id": 113,
+        "kind": "bool"
+      },
+      {
+        "id": 114,
+        "kind": "bool"
+      },
+      {
+        "id": 115,
+        "kind": "bool"
+      },
+      {
+        "id": 116,
+        "kind": "bool"
+      },
+      {
+        "id": 117,
+        "kind": "bool"
+      },
+      {
+        "id": 118,
+        "kind": "bool"
+      },
+      {
+        "id": 119,
+        "kind": "bool"
+      },
+      {
+        "id": 120,
+        "kind": "bool"
+      },
+      {
+        "id": 121,
+        "kind": "bool"
+      }
+    ]
+  }
+}

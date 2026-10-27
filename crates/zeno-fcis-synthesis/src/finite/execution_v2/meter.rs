@@ -4,13 +4,13 @@
 use vstd::prelude::*;
 
 pub use zeno_fcis_core::Resource;
-pub(super) use zeno_fcis_core::resource::COUNT;
+pub(crate) use zeno_fcis_core::resource::COUNT;
 
 /// V2 policy limits; these are configuration, not a usage report.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Limits {
-    pub(super) counters: [u64; COUNT],
+    pub(crate) counters: [u64; COUNT],
 }
 
 /// Starts a V2 policy with every limit zero.
@@ -51,7 +51,7 @@ impl Limits {
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Usage {
-    pub(super) counters: [u64; COUNT],
+    pub(crate) counters: [u64; COUNT],
 }
 
 impl Usage {
@@ -81,16 +81,16 @@ pub struct MeterFailure {
 }
 
 #[cfg_attr(verus_keep_ghost, verus_verify)]
-pub(super) struct Meter {
-    pub(super) limits: Limits,
-    pub(super) used: Usage,
+pub(crate) struct Meter {
+    pub(crate) limits: Limits,
+    pub(crate) used: Usage,
 }
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures result.limits == limits,
         result.used.counters@ == Seq::new(8, |_: int| 0u64),
 ))]
-pub(super) fn new(limits: Limits) -> Meter {
+pub(crate) fn new(limits: Limits) -> Meter {
     Meter {
         limits,
         used: Usage {
@@ -105,7 +105,7 @@ impl Meter {
             (result, final(self).used.counters@) == super::spec::charge(
                 old(self).limits.counters@, old(self).used.counters@, resource, amount),
     ))]
-    pub(super) fn charge(&mut self, resource: Resource, amount: u64) -> Result<(), MeterFailure> {
+    pub(crate) fn charge(&mut self, resource: Resource, amount: u64) -> Result<(), MeterFailure> {
         let index = resource.index();
         let limit = self.limits.counters[index];
         let Some(next) = self.used.counters[index].checked_add(amount) else {

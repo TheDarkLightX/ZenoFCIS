@@ -553,6 +553,32 @@ fn channels(values: &[Channel<'_>]) -> bool {
     }
     true
 }
+#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::reason_laws(d),))]
+fn reason_laws(d: &Descriptor<'_>) -> bool {
+    let mut i = 0usize;
+    #[cfg_attr(verus_keep_ghost,verus_spec(
+        invariant i<=d.laws.len(), forall|j:int|0<=j<i ==> spec::reason_law(d,j),
+        decreases d.laws.len()-i,
+    ))]
+    while i < d.laws.len() {
+        let invalid = match d.laws[i].scope {
+            laws::Scope::RejectReason(id) => !reason(d, Class::Reject, Some(id)),
+            _ => false,
+        };
+        if invalid {
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                assert(!spec::reason_law(d, i as int));
+                assert(!spec::reason_laws(d)) by {
+                    if spec::reason_laws(d) { assert(spec::reason_law(d, i as int)); }
+                }
+            }
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::admitted(d),))]
 pub(super) fn admitted(d: &Descriptor<'_>) -> bool {
     let Schema::Record(fields) = d.state else {
@@ -570,6 +596,7 @@ pub(super) fn admitted(d: &Descriptor<'_>) -> bool {
             d.program.roots,
         )
         .is_ok()
+        && reason_laws(d)
         && reasons(d.reasons)
         && channels(d.channels)
         && branches(d, fields)

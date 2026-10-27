@@ -35,21 +35,74 @@ use super::evaluate::LawSet;
 use super::machine::{self, Inconclusive, Loaded, Machine, Observation};
 use super::probe::{self, Truth};
 
+/// Shared initiation and reachable consecution check. Breadth-first parents
+/// make the first failed obligation a shortest run, including a zero-step
+/// genesis failure. The caller supplies bounded, owned product states.
+pub(super) fn induction<S: Clone + Ord>(
+    genesis: S,
+    initial_holds: bool,
+    inputs: usize,
+    mut step: impl FnMut(&S, usize) -> Result<(S, bool), ContractError>,
+) -> Result<(usize, Option<Vec<usize>>), ContractError> {
+    if !initial_holds {
+        return Ok((1, Some(Vec::new())));
+    }
+    let mut states = vec![genesis.clone()];
+    let mut indices = std::collections::BTreeMap::from([(genesis, 0)]);
+    let mut parents = vec![None];
+    let mut at = 0;
+    while at < states.len() {
+        for input in 0..inputs {
+            let (next, holds) = step(&states[at], input)?;
+            if !holds {
+                let mut trace = Machine::trace(&parents, at);
+                trace.push(input);
+                return Ok((states.len(), Some(trace)));
+            }
+            if let std::collections::btree_map::Entry::Vacant(entry) = indices.entry(next.clone()) {
+                entry.insert(states.len());
+                states.push(next);
+                parents.push(Some((at, input)));
+            }
+        }
+        at += 1;
+    }
+    Ok((states.len(), None))
+}
+
+/// Which declared pre-states a lemma obligation covers. The finite and
+/// symbolic transition judges must use the same scope, including repairs.
+#[derive(Clone, Copy)]
+pub(super) enum PreStates {
+    Declared,
+    Lawful,
+}
+
+impl PreStates {
+    pub(super) const TRANSITION: Self = Self::Declared;
+
+    /// Select either the whole declared domain or its lawful subset. The
+    /// predicate can be a native Boolean or a symbolic Boolean term.
+    pub(super) fn predicate<T>(self, declared: T, lawful: impl FnOnce() -> T) -> T {
+        match self {
+            Self::Declared => declared,
+            Self::Lawful => lawful(),
+        }
+    }
+}
+
 /// The lemma judge's result.
 #[derive(Clone, Debug)]
 pub(crate) enum Lemmas {
     /// Each lemma's verdict, in the order given.
     Judged(Vec<Value>),
+    NoStartingState(Value),
     Inconclusive(Inconclusive),
 }
 
-/// What a verdict says.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Verdict {
-    Inductive,
-    NotInductive,
-    False,
-}
+use super::lemma_kernel as kernel;
+
+pub(crate) use kernel::Verdict;
 
 impl Verdict {
     pub(crate) fn name(self) -> &'static str {
@@ -72,11 +125,20 @@ pub(crate) fn judge(
     lemmas: &[String],
     max_tuples: u64,
 ) -> Result<Lemmas, ContractError> {
+    if zeno_fcis_contract::collections::judges::has_maps(project)? {
+        return map_lemmas(project, rules, lemmas, max_tuples, false);
+    }
+    if super::super::rules::Rules::read_for_project(project, rules)?.unsigned {
+        return super::unsigned::lemmas(project, rules, lemmas, max_tuples, false);
+    }
     let loaded = Loaded::read(project, rules)?;
     let observation = match machine::observe_contract(&loaded, max_tuples)? {
         Ok(observation) => observation,
         Err(inconclusive) => return Ok(Lemmas::Inconclusive(inconclusive)),
     };
+    if let Err(refusal) = &observation.machine.starting_state {
+        return Ok(Lemmas::NoStartingState(refusal.packet()));
+    }
     let mut judged = Vec::new();
     for (index, formula) in lemmas.iter().enumerate() {
         let what = format!("lemma {}", index + 1);
@@ -97,11 +159,17 @@ pub(crate) fn judge_transitions(
     lemmas: &[String],
     max_tuples: u64,
 ) -> Result<Lemmas, ContractError> {
+    if zeno_fcis_contract::collections::judges::has_maps(project)? {
+        return map_lemmas(project, rules, lemmas, max_tuples, true);
+    }
     if lemmas.is_empty() {
         return Err(ContractError::new(
             "transition lemmas",
             "requires at least one relation",
         ));
+    }
+    if super::super::rules::Rules::read_for_project(project, rules)?.unsigned {
+        return super::unsigned::lemmas(project, rules, lemmas, max_tuples, true);
     }
     let loaded = Loaded::read(project, rules)?;
     let observation = match machine::observe_contract(&loaded, max_tuples)? {
@@ -122,11 +190,15 @@ pub(crate) fn judge_transitions(
             &format!("transition lemma {}", index + 1),
             formula,
         )?;
+        let in_scope = |ordinal: usize| {
+            PreStates::TRANSITION.predicate(true, || observation.valid[ordinal / space.inputs])
+                && machine.observed[ordinal].commits()
+        };
         let count = |truth| {
             truths
                 .iter()
-                .zip(&machine.observed)
-                .filter(|(value, outcome)| outcome.commits() && **value == truth)
+                .enumerate()
+                .filter(|(ordinal, value)| in_scope(*ordinal) && **value == truth)
                 .count()
         };
         let failed = count(Truth::Fails);
@@ -139,7 +211,8 @@ pub(crate) fn judge_transitions(
         let admitted = machine
             .observed
             .iter()
-            .filter(|outcome| outcome.commits())
+            .enumerate()
+            .filter(|(ordinal, _)| in_scope(*ordinal))
             .count();
         let verdict = if failed != 0 {
             "false"
@@ -153,7 +226,7 @@ pub(crate) fn judge_transitions(
         let mut result = json!({
             "mode": "transition-relation", "formula": formula, "verdict": verdict,
             "scope": "all admitted committed decisions in the declared finite domain",
-            "decided_by": "library-authority-and-law-evaluator",
+            "decided_by": if formula.contains("outbox.") || formula.contains("delivery.") || formula.contains("verdict.") { "library-authority-and-scalar-interpreter" } else { "library-authority-and-law-evaluator" },
             "tuples": space.tuples(), "admitted": admitted, "checked": count(Truth::Holds),
             "failed": failed, "undefined": undefined, "refused": refused,
             "rejected_without_state_change": space.tuples() - refused - admitted,
@@ -166,8 +239,8 @@ pub(crate) fn judge_transitions(
         };
         if let Some(ordinal) = truths
             .iter()
-            .zip(&machine.observed)
-            .position(|(truth, outcome)| outcome.commits() && *truth == witness)
+            .enumerate()
+            .position(|(ordinal, truth)| in_scope(ordinal) && *truth == witness)
         {
             result["counterexample"] = json!({
                 "ordinal": ordinal,
@@ -180,6 +253,37 @@ pub(crate) fn judge_transitions(
         judged.push(result);
     }
     Ok(Lemmas::Judged(judged))
+}
+
+fn map_lemmas(
+    project: &str,
+    rules: &str,
+    formulas: &[String],
+    max_tuples: u64,
+    transition: bool,
+) -> Result<Lemmas, ContractError> {
+    use zeno_fcis_contract::collections::{Limits, Verdict, judges};
+    if formulas.is_empty() {
+        return Err(ContractError::new(
+            "map lemma",
+            "requires at least one formula",
+        ));
+    }
+    let mut results = Vec::new();
+    for formula in formulas {
+        let result = judges::lemma(project, rules, formula, transition, Limits { max_tuples })?;
+        if result.verdict() == Verdict::Unknown && result.packet()["verdict"].is_null() {
+            return Ok(Lemmas::Inconclusive(Inconclusive {
+                reason: "collection view domain exceeds the tuple limit",
+                size: result.packet()["view_domain"]
+                    .as_str()
+                    .and_then(|s| s.parse().ok()),
+                limit: max_tuples,
+            }));
+        }
+        results.push(result.packet().clone());
+    }
+    Ok(Lemmas::Judged(results))
 }
 
 #[cfg(test)]
@@ -219,7 +323,10 @@ pub(super) fn state_holds(
 fn verdict(observation: &Observation, holds: &[bool], formula: &str) -> Value {
     let machine = &observation.machine;
     let space = &machine.space;
-    let (reachable, parent) = machine.reachable();
+    let (after, commits) = machine.kernel_tables();
+    let decision = kernel::decide(space.inputs, machine.genesis, &after, &commits, holds)
+        .unwrap_or_else(|| unreachable!("observed machine tables are bounded and complete"));
+    let reachable = decision.search.seen;
     let admitted = holds.iter().filter(|holds| **holds).count();
     let reachable_count = reachable.iter().filter(|seen| **seen).count();
     let mut out = json!({
@@ -227,38 +334,29 @@ fn verdict(observation: &Observation, holds: &[bool], formula: &str) -> Value {
         "holds_sha256": machine::table_digest(
             holds.iter().map(|holds| u8::from(*holds).to_string())
         ),
-        "initiation": holds[machine.genesis],
+        "initiation": decision.initiation,
         "states": {
             "declared": space.states,
             "admitted": admitted,
             "reachable": reachable_count,
         },
     });
-    let mut first = None;
-    let mut count = 0usize;
-    for state in (0..space.states).filter(|state| holds[*state]) {
-        for input in 0..space.inputs {
-            let outcome = machine.of(state, input);
-            if outcome.commits() && !holds[outcome.after(state)] {
-                count += 1;
-                first.get_or_insert((state, input));
-            }
-        }
-    }
-    // The nearest reachable state outside the lemma, nearest first, then
-    // least: its shortest trace's last step leaves a reachable state the
-    // lemma admits, since a nearer violation would have been chosen.
-    let violation = (0..space.states)
-        .filter(|state| reachable[*state] && !holds[*state])
-        .map(|state| (Machine::trace(&parent, state), state))
-        .min_by_key(|(trace, state)| (trace.len(), *state));
-    let verdict = if !holds[machine.genesis] {
+    let count = decision.count;
+    let first = decision
+        .counterexample
+        .map(|(state, input, _)| (state, input));
+    let violation = if decision.verdict == Verdict::False {
+        decision.target.map(|state| (decision.trace, state))
+    } else {
+        None
+    };
+    let verdict = if !decision.initiation {
         out["reason"] = json!("genesis does not satisfy the lemma");
         out["genesis"] = crate::report_numbers::integers(&space.state(machine.genesis));
         Verdict::False
     } else if let Some((trace, state)) = violation {
         let last = *trace.last().unwrap_or(&0);
-        let before = parent[state].map_or(machine.genesis, |(before, _)| before);
+        let before = first.map_or(machine.genesis, |(before, _)| before);
         out["reason"] = json!("a reachable state lies outside the lemma");
         out["counterexample_to_induction"] = json!({
             "state": crate::report_numbers::integers(&space.state(before)),

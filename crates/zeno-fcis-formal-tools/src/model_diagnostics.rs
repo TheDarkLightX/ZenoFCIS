@@ -120,6 +120,7 @@ impl Default for DiagnosticLimits {
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ModelReason {
+    U128SubjectUnsupported,
     MissingProjection,
     MissingPredicate,
     Overflow,
@@ -231,6 +232,9 @@ impl Fuel {
 /// Evaluates one relational formula over an immutable context.
 #[must_use]
 pub(super) fn check_relation(formula: &RelExpr, context: ModelContext<'_>) -> DiagnosticOutcome {
+    if formula.uses_u128() {
+        return DiagnosticOutcome::Indeterminate(ModelReason::U128SubjectUnsupported);
+    }
     let shape = formula_shape_rel(formula);
     if formula_exceeds_hard_limits(shape) || shape.0 > operation_bound(context.limits) {
         return DiagnosticOutcome::Indeterminate(ModelReason::ResourceLimit);
@@ -252,6 +256,9 @@ pub(super) fn check_trace(
     trace: &[ModelStep],
     limits: DiagnosticLimits,
 ) -> TemporalDiagnosis {
+    if formula.uses_u128() {
+        return TemporalDiagnosis::Indeterminate(ModelReason::U128SubjectUnsupported);
+    }
     let shape = formula_shape_temporal(formula);
     if formula_exceeds_hard_limits(shape) {
         return TemporalDiagnosis::Indeterminate(ModelReason::ResourceLimit);
@@ -299,6 +306,32 @@ fn eval_rel<'formula>(
 ) -> Result<bool, ModelReason> {
     fuel.operation()?;
     match formula {
+        RelExpr::Circuit(c) => {
+            use zeno_fcis_spec::BoolNode;
+            let mut values: Vec<bool> = Vec::with_capacity(c.nodes().len());
+            for n in c.nodes() {
+                fuel.operation()?;
+                let v = match n {
+                    BoolNode::Formula(f) => eval_rel(f, step, variables, fuel)?,
+                    BoolNode::Literal(v) => *v,
+                    BoolNode::Not(a) => !values[*a as usize],
+                    BoolNode::And(a, b) => values[*a as usize] & values[*b as usize],
+                    BoolNode::Or(a, b) => values[*a as usize] | values[*b as usize],
+                    BoolNode::Select(c, a, b) => {
+                        if values[*c as usize] {
+                            values[*a as usize]
+                        } else {
+                            values[*b as usize]
+                        }
+                    }
+                };
+                values.push(v);
+            }
+            values
+                .get(c.output() as usize)
+                .copied()
+                .ok_or(ModelReason::UnsupportedExpression)
+        }
         RelExpr::Bool(value) => Ok(*value),
         RelExpr::Not(value) => Ok(!eval_rel(value, step, variables, fuel)?),
         RelExpr::And(left, right) => {
@@ -383,6 +416,12 @@ fn eval_value<'formula>(
 ) -> Result<i128, ModelReason> {
     fuel.operation()?;
     match value {
+        ValueExpr::Select(c, a, b) => {
+            let condition = eval_rel(c, step, variables, fuel)?;
+            let then = eval_value(a, step, variables, fuel)?;
+            let otherwise = eval_value(b, step, variables, fuel)?;
+            Ok(if condition { then } else { otherwise })
+        }
         ValueExpr::Int(value) => Ok(*value),
         // There is no second implementation of full-product arithmetic here.
         // Only the native library route can check this expression.
@@ -403,7 +442,10 @@ fn eval_value<'formula>(
         ValueExpr::Mul(left, right) => eval_value(left, step, variables, fuel)?
             .checked_mul(eval_value(right, step, variables, fuel)?)
             .ok_or(ModelReason::Overflow),
-        ValueExpr::SignedMulDivFloor(..)
+        ValueExpr::U128(..)
+        | ValueExpr::ToI128(..)
+        | ValueExpr::ToU128(..)
+        | ValueExpr::SignedMulDivFloor(..)
         | ValueExpr::ScaledMulDiv(..)
         | ValueExpr::RepeatMulDiv(..) => Err(ModelReason::UnsupportedArithmetic),
         ValueExpr::Div(mode, left, right) => divide(
@@ -541,6 +583,13 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
         nodes = nodes.saturating_add(1);
         depth = depth.max(current_depth);
         match current {
+            ValueExpr::Select(c, a, b) => {
+                let (condition_nodes, condition_depth) = formula_shape_rel(c);
+                nodes = nodes.saturating_add(condition_nodes);
+                depth = depth.max(current_depth.saturating_add(condition_depth));
+                stack.push((a, current_depth.saturating_add(1)));
+                stack.push((b, current_depth.saturating_add(1)));
+            }
             ValueExpr::Add(left, right)
             | ValueExpr::Sub(left, right)
             | ValueExpr::Mul(left, right)
@@ -556,7 +605,7 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
                 stack.push((b, next));
                 stack.push((d, next));
             }
-            ValueExpr::Sum { body, .. } => {
+            ValueExpr::ToI128(body) | ValueExpr::ToU128(body) | ValueExpr::Sum { body, .. } => {
                 stack.push((body, current_depth.saturating_add(1)));
             }
             ValueExpr::MulDiv(_, a, b, d) => {
@@ -564,7 +613,10 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
                     stack.push((child, current_depth.saturating_add(1)));
                 }
             }
-            ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
+            ValueExpr::U128(_)
+            | ValueExpr::Int(_)
+            | ValueExpr::Var(_)
+            | ValueExpr::Projection(_) => {}
         }
     }
     (nodes, depth)
@@ -579,6 +631,10 @@ fn formula_shape_rel(value: &RelExpr) -> (usize, usize) {
         nodes = nodes.saturating_add(1);
         depth = depth.max(current_depth);
         match current {
+            RelExpr::Circuit(c) => {
+                nodes = nodes.saturating_add(c.nodes().len());
+                stack.extend(c.formulas().map(|f| (f, current_depth.saturating_add(1))));
+            }
             RelExpr::Not(inner) => {
                 stack.push((inner, current_depth.saturating_add(1)));
             }

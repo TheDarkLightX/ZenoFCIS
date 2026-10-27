@@ -16,8 +16,35 @@ pub(crate) struct LoopPolicy {
     pub(crate) consultation_work: u64,
     inbox: Option<PathBuf>,
     invocation: String,
+    scope: crate::knowledge_assessment::Scope,
+    consulted_lessons: Vec<String>,
+    command_sha256: String,
+    lesson_actions: std::collections::BTreeMap<String, crate::knowledge_assessment::Action>,
 }
 impl LoopPolicy {
+    pub(crate) fn from_actions(actions: &[crate::knowledge_assessment::Action]) -> Self {
+        let mut policy = Self::default();
+        for action in actions {
+            policy.excluded.extend(action.skip.iter().cloned());
+            if !action.order.is_empty() {
+                for stage in crate::knowledge_assessment::STAGES {
+                    policy
+                        .ranks
+                        .entry(stage.into())
+                        .or_insert((action.order.len() as u64, 0));
+                }
+            }
+            for (i, step) in action.order.iter().enumerate() {
+                policy.ranks.insert(step.clone(), (i as u64, 0));
+            }
+        }
+        policy
+    }
+    pub(crate) fn add_assessed(&mut self, actions: &[crate::knowledge_assessment::Action]) {
+        let trial = Self::from_actions(actions);
+        self.excluded.extend(trial.excluded);
+        self.ranks.extend(trial.ranks);
+    }
     pub(crate) fn allows(&self, step: &str) -> bool {
         !self.excluded.iter().any(|s| s == step)
     }
@@ -132,9 +159,157 @@ impl LoopPolicy {
         write_new(
             &inbox.join(format!("outcome-{}.json", self.invocation)),
             &serde_json::to_vec(&event).map_err(|_| failure("kb-observation-encoding"))?,
+        )?;
+        self.record_episode(inbox, report, &event)
+    }
+}
+impl LoopPolicy {
+    fn record_episode(
+        &self,
+        inbox: &std::path::Path,
+        report: &Value,
+        event: &Value,
+    ) -> Result<(), Value> {
+        use crate::knowledge_assessment::{EvidenceFamily, Verdict};
+        use crate::knowledge_growth::{AdviceUse, Episode};
+        let subject = [
+            "/detail/binding/original_sha256",
+            "/detail/original_sha256",
+            "/detail/subject_sha256",
+        ]
+        .iter()
+        .find_map(|p| report.pointer(p).and_then(Value::as_str))
+        .filter(|s| crate::knowledge_assessment::digest(s))
+        .map(str::to_owned);
+        let verdict = match event["checker_verdict"].as_str() {
+            Some("equivalent") if event["replay"] == "matched" => Some(Verdict::Accepted),
+            Some("different" | "counterexample") => Some(Verdict::Counterexample),
+            Some("refused") => Some(Verdict::Refused),
+            Some("inconclusive" | "equivalent") => Some(Verdict::Inconclusive),
+            _ => None,
+        };
+        let receipt = report
+            .pointer("/detail/best_check/receipt_sha256")
+            .and_then(Value::as_str)
+            .filter(|s| crate::knowledge_assessment::digest(s))
+            .map(str::to_owned)
+            .or_else(|| {
+                verdict.map(|_| sha256_hex(&serde_json::to_vec(event).unwrap_or_default()))
+            });
+        let mut work = std::collections::BTreeMap::new();
+        for key in [
+            "check_requests",
+            "gate_pairs_reserved",
+            "search_stage_requests",
+            "control_frames",
+        ] {
+            if let Some(n) = report
+                .pointer(&format!("/detail/work/{key}"))
+                .and_then(Value::as_u64)
+            {
+                work.insert(key.into(), n);
+            }
+        }
+        let scope = self.scope.clone();
+        let episode = Episode {
+            schema: "zeno-fcis/kb-episode/1".into(),
+            task: crate::knowledge_store::hash(&(
+                &subject,
+                &scope,
+                &self.command_sha256,
+                &report["detail"]["limits"],
+                &report["detail"]["binding"],
+            ))
+            .map_err(failure)?,
+            subject: subject.clone(),
+            scope,
+            door: report["door"].as_str().unwrap_or("configured-loop").into(),
+            steps: report
+                .pointer("/detail/execution_trace")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .take(64)
+                .collect(),
+            advice: self
+                .consulted_lessons
+                .iter()
+                .map(|id| AdviceUse {
+                    lesson: id.clone(),
+                    outcome: if self.excluded.iter().any(|s| s == "pipeline") {
+                        "blocked"
+                    } else if self.lesson_actions.get(id).is_some_and(|action| {
+                        report["detail"]["proposal"]["stages"]
+                            .as_array()
+                            .is_some_and(|stages| {
+                                stages.iter().filter_map(Value::as_str).any(|s| {
+                                    action.skip.contains(s) || action.order.iter().any(|o| o == s)
+                                })
+                            })
+                    }) {
+                        "applied"
+                    } else {
+                        "consulted"
+                    }
+                    .into(),
+                })
+                .collect(),
+            counterexamples: report
+                .pointer("/detail/candidates")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter(|c| c["check"]["verdict"] == "counterexample")
+                .take(64)
+                .map(|c| c["check"].clone())
+                .collect(),
+            stopping_bound: report
+                .pointer("/detail/search_limit/bound")
+                .or_else(|| report.pointer("/detail/reason"))
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            verdict,
+            receipt_sha256: receipt,
+            work,
+            checker_sha256: crate::knowledge_evidence::checker_sha256()
+                .ok()
+                .unwrap_or_default(),
+            engine_sha256: crate::knowledge_store::engine(),
+            family: EvidenceFamily {
+                subject: subject.unwrap_or_else(|| "unknown".into()),
+                session: self.invocation.clone(),
+                actor: "configured-run".into(),
+                tool: env!("CARGO_PKG_VERSION").into(),
+                environment: "configured".into(),
+            },
+            result_cost: if verdict == Some(Verdict::Accepted) {
+                report["detail"]["best"]["nodes"]
+                    .as_u64()
+                    .zip(report["detail"]["best"]["bytes"].as_u64())
+                    .map(|(n, b)| [n, b])
+            } else {
+                None
+            },
+            iterations: crate::knowledge_growth::iterations(report).0,
+            iterations_truncated: crate::knowledge_growth::iterations(report).1,
+            model_calls: None,
+            tokens: None,
+            money_reserved: None,
+            owner_questions: None,
+        };
+        let bytes = serde_json::to_vec(&episode).map_err(|_| failure("kb-episode-encoding"))?;
+        if bytes.len() > 65_536 {
+            return Err(failure("kb-episode-budget"));
+        }
+        write_new(
+            &inbox.join(format!("episode-{}.json", self.invocation)),
+            &bytes,
         )
     }
 }
+
 fn ensure_inbox(inbox: &std::path::Path) -> Result<(), Value> {
     if !inbox.exists() {
         let mut builder = std::fs::DirBuilder::new();
@@ -319,6 +494,34 @@ pub(crate) fn prepare(
         }
         policy.ranks.insert(s.name().into(), (penalty, work));
     }
+    let assessed = if advice.problems.is_empty() {
+        crate::knowledge_workflow::advice(&loaded.assessed, &advice.task_facts)
+    } else {
+        vec![]
+    };
+    policy.scope = crate::knowledge_workflow::task_scope(&advice.task_facts);
+    policy.consulted_lessons = advice
+        .lessons
+        .iter()
+        .filter_map(|l| {
+            if let K::Value::Text(id) = l {
+                Some(id.clone())
+            } else {
+                None
+            }
+        })
+        .chain(assessed.iter().map(|c| c.id.clone()))
+        .collect();
+    policy.lesson_actions = assessed
+        .iter()
+        .map(|c| (c.id.clone(), c.action.clone()))
+        .collect();
+    policy.add_assessed(
+        &assessed
+            .iter()
+            .map(|c| c.action.clone())
+            .collect::<Vec<_>>(),
+    );
     // Pipeline/strategy primitives can be filtered independently. A blocker on
     // the requested whole operation still prevents starting that operation.
     let filterable = subjects
@@ -333,12 +536,17 @@ pub(crate) fn prepare(
         .map(|a| format!("'{0}'", a.to_string_lossy().replace('\'', "'\\''")))
         .collect::<Vec<_>>()
         .join(" ");
+    policy.command_sha256 = sha256_hex(command.as_bytes());
+    let counts = (
+        advice.lessons.len() + assessed.len(),
+        advice.exclusions.len(),
+    );
     Ok(Some(Consultation {
         loaded,
         subjects,
         command,
         blocked,
-        counts: (advice.lessons.len(), advice.exclusions.len()),
+        counts,
         consulted_work: report.work,
         consultation_micros: started.elapsed().as_micros(),
         started,
@@ -384,6 +592,12 @@ impl Consultation {
         let root = path.parent().ok_or_else(|| failure("kb-inbox-parent"))?;
         let inbox = root.join("inbox");
         ensure_inbox(&inbox)?;
+        if !inbox
+            .join(format!("episode-{}.json", self.policy.invocation))
+            .exists()
+        {
+            self.policy.record_episode(&inbox, &json!({}), &json!({}))?;
+        }
         let observation_path = inbox.join(format!("outcome-{}.json", self.policy.invocation));
         let observation = if observation_path.is_file() {
             crate::knowledge_evidence::read(&observation_path, 65_536)
@@ -523,6 +737,15 @@ fn read_session_config(marker: &std::path::Path) -> Result<SessionConfig, Value>
 mod tests {
     use super::*;
     use clap::Parser;
+    #[test]
+    fn listed_assessment_stages_precede_unlisted_stages() {
+        let actions = [crate::knowledge_assessment::Action {
+            skip: std::collections::BTreeSet::new(),
+            order: vec!["resubstitute".into()],
+        }];
+        let policy = LoopPolicy::from_actions(&actions);
+        assert!(policy.rank("resubstitute") < policy.rank("canonical"));
+    }
     #[test]
     fn kb_usage_session_configuration_reuses_snapshot_and_invalidates_changes() {
         // Preparation/serialization test only. No checked loop execution is

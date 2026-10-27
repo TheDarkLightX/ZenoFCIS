@@ -1,5 +1,6 @@
 [workspace]
 resolver = "3"
+exclude = ["core-apps/zusd-v1"]
 members = [
     "crates/zeno-fcis",
     "crates/zeno-fcis-core",
@@ -40,17 +41,20 @@ members = [
     "crates/zeno-fcis-contract",
     "crates/zeno-fcis-cli",
     "crates/zeno-fcis-shell-sqlite",
+    "crates/zeno-fcis-commons",
+    "crates/zeno-fcis-ingress",
+    "crates/zeno-fcis-bls",
     "crates/zeno-fcis-collections",
 ]
 
 [workspace.package]
-version = "2.5.0"
+version = "2.6.0"
 edition = "2024"
 rust-version = "1.97.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/TheDarkLightX/ZenoFCIS"
 homepage = "https://github.com/TheDarkLightX/ZenoFCIS"
-authors = ["TheDarkLightX and ZenoFCIS contributors"]
+authors = ["Dana Edwards (TheDarkLightX) and ZenoFCIS contributors"]
 readme = "README.md"
 
 [workspace.lints.rust]

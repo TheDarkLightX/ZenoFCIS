@@ -1,5 +1,5 @@
 //! One primitive byte decoder with explicit legacy versus typed value encoding.
-use super::super::super::value::{Atom, Domain};
+use super::super::super::value::{Atom, Domain, contains_variant_code, validate_variant_codes};
 use super::super::{Resource, meter::Meter};
 use super::{AccessAttempt, Failure, Field};
 use super::{Leaf, decode_variant, read_big_endian, read_signed_128};
@@ -72,6 +72,7 @@ pub(crate) fn valid(view: FieldsView<'_>) -> bool {
                     return false;
                 }
                 let admitted = match fields[i].leaf {
+                    Domain::Sum { variants, .. } => validate_variant_codes(variants),
                     Domain::Bool => true,
                     Domain::I128 { min, max } => min <= max,
                     Domain::U128 { min, max } => min <= max,
@@ -254,6 +255,27 @@ pub(crate) fn decode_value(
             }
             let (code, end) = decode_variant(bytes, payload_offset, *type_id, variants, true)?;
             Some((Atom::I128(code), end))
+        }
+        LeafView::Numeric(Domain::Sum { type_id, variants }) => {
+            if tag != 0x0a {
+                return None;
+            }
+            let (actual, start) = read_big_endian(bytes, payload_offset, 4)?;
+            let (variant, end) = read_big_endian(bytes, start, 2)?;
+            let (payload, end) = read_big_endian(bytes, end, 1)?;
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                crate::finite::canonical_v2::spec::unsigned_bound(bytes@, start as int, 2);
+                reveal_with_fuel(crate::finite::canonical_v2::spec::power, 3);
+                assert(variant <= u16::MAX);
+            }
+            if actual != type_id as u128
+                || payload != 0
+                || !contains_variant_code(variants, variant as u16)
+            {
+                return None;
+            }
+            Some((Atom::I128(variant as i128), end))
         }
         LeafView::Numeric(Domain::Bool) => match tag {
             0x01 => Some((Atom::Bool(false), payload_offset)),

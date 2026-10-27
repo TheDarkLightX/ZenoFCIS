@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use ZenoFCIS, please cite this software."
+title: ZenoFCIS
+authors:
+  - given-names: Dana
+    family-names: Edwards
+    alias: TheDarkLightX
+version: 2.6.0
+# date-released: Set the release date during the release step.
+license: [MIT, Apache-2.0]
+repository-code: "https://github.com/TheDarkLightX/ZenoFCIS"
+abstract: >-
+  ZenoFCIS is a software factory that combines human intent, large language
+  model proposals, and symbolic checking to develop bounded software contracts
+  and implementations. Humans define requirements and review results; language
+  models propose candidate programs and explanations; deterministic checkers
+  assess declared properties within explicit supported domains. The factory
+  separates pure decisions from effects and retains evidence for review.
+keywords:
+  - software factory
+  - human and LLM collaboration
+  - symbolic verification
+  - program synthesis
+  - functional core

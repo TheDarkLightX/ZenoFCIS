@@ -4,7 +4,7 @@
 #[path = "v2_contract.rs"]
 pub mod v2_contract;
 
-pub use super::{bindings, generated, delivery, profile};
+pub use super::{bindings, delivery, generated, profile};
 
 use bindings::GeneratedProject;
 use delivery::Destination;
@@ -28,6 +28,23 @@ pub type AppResult<T> = Result<T, String>;
 
 fn checked<T, E: std::fmt::Debug>(value: Result<T, E>) -> AppResult<T> {
     value.map_err(|error| format!("{error:?}"))
+}
+
+// The historical API covers its old actions at day zero. Current authority
+// receives the full revised schema and independently checks every transition.
+fn current_frame(old: &zeno_fcis_codec::AdmittedEnvelope) -> AppResult<Vec<u8>> {
+    checked(
+        zeno_fcis_codec::Envelope::new(
+            old.type_id(),
+            zeno_fcis_codec::Hash32::new(v2_contract::FRAMING.state.schema),
+            crate::oracle::templates::v2_bridge::current_value(
+                5,
+                old.type_id(),
+                old.value().value(),
+            ),
+        )
+        .canonical_bytes(),
+    )
 }
 
 /// The vault before any request: no funds, both lanes empty, no pause, lane A
@@ -93,7 +110,7 @@ pub fn create<'a, 'p>(path: &Path, authority: &'a Authority<'p>) -> AppResult<Sh
     let initial = checked(
         project.admit_root::<RustCryptoSha256>(&genesis_state(), ValidationLimits::default()),
     )?;
-    let initial = checked(initial.envelope().canonical_bytes())?;
+    let initial = current_frame(initial.envelope())?;
     let genesis = match authority.publish_genesis(&initial) {
         PublicationOutcome::Commit(genesis) => genesis,
         PublicationOutcome::Refused { evaluation, error } => {
@@ -128,8 +145,8 @@ pub fn invoke(
         },
         ValidationLimits::default(),
     ))?;
-    let command = checked(command.admitted().envelope().canonical_bytes())?;
-    let context = checked(context.admitted().envelope().canonical_bytes())?;
+    let command = current_frame(command.admitted().envelope())?;
+    let context = current_frame(context.admitted().envelope())?;
     let original = composition::Raw {
         state: snapshot.state(),
         command: &command,

@@ -1,0 +1,160 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "escrow-deal",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      16
+    ]
+  },
+  "variables": {
+    "status": "pre.100.110",
+    "held": "pre.100.111",
+    "action": "command.101.120",
+    "amount": "command.101.121",
+    "party": "context.102.130",
+    "day": "context.102.131"
+  },
+  "cases": [
+    {
+      "rule": "the buyer deposits and releases, the seller ships, the operator refunds",
+      "when": "(action == 160 && party != 170) || (action == 161 && party != 171) || (action == 162 && party != 170 && party != 173) || (action == 163 && party != 172)",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "each step needs its stage",
+      "when": "(action == 160 && status != 150) || (action == 161 && status != 151) || (action == 162 && status != 152) || (action == 163 && status != 151 && status != 152)",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "the operator refunds only after day 7, the shipping deadline",
+      "when": "action == 163 && day <= 7",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "deposit",
+      "when": "action == 160",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 151,
+        "111": "amount"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "mark shipped",
+      "when": "action == 161",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 152
+      },
+      "outbox": []
+    },
+    {
+      "rule": "release to the seller",
+      "when": "action == 162",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 153,
+        "111": 0,
+        "112": "held"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "seller",
+          "payload": {
+            "140": "held"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "refund to the buyer",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 154,
+        "111": 0,
+        "113": "held"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 301,
+          "destination": "buyer",
+          "payload": {
+            "140": "held"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    }
+  ],
+  "genesis": {
+    "110": 150,
+    "111": 0,
+    "112": 0,
+    "113": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AssetConservation",
+    "502": "AuthoritySubjectRecipient",
+    "503": "AuthoritySubjectRecipient",
+    "510": "AssetConservation",
+    "511": "AssetConservation"
+  },
+  "clock": {
+    "field": 131,
+    "unit": "days",
+    "epoch": "2026-11-01"
+  },
+  "delivery_laws": {
+    "510": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.140": {
+          "channel": 300,
+          "field": 140
+        }
+      }
+    },
+    "511": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 301
+        },
+        "outbox.104.140": {
+          "channel": 301,
+          "field": 140
+        }
+      }
+    }
+  }
+}

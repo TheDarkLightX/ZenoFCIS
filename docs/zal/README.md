@@ -1,10 +1,42 @@
-# ZAL: terminal-first behavior review
+# ZAL: state the intent, then check the contract
 
-ZAL is an additive research prototype for discussing a small, precise behavior
-before realizing it through ZenoFCIS. Two deterministic surfaces, symbolic and
-controlled English, describe one `zal/finite-fsm/1` model. Start in a terminal;
-the browser is optional. Built-in help, translation and input-specific
-explanations work locally without an LLM. This is not a released ZenoFCIS API.
+ZAL states what must hold. A contract and its code must refine that statement.
+Start with the requirement and its declared theory, then choose the reading
+that is easiest to understand. The [progression ladder](ladder/README.md)
+presents one formula as symbols, English or a question without changing its
+declared meaning. Its legend explains the symbols; shorter readings keep the
+same definitions and assumptions.
+
+Ask: **Approve an order only when the supplied authorization fact is true.**
+
+The [order example](../../integrations/zal/examples/order.zal) is a finite
+behavior model for that requirement. Its English rule says:
+
+> Rule approve_order: when the state is pending and the event is approve, if authorized, move to approved.
+
+Its `zal 1` header selects the finite-machine theory `zal/finite-fsm/1`.
+The explicit default rejects other inputs and keeps the state unchanged.
+Inspect the statement, export the contract, then run the comparison:
+
+```sh
+python3 integrations/zal/run.py render integrations/zal/examples/order.zal --to english
+python3 integrations/zal/run.py export integrations/zal/examples/order.zal --out order-contract
+python3 integrations/zal/run.py qualify integrations/zal/examples/order.zal --out order-check.json
+```
+
+The contract is `order-contract/project.zeno` plus `v2/policy.json`.
+`qualify` needs the built CLI and checks the ZAL initial state and every declared
+input against the generated application's Authority. A mismatch names the
+input and differing result. See the [exact refinement relation](REFINEMENT.md)
+for scope, limits and refusal examples. The supplied `authorized` fact is not
+itself authentication.
+
+Finite machine profiles have symbolic and controlled-English views; they are
+explicit behavior models, not descriptions of core implementation structure.
+The formula ladder and those machine profiles remain separate. Built-in help,
+translation and input explanations work locally without an LLM. These are
+experimental interfaces, not a released ZenoFCIS API. A terminal or browser is
+optional for the file-based journey above.
 
 Read the [specification](SPECIFICATION.md), [exact grammar](GRAMMAR.md),
 and [factory source map](../ZAL_SOURCE_MAP.md).
@@ -114,6 +146,50 @@ printf '%s\n' '? and' 'man rule:approve_order' 'translate english' \
   'check' 'quit' | python3 integrations/zal/terminal.py review --workspace "$ZAL_WORKSPACE"
 ```
 
+### Ask why not, what if, and for the story
+
+Three further explanation commands use the same typed model and no provider:
+
+```text
+whynot pending approve authorized=no want Accept
+whynot draft approve authorized=no want Accept approved scope input
+whatif pending approve authorized=no change authorized=yes
+story
+story trace submit authorized=no then approve authorized=yes
+```
+
+`whynot` searches a stated finite scope for the fewest input changes that give
+the wanted outcome. `want` takes `Accept [TARGET]`, `Reject [REASON]` or
+`rule ID`. The default scope keeps the state and event fixed and tries every
+context valuation; `scope input` searches every declared input. It reports each
+minimal input, the rule that would fire and that rule's statement, and says
+plainly when no input in the scope (or in the whole declared domain) gives it.
+For the first example it reports one change, `authorized` from no to yes, and
+`approve_order`. Inputs are hypotheses: each witness also says whether its
+source state is reachable.
+
+`whatif` applies every named change (`fact=yes`, `state:NAME`, `event:NAME`)
+and compares the two decisions rule by rule. Undeclared names are refused, and
+a change to the value already supplied is reported as having no effect.
+
+`story` turns the current check's counterexample (determinism, a reachable
+invariant violation or a raw Accept that breaks an invariant) into a short
+numbered story; `story candidate` does the same for the pending candidate, and
+`story trace ...` narrates assumed inputs. Every sentence is a registered
+template filled from the witness, paired with a symbolic line, and re-derived
+from the model before it is shown. For example, adding
+`invariant never_cancelled: !(state == cancelled);` to the seed gives
+"Step 2: in pending, event cancel arrives with authorized=no; rule cancel_order
+accepts and moves to cancelled." and `pending + cancel (authorized=false) ->
+accept cancelled [cancel_order]`.
+
+`guide TOPIC` is construct help (`zal/help/2`) generated from the construct
+registry: meaning, symbolic and English forms, the model's own lines and the
+typed IDs that use an operator. It resolves the same topics as `?`. Bare
+`guide` lists every construct with its forms. A drift test requires a registry
+entry for every statement kind, Boolean node and unsupported kind, and requires
+the live parser to accept every registry form.
+
 ### Check scope and the intent boundary
 
 Completed `check` reports warn when no application invariants are declared. Other
@@ -185,7 +261,7 @@ python3 /absolute/path/to/repository/integrations/zal/mcp.py \
 
 Normally the harness launches it; there is no HTTP service to start. The bridge
 uses newline-delimited MCP JSON-RPC, advertises protocol `2024-11-05`, and exposes
-only these seven tools:
+these model tools:
 
 | Tool | Required arguments | Result/purpose |
 | --- | --- | --- |
@@ -196,6 +272,26 @@ only these seven tools:
 | `zal_compare` | `revision`, `syntax`, `surface` | Compare a complete candidate surface without staging it. |
 | `zal_trace` | `revision`, `inputs` | Replay an array of `{event, context}` inputs from the initial state. |
 | `zal_propose` | `base_revision`, `object_ids`, `message`, `syntax`, `surface` | Parse and stage a complete candidate with checks and diff; never accept it. |
+| `zal_why_not` | `revision`, `state`, `event`, `context`, `want`, optional `scope` | Fewest input changes giving a wanted outcome in the stated scope. |
+| `zal_what_if` | `revision`, `state`, `event`, `context`, `change` | Apply named changes and compare both decisions rule by rule. |
+| `zal_narrate` | `revision`, `source` (`check`, `candidate`, `trace`), optional `inputs` | Numbered story of a counterexample or trace, paired with symbolic lines. |
+| `zal_guide` | `revision`, `topic` | Construct help (`zal/help/2`) generated from the construct registry. |
+
+The ladder tools work on the shipped [ladder examples](ladder/README.md) and,
+when `ZAL_LADDER_DIR` names a directory, its `*.json` statements as
+`project:NAME`. Each statement has its own revision: a SHA-256 of its canonical
+JSON. Read first, then pass the statement ID and exact revision; a stale
+revision is refused with `Stale ladder revision; call zal_ladder_read again`.
+There is no ladder write or acceptance tool.
+
+| Tool | Required arguments | Result/purpose |
+| --- | --- | --- |
+| `zal_ladder_read` | `{}` | Statement IDs, revisions, profiles and scope identities. |
+| `zal_ladder_render` | `statement`, `revision`, optional `rung` | All seven rungs (or one), scope strip, legend and evidence status. |
+| `zal_ladder_parse` | `statement`, `revision`, `rung`, `text` | Exactly one normalized tree with its uniqueness counts, or a named refusal. |
+| `zal_ladder_same` | `statement`, `revision`, and `other_statement`/`other_revision` or `rung`/`text` | Same normal form and scope, with the evidence. |
+| `zal_ladder_lower` | `statement`, `revision` | The inert `.zeno` claim and its obligations; authority none. |
+| `zal_ladder_explain` | `statement`, `revision`, optional `rung`, `text` | Which rung admits a text, why its parse is unique, and what the scope strip means. |
 
 `syntax` is `symbolic` or `english`. Copy `model.revision` from `zal_read`;
 `object_ids` must refer to the current model. Surface text follows the grammar,
@@ -218,57 +314,16 @@ unsolicited model turns, change subscriptions or auto-refresh into a conversatio
 Neither the shared store nor the bridge calls a provider. The harness controls
 what it sends to its model, using its existing account and permissions.
 
-### Project addon for Codex and Claude Code
+### Optional tool integration
 
 The [2.3 addon guide](HARNESS_INTEGRATION.md) provides persistent project-local
 MCP entries and a shared specification skill. Run `integrations/zal/setup.py` from a
 stable source checkout, first without `--apply` to inspect the plan. It preserves
 unrelated configuration and pending work, and refuses a differing existing ZAL
-entry or skill. The older per-invocation instructions below remain available.
-Installation does not change tool approval policies or call a model.
-
-### Codex: per-invocation configuration
-
-In a second shell at the repository root, set `ZAL_WORKSPACE` to the exact path
-printed above. These overrides use the installed Codex 0.159.2 `--config`
-interface and the documented [stdio MCP configuration](https://learn.chatgpt.com/docs/extend/mcp).
-They do not write a registration to `config.toml` or widen approval policy.
-
-```sh
-export ZAL_WORKSPACE=/absolute/path/printed/by/the/review/setup/workspace.json
-ZAL_ARGS=$(python3 -c 'import json,sys; print(json.dumps([sys.argv[1], "--workspace", sys.argv[2]]))' \
-  "$PWD/integrations/zal/mcp.py" "$ZAL_WORKSPACE")
-codex \
-  -c 'mcp_servers.zal.command="python3"' \
-  -c "mcp_servers.zal.args=$ZAL_ARGS" \
-  -c 'mcp_servers.zal.enabled_tools=["zal_read","zal_check","zal_help","zal_explain","zal_propose","zal_compare","zal_trace"]'
-```
-
-Before starting the interactive session, the same command with `mcp get zal
---json` appended inspects the effective entry without running a model. That
-configuration check was observed on 0.159.2. Use an unused server name if your
-existing configuration already defines `zal`; other configured integrations
-remain governed by your existing setup.
-
-**Interoperability limit:** the earlier stock Codex probe discovered `zal_read`
-but its permission layer cancelled both calls. No read/check/proposal completed.
-An explicitly approved, narrowly scoped cloud retry on 0.159.2 stopped during
-runtime initialization with a read-only-filesystem error, before any model or
-MCP tool execution was observed. The demo workspace and configuration remained
-unchanged. Neither attempt establishes an end-to-end stock-CLI pass.
-Keep required approvals visible; a
-blocked call is not a reason to bypass policy or install persistent permissions.
-
-### Claude Code: documented adapter, not live-validated
-
-The same seven tools fit Claude Code's documented [local stdio MCP
-interface](https://code.claude.com/docs/en/mcp). Its [CLI reference](https://code.claude.com/docs/en/cli-reference)
-documents `--mcp-config` for per-session JSON, with `mcpServers.zal` containing
-`type: "stdio"`, `command: "python3"` and the same absolute-path argument array.
-An installed Claude executable was not available in the cloud validation
-environment. Verify that installed version's flags, configuration loading and
-ordinary tool approval flow before use. No Claude model was invoked, no content
-was sent to Claude, and no persistent Claude configuration was installed.
+entry or skill. Installation does not change tool approval policies or call a
+model. A connected coding tool must refresh the exact revision before checking
+or proposing a change. Tool permission and human acceptance of the statement
+remain separate actions.
 
 ## Workspace boundary
 
@@ -285,7 +340,7 @@ lock contention refuses after two seconds. Keep sensitive model content in an
 appropriately protected workspace. This prototype has no shared multi-user
 access control or production durability guarantee.
 
-## Optional browser and separate Codex custom client
+## Optional browser and provider conversation
 
 To view and review the same existing terminal/MCP workspace:
 
@@ -298,7 +353,7 @@ is a disclosed fixture, not a live model. It provides paired rule views, graph
 and table selection, traces, witnesses, built-in contextual help and
 exact-revision review. `Explain next input` evaluates the current trace state,
 selected event and every Boolean checkbox; `Why this recorded step?` explains
-the exact input at the trace cursor. `Ask Codex` is the separate provider
+the exact input at the trace cursor. The provider control opens a separate
 conversation. `Help ?` opens the topic overview; `Meaning of this object ?`
 opens help for the selected typed ID. Mouse/pen pointer or keyboard focus on
 objects/topics loads a persistent Context help preview. Visible controls also
@@ -316,10 +371,10 @@ For an independent disposable demo, omit `--workspace`:
 in-memory session, is not synchronized with the terminal/MCP file, and loses
 its session when restarted. The UI state labels which workspace mode is active.
 
-The browser's explicit Codex connection uses the separate
+The browser's optional provider connection uses the separate
 [`codex_transport.py`](../../integrations/zal/codex_transport.py) app-server
-client. That mode owns a Codex conversation; it does not attach a pane or send
-events into your stock Codex CLI session. It uses stdio, an ephemeral read-only
+client. That mode owns a conversation; it does not attach a pane or send
+events into an existing terminal session. It uses stdio, an ephemeral read-only
 thread, structured final output and exact turn IDs, and refuses execution
 approval requests. Actual permitted read-only tools must still be observed;
 an instruction to avoid tools is not a physical isolation guarantee.
@@ -362,9 +417,16 @@ tests. Its temporary application lockfile is normalized offline; the repository
 lockfile is unchanged. Inspect every report entry and terminal status. None of
 these commands adopts, publishes, upgrades, releases or deploys an application.
 
-CLI exit codes are 0 for a completed operation, 1 for `counterexample` or
-`unfinished`, 2 for refused input/operation, and 3 for `unsupported`. A diff's
-`different` or `domain-changed` result is data, not an exit-code failure.
+The [shared exit contract](../CLI_REFERENCE.md#exit-codes) applies.
+`diff` returns 1 for `different` and 2 for `domain-changed` or
+`invalid-overlap`; a changed domain supplies no equivalence verdict.
+`why-not` returns 1 for `none-in-scope`. `unfinished` and `unsupported`
+return 2; input/operation refusal still returns 2. Rendered stories and
+`what-if` results remain completed diagnostic queries.
+
+Background: IEEE and The Open Group, *POSIX.1-2024*, Shell Command Language,
+2024, defines shell exit status conventions; these mappings apply them to
+the existing finite checker verdicts without changing their scope.
 
 ## Reproduce checks
 
@@ -377,7 +439,17 @@ python3 integrations/zal/oracles/explanation_oracle.py
 ```
 
 They derive expected outcomes from explicit transition tables and integer truth
-masks, then compare the exact hashed implementation. Each prints its case counts
+masks, then compare the exact hashed implementation. Profile 2 has its own
+oracle and planted-defect run, both also in `zal-dialogue`:
+
+```sh
+python3 integrations/zal/oracles/temporal_oracle.py
+python3 -B integrations/zal/check_behavior2.py planted
+```
+
+The temporal oracle judges small machines by brute-force lasso enumeration
+and finite words by the ZAL-T macro expansion, without the checker's search.
+Each planted defect must fail its named test before the baseline passes. Each prints its case counts
 and bounded scope. They cover named finite families, not all admitted programs,
 human intent, external context truth, factory lowering or browser behavior.
 Run without Python `-O`; the loader refuses disabled assertions.
@@ -391,9 +463,8 @@ The Node command runs the actual UI script with minimal DOM doubles and fixtures
 generated by the Python domain. Its deterministic checks need no browser,
 Playwright, network or provider; they do not test native rendering, focus behavior
 or the browser-to-server HTTP path. Use the final run's output for the current
-check count. Final cloud browser QA remains blocked before page creation by a
-local socket restriction; the supported browser also refused loopback access.
-No new native pointer, keyboard, touch or accessibility pass is claimed.
+check count. A pass of the DOM-double tests does not establish native pointer,
+keyboard, touch or accessibility behavior.
 
 The repository's registered acceptance scenario runs the Python suite,
 deterministic Node UI checks, pinned CLI build and actual sample-model factory
@@ -414,3 +485,528 @@ http://127.0.0.1:8765/ /tmp/zal-browser`. `CHROMIUM` can select an existing brow
 `NODE_PATH` can locate an existing Playwright installation. This command neither
 installs them nor establishes a complete accessibility audit. Final repository
 checks are those in [CONTRIBUTING.md](../../CONTRIBUTING.md), not just these suites.
+
+## Profile 2: integers, requirements and temporal properties
+
+A source that starts with `zal 2;` or `ZAL version 2.` uses
+`zal/finite-fsm/2` ([grammar](GRAMMAR.md#profile-zalfinite-fsm2),
+[semantics](SPECIFICATION.md#profile-zalfinite-fsm2-integers-requirements-and-temporal-properties)).
+The file-level commands select the profile from that header:
+
+```sh
+python3 integrations/zal/run.py check integrations/zal/examples/withdrawal2.zal
+python3 integrations/zal/run.py render --to english integrations/zal/examples/keeper2.zal
+python3 integrations/zal/run.py diff integrations/zal/examples/order2.zal candidate.zal
+python3 integrations/zal/run.py qualify integrations/zal/examples/order2.zal
+```
+
+`withdrawal2.zal` is a one-lane abstraction of the withdrawal-queue
+template's alarm controller: "an alarm can delay a withdrawal but never
+freeze it" is a liveness property under the fairness assumption that the
+keeper keeps ticking. `keeper2.zal` is the keeper's tick-only view, where
+"every request is paid within four ticks" is a bounded `within` property.
+Both are review abstractions, not bindings to the template's contract, and
+their properties are finite checked over the declared machine only.
+`order2.zal` adds "approve only if authorized" as a transition requirement.
+Weakening its approval guard to `true` now fails with a requirement
+counterexample.
+
+`lower --out DIRECTORY`, `export` and `qualify` use the existing factory
+lowerer. Step safety properties `always(P)` and `never(P)` become contract
+laws when they hold on every admissible step. Other temporal properties and
+fairness still refuse as unsupported lowering. `refine-check SOURCE CONTRACT
+--cli PATH` delegates to the existing native refinement checker. See the
+[lowering guide](LOWERING.md), including its lineage in Baier and Katoen,
+*Principles of Model Checking* (MIT Press, 2008), and Abadi and Lamport,
+*The Existence of Refinement Mappings* (Theoretical Computer Science, 1991).
+The review terminal, MCP tools and browser workspace
+still use profile 1; `run.py ui` refuses a profile 2 model.
+
+The explanations work on profile 2 models from a file, through `run.py`:
+
+```sh
+python3 integrations/zal/run.py story MODEL.zal
+python3 integrations/zal/run.py story MODEL.zal --trace INPUTS.json
+python3 integrations/zal/run.py why-not integrations/zal/examples/withdrawal2.zal --scope input \
+  --input '{"state": "idle", "variables": {"balance": 0, "must_serve": 0, "pause": 0, "reserved": 0}, "event": "request", "context": {"alarm": false, "amount": 1}}' \
+  --want '{"class": "Accept"}'
+python3 integrations/zal/run.py what-if MODEL.zal --input '{...}' --change '{"variables": {"balance": 2}}'
+```
+
+`story` tells the check's counterexample. Range traps, requirement failures,
+safety, strong-next and within-k violations and fair lassos each get their own
+sentences. For example, removing `must_serve = 1` from the lane's `wait_last`
+rule gives a lasso. After two steps, "From here the next 3 steps repeat
+forever." lists the alarm cycle, and "Fairness keeper_ticks (event is tick)
+holds at cycle step 1" shows that the cycle is fair. The story ends: "state is
+waiting and state after this event is idle is false at every step from step 2
+on, including every step of the repeating cycle, so it never happens." In
+`why-not` and `what-if`, variables and integer inputs are inputs like any
+other, and `want` can name `Trap` to find the nearest input whose update
+leaves a range. The same commands accept profile 1 models without `variables`.
+
+### Game properties
+
+The withdrawal example checks whether the user can keep withdrawing while
+the operator controls the other states and reopens the window infinitely
+often:
+
+```sh
+python3 integrations/zal/run.py check integrations/zal/examples/withdrawal_game2.zal
+python3 integrations/zal/run.py export-game integrations/zal/examples/withdrawal_game2.zal --property keep_withdrawing --out /tmp/withdrawal-game/project.zeno
+zeno-fcis check --expand /tmp/withdrawal-game/project.zeno
+```
+
+The first command prints this JSON:
+
+<!-- withdrawal-game-check-output -->
+```json
+{
+  "status": "pass-with-scope",
+  "revision": "62f361bbe3dbdb74bdbfe7050626e26f4d029990be5ddc1d37f9187dd729b8e0",
+  "profile": "zal/finite-fsm/2",
+  "checker": "1092a97d3f96b46e3e6d522c8aa4ed8563348c41e5e48c82c3f1fc69e9b4aa4f",
+  "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
+  "checks": {
+    "initial_nonempty": "pass-with-scope",
+    "typing": "pass-with-scope",
+    "determinism": "pass-with-scope",
+    "update_ranges": "pass-with-scope",
+    "coverage_with_explicit_default": "pass-with-scope",
+    "reachable_invariants": "pass-with-scope",
+    "invariant_preservation": "pass-with-scope",
+    "transition_requirements": "pass-with-scope",
+    "temporal_properties": "pass-with-scope",
+    "game_properties": "pass-with-scope"
+  },
+  "input_tuples": 9,
+  "configurations": 3,
+  "admissible_configurations": 3,
+  "reachable_configurations": 3,
+  "reachable_states": [
+    "open",
+    "paused",
+    "withdrawn"
+  ],
+  "unreachable_rules": [],
+  "invariant_count": 0,
+  "requirement_count": 0,
+  "property_count": 1,
+  "fairness_count": 1,
+  "properties": {
+    "keep_withdrawing": {
+      "status": "pass-with-scope",
+      "kind": "game",
+      "player": "user",
+      "objective": "infinitely often",
+      "english": "Property keep_withdrawing: user can force (state is withdrawn) to happen infinitely often.",
+      "configurations": 3,
+      "winning_configurations": 3,
+      "initial_wins": true,
+      "solvers": [
+        "fixed-point",
+        "parity"
+      ]
+    }
+  },
+  "advisories": [],
+  "default_count": 5,
+  "default_witness": {
+    "state": "open",
+    "variables": {},
+    "event": "pause",
+    "context": {},
+    "outcome": {
+      "class": "Reject",
+      "state": "open",
+      "variables": {},
+      "reason": "not_allowed",
+      "rule": "default"
+    }
+  },
+  "unresolved": [],
+  "factory": "not-run",
+  "authority": "none",
+  "game_property_count": 1
+}
+```
+
+The export command prints:
+
+<!-- withdrawal-game-export-output -->
+```json
+{
+  "status": "exported",
+  "format": "contract-tables",
+  "property": "keep_withdrawing",
+  "nodes": 3,
+  "out": "/tmp/withdrawal-game/project.zeno",
+  "authority": "none"
+}
+```
+
+When `$ZENO_FCIS_BIN` is set, the replay test runs the third command and
+checks each `from_` law against the fixed-point solver. With it unset, the
+external expansion is skipped; the ZAL check and table export still run. The
+`check` and `export-game` output shown here is compared byte for byte by the
+profile 2 game tests. The exporter supports up to 64 nodes and includes a
+`stable` law that must expand to exactly `true`. Native formula expansion has
+a lower practical limit: measured expansion is about 20 nodes with one goal
+and one fairness assumption, and about 12 nodes with two of each. Beyond that
+limit, `zeno-fcis check --expand` refuses and the ZAL check result stands.
+
+### Bounded game example
+
+The deadline example asks whether the user can reach `withdrawn` within one
+rule application, while the operator chooses the context. It exercises the
+inclusive deadline and whole-step context rule.
+
+```sh
+python3 integrations/zal/run.py check integrations/zal/examples/deadline_game2.zal
+python3 integrations/zal/run.py export-game integrations/zal/examples/deadline_game2.zal --property quick_withdrawal --out /tmp/withdrawal-deadline/project.zeno
+zeno-fcis check --expand /tmp/withdrawal-deadline/project.zeno
+```
+
+The first command prints:
+
+<!-- deadline-game-check-output -->
+```json
+{
+  "status": "pass-with-scope",
+  "revision": "f9d5a4db71761f0ef6b9a5dff04bfec3189c617f56ff8cfe18b77facd49e9aef",
+  "profile": "zal/finite-fsm/2",
+  "checker": "1092a97d3f96b46e3e6d522c8aa4ed8563348c41e5e48c82c3f1fc69e9b4aa4f",
+  "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
+  "checks": {
+    "initial_nonempty": "pass-with-scope",
+    "typing": "pass-with-scope",
+    "determinism": "pass-with-scope",
+    "update_ranges": "pass-with-scope",
+    "coverage_with_explicit_default": "pass-with-scope",
+    "reachable_invariants": "pass-with-scope",
+    "invariant_preservation": "pass-with-scope",
+    "transition_requirements": "pass-with-scope",
+    "temporal_properties": "pass-with-scope",
+    "game_properties": "pass-with-scope"
+  },
+  "input_tuples": 8,
+  "configurations": 2,
+  "admissible_configurations": 2,
+  "reachable_configurations": 2,
+  "reachable_states": [
+    "open",
+    "withdrawn"
+  ],
+  "unreachable_rules": [],
+  "invariant_count": 0,
+  "requirement_count": 0,
+  "property_count": 1,
+  "fairness_count": 0,
+  "properties": {
+    "quick_withdrawal": {
+      "status": "pass-with-scope",
+      "kind": "game",
+      "player": "user",
+      "objective": "within 1",
+      "english": "Property quick_withdrawal: user can force (state is withdrawn) to happen within 1 steps.",
+      "configurations": 2,
+      "winning_configurations": 2,
+      "initial_wins": true,
+      "solvers": [
+        "fixed-point",
+        "parity"
+      ]
+    }
+  },
+  "advisories": [],
+  "default_count": 4,
+  "default_witness": {
+    "state": "open",
+    "variables": {},
+    "event": "wait",
+    "context": {
+      "signal": false
+    },
+    "outcome": {
+      "class": "Reject",
+      "state": "open",
+      "variables": {},
+      "reason": "not_allowed",
+      "rule": "default"
+    }
+  },
+  "unresolved": [],
+  "factory": "not-run",
+  "authority": "none",
+  "game_property_count": 1
+}
+```
+
+The export command prints:
+
+<!-- deadline-game-export-output -->
+```json
+{
+  "status": "exported",
+  "format": "contract-tables",
+  "property": "quick_withdrawal",
+  "nodes": 2,
+  "out": "/tmp/withdrawal-deadline/project.zeno",
+  "authority": "none"
+}
+```
+
+The native expansion prints:
+
+<!-- deadline-game-native-output -->
+```text
+zeno 1;
+project 1 constant_role_hierarchy;
+namespace 2 permissions;
+type 100 state Roles;
+type 101 command Request;
+type 102 context Session;
+type 105 int Parent in 0..=2;
+type 106 int Role in 0..=1;
+type 107 int Grant in 0..=1;
+type 108 int ContextChoice in 0..=1;
+// Who moves: 0 = the property's player, 1 = the other player.
+
+
+
+
+
+
+
+field 210 100 grants_0 107;
+field 211 100 grants_1 107;
+field 120 101 role 106;
+variant 130 102 Session none;
+reason 200 permission_required precedence 0;
+component 400 inheritance {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+
+
+// n0: configuration state=open variables=
+law 600 from_n0 on commit = true;
+// n1: configuration state=withdrawn variables=
+law 601 from_n1 on commit = true;
+expanded /tmp/withdrawal-deadline/project.zeno: tables=1 entries=2 inputs=4 domain=8
+```
+
+The README replay test compares the first two command outputs byte for byte
+and, when `ZENO_FCIS_BIN` is set, compares the native `from_` laws with solver
+A. Bounded exports contain `r0` through `rK` and have no `stable` law.
+
+
+### Several recurring goals
+
+The recurring-goals example checks that every play visits both states infinitely often, even though the operator controls the withdrawn state:
+
+```sh
+python3 integrations/zal/run.py check integrations/zal/examples/recurring_goals_game2.zal
+python3 integrations/zal/run.py export-game integrations/zal/examples/recurring_goals_game2.zal --property both_goals --out /tmp/recurring-goals/project.zeno
+zeno-fcis check --expand /tmp/recurring-goals/project.zeno
+```
+
+The first command prints:
+
+<!-- multi-goal-check-output -->
+```json
+{
+  "status": "pass-with-scope",
+  "revision": "5eb629ebc9bff7c65dc6e06613dd1126f0cf4775a080f161adabbfb7531da3af",
+  "profile": "zal/finite-fsm/2",
+  "checker": "1092a97d3f96b46e3e6d522c8aa4ed8563348c41e5e48c82c3f1fc69e9b4aa4f",
+  "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
+  "checks": {
+    "initial_nonempty": "pass-with-scope",
+    "typing": "pass-with-scope",
+    "determinism": "pass-with-scope",
+    "update_ranges": "pass-with-scope",
+    "coverage_with_explicit_default": "pass-with-scope",
+    "reachable_invariants": "pass-with-scope",
+    "invariant_preservation": "pass-with-scope",
+    "transition_requirements": "pass-with-scope",
+    "temporal_properties": "pass-with-scope",
+    "game_properties": "pass-with-scope"
+  },
+  "input_tuples": 2,
+  "configurations": 2,
+  "admissible_configurations": 2,
+  "reachable_configurations": 2,
+  "reachable_states": [
+    "open",
+    "withdrawn"
+  ],
+  "unreachable_rules": [],
+  "invariant_count": 0,
+  "requirement_count": 0,
+  "property_count": 1,
+  "fairness_count": 0,
+  "properties": {
+    "both_goals": {
+      "status": "pass-with-scope",
+      "kind": "game",
+      "player": "user",
+      "objective": "infinitely often",
+      "english": "Property both_goals: user can force (state is open) and (state is withdrawn) to each happen infinitely often.",
+      "configurations": 2,
+      "winning_configurations": 2,
+      "initial_wins": true,
+      "solvers": [
+        "fixed-point",
+        "parity"
+      ]
+    }
+  },
+  "advisories": [],
+  "default_count": 0,
+  "default_witness": null,
+  "unresolved": [],
+  "factory": "not-run",
+  "authority": "none",
+  "game_property_count": 1
+}
+```
+
+The export command prints:
+
+<!-- multi-goal-export-output -->
+```json
+{
+  "status": "exported",
+  "format": "contract-tables",
+  "property": "both_goals",
+  "nodes": 2,
+  "out": "/tmp/recurring-goals/project.zeno",
+  "authority": "none"
+}
+```
+
+The native expansion prints:
+
+<!-- multi-goal-native-output -->
+```text
+zeno 1;
+project 1 constant_role_hierarchy;
+namespace 2 permissions;
+type 100 state Roles;
+type 101 command Request;
+type 102 context Session;
+type 105 int Parent in 0..=2;
+type 106 int Role in 0..=1;
+type 107 int Grant in 0..=1;
+// Who moves: 0 = the property's player, 1 = the other player.
+
+
+
+
+
+field 210 100 grants_0 107;
+field 211 100 grants_1 107;
+field 120 101 role 106;
+variant 130 102 Session none;
+reason 200 permission_required precedence 0;
+component 400 inheritance {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+// w(k,l,i)[s]: the other player can escape middle stratum (k,l) through assumption i.
+
+
+
+
+
+
+// win[s]: the property player wins from s under the fairness assumptions.
+
+
+law 500 domains on commit, genesis = (post.100.210 >= 0 && post.100.210 <= 1 && (post.100.211 >= 0 && post.100.211 <= 1));
+law 510 stable on commit = true;
+law 600 from_open on commit = true;
+law 601 from_withdrawn on commit = true;
+expanded /tmp/recurring-goals/project.zeno: tables=1 entries=2 inputs=4 domain=8
+```
+
+The README replay test compares the check and export outputs byte for byte.
+When `ZENO_FCIS_BIN` is set, it also checks the native output. One `stable`
+law checks the proposed per-goal strata; the tables name the recurring goals
+`goal0`, `goal1`, and so on.
+
+## Types and effect signatures
+
+`zal/effects/1` writes the shell's effect ports in ZAL, and `zal/typed-fsm/1`
+gives profile 2 variables and inputs finite types. See
+[types and effects](EFFECTS.md):
+
+```sh
+python3 integrations/zal/check_effects.py native-build
+python3 integrations/zal/run.py check integrations/zal/examples/shell_effects.zal
+python3 integrations/zal/run.py explain integrations/zal/examples/shell_effects.zal --topic port:Commit --human
+python3 integrations/zal/run.py check integrations/zal/examples/relay_typed.zal
+```
+
+The first command builds the small Rust printer that the byte-for-byte test
+compares against.
+
+## Experimental progression ladders
+
+The [ladder prototype](ladder/README.md) presents a statement through seven
+deterministic readings. Its separate temporal profile uses explicit event
+order, finite or unbounded scope, and versioned assumptions. Rendering and
+native-source previews have authority none. The [withdrawal
+pilot](ladder/WITHDRAWAL_PILOT.md) binds the withdrawal statements to the
+withdrawal-queue contract: its bounded claim is finite checked through length
+12, and its unbounded claim is kernel checked by Lean under a stated fairness
+premise. The vault and interface examples use proposed definitions awaiting
+owner confirmation.
+
+The same statements are available through the `zal_ladder_*` MCP tools above
+and the review terminal's `ladder` commands, which bind the revision read when
+the command runs:
+
+```text
+ladder list
+ladder render example:temporal/vault_drain plain
+ladder parse example:ladders/dex_k typed forall t in T: S(t) => x'(t)*y'(t) >= x(t)*y(t)
+ladder same example:temporal/vault_drain plain No admitted operation sequence drains the vault.
+ladder explain example:temporal/vault_drain No admitted operation sequence drains the vault.
+ladder lower example:temporal/vault_drain
+```
+
+`ladder explain` without a rung tries every rung, names the rungs that admit
+the text and gives the parse counts behind its uniqueness. `same` reports
+"same" only for identical expanded normal forms with an identical scope
+identity in either profile. The identity binds all declarations except the
+display ID, formula text and fixtures. Different normal forms do not prove
+different meanings.
+
+## Lineage and scope
+
+**Background.** Niklaus Wirth, “Program Development by Stepwise Refinement,”
+*Communications of the ACM* 14(4), 1971, describes successive program refinement.
+Matthew B. Dwyer, George S. Avrunin and James C. Corbett, “Patterns in Property
+Specifications for Finite-State Verification,” *ICSE*, 1999, organizes recurring
+temporal requirements as patterns. Tobias Kuhn, “A Survey and Classification of
+Controlled Natural Languages,” *ACM Computing Surveys* 46(3), article 41, 2014,
+surveys constrained natural-language systems.
+
+**What is new here.** This integration connects declared statements and readable
+views to existing finite checks and generated-application comparisons.
+Prior-art search pending.
+
+**Scope.** A check covers its named finite domain or explicitly stated proof
+obligation. Reading, review and human acceptance grant no runtime, publication
+or authentication authority. A readable requirement still needs a checked
+refinement before its implementation can claim to satisfy it.

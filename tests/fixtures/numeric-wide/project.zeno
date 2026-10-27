@@ -1,0 +1,14 @@
+zeno 1;
+project 1 numeric_overflow;
+namespace 2 core;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 105 u128 Amount in 0..=1329227995784915872903807060280344576;
+field 110 100 balance 105;
+field 120 101 amount 105;
+reason 300 Cancel precedence 0;
+component 400 core { owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 4096; }
+merge [400];
+law 500 bounded on commit, genesis = post.100.110 >= u128(0);
+law 501 observed on accept = post.100.110 == command.101.120;

@@ -21,7 +21,7 @@ use bindings::GeneratedProject;
 use delivery::Destination;
 use generated::{Attempts, Order, OrderAction, OrderCommand, OrderStatus};
 #[cfg(feature = "sqlite")]
-use generated::{Caller, CallerContext};
+use generated::{Caller, CallerContext, Day};
 #[cfg(feature = "sqlite")]
 use std::path::Path;
 #[cfg(feature = "sqlite")]
@@ -111,12 +111,29 @@ pub fn invoke(
     caller: Caller,
     replay: &str,
 ) -> AppResult<&'static str> {
+    invoke_at(shell, authority, command, caller, 0, replay)
+}
+
+/// Invoke with the host-authenticated day; the historical helper uses day zero.
+/// Days above 8 stay in the terminal recovery phase; negative days still refuse.
+#[cfg(feature = "sqlite")]
+pub fn invoke_at(
+    shell: &mut Shell<'_, '_>,
+    authority: &Authority<'_>,
+    command: OrderCommand,
+    caller: Caller,
+    now: i128,
+    replay: &str,
+) -> AppResult<&'static str> {
     let project = checked(GeneratedProject::try_new::<RustCryptoSha256>())?;
     let snapshot = checked(shell.snapshot())?;
     let command =
         checked(project.admit_command::<RustCryptoSha256>(&command, ValidationLimits::default()))?;
     let context = checked(project.admit_context::<RustCryptoSha256>(
-        &CallerContext { caller },
+        &CallerContext {
+            caller,
+            now: Day(now.min(8)),
+        },
         ValidationLimits::default(),
     ))?;
     let command = checked(command.admitted().envelope().canonical_bytes())?;

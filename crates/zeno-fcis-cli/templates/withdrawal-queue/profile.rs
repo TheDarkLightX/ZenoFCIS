@@ -23,7 +23,9 @@ pub const NO_COMMITTED_FAILURES: u32 = 508;
 /// The rejection law. The framework checks it for every rejection: a
 /// rejection commits no state, effect, or outbox entry. It has no formula, so
 /// it is registered here instead of as an always-true law in `project.zeno`.
-pub const REJECT_PUBLISHES_NOTHING: u32 = 509;
+/// The project now supplies a substantive RejectNoAuthority law; generated
+/// structural law 909 accompanies it as AuthoritySubjectRecipient.
+pub const REJECT_PUBLISHES_NOTHING: u32 = 909;
 
 /// A reviewed constant or the authored source failed the library's admission.
 /// Every fallible function in this file returns it, naming what was refused.
@@ -205,24 +207,29 @@ pub fn manifest() -> Result<LawManifest, BindingError> {
         // committing decision, which lets claims 600 and 601 assume it on
         // every commit.
         let (kind, scope, genesis) = match law.id().get() {
-            500 => (
+            500 | 506 => (
                 LawKind::StateInvariant,
                 DecisionScope::Committing,
                 GenesisApplicability::Required,
             ),
-            501 => (
+            501 | 505 => (
                 LawKind::AssetConservation,
                 DecisionScope::Committing,
                 no_genesis()?,
             ),
-            502 => (
+            502 | 511 | 512 => (
                 LawKind::AuthoritySubjectRecipient,
                 DecisionScope::Committing,
                 no_genesis()?,
             ),
-            503 => (
+            503 | 504 | 510 | 514 => (
                 LawKind::DebitCreditEffectEquality,
                 DecisionScope::Committing,
+                no_genesis()?,
+            ),
+            513 => (
+                LawKind::RejectNoAuthority,
+                DecisionScope::Reject,
                 no_genesis()?,
             ),
             _ => return Err(BindingError("a new law needs a reviewed runtime binding")),
@@ -265,7 +272,7 @@ pub fn manifest() -> Result<LawManifest, BindingError> {
         LawDefinition::try_new(
             id(REJECT_PUBLISHES_NOTHING)?,
             name("reject_publishes_nothing")?,
-            LawKind::RejectNoAuthority,
+            LawKind::AuthoritySubjectRecipient,
             DecisionScope::Reject,
             no_genesis()?,
             digest(

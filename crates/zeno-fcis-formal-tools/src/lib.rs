@@ -27,7 +27,63 @@ use spec_authoring::{
 };
 /// Pinned independent certificate checking with immutable input custody.
 pub mod certificate;
+mod lean_inductive;
 mod model_diagnostics;
+
+#[cfg(test)]
+mod recursive_circuit_tests {
+    use super::*;
+
+    #[test]
+    fn recursive_circuit_exports_share_nodes_and_diagnostics_bound_work() {
+        let source = "zeno 1; project 1 recursion; type 100 state S; type 105 int V in 0..=1;
+            table 110 100 edge 105 size 2;
+            derived table 700 x[i] in table 110 rounds 2 {
+                when true then pre.100.110[i] == 1 || exists j in table 110 { x[j] };
+                default false;
+            };
+            claim 800 reachable z3 relational = x[0];";
+        let parsed = spec_authoring::parse_project(source, spec_authoring::SourceLimits::default())
+            .unwrap_or_else(|e| panic!("{e}"));
+        let spec =
+            spec_authoring::elaborate_project(parsed, spec_authoring::ProjectLimits::default())
+                .unwrap_or_else(|e| panic!("{e}"));
+        let claim = &spec.claims()[0];
+        let exported = export_smt(claim, ToolBackend::Z3).unwrap_or_else(|e| panic!("{e:?}"));
+        let text = std::str::from_utf8(exported.source()).unwrap_or_else(|e| panic!("{e}"));
+        assert!(text.contains("(let ((circuit_"));
+        let ClaimFormula::Relational(formula) = claim.formula() else {
+            panic!("relational claim")
+        };
+        let observations = [110, 111].map(|id| {
+            ModelObservation::new(
+                ProjectionPath::try_new(
+                    ProjectionRoot::Pre,
+                    vec![
+                        StableId::new(100).unwrap_or_else(|| unreachable!()),
+                        StableId::new(id).unwrap_or_else(|| unreachable!()),
+                    ],
+                )
+                .unwrap_or_else(|| unreachable!()),
+                i128::from(id == 111),
+            )
+        });
+        let step = ModelStep::try_new(observations.to_vec()).unwrap_or_else(|| unreachable!());
+        assert_eq!(
+            check_relation(
+                formula,
+                ModelContext::new(&step, DiagnosticLimits::default())
+            ),
+            DiagnosticOutcome::True
+        );
+        let tiny = DiagnosticLimits::try_new(1, 1, 1).unwrap_or_else(|| unreachable!());
+        assert_eq!(
+            check_relation(formula, ModelContext::new(&step, tiny)),
+            DiagnosticOutcome::Indeterminate(ModelReason::ResourceLimit)
+        );
+    }
+}
+pub use lean_inductive::{export_inductive_lean, export_inductive_lean_with_limits};
 use model_diagnostics::{
     DiagnosticLimits, DiagnosticOutcome, ModelContext, ModelObservation, ModelReason, ModelStep,
     TemporalDiagnosis, check_relation, check_trace,
@@ -167,6 +223,8 @@ impl Default for ExportLimits {
 }
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+/// Names tried for one private executable copy before admission fails.
+const MAX_PRIVATE_NAME_ATTEMPTS: u32 = 1024;
 
 fn open_untrusted_read(path: &Path) -> std::io::Result<File> {
     let mut options = OpenOptions::new();
@@ -485,6 +543,8 @@ pub enum ToolFailure {
     UnsupportedEvidence,
     ModelReplayFailed,
     LeanAxiomReport,
+    /// A reported dependency outside the fixed constructive axiom ceiling.
+    DisallowedLeanAxiom(String),
     Io(String),
 }
 
@@ -852,6 +912,31 @@ fn lean_executable_relative(config: &ToolConfig, runtime: &ToolRuntimeConfig) ->
     Some(relative.to_path_buf())
 }
 
+/// Atomically claims a fresh shell-owned path. PIDs can repeat across namespaces
+/// sharing a temporary root, and a killed run can leave its files behind. A name
+/// collision is not permission to reuse, truncate or remove the existing path.
+fn fresh_temporary<T>(
+    name: &str,
+    extension: &str,
+    mut create: impl FnMut(&Path) -> std::io::Result<T>,
+) -> Result<(PathBuf, T), ToolFailure> {
+    for _ in 0..128 {
+        let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "zeno-fcis-{name}-{}-{sequence}{extension}",
+            std::process::id()
+        ));
+        match create(&path) {
+            Ok(value) => return Ok((path, value)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(ToolFailure::Io(error.to_string())),
+        }
+    }
+    Err(ToolFailure::Io(
+        "temporary path collision limit (128)".into(),
+    ))
+}
+
 struct PrivateExecutable {
     path: PathBuf,
 }
@@ -860,17 +945,7 @@ impl PrivateExecutable {
         Self::create_named(&format!("{backend:?}"), bytes)
     }
     fn create_named(name: &str, bytes: &[u8]) -> Result<Self, ToolFailure> {
-        let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let extension = if cfg!(windows) { ".exe" } else { "" };
-        let path = std::env::temp_dir().join(format!(
-            "zeno-fcis-checked-{}-{name}-{sequence}{extension}",
-            std::process::id()
-        ));
-        let mut file = OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&path)
-            .map_err(|error| ToolFailure::Io(error.to_string()))?;
+        let (path, mut file) = Self::new_file(name)?;
         let result = (|| {
             file.write_all(bytes)?;
             #[cfg(unix)]
@@ -887,6 +962,31 @@ impl PrivateExecutable {
             return Err(ToolFailure::Io(error.to_string()));
         }
         Ok(Self { path })
+    }
+    /// Creates a new, exclusive file for one copy. A process killed before
+    /// `Drop` leaves its copy behind, and runs in fresh PID namespaces reuse
+    /// process IDs, so a name may already be taken: take the next sequence
+    /// number instead of failing admission. Existing files are never opened.
+    fn new_file(name: &str) -> Result<(PathBuf, fs::File), ToolFailure> {
+        let extension = if cfg!(windows) { ".exe" } else { "" };
+        for _ in 0..MAX_PRIVATE_NAME_ATTEMPTS {
+            let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+            let path = Self::path_for(name, sequence, extension);
+            match OpenOptions::new().create_new(true).write(true).open(&path) {
+                Ok(file) => return Ok((path, file)),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+                Err(error) => return Err(ToolFailure::Io(error.to_string())),
+            }
+        }
+        Err(ToolFailure::Io(format!(
+            "no free private executable name after {MAX_PRIVATE_NAME_ATTEMPTS} attempts"
+        )))
+    }
+    fn path_for(name: &str, sequence: u64, extension: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "zeno-fcis-checked-{}-{name}-{sequence}{extension}",
+            std::process::id()
+        ))
     }
     fn path(&self) -> &Path {
         &self.path
@@ -1251,6 +1351,8 @@ impl ExportedObligation {
 /// by the committing decisions they are enforced on.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct StepHypotheses {
+    /// Paths whose integer range is asserted by the exporter.
+    paths: BTreeSet<ProjectionPath>,
     every_commit: Box<[LawDecl]>,
     accepts: Box<[LawDecl]>,
     committed_failures: Box<[LawDecl]>,
@@ -1259,6 +1361,11 @@ pub struct StepHypotheses {
     domains: BTreeMap<ProjectionPath, DeclaredDomain>,
 }
 impl StepHypotheses {
+    /// Every observed path whose i128 range the inductive exporter asserts.
+    #[must_use]
+    pub const fn paths(&self) -> &BTreeSet<ProjectionPath> {
+        &self.paths
+    }
     /// Laws assumed for every committing decision.
     #[must_use]
     pub const fn every_commit(&self) -> &[LawDecl] {
@@ -1359,6 +1466,8 @@ impl ObligationScope {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum ExportError {
+    /// The complete subject uses unsigned scalar semantics outside this exporter.
+    U128SubjectUnsupported,
     BackendNotSelected,
     UnsupportedMode,
     InvalidFormula,
@@ -1447,6 +1556,30 @@ fn preflight_smt(claim: &ClaimDecl, limits: ExportLimits) -> Result<(), ExportEr
         let next_depth = depth.checked_add(1).ok_or(ExportError::ResourceLimit)?;
         match node {
             ExportNode::Rel(value) => match value {
+                RelExpr::Circuit(c) => {
+                    nodes = nodes
+                        .checked_add(c.nodes().len())
+                        .ok_or(ExportError::ResourceLimit)?;
+                    operations = operations
+                        .checked_add(
+                            (c.nodes().len() as u64)
+                                .checked_mul(render_multiplier)
+                                .ok_or(ExportError::ResourceLimit)?,
+                        )
+                        .ok_or(ExportError::ResourceLimit)?;
+                    if nodes > limits.max_formula_nodes() || operations > limits.max_operations() {
+                        return Err(ExportError::ResourceLimit);
+                    }
+                    for f in c.formulas() {
+                        push_export_node(
+                            &mut stack,
+                            ExportNode::Rel(f),
+                            next_depth,
+                            render_multiplier,
+                            limits,
+                        )?;
+                    }
+                }
                 RelExpr::Bool(_) => {}
                 RelExpr::Not(value) => push_export_node(
                     &mut stack,
@@ -1517,9 +1650,30 @@ fn preflight_smt(claim: &ClaimDecl, limits: ExportLimits) -> Result<(), ExportEr
                 }
             },
             ExportNode::Value(value) => match value {
-                ValueExpr::SignedMulDivFloor(..)
+                ValueExpr::U128(..)
+                | ValueExpr::ToI128(..)
+                | ValueExpr::ToU128(..)
+                | ValueExpr::SignedMulDivFloor(..)
                 | ValueExpr::ScaledMulDiv(..)
                 | ValueExpr::RepeatMulDiv(..) => return Err(ExportError::UnsupportedMode),
+                ValueExpr::Select(c, a, b) => {
+                    push_export_node(
+                        &mut stack,
+                        ExportNode::Rel(c),
+                        next_depth,
+                        render_multiplier,
+                        limits,
+                    )?;
+                    for child in [a, b] {
+                        push_export_node(
+                            &mut stack,
+                            ExportNode::Value(child),
+                            next_depth,
+                            render_multiplier,
+                            limits,
+                        )?;
+                    }
+                }
                 ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
                 ValueExpr::MulDiv(_, a, b, d) => {
                     for child in [a, b, d] {
@@ -1652,6 +1806,12 @@ pub fn export_smt_with_limits(
     backend: ToolBackend,
     limits: ExportLimits,
 ) -> Result<ExportedObligation, ExportError> {
+    if match claim.formula() {
+        ClaimFormula::Relational(v) => v.uses_u128(),
+        ClaimFormula::Temporal(v) => v.uses_u128(),
+    } {
+        return Err(ExportError::U128SubjectUnsupported);
+    }
     if !matches!(backend, ToolBackend::Cvc5 | ToolBackend::Z3)
         || !claim.backends().contains(&backend.spec_backend())
     {
@@ -1751,6 +1911,9 @@ pub fn export_inductive_smt_with_limits(
     backend: ToolBackend,
     limits: ExportLimits,
 ) -> Result<ExportedObligation, ExportError> {
+    if spec.uses_u128() {
+        return Err(ExportError::U128SubjectUnsupported);
+    }
     if !matches!(backend, ToolBackend::Cvc5 | ToolBackend::Z3)
         || !claim.backends().contains(&backend.spec_backend())
     {
@@ -1828,6 +1991,7 @@ pub fn export_inductive_smt_with_limits(
         let name = smt_path(path, 0);
         source.push_str(&format!("(declare-const {name} Int)\n"));
         source.push_str(&format!("(assert {})\n", smt_i128_range(&name)));
+        hypotheses.paths.insert(path.clone());
         if let Some(domain) = declared_domain(spec, path) {
             let member = match &domain {
                 DeclaredDomain::Values(values) => smt_or(
@@ -1915,6 +2079,7 @@ fn step_hypotheses(claim: &ClaimDecl, laws: &[LawDecl]) -> Result<StepHypotheses
         Ok(resolved.into_boxed_slice())
     };
     Ok(StepHypotheses {
+        paths: BTreeSet::new(),
         every_commit: resolve(assumptions.every_commit())?,
         accepts: resolve(assumptions.accepts())?,
         committed_failures: resolve(assumptions.committed_failures())?,
@@ -2163,6 +2328,7 @@ fn failure_record(failure: &ToolFailure) -> Result<Vec<u8>, ToolFailure> {
         ToolFailure::ModelReplayFailed => (19, None),
         ToolFailure::LeanAxiomReport => (20, None),
         ToolFailure::Io(message) => (21, Some(message.as_bytes().to_vec())),
+        ToolFailure::DisallowedLeanAxiom(name) => (22, Some(name.as_bytes().to_vec())),
     };
     let mut bytes = vec![tag];
     if let Some(detail) = detail {
@@ -2239,6 +2405,12 @@ pub fn execute_tool(
     obligation: ExportedObligation,
 ) -> Result<ToolRun, ToolFailure> {
     if config.backend != obligation.backend {
+        return Err(ToolFailure::UnsupportedEvidence);
+    }
+    if config.backend == ToolBackend::Lean
+        && matches!(obligation.claim.mode(), ClaimMode::Inductive)
+        && !lean_inductive::source_is_bound(&obligation)
+    {
         return Err(ToolFailure::UnsupportedEvidence);
     }
     let checked = check_tool(config)?;
@@ -2729,10 +2901,31 @@ fn classify(
         {
             ToolRunStatus::Blocked(ToolFailure::UnsupportedEvidence)
         }
-        ToolBackend::Lean => match parse_lean_axioms(&text) {
-            Some(axioms) if axioms == config.allowed_axioms => ToolRunStatus::KernelChecked,
-            _ => ToolRunStatus::Blocked(ToolFailure::LeanAxiomReport),
-        },
+        ToolBackend::Lean
+            if matches!(obligation.claim.mode(), ClaimMode::Inductive)
+                && (!lean_inductive::source_is_bound(obligation)
+                    || !lean_inductive::theorem_report_is_bound(&text)) =>
+        {
+            ToolRunStatus::Blocked(ToolFailure::UnsupportedEvidence)
+        }
+        ToolBackend::Lean => {
+            let Some(axioms) = parse_lean_axioms(&text) else {
+                return ToolRunStatus::Blocked(ToolFailure::LeanAxiomReport);
+            };
+            // A manifest may narrow admission, but cannot authorize classical
+            // choice, native evaluation or any other unreviewed dependency.
+            if let Some(name) = axioms
+                .iter()
+                .find(|name| !matches!(name.as_str(), "propext" | "Quot.sound"))
+            {
+                return ToolRunStatus::Blocked(ToolFailure::DisallowedLeanAxiom(name.clone()));
+            }
+            if axioms == config.allowed_axioms {
+                ToolRunStatus::KernelChecked
+            } else {
+                ToolRunStatus::Blocked(ToolFailure::LeanAxiomReport)
+            }
+        }
     }
 }
 
@@ -2769,6 +2962,7 @@ fn failure_name(failure: &ToolFailure) -> &'static str {
         ToolFailure::UnsupportedEvidence => "unsupported_evidence",
         ToolFailure::ModelReplayFailed => "model_replay_failed",
         ToolFailure::LeanAxiomReport => "lean_axiom_report",
+        ToolFailure::DisallowedLeanAxiom(_) => "disallowed_lean_axiom",
         ToolFailure::Io(_) => "io",
     }
 }
@@ -3097,9 +3291,22 @@ fn run_fixed_unix(
         })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    #[cfg(target_os = "macos")]
+    let anchor = MacProcessGroup::new(
+        working_directory.path(),
+        start,
+        Duration::from_millis(timeout_ms),
+    )?;
+    #[cfg(target_os = "macos")]
+    command.process_group(anchor.pid()?);
+    #[cfg(not(target_os = "macos"))]
     command.process_group(0);
     let child = spawn_unless_busy(&mut command, start, Duration::from_millis(timeout_ms))?;
-    let mut child = ContainedChild::new(child)?;
+    let mut child = ContainedChild::new(
+        child,
+        #[cfg(target_os = "macos")]
+        anchor,
+    )?;
     let stdout = child
         .child
         .stdout
@@ -3140,14 +3347,12 @@ struct PrivateWorkingDirectory {
 #[cfg(unix)]
 impl PrivateWorkingDirectory {
     fn create() -> Result<Self, ToolFailure> {
-        let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let path =
-            std::env::temp_dir().join(format!("zeno-fcis-work-{}-{sequence}", std::process::id()));
-        fs::create_dir(&path).map_err(|error| ToolFailure::Io(error.to_string()))?;
+        let (path, ()) = fresh_temporary("work", "", |path| fs::create_dir(path))?;
+        let directory = Self { path };
         use std::os::unix::fs::PermissionsExt as _;
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))
             .map_err(|error| ToolFailure::Io(error.to_string()))?;
-        Ok(Self { path })
+        Ok(directory)
     }
     fn path(&self) -> &Path {
         &self.path
@@ -3160,24 +3365,71 @@ impl Drop for PrivateWorkingDirectory {
     }
 }
 
+// Darwin can return EPERM for a zombie-only process group. Keep a live,
+// owned member until signalling the group, rather than accepting permission
+// errors. Its unreaped PID also reserves the group identity after try_wait
+// reaps the target. This is process supervision, not a security sandbox.
+#[cfg(target_os = "macos")]
+struct MacProcessGroup(Child);
+#[cfg(target_os = "macos")]
+impl MacProcessGroup {
+    fn new(cwd: &Path, start: Instant, budget: Duration) -> Result<Self, ToolFailure> {
+        use std::os::unix::process::CommandExt as _;
+
+        let mut command = Command::new("/bin/cat");
+        command
+            .env_clear()
+            .current_dir(cwd)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(0);
+        // Both helper and target startup share the original operation budget.
+        // The parent's held pipe keeps the helper alive; parent death closes it.
+        spawn_unless_busy(&mut command, start, budget).map(Self)
+    }
+
+    fn pid(&self) -> Result<i32, ToolFailure> {
+        i32::try_from(self.0.id()).map_err(|_| ToolFailure::ProcessContainmentFailed)
+    }
+}
+#[cfg(target_os = "macos")]
+impl Drop for MacProcessGroup {
+    fn drop(&mut self) {
+        // Also runs when target startup fails, before ContainedChild exists.
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
 #[cfg(unix)]
 struct ContainedChild {
     child: Child,
     process_group: nix::unistd::Pid,
     armed: bool,
+    #[cfg(target_os = "macos")]
+    _anchor: MacProcessGroup,
 }
 #[cfg(unix)]
 impl ContainedChild {
-    fn new(mut child: Child) -> Result<Self, ToolFailure> {
-        let raw = i32::try_from(child.id()).map_err(|_| {
+    fn new(
+        mut child: Child,
+        #[cfg(target_os = "macos")] anchor: MacProcessGroup,
+    ) -> Result<Self, ToolFailure> {
+        #[cfg(target_os = "macos")]
+        let raw = anchor.pid();
+        #[cfg(not(target_os = "macos"))]
+        let raw = i32::try_from(child.id()).map_err(|_| ToolFailure::ProcessContainmentFailed);
+        let raw = raw.inspect_err(|_| {
             let _ = child.kill();
             let _ = child.wait();
-            ToolFailure::ProcessContainmentFailed
         })?;
         Ok(Self {
             child,
             process_group: nix::unistd::Pid::from_raw(raw),
             armed: true,
+            #[cfg(target_os = "macos")]
+            _anchor: anchor,
         })
     }
 
@@ -3558,6 +3810,15 @@ fn render_value_smt(
 ) -> Result<SmtValue, ExportError> {
     budget.operation()?;
     let rendered = match value {
+        ValueExpr::Select(c, a, b) => {
+            let c = render_rel_smt(c, step, environment, budget)?;
+            let a = render_value_smt(a, step, environment, budget)?;
+            let b = render_value_smt(b, step, environment, budget)?;
+            SmtValue {
+                term: format!("(ite {} {} {})", c.term, a.term, b.term),
+                defined: smt_and(vec![c.defined, a.defined, b.defined]),
+            }
+        }
         ValueExpr::Int(value) => SmtValue {
             term: smt_int(*value),
             defined: "true".to_owned(),
@@ -3597,7 +3858,10 @@ fn render_value_smt(
         // backend has no matching full-product semantics: refuse, never emit
         // an intermediate signed multiplication with different overflow rules.
         ValueExpr::MulDiv(..) => return Err(ExportError::UnsupportedMode),
-        ValueExpr::SignedMulDivFloor(..)
+        ValueExpr::U128(..)
+        | ValueExpr::ToI128(..)
+        | ValueExpr::ToU128(..)
+        | ValueExpr::SignedMulDivFloor(..)
         | ValueExpr::ScaledMulDiv(..)
         | ValueExpr::RepeatMulDiv(..) => return Err(ExportError::UnsupportedMode),
         ValueExpr::Div(mode, left, right) => {
@@ -3673,6 +3937,35 @@ fn render_rel_smt(
 ) -> Result<SmtBool, ExportError> {
     budget.operation()?;
     let rendered = match value {
+        RelExpr::Circuit(c) => {
+            use zeno_fcis_spec::BoolNode;
+            let mut term = String::new();
+            let mut defined = Vec::new();
+            for (i, node) in c.nodes().iter().enumerate() {
+                budget.operation()?;
+                let value = match node {
+                    BoolNode::Formula(f) => {
+                        let v = render_rel_smt(f, step, environment, budget)?;
+                        defined.push(v.defined);
+                        v.term
+                    }
+                    BoolNode::Literal(v) => v.to_string(),
+                    BoolNode::Not(a) => format!("(not circuit_{a})"),
+                    BoolNode::And(a, b) => format!("(and circuit_{a} circuit_{b})"),
+                    BoolNode::Or(a, b) => format!("(or circuit_{a} circuit_{b})"),
+                    BoolNode::Select(c, a, b) => {
+                        format!("(ite circuit_{c} circuit_{a} circuit_{b})")
+                    }
+                };
+                term.push_str(&format!("(let ((circuit_{i} {value})) "));
+            }
+            term.push_str(&format!("circuit_{}", c.output()));
+            term.extend(core::iter::repeat_n(')', c.nodes().len()));
+            SmtBool {
+                term,
+                defined: smt_and(defined),
+            }
+        }
         RelExpr::Bool(value) => SmtBool {
             term: value.to_string(),
             defined: "true".to_owned(),
@@ -3961,19 +4254,24 @@ fn collect_rel(
     predicates: &mut BTreeMap<Identifier, usize>,
 ) {
     match value {
+        RelExpr::Circuit(c) => {
+            for f in c.formulas() {
+                collect_rel(f, paths, predicates);
+            }
+        }
         RelExpr::Not(value) => collect_rel(value, paths, predicates),
         RelExpr::And(a, b) | RelExpr::Or(a, b) | RelExpr::Implies(a, b) => {
             collect_rel(a, paths, predicates);
             collect_rel(b, paths, predicates)
         }
         RelExpr::Compare(_, a, b) => {
-            collect_value(a, paths);
-            collect_value(b, paths)
+            collect_value(a, paths, predicates);
+            collect_value(b, paths, predicates)
         }
         RelExpr::Predicate { name, arguments } => {
             predicates.insert(name.clone(), arguments.len());
             for argument in arguments.iter() {
-                collect_value(argument, paths)
+                collect_value(argument, paths, predicates)
             }
         }
         RelExpr::ForAll { body, .. } | RelExpr::Exists { body, .. } => {
@@ -3999,8 +4297,17 @@ fn collect_temporal(
         }
     }
 }
-fn collect_value(value: &ValueExpr, paths: &mut BTreeSet<ProjectionPath>) {
+fn collect_value(
+    value: &ValueExpr,
+    paths: &mut BTreeSet<ProjectionPath>,
+    predicates: &mut BTreeMap<Identifier, usize>,
+) {
     match value {
+        ValueExpr::Select(c, a, b) => {
+            collect_rel(c, paths, predicates);
+            collect_value(a, paths, predicates);
+            collect_value(b, paths, predicates);
+        }
         ValueExpr::Projection(path) => {
             paths.insert(path.clone());
         }
@@ -4008,23 +4315,25 @@ fn collect_value(value: &ValueExpr, paths: &mut BTreeSet<ProjectionPath>) {
         | ValueExpr::Sub(a, b)
         | ValueExpr::Mul(a, b)
         | ValueExpr::Div(_, a, b) => {
-            collect_value(a, paths);
-            collect_value(b, paths)
+            collect_value(a, paths, predicates);
+            collect_value(b, paths, predicates)
         }
         ValueExpr::SignedMulDivFloor(a, b, d)
         | ValueExpr::ScaledMulDiv(_, _, a, b, d, _)
         | ValueExpr::RepeatMulDiv(_, a, b, d, _) => {
-            collect_value(a, paths);
-            collect_value(b, paths);
-            collect_value(d, paths);
+            collect_value(a, paths, predicates);
+            collect_value(b, paths, predicates);
+            collect_value(d, paths, predicates);
         }
-        ValueExpr::Sum { body, .. } => collect_value(body, paths),
+        ValueExpr::ToI128(body) | ValueExpr::ToU128(body) | ValueExpr::Sum { body, .. } => {
+            collect_value(body, paths, predicates)
+        }
         ValueExpr::MulDiv(_, a, b, d) => {
-            collect_value(a, paths);
-            collect_value(b, paths);
-            collect_value(d, paths);
+            collect_value(a, paths, predicates);
+            collect_value(b, paths, predicates);
+            collect_value(d, paths, predicates);
         }
-        ValueExpr::Int(_) | ValueExpr::Var(_) => {}
+        ValueExpr::U128(_) | ValueExpr::Int(_) | ValueExpr::Var(_) => {}
     }
 }
 
@@ -4751,7 +5060,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     fn busy_executables_are_retried_briefly_then_fail_closed() {
         use std::os::unix::fs::PermissionsExt as _;
 
@@ -4826,6 +5135,93 @@ mod tests {
             Err(other) => panic!("unexpected {other:?}"),
         }
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn exhausted_process_budget_starts_nothing() {
+        match spawn_unless_busy(&mut Command::new("/bin/sh"), Instant::now(), Duration::ZERO) {
+            Err(ToolFailure::Timeout) => {}
+            Ok(mut child) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("an exhausted budget started a process");
+            }
+            Err(other) => panic!("unexpected {other:?}"),
+        }
+        #[cfg(target_os = "macos")]
+        assert!(matches!(
+            MacProcessGroup::new(Path::new("/"), Instant::now(), Duration::ZERO),
+            Err(ToolFailure::Timeout)
+        ));
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn macos_group_identity_survives_target_exit_and_is_reaped_after_cleanup() {
+        use nix::{
+            errno::Errno,
+            sys::{signal::killpg, wait::waitpid},
+            unistd::Pid,
+        };
+        use std::os::unix::process::CommandExt as _;
+
+        let anchor = MacProcessGroup::new(Path::new("/"), Instant::now(), Duration::from_secs(1))
+            .unwrap_or_else(|error| panic!("start group anchor: {error:?}"));
+        let group = anchor.pid().unwrap_or_else(|_| unreachable!());
+        let target = Command::new("/usr/bin/true")
+            .process_group(group)
+            .spawn()
+            .unwrap_or_else(|error| panic!("start target: {error}"));
+        let mut child = ContainedChild::new(target, anchor).unwrap_or_else(|_| unreachable!());
+        assert!(
+            child
+                .child
+                .wait()
+                .unwrap_or_else(|_| unreachable!())
+                .success()
+        );
+        // The target is reaped, but a live owned member still reserves the group.
+        assert_eq!(killpg(Pid::from_raw(group), None), Ok(()));
+        assert_eq!(child.terminate(true), Ok(()));
+        drop(child);
+        assert_eq!(waitpid(Pid::from_raw(group), None), Err(Errno::ECHILD));
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn macos_group_anchor_is_reaped_on_setup_failure_and_cancellation() {
+        use nix::{errno::Errno, sys::wait::waitpid, unistd::Pid};
+        use std::os::unix::process::CommandExt as _;
+
+        let anchor = MacProcessGroup::new(Path::new("/"), Instant::now(), Duration::from_secs(1))
+            .unwrap_or_else(|error| panic!("start group anchor: {error:?}"));
+        let group = anchor.pid().unwrap_or_else(|_| unreachable!());
+        assert!(
+            Command::new("/zeno-fcis-missing-executable")
+                .process_group(group)
+                .spawn()
+                .is_err()
+        );
+        drop(anchor);
+        assert_eq!(waitpid(Pid::from_raw(group), None), Err(Errno::ECHILD));
+
+        let anchor = MacProcessGroup::new(Path::new("/"), Instant::now(), Duration::from_secs(1))
+            .unwrap_or_else(|error| panic!("start cancellation anchor: {error:?}"));
+        let group = anchor.pid().unwrap_or_else(|_| unreachable!());
+        let target = Command::new("/bin/cat")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(group)
+            .spawn()
+            .unwrap_or_else(|_| unreachable!());
+        let target_pid =
+            Pid::from_raw(i32::try_from(target.id()).unwrap_or_else(|_| unreachable!()));
+        // Dropping an unfinished guard must kill and reap both owned children.
+        drop(ContainedChild::new(target, anchor).unwrap_or_else(|_| unreachable!()));
+        assert_eq!(waitpid(target_pid, None), Err(Errno::ECHILD));
+        assert_eq!(waitpid(Pid::from_raw(group), None), Err(Errno::ECHILD));
     }
 
     #[test]
@@ -6095,6 +6491,31 @@ mod tests {
     }
 
     #[test]
+    fn private_executable_skips_a_copy_left_by_a_killed_process() {
+        // A killed run leaves `zeno-fcis-checked-PID-NAME-SEQ`; a later run with
+        // the same process ID must take another name, not fail admission.
+        let name = "StaleCopyRegression";
+        let next = TEMP_SEQUENCE.load(Ordering::Relaxed);
+        let stale: Vec<PathBuf> = (next..next + 64)
+            .map(|sequence| PrivateExecutable::path_for(name, sequence, ""))
+            .collect();
+        for path in &stale {
+            fs::write(path, b"stale").unwrap_or_else(|error| panic!("plant stale copy: {error}"));
+        }
+        let admitted = PrivateExecutable::create_named(name, b"fresh")
+            .unwrap_or_else(|error| panic!("admit beside stale copies: {error:?}"));
+        assert!(!stale.contains(&admitted.path().to_path_buf()));
+        assert_eq!(
+            fs::read(admitted.path()).ok().as_deref(),
+            Some(&b"fresh"[..])
+        );
+        for path in &stale {
+            assert_eq!(fs::read(path).ok().as_deref(), Some(&b"stale"[..]));
+            let _ = fs::remove_file(path);
+        }
+    }
+
+    #[test]
     fn rc3_private_executable_preserves_the_admitted_bytes() {
         let executable = std::env::current_exe()
             .unwrap_or_else(|error| panic!("locate test executable: {error}"));
@@ -6630,7 +7051,7 @@ mod tests {
         std::mem::forget(descendant);
         let marker = root.join("descendant");
         for _ in 0..200 {
-            if marker.exists() {
+            if fs::metadata(&marker).is_ok_and(|metadata| metadata.len() > 0) {
                 return;
             }
             thread::sleep(Duration::from_millis(5));
@@ -6679,7 +7100,7 @@ mod tests {
         std::mem::forget(descendant);
         let marker = root.join("descendant");
         for _ in 0..200 {
-            if marker.exists() {
+            if fs::metadata(&marker).is_ok_and(|metadata| metadata.len() > 0) {
                 return;
             }
             thread::sleep(Duration::from_millis(5));
@@ -6698,6 +7119,83 @@ mod tests {
         fs::write(root.join("descendant"), std::process::id().to_string())
             .unwrap_or_else(|error| panic!("write descendant pid: {error}"));
         thread::sleep(Duration::from_secs(30));
+    }
+
+    #[test]
+    fn solver_paths_are_fresh_and_occupied_files_are_preserved() {
+        let mut occupied = None;
+        let mut attempts = 0;
+        let result = fresh_temporary("solver-collision-test", "", |path| {
+            attempts += 1;
+            if occupied.is_none() {
+                fs::write(path, b"another live solver")?;
+                occupied = Some(path.to_path_buf());
+            }
+            OpenOptions::new().create_new(true).write(true).open(path)
+        });
+        let path = occupied.unwrap_or_else(|| panic!("allocation was never attempted"));
+        let contents = fs::read(&path);
+        fs::remove_file(&path).unwrap_or_else(|error| panic!("remove sentinel: {error}"));
+        let (fresh_path, error) = match result {
+            Ok((path, file)) => {
+                drop(file);
+                (Some(path), None)
+            }
+            Err(error) => (None, Some(error)),
+        };
+        if let Some(path) = &fresh_path {
+            fs::remove_file(path).unwrap_or_else(|error| panic!("remove fresh file: {error}"));
+        }
+        assert!(
+            error.is_none(),
+            "occupied solver path must be skipped: {error:?}"
+        );
+        assert_eq!(attempts, 2, "one occupied name followed by a fresh name");
+        assert_eq!(
+            contents.unwrap_or_else(|error| panic!("read sentinel: {error}")),
+            b"another live solver"
+        );
+        assert_ne!(fresh_path, Some(path));
+
+        let first = PrivateExecutable::create_named("solver-fresh-test", b"first");
+        let second = PrivateExecutable::create_named("solver-fresh-test", b"second");
+        assert!(
+            first.is_ok() && second.is_ok(),
+            "live solvers need separate files"
+        );
+        let (first, second) = (
+            first.unwrap_or_else(|error| panic!("first solver: {error:?}")),
+            second.unwrap_or_else(|error| panic!("second solver: {error:?}")),
+        );
+        assert_ne!(first.path(), second.path());
+        assert_eq!(
+            fs::read(first.path()).unwrap_or_else(|error| panic!("read first: {error}")),
+            b"first"
+        );
+        assert_eq!(
+            fs::read(second.path()).unwrap_or_else(|error| panic!("read second: {error}")),
+            b"second"
+        );
+    }
+
+    #[test]
+    fn fresh_solver_path_retries_are_bounded_and_other_errors_stop() {
+        let mut attempts = 0;
+        let result = fresh_temporary("solver-budget-test", "", |_| {
+            attempts += 1;
+            Err::<(), _>(std::io::Error::from(std::io::ErrorKind::AlreadyExists))
+        });
+        assert!(
+            matches!(result, Err(ToolFailure::Io(ref reason)) if reason == "temporary path collision limit (128)")
+        );
+        assert_eq!(attempts, 128);
+        attempts = 0;
+        let result = fresh_temporary("solver-error-test", "", |_| {
+            attempts += 1;
+            Err::<(), _>(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
+        });
+        assert!(matches!(result, Err(ToolFailure::Io(_))));
+        assert_eq!(attempts, 1);
     }
 
     /// A stand-in solver that answers each script by the `answer=` marker the
@@ -6828,3 +7326,54 @@ mod legacy_cli;
 #[cfg(test)]
 #[path = "../../../verification/kernel-laws/src/oracle/formal_tools/model_comparison.rs"]
 mod model_comparison;
+#[cfg(test)]
+mod u128_binding_tests {
+    use super::*;
+    struct Missing;
+    impl original_logic::PredicateProvider for Missing {
+        fn evaluate(&self, _: &Identifier, _: &[i128]) -> Option<bool> {
+            None
+        }
+    }
+    #[test]
+    fn u128_exporters_and_kernel_oracles_refuse_before_short_circuit() {
+        for value in [0, 1, u128::MAX] {
+            let formula = RelExpr::And(
+                Box::new(RelExpr::Bool(false)),
+                Box::new(RelExpr::Compare(
+                    CompareOp::Eq,
+                    ValueExpr::U128(value),
+                    ValueExpr::U128(value),
+                )),
+            );
+            let claim = ClaimDecl::new(
+                StableId::new(600).unwrap_or_else(|| panic!("required value missing")),
+                Identifier::try_new("unsigned_check")
+                    .unwrap_or_else(|| panic!("required value missing")),
+                vec![BackendId::Z3],
+                ClaimMode::Relational,
+                ClaimFormula::Relational(formula.clone()),
+            );
+            assert_eq!(
+                export_smt(&claim, ToolBackend::Z3).map_or_else(
+                    |error| error,
+                    |value| panic!("expected refusal, got {value:?}")
+                ),
+                ExportError::U128SubjectUnsupported
+            );
+            let step = original_logic::TraceStep::try_new(vec![])
+                .unwrap_or_else(|| panic!("required value missing"));
+            let context = original_logic::EvaluationContext::new(
+                &step,
+                &Missing,
+                original_logic::EvalLimits::default(),
+            );
+            assert_eq!(
+                original_logic::evaluate_relational(&formula, context),
+                original_logic::EvalOutcome::Indeterminate(
+                    original_logic::IndeterminateReason::U128SubjectUnsupported
+                )
+            );
+        }
+    }
+}

@@ -1,6 +1,6 @@
 # Wide values and larger decision programs
 
-This document describes wide values in the current 2.5.0 release source. The
+This document describes wide values in the current 2.6.0 release source. The
 historical
 [2.3.0 release notes](RELEASE_NOTES.md#historical-230-source-and-qualification)
 state that source line's scope and limits; the earlier public candidates have

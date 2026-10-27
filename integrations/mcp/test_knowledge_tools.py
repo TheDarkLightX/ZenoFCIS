@@ -21,13 +21,21 @@ class KnowledgeTools(unittest.TestCase):
             self.assertNotIn('--out',actual.args[0])
             return actual.args[0]
 
-    def test_only_three_readonly_tools_are_exported(self):
-        self.assertEqual({f.__name__ for f in K.TOOLS},{'kb_advise','kb_plan','kb_explain'})
+    def test_only_readonly_tools_are_exported(self):
+        self.assertEqual({f.__name__ for f in K.TOOLS},{'kb_advise','kb_plan','kb_explain','kb_assessment_view'})
         self.assertTrue(K.ANNOTATIONS['readOnlyHint'])
         self.assertFalse(K.ANNOTATIONS['destructiveHint'])
         self.assertEqual(self.call(K.kb_advise,[], 'task(subject,sample).')[2],'advise')
         self.assertEqual(self.call(K.kb_plan,['/tmp/zeno-fcis-test-a','/tmp/zeno-fcis-test-b'],'task(subject,sample).','original','examples').count('--kb'),2)
         self.assertIn('usage_applies(L,S)',self.call(K.kb_explain,[],'task(subject,sample).','usage_applies(L,S)'))
+
+    def test_assessment_view_has_no_write_path(self):
+        for view, operation in (("assessments", "assessment-view"), ("queue", "assessment-queue"), ("leaderboard", "leaderboard"), ("telemetry", "telemetry")):
+            command = self.call(K.kb_assessment_view, [], view)
+            self.assertEqual(command[2], operation)
+            self.assertNotIn("--task", command)
+        for view in ("assess", "curate", "reuse", "grow", "refresh"):
+            with self.assertRaises(K.KnowledgeToolError): K.kb_assessment_view([], view)
 
     def test_refuses_write_operation_and_invalid_argument_shapes(self):
         with self.assertRaisesRegex(K.KnowledgeToolError,'operation-refused'):K._invoke('replay',[],'')

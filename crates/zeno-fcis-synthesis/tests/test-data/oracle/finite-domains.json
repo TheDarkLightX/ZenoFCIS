@@ -1,0 +1,33 @@
+{
+  "account_capacity": 4,
+  "bond": {
+    "case_count": 3801600,
+    "commands": "24 command variants x two actors x now0..4 x submitted_nonce0..4; every BondCommand has a legitimate accept; unknown references, duplicate IDs, invalid verdicts and guard conflicts included",
+    "state_product": "8 exact templates: absent,reserved,published,cleared,open-unslashed,open-slashed,resolved-rejected,resolved-upheld; held and equal owner/challenger wallet atoms 0..2; Active or Unbonding exit=0; clear_after and exposure_until independently 0..4 (absent template both0); retained epoch/nonce=0; IDs/report/scheme are fixed opaque byte subjects; exact template constructor is source-pinned",
+    "states": 3168
+  },
+  "limits": {
+    "Byte": 10000000,
+    "Read": 10000000,
+    "Step": 10000000,
+    "WitnessByte": 10000000
+  },
+  "native_fixture_bounds": {
+    "B": 1000000,
+    "C": 64,
+    "F": 2000000,
+    "I": 8192
+  },
+  "nonclaims": "Exhaustive for these declared factored state projections only. These do not enumerate the full Cartesian product of oracle, consumer, custody, keys or all independent epoch/nonce/history coordinates. Other finite domains and actual signed native journeys are separate evidence. No live parameter or parametric proof.",
+  "phase": "pre-run frozen declaration",
+  "profile": "oracle-finite-accounting-projections/1",
+  "relation_sha256": "5505642c98aa7acc1aa9839644d54980c79d0cf91e39de5fda77c2071c2b296c",
+  "result_domain": "all 32 ordered reasons or complete owned successor; independent equality fixes the entire frame, no law 991; undefined and budget are failures",
+  "rewards": {
+    "case_count": 2073600,
+    "commands": "12 variants x two actors x now0..4 x submitted_nonce0..4; every RewardCommand has a legitimate accept",
+    "state_product": "two beneficiaries and claims, each independently absent/Held/Paid/ClawedBack; remaining0..2; two independent wallet balances0..2; cleared bool; none/open/upheld/rejected dispute; exact funded conservation; fixed epoch/nonce=0",
+    "states": 3456
+  },
+  "test_only": true
+}

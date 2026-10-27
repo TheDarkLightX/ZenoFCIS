@@ -16,7 +16,7 @@ failed logins. It shows five patterns:
   account. CVC5 attests the induction step over those ranges, and
   `tests/claims.rs` checks the rest of the argument.
 
-The original privately retained decision was written by hand in `src/program.rs`. The original law checker in
+The privately retained LLM-generated decision is in `src/program.rs`. The original law checker in
 `src/laws.rs` evaluates the formulas in `project.zeno` against every decision
 the program makes, and refuses any decision that breaks them.
 
@@ -99,8 +99,37 @@ Every decision is checked at run time, before it can be published:
 - law 502: an unlock requires `admin` and clears the lock and the count;
 - law 503: a failed login is recorded, and the third in a row locks the
   account for 900 seconds;
-- in Rust, because formulas cannot see them: the rejection reason, the exact
-  alert, the absence of effects, and a zero genesis.
+- law 504: a rejection requires the first documented guard and its exact reason;
+- law 505: a committed failed login names reason 203;
+- law 510: a third failure sends exactly one `Locked` alert with `now + 900`,
+  an administrator unlock sends exactly one `Unlocked` alert with deadline 0,
+  and other committing actions send no alert;
+- law 511: every required alert goes to `security-team` on channel 300.
+
+The delivery laws observe the actual candidate outbox, including its count,
+kind, deadline and destination. The schema and framework additionally check
+the exact initial state, empty effects and rejection without publication.
+These independent laws also apply to a separately compiled replacement policy;
+the policy's own conformance identity is a separate check.
+
+### Policy for the owner
+
+- Equal timestamps remain allowed. A successful login keeps an expired deadline.
+- An authorized administrator may unlock before expiry and sends an `Unlocked`
+  alert even when the account is already unlocked.
+- The declared clock has a maximum. A lock beyond that maximum needs an
+  available administrator to clear it; no clock rollover is introduced.
+
+### Background and scope
+
+The relational obligations follow C. A. R. Hoare, "An Axiomatic Basis for
+Computer Programming," Communications of the ACM, 1969. Finite-domain checking
+follows E. M. Clarke, E. A. Emerson and A. P. Sistla, "Automatic Verification of
+Finite-State Concurrent Systems Using Temporal Logic Specifications," ACM
+Transactions on Programming Languages and Systems, 1986. This example applies
+the existing library interpreter to the stated account rules; it claims no new
+verification method. Clock boundary tests sample the declared time range;
+they do not enumerate every timestamp or authenticate the supplied context.
 
 Law 500 is also claimed by induction, for `zeno-fcis prove`:
 
@@ -153,9 +182,10 @@ negative time, from which law 503 constrains only `last_seen`. With
 refutes the step, and two tests fail: the ranges no longer agree with the
 program, and the schema admits a count of 3.
 
-A rejection publishes nothing by construction: a rejected decision carries no
-patch, effect, or outbox entry, and the law framework records law 509 as
-satisfied for every rejection. That law has no formula, so `profile.rs`
+A rejection publishes nothing: a rejected decision carries no
+patch, effect, or outbox entry, and the law framework checks structural law
+909 for every rejection. Adding declared rejection law 504 gives this
+structural check its separate framework identifier. It has no formula, so `profile.rs`
 registers it instead of `project.zeno` carrying an always-true placeholder.
 As a result, this passes:
 
@@ -273,19 +303,31 @@ is shared.
    ```
 
    Z3 also answered `unsat`. Z3 proof checking is unsupported for these inductive claims, so the run is
-   recorded as blocked evidence, with exit code 2. There is no Lean export
-   for inductive claims, so `--backend lean` selects nothing.
+   recorded as blocked evidence, with exit code 2.
 
    ```text
    $ zeno-fcis prove project.zeno --claim 600 --backend z3 --tools zeno-fcis.tools.json
    z3 claim 600 blocked: UnsupportedEvidence
    z3 claim 600 assumes laws [] on every commit, [501, 502] on accepts, [503] on committed failures
    (exit 2)
-   $ zeno-fcis prove project.zeno --claim 600 --backend lean --tools zeno-fcis.tools.json
-   claim 600 does not select compatible lean
-   no compatible claim/backend pair was selected
-   (exit 2)
    ```
+
+   The development candidate routes claim 600 through `--backend lean`.
+   The 2026-10-19 run used the pinned Lean 4.30.0 runtime and an explicit
+   manifest allowing exactly `propext` and `Quot.sound`. Its recorded
+   output includes:
+
+   ```text
+   $ zeno-fcis prove project.zeno --claim 600 --backend lean --tools zeno-fcis.tools.json
+   lean claim 600: generated theorem kernel checked
+   (exit 0)
+   ```
+
+   Its finite-history theorem is conditional on the invariant holding at the
+   application's exact initial state. Both `step_preserves` and `history_holds`
+   report exactly those two axioms; neither depends on `Classical.choice`.
+   The ignored `pinned_lean_kernel_checks_both_inductive_pilots_through_prove`
+   test checks this CLI route and its retained source-bound evidence.
 
    In the historical 1.1.0 run, the same control command on a copy whose three integer types
    declare no range printed, for CVC5:
@@ -332,7 +374,8 @@ It does not say:
   agree, on every input of its grid;
 - that the step is proved: CVC5's `unsat` is attested; `prove` exits 2, and
   the proof text is not checked. Z3's `unsat` is recorded as unsupported
-  evidence, and there is no Lean export for inductive claims;
+  evidence. The new restricted Lean route still requires its pinned kernel
+  check; the solver observations above do not establish that result;
 - anything outside the declared ranges: the step assumes them. That no
   committed account leaves them is the schema's doing, which the authority
   checks at admission, at genesis, and on every transition.

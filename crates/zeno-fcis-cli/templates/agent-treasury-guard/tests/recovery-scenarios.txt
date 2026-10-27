@@ -1,0 +1,7 @@
+# scenario last_tick_cannot_create_unrecoverable_intent
+6 1 0 0 170 0 0 175 173 1 1 0 0 178 11 1 11 180 | reject 213 6 1 0 0 170 0 0 | -
+# scenario agent_recovers_last_safe_proposal
+6 1 0 0 170 0 0 175 173 1 1 0 0 178 9 1 9 180 | accept - 5 1 1 9 171 1 1 | 300 9 183 184 1 1 11
+5 1 1 9 171 1 1 185 173 1 0 9 0 178 10 1 0 182 | reject 214 5 1 1 9 171 1 1 | -
+5 1 1 9 171 1 1 185 173 1 0 9 0 178 11 1 0 182 | accept - 6 1 1 11 170 0 0 | -
+6 1 1 11 170 0 0 185 173 1 0 9 0 178 11 1 0 182 | reject 201 6 1 1 11 170 0 0 | -

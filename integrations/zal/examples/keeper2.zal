@@ -1,0 +1,28 @@
+zal 2;
+# The keeper's view of one withdrawal lane: every event is a tick, and the
+# tick's context says whether an alarm is raised and whether a request
+# arrived since the last tick. The controller is the withdrawal lane's.
+machine withdrawal_keeper;
+states idle, waiting;
+events tick;
+context alarm, request;
+var pause in 0..=2 initially 0;
+var must_serve in 0..=1 initially 0;
+initial idle;
+step atomic; frame control_and_variables;
+default reject not_enabled unchanged;
+rule idle_count: idle + tick [pause > 0 & !request] -> accept idle, pause -= 1;
+rule idle_alarm: idle + tick [pause == 0 & alarm & !request] -> accept idle, pause = 2;
+rule idle_quiet: idle + tick [pause == 0 & !alarm & !request] -> accept idle;
+rule arrive_count: idle + tick [pause == 2 & request] -> accept waiting, pause -= 1;
+rule arrive_last: idle + tick [pause == 1 & request] -> accept waiting, pause = 0, must_serve = 1;
+rule arrive_alarm: idle + tick [pause == 0 & alarm & request] -> accept waiting, pause = 2;
+rule arrive_quiet: idle + tick [pause == 0 & !alarm & request] -> accept waiting;
+rule wait_count: waiting + tick [pause == 2] -> accept waiting, pause -= 1;
+rule wait_last: waiting + tick [pause == 1] -> accept waiting, pause = 0, must_serve = 1;
+rule wait_alarm: waiting + tick [pause == 0 & alarm & must_serve == 0] -> accept waiting, pause = 2;
+rule pay: waiting + tick [pause == 0 & (!alarm | must_serve == 1)] -> accept idle, must_serve = 0;
+invariant must_serve_only_when_due: must_serve == 1 => (pause == 0 & state == waiting);
+property paid_within_four_ticks: always((state == idle & state' == waiting) => within(4, state == waiting & state' == idle));
+property must_serve_pays_next: always((state' == waiting & must_serve' == 1) => next(state' == idle));
+property no_payout_while_paused: never(pause > 0 & state == waiting & state' == idle);

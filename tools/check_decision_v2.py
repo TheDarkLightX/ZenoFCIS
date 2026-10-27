@@ -229,4 +229,12 @@ def main():
     args.out.parent.mkdir(parents=True,exist_ok=True);args.out.write_text(json.dumps(receipt,sort_keys=True,indent=2)+'\n');print(receipt['status'])
     if receipt['status']!='passed':print(receipt['error']);return 1
     return 0
-if __name__=='__main__':raise SystemExit(main())
+if __name__ == "__main__":
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

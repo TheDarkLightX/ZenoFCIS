@@ -1,0 +1,57 @@
+{
+  "format": "zenoui/metadata/1",
+  "title": "Inventory",
+  "action": "command.101.120",
+  "fields": {
+    "pre.100.110": {
+      "label": "Available stock",
+      "unit": "items"
+    },
+    "pre.100.111": {
+      "label": "Reserved stock",
+      "unit": "items"
+    },
+    "command.101.120": {
+      "label": "Command",
+      "unit": "unitless"
+    },
+    "command.101.121": {
+      "label": "Quantity",
+      "unit": "items"
+    },
+    "context.102.130": {
+      "label": "Operator permission supplied",
+      "unit": "unitless"
+    }
+  },
+  "variants": {
+    "150": "Reserve",
+    "151": "Release",
+    "152": "Ship",
+    "153": "Restock"
+  },
+  "commands": {
+    "150": {
+      "label": "Reserve",
+      "consequential": true
+    },
+    "151": {
+      "label": "Release",
+      "consequential": true
+    },
+    "152": {
+      "label": "Ship",
+      "consequential": true
+    },
+    "153": {
+      "label": "Restock",
+      "consequential": true
+    }
+  },
+  "reasons": {
+    "200": "Operator permission is required. Set the local permission context before trying again.",
+    "201": "There are not enough available items. Restock or choose a smaller quantity.",
+    "202": "There are not enough reserved items. Reserve items or choose a smaller quantity.",
+    "203": "This would exceed the receiving stock capacity of 5 items. Choose a smaller quantity."
+  }
+}

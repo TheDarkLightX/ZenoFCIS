@@ -58,6 +58,24 @@ class PrivacyTests(unittest.TestCase):
             scan.inspect(entry[0], data)
             self.assertEqual(scan.report()["status"], "failed")
 
+    def test_refused_token_reports_only_hashes_and_offsets_for_review(self):
+        token = b"sk-" + b"A" * 50
+        data = b"prefix\n" + token + b"\nsuffix"
+        scan = Scan()
+        scan.inspect("binaries/program", data)
+        report = scan.report()
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(report["allowlisted_matches"], 0)
+        self.assertEqual(len(scan.findings), 1)
+        finding = scan.findings[0]
+        self.assertEqual(finding["file_sha256"], hashlib.sha256(data).hexdigest())
+        self.assertEqual(finding["match_sha256"], hashlib.sha256(token).hexdigest())
+        match = PATTERNS["model-api-token"].search(data)
+        self.assertEqual(finding["fingerprint_sha256"], match_fingerprint(data, match))
+        self.assertEqual((finding["offset"], finding["length"], finding["line"]), (7, 53, 2))
+        self.assertNotIn(token.decode(), json.dumps(report))
+        self.assertNotIn("prefix", json.dumps(report))
+
     def test_allowlisting_one_match_does_not_hide_another_secret_in_the_same_file(self):
         literal = b"sk-" + b"public_literal_" * 5
         secret = b"identifier_prefix_" + b"sk-" + b"A" * 50

@@ -133,6 +133,10 @@ impl<M: PersistentMap> BoundedMap<M> {
     pub fn entries(&self) -> Vec<LogicalEntry> {
         self.map.to_entries()
     }
+    /// Fallibly materializes the logical map, revalidating canonical encoded keys.
+    pub fn try_to_value_map(&self) -> Result<Value, MapError> {
+        self.map.try_to_value_map()
+    }
     /// Validates the value, then item bytes, capacity and full snapshot bytes.
     /// Replacement at capacity is permitted. Refusal preserves every old snapshot.
     pub fn insert(&self, entry: LogicalEntry) -> Result<Self, BoundedError> {

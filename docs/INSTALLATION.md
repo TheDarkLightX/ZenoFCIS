@@ -1,13 +1,14 @@
 # Installation
 
-ZenoFCIS [2.5.0 is released](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.5.0).
-ZenoFCIS 2.3.0 introduced the first stable V2 line.
-The initial 2.5.0 release set includes the **Linux x86_64 GNU** CLI archive
-and offline Rustdoc. The **macOS on Apple silicon** archive is deferred until
-native platform validation is complete. The signed `DOWNLOADS.sha256` on the
-release page lists the assets available to install.
+ZenoFCIS `2.6.0` is the current release source. Final qualification and
+publication remain pending. ZenoFCIS 2.3.0 introduced the first stable V2 line.
+The intended 2.6.0 release set includes the **Linux x86_64 GNU** CLI archive
+and offline Rustdoc. The **macOS on Apple silicon** archive follows native
+platform validation. After qualification and publication, the signed
+`DOWNLOADS.sha256` on the release page will list the assets available to
+install.
 [Supported hosts](#supported-hosts) gives each host's requirements and
-qualification boundary. The [2.5.0 release notes](RELEASE_NOTES.md) describe
+qualification boundary. The [2.6.0 release notes](RELEASE_NOTES.md) describe
 the release's scope.
 
 Applications use the V2 API from the matching source tag, as
@@ -27,8 +28,8 @@ exact source pins, signed checksum assets and qualification limits.
   need). Ubuntu 24.04, where they were built, ships glibc 2.39. On an older
   glibc, such as Ubuntu 22.04's 2.35, the dynamic loader refuses to start the
   executable and names the missing `GLIBC_2.39` version.
-- **macOS on Apple silicon** (`aarch64-apple-darwin`): deferred from the initial
-  publication. The optional release workflow builds this archive on GitHub's macOS 15 arm64 image
+- **macOS on Apple silicon** (`aarch64-apple-darwin`): added after native
+  platform validation. The optional release workflow builds this archive on GitHub's macOS 15 arm64 image
   (`macos-15`), with a minimum-version field of macOS 11.0. The archive joins
   the release set only if an installed-binary journey passes on that image.
   Qualification is bound to the matching workflow run, and other macOS
@@ -37,10 +38,11 @@ exact source pins, signed checksum assets and qualification limits.
   Building from the matching source tag on those hosts may work, but it is not
   qualified.
 
-## Install the 2.5.0 CLI
+## Install the 2.6.0 CLI
 
-The signed `DOWNLOADS.sha256` lists the Linux archive. In the directory where you
-want to keep the archive and the executable, set `export VERSION=2.5.0`, then
+Once the qualified 2.6.0 release is published and its signed `DOWNLOADS.sha256`
+lists the Linux archive, use the commands below. In the directory where you
+want to keep the archive and the executable, set `export VERSION=2.6.0`, then
 run:
 
 <!-- installed-journey: x86_64-unknown-linux-gnu -->
@@ -51,7 +53,8 @@ curl --fail --location --output "$ARCHIVE.tar.gz" \
   "https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v$VERSION/$ARCHIVE.tar.gz"
 curl --fail --location --output DOWNLOADS.sha256 \
   "https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v$VERSION/DOWNLOADS.sha256"
-sha256sum --ignore-missing --check DOWNLOADS.sha256
+awk -v archive="$ARCHIVE.tar.gz" '$2 == archive { print; found=1 } END { if (!found) exit 1 }' \
+  DOWNLOADS.sha256 | sha256sum --check -
 tar -xzf "$ARCHIVE.tar.gz"
 export PATH="$PWD/$ARCHIVE:$PATH"
 zeno-fcis describe
@@ -61,11 +64,11 @@ The executable sits in the archive's top-level directory, beside its README
 and licenses. Keep that directory and add it to your shell's `PATH` to use the
 CLI in later sessions.
 
-`--ignore-missing` checks the downloaded assets listed in the flat
-`DOWNLOADS.sha256`; it does not check assets you have not downloaded. Verify
-the published release's [detached checksum signature](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.5.0/DOWNLOADS.sha256.sig)
+The exact archive filename must appear in `DOWNLOADS.sha256`; a missing entry
+or checksum mismatch stops installation. Other assets need not be downloaded. Verify
+the published release's [detached checksum signature](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.6.0/DOWNLOADS.sha256.sig)
 separately, under your trusted signing-key policy. That published release must
-also provide the [signing key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.5.0/RELEASE-SIGNING-KEY.pub).
+also provide the [signing key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.6.0/RELEASE-SIGNING-KEY.pub).
 Downloading it beside the artifacts does not independently establish trust, so
 confirm its fingerprint through a trusted channel. See
 [Verify downloads](#verify-downloads).
@@ -75,10 +78,10 @@ The older prerelease downloads, source pins and signatures stay in the
 
 ## Install on macOS (Apple silicon)
 
-The initial release does not include a macOS archive. After native validation,
-check that the release's signed `DOWNLOADS.sha256` lists
-`zeno-fcis-2.5.0-aarch64-apple-darwin.tar.gz`. Then set
-`export VERSION=2.5.0` in your shell and run:
+After the qualified 2.6.0 release is published, and once native validation
+adds the macOS archive, check that its signed `DOWNLOADS.sha256` lists
+`zeno-fcis-2.6.0-aarch64-apple-darwin.tar.gz`. Then set
+`export VERSION=2.6.0` in your shell and run:
 
 <!-- installed-journey: aarch64-apple-darwin -->
 ```bash
@@ -88,14 +91,15 @@ curl --fail --location --output "$ARCHIVE.tar.gz" \
   "https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v$VERSION/$ARCHIVE.tar.gz"
 curl --fail --location --output DOWNLOADS.sha256 \
   "https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v$VERSION/DOWNLOADS.sha256"
-grep "  $ARCHIVE.tar.gz\$" DOWNLOADS.sha256 | shasum -a 256 -c -
+awk -v archive="$ARCHIVE.tar.gz" '$2 == archive { print; found=1 } END { if (!found) exit 1 }' \
+  DOWNLOADS.sha256 | shasum -a 256 -c -
 tar -xzf "$ARCHIVE.tar.gz"
 export PATH="$PWD/$ARCHIVE:$PATH"
 zeno-fcis describe
 ```
 
-`shasum -a 256 -c -` checks only the line that `grep` selects, so this step
-does not depend on `--ignore-missing`. The executable is arm64 only, and its
+`shasum -a 256 -c -` checks the exact archive filename selected by `awk`;
+a missing entry or checksum mismatch stops installation. The executable is arm64 only, and its
 minimum-version field is macOS 11.0. The release workflow runs it only on the
 macOS 15 arm64 image.
 
@@ -131,16 +135,30 @@ platforms. `F_FULLFSYNC` asks the drive to flush its write cache. On every
 platform, durability against power loss still depends on the drive honouring
 the syncs it is asked for.
 
-### Linux-only features on macOS
+### Runtime conformance and Linux-only features on macOS
+
+Source builds support `synth verify` on Linux and macOS for Rust 1.97.1,
+Python 3 and Node.js 22. The runner checks the regenerated artifact, executes
+the exact emitted function over every admitted input, and records a separate
+finite-conformance receipt with no application authority. Each subprocess has
+a 30-second startup-inclusive deadline and a 32-MiB bound per output stream.
+On macOS, an owned live process-group member retains the group identity until
+cleanup, including when the target exits first. Failed setup, execution,
+capture or cleanup cannot produce a passing receipt.
+
+This is bounded process supervision, not a security sandbox for arbitrary
+executables. Use trusted compilers/interpreters and the registered emitters;
+the command executes regenerated code, not a supplied replacement source.
+Dynamic dependencies and runtime correctness remain external premises.
+Processes that deliberately leave the owned group and abrupt termination of
+the supervisor are outside its cleanup guarantee. A finite-conformance pass
+does not qualify the separate contained checker runtime or production trust.
 
 On macOS these features are unavailable or unqualified:
 
 - **Contained checker runtime** (`loop` commands and
   `transform check --offline-parallel`): exits 2 with an inconclusive result
   and does nothing; see [contained checker runtime](#contained-checker-runtime).
-- **`synth verify` execution of emitted code**: exits 2 with
-  `conformance-unknown` and code `unsupported-runtime-platform`, and writes no
-  receipt. `synth discover` and `synth run` work.
 - **Lean evidence**: the qualified Lean distribution is the pinned Linux x86-64
   tree, so a result from any other Lean installation stays blocked as
   unqualified evidence. The pinned CVC5 and Z3 binaries are also Linux x86-64.
@@ -171,12 +189,14 @@ The current V2 API uses source or path dependencies on the source tag that
 matches your CLI. The historical `1.1.0` package keeps its own V1 API. Follow
 the release's source pin when you build generated applications.
 
-Use the source tag that matches the installed CLI. Clone it into a fresh directory:
+Before publication, use an explicitly pinned, reviewed source checkout. Once
+the matching 2.6.0 release and its source tag are published, clone into a fresh
+directory:
 
 ```bash
-git clone --branch v2.5.0 --depth 1 https://github.com/TheDarkLightX/ZenoFCIS.git ZenoFCIS
+git clone --branch v2.6.0 --depth 1 https://github.com/TheDarkLightX/ZenoFCIS.git ZenoFCIS
 git -C ZenoFCIS rev-parse HEAD
-# Expected: the source commit named on the v2.5.0 release page
+# Expected: the source commit named on the v2.6.0 release page
 zeno-fcis new my-counter --template durable-counter --source "$PWD/ZenoFCIS"
 ```
 
@@ -186,7 +206,7 @@ lockfile to that tree; keep the source and follow the generated README. The
 historical prerelease source and binary-build revisions stay in the
 [release-candidate record](RELEASE_CANDIDATES.md).
 
-An application beside that 2.5.0 source checkout can use:
+An application beside that 2.6.0 source checkout can use:
 
 ```toml
 [dependencies]

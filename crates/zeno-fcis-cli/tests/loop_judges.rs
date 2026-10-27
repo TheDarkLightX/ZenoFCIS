@@ -37,6 +37,39 @@ impl Directory {
         path.to_string_lossy().into_owned()
     }
 
+    /// Historical incomplete-law specimens keep the gap-discovery tests meaningful.
+    fn incomplete_contract(&self, family: &str, parameters: &[(&str, i128)]) -> String {
+        let app = self.contract(family, parameters);
+        let project = Path::new(&app).join("project.zeno");
+        let source = fs::read_to_string(&project)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        fs::write(
+            &project,
+            source
+                .split("// Independent complete relation")
+                .next()
+                .unwrap_or_else(|| panic!("required value missing")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        let policy = Path::new(&app).join("v2/policy.json");
+        let mut rules: Value = serde_json::from_str(
+            &fs::read_to_string(&policy)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        rules["law_kinds"]
+            .as_object_mut()
+            .unwrap_or_else(|| panic!("required value missing"))
+            .retain(|id, _| {
+                id.parse::<u32>()
+                    .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                    < 520
+            });
+        fs::write(policy, rules.to_string())
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        app
+    }
+
     /// A core component instantiated from its templates.
     fn contract(&self, family: &str, parameters: &[(&str, i128)]) -> String {
         let base = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -86,6 +119,201 @@ fn answers(items: &[Value]) -> Value {
     json!({"schema": "zeno-fcis/loop-answers/1", "answers": items})
 }
 
+fn counter_with_law(directory: &Directory, scope: &str, predicate: &str) -> String {
+    let app = directory.contract("bounded-counter", &[("C", 1)]);
+    let project = Path::new(&app).join("project.zeno");
+    let mut source = fs::read_to_string(&project)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    source.push_str(&format!(
+        "\nlaw 550 contradiction on {scope} = {predicate};\n"
+    ));
+    fs::write(project, source).unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let policy = Path::new(&app).join("v2/policy.json");
+    let mut rules: Value = serde_json::from_str(
+        &fs::read_to_string(&policy)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    rules["law_kinds"]["550"] = json!("AuthoritySubjectRecipient");
+    fs::write(policy, rules.to_string())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    app
+}
+
+fn assert_zero_outcome_question(scope: &str, predicate: &str, zero: u64) {
+    let directory = Directory::new();
+    let app = counter_with_law(&directory, scope, predicate);
+    let (exit, report) = run(&["loop", "question", "--contract", &app]);
+    assert_eq!(exit, Some(1), "{report}");
+    assert_eq!(report["status"], "inconsistent", "{report}");
+    let stats = &report["detail"]["stats"];
+    assert_eq!(stats["tuples"], 8);
+    assert_eq!(stats["inconsistent"], zero);
+    assert_eq!(stats["reference_refused"], zero);
+    assert_eq!(stats["determined"], 8 - zero);
+    assert_eq!(stats["determined_rate"], (8 - zero) as f64 / 8.0);
+    let residuals = report["detail"]["residual_witnesses"]
+        .as_array()
+        .unwrap_or_else(|| panic!("required value missing"));
+    assert_eq!(residuals.len() as u64, zero);
+    for residual in residuals {
+        assert_eq!(residual["lawful_outcomes"], 0);
+        assert_eq!(residual["reason"], "zero-lawful-outcomes");
+        assert!(
+            residual["input_ordinal"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("required value missing"))
+                < 8
+        );
+        assert!(residual["row"].is_object());
+        assert!(
+            residual["laws"]
+                .as_array()
+                .unwrap_or_else(|| panic!("required value missing"))
+                .contains(&json!(550))
+        );
+        assert_eq!(residual["execution_refusal"]["law"], 550);
+    }
+}
+
+#[test]
+fn a63_round2_contradictory_reason_laws_remain_residual() {
+    assert_zero_outcome_question("reject:200", "context.102.130 == 1", 4);
+}
+
+#[test]
+fn a63_round2_accept_false_remains_residual() {
+    assert_zero_outcome_question("accept", "false", 2);
+}
+
+#[test]
+fn a63_round2_execution_refusals_preserve_the_law_relation() {
+    let directory = Directory::new();
+    let app = directory.contract("bounded-counter", &[("C", 1)]);
+    let policy = Path::new(&app).join("v2/policy.json");
+    let mut rules: Value = serde_json::from_str(
+        &fs::read_to_string(&policy)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    rules["cases"][0]["when"] = json!("true");
+    fs::write(policy, rules.to_string())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let (exit, report) = run(&["loop", "question", "--contract", &app]);
+    assert_eq!(exit, Some(2), "{report}");
+    assert_eq!(report["status"], "incomplete", "{report}");
+    let stats = &report["detail"]["stats"];
+    assert_eq!(stats["tuples"], 8);
+    assert_eq!(stats["inconsistent"], 0);
+    assert_eq!(stats["reference_refused"], 4);
+    assert_eq!(stats["determined"], 4);
+    assert_eq!(stats["determined_rate"], 0.5);
+    let residuals = report["detail"]["residual_witnesses"]
+        .as_array()
+        .unwrap_or_else(|| panic!("required value missing"));
+    assert_eq!(residuals.len(), 4);
+    for residual in residuals {
+        assert_eq!(residual["lawful_outcomes"], 1);
+        assert_eq!(residual["reason"], "execution-refusal");
+    }
+}
+
+fn assert_question_delivery_profile(delivers: bool) {
+    let directory = Directory::new();
+    let app = directory.contract("bounded-counter", &[("C", 1)]);
+    let project = Path::new(&app).join("project.zeno");
+    let mut source = fs::read_to_string(&project)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    source.push_str("\ntype 103 destination Sink;\ntype 104 payload Notice;\nfield 132 104 count 105;\nchannel 300 notify destination 103 payload 104;\n");
+    fs::write(&project, &source)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let policy = Path::new(&app).join("v2/policy.json");
+    let mut rules: Value = serde_json::from_str(
+        &fs::read_to_string(&policy)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    rules["leaf_bindings"]["103"] = json!(["Text", 1, 32]);
+    if delivers {
+        rules["cases"][4]["outbox"] = json!([{"ordinal":0,"channel":300,"destination":"sink","payload":{"132":"value"},"idempotency_ordinal":0}]);
+    }
+    fs::write(&policy, rules.to_string())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let policy_before =
+        fs::read(&policy).unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let review_path = directory.0.join("review.json");
+    let (review_exit, _) = run(&[
+        "contract",
+        "review",
+        &app,
+        "--gaps",
+        "--format",
+        "json",
+        "--out",
+        review_path
+            .to_str()
+            .unwrap_or_else(|| panic!("required value missing")),
+    ]);
+    let review: Value = serde_json::from_slice(
+        &fs::read(review_path).unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    assert_eq!(review_exit, Some(0), "{review}");
+    assert_eq!(review["gaps"]["status"], "measured");
+    assert_eq!(review["gaps"]["frame_check"]["mismatches"], 0);
+    assert_eq!(review["gaps"]["admissible"]["full"]["determined"], 6);
+    assert_eq!(review["gaps"]["admissible"]["full"]["undetermined"], 2);
+    for entries in [
+        None,
+        Some(vec![]),
+        Some(vec![
+            json!({"where":"!authorized","class":"Reject","reason":"not_authorized"}),
+        ]),
+    ] {
+        let mut args = vec!["loop", "question", "--contract", &app];
+        let path = entries.map(|items| directory.json("answers.json", &answers(&items)));
+        if let Some(path) = &path {
+            args.extend(["--answers", path]);
+        }
+        let (exit, report) = run(&args);
+        assert_eq!(exit, review_exit, "{report}");
+        assert_eq!(report["status"], "open", "{report}");
+        assert_eq!(
+            report["detail"]["stats"]["determined"],
+            review["gaps"]["admissible"]["full"]["determined"],
+            "{report}"
+        );
+        assert_eq!(
+            report["detail"]["stats"]["inconsistent"],
+            review["gaps"]["admissible"]["full"]["zero_outcome"]
+        );
+        assert!(
+            report["detail"]["question"]["delivery_choices"]
+                .as_array()
+                .is_some_and(|v| v.len() >= 2)
+        );
+    }
+    assert_eq!(
+        fs::read_to_string(project)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        source
+    );
+    assert_eq!(
+        fs::read(policy).unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        policy_before
+    );
+}
+
+#[test]
+fn a63_round2_eventful_question_matches_the_gap_profile() {
+    assert_question_delivery_profile(true);
+}
+
+#[test]
+fn a63_round2_unused_channel_question_matches_the_gap_profile() {
+    assert_question_delivery_profile(false);
+}
+
 fn arithmetic_contract(directory: &Directory, successor: &str, condition: &str) -> String {
     let app = directory.0.join("arithmetic");
     fs::create_dir_all(app.join("v2")).unwrap_or_else(|e| panic!("{e:?}"));
@@ -128,7 +356,7 @@ fn arithmetic_teach_back_cli_rejects_wrong_rounding_and_undefined_successors() {
             "--rule",
             &rules,
         ]);
-        assert_eq!(exit, Some(0), "{report}");
+        assert_eq!(exit, Some(1), "{report}");
         assert_eq!(report["authority"], "none");
         let judged = &report["detail"]["rules"];
         assert_eq!(judged[0]["verdict"], "exact", "{report}");
@@ -167,7 +395,7 @@ fn arithmetic_teach_back_cli_checks_both_product_conditions() {
             "--rule",
             &rules,
         ]);
-        assert_eq!(exit, Some(0), "{report}");
+        assert_eq!(exit, Some(1), "{report}");
         let judged = &report["detail"]["rules"];
         assert_eq!(judged[0]["verdict"], "exact", "{report}");
         assert_eq!(judged[1]["verdict"], "wrong", "{report}");
@@ -239,10 +467,12 @@ law 501 toggle on accept = post.100.110 == 1 - pre.100.110;
         "--answers",
         &answer,
     ]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     assert_eq!(report["detail"]["answers"][0]["status"], "disagreement");
     assert_eq!(report["detail"]["stats"]["inconsistent"], 0);
-    assert_eq!(report["detail"]["stats"]["determined"], 2);
+    assert_eq!(report["detail"]["stats"]["disagreements"], 2);
+    // A unique lawful outcome that disagrees with the Authority is not determined.
+    assert_eq!(report["detail"]["stats"]["determined"], 0);
 
     // Keep unanswerable but admissible classes visible with an explicit limit.
     policy["cases"][0]["class"] = json!("CommittedFailure");
@@ -274,7 +504,7 @@ law 501 toggle on accept = post.100.110 == 1 - pre.100.110;
 #[test]
 fn the_largest_open_region_becomes_an_exact_question_and_answers_pin_it() {
     let directory = Directory::new();
-    let c8 = directory.contract("bounded-counter", &[("C", 8)]);
+    let c8 = directory.incomplete_contract("bounded-counter", &[("C", 8)]);
     let (exit, report) = run(&["loop", "question", "--contract", &c8]);
     assert_eq!(exit, Some(0), "{report}");
     assert_eq!(report["schema"], "zeno-fcis/loop-doors/2");
@@ -326,7 +556,7 @@ fn the_largest_open_region_becomes_an_exact_question_and_answers_pin_it() {
     let other = json!({"where": "!authorized", "class": "Reject", "reason": "at_zero", "case": 0});
     let path = directory.json("other.json", &answers(&[other]));
     let (exit, report) = run(&["loop", "question", "--contract", &c8, "--answers", &path]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     let answer = &report["detail"]["answers"][0];
     assert_eq!(answer["status"], "disagreement");
     assert_eq!(answer["disagreement"]["inputs"], 18);
@@ -335,7 +565,7 @@ fn the_largest_open_region_becomes_an_exact_question_and_answers_pin_it() {
     let reject = json!({"where": "authorized && action == Inc && value == 3", "class": "Reject", "reason": "at_capacity"});
     let path = directory.json("reject.json", &answers(std::slice::from_ref(&reject)));
     let (exit, report) = run(&["loop", "question", "--contract", &c8, "--answers", &path]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     let answer = &report["detail"]["answers"][0];
     assert_eq!(answer["status"], "disagreement");
     assert!(answer["false_alarm"]["law"].is_u64(), "{report}");
@@ -362,9 +592,38 @@ fn the_largest_open_region_becomes_an_exact_question_and_answers_pin_it() {
 }
 
 #[test]
+fn teach_back_verdict_exits_distinguish_holds_wrong_and_vacuous() {
+    let directory = Directory::new();
+    let app = directory.incomplete_contract("bounded-counter", &[("C", 1)]);
+    for (name, condition, class, reason, exit, verdict) in [
+        (
+            "positive",
+            "!authorized",
+            "Reject",
+            json!("not_authorized"),
+            0,
+            "exact",
+        ),
+        ("negative", "!authorized", "Accept", Value::Null, 1, "wrong"),
+        ("unknown", "false", "Accept", Value::Null, 2, "vacuous"),
+    ] {
+        let rules = directory.json(
+            &format!("{name}.json"),
+            &json!({
+                "schema": "zeno-fcis/loop-rules/1",
+                "rules": [{"id": name, "where": condition, "class": class, "reason": reason}]
+            }),
+        );
+        let (code, report) = run(&["loop", "teach-back", "--contract", &app, "--rule", &rules]);
+        assert_eq!(code, Some(exit), "{report}");
+        assert_eq!(report["detail"]["rules"][0]["verdict"], verdict, "{report}");
+    }
+}
+
+#[test]
 fn rules_are_judged_exactly_with_regions_and_a_summary() {
     let directory = Directory::new();
-    let c3 = directory.contract("bounded-counter", &[("C", 3)]);
+    let c3 = directory.incomplete_contract("bounded-counter", &[("C", 3)]);
     let rule = |id: &str, where_: &str, class: &str, reason: Value, sets: Value| {
         let mut out = json!({"id": id, "where": where_, "class": class, "reason": reason});
         if !sets.is_null() {
@@ -380,7 +639,7 @@ fn rules_are_judged_exactly_with_regions_and_a_summary() {
     ]});
     let path = directory.json("rules.json", &rules);
     let (exit, report) = run(&["loop", "teach-back", "--contract", &c3, "--rule", &path]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     let judged = &report["detail"]["rules"];
     assert_eq!(judged[0]["verdict"], "exact");
     assert_eq!(judged[1]["verdict"], "wrong");
@@ -437,7 +696,7 @@ fn architecture(components: &[Value]) -> Value {
 #[test]
 fn a_decomposition_is_projected_explained_or_blamed() {
     let directory = Directory::new();
-    let c3 = directory.contract("bounded-counter", &[("C", 3)]);
+    let c3 = directory.incomplete_contract("bounded-counter", &[("C", 3)]);
     let guard = json!({"name": "guard", "reads": ["authorized"], "decides": ["not_authorized"]});
     // a skeleton: both case tables are projected from the core
     let path = directory.json(
@@ -540,7 +799,7 @@ fn a_decomposition_is_projected_explained_or_blamed() {
 #[test]
 fn reads_come_from_earlier_components_and_a_reorder_is_explained() {
     let directory = Directory::new();
-    let k2 = directory.contract("approval-queue", &[("K", 2)]);
+    let k2 = directory.incomplete_contract("approval-queue", &[("K", 2)]);
     let ballot = json!({"name": "ballot", "owns": ["vote0", "vote1", "vote2"],
                         "reads": ["action", "principal", "authorized", "phase"],
                         "decides": ["not_authorized", "duplicate_vote", "quorum_missing"]});
@@ -616,7 +875,7 @@ fn reads_come_from_earlier_components_and_a_reorder_is_explained() {
 #[test]
 fn malformed_requests_are_refused() {
     let directory = Directory::new();
-    let c3 = directory.contract("bounded-counter", &[("C", 3)]);
+    let c3 = directory.incomplete_contract("bounded-counter", &[("C", 3)]);
     for (name, document, command, flag) in [
         ("a.json", json!({"schema": "x"}), "question", "--answers"),
         (
@@ -641,7 +900,7 @@ fn malformed_requests_are_refused() {
 #[test]
 fn equal_rule_keys_give_equal_verdicts_and_the_successor_counts_outside_the_region() {
     let directory = Directory::new();
-    let c3 = directory.contract("bounded-counter", &[("C", 3)]);
+    let c3 = directory.incomplete_contract("bounded-counter", &[("C", 3)]);
     // the same region and claim; the second rule's successor differs only
     // where the rule does not apply, which teach-back compares for the
     // inputs a rule misses
@@ -680,12 +939,12 @@ fn equal_rule_keys_give_equal_verdicts_and_the_successor_counts_outside_the_regi
 #[test]
 fn a_negated_number_is_pinned_with_its_loop_meaning_and_a_mixed_comparison_is_refused() {
     let directory = Directory::new();
-    let c3 = directory.contract("bounded-counter", &[("C", 3)]);
+    let c3 = directory.incomplete_contract("bounded-counter", &[("C", 3)]);
     // the loop language reads `!value` as `value == 0`: four inputs
     let negated = json!({"where": "!value", "class": "Reject", "reason": "at_zero"});
     let path = directory.json("negated.json", &answers(&[negated]));
     let (exit, report) = run(&["loop", "question", "--contract", &c3, "--answers", &path]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     let answer = &report["detail"]["answers"][0];
     assert_eq!(answer["inputs"], 4, "{report}");
     let laws: Vec<String> = answer["laws"]
@@ -737,7 +996,7 @@ fn a_negated_number_is_pinned_with_its_loop_meaning_and_a_mixed_comparison_is_re
 #[test]
 fn an_answer_whose_successor_differs_from_the_core_is_a_disagreement() {
     let directory = Directory::new();
-    let c8 = directory.contract("bounded-counter", &[("C", 8)]);
+    let c8 = directory.incomplete_contract("bounded-counter", &[("C", 8)]);
     // Without the exact-movement law (502) the laws admit any in-range
     // successor, so an answer can name another one without a conflict.
     let project = Path::new(&c8).join("project.zeno");
@@ -762,7 +1021,7 @@ fn an_answer_whose_successor_differs_from_the_core_is_a_disagreement() {
     ];
     let path = directory.json("successor.json", &answers(&items));
     let (exit, report) = run(&["loop", "question", "--contract", &c8, "--answers", &path]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     let answer = &report["detail"]["answers"][1];
     assert_eq!(answer["status"], "disagreement", "{report}");
     assert_eq!(answer["disagreement"]["inputs"], 1);
@@ -773,7 +1032,7 @@ fn an_answer_whose_successor_differs_from_the_core_is_a_disagreement() {
 #[test]
 fn structure_problems_make_a_decomposition_unrealizable_even_with_tables() {
     let directory = Directory::new();
-    let c3 = directory.contract("bounded-counter", &[("C", 3)]);
+    let c3 = directory.incomplete_contract("bounded-counter", &[("C", 3)]);
     // no component decides not_authorized, so on those inputs no component
     // is required to do anything and no blame can arise there
     let path = directory.json(
@@ -805,7 +1064,7 @@ fn structure_problems_make_a_decomposition_unrealizable_even_with_tables() {
 #[test]
 fn a_rule_the_confirmed_answers_contradict_is_forbidden_never_required() {
     let directory = Directory::new();
-    let c3 = directory.contract("bounded-counter", &[("C", 3)]);
+    let c3 = directory.incomplete_contract("bounded-counter", &[("C", 3)]);
     let rules = directory.json(
         "old-core.json",
         &json!({"schema": "zeno-fcis/loop-rules/1", "rules": [
@@ -817,7 +1076,7 @@ fn a_rule_the_confirmed_answers_contradict_is_forbidden_never_required() {
         &answers(&[json!({"where": "!authorized", "class": "Reject", "reason": "at_capacity"})]),
     );
     let (exit, report) = run(&["loop", "question", "--contract", &c3, "--answers", &other]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     assert_eq!(report["detail"]["answers"][0]["status"], "disagreement");
     let (exit, report) = run(&[
         "loop",
@@ -874,7 +1133,7 @@ fn a_question_over_boolean_votes_writes_their_sum_as_the_laws_do() {
     let directory = Directory::new();
     // the approval queue's laws sum Boolean votes as 0 and 1; a question
     // region over them is written the same way, never refused
-    let queue = directory.contract("approval-queue", &[("K", 1)]);
+    let queue = directory.incomplete_contract("approval-queue", &[("K", 1)]);
     let (exit, report) = run(&["loop", "question", "--contract", &queue]);
     assert_eq!(exit, Some(0), "{report}");
     assert_eq!(report["status"], "open", "{report}");
@@ -888,9 +1147,9 @@ fn a_question_over_boolean_votes_writes_their_sum_as_the_laws_do() {
 }
 
 #[test]
-fn truthful_counter_answers_distinguish_laws_from_recorded_reasons() {
+fn truthful_counter_answers_pin_reason_laws_and_retain_sources() {
     let directory = Directory::new();
-    let c3 = directory.contract("bounded-counter", &[("C", 3)]);
+    let c3 = directory.incomplete_contract("bounded-counter", &[("C", 3)]);
     let document: Value = serde_json::from_str(include_str!(
         "../../zeno-fcis-loop-doors/tests/data/bc-c3-explicit-answers.json"
     ))
@@ -898,19 +1157,19 @@ fn truthful_counter_answers_distinguish_laws_from_recorded_reasons() {
     let path = directory.json("all-answers.json", &document);
     let (exit, report) = run(&["loop", "question", "--contract", &c3, "--answers", &path]);
     assert_eq!(exit, Some(0), "{report}");
-    assert_eq!(report["detail"]["stats"]["determined_by_laws"], 6);
+    assert_eq!(report["detail"]["stats"]["determined_by_laws"], 16);
     assert_eq!(report["detail"]["stats"]["determined_with_reasons"], 16);
     assert_eq!(report["detail"]["stats"]["determined"], 16);
     assert_eq!(
         report["detail"]["gaps"]["determined"],
-        json!({"full":[0,6],"valid":[0,6]})
+        json!({"full":[0,16],"valid":[0,16]})
     );
 }
 
 #[test]
 fn later_owned_votes_are_unrealizable_in_this_order_with_a_reorder_suggestion() {
     let directory = Directory::new();
-    let queue = directory.contract("approval-queue", &[("K", 1)]);
+    let queue = directory.incomplete_contract("approval-queue", &[("K", 1)]);
     let document: Value = serde_json::from_str(include_str!(
         "../../zeno-fcis-loop-doors/tests/data/aq-arch.json"
     ))
@@ -932,4 +1191,44 @@ fn later_owned_votes_are_unrealizable_in_this_order_with_a_reorder_suggestion() 
     assert_eq!(problem["suggested_order"], json!(["ballot", "lifecycle"]));
     assert_eq!(problem["cyclic_reads"], false);
     assert!(report["detail"].get("compose").is_none());
+}
+
+#[test]
+fn complete_catalogue_laws_leave_no_question_and_refuse_a_wrong_reason_answer() {
+    let directory = Directory::new();
+    let contract = directory.contract("bounded-counter", &[("C", 2)]);
+    let source = fs::read(Path::new(&contract).join("project.zeno"))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let (exit, report) = run(&["loop", "question", "--contract", &contract]);
+    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(report["status"], "determined", "{report}");
+    assert_eq!(report["detail"]["stats"]["determined"], 12);
+    assert!(report["detail"].get("question").is_none());
+    let path = directory.json(
+        "wrong-reason.json",
+        &answers(&[json!({"where":"!authorized","class":"Reject","reason":"at_capacity"})]),
+    );
+    let (exit, report) = run(&[
+        "loop",
+        "question",
+        "--contract",
+        &contract,
+        "--answers",
+        &path,
+    ]);
+    assert_eq!(exit, Some(1), "{report}");
+    assert_eq!(report["status"], "conflict", "{report}");
+    assert_eq!(report["authority"], "none");
+    assert!(
+        report["detail"]["requirement"]["laws"]
+            .as_array()
+            .unwrap_or_else(|| panic!("required value missing"))
+            .iter()
+            .any(|law| law["scope"] == "reject:200")
+    );
+    assert_eq!(
+        fs::read(Path::new(&contract).join("project.zeno"))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        source
+    );
 }

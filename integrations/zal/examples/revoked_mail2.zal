@@ -1,0 +1,14 @@
+zal 2;
+# Revocation is retained in the control state; no observation authenticates a caller.
+machine mail_access;
+states active, revoked;
+events read_mail, revoke;
+context none;
+var reads in 0..=2 initially 0;
+initial active;
+step atomic; frame control_and_variables;
+default reject not_enabled unchanged;
+rule read_active: active + read_mail [reads < 2] -> accept active, reads += 1;
+rule revoke_access: active + revoke [true] -> accept revoked;
+property no_new_mail_after_revoke: never(state == revoked & accepted & event == read_mail);
+property reads_stay_after_revoke: always(state == revoked => reads' == reads);

@@ -7,7 +7,7 @@
 //! field of a record, and the library's law evaluator decides it, as `/1`
 //! decides its invariants. A binding is a rule expression: the contract's
 //! decision-program compiler compiles it once into a library program of one
-//! output, with checked 64-bit arithmetic and no multiplication or division,
+//! output, with checked 128-bit arithmetic and no multiplication or division,
 //! and the library's program evaluator computes its value. Nothing here
 //! interprets a formula.
 //!
@@ -213,6 +213,7 @@ impl Formula {
             .iter()
             .map(|node| {
                 Ok(match *node {
+                    ScalarOp::Numeric(_) => return Err("U128SubjectUnsupported".to_owned()),
                     ScalarOp::Input(at) => ProgramOp::Input(index(at)?),
                     ScalarOp::Int(value) => ProgramOp::Int(value),
                     ScalarOp::Bool(value) => ProgramOp::Bool(value),
@@ -332,6 +333,9 @@ fn record(tuple: &[i128]) -> Vec<c::Field<'static>> {
 /// The children of one expression node.
 fn children(ast: &Ast) -> Vec<&Ast> {
     match ast {
+        Ast::Circuit(c) => c.formulas().collect(),
+        Ast::U128(_) => Vec::new(),
+        Ast::ToI128(v) | Ast::ToU128(v) => vec![v],
         Ast::Name(_) | Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => Vec::new(),
         Ast::Not(inner) | Ast::Neg(inner) => vec![inner],
         Ast::Binary(_, left, right) | Ast::Div(_, left, right) => vec![left, right],
@@ -351,6 +355,9 @@ fn shape(ast: &Ast) -> (usize, usize) {
     let mut stack = vec![(ast, 1usize)];
     while let Some((node, depth)) = stack.pop() {
         nodes += 1;
+        if let Ast::Circuit(c) = node {
+            nodes += c.nodes().len();
+        }
         deepest = deepest.max(depth);
         stack.extend(children(node).into_iter().map(|child| (child, depth + 1)));
     }

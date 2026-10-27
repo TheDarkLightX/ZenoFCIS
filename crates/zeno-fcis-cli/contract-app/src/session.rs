@@ -110,8 +110,9 @@ impl Upgraded {
             || "null".to_owned(),
             |premises| {
                 format!(
-                    "{{\"policy_differs_only_in_program_and_step_limit\":true,\"decision_law_991_required\":true,\"programs_equal_on_input_tuples\":{},\"step_limits_never_bind\":true,\"step_usage_unobserved\":true}}",
-                    premises.tuples()
+                    "{{\"policy_differs_only_in_program_and_step_limit\":true,\"decision_law_991_required\":true,\"programs_equal_on_input_tuples\":{},\"step_limits_never_bind\":true,\"step_usage_unobserved\":true{}}}",
+                    premises.tuples(),
+                    if premises.released_24() { ",\"comparison_evaluator\":\"2.4.0\",\"current_state_laws_held\":true" } else { "" }
                 )
             },
         );
@@ -439,8 +440,17 @@ fn record_targets<'a>(
 /// step that made each later version: an adoption's receipt digest, a
 /// behaviour change with its review and claims, a data migration, or a
 /// rename, for `f`.
+fn with_released_contexts<R>(
+    f: impl FnOnce(
+        &[Option<&zeno_fcis_synthesis::finite::historical::HistoricalContext<'_>>],
+    ) -> AppResult<R>,
+) -> AppResult<R> {
+    f(&[]) // released predecessor contexts
+}
+
 pub(crate) fn with_lineage<R>(f: impl FnOnce(&Lineage<'_, '_>) -> AppResult<R>) -> AppResult<R> {
-    v2_contract::with_lineage(|generated| {
+    with_released_contexts(|historical| {
+        v2_contract::with_lineage(|generated| {
         let (catalogs, receipts, evolutions, state_steps, record_steps) = generated.parts();
         let mut receipts = receipts
             .iter()
@@ -533,10 +543,11 @@ pub(crate) fn with_lineage<R>(f: impl FnOnce(&Lineage<'_, '_>) -> AppResult<R>) 
         if receipts.next().is_some() {
             return Err("catalog: more adoption receipts than adoptions".to_owned());
         }
-        let lineage = Lineage::bind_steps(catalogs, &steps).map_err(store)?;
+        let lineage = Lineage::bind_steps_with_history(catalogs, &steps, historical).map_err(store)?;
         f(&lineage)
     })
     .map_err(|error| format!("catalog: {error:?}"))?
+    })
 }
 
 /// Replays every history segment of the store at `path` under the contract

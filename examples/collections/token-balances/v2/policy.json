@@ -1,0 +1,106 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "token-balances",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "action": "command.101.130",
+    "amount": "command.101.133",
+    "desk": "context.102",
+    "self_transfer": "command.101.131 == command.101.132",
+    "supply": "pre.100.120",
+    "sender_present": "pre.100.160",
+    "sender_balance": "pre.100.161",
+    "receiver_balance": "pre.100.171"
+  },
+  "cases": [
+    {
+      "rule": "only the issuer mints",
+      "when": "action == 150 && desk != 180",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "minting stays within the supply and account limits",
+      "when": "action == 150 && (supply + amount > 6 || receiver_balance + amount > 3)",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "mint to the receiver",
+      "when": "action == 150",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": "supply + amount",
+        "170": "1",
+        "171": "receiver_balance + amount"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "a transfer needs the sender's account",
+      "when": "sender_present == 0",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "a transfer needs the balance",
+      "when": "sender_balance < amount",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "a transfer to the same account changes nothing",
+      "when": "self_transfer",
+      "class": "Accept",
+      "reason": null,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "the receiver stays within the account limit",
+      "when": "receiver_balance + amount > 3",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "transfer",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "161": "sender_balance - amount",
+        "170": "1",
+        "171": "receiver_balance + amount"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "120": 0,
+    "160": 0,
+    "161": 0,
+    "170": 0,
+    "171": 0
+  },
+  "law_kinds": {
+    "500": "AuthoritySubjectRecipient",
+    "501": "StateInvariant",
+    "502": "AuthoritySubjectRecipient"
+  }
+}

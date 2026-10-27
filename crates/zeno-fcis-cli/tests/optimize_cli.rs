@@ -96,6 +96,76 @@ fn replay(receipt: &Path, original: &Path, candidate: &Path) -> (Option<i32>, Va
 }
 
 #[test]
+fn output_failure_reports_published_and_remaining_artifacts() {
+    let directory = Directory::new();
+    let original = artifact("boolean-kernel-original");
+    let candidate = directory.0.join("candidate.zcve");
+    let receipt = directory.0.join("missing/receipt.json");
+    let (exit, report) = optimize(
+        &original,
+        &[
+            "--candidate-out",
+            &candidate.to_string_lossy(),
+            "--receipt",
+            &receipt.to_string_lossy(),
+        ],
+    );
+    assert_eq!(exit, Some(3), "{report}");
+    assert_eq!(report["status"], "io-error");
+    assert_eq!(report["authority"], "none");
+    assert_eq!(
+        report["detail"]["publication"],
+        json!({
+            "candidate": {"path": candidate, "status": "published"},
+            "receipt": {"path": receipt, "status": "write-failed"},
+        })
+    );
+    assert_eq!(
+        read(&candidate),
+        read(&artifact("boolean-kernel-candidate"))
+    );
+    assert!(!receipt.exists());
+    assert!(
+        report["detail"]["next_step"]
+            .as_str()
+            .is_some_and(|s| s.contains("unused output paths"))
+    );
+
+    let missing_candidate = directory.0.join("missing/candidate.zcve");
+    let untouched_receipt = directory.0.join("untouched.json");
+    let (exit, report) = optimize(
+        &original,
+        &[
+            "--candidate-out",
+            &missing_candidate.to_string_lossy(),
+            "--receipt",
+            &untouched_receipt.to_string_lossy(),
+        ],
+    );
+    assert_eq!(exit, Some(3), "{report}");
+    assert_eq!(
+        report["detail"]["publication"],
+        json!({
+            "candidate": {"path": missing_candidate, "status": "write-failed"},
+            "receipt": {"path": untouched_receipt, "status": "not-attempted"},
+        })
+    );
+    assert!(!missing_candidate.exists() && !untouched_receipt.exists());
+    assert_eq!(
+        read(&candidate),
+        read(&artifact("boolean-kernel-candidate"))
+    );
+
+    let (exit, report) = optimize(&original, &["--receipt", &receipt.to_string_lossy()]);
+    assert_eq!(exit, Some(3), "{report}");
+    assert_eq!(report["detail"]["publication"]["candidate"], Value::Null);
+    assert_eq!(
+        report["detail"]["publication"]["receipt"]["status"],
+        "write-failed"
+    );
+}
+
+#[test]
 fn kernel_improves_to_seven_nodes_and_the_written_receipt_replays() {
     let directory = Directory::new();
     let original = artifact("boolean-kernel-original");
@@ -492,6 +562,7 @@ fn describe_declares_optimize_effects() {
             "candidate_out",
             "containment_backend",
             "help",
+            "indexed_branches",
             "kb",
             "kb_task",
             "max_input_tuples",
@@ -509,6 +580,39 @@ fn describe_declares_optimize_effects() {
         .unwrap_or_else(|| panic!("tuple cap"));
     assert_eq!(cap["defaults"], json!(["100000000"]));
     assert_eq!(command["subcommands"], json!([]));
+}
+
+#[test]
+fn indexed_branches_flag_is_opt_in_and_receipt_replays() {
+    let directory = Directory::new();
+    let original = artifact("boolean-kernel-original");
+    let first = optimize(&original, &[]);
+    let second = optimize(&original, &[]);
+    assert_eq!(first, second);
+    assert!(first.1["detail"].get("indexed_branches").is_none());
+    let candidate = directory.0.join("indexed.zcve");
+    let receipt = directory.0.join("indexed.receipt.json");
+    let (exit, on) = optimize(
+        &original,
+        &[
+            "--indexed-branches",
+            "--candidate-out",
+            &candidate.to_string_lossy(),
+            "--receipt",
+            &receipt.to_string_lossy(),
+        ],
+    );
+    assert_eq!(exit, Some(0), "{on}");
+    assert!(on["detail"].get("indexed_branches").is_some());
+    assert!(
+        on["detail"]["best"]["nodes"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("missing node count"))
+            <= first.1["detail"]["best"]["nodes"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("missing node count"))
+    );
+    assert_eq!(replay(&receipt, &original, &candidate).0, Some(0));
 }
 
 #[test]
@@ -536,12 +640,13 @@ fn an_unsupported_original_names_its_node_instead_of_claiming_search() {
         receipt.as_os_str(),
     ]);
     assert_eq!(output.status.code(), Some(2));
-    let report: Value =
-        serde_json::from_slice(&output.stdout).unwrap_or_else(|error| panic!("{error:?}"));
+    let report: Value = serde_json::from_slice(&output.stdout)
+        .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
     assert_eq!(report["status"], "unsupported-original");
     assert_eq!(report["authority"], "none");
     assert_eq!(report["detail"]["reason"], "unsupported-original-node");
-    let program = import_program(&read(&original)).unwrap_or_else(|error| panic!("{error:?}"));
+    let program = import_program(&read(&original))
+        .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
     let index = program
         .nodes()
         .iter()
@@ -570,11 +675,11 @@ fn a_checked_supplied_candidate_survives_an_unsupported_original_opcode() {
     let domain = Domain::Int { min: 0, max: 0 };
     let make = |nodes, root| {
         Program::try_new(vec![domain], vec![domain], nodes, vec![root])
-            .unwrap_or_else(|error| panic!("{error:?}"))
+            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"))
             .value()
-            .unwrap_or_else(|error| panic!("{error:?}"))
+            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"))
             .canonical_bytes()
-            .unwrap_or_else(|error| panic!("{error:?}"))
+            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"))
     };
     let original = directory.write(
         "original.zcve",

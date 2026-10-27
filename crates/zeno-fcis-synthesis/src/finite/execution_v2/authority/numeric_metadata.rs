@@ -23,6 +23,14 @@ fn width(value: IntegerWidth) -> u128 {
 #[cfg_attr(verus_keep_ghost,verus_spec(ensures final(parts)@==old(parts)@+model::op(op),))]
 fn op<'a>(parts: &mut Vec<Part<'a>>, op: NumericOp) {
     match op {
+        NumericOp::ToI128(i) => {
+            parts.push(Part::Word(21));
+            parts.push(Part::Word(i as u128));
+        }
+        NumericOp::ToU128(i) => {
+            parts.push(Part::Word(22));
+            parts.push(Part::Word(i as u128));
+        }
         NumericOp::Input(i) => {
             parts.push(Part::Word(0));
             parts.push(Part::Word(i as u128));

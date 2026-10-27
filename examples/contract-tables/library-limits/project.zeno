@@ -1,0 +1,58 @@
+zeno 1;
+project 1 library_limits;
+namespace 2 library;
+// Six copies of one book and three members. Each copy records its holder:
+// 0 means on the shelf, 1..3 is the member who has it. One holder per copy
+// means a copy cannot be lent twice; the rules also refuse to try.
+type 100 state Loans;
+type 101 command LoanCommand;
+type 102 context Desk;
+type 105 int Holder in 0..=3;
+type 106 index CopyNumber of 110;
+type 107 int MemberNumber in 1..=3;
+type 108 data LoanAction;
+type 109 int LoanLimit in 1..=2;
+field 160 100 limit_per_member 109;
+// Copies 0..5 are the state fields 110..115, named copies_0..copies_5.
+table 110 100 copies 105 size 6;
+field 120 101 action 108;
+field 121 101 copy 106;
+field 122 101 member 107;
+variant 150 108 Borrow none;
+variant 151 108 Return none;
+variant 130 102 Librarian none;
+variant 131 102 Visitor none;
+reason 200 librarian_required precedence 0;
+reason 201 copy_on_loan precedence 1;
+reason 202 loan_limit precedence 2;
+reason 203 not_holder precedence 3;
+component 400 loans {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+// Each member holds no more copies than the state limit, including this copy.
+law 500 per_member_limit on commit, genesis =
+  forall i in table 110 where post.100.110[i] != 0 {
+    count j in table 110 { post.100.110[j] == post.100.110[i] } <= post.100.160
+  };
+law 501 librarian_only on commit = context.102 == 130;
+// Only the chosen copy changes hands; every other copy keeps its holder.
+law 502 other_copies_unchanged on commit =
+  forall i in table 110 where i != command.101.121 { post.100.110[i] == pre.100.110[i] };
+// A borrow takes the chosen copy from the shelf to the member; a return
+// takes it from that member back to the shelf.
+law 503 exact_loan on commit =
+  forall i in table 110 where i == command.101.121 {
+    (command.101.120 == 150 -> pre.100.110[i] == 0 && post.100.110[i] == command.101.122)
+      && (command.101.120 == 151 -> pre.100.110[i] == command.101.122 && post.100.110[i] == 0)
+  };
+
+// The command does not change the per-member limit.
+law 504 limit_unchanged on commit = post.100.160 == pre.100.160;
+// A conditional count may read the command and a bound from state.
+law 505 chosen_member_count on commit =
+  sum j in table 110 { choose(post.100.110[j] == command.101.122, 1, 0) } <= pre.100.160;

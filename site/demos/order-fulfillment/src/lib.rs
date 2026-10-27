@@ -10,7 +10,7 @@ use order_fulfillment::{
     authority,
     bindings::GeneratedProject,
     command,
-    generated::{Caller, CallerContext, Order, OrderAction, OrderCommand},
+    generated::{Caller, CallerContext, Day, Order, OrderAction, OrderCommand},
     genesis_state, profile, v2_contract,
 };
 use zeno_fcis_site_common::{
@@ -55,11 +55,12 @@ impl Application for OrderFulfillment {
         admit_root(&checked(Order::try_from_value(state))?)
     }
 
-    /// `command` is one of the six actions; a payment provider's callback,
+    /// `command` is one of the nine actions; a payment provider's callback,
     /// `PaymentCaptured` or `PaymentDeclined`, also carries
     /// `callback_attempt`, the attempt it answers. The context is `caller`:
-    /// `Customer`, `PaymentProvider`, or `Carrier`.
+    /// `Customer`, `PaymentProvider`, or `Carrier`, and optional `now` (default 0).
     fn parse(request: &Map<String, Json>) -> Result<(OrderCommand, CallerContext), String> {
+        let has_now = request.contains_key("now");
         let mut request = Request::new(request);
         let action = request.choice(
             "command",
@@ -70,6 +71,9 @@ impl Application for OrderFulfillment {
                 ("ParcelDispatched", OrderAction::ParcelDispatched),
                 ("ParcelDelivered", OrderAction::ParcelDelivered),
                 ("CancelOrder", OrderAction::CancelOrder),
+                ("TimeoutOrder", OrderAction::TimeoutOrder),
+                ("ReleaseDelivered", OrderAction::ReleaseDelivered),
+                ("DisputeDelivery", OrderAction::DisputeDelivery),
             ],
         )?;
         let callback_attempt = match action {
@@ -86,8 +90,12 @@ impl Application for OrderFulfillment {
                 ("Carrier", Caller::Carrier),
             ],
         )?;
+        let now = Day(if has_now { request.integer("now")? } else { 0 });
         request.finish()?;
-        Ok((command(action, callback_attempt), CallerContext { caller }))
+        Ok((
+            command(action, callback_attempt),
+            CallerContext { caller, now },
+        ))
     }
 
     fn admit(
@@ -201,16 +209,50 @@ mod tests {
     }
 
     #[test]
+    fn customer_recovers_carrier_silence_and_finalizes_delivery_without_operator() {
+        for delivered in [false, true] {
+            let mut demo = Demo::<OrderFulfillment>::new().unwrap();
+            demo.step(&request("Checkout", "Customer")).unwrap();
+            demo.step(&callback("PaymentCaptured", 1, "PaymentProvider"))
+                .unwrap();
+            if delivered {
+                demo.step(&request("ParcelDispatched", "Carrier")).unwrap();
+                demo.step(&request("ParcelDelivered", "Carrier")).unwrap();
+            }
+            let (action, day, status, payment) = if delivered {
+                ("ReleaseDelivered", 8, "Settled", "Release")
+            } else {
+                ("TimeoutOrder", 4, "Cancelled", "Refund")
+            };
+            let input = json!({"command": action, "caller": "Customer", "now": day}).to_string();
+            let report = demo.step(&input).unwrap();
+            assert_eq!(report["decision"], "Accept");
+            assert_eq!(report["after"], order(status, 1));
+            assert_eq!(report["outbox"][0]["destination"], "payment-provider");
+            assert_eq!(report["outbox"][0]["payload"]["request_action"], payment);
+            assert_eq!(demo.step(&input).unwrap()["decision"], "Reject");
+        }
+    }
+
+    #[test]
     fn law_statuses_follow_the_manifest_scopes() {
         let mut demo = Demo::<OrderFulfillment>::new().unwrap();
         let accept = demo.step(&request("Checkout", "Customer")).unwrap();
-        assert_eq!(law_ids(&accept), [500, 501, 502, 503, 504, 505, 991]);
+        assert_eq!(
+            law_ids(&accept),
+            [
+                500, 501, 502, 503, 504, 505, 507, 508, 511, 512, 513, 514, 515, 991
+            ]
+        );
         let failure = demo
             .step(&callback("PaymentDeclined", 1, "PaymentProvider"))
             .unwrap();
-        assert_eq!(law_ids(&failure), [500, 506, 991]);
+        assert_eq!(
+            law_ids(&failure),
+            [500, 506, 508, 512, 513, 514, 515, 516, 991]
+        );
         let reject = demo.step(&request("ParcelDelivered", "Carrier")).unwrap();
-        assert_eq!(law_ids(&reject), [509, 991]);
+        assert_eq!(law_ids(&reject), [510, 909, 991]);
     }
 
     #[test]

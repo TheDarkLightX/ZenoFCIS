@@ -1,0 +1,182 @@
+{
+  "profile": "zal/ladder/0",
+  "theory": "steps-over-integers",
+  "id": "member_missing_zero",
+  "kind": "law",
+  "authority": {
+    "status": "OPEN",
+    "source": "Finite reading of the cited example contract; no runtime authority."
+  },
+  "scope": "One post-state snapshot at genesis or commit; two members slots, presence 0..1, loan count 0..2. The source law is per entry; unrelated map behavior is outside this projection.",
+  "contract_source": {
+    "path": "examples/collections/library/project.zeno",
+    "sha256": "20caa85422acbc82117b57f9134e62b542201e5bb19ed99715bc5d5e86eab8c7",
+    "law": 501,
+    "name": "absent_members_hold_nothing",
+    "when": "commit, genesis",
+    "body": "forall m in entries 110 { post.100.m == 1 || post.100.m.140 == 0 }"
+  },
+  "domains": {
+    "T": {
+      "member": "snapshot",
+      "plural": "snapshots",
+      "noun": "snapshots",
+      "integer": true,
+      "values": [
+        0
+      ]
+    },
+    "E": {
+      "member": "member",
+      "plural": "members",
+      "noun": "members",
+      "integer": true,
+      "values": [
+        0,
+        1
+      ]
+    }
+  },
+  "symbols": {
+    "present": {
+      "kind": "function",
+      "arity": 2,
+      "args": [
+        "T",
+        "E"
+      ],
+      "noun": "entry presence",
+      "state": false
+    },
+    "amount": {
+      "kind": "function",
+      "arity": 2,
+      "args": [
+        "T",
+        "E"
+      ],
+      "noun": "loan count",
+      "state": false
+    }
+  },
+  "definitions": [
+    {
+      "name": "MissingHoldNothing",
+      "params": [
+        {
+          "name": "t",
+          "domain": "T"
+        }
+      ],
+      "body": "forall e in E: present(t, e) = 0 => amount(t, e) = 0",
+      "clause": "{0} gives missing members a zero loan count"
+    }
+  ],
+  "formula": "forall t in T: forall e in E: present(t, e) = 0 => amount(t, e) = 0",
+  "fixtures": [
+    {
+      "id": "missing_is_zero",
+      "domains": {
+        "T": [
+          0
+        ],
+        "E": [
+          0,
+          1
+        ]
+      },
+      "symbols": {
+        "present": {
+          "rows": [
+            [
+              [
+                0,
+                0
+              ],
+              0
+            ],
+            [
+              [
+                0,
+                1
+              ],
+              1
+            ]
+          ]
+        },
+        "amount": {
+          "rows": [
+            [
+              [
+                0,
+                0
+              ],
+              0
+            ],
+            [
+              [
+                0,
+                1
+              ],
+              2
+            ]
+          ]
+        }
+      },
+      "expected": true,
+      "note": "A finite per-entry invariant projection, not an enumeration of all possible maps."
+    },
+    {
+      "id": "missing_holds_one",
+      "domains": {
+        "T": [
+          0
+        ],
+        "E": [
+          0,
+          1
+        ]
+      },
+      "symbols": {
+        "present": {
+          "rows": [
+            [
+              [
+                0,
+                0
+              ],
+              0
+            ],
+            [
+              [
+                0,
+                1
+              ],
+              1
+            ]
+          ]
+        },
+        "amount": {
+          "rows": [
+            [
+              [
+                0,
+                0
+              ],
+              1
+            ],
+            [
+              [
+                0,
+                1
+              ],
+              2
+            ]
+          ]
+        }
+      },
+      "expected": false,
+      "note": "A finite per-entry invariant projection, not an enumeration of all possible maps."
+    }
+  ]
+}

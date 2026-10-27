@@ -1,0 +1,44 @@
+{
+  "programs": [
+    "crates/zeno-fcis-cli/templates/agent-treasury-guard/synthesized/program.zcve",
+    "crates/zeno-fcis-cli/templates/compliance-gateway/synthesized/program.zcve",
+    "crates/zeno-fcis-cli/templates/durable-counter/synthesized/program.zcve",
+    "crates/zeno-fcis-cli/templates/inventory-reservation/synthesized/program.zcve",
+    "crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/program.zcve",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesized/program.zcve"
+  ],
+  "problems": [
+    "crates/zeno-fcis-cli/templates/agent-treasury-guard/synthesis.json",
+    "crates/zeno-fcis-cli/templates/agent-treasury-guard/synthesized/problem.json",
+    "crates/zeno-fcis-cli/templates/compliance-gateway/synthesis.json",
+    "crates/zeno-fcis-cli/templates/compliance-gateway/synthesized/problem.json",
+    "crates/zeno-fcis-cli/templates/durable-counter/synthesis.json",
+    "crates/zeno-fcis-cli/templates/durable-counter/synthesized/problem.json",
+    "crates/zeno-fcis-cli/templates/inventory-reservation/synthesis.json",
+    "crates/zeno-fcis-cli/templates/inventory-reservation/synthesized/problem.json",
+    "crates/zeno-fcis-cli/templates/order-fulfillment/synthesis.json",
+    "crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/problem.json",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesis.json",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesized/problem.json"
+  ],
+  "operations": [
+    "input",
+    "int",
+    "bool",
+    "add",
+    "sub",
+    "mul",
+    "div_floor",
+    "div_ceil",
+    "mul_div_floor",
+    "mul_div_ceil",
+    "signed_mul_div_floor",
+    "products_ge",
+    "eq",
+    "lt",
+    "and",
+    "not",
+    "select",
+    "eager_select"
+  ]
+}

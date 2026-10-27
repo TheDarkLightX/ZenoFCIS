@@ -6,7 +6,6 @@ use super::{STATELESS_DEADLINE, Stages};
 use crate::neural_loop::program_json::{encode, program_to_json};
 use crate::transform::{self, sha256_hex};
 use clap::Args;
-use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -26,14 +25,19 @@ const RESULT_SCHEMA: &str = "zeno-fcis/loop-version-space/2";
 
 #[derive(Args, Clone, Copy, Default)]
 pub(crate) struct Arguments {
+    /// Specification work units: default 2,000,000, cap 100,000,000; applies to --specification, ignored by contract mode.
     #[arg(long, requires = "specification")]
     max_work: Option<u64>,
+    /// Specification input tuples: default 4,096, cap 65,536; applies to --specification, ignored by contract mode.
     #[arg(long, requires = "specification")]
     max_domain: Option<u64>,
+    /// Specification meanings: default 4,096, cap 16,384; applies to --specification, ignored by contract mode.
     #[arg(long, requires = "specification")]
     max_meanings: Option<usize>,
+    /// Specification cells: default 1,000,000, cap 8,000,000; applies to --specification, ignored by contract mode.
     #[arg(long, requires = "specification")]
     max_cells: Option<u64>,
+    /// Specification conflict subsets: default 10,000, cap 1,000,000; applies to --specification, ignored by contract mode.
     #[arg(long, requires = "specification")]
     max_conflict_subsets: Option<u64>,
 }
@@ -52,56 +56,6 @@ impl Arguments {
     }
 }
 
-// Reject duplicate properties and nonintegral numbers at every nesting level.
-struct Strict(Value);
-impl<'de> Deserialize<'de> for Strict {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        struct Read;
-        impl<'de> Visitor<'de> for Read {
-            type Value = Strict;
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("bounded integral JSON with unique keys")
-            }
-            fn visit_bool<E: de::Error>(self, v: bool) -> Result<Strict, E> {
-                Ok(Strict(json!(v)))
-            }
-            fn visit_i64<E: de::Error>(self, v: i64) -> Result<Strict, E> {
-                Ok(Strict(json!(v)))
-            }
-            fn visit_u64<E: de::Error>(self, v: u64) -> Result<Strict, E> {
-                Ok(Strict(json!(v)))
-            }
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<Strict, E> {
-                Ok(Strict(json!(v)))
-            }
-            fn visit_string<E: de::Error>(self, v: String) -> Result<Strict, E> {
-                Ok(Strict(json!(v)))
-            }
-            fn visit_unit<E: de::Error>(self) -> Result<Strict, E> {
-                Ok(Strict(Value::Null))
-            }
-            fn visit_seq<A: SeqAccess<'de>>(self, mut a: A) -> Result<Strict, A::Error> {
-                let mut values = Vec::new();
-                while let Some(Strict(v)) = a.next_element()? {
-                    values.push(v);
-                }
-                Ok(Strict(Value::Array(values)))
-            }
-            fn visit_map<A: MapAccess<'de>>(self, mut a: A) -> Result<Strict, A::Error> {
-                let mut values = serde_json::Map::new();
-                while let Some(k) = a.next_key::<String>()? {
-                    if values.contains_key(&k) {
-                        return Err(de::Error::custom("duplicate JSON property"));
-                    }
-                    let Strict(v) = a.next_value()?;
-                    values.insert(k, v);
-                }
-                Ok(Strict(Value::Object(values)))
-            }
-        }
-        d.deserialize_any(Read)
-    }
-}
 fn bad(reason: impl Into<String>) -> Stop {
     Stop::Refused(reason.into())
 }
@@ -169,8 +123,9 @@ fn specification(data: &[u8]) -> Result<Specification, Stop> {
     if !data.is_ascii() {
         return Err(bad("version-space-ascii-json"));
     }
-    let Strict(v) =
-        serde_json::from_slice(data).map_err(|e| bad(format!("version-space-json:{e}")))?;
+    // Duplicate properties and nonintegral numbers are refused at every nesting level.
+    let v =
+        crate::integral_json::parse(data).map_err(|e| bad(format!("version-space-json:{e}")))?;
     fields(
         &v,
         &["schema", "inputs", "outputs", "sketch", "requirements"],
@@ -661,7 +616,11 @@ pub(super) fn run(path: &Path, arguments: Arguments) -> (u8, Value) {
     detail["budget"] = usage(&budget);
     super::search_limits::annotate("version-space", status, &mut detail);
     (
-        0,
+        match status {
+            "determined" => crate::OK,
+            "no-completion" => crate::INVALID,
+            _ => crate::BLOCKED,
+        },
         json!({"schema":RESULT_SCHEMA,"integer_encoding":crate::report_numbers::ENCODING,"door":"version-space","status":status,"authority":"none","detail":detail}),
     )
 }

@@ -13,7 +13,7 @@ const CALLERS = { 170: "Customer", 171: "PaymentProvider", 172: "Carrier" };
 const PAYMENT_ACTIONS = { 175: "Capture", 176: "Void" };
 const CALLBACKS = ["PaymentCaptured", "PaymentDeclined"];
 
-export const laws = { Accept: [500, 501, 502, 503, 504, 505, 991], CommittedFailure: [500, 506, 991], Reject: [509, 991] };
+export const laws = {"Accept": [500, 501, 502, 503, 504, 505, 507, 508, 511, 512, 513, 514, 515, 991], "CommittedFailure": [500, 506, 508, 512, 513, 514, 515, 516, 991], "Reject": [510, 909, 991]};
 
 // Inputs refused before any decision, with the stage that refuses them.
 export const refusals = [
@@ -30,11 +30,11 @@ export const unreachable = {};
 // other actions, which the page never sends.
 export function parse(text) {
   return lines(text).map(({ line, parts: [input, decision, queued] }) => {
-    const [status, attempts, action, callbackAttempt, caller] = input;
+    const [status, attempts, action, callbackAttempt, caller, now] = input;
     const [outcome, why, postStatus, postAttempts] = decision;
     const order = (state, count) => ({ status: named(STATUSES, state, line), payment_attempts: integer(count, line) });
     const command = named(ACTIONS, action, line);
-    const request = { command, caller: named(CALLERS, caller, line) };
+    const request = { command, caller: named(CALLERS, caller, line), now: integer(now, line) };
     if (CALLBACKS.includes(command)) request.callback_attempt = integer(callbackAttempt, line);
     let entries = [];
     if (queued[0] === "300") {

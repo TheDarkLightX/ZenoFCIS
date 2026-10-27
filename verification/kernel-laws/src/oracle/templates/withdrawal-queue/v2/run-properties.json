@@ -1,0 +1,15 @@
+{
+  "schema": "zeno-fcis/run-properties/1",
+  "properties": [
+    {
+      "kind": "predicate",
+      "name": "every_debit_has_exactly_one_equal_payout",
+      "formula": "post.100.120 < pre.100.120 -> outbox.300 == 1 && outbox.300.151 == pre.100.120 - post.100.120"
+    },
+    {
+      "kind": "predicate",
+      "name": "empty_lanes_hold_nothing",
+      "formula": "(post.100.121 == 180 -> post.100.122 == 0) && (post.100.123 == 180 -> post.100.124 == 0)"
+    }
+  ]
+}

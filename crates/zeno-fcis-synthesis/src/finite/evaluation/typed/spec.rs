@@ -52,6 +52,7 @@ pub(crate) open spec fn typed_instruction(op:NumericOp)->Instruction {
         NumericOp::I128(v)=>Instruction::Literal(Atom::I128(v),Kind::Signed),
         NumericOp::U128(v)=>Instruction::Literal(Atom::U128(v),Kind::Unsigned),
         NumericOp::Bool(v)=>Instruction::Literal(Atom::Bool(v),Kind::Bool),
+        NumericOp::ToI128(a)=>Instruction::Cast(true,a),NumericOp::ToU128(a)=>Instruction::Cast(false,a),
         NumericOp::Add(w,a,b)=>Instruction::Arithmetic(w,ArithmeticOp::Add,a,b),
         NumericOp::Sub(w,a,b)=>Instruction::Arithmetic(w,ArithmeticOp::Sub,a,b),
         NumericOp::Eq(a,b)=>Instruction::Eq(e,a,b),NumericOp::Lt(a,b)=>Instruction::Lt(e,a,b),
@@ -84,7 +85,16 @@ pub(crate) open spec fn node<'a>(op:Instruction,input:Seq<Atom<'a>>,values:Seq<A
             None=>Err(Failure::Reference),Some(v)=>if kind(v).is_some(){Ok(v)}else{Err(Failure::Kind)},
         },
         Instruction::Literal(v,_)=>Ok(v),
+        Instruction::Cast(signed,a)=>match at(values,a as nat){
+            Some(Atom::U128(v)) if signed=>if v<=i128::MAX as u128{Ok(Atom::I128(v as i128))}else{Err(Failure::Arithmetic)},
+            Some(Atom::I128(v)) if !signed=>if v>=0{Ok(Atom::U128(v as u128))}else{Err(Failure::Arithmetic)},
+            Some(_)=>Err(Failure::Kind),None=>Err(Failure::Reference),
+        },
         Instruction::ScalarMul(w,a,b)|Instruction::ScalarDiv(w,_,a,b)=>match(at(values,a as nat),at(values,b as nat)) {
+            (Some(Atom::U128(a)),Some(Atom::U128(b))) if w==IntegerWidth::Unsigned128=>{
+                let v=match op {Instruction::ScalarMul(..)=>Some(a as int*b as int),Instruction::ScalarDiv(_,up,_,_)=>if b==0{None}else{Some(a as int / b as int + if up && a as int % b as int !=0{1int}else{0int})},_=>None};
+                match v{Some(v)=>if 0<=v<=u128::MAX{Ok(Atom::U128(v as u128))}else{Err(Failure::Arithmetic)},None=>Err(Failure::Arithmetic)}
+            },
             (Some(a),Some(b))=>if project(a).is_none() || project(b).is_none(){Err(Failure::Kind)}else{match(project_width(w,a),project_width(w,b)) {
                 (Some(a),Some(b))=>width_result(w,match op {
                     Instruction::ScalarMul(..)=>value::scalar::multiply_value(a,b),

@@ -1,0 +1,283 @@
+{
+  "schema": "zeno-fcis/kb-suite/1",
+  "proposing_subjects": [
+    "388affcd1b87419028978f0f85f223d5d28d89ab36f7071818f58359ce7aa39f",
+    "e118df3fb976c2e5bc30c39d02fb192f6adca48fc2c1d0772279d3a637b63f1e"
+  ],
+  "tasks": [
+    {
+      "name": "counter-c3",
+      "subject": {
+        "path": "subjects/counter-c3.zcve",
+        "sha256": "04270561ad3b395c9c1252b7216092c70b406333c9a0438085c2e8f159c25aed"
+      },
+      "scope": {
+        "capability": [
+          "finite-domain",
+          "immutable-proposal"
+        ],
+        "environment": [
+          "sandbox"
+        ],
+        "family": [
+          "bounded-counter"
+        ],
+        "tool": [
+          "zeno-fcis"
+        ],
+        "version": [
+          "v250"
+        ]
+      },
+      "seed": 17,
+      "budget": {
+        "work": 1000000,
+        "tuples": 4096,
+        "gate_pairs": 100000,
+        "checks": 12,
+        "search_work": 500000,
+        "timeout_ms": 22000
+      },
+      "proposal": {
+        "program": "identity",
+        "stages": [
+          "canonical",
+          "resubstitute"
+        ]
+      },
+      "sha256": "3e1dfc3816c331727600ba68fbf0209094dc9bbcb36723385d5611670094a363"
+    },
+    {
+      "name": "counter-c5",
+      "subject": {
+        "path": "subjects/counter-c5.zcve",
+        "sha256": "48e4b237ce1d41dfa80cadfefc36582c8c7e656f904cfada243a904fe6b03520"
+      },
+      "scope": {
+        "capability": [
+          "finite-domain",
+          "immutable-proposal"
+        ],
+        "environment": [
+          "sandbox"
+        ],
+        "family": [
+          "bounded-counter"
+        ],
+        "tool": [
+          "zeno-fcis"
+        ],
+        "version": [
+          "v250"
+        ]
+      },
+      "seed": 17,
+      "budget": {
+        "work": 1000000,
+        "tuples": 4096,
+        "gate_pairs": 100000,
+        "checks": 12,
+        "search_work": 500000,
+        "timeout_ms": 22000
+      },
+      "proposal": {
+        "program": "identity",
+        "stages": [
+          "canonical",
+          "resubstitute"
+        ]
+      },
+      "sha256": "b1b807de2ef4e9b2811829d730294fdb1377839584fe089ac5f9a619757bcc9d"
+    },
+    {
+      "name": "reservation-pool",
+      "subject": {
+        "path": "subjects/reservation-pool.zcve",
+        "sha256": "cf561f98efe6550d6eebc14331f0c36d2562dc3f376d79b2b4b5591d22d30987"
+      },
+      "scope": {
+        "capability": [
+          "finite-domain",
+          "immutable-proposal"
+        ],
+        "environment": [
+          "sandbox"
+        ],
+        "family": [
+          "core-component"
+        ],
+        "tool": [
+          "zeno-fcis"
+        ],
+        "version": [
+          "v250"
+        ]
+      },
+      "seed": 17,
+      "budget": {
+        "work": 1000000,
+        "tuples": 4096,
+        "gate_pairs": 100000,
+        "checks": 12,
+        "search_work": 500000,
+        "timeout_ms": 22000
+      },
+      "proposal": {
+        "program": "identity",
+        "stages": [
+          "canonical",
+          "resubstitute"
+        ]
+      },
+      "sha256": "e9cd31bc0605e239676b9920347315e0f6c6c2b7d1e86b6059721eb38d640557"
+    },
+    {
+      "name": "retry-budget",
+      "subject": {
+        "path": "subjects/retry-budget.zcve",
+        "sha256": "712956ec375349dfd3d5cd2de067affb72b35e36fd67266ef296c79bfd3fb198"
+      },
+      "scope": {
+        "capability": [
+          "finite-domain",
+          "immutable-proposal"
+        ],
+        "environment": [
+          "sandbox"
+        ],
+        "family": [
+          "core-component"
+        ],
+        "tool": [
+          "zeno-fcis"
+        ],
+        "version": [
+          "v250"
+        ]
+      },
+      "seed": 17,
+      "budget": {
+        "work": 1000000,
+        "tuples": 4096,
+        "gate_pairs": 100000,
+        "checks": 12,
+        "search_work": 500000,
+        "timeout_ms": 22000
+      },
+      "proposal": {
+        "program": "identity",
+        "stages": [
+          "canonical",
+          "resubstitute"
+        ]
+      },
+      "sha256": "945ac371ae9a1066fe9ec1e63526c34c2ee7c5cb36c57b9df40885a9d24de1ed"
+    },
+    {
+      "name": "durable-template",
+      "subject": {
+        "path": "subjects/durable-template.zcve",
+        "sha256": "f5989719cbd8995a984872ae9508e2f4395e800c52c5e29d4982c38287723863"
+      },
+      "scope": {
+        "capability": [
+          "finite-domain",
+          "immutable-proposal"
+        ],
+        "environment": [
+          "sandbox"
+        ],
+        "family": [
+          "template-synthesis"
+        ],
+        "tool": [
+          "zeno-fcis"
+        ],
+        "version": [
+          "v250"
+        ]
+      },
+      "seed": 17,
+      "budget": {
+        "work": 1000000,
+        "tuples": 4096,
+        "gate_pairs": 100000,
+        "checks": 12,
+        "search_work": 500000,
+        "timeout_ms": 22000
+      },
+      "proposal": {
+        "program": "identity",
+        "stages": [
+          "canonical",
+          "resubstitute"
+        ]
+      },
+      "sha256": "1c5b52ea7f74f397689f48188d118f6f9bc179e44162afa6fb9ee9f826dd7724"
+    },
+    {
+      "name": "counter-sketch",
+      "subject": {
+        "path": "subjects/counter-sketch.zcve",
+        "sha256": "655160153a3c7121d4d3b61a5dc0e8917d9aab4012154072adf94f679c247dcd"
+      },
+      "scope": {
+        "capability": [
+          "finite-domain",
+          "sketch"
+        ],
+        "environment": [
+          "sandbox"
+        ],
+        "family": [
+          "bounded-counter"
+        ],
+        "tool": [
+          "zeno-fcis"
+        ],
+        "version": [
+          "v250"
+        ]
+      },
+      "seed": 17,
+      "budget": {
+        "work": 1000000,
+        "tuples": 4096,
+        "gate_pairs": 100000,
+        "checks": 12,
+        "search_work": 500000,
+        "timeout_ms": 22000
+      },
+      "proposal": {
+        "expressions": {
+          "outputs": [
+            "authorized ? action - (value == (action == Inc ? ?c : 0) ? ?c : ?c) : 0",
+            "keep",
+            "keep"
+          ],
+          "schema": "zeno-fcis/loop-expressions/1",
+          "vocabulary": {
+            "cases": 5,
+            "inputs": [
+              "value",
+              "action",
+              "authorized"
+            ],
+            "variants": {
+              "action": {
+                "Dec": 151,
+                "Inc": 150
+              }
+            }
+          }
+        },
+        "stages": [
+          "complete",
+          "canonical",
+          "resubstitute"
+        ]
+      },
+      "sha256": "c8cf6ec7986a21560c73179607f78fa703b6e15316477921d0168b71832c765f"
+    }
+  ]
+}

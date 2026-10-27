@@ -1,0 +1,1612 @@
+{
+  "schema": "zeno-fcis/contract-review/4",
+  "sources": {
+    "examples_sha256": "9f92a9a61a374ce44e129bd0e5d2836cb437e73beb606d3f5c7e356894529a28",
+    "project_sha256": "9907c49c462ae587ca984eae8410ace06a886b4ee6fe36aaab40c40accb004b6",
+    "rules_sha256": "31d21c42a9a9541c69ab56b90b30cea395bc1c53d9295fbe83d891ac2dc11f3c",
+    "schema_sha256": "bd7c96180032d71bcf2d239e0f9be7b51f695f60f4f9b3861ce0d8eb25e959c9"
+  },
+  "summary": {
+    "application": "bounded-counter-guide",
+    "examples": {
+      "compared": 3,
+      "disagreements": 0
+    },
+    "findings": 0,
+    "gaps": {
+      "full": {
+        "determined": 0,
+        "mutants_admitted": 9,
+        "mutants_caught": 28,
+        "tuples": 12
+      },
+      "inactive_laws": [],
+      "reject_everything_admitted": true,
+      "status": "measured",
+      "valid": {
+        "determined": 0,
+        "mutants_admitted": 9,
+        "mutants_caught": 28,
+        "tuples": 12
+      }
+    },
+    "inputs": {
+      "construction": "full-domain",
+      "count": 12
+    },
+    "law_refusal_findings": 0,
+    "mutants": {
+      "count": 48,
+      "distinguished": 37,
+      "equivalent_over_full_domain": 2,
+      "not_distinguished_within_boundary_set": 0,
+      "refused_by_generator": 9,
+      "refused_by_library": 0
+    },
+    "refusals": {
+      "by_class": {},
+      "count": 0,
+      "on_law_consistent_states": {
+        "by_class": {},
+        "count": 0
+      },
+      "on_states_the_laws_exclude": {
+        "by_class": {},
+        "count": 0
+      }
+    }
+  },
+  "inputs": {
+    "boundary": null,
+    "boundary_rule": "an integer position takes its domain endpoints and every integer constant the rules compare with, add to, subtract from or assign to a value of its type, with that constant's two neighbours, where in domain; genesis values count as constants; a sum takes every variant; a boolean both values; probe bases are the genesis state with the first boundary value of every command and context position, then each owner example",
+    "construction": "full-domain",
+    "construction_rule": "full-domain when the domain has at most max_tuples tuples; else boundary-product when the product of the boundary sets does; else boundary-probes, stopped at max_tuples",
+    "count": 12,
+    "domain_size": "12",
+    "max_tuples": 1048576,
+    "order": "every tuple of the admitted domain; positions in program order, the last position fastest",
+    "positions": [
+      {
+        "domain": {
+          "kind": "int",
+          "max": "2",
+          "min": "0"
+        },
+        "field": 110,
+        "name": "pre.100.110",
+        "source": "state",
+        "type": 105
+      },
+      {
+        "domain": {
+          "kind": "sum",
+          "type_id": 107,
+          "variants": [
+            150,
+            151
+          ]
+        },
+        "field": 120,
+        "name": "command.101.120",
+        "source": "command",
+        "type": 107
+      },
+      {
+        "domain": {
+          "kind": "bool"
+        },
+        "field": 130,
+        "name": "context.102.130",
+        "source": "context",
+        "type": 108
+      }
+    ]
+  },
+  "gaps": {
+    "activation": {
+      "full": {
+        "500": 4,
+        "501": 4,
+        "502": 4
+      },
+      "inactive": [],
+      "valid": {
+        "500": 4,
+        "501": 4,
+        "502": 4
+      }
+    },
+    "admissible": {
+      "full": {
+        "determined": 0,
+        "examples": [
+          {
+            "admissible": 3,
+            "also_admitted": [
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 201
+              },
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 202
+              }
+            ],
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 200
+            },
+            "input": [
+              0,
+              150,
+              0
+            ]
+          },
+          {
+            "admissible": 4,
+            "also_admitted": [
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 200
+              },
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 201
+              },
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 202
+              }
+            ],
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ]
+          },
+          {
+            "admissible": 3,
+            "also_admitted": [
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 201
+              },
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 202
+              }
+            ],
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 200
+            },
+            "input": [
+              0,
+              151,
+              0
+            ]
+          }
+        ],
+        "freedom": {
+          "class": 4,
+          "reject_reason": 12,
+          "successor": 0
+        },
+        "reference_refused": 0,
+        "tuples": 12,
+        "undetermined": 12,
+        "zero_outcome": 0
+      },
+      "valid": {
+        "determined": 0,
+        "examples": [
+          {
+            "admissible": 3,
+            "also_admitted": [
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 201
+              },
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 202
+              }
+            ],
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 200
+            },
+            "input": [
+              0,
+              150,
+              0
+            ]
+          },
+          {
+            "admissible": 4,
+            "also_admitted": [
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 200
+              },
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 201
+              },
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 202
+              }
+            ],
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ]
+          },
+          {
+            "admissible": 3,
+            "also_admitted": [
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 201
+              },
+              {
+                "class": "Reject",
+                "post": null,
+                "reason": 202
+              }
+            ],
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 200
+            },
+            "input": [
+              0,
+              151,
+              0
+            ]
+          }
+        ],
+        "freedom": {
+          "class": 4,
+          "reject_reason": 12,
+          "successor": 0
+        },
+        "reference_refused": 0,
+        "tuples": 12,
+        "undetermined": 12,
+        "zero_outcome": 0
+      }
+    },
+    "completeness": {
+      "accepted_rows": 4,
+      "decision_universe": "all declared scalar successors with canonical difference patches, every declared reason, Accept/Reject/CommittedFailure; effects and channels structurally excluded by the scalar profile",
+      "exactly_one": 0,
+      "execution_refusals": 0,
+      "law_991_used": false,
+      "meaning": "the declared laws only; compare against an independent reviewed relation before adoption",
+      "residual_witnesses": [
+        {
+          "admissible": 3,
+          "also_admitted": [
+            {
+              "class": "Reject",
+              "post": null,
+              "reason": 201
+            },
+            {
+              "class": "Reject",
+              "post": null,
+              "reason": 202
+            }
+          ],
+          "contract": {
+            "class": "Reject",
+            "post": [
+              0
+            ],
+            "reason": 200
+          },
+          "input": [
+            0,
+            150,
+            0
+          ]
+        },
+        {
+          "admissible": 4,
+          "also_admitted": [
+            {
+              "class": "Reject",
+              "post": null,
+              "reason": 200
+            },
+            {
+              "class": "Reject",
+              "post": null,
+              "reason": 201
+            },
+            {
+              "class": "Reject",
+              "post": null,
+              "reason": 202
+            }
+          ],
+          "contract": {
+            "class": "Accept",
+            "post": [
+              1
+            ],
+            "reason": null
+          },
+          "input": [
+            0,
+            150,
+            1
+          ]
+        },
+        {
+          "admissible": 3,
+          "also_admitted": [
+            {
+              "class": "Reject",
+              "post": null,
+              "reason": 201
+            },
+            {
+              "class": "Reject",
+              "post": null,
+              "reason": 202
+            }
+          ],
+          "contract": {
+            "class": "Reject",
+            "post": [
+              0
+            ],
+            "reason": 200
+          },
+          "input": [
+            0,
+            151,
+            0
+          ]
+        }
+      ],
+      "status": "incomplete",
+      "zero_outcome": 0
+    },
+    "declared_laws": [
+      500,
+      501,
+      502
+    ],
+    "domain": {
+      "inputs": 4,
+      "state_laws": [
+        500
+      ],
+      "states": 3,
+      "tuples": 12,
+      "valid_states": 3
+    },
+    "frame_check": {
+      "mismatches": 0,
+      "reference_decisions_rechecked": 12
+    },
+    "max_work": 60000000,
+    "mutation": {
+      "catalog": "zeno-fcis/contract-review-mutants/2",
+      "count": 48,
+      "full": {
+        "admitted": 9,
+        "caught": 28,
+        "caught_of_scored": [
+          28,
+          37
+        ],
+        "equivalent": 2
+      },
+      "list": [
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                2
+              ],
+              "reason": 201
+            },
+            "input": [
+              2,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`action == 150` -> `action != 150`",
+          "classification": "caught",
+          "id": "m0001",
+          "operator": "flip-comparison",
+          "site": "cases[1].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                2
+              ],
+              "reason": 201
+            },
+            "input": [
+              2,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`value == 2` -> `value != 2`",
+          "classification": "caught",
+          "id": "m0002",
+          "operator": "flip-comparison",
+          "site": "cases[1].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 202
+            },
+            "input": [
+              0,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`action == 151` -> `action != 151`",
+          "classification": "caught",
+          "id": "m0003",
+          "operator": "flip-comparison",
+          "site": "cases[2].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 202
+            },
+            "input": [
+              0,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`value == 0` -> `value != 0`",
+          "classification": "caught",
+          "id": "m0004",
+          "operator": "flip-comparison",
+          "site": "cases[2].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`action == 150` -> `action != 150`",
+          "classification": "caught",
+          "id": "m0005",
+          "operator": "flip-comparison",
+          "site": "cases[3].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                2
+              ],
+              "reason": 201
+            },
+            "input": [
+              2,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`150` -> `151`",
+          "classification": "caught",
+          "id": "m0006",
+          "operator": "constant-up",
+          "site": "cases[1].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                2
+              ],
+              "reason": 201
+            },
+            "input": [
+              2,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`2` -> `3`",
+          "classification": "caught",
+          "id": "m0007",
+          "operator": "constant-up",
+          "site": "cases[1].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 202
+            },
+            "input": [
+              0,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`151` -> `152`",
+          "classification": "caught",
+          "id": "m0008",
+          "operator": "constant-up",
+          "site": "cases[2].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 202
+            },
+            "input": [
+              0,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`0` -> `1`",
+          "classification": "caught",
+          "id": "m0009",
+          "operator": "constant-up",
+          "site": "cases[2].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`150` -> `151`",
+          "classification": "caught",
+          "id": "m0010",
+          "operator": "constant-up",
+          "site": "cases[3].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": 502,
+              "refusal": "law"
+            }
+          },
+          "change": "`1` -> `2`",
+          "classification": "caught",
+          "id": "m0011",
+          "operator": "constant-up",
+          "site": "cases[3].post.110",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                0
+              ],
+              "reason": null
+            },
+            "input": [
+              1,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`1` -> `2`",
+          "classification": "caught",
+          "id": "m0012",
+          "operator": "constant-up",
+          "site": "cases[4].post.110",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                2
+              ],
+              "reason": 201
+            },
+            "input": [
+              2,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`150` -> `149`",
+          "classification": "caught",
+          "id": "m0013",
+          "operator": "constant-down",
+          "site": "cases[1].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                2
+              ],
+              "reason": 201
+            },
+            "input": [
+              2,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`2` -> `1`",
+          "classification": "caught",
+          "id": "m0014",
+          "operator": "constant-down",
+          "site": "cases[1].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 202
+            },
+            "input": [
+              0,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`151` -> `150`",
+          "classification": "caught",
+          "id": "m0015",
+          "operator": "constant-down",
+          "site": "cases[2].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 202
+            },
+            "input": [
+              0,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`0` -> `-1`",
+          "classification": "caught",
+          "id": "m0016",
+          "operator": "constant-down",
+          "site": "cases[2].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`150` -> `149`",
+          "classification": "caught",
+          "id": "m0017",
+          "operator": "constant-down",
+          "site": "cases[3].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": 502,
+              "refusal": "law"
+            }
+          },
+          "change": "`1` -> `0`",
+          "classification": "caught",
+          "id": "m0018",
+          "operator": "constant-down",
+          "site": "cases[3].post.110",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                0
+              ],
+              "reason": null
+            },
+            "input": [
+              1,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": 502,
+              "refusal": "law"
+            }
+          },
+          "change": "`1` -> `0`",
+          "classification": "caught",
+          "id": "m0019",
+          "operator": "constant-down",
+          "site": "cases[4].post.110",
+          "valid_domain": "caught"
+        },
+        {
+          "admitted_witness": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 201
+            }
+          },
+          "change": "`(action == 150) && (value == 2)` -> `action == 150`",
+          "classification": "admitted",
+          "id": "m0020",
+          "operator": "drop-conjunct",
+          "site": "cases[1].when",
+          "valid_domain": "admitted"
+        },
+        {
+          "admitted_witness": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              2,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Reject",
+              "post": [
+                2
+              ],
+              "reason": 201
+            }
+          },
+          "change": "`(action == 150) && (value == 2)` -> `value == 2`",
+          "classification": "admitted",
+          "id": "m0021",
+          "operator": "drop-conjunct",
+          "site": "cases[1].when",
+          "valid_domain": "admitted"
+        },
+        {
+          "admitted_witness": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                0
+              ],
+              "reason": null
+            },
+            "input": [
+              1,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Reject",
+              "post": [
+                1
+              ],
+              "reason": 202
+            }
+          },
+          "change": "`(action == 151) && (value == 0)` -> `action == 151`",
+          "classification": "admitted",
+          "id": "m0022",
+          "operator": "drop-conjunct",
+          "site": "cases[2].when",
+          "valid_domain": "admitted"
+        },
+        {
+          "admitted_witness": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 202
+            }
+          },
+          "change": "`(action == 151) && (value == 0)` -> `value == 0`",
+          "classification": "admitted",
+          "id": "m0023",
+          "operator": "drop-conjunct",
+          "site": "cases[2].when",
+          "valid_domain": "admitted"
+        },
+        {
+          "admitted_witness": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                2
+              ],
+              "reason": 200
+            },
+            "input": [
+              2,
+              150,
+              0
+            ],
+            "mutant": {
+              "class": "Reject",
+              "post": [
+                2
+              ],
+              "reason": 201
+            }
+          },
+          "change": "case 1 `(action == 150) && (value == 2)` decides before case 0 `!authorized`",
+          "classification": "admitted",
+          "id": "m0024",
+          "operator": "swap-adjacent-cases",
+          "site": "cases[0],cases[1]",
+          "valid_domain": "admitted"
+        },
+        {
+          "change": "case 2 `(action == 151) && (value == 0)` decides before case 1 `(action == 150) && (value == 2)`",
+          "classification": "equivalent",
+          "id": "m0025",
+          "operator": "swap-adjacent-cases",
+          "site": "cases[1],cases[2]",
+          "valid_domain": "equivalent"
+        },
+        {
+          "change": "case 3 `action == 150` decides before case 2 `(action == 151) && (value == 0)`",
+          "classification": "equivalent",
+          "id": "m0026",
+          "operator": "swap-adjacent-cases",
+          "site": "cases[2],cases[3]",
+          "valid_domain": "equivalent"
+        },
+        {
+          "admitted_witness": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 200
+            },
+            "input": [
+              0,
+              150,
+              0
+            ],
+            "mutant": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 201
+            }
+          },
+          "change": "`200` -> `201` and `201` -> `200`",
+          "classification": "admitted",
+          "id": "m0027",
+          "operator": "swap-reasons",
+          "site": "cases[0].reason,cases[1].reason",
+          "valid_domain": "admitted"
+        },
+        {
+          "admitted_witness": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 202
+            },
+            "input": [
+              0,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 201
+            }
+          },
+          "change": "`201` -> `202` and `202` -> `201`",
+          "classification": "admitted",
+          "id": "m0028",
+          "operator": "swap-reasons",
+          "site": "cases[1].reason,cases[2].reason",
+          "valid_domain": "admitted"
+        },
+        {
+          "change": "`200` -> `201`",
+          "classification": "refused-by-generator",
+          "id": "m0029",
+          "operator": "change-reason",
+          "refusal": {
+            "place": "v2/policy.json cases",
+            "reason": "reason 200 is declared but no case uses it; if you removed the rule that used it, also delete `reason 200 not_authorized` from project.zeno, or give a case `\"reason\": 200`"
+          },
+          "site": "cases[0].reason"
+        },
+        {
+          "change": "`201` -> `202`",
+          "classification": "refused-by-generator",
+          "id": "m0030",
+          "operator": "change-reason",
+          "refusal": {
+            "place": "v2/policy.json cases",
+            "reason": "reason 201 is declared but no case uses it; if you removed the rule that used it, also delete `reason 201 at_capacity` from project.zeno, or give a case `\"reason\": 201`"
+          },
+          "site": "cases[1].reason"
+        },
+        {
+          "change": "`202` -> `200`",
+          "classification": "refused-by-generator",
+          "id": "m0031",
+          "operator": "change-reason",
+          "refusal": {
+            "place": "v2/policy.json cases",
+            "reason": "reason 202 is declared but no case uses it; if you removed the rule that used it, also delete `reason 202 at_zero` from project.zeno, or give a case `\"reason\": 202`"
+          },
+          "site": "cases[2].reason"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 200
+            },
+            "input": [
+              0,
+              150,
+              0
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": 501,
+              "refusal": "law"
+            }
+          },
+          "change": "`!authorized` -> `!!authorized`",
+          "classification": "caught",
+          "id": "m0032",
+          "operator": "negate-guard",
+          "site": "cases[0].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                2
+              ],
+              "reason": 201
+            },
+            "input": [
+              2,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`(action == 150) && (value == 2)` -> `!((action == 150) && (value == 2))`",
+          "classification": "caught",
+          "id": "m0033",
+          "operator": "negate-guard",
+          "site": "cases[1].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 202
+            },
+            "input": [
+              0,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`(action == 151) && (value == 0)` -> `!((action == 151) && (value == 0))`",
+          "classification": "caught",
+          "id": "m0034",
+          "operator": "negate-guard",
+          "site": "cases[2].when",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`action == 150` -> `!(action == 150)`",
+          "classification": "caught",
+          "id": "m0035",
+          "operator": "negate-guard",
+          "site": "cases[3].when",
+          "valid_domain": "caught"
+        },
+        {
+          "change": "case 0 `!authorized` is removed",
+          "classification": "refused-by-generator",
+          "id": "m0036",
+          "operator": "drop-case",
+          "refusal": {
+            "place": "v2/policy.json cases",
+            "reason": "reason 200 is declared but no case uses it; if you removed the rule that used it, also delete `reason 200 not_authorized` from project.zeno, or give a case `\"reason\": 200`"
+          },
+          "site": "cases[0]"
+        },
+        {
+          "change": "case 1 `(action == 150) && (value == 2)` is removed",
+          "classification": "refused-by-generator",
+          "id": "m0037",
+          "operator": "drop-case",
+          "refusal": {
+            "place": "v2/policy.json cases",
+            "reason": "reason 201 is declared but no case uses it; if you removed the rule that used it, also delete `reason 201 at_capacity` from project.zeno, or give a case `\"reason\": 201`"
+          },
+          "site": "cases[1]"
+        },
+        {
+          "change": "case 2 `(action == 151) && (value == 0)` is removed",
+          "classification": "refused-by-generator",
+          "id": "m0038",
+          "operator": "drop-case",
+          "refusal": {
+            "place": "v2/policy.json cases",
+            "reason": "reason 202 is declared but no case uses it; if you removed the rule that used it, also delete `reason 202 at_zero` from project.zeno, or give a case `\"reason\": 202`"
+          },
+          "site": "cases[2]"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "case 3 `action == 150` is removed",
+          "classification": "caught",
+          "id": "m0039",
+          "operator": "drop-case",
+          "site": "cases[3]",
+          "valid_domain": "caught"
+        },
+        {
+          "change": "Reject -> Accept keeping every state field",
+          "classification": "refused-by-generator",
+          "id": "m0040",
+          "operator": "flip-class",
+          "refusal": {
+            "place": "v2/policy.json cases",
+            "reason": "reason 200 is declared but no case uses it; if you removed the rule that used it, also delete `reason 200 not_authorized` from project.zeno, or give a case `\"reason\": 200`"
+          },
+          "site": "cases[0].class"
+        },
+        {
+          "change": "Reject -> Accept keeping every state field",
+          "classification": "refused-by-generator",
+          "id": "m0041",
+          "operator": "flip-class",
+          "refusal": {
+            "place": "v2/policy.json cases",
+            "reason": "reason 201 is declared but no case uses it; if you removed the rule that used it, also delete `reason 201 at_capacity` from project.zeno, or give a case `\"reason\": 201`"
+          },
+          "site": "cases[1].class"
+        },
+        {
+          "change": "Reject -> Accept keeping every state field",
+          "classification": "refused-by-generator",
+          "id": "m0042",
+          "operator": "flip-class",
+          "refusal": {
+            "place": "v2/policy.json cases",
+            "reason": "reason 202 is declared but no case uses it; if you removed the rule that used it, also delete `reason 202 at_zero` from project.zeno, or give a case `\"reason\": 202`"
+          },
+          "site": "cases[2].class"
+        },
+        {
+          "admitted_witness": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Reject",
+              "post": [
+                0
+              ],
+              "reason": 200
+            }
+          },
+          "change": "Accept -> Reject 200",
+          "classification": "admitted",
+          "id": "m0043",
+          "operator": "flip-class",
+          "site": "cases[3].class",
+          "valid_domain": "admitted"
+        },
+        {
+          "admitted_witness": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                0
+              ],
+              "reason": null
+            },
+            "input": [
+              1,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Reject",
+              "post": [
+                1
+              ],
+              "reason": 200
+            }
+          },
+          "change": "Accept -> Reject 200",
+          "classification": "admitted",
+          "id": "m0044",
+          "operator": "flip-class",
+          "site": "cases[4].class",
+          "valid_domain": "admitted"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": 502,
+              "refusal": "law"
+            }
+          },
+          "change": "`value + 1` -> `(value + 1) + 1`",
+          "classification": "caught",
+          "id": "m0045",
+          "operator": "perturb-successor",
+          "site": "cases[3].post.110",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                1
+              ],
+              "reason": null
+            },
+            "input": [
+              0,
+              150,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": 502,
+              "refusal": "law"
+            }
+          },
+          "change": "`value + 1` -> `(value + 1) - 1`",
+          "classification": "caught",
+          "id": "m0046",
+          "operator": "perturb-successor",
+          "site": "cases[3].post.110",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                0
+              ],
+              "reason": null
+            },
+            "input": [
+              1,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": 502,
+              "refusal": "law"
+            }
+          },
+          "change": "`value - 1` -> `(value - 1) + 1`",
+          "classification": "caught",
+          "id": "m0047",
+          "operator": "perturb-successor",
+          "site": "cases[4].post.110",
+          "valid_domain": "caught"
+        },
+        {
+          "caught_at": {
+            "contract": {
+              "class": "Accept",
+              "post": [
+                0
+              ],
+              "reason": null
+            },
+            "input": [
+              1,
+              151,
+              1
+            ],
+            "mutant": {
+              "class": "Refused",
+              "law": null,
+              "refusal": "domain"
+            }
+          },
+          "change": "`value - 1` -> `(value - 1) - 1`",
+          "classification": "caught",
+          "id": "m0048",
+          "operator": "perturb-successor",
+          "site": "cases[4].post.110",
+          "valid_domain": "caught"
+        }
+      ],
+      "refused_by_generator": 9,
+      "refused_by_library": 0,
+      "valid": {
+        "admitted": 9,
+        "caught": 28,
+        "caught_of_scored": [
+          28,
+          37
+        ],
+        "equivalent": 2
+      }
+    },
+    "proposals": null,
+    "reject_everything": {
+      "admitted_where_the_contract_decides": true,
+      "first_refusal": null,
+      "refused_tuples": 0,
+      "refused_where_the_contract_decides": 0,
+      "reject_reason": 200,
+      "status": "bound"
+    },
+    "status": "measured",
+    "tables": {
+      "admissible_sha256": "eef4ca197f8167da61ffe23ccf6610324d598f3483913581839881c7eb9aa88a",
+      "rule": "SHA-256 of one line per tuple in ordinal order, each ending in a newline: the number of admissible decisions, or `-` where the contract's own decision is refused"
+    },
+    "work": "1260"
+  }
+}

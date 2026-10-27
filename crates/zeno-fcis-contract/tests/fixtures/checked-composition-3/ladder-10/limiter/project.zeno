@@ -27,7 +27,14 @@ merge [400];
 // supplies the substantive no-free-request and no-spurious-reset obligation.
 law 500 quota on commit, genesis = post.100.111 >= 0 && post.100.111 <= 3;
 law 501 exact_charge on accept = context.102.131 == 1 && context.102.130 >= pre.100.110 && (context.102.130 < pre.100.110 + 3 -> post.100.110 == pre.100.110 && post.100.111 == pre.100.111 + 1) && (context.102.130 >= pre.100.110 + 3 -> post.100.110 == context.102.130 && post.100.111 == 1);
+// Independent complete relation; ordered guards exclude earlier reasons.
+law 520 reason_200 on reject:200 = (true) && (context.102.131 == 0);
+law 521 reason_201 on reject:201 = ((true) && !(context.102.131 == 0)) && (context.102.130 < pre.100.110);
+law 522 reason_202 on reject:202 = (((true) && !(context.102.131 == 0)) && !(context.102.130 < pre.100.110)) && (context.102.130 < pre.100.110 + 3 && pre.100.111 == 3);
+law 540 legitimate_acceptance on reject = !((((true) && !(context.102.131 == 0)) && !(context.102.130 < pre.100.110)) && !(context.102.130 < pre.100.110 + 3 && pre.100.111 == 3));
+law 541 acceptance_eligibility on accept = (((true) && !(context.102.131 == 0)) && !(context.102.130 < pre.100.110)) && !(context.102.130 < pre.100.110 + 3 && pre.100.111 == 3);
+law 542 no_committed_failure on failure = false;
 // Core seed rate-limiter/1; parameters {"N": 3, "W": 3}.
-// Instance source-set SHA256 75ed8411409674c89a3ac3d2ca6a17ab9a0c56feb5b919117dc4f4cc4cb3839b.
+// Instance source-set SHA256 3b574b1b4ffc760cfe97f5a0376d14b463f5fd11c1b85c79dbba87b333ef093e.
 // Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

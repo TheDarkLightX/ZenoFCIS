@@ -1,0 +1,45 @@
+zeno 1;
+project 1 withdrawal_window;
+namespace 2 permissions;
+type 100 state Roles;
+type 101 command Request;
+type 102 context Session;
+type 105 int Parent in 0..=3;
+type 106 index Role of 110;
+type 107 int Grant in 0..=1;
+// Withdrawals: the operator may keep the window paused forever
+// States: 0 open, 1 withdrawn, 2 paused
+// Who moves: 0 = controller (the party we ask about), 1 = environment (anyone else).
+const table 110 mover 107 size 3 [0,1,1];
+const table 111 goal 107 size 3 [0,1,0];
+const table 800 next0 105 size 3 [2,1,3];
+const table 801 next1 105 size 3 [3,3,1];
+table 210 100 grants 107 size 3;
+field 120 101 role 106;
+variant 130 102 Session none;
+reason 200 permission_required precedence 0;
+component 400 inheritance {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+// z1..zN: the controller can force visiting a goal state infinitely often (Büchi), unrolled into N strata.
+derived table 701 z1[i] in table 110 rounds 3 {
+  when true then ((mover[i] == 0 && exists j in table 110 { (next0[i] == j + 1 || next1[i] == j + 1) && z1[j] }) || (mover[i] == 1 && (next0[i] != 0 || next1[i] != 0) && forall j in table 110 { !(next0[i] == j + 1 || next1[i] == j + 1) || z1[j] })) || (goal[i] == 1 && ((mover[i] == 0 && (next0[i] != 0 || next1[i] != 0)) || (mover[i] == 1 && (next0[i] != 0 || next1[i] != 0))));
+  default false;
+};
+derived table 702 z2[i] in table 110 rounds 3 {
+  when true then ((mover[i] == 0 && exists j in table 110 { (next0[i] == j + 1 || next1[i] == j + 1) && z2[j] }) || (mover[i] == 1 && (next0[i] != 0 || next1[i] != 0) && forall j in table 110 { !(next0[i] == j + 1 || next1[i] == j + 1) || z2[j] })) || (goal[i] == 1 && (((mover[i] == 0 && exists j in table 110 { (next0[i] == j + 1 || next1[i] == j + 1) && z1[j] }) || (mover[i] == 1 && (next0[i] != 0 || next1[i] != 0) && forall j in table 110 { !(next0[i] == j + 1 || next1[i] == j + 1) || z1[j] }))));
+  default false;
+};
+derived table 703 z3[i] in table 110 rounds 3 {
+  when true then ((mover[i] == 0 && exists j in table 110 { (next0[i] == j + 1 || next1[i] == j + 1) && z3[j] }) || (mover[i] == 1 && (next0[i] != 0 || next1[i] != 0) && forall j in table 110 { !(next0[i] == j + 1 || next1[i] == j + 1) || z3[j] })) || (goal[i] == 1 && (((mover[i] == 0 && exists j in table 110 { (next0[i] == j + 1 || next1[i] == j + 1) && z2[j] }) || (mover[i] == 1 && (next0[i] != 0 || next1[i] != 0) && forall j in table 110 { !(next0[i] == j + 1 || next1[i] == j + 1) || z2[j] }))));
+  default false;
+};
+law 500 domains on commit, genesis = forall i in table 110 { post.100.210[i] >= 0 && post.100.210[i] <= 1 };
+law 600 from_open on commit = z3[0];
+law 601 from_withdrawn on commit = z3[1];
+law 602 from_paused on commit = z3[2];

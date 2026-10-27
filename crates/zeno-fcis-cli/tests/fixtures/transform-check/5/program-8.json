@@ -1,0 +1,25 @@
+{
+  "inputs": [
+    {
+      "kind": "Int",
+      "min": "-4",
+      "max": "4"
+    }
+  ],
+  "outputs": [
+    {
+      "kind": "Int",
+      "min": "-4",
+      "max": "4"
+    }
+  ],
+  "nodes": [
+    [
+      "Input",
+      0
+    ]
+  ],
+  "roots": [
+    0
+  ]
+}

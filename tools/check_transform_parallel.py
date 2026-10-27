@@ -30,7 +30,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 CASES = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/cases-i128.json'
 ARTIFACTS = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/i128-programs'
-VECTORS = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/transform-check/4'
+VECTORS = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/transform-check/5'
 ARTIFACT_PAIRS = (
     ('kernel', 'boolean-kernel-original', 'boolean-kernel-candidate'),
     ('kernel-padded', 'boolean-kernel-original', 'boolean-kernel-padded'),
@@ -461,5 +461,12 @@ def main():
     print('transform-parallel-parity: PASS')
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        main()
+    run_cli(_entrypoint)

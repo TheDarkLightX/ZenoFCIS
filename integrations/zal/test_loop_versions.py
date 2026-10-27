@@ -111,13 +111,13 @@ class Workspace(unittest.TestCase):
         if "--max-work" in arguments and arguments[arguments.index("--max-work") + 1] == "0":
             return 2, {"status": "inconclusive", "detail": {"count": None, "question": None, "candidate": None}}
         if r["count"] == 0:
-            return 0, {"status": "no-completion", "detail": {"count": 0, "conflict": {"requirements": r["conflict"]}}}
+            return 1, {"status": "no-completion", "detail": {"count": 0, "conflict": {"requirements": r["conflict"]}}}
         if r["count"] == 1:
             return 0, {"status": "determined", "detail": {"count": 1, "candidate": {"status": "checked",
                        "checks": [{"verdict": "equivalent", "replay": "matched"}], "sha256": "a"*64, "domain": 2}}}
         q = r["question"]
         q["id"] = "q" + Z.digest({"specification": s, "partition": q})[:48]
-        return 0, {"status": "question", "detail": {"count": r["count"], "question": q}}
+        return 2, {"status": "question", "detail": {"count": r["count"], "question": q}}
 
     def doc(self, statement, author="model"):
         ctx = Z.Context(self.workspace.load()["subject"])

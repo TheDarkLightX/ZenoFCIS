@@ -9,6 +9,7 @@ pub(crate) open spec fn decode(bytes:Seq<u8>,offset:usize,leaf:LeafView)->Option
     match leaf {
         LeafView::Legacy(l)=>match legacy::scalar(bytes,offset,*l){Some((v,end))=>Some((Atom::I128(v as i128),end)),None=>None},
         LeafView::Numeric(domain)=>match integer::read_unsigned(bytes,offset,1){None=>None,Some((tag,start))=>match domain {
+            Domain::Sum{type_id,variants}=>if tag!=10{None}else{match integer::read_unsigned(bytes,start,4){None=>None,Some((actual,start))=>match integer::read_unsigned(bytes,start,2){None=>None,Some((variant,end))=>match integer::read_unsigned(bytes,end,1){None=>None,Some((payload,end))=>if actual==type_id as int&&payload==0&&(exists|i:int|0<=i<variants@.len()&&variants@[i] as int==variant){Some((Atom::I128(variant as i128),end))}else{None}}}}},
             Domain::Bool=>if tag==1{Some((Atom::Bool(false),start))}else if tag==2{Some((Atom::Bool(true),start))}else{None},
             Domain::I128{min,max}=>if tag!=4{None}else{match integer::read_signed(bytes,start){Some((v,end))=>if min<=v<=max{Some((Atom::I128(v),end))}else{None},None=>None}},
             Domain::U128{min,max}=>if tag!=3{None}else{match integer::read_unsigned(bytes,start,16){Some((v,end))=>if min<=v<=max{Some((Atom::U128(v),end))}else{None},None=>None}},
@@ -33,7 +34,7 @@ pub(crate) open spec fn fields<'a>(view:FieldsView<'a>)->Seq<(u16,LeafView<'a>)>
 }
 pub(crate) open spec fn numeric_field_valid(fs:Seq<Field<Domain>>,i:int)->bool {
     0<=i<fs.len() && (i==0 || fs[i-1].id<fs[i].id) && match fs[i].leaf {
-        Domain::Bool=>true,Domain::I128{min,max}=>min<=max,Domain::U128{min,max}=>min<=max,_=>false,
+        Domain::Sum{variants,..}=>0<variants@.len()&&(forall|i:int|0<i<variants@.len()==>variants@[i-1]< #[trigger] variants@[i]),Domain::Bool=>true,Domain::I128{min,max}=>min<=max,Domain::U128{min,max}=>min<=max,_=>false,
     }
 }
 pub(crate) open spec fn valid(view:FieldsView)->bool {

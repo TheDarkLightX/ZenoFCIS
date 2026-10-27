@@ -1,0 +1,48 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "invalid-payload",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "102": [
+      "I128",
+      0,
+      0
+    ],
+    "103": [
+      "Text",
+      1,
+      16
+    ]
+  },
+  "variables": {},
+  "cases": [
+    {
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {},
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "A",
+          "payload": {
+            "130": "choose(pre.100.111 == 0, -1, 2)"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant"
+  }
+}

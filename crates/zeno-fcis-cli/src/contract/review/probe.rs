@@ -37,6 +37,7 @@ use super::lemma;
 use super::machine::{self, Inconclusive, Loaded, Machine, Observed};
 use super::mutants;
 use super::parallel;
+use super::probe_kernel;
 use zeno_fcis_synthesis::finite::v2_laws::{Failure, Verdict};
 
 /// A question.
@@ -81,6 +82,7 @@ impl Question {
 #[derive(Clone, Debug)]
 pub(crate) enum Answer {
     Answered(Value),
+    NoStartingState(Value),
     Inconclusive(Inconclusive),
 }
 
@@ -106,6 +108,11 @@ pub(crate) fn probe(
     question: &Question,
     max_tuples: u64,
 ) -> Result<Answer, ContractError> {
+    if let Question::Count { condition } = question
+        && super::super::rules::Rules::read_for_project(project, rules)?.unsigned
+    {
+        return super::unsigned::count_probe(project, rules, condition, max_tuples);
+    }
     let loaded = Loaded::read(project, rules)?;
     if let Question::Explain { input } = question {
         return explain(&loaded, input).map(Answer::Answered);
@@ -115,6 +122,11 @@ pub(crate) fn probe(
         Err(inconclusive) => return Ok(Answer::Inconclusive(inconclusive)),
     };
     let machine = &observation.machine;
+    if matches!(question, Question::Reachable { .. })
+        && let Err(refusal) = &machine.starting_state
+    {
+        return Ok(Answer::NoStartingState(refusal.packet()));
+    }
     let space = &machine.space;
     let condition =
         |what: &str, formula: &str| conditions(project, &loaded, machine, what, formula);
@@ -122,9 +134,29 @@ pub(crate) fn probe(
         Question::Explain { .. } => unreachable!("answered above"),
         Question::Reachable { state } => {
             let holds = lemma::state_holds(project, &loaded, machine, "--state", state)?;
-            let (reachable, parent) = machine.reachable();
-            let reachable_count = reachable.iter().filter(|seen| **seen).count();
-            match (0..space.states).find(|state| holds[*state] && reachable[*state]) {
+            let (after, commits) = machine.kernel_tables();
+            let result = probe_kernel::decide_reachable(
+                space.inputs,
+                machine.genesis,
+                &after,
+                &commits,
+                &holds,
+                max_tuples,
+            )
+            .unwrap_or_else(|| unreachable!("observed machine tables are bounded and complete"));
+            let probe_kernel::Answer::Known {
+                target,
+                trace,
+                reachable_count,
+            } = result
+            else {
+                return Ok(Answer::Inconclusive(Inconclusive {
+                    reason: "domain-over-limit",
+                    size: Some(after.len() as u128),
+                    limit: max_tuples,
+                }));
+            };
+            match target {
                 None => json!({
                     "answer": "no",
                     "proof": format!("exhaustive over the {reachable_count} reachable states"),
@@ -132,7 +164,7 @@ pub(crate) fn probe(
                 Some(found) => json!({
                     "answer": "yes",
                     "state": crate::report_numbers::integers(&space.state(found)),
-                    "trace_from_genesis": Machine::trace(&parent, found)
+                    "trace_from_genesis": trace
                         .into_iter()
                         .map(|input| crate::report_numbers::integers(&space.input(input)))
                         .collect::<Vec<_>>(),
@@ -259,6 +291,26 @@ pub(super) fn conditions(
     what: &str,
     formula: &str,
 ) -> Result<Vec<Truth>, ContractError> {
+    if formula.contains("outbox.") || formula.contains("verdict.") || formula.contains("delivery.")
+    {
+        let expression = super::observations::Expression::compile(
+            formula,
+            &super::observations::names(loaded),
+            true,
+        )?;
+        return Ok(parallel(machine.space.tuples(), |ordinal| {
+            if matches!(machine.observed[ordinal], Observed::Refused { .. }) {
+                return Truth::Refused;
+            }
+            match super::observations::values(loaded, machine, ordinal)
+                .and_then(|v| expression.evaluate(&v))
+            {
+                Some(1) => Truth::Holds,
+                Some(0) => Truth::Fails,
+                _ => Truth::Undefined,
+            }
+        }));
+    }
     let (extended, id) = machine::with_law(
         project,
         &loaded.rules,

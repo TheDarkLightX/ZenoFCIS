@@ -6,7 +6,7 @@ law projection and signed-law division projection require fresh whole-source
 proofs and reviewed translated inventories. Historical counts and receipts
 below do not qualify these changed bytes. Qualification is pending.
 
-The [Verus workflow](../../.github/workflows/verus.yml) runs 20 qualification
+The [Verus workflow](../../.github/workflows/verus.yml) runs 23 qualification
 gates. Each gate first runs its script's own tests, then the script itself;
 for the `shared-runtime` gate these are `python3 tools/test_check_verus.py` and
 `python3 tools/check_verus.py --out` with an evidence path. The script requires
@@ -17,11 +17,14 @@ checks the authority and synthesis crates without default features.
 | --- | --- | --- |
 | `shared-runtime` | `check_verus.py` | [Finite-domain arithmetic](#arithmetic-unit) in the shared runtime source |
 | `scalar-query` | `check_scalar_query_refinement.py` | Scalar runtime/query correspondence |
-| `scalar-arithmetic` | `check_scalar_arithmetic.py` | Independently graded native emitted arithmetic; not a Verus theorem |
+| `scalar-arithmetic` | `check_scalar_arithmetic.py` | Native emitted arithmetic conformance; separate [source proofs and Rust AST translation validation](#arithmetic-correspondence) |
 | `finite-execution` | `check_finite_execution.py` | [Finite admission and eager evaluation](#v2-finite-admission-and-eager-execution) |
 | `metered-execution` | `check_metered_execution.py` | [Owned V2 instruction metering](#owned-v2-instruction-metering); not transition authorization |
 | `shared-finite-checker` | `check_checker.py` | The [shared finite checker](#shared-finite-checker) against its real metered evaluator |
+| `lemma-kernel` | `check_lemma_kernel.py` | [State lemma decision core](#state-lemma-decision-core) over validated finite tables |
+| `reachable-probe` | `check_reachable_probe.py` | [Reachable probe](#reachable-probe-and-shared-fixed-points), effective traces and fixed-point verdict forms |
 | `canonical-bytes` | `check_canonical_bytes.py` | [Production V2 integer byte readers](#v2-integer-byte-interpretation); not schema admission |
+| `value-decoder` | `check_value_decoder.py` | Production `decode_value`, abstract ZCVE model, resource invariants and refinement; qualification status is pinned in `value-decoder.json` |
 | `protected-input` | `check_protected_input.py` | [Owned V2 protected record projection](#v2-protected-flat-record-projection) |
 | `envelope-frame` | `check_envelope_frame_v2.py` | Original-envelope framing and exact payload custody |
 | `schema-binding` | `check_schema_binding_v2.py` | Complete original schema bytes, closed metadata and private custody |
@@ -458,3 +461,338 @@ leaf providing its own interface, an aggregate allowed to write unselected
 slots, and the identity `true && x = x` applied to a non-Boolean `x`. The proof
 makes no claim about liveness, fairness, traces, continuous dynamics, or
 asynchronous or shared-write coupling.
+
+## Spot refinement
+
+[spot_refinement.rs](spot_refinement.rs) proves the compiled ZenoDEX Spot
+decision program against the Spot core specification and the integer Step
+contracts that `core-apps/zenodex-spot/proofs/NativeBridge.lean` states. It is
+an application gate, not one of the workflow's qualification gates, and runs
+through `core-apps/zenodex-spot/tools/check_refinement.py`.
+
+- [spot_native_program.rs](spot_native_program.rs) is generated from
+  `core-apps/zenodex-spot/src/v2_contract.rs`: the 1,377 instructions, roots
+  and declared domains, each node's value as a function of the input, and
+  `program_terms`, which proves from the evaluator specification's `prefix`
+  and `projection` that a successful `execution` computes exactly those
+  values. Per accepting branch it also proves the guard and successor terms
+  the branch selection implies.
+- [spot_refinement_proof.rs](spot_refinement_proof.rs) states the
+  specification's successor, rounding included, and proves `spot_refinement`:
+  on every input `execution` accepts, an accepting branch assigns exactly that
+  successor, which meets the Step contract for every coalition containing the
+  actor.
+
+The closure is `evaluation/spec.rs`, `value/scalar.rs` and `value/wide.rs` by
+path. The evaluator's `Domain`, `Op` and `Failure` declarations come from a
+generated verbatim copy ([spot_evaluator_types.rs](spot_evaluator_types.rs))
+because their module also owns executable bodies this unit does not need. The
+generator's `--check` mode keeps both generated files fresh. That the
+executable evaluator, decision construction and publication meet the
+specification is the subject of the gates above, not of this unit.
+
+The check runs the whole crate under `--no-cheating`, requires the reviewed
+obligation count and theorem names, and runs five planted program defects
+that must each fail the proof.
+## Composed-domain outcome and invariant theorem
+
+The harness `composed_domain.rs` includes the production ordered resolver and
+concrete state application, plus a conditional n-component finite-history
+induction. Its premises include local decision-table preservation, delivered
+input assumptions and read-only invariants, and coupling checks at member and
+outside-failure endings. A concrete three-component pilot discharges them.
+The reviewed counts, contracts, specifications and runtime body inventory are in
+`composed-domain.json`. The [proof boundary](../../docs/COMPOSED_DOMAIN_PROOF.md)
+separates proved code from tested parsing, planning, table and binding bridges.
+
+```sh
+python3 tools/test_check_composed_domain.py
+python3 tools/check_composed_domain.py --out evidence/composed-domain.json
+```
+
+The gate runs unfiltered positive verification and restricted semantic controls
+for omitted cuts, dropped read-only invariants, wrong prefixes, own-only
+application, read-only writes and an extra callback after Reject. Native
+specimens and reference disagreement can be replayed separately with
+`python3 tools/test_composed_domain_runtime_controls.py --out evidence/composed-native.json`.
+
+
+## State lemma decision core
+
+[lemma_kernel.rs](lemma_kernel.rs) includes the production CLI
+[decision kernel](../../crates/zeno-fcis-cli/src/contract/review/lemma_kernel.rs)
+by path. The abstract specification defines Reach as the least genesis-containing
+set closed under effective steps, Init as genesis admission, and Cons as
+preservation by every committed edge. A separate induction theorem proves
+Init and Cons imply admission of every reachable state. The executable table
+validator, FIFO search with parents, complete consecution count, violation
+selection, trace construction and verdict refine these specifications.
+
+`Inductive` implies Init, Cons and admission of every reachable state.
+`False` has a genesis failure or a real trace to an excluded state; its final
+step leaves an admitted reachable state. `NotInductive` admits every reachable
+state but supplies a committed induction counterexample and its complete count.
+These statements quantify over arbitrary finite, representable tables admitted
+by the validator. The frozen [profile](lemma-kernel.json) binds every translated
+contract, mathematical function and executable body and fixes the obligation
+count. Internal helper preconditions are discharged by the unconditional
+`decide` boundary after table validation.
+
+Before translation, the shared `check_native_configuration` helper in
+`tools/check_verus.py` checks configuration at every lexical scope in the kernel.
+It admits direct `cfg(verus_keep_ghost)` guards and
+`cfg_attr(verus_keep_ghost, verus_spec(...))` annotations. Other configuration
+forms, including unknown target/feature predicates, nested conditional removal
+and `cfg!` expressions, refuse with a source line. The profile's exact exception
+list records the full native-only `Verdict` derive attribute, its declaration
+and a reason. Missing, moved, duplicated or changed exceptions refuse. This is
+a conservative source guard; macro expansion and compiler correspondence remain
+trusted. The other gates can call the shared helper but do not thereby inherit
+this gate's configuration qualification.
+
+```sh
+python3 tools/test_check_lemma_kernel.py
+python3 tools/check_lemma_kernel.py --out evidence/lemma-kernel.json
+```
+
+The gate checks the pinned whole crate with `--no-cheating`, native allocation,
+slice, vector, option and checked-product contracts, an independent FIFO oracle
+on every small table, and transitive-closure verdict comparisons. Six planted
+defects must compile and fail their named native assertion. Five fail a Verus
+obligation: omitted initiation, approval of an excluded genesis, a noncommit
+treated as a commit, premature search exit and an admitted counterexample
+successor. The sixth inserts a native-only verdict override: its translated
+proof still passes, but the configuration guard must reject its exact line.
+Each specimen is restored byte for byte, its SHA-256 recorded, then rebuilt,
+tested and verified again.
+
+The method builds on Klein et al., *seL4: Formal Verification of an OS Kernel*
+(SOSP 2009), and the [seL4 refinement proof organization](https://github.com/seL4/l4v).
+This is a scoped specification/refinement application, not a whole-system
+verification claim. Verus/vstd/Z3, Rust compilation and erasure, the allocator
+and the host remain trusted. Native tests exercise the assumed standard-library
+contracts. Shortest-trace minimality, the Machine/table adapter, `state_holds`,
+the law evaluator, generic `induction<S>`, unsigned/symbolic routes and JSON
+rendering are outside this theorem; adapter behavior and rendering are checked
+separately. No evaluator identity or application authority is changed.
+
+## Reachable probe and shared fixed points
+
+The [shared specification](finite_machine_spec.rs) defines declared state and
+input ordinals, genesis, raw successor and commit tables, the effective step,
+`F(X) = {genesis} union post(X)`, and Reach. A noncommitting outcome keeps its
+source state. The specification has no dependency on either judge.
+[Shared proofs](finite_machine_proofs.rs) establish that Reach is a fixed point
+and is contained in every pre-fixed point. They follow D. Park, *Fixpoint
+induction and proofs of program properties*, Machine Intelligence 5 (1969),
+and the specification/refinement organization described by
+[seL4](https://sel4.systems/Verification/proofs.html).
+
+The [verdict theorem](lemma_fixed_point.rs) proves the fixed-point forms:
+`Inductive` iff `F(H)` is a subset of `H`; `NotInductive` iff Reach is a subset
+of `H` but `F(H)` is not; `False` iff Reach is not a subset of `H`.
+The lemma harness retains its 32 obligations. Its profile now covers the shared
+definitions too. Its six original controls remain required.
+
+The [probe harness](probe_kernel.rs) includes the production
+[probe core](../../crates/zeno-fcis-cli/src/contract/review/probe_kernel.rs)
+and the same verified FIFO search and parent traversal. For a complete valid
+table within the tuple limit, it returns a matching state exactly when some
+state satisfying the query is in Reach. It selects the least matching state
+ordinal, preserving the CLI's choice even when another match has a shorter
+trace. The witness starts at genesis, follows effective steps, and ends at the
+selected state. A singleton query specializes this to exact state membership.
+An answer of no means no matching state is reachable, and includes the complete
+reachable-state count used by the renderer.
+
+Invalid tables refuse separately. Exceeding the tuple limit returns an
+`Unknown` variant with no answer, count or witness fields. The shared size
+predicate also refuses overflowed/unknown domain sizes. The existing adapter
+checks the domain limit before enumeration and reports invalid genesis as a
+separate refusal. No partial search is promoted to an answer.
+
+```sh
+python3 tools/test_check_reachable_probe.py
+python3 tools/check_reachable_probe.py --out evidence/reachable-probe.json
+```
+
+The [profile](reachable-probe.json) freezes 58 records and 48 whole-crate
+obligations, including the lemma unit and shared fixed-point proofs. These
+counts overlap the lemma gate and must not be added. Both gates use the shared
+native-configuration guard and the exact derive exception. Two probe controls
+ignore commit flags or stop the FIFO search early; each must compile, fail a
+named native assertion, fail its intended obligation, restore SHA-identically,
+and rebuild/test/verify successfully. Native tests compare 1,127,116 cases with
+independent transitive closure and simulate every reported trace.
+
+The Machine/table and predicate projections, domain enumeration and JSON/exit
+rendering remain tested boundaries. Native comparison with the prior search
+and CLI differentials cover their behavior on the retained example and fixture
+corpus; they do not supply a universal adapter theorem. Verus/vstd/Z3, Rust
+compilation and erasure, standard-library contracts, the allocator and host
+remain trusted. Shortest-trace minimality, physical cost/OOM, unsigned/symbolic
+reachability and whole-CLI correctness remain outside this proof. The probe
+remains advisory and grants no application authority.
+
+## Value decoder refinement
+
+`value_decoder.rs` includes the actual value and codec libraries with `#[path]`.
+The qualification profile is [value-decoder.json](value-decoder.json). The gate
+uses the tool files pinned in [toolchain.json](toolchain.json), verifies the
+whole crate, requires the exact obligation count and local declaration inventory, and
+refuses verifier errors, incomplete coverage, timeouts and nonsemantic control
+failures. The CI matrix runs the same gate.
+
+The proof layers are:
+
+1. `zeno-fcis-value/src/decoder_model.rs`: canonical values, `wf`, `spec_encode`,
+   resource accounting and wire order.
+2. `zeno-fcis-codec/src/decoder_spec.rs` and `decoder_induction.rs`: a total
+   decoder and depth/count induction for consumption and resource bounds.
+   `value_decoder_completeness.rs` proves the reverse direction by structural
+   node-count induction, with exact consumed prefixes and resource charges.
+3. Named `Cursor::invariant` and `DecodeState::invariant` predicates, preserved
+   by every reader and state method.
+4. Contracts on the production constructors, validators, encoding functions,
+   collection loops, `decode_value_inner`, `decode_complete_value`,
+   `decode_value_with_metrics` and `decode_value`.
+
+The top contract is
+`decoded_result(&result, bytes@.len()) == spec_decode(bytes@, limits.model())`.
+An accepted result additionally ensures `wf(value.model(), limits.model())`,
+`bytes@ == spec_encode(value.model())` and
+`bytes.len() <= limits.max_input_bytes`. The entry point has no precondition.
+All executable recursion has decreasing measures, and every loop has a
+termination argument. No application body or termination check is exempted.
+This completes Tier 1 (T1 safety/termination, T2 canonical acceptance, T3 input
+limit). `value_decoder_roundtrip.rs` adds the production call-boundary theorems:
+
+- Tier 2, `t4_encoder_append`: representation-valid storage, `wf`, and
+  `old(output).len() + spec_encode(value.model()).len() <= usize::MAX` imply
+  successful `encode_value_with_limits` and exact append of the specification
+  bytes. `t4_encoder_agreement` starts with an empty output buffer. The length
+  precondition is explicit and does not establish allocation availability.
+- Tier 3, `t5_decoder_complete`: `wf(v, L)` and
+  `spec_encode(v).len() <= L.max_input_bytes` imply successful production decoding
+  of those bytes with resulting model `v`. It invokes `spec_t5_complete` from the
+  completeness module and the existing production correspondence.
+- `production_roundtrip` composes both production calls under their respective
+  byte bounds. Value equality is expressed by the `ModelValue` relation.
+
+The completeness induction first proves that parsing an encoding with any suffix
+consumes exactly that encoding and adds its exact node and payload costs. Separate
+tag lemmas keep solver contexts small. Nested map frames retain both validation
+and canonical re-encoding checks. None of these additions changes runtime code.
+
+`value_decoder_vectors.rs` checks literal encodings, admission rules and
+resource totals from the existing codec corpus and the public canonical-byte
+examples. Map charges include both encoded frames and recursive payloads.
+`value_decoder_differential.rs` emits seeded byte inputs, explicit limits and
+canonical output or exact error `Debug` text for behavior comparison.
+
+The trusted base is Verus (including translation, ghost erasure and bundled
+`vstd`), Z3, rustc and the execution platform. Five additional `std`/`alloc`
+contracts are isolated in `value_decoder_std.rs`: `Vec::into_boxed_slice`,
+`String::into_boxed_str`, slice `to_vec`, byte-slice `is_ascii`, and
+`str::from_utf8`; the UTF-8 error type is opaque. Their native sample tests are
+in `value_decoder_std_tests.rs`. Slice cloning specifies the `Clone` relation,
+not equality for arbitrary element types. The source audit admits only the
+exact reviewed standard-contract file and rejects application trust escapes.
+`--no-cheating` is incompatible with these explicitly admitted standard
+contracts, so the gate uses this audit and `--no-external-by-default` while
+retaining lifetime, erasure, overflow, bounds and termination checking.
+
+The six defects are checked in separate copies: acceptance of trailing input,
+removal of map-key order checking, removal of the depth check, and a
+little-endian blob length, plus an encoder that appends an extra byte and a decoder
+that refuses a valid empty vector. Each must produce a semantic proof failure in its
+named production function. Normal and restored runs must both pass, and the
+original source hashes must remain unchanged. A compiler error, solver resource
+limit or timeout never counts as a successful control. Three further controls
+compile different code natively than Verus checks: an early return under
+`cfg(not(verus_keep_ghost))`, a replacement `Cursor::take_u8` in a native-only
+`impl`, and a `cfg!(verus_keep_ghost)` expression that hands the decoder other
+bytes. Each such copy still verifies; the source audit, which maps every
+verified function to its declaration, must then refuse it at its named function.
+
+```sh
+python3 tools/test_check_value_decoder.py
+python3 tools/check_value_decoder.py --install --out evidence/value-decoder/receipt.json
+```
+
+The profile qualifies Linux x86-64. Stack bytes and allocation availability are
+outside the formal result; stack limits are exercised natively. Envelope and
+commit-bundle decoders, machine-code correspondence and the native behavior of
+unverified configurations are outside this proof. The contract review/lemma/
+probe loops used for project contracts do not apply to this Rust decoder proof.
+See [canonical bytes](../../docs/CANONICAL_BYTES.md#verified-value-decoder) for
+the user-facing guarantee and the seL4 and Verus references.
+
+## Arithmetic correspondence
+
+The following separate checks assess arithmetic in generated Rust. They do not
+change the twenty workflow profiles or their qualification status above.
+
+| Check | Proof subject and boundary |
+| --- | --- |
+| [check_arithmetic_proof.py](../../tools/check_arithmetic_proof.py) | Production scalar and wide bodies included by path; abstract integer rounding, quotient/remainder, monotonicity and 128-bit reference expectations |
+| [check_arithmetic_typed_proof.py](../../tools/check_arithmetic_typed_proof.py) | Complete production evaluator closure; legacy-node correspondence, checked unsigned operations, casts and signed-width projection |
+| [check_arithmetic_emission.py](../../tools/check_arithmetic_emission.py) | Per-program emitted-AST translation validation of six shipped Rust templates and eighteen operation probes; byte-identical verified helpers and 64-bit reference expectations |
+
+[arithmetic_spec.rs](arithmetic_spec.rs) states mathematical floor and ceiling
+for either divisor sign, checked final representability, positive-divisor fused
+operations and exact product comparison. Its rounding lemmas cover both directions
+without selecting a financial policy. [arithmetic_typed_spec.rs](arithmetic_typed_spec.rs)
+relates these meanings to the source evaluator, including unsigned arithmetic
+and checked conversions. The production bodies and these lemmas verify together.
+
+[arithmetic_emitted_spec.rs](arithmetic_emitted_spec.rs) gives independent eager
+AST semantics and proves `emitted_program_correspondence` with the production
+evaluator specification. The companion emission gate decodes the complete
+generated Rust subset and emits a Verus check for every captured program and
+every input vector. The pinned [inventory](arithmetic-emission-inventory.json)
+covers all shipped scalar Rust programs found under examples and templates;
+the eighteen additional probes cover every legacy operation and eager refusal.
+The existing emitter and shipped bytes remain unchanged.
+The six shipped programs are the templates' standalone `synthesized/transition.rs`
+controllers. Applications from `new --contract` run the library evaluator and
+are outside this emitter result. Python and JavaScript emission have native
+conformance checks, but no E1 correspondence proof is claimed for those targets.
+
+This is per-program translation validation under a **trusted grammar decoder
+and Program data printer**. Their source is pinned and tested; their correctness
+is not proved. It is not a universal formatter theorem or a direct Verus proof
+of native emitted bodies. The gate checks every instruction, input/output guard,
+root and helper byte, rejects unrecognized executable text, and requires the
+complete pinned whole-crate function inventory and obligation count.
+The E2 check also resolves the emitter's two `include_str!` paths and the proof
+harness's two `#[path]` declarations to the same scalar and wide source files.
+Copied helper text must match raw bytes, including line endings.
+
+The typed arithmetic and emission profiles expect 1,257 and 1,288 whole-crate obligations
+respectively; these overlap and must not be added. Concrete specification checks
+cover all 1,165 reference vectors at each of 64 and 128 bits. Native conformance
+over bounded vectors remains distinct from universal mathematical correspondence.
+Controls include ceiling error, wrapped fused arithmetic, truncating cast,
+lost refusal propagation, lazy untaken computation and native-only helper code.
+Each semantic control compiles, fails its named assertion, and restores exact bytes.
+
+Run each script's unit tests and then its default gate with fresh `--out` and
+`--work` directories. The gates require an owned `CARGO_TARGET_DIR`, cached locked
+dependencies, Rust 1.97.1, and the verifier cache selected by
+`ZENO_FCIS_VERUS_CACHE`. They do not install dependencies or access the network.
+Profiles and source receipts bind exact files; changing them requires review
+and replay rather than automatic pin replacement.
+
+Scope is Linux x86-64, native Rust 1.97.1 and the verifier identified by
+[toolchain.json](toolchain.json). Rust code generation/erasure, standard-library
+checked integer contracts, Verus/vstd/Z3, the grammar/printer bridge, orchestration
+and platform remain trusted. This establishes no shell, resource-metering,
+application-policy, source-to-binary or release result.
+
+Method lineage: Klein et al., *seL4: Formal Verification of an OS Kernel*, SOSP
+2009; Klein et al., *Comprehensive Formal Verification of an OS Microkernel*,
+TOCS 2014; Pnueli, Siegel and Singerman, *Translation Validation*, TACAS 1998;
+Necula, *Translation Validation for an Optimizing Compiler*, PLDI 2000; and the
+pinned Verus implementation. These supply the layered correspondence and
+translation-validation methods, not inherited proofs of this code.

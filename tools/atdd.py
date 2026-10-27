@@ -10,8 +10,11 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
+
+from commons_hook import failure, report
 
 ROOT = Path(__file__).resolve().parents[1]
 FEATURE_ROOT = ROOT / "acceptance" / "features"
@@ -47,6 +50,85 @@ def historical_oracle(test_filter: str, *, exact: bool = False) -> tuple[str, ..
 
 
 SCENARIOS: dict[str, AcceptanceScenario] = {
+    "app-factory-journey": AcceptanceScenario(
+        "Generate and run the checked core, shell, ingress and UI together",
+        (("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "template"),
+         ("cargo", "+1.97.1", "build", "--locked", "--offline", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis"),
+         ("env", "ZF_BIN=" + str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis"), "python3", "tools/test_template_rules.py"),
+         ("python3", "tools/test_zenoui_text.py"),
+         ("python3", "tools/test_zenoui_refusal.py"),
+         ("python3", "tools/test_app_factory.py"),
+         ("python3", "tools/test_check_app_factory.py"),
+         ("python3", "tools/check_app_factory.py")),
+    ),
+    "quantitative-risk": AcceptanceScenario(
+        "Count declared inputs and bounded states and compute both exact reward extremes",
+        (("nice", "-n", "19", "ionice", "-c3", "cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-contract", "--test", "risk"),
+         ("nice", "-n", "19", "ionice", "-c3", "cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--test", "risk"),
+         ("nice", "-n", "19", "ionice", "-c3", "python3", "tools/risk_reference.py", "--cli",
+          str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug" / "zeno-fcis"),
+          "--scratch", str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "risk-reference"))),
+    ),
+    "distribution-laws": AcceptanceScenario(
+        "Check exact finite distributions given uniform independent random bits",
+        (("nice", "-n", "19", "ionice", "-c3", "cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-spec", "--test", "distribution"),
+         ("nice", "-n", "19", "ionice", "-c3", "cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-contract", "--test", "distribution_laws"),
+         ("nice", "-n", "19", "ionice", "-c3", "cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--test", "distribution_laws"),
+         ("nice", "-n", "19", "ionice", "-c3", "python3", "tools/distribution_reference.py", "--cli",
+          str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug" / "zeno-fcis"))),
+    ),
+    "command-experience": AcceptanceScenario(
+        "Keep public guide, diagnostics, link parsing and optional telemetry checks active",
+        (("cargo", "+1.97.1", "build", "--locked", "--offline", "-p", "zeno-fcis-cli"),
+         ("env", "ZENO_FCIS_CLI=" + str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis"), "python3", "tools/test_guide_cli.py"),
+         ("env", "ZENO_FCIS_CLI=" + str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis"), "python3", "integrations/mcp/test_guide_tools.py"),
+         ("env", "ZENO_FCIS_CLI=" + str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis"), "python3", "integrations/commons/test_guide_mcp.py"),
+         ("python3", "tools/test_agent_diagnostics.py"),
+         ("python3", "tools/test_replay_run.py"),
+         ("python3", "tools/test_library_doc_links.py"),
+         ("env", "ZENO_FCIS_CLI=" + str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis"), "python3", "tools/test_telemetry.py"),
+         ("python3", "integrations/commons/test_telemetry.py")),
+    ),
+    "commons-rust": AcceptanceScenario(
+        "Check the Rust coordination store against the Python reference",
+        (("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-commons"),
+         ("cargo", "+1.97.1", "build", "--locked", "--offline", "-p", "zeno-fcis-cli"),
+         ("env", "ZENO_FCIS_COMMONS_CLI=" + shlex.quote(str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis")), "python3", "integrations/commons/test_commons.py"),
+         ("env", "ZENO_FCIS_CLI=" + str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis"), "ZENO_FCIS_COMMONS_CLI=" + shlex.quote(str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis")), "python3", "integrations/commons/test_cross.py")),
+    ),
+    "contract-game-input": AcceptanceScenario(
+        "Exercise native Authority game inputs and independent certificate replay",
+        (("cargo", "+1.97.1", "build", "--locked", "--offline", "-p", "zeno-fcis-contract", "--example", "trace_game_input"),
+         ("env", "ZENO_TRACE_GAME_NATIVE=" + str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/examples/trace_game_input"),
+          "python3", "-B", "-m", "unittest", "discover", "-s", "tools/trace_game")),
+    ),
+    "zeno-commons": AcceptanceScenario(
+        "Share factory state, negative memory and coordination through Zeno Commons",
+        (("python3", "integrations/commons/test_commons.py"),
+         ("python3", "tools/test_commons_hooks.py"),
+         ("python3", "-I", "tools/check_commons_controls.py")),
+    ),
+    "construction-command": AcceptanceScenario(
+        "Refuse unsupported families and preserve construction authority boundaries",
+        (("cargo", "+1.97.1", "test", "--release", "-p", "zeno-fcis-cli", "--test", "construct", "--locked", "--offline"),
+         ("python3", "tools/test_priority_reference.py")),
+    ),
+    "keyed-collections": AcceptanceScenario(
+        "Check maps of any size by data independence over their named entries",
+        (("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-spec", "--test", "collections"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-contract", "--test", "collections"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--test", "collections"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-shell-sqlite", "--test", "collections_store"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--test", "collections_runtime"),
+         ("python3", "tools/check_collections_controls.py", "--remove-targets")),
+    ),
+    "contract-tables": AcceptanceScenario(
+        "Expand fixed-size tables exactly into ordinary fields and laws",
+        (("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-spec", "--test", "tables"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-contract", "--test", "contract_tables"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--test", "contract_tables"),
+         ("python3", "tools/check_table_controls.py", "--remove-targets")),
+    ),
     # BEGIN version-space acceptance registrations
     "loop-version-space": AcceptanceScenario(
         "Count finite meanings, ask the owner and check the unique program",
@@ -184,13 +266,23 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     ),
     "zal-dialogue": AcceptanceScenario(
         "Review finite behavior through deterministic language help and exact revisions",
-        (("python3", "-m", "unittest", "discover", "-s", "integrations/zal", "-p", "test_*.py", "-v"),
+        (("python3", "-B", "integrations/zal/check_ladder_temporal.py", "native-build"),
+         ("python3", "-B", "integrations/zal/check_withdrawal_pilot.py", "native-build"),
+         ("python3", "-B", "integrations/zal/check_effects.py", "native-build"),
+         ("python3", "-B", "-m", "unittest", "discover", "-s", "integrations/zal", "-p", "test_*.py", "-v"),
+         ("python3", "-B", "integrations/zal/check_ladder_temporal.py", "planted"),
+         ("python3", "-B", "integrations/zal/check_zal_tools.py"),
+         ("python3", "-B", "integrations/zal/check_withdrawal_pilot.py", "run"),
+         ("python3", "-B", "integrations/zal/check_withdrawal_pilot.py", "planted"),
          ("node", "integrations/zal/test_workspace.cjs"),
          ("node", "integrations/zal/test_mcp_sdk.mjs"),
          ("python3", "integrations/zal/oracles/independent_oracle.py"),
          ("python3", "integrations/zal/oracles/formula_oracle.py"),
          ("python3", "integrations/zal/oracles/explanation_oracle.py"),
-         ("cargo", "+1.97.1", "build", "-p", "zeno-fcis-cli", "--locked"),
+         ("python3", "integrations/zal/oracles/temporal_oracle.py"),
+         ("python3", "-B", "integrations/zal/check_behavior2.py", "planted"),
+         ("python3", "-B", "integrations/zal/check_effects.py", "planted"),
+         ("python3", "-B", "integrations/zal/check_lowering.py"),
          ("python3", "integrations/zal/run.py", "qualify", "integrations/zal/examples/order.zal")),
     ),
     "core-component-families": AcceptanceScenario(
@@ -303,6 +395,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--locked", "--offline", "--bin", "zeno-fcis", "kb_usage_"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--locked", "--offline", "--test", "kb_usage"),
          ("python3", "-B", "tools/test_usage_knowledge_reference.py"),
+         ("python3", "-B", "integrations/knowledge/test_import_sources.py"),
          ("python3", "-B", "-m", "unittest", "discover", "-s", "integrations/mcp", "-p", "test_knowledge_tools.py")),
     ),
     # END bounded knowledge acceptance.
@@ -603,13 +696,38 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Review a contract with distinguishing examples before it is trusted",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
           "contract::review::tests::"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_review", "--locked")),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_review", "--locked"),
+         ("python3", "tools/numeric_symbolic_solver_tests.py")),
+    ),
+    "contract-refinement": AcceptanceScenario(
+        "Check all raw reservation pairs and detect refinement faults",
+        (("cargo", "+1.97.1", "test", "--release", "-p", "zeno-fcis-contract", "--lib", "--locked", "--offline",
+          "refinement::"),
+         ("cargo", "+1.97.1", "test", "--release", "-p", "zeno-fcis-contract", "--test", "contract_refinement",
+          "--locked", "--offline"),
+         ("cargo", "+1.97.1", "test", "--release", "-p", "zeno-fcis-cli", "--test", "contract_refine_check",
+          "--locked", "--offline"),
+         ("python3", "tools/test_refinement_reference.py"),
+         ("python3", "tools/make_refinement_example.py", "--check"),
+         ("python3", "tools/check_contract_refinement.py", "--self-test"),
+         ("cargo", "+1.97.1", "test", "--release", "-p", "zeno-fcis-contract", "--test", "compiler_roots",
+          "--locked", "--offline")),
     ),
     "specification-gaps": AcceptanceScenario(
         "Find the decisions and decision tables the declared laws admit",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
           "contract::review::judge_tests::"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_judges", "--locked")),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "contract::review::run_properties::tests::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "contract::review::decision_space::tests::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "loop_command::doors::judges::"),
+         ("python3", "tools/test_contract_judges_reference.py",
+          "Judges.test_determined_requires_the_unique_outcome_to_match_native_execution"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_judges", "--locked"),
+         ("env", "ZENO_FCIS_CLI=" + str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis"),
+          "python3", "tools/test_judge_doc_commands.py")),
     ),
     "core-profile": AcceptanceScenario(
         "Agree with an independent reference on all 77 core-component instances",
@@ -660,7 +778,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     ),
     "composed-domain-reference": AcceptanceScenario(
         "Agree with an independent reference on fresh-seed random compositions",
-        (("python3", "tools/test_composition_domain_reference.py"),
+        (("python3", "tools/test_check_composed_domain.py"),
+         ("python3", "tools/test_composed_domain_runtime_controls.py", "--out",
+          str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "composed-domain-runtime-atdd.json")),
+         ("python3", "tools/test_composition_domain_reference.py"),
          ("cargo", "+1.97.1", "build", "-p", "zeno-fcis-cli", "--locked", "--offline"),
          ("python3", "tools/composition_domain_soundness.py", "fixtures", "--check", "--cli",
           str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug" / "zeno-fcis")),
@@ -699,13 +820,21 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     ),
     "checked-upgrade": AcceptanceScenario(
         "Adopt a checked candidate and upgrade a live store under its lineage",
-        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+        (("python3", "tools/check_historical_24_copy.py"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--locked", "--offline",
+          "--test", "historical_i64", "--test", "historical_copy", "--test", "historical_context"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-contract", "--locked", "--offline",
+          "--test", "historical_24"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
           "contract::tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_adopt", "--locked"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--lib", "--locked",
           "v2::upgrade::tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--lib", "--locked",
           "v2::equivalence::tests::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--test", "historical_24", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "transform::tests::every_receipt_field_is_bound", "--", "--exact"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
           "transform::tests::the_shells_comparison_agrees"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--test", "upgrade", "--locked",
@@ -779,6 +908,11 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "tools/test_check_api_refusals.py"),
          ("python3", "tools/check_api_refusals.py")),
     ),
+    "authenticated-ingress": AcceptanceScenario(
+        "Authenticate HTTP commands and recover one durable SQLite connection",
+        (("python3", "tools/check_ingress.py", "--require-loopback"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-ingress", "--locked", "--offline")),
+    ),
     "sqlite-authority": AcceptanceScenario(
         "Persist an authorized transition and its exact outbox obligations",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--locked",
@@ -789,6 +923,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     "release-contract": AcceptanceScenario(
         "Run the local V1 release gate",
         (
+            ("python3", "-B", "site/tests/test_socket_free_launcher.py"),
+            ("python3", "tools/test_bls_boundary.py"),
+            ("python3", "tools/test_cargo_source_scope.py"),
+            ("python3", "-B", "-m", "unittest", "discover", "-s", "tools/trace_game", "-p", "test_*.py"),
             ("python3", "tools/check_assurance.py", "--self-test"),
             ("python3", "tools/test_resolved_assurance.py"),
             ("python3", "tools/check_assurance.py"),
@@ -853,6 +991,28 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
             ),
         ),
     ),
+    "lean-proof-tools": AcceptanceScenario(
+        "Check Lean source closure, axiom auditing and proof-gate controls",
+        (("python3", "tools/test_check_lean_proofs.py"),),
+    ),
+    "effect-policy-tools": AcceptanceScenario(
+        "Check complete effect control spaces and payment policy products",
+        (("python3", "tools/test_effect_control_space.py"),
+         ("python3", "tools/test_payment_policy_product.py")),
+    ),
+    "meaning-client-exits": AcceptanceScenario(
+        "Preserve verdict exit classes in meaning clients",
+        (("python3", "tools/test_meaning_exit_clients.py"),),
+    ),
+    "service-runtime-tools": AcceptanceScenario(
+        "Check generated services and their independent controls",
+        (("python3", "tools/check_service_app.py"),
+         ("python3", "tools/test_service_controls.py")),
+    ),
+    "two-run-reference": AcceptanceScenario(
+        "Compare two-run properties with the independent finite reference",
+        (("python3", "tools/test_two_run.py", "--binary", str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis")),),
+    ),
     "probity-guardrails": AcceptanceScenario(
         "Reject unsafe agent workflow actions deterministically",
         (("python3", "tools/check_probity.py"),),
@@ -864,7 +1024,12 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "tools/test_verus_ids.py"),
          ("python3", "tools/test_qualification_controls.py"),
          ("python3", "tools/test_qualification_sources.py"),
-         ("python3", "tools/test_v2_native_dependencies.py")),
+         ("python3", "tools/test_v2_native_dependencies.py"),
+         ("python3", "tools/test_check_arithmetic_proof.py"),
+         ("python3", "tools/test_check_arithmetic_typed_proof.py"),
+         ("python3", "tools/test_arithmetic_emitted_ast.py"),
+         ("python3", "tools/test_check_collections_runtime.py"),
+         ("python3", "tools/test_check_effect_reservation.py")),
     ),
     "finite-execution-proof": AcceptanceScenario(
         "Preserve complete finite execution and reject missing proof contracts",
@@ -1379,9 +1544,11 @@ def run_command(command: tuple[str, ...]) -> None:
     because a filter that matches nothing passes without checking anything."""
 
     environment = None
-    if command[0:3] == ("cargo", "+1.97.1", "doc"):
+    resource_prefix = ("nice", "-n", "19", "ionice", "-c3")
+    executable = command[len(resource_prefix):] if command[:len(resource_prefix)] == resource_prefix else command
+    if executable[0:3] == ("cargo", "+1.97.1", "doc"):
         environment = {**os.environ, "RUSTDOCFLAGS": "-D warnings"}
-    if command[0:3] != ("cargo", "+1.97.1", "test"):
+    if executable[0:3] != ("cargo", "+1.97.1", "test"):
         subprocess.run(command, cwd=ROOT, check=True, env=environment)
         return
     completed = subprocess.run(
@@ -1400,9 +1567,18 @@ def run_scenario(scenario_id: str) -> None:
 
     scenario = SCENARIOS[scenario_id]
     print(f"atdd: RUN {scenario_id}: {scenario.title}", flush=True)
-    for command in scenario.commands:
-        print(f"atdd: EXEC {shlex.join(command)}", flush=True)
-        run_command(command)
+    started = time.monotonic()
+    command: tuple[str, ...] = ()
+    try:
+        for command in scenario.commands:
+            print(f"atdd: EXEC {shlex.join(command)}", flush=True)
+            run_command(command)
+    except BaseException as error:
+        report("atdd", "scenario-failed", scenario_id, {**failure(error), "command": shlex.join(command),
+                                                        "seconds": round(time.monotonic() - started, 1)})
+        raise
+    report("atdd", "scenario-passed", scenario_id, {"commands": len(scenario.commands),
+                                                   "seconds": round(time.monotonic() - started, 1)})
     print(f"atdd: PASS {scenario_id}", flush=True)
 
 

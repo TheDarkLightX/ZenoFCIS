@@ -38,6 +38,7 @@ fn original_step(values: &[(u32, i128)]) -> old::TraceStep {
 }
 fn reason(value: old::IndeterminateReason) -> ModelReason {
     match value {
+        old::IndeterminateReason::U128SubjectUnsupported => ModelReason::U128SubjectUnsupported,
         old::IndeterminateReason::MissingProjection => ModelReason::MissingProjection,
         old::IndeterminateReason::MissingPredicate => ModelReason::MissingPredicate,
         old::IndeterminateReason::Overflow => ModelReason::Overflow,

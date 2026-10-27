@@ -15,6 +15,37 @@ use crate::symbolic::smt::Sort;
 use crate::symbolic::testing::reference;
 use crate::symbolic::verdict::Answer;
 
+#[test]
+fn genesis_symbolic_checks_runtime_admission_before_querying() {
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/apps/library-loans");
+    for law in [500, 550] {
+        let mut app = App::read(base.clone());
+        let mut rules: Value = serde_json::from_str(&app.rules).unwrap_or_else(|e| panic!("{e}"));
+        if law == 500 {
+            rules["genesis"] = serde_json::json!({"110":1,"111":1,"112":1});
+        } else {
+            // This startup law is not an invariant target. Checking only
+            // induction targets would miss its runtime refusal.
+            app.project
+                .push_str("\nlaw 550 startup_guard on accept, genesis = 0 == 1;\n");
+            rules["law_kinds"]["550"] = serde_json::json!("FeeAndRounding");
+        }
+        app.rules = rules.to_string();
+        let result = check(
+            SymbolicSources {
+                project: &app.project,
+                rules: &app.rules,
+                strengthening: None,
+            },
+            1,
+            &mut |_| panic!("solver queried before startup admission"),
+        );
+        assert!(
+            matches!(result, Err(ref e) if e.reason() == format!("no admissible starting state: law {law}: Core(Law(Violated))"))
+        );
+    }
+}
+
 /// An application's contract files, with optional text replacements.
 struct App {
     name: String,

@@ -85,7 +85,10 @@ jobs:
           - {gate: finite-execution, script: check_finite_execution.py, output: receipt.json}
           - {gate: metered-execution, script: check_metered_execution.py, output: receipt.json}
           - {gate: shared-finite-checker, script: check_checker.py, output: run}
+          - {gate: lemma-kernel, script: check_lemma_kernel.py, output: receipt.json}
+          - {gate: reachable-probe, script: check_reachable_probe.py, output: receipt.json}
           - {gate: canonical-bytes, script: check_canonical_bytes.py, output: receipt.json}
+          - {gate: value-decoder, script: check_value_decoder.py, output: receipt.json}
           - {gate: protected-input, script: check_protected_input.py, output: receipt.json}
           - {gate: envelope-frame, script: check_envelope_frame_v2.py, output: receipt.json}
           - {gate: schema-binding, script: check_schema_binding_v2.py, output: receipt.json}
@@ -140,6 +143,18 @@ jobs:
           check_verus.prepare_tools(Path.home() / '.cache/zeno-fcis/verus', pin, True)
           PY
           mkdir -p "$EVIDENCE_DIRECTORY" "$CARGO_TARGET_DIR"
+      - name: Match the qualified native control build profile
+        if: matrix.gate == 'shared-finite-checker'
+        run: |
+          {
+            echo 'CARGO_PROFILE_DEV_OPT_LEVEL=1'
+            echo 'CARGO_PROFILE_TEST_OPT_LEVEL=1'
+            echo 'CARGO_PROFILE_DEV_DEBUG_ASSERTIONS=true'
+            echo 'CARGO_PROFILE_TEST_DEBUG_ASSERTIONS=true'
+            echo 'CARGO_PROFILE_DEV_OVERFLOW_CHECKS=true'
+            echo 'CARGO_PROFILE_TEST_OVERFLOW_CHECKS=true'
+            echo 'RUST_MIN_STACK=33554432'
+          } >> "$GITHUB_ENV"
       - name: Check gate admission and failure controls
         run: python3 "tools/test_${GATE_SCRIPT}"
       - name: Require the complete exact-source proof and control suite

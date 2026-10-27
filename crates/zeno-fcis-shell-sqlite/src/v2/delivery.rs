@@ -54,7 +54,14 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
             Some((sequence, lane, ordinal)) => {
                 let row = load_commit(&tx, sequence)?;
                 let state = previous_state(&tx, sequence)?;
-                check_commit(&tx, self.members.authorities(), &segments, &row, &state)?;
+                check_commit(
+                    &tx,
+                    self.members.authorities(),
+                    &segments,
+                    &row,
+                    &state,
+                    self.members.lineage(),
+                )?;
                 Some(load_delivery(&tx, sequence, lane, ordinal)?)
             }
         };
@@ -99,7 +106,14 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
         }
         let row = load_commit(&tx, sequence)?;
         let state = previous_state(&tx, sequence)?;
-        check_commit(&tx, self.members.authorities(), &segments, &row, &state)?;
+        check_commit(
+            &tx,
+            self.members.authorities(),
+            &segments,
+            &row,
+            &state,
+            self.members.lineage(),
+        )?;
         let delivery = load_delivery(&tx, sequence, lane, ordinal)?;
         tx.commit()?;
         Ok(Pending {
@@ -547,7 +561,14 @@ impl<'p, D: DescriptorData<'p> + 'p> Delivered<'_, '_, 'p, D> {
             .ok_or(Error::Delivery)?;
         let row = load_commit(&tx, sequence)?;
         let state = previous_state(&tx, sequence)?;
-        check_commit(&tx, shell.members.authorities(), &segments, &row, &state)?;
+        check_commit(
+            &tx,
+            shell.members.authorities(),
+            &segments,
+            &row,
+            &state,
+            shell.members.lineage(),
+        )?;
         let expected: Vec<u8> = tx.query_row(
             "SELECT entry_hash FROM v2_deliveries WHERE delivery_id=?1",
             [id.as_bytes().as_slice()],

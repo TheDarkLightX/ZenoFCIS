@@ -25,7 +25,7 @@ const EXAMPLES: &str = "tests/decision-examples.txt";
 
 #[derive(Subcommand)]
 pub(super) enum Command {
-    /// Review a contract: its decisions over the input domain or a boundary set, their agreement with the decision examples, and the rule mutants those inputs distinguish. Advisory; the application is not changed.
+    /// Review decisions, owner examples and rule mutants. Small domains remain exhaustive; above the cap, full-domain law checking needs both pinned solvers. A concrete native example can refuse first. Advisory; the application is not changed.
     Review {
         /// Application directory holding project.zeno, v2/policy.json and, optionally, tests/decision-examples.txt.
         #[arg(default_value = ".")]
@@ -33,7 +33,7 @@ pub(super) enum Command {
         /// Write the review packet to this file. Without it the packet goes to stdout and the summary to stderr.
         #[arg(long)]
         out: Option<PathBuf>,
-        /// Largest input set to enumerate or probe. A domain of at most this many tuples is enumerated in full.
+        /// Largest domain to enumerate in full. Larger scalar domains automatically use symbolic law checking with ZENO_FCIS_Z3 and ZENO_FCIS_CVC5.
         #[arg(long, default_value_t = DEFAULT_MAX_TUPLES)]
         max_tuples: u64,
         /// Summary format, used with --out.
@@ -116,6 +116,87 @@ fn review_directory(
         let message = format!("{} exists; seeds go to a new directory", path.display());
         return report_failure(dir, Failure::Read(message), format);
     }
+    if let Ok(rules) = read_text(dir, RULES)
+        && zeno_fcis_contract::internals::tables::recognizes(&rules).unwrap_or(false)
+    {
+        if mutant_programs.is_some()
+            || gap_settings.is_some_and(|g| g.laws.is_some())
+            || dir.join(EXAMPLES).exists()
+        {
+            return report_failure(dir, Failure::Invalid {place: "tables/1".into(), reason: "scalar examples, mutant programs and scalar proposed laws do not support table subjects".into()}, format);
+        }
+        let result = (|| {
+            let project = read_text(dir, PROJECT)?;
+            let compiled = zeno_fcis_contract::internals::tables::compile(&project, &rules)
+                .map_err(|e| Failure::Invalid {
+                    place: e.place().into(),
+                    reason: e.reason().into(),
+                })?;
+            let report = zeno_fcis_contract::internals::tables_review::review(
+                &compiled,
+                max_tuples,
+                gap_settings.map_or(0, |g| g.max_work),
+                gap_settings.is_some(),
+            )
+            .map_err(|e| Failure::Invalid {
+                place: e.place().into(),
+                reason: e.reason().into(),
+            })?;
+            if let Some(path) = out {
+                if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+                    fs::create_dir_all(parent).map_err(|e| Failure::Read(e.to_string()))?;
+                }
+                atomic_replace(
+                    path,
+                    serde_json::to_string_pretty(&report)
+                        .map_err(|e| Failure::Read(e.to_string()))?
+                        .as_bytes(),
+                )
+                .map_err(|e| Failure::Read(e.to_string()))?;
+            }
+            Ok(report)
+        })();
+        return match result {
+            Ok(report) => {
+                let code = match report["status"].as_str() {
+                    Some("finite-checked") => OK,
+                    Some("inconclusive") => BLOCKED,
+                    _ => INVALID,
+                };
+                print_json(&report);
+                code
+            }
+            Err(failure) => report_failure(dir, failure, format),
+        };
+    }
+    // Preserve the existing exhaustive route at and below its exact cap.
+    // Solver acquisition belongs here in the file/process shell, never in
+    // the pure review implementation.
+    if let (Ok(project), Ok(rules)) = (read_text(dir, PROJECT), read_text(dir, RULES)) {
+        match review::numeric_symbolic::over_cap(&project, &rules, max_tuples) {
+            Ok(true) => {
+                return symbolic_directory(
+                    dir,
+                    out,
+                    format,
+                    &project,
+                    &rules,
+                    mutant_programs.is_some() || gap_settings.is_some(),
+                );
+            }
+            Ok(false) => {}
+            Err(error) => {
+                return report_failure(
+                    dir,
+                    Failure::Invalid {
+                        place: error.place().into(),
+                        reason: error.reason().into(),
+                    },
+                    format,
+                );
+            }
+        }
+    }
     let result = (|| {
         let project = read_text(dir, PROJECT)?;
         let rules = read_text(dir, RULES)?;
@@ -124,6 +205,12 @@ fn review_directory(
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
             Err(error) => return Err(Failure::Read(format!("read {EXAMPLES}: {error}"))),
         };
+        let invalid = |error: crate::contract::ContractError| Failure::Invalid {
+            place: error.place().to_owned(),
+            reason: error.reason().to_owned(),
+        };
+        // Admit the same immutable snapshot that the review receives.
+        review::application(&project, &rules).map_err(invalid)?;
         let sources = ReviewSources {
             project: &project,
             rules: &rules,
@@ -152,10 +239,6 @@ fn review_directory(
                 )
             }
         };
-        let invalid = |error: crate::contract::ContractError| Failure::Invalid {
-            place: error.place().to_owned(),
-            reason: error.reason().to_owned(),
-        };
         let review = reviewed.map_err(invalid)?;
         let seeds = match mutant_programs {
             Some(path) => Some(write_seeds(
@@ -177,6 +260,8 @@ fn review_directory(
         "disagreement"
     } else if summary.law_refusals > 0 {
         "law-refusal"
+    } else if summary.case_findings > 0 {
+        "case-coverage"
     } else {
         review.gaps().map_or("reviewed", gaps::Gaps::review_status)
     };
@@ -185,6 +270,12 @@ fn review_directory(
     } else {
         PACKET_SCHEMA
     };
+    // Observe the completed measure before an optional packet write can fail.
+    if std::env::var_os("ZENO_FCIS_TELEMETRY").is_some()
+        && let Ok(packet) = serde_json::from_str(review.packet())
+    {
+        crate::telemetry::observe(&packet);
+    }
     match out {
         Some(path) => {
             let written = path
@@ -240,6 +331,130 @@ fn review_directory(
         Some("invalid-proposals") => MALFORMED,
         _ => OK,
     }
+}
+
+fn symbolic_directory(
+    dir: &Path,
+    out: Option<&Path>,
+    format: OutputFormat,
+    project: &str,
+    rules: &str,
+    unsupported_options: bool,
+) -> u8 {
+    let result = (|| {
+        let application =
+            review::application(project, rules).map_err(|error| Failure::Invalid {
+                place: error.place().to_owned(),
+                reason: error.reason().to_owned(),
+            })?;
+        let examples = match read_input(&dir.join(EXAMPLES)) {
+            Ok(b) => Some(text(EXAMPLES, b)?),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => return Err(Failure::Read(e.to_string())),
+        };
+        let mut report = if unsupported_options {
+            json!({"schema":"zeno-fcis/numeric-law-review/1","authority":"none","mode":"symbolic","status":"UNKNOWN","reason":"symbolic gap counting and exhaustive mutant seed receipts are unsupported"})
+        } else if let Some(report) = native_example_refutation(ReviewSources {
+            project,
+            rules,
+            examples: examples.as_deref(),
+        })? {
+            report
+        } else {
+            match crate::symbolic_command::Solvers::from_environment() {
+                Ok(solvers) => {
+                    let mut report = review::numeric_symbolic::review(
+                        ReviewSources {
+                            project,
+                            rules,
+                            examples: examples.as_deref(),
+                        },
+                        &mut |q| solvers.solve(q),
+                        true,
+                    )
+                    .map_err(|e| Failure::Invalid {
+                        place: e.place().into(),
+                        reason: e.reason().into(),
+                    })?;
+                    report["solver_identities"] = solvers.identities();
+                    if let Some(reason) = solvers.retention_failure() {
+                        report["status"] = json!("UNKNOWN");
+                        report["evidence"] = json!("none");
+                        report["reason"] = json!(reason);
+                    }
+                    report
+                }
+                Err(reason) => {
+                    json!({"schema":"zeno-fcis/numeric-law-review/1","authority":"none","mode":"symbolic","status":"UNKNOWN","reason":reason})
+                }
+            }
+        };
+        report["case_coverage"] = json!({"status": "not checked", "reason": "domain not fully enumerated; symbolic path", "cases": null});
+        report["application"] = json!(application);
+        if let Some(path) = out {
+            if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+                fs::create_dir_all(parent).map_err(|e| Failure::Read(e.to_string()))?;
+            }
+            atomic_replace(path, crate::transform::canonical_json(&report).as_bytes())
+                .map_err(|e| Failure::Read(e.to_string()))?;
+        }
+        Ok(report)
+    })();
+    match result {
+        Err(f) => report_failure(dir, f, format),
+        Ok(report) => {
+            let status = report["status"].as_str().unwrap_or("UNKNOWN");
+            if out.is_none() || matches!(format, OutputFormat::Json) {
+                print_json(&report)
+            } else {
+                println!(
+                    "contract review: {status}; mode: {}",
+                    report["mode"].as_str().unwrap_or("unknown")
+                );
+                if status == "solver-checked" {
+                    println!("{}", review::numeric_symbolic::MODE);
+                }
+                if let Some(reason) = report["reason"].as_str() {
+                    println!("{reason}");
+                }
+            }
+            match status {
+                "solver-checked" => OK,
+                "refuted" | "disagreement" | "law-refusal" => INVALID,
+                _ => BLOCKED,
+            }
+        }
+    }
+}
+
+/// A concrete native example can refuse a review before global solver work.
+/// Reuse the existing owner-example and mutant-witness checks with one probe;
+/// its packet retains the boundary scope and issues no symbolic law verdict.
+fn native_example_refutation(sources: ReviewSources<'_>) -> Result<Option<Value>, Failure> {
+    if !sources.examples.is_some_and(|text| {
+        text.lines()
+            .any(|line| !line.trim().is_empty() && !line.trim_start().starts_with('#'))
+    }) {
+        return Ok(None);
+    }
+    let reviewed = review::review(sources, 1).map_err(|e| Failure::Invalid {
+        place: e.place().into(),
+        reason: e.reason().into(),
+    })?;
+    if reviewed.summary().findings == 0 {
+        return Ok(None);
+    }
+    let mut packet: Value =
+        serde_json::from_str(reviewed.packet()).map_err(|e| Failure::Read(e.to_string()))?;
+    packet["mode"] = json!("native-examples");
+    packet["status"] = json!(if reviewed.summary().disagreements > 0 {
+        "disagreement"
+    } else {
+        "law-refusal"
+    });
+    packet["law_check"] =
+        json!("symbolic checking not run: a concrete native finding already refuses the review");
+    Ok(Some(packet))
 }
 
 /// Writes each seed as `<id>.zcve` into the new directory `path` and
@@ -313,6 +528,7 @@ fn lines(review: &Review, status: &str) -> Vec<String> {
         ),
     ];
     lines.extend(review.law_refusal_lines());
+    lines.extend(review.case_finding_lines().iter().cloned());
     lines.push(format!(
         "original decisions: {} example disagreements, {} law refusals",
         summary.disagreements, summary.law_refusals
@@ -356,21 +572,32 @@ fn text(name: &str, bytes: Vec<u8>) -> Result<String, Failure> {
     String::from_utf8(bytes).map_err(|error| Failure::Read(format!("read {name}: {error}")))
 }
 
-/// One line on the specification-gap judge.
+fn measured_gaps_line(label: &str, summary: &Value) -> String {
+    format!(
+        "{label}: {} of {} tuples determined by the declared laws ({} of {} on valid pre-states); mutants admitted {}, caught {}; inactive laws {}; reject-everything core admitted where the contract decides: {}",
+        summary["full"]["determined"],
+        summary["full"]["tuples"],
+        summary["valid"]["determined"],
+        summary["valid"]["tuples"],
+        summary["full"]["mutants_admitted"],
+        summary["full"]["mutants_caught"],
+        summary["inactive_laws"],
+        summary["reject_everything_admitted"],
+    )
+}
+
+/// Report both checked measures when a proposal was measured.
 fn gaps_line(gaps: &gaps::Gaps) -> String {
     let summary = gaps.summary();
     match gaps {
-        gaps::Gaps::Measured(_) => format!(
-            "gaps: {} of {} tuples determined by the declared laws ({} of {} on valid pre-states); mutants admitted {}, caught {}; inactive laws {}; reject-everything core admitted where the contract decides: {}",
-            summary["full"]["determined"],
-            summary["full"]["tuples"],
-            summary["valid"]["determined"],
-            summary["valid"]["tuples"],
-            summary["full"]["mutants_admitted"],
-            summary["full"]["mutants_caught"],
-            summary["inactive_laws"],
-            summary["reject_everything_admitted"],
-        ),
+        gaps::Gaps::Measured(_) => {
+            let mut line = measured_gaps_line("gaps", &summary);
+            if let Some(after) = summary.get("with_proposals") {
+                line.push('\n');
+                line.push_str(&measured_gaps_line("gaps with proposals", after));
+            }
+            line
+        }
         gaps::Gaps::FalseAlarm(value) => format!(
             "gaps: proposed law {} fails on the contract's decision at input {}",
             value["false_alarm"]["law"], value["false_alarm"]["input"]

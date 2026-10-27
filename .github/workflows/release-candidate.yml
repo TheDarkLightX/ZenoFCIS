@@ -18,7 +18,7 @@ on:
       - "v1.1.0"
       - "v2.2.*"
       - "v2.3.*"
-      - "v2.5.*"
+      - "v2.6.*"
 
 permissions:
   contents: read
@@ -26,6 +26,10 @@ permissions:
 concurrency:
   group: zeno-fcis-release-candidate-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
 
 jobs:
   assemble:

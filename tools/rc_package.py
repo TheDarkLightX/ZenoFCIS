@@ -38,6 +38,7 @@ NPM_PACKAGE_PATH = ROOT / "package.json"
 NPM_LOCK_PATH = ROOT / "package-lock.json"
 PROBITY_CONFIG_PATH = ROOT / "probity.config.ts"
 NODE_VERSION_PATH = ROOT / ".node-version"
+ATTRIBUTION_FILES = ("LICENSE-APACHE", "LICENSE-MIT", "NOTICE", "THIRD_PARTY_NOTICES", "CITATION.cff")
 EXPECTED_NODE_VERSION = "22.23.1"
 EXPECTED_PROBITY_VERSION = "1.10.0"
 EXPECTED_PROBITY_INTEGRITY = (
@@ -45,7 +46,7 @@ EXPECTED_PROBITY_INTEGRITY = (
     "EBUePD8+S4/kRiqh8K/B0oA=="
 )
 EXPECTED_NPM_LOCK_CANONICAL_SHA256 = (
-    "20e01c600a0df0baf92ccf54a56d807a955616cf13bb7ac9d13c95be65045030"
+    "58fa3a550f10fd1dfc1a2b668582ff627ba34aee376dc238b092abee043ad292"
 )
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 RUSTDOC_ARCHIVE_NOTICE = """ZenoFCIS offline rustdoc archive
@@ -897,8 +898,7 @@ def deterministic_binary_archive(binary: Path, destination: Path, prefix: str, r
     members = [
         (binary, binary.name, 0o755),
         (root / "README.md", "README.md", 0o644),
-        (root / "LICENSE-APACHE", "LICENSE-APACHE", 0o644),
-        (root / "LICENSE-MIT", "LICENSE-MIT", 0o644),
+        *((root / name, name, 0o644) for name in ATTRIBUTION_FILES),
         (root / "docs" / "INSTALLATION.md", "INSTALLATION.md", 0o644),
     ]
     with (
@@ -915,6 +915,12 @@ def deterministic_binary_archive(binary: Path, destination: Path, prefix: str, r
             info.mode = mode
             normalized_tar_info(info)
             archive.addfile(info, io.BytesIO(content))
+
+
+def archive_rustdoc(doc_root: Path, destination: Path, prefix: str, root: Path = ROOT) -> None:
+    for name in ATTRIBUTION_FILES:
+        shutil.copyfile(root / name, doc_root / name)
+    deterministic_tree_archive(doc_root, destination, prefix)
 
 
 def binary_artifact_inventory(
@@ -979,6 +985,18 @@ def run_binary_inventory_self_test(configured: dict[str, object]) -> None:
             expected_executable = str(Path(item["prefix"]) / item["target"])
             if expected_executable not in members:
                 raise RcError(f"binary archive omitted {item['target']}")
+            with tarfile.open(archive_path, mode="r:gz") as archive:
+                for name in ATTRIBUTION_FILES:
+                    if archive.extractfile(f"{item['prefix']}/{name}").read() != (ROOT / name).read_bytes():
+                        raise RcError(f"binary archive attribution differs: {name}")
+        doc_root = root / "doc"
+        doc_root.mkdir()
+        doc_archive = root / "rustdoc.tar.gz"
+        archive_rustdoc(doc_root, doc_archive, "rustdoc")
+        with tarfile.open(doc_archive, mode="r:gz") as archive:
+            for name in ATTRIBUTION_FILES:
+                if archive.extractfile(f"rustdoc/{name}").read() != (ROOT / name).read_bytes():
+                    raise RcError(f"rustdoc archive attribution differs: {name}")
 
 
 def source_archive(destination: Path, prefix: str) -> None:
@@ -1226,6 +1244,57 @@ REPOSITORY_INPUT_FILES = frozenset((
     "tools/test-data/scalar-arithmetic/i128-vectors.tsv",
     "tools/test-data/scalar-arithmetic/vectors.tsv",
     "tools/test-data/signed-arithmetic/vectors.tsv",
+    # 2.6 test targets compile these example, test-data and document files; each is still listed by
+    # target and SHA-256 in release/packaged-test-inputs.json.
+    "docs/TABLE_GAMES.md",
+    "examples/apps/escrow-deal/project.zeno",
+    "examples/apps/escrow-deal/v2/policy.json",
+    "examples/apps/escrow-deal/v2/run-properties.json",
+    "examples/collections/library/project.zeno",
+    "examples/collections/library/v2/policy.json",
+    "examples/collections/order-book/project.zeno",
+    "examples/collections/order-book/v2/policy.json",
+    "examples/collections/token-balances/project.zeno",
+    "examples/collections/token-balances/tests/decision-scenarios.txt",
+    "examples/collections/token-balances/v2/policy.json",
+    "examples/contract-refinement/reservation/abstract/project.zeno",
+    "examples/contract-refinement/reservation/abstract/v2/policy.json",
+    "examples/contract-refinement/reservation/abstraction.json",
+    "examples/contract-refinement/reservation/concrete/project.zeno",
+    "examples/contract-refinement/reservation/concrete/v2/policy.json",
+    "examples/contract-tables/fee-tiers/project.zeno",
+    "examples/contract-tables/fee-tiers/v2/policy.json",
+    "examples/contract-tables/games/README.md",
+    "examples/contract-tables/library-loans/project.zeno",
+    "examples/contract-tables/library-loans/tests/decision-examples.txt",
+    "examples/contract-tables/library-loans/v2/policy.json",
+    "examples/contract-tables/permission-words/project.zeno",
+    "examples/contract-tables/permission-words/tests/decision-examples.txt",
+    "examples/contract-tables/permission-words/v2/policy.json",
+    "examples/distribution-laws/biased-reward/project.zeno",
+    "examples/distribution-laws/biased-reward/v2/policy.json",
+    "examples/distribution-laws/lottery-reward/project.zeno",
+    "examples/distribution-laws/lottery-reward/v2/policy.json",
+    "examples/distribution-laws/modulo-bias/project.zeno",
+    "examples/distribution-laws/modulo-bias/v2/policy.json",
+    "examples/distribution-laws/payout-tie/project.zeno",
+    "examples/distribution-laws/payout-tie/v2/policy.json",
+    "examples/distribution-laws/reporter-choice/project.zeno",
+    "examples/distribution-laws/reporter-choice/v2/policy.json",
+    "examples/distribution-laws/shortfall-reward/project.zeno",
+    "examples/distribution-laws/shortfall-reward/v2/policy.json",
+    "examples/dual-approval/project.zeno",
+    "examples/dual-approval/v2/policy.json",
+    "examples/guide-counter/project.zeno",
+    "examples/guide-counter/v2/policy.json",
+    "examples/quantitative-risk/swap-pool/project.zeno",
+    "examples/quantitative-risk/swap-pool/v2/policy.json",
+    "test-data/collections/deletion/project.zeno",
+    "test-data/collections/deletion/v2/policy.json",
+    "test-data/trace-games/escrow-safe/project.zeno",
+    "test-data/trace-games/escrow-safe/v2/policy.json",
+    "tests/fixtures/repair-pre-lemma/project.zeno",
+    "tests/fixtures/repair-pre-lemma/v2/policy.json",
 ))
 CONSUMER_TARGET_ARGUMENTS = ("--workspace", "--lib", "--bins", "--examples", "--all-features")
 PACKAGED_TEST_ARGUMENTS = ("--workspace", "--all-targets", "--all-features")
@@ -2078,6 +2147,7 @@ def build_host_binary(output: Path) -> None:
     version = require_string(configured, "version")
     commit = require_clean_commit()
     require_source_state("build-host-binary start")
+    run([sys.executable, "tools/third_party_notices.py", "--check"])
     if output.exists() and any(output.iterdir()):
         raise RcError("output directory must not exist or must be empty")
     output.mkdir(parents=True, exist_ok=True)
@@ -2102,6 +2172,7 @@ def build(output: Path) -> None:
     require_source_state("build start")
     run([sys.executable, "tools/check_public_docs.py"])
     run([sys.executable, "tools/check_release_privacy.py", "check"])
+    run([sys.executable, "tools/third_party_notices.py", "--check"])
     if output.exists() and any(output.iterdir()):
         raise RcError("output directory must not exist or must be empty")
     output.mkdir(parents=True, exist_ok=True)
@@ -2169,7 +2240,7 @@ def build(output: Path) -> None:
     if (build_target / "doc" / "zeno_fcis_generated_code_tests").exists():
         raise RcError("private generated-code test crate leaked into public rustdoc")
     normalize_rustdoc_tree(build_target / "doc")
-    deterministic_tree_archive(
+    archive_rustdoc(
         build_target / "doc",
         docs_dir / f"zeno-fcis-rustdoc-{version}.tar.gz",
         f"zeno-fcis-rustdoc-{version}",
@@ -2247,6 +2318,7 @@ def main() -> int:
         if args.command == "check":
             run([sys.executable, "tools/check_public_docs.py"])
             run([sys.executable, "tools/check_release_privacy.py", "check"])
+            run([sys.executable, "tools/third_party_notices.py", "--check"])
             print(
                 "rc-package: PASS "
                 f"({len(require_string_list(configured, 'publish_order'))} public, "
@@ -2254,6 +2326,7 @@ def main() -> int:
                 f"version {require_string(configured, 'version')})"
             )
         elif args.command == "self-test":
+            run([sys.executable, "tools/test_third_party_notices.py"])
             run([sys.executable, "tools/test_release_privacy.py"])
             run([sys.executable, "tools/test_check_release_custody.py"])
             run([sys.executable, "tools/test_release_hosts.py"])

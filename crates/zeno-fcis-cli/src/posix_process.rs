@@ -43,7 +43,9 @@ mod runtime {
     use std::fs;
     use std::io::{Read, Write};
     use std::os::fd::AsFd;
-    use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
+    #[cfg(test)]
+    use std::os::unix::fs::MetadataExt;
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
     use std::os::unix::{
         net::UnixStream,
         process::{CommandExt, ExitStatusExt},
@@ -78,8 +80,9 @@ mod runtime {
 
     // Owner-private append-only invocation directories. No session is created
     // merely to retain a refusal. Only qualified admission may create a journal.
+    #[cfg(test)]
     fn evidence_root() -> PathBuf {
-        Path::new("/tmp").join(format!("zeno-fcis-containment-{}", nix::unistd::geteuid()))
+        PathBuf::from("/tmp")
     }
 
     fn evidence_directory(invocation: &str) -> Result<PathBuf, String> {
@@ -90,7 +93,12 @@ mod runtime {
         {
             return Err("evidence-invocation-identity".into());
         }
-        Ok(evidence_root().join(invocation))
+        // Invocation::new obtains this identity from 256 bits of OS randomness.
+        // Create its directory atomically, without a shared predictable parent.
+        Ok(Path::new("/tmp").join(format!(
+            "zeno-fcis-containment-{}-{invocation}",
+            nix::unistd::geteuid()
+        )))
     }
 
     fn append_record(
@@ -275,19 +283,6 @@ mod runtime {
             let invocation = crate::transform::sha256_hex(&nonce);
             timing.set("invocation_sha256", serde_json::json!(invocation));
             let build = build_identity()?;
-            let root = evidence_root();
-            match fs::DirBuilder::new().mode(0o700).create(&root) {
-                Ok(()) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-                Err(e) => return Err(e.to_string()),
-            }
-            let metadata = fs::symlink_metadata(&root).map_err(|e| e.to_string())?;
-            if !metadata.is_dir()
-                || metadata.uid() != nix::unistd::geteuid().as_raw()
-                || metadata.mode() & 0o777 != 0o700
-            {
-                return Err("evidence-directory-ownership".into());
-            }
             let directory = evidence_directory(&invocation)?;
             fs::DirBuilder::new()
                 .mode(0o700)
@@ -465,7 +460,7 @@ mod runtime {
                 evidence.cleanup = Cleanup::Unknown;
                 evidence.termination_reason = Some("invocation-stopped-before-final-report".into());
                 if let Err(e) = self.finish(&mut evidence) {
-                    eprintln!("containment-evidence-unavailable:{e}");
+                    let _ = writeln!(std::io::stderr(), "containment-evidence-unavailable:{e}");
                 }
             }
         }
@@ -484,12 +479,16 @@ mod runtime {
         // Only parent/guardian read it; the 64 MiB worker never loads a copy.
         let file =
             fs::File::open("/proc/self/exe").map_err(|e| format!("policy-build-digest:{e}"))?;
+        read_build_identity(file)
+    }
+
+    fn read_build_identity(file: impl Read) -> Result<String, String> {
         let mut bytes = Vec::new();
         file.take(128 * 1024 * 1024 + 1)
             .read_to_end(&mut bytes)
             .map_err(|e| format!("policy-build-digest:{e}"))?;
         if bytes.len() > 128 * 1024 * 1024 {
-            return Err("policy-build-size".into());
+            return Err("the zeno-fcis executable is over the 128 MiB containment limit (a debug build?); use a release build".into());
         }
         Ok(crate::transform::sha256_hex(&bytes))
     }
@@ -1322,7 +1321,7 @@ mod runtime {
         match result {
             Ok(code) => code,
             Err(error) => {
-                eprintln!("{}", unavailable(error));
+                let _ = writeln!(std::io::stderr(), "{}", unavailable(error));
                 Some(crate::BLOCKED)
             }
         }
@@ -1514,9 +1513,22 @@ mod runtime {
         // capture packet's four fields and canonical receipt remain intact.
         let mut public: serde_json::Value = serde_json::from_slice(&stdout.bytes)
             .map_err(|_| "contained-result-json".to_string())?;
-        super::super::label_public_result(&mut public);
-        stdout.bytes = serde_json::to_vec(&public).map_err(|e| e.to_string())?;
-        stdout.bytes.push(b'\n');
+        crate::telemetry::observe(&public);
+        // A successful print is program interchange data, not a report. All
+        // containment/cleanup evidence above is still required and retained;
+        // adding report fields would make these bytes unusable by loop encode.
+        if !(code == crate::OK
+            && matches!(
+                command,
+                crate::Command::Loop {
+                    command: crate::loop_command::Command::Print { .. }
+                }
+            ))
+        {
+            super::super::label_public_result(&mut public);
+            stdout.bytes = serde_json::to_vec(&public).map_err(|e| e.to_string())?;
+            stdout.bytes.push(b'\n');
+        }
         let diagnostic = std::io::stderr().write_all(&stderr.bytes);
         let output = std::io::stdout().write_all(&stdout.bytes);
         if let Err(error) = diagnostic.and(output) {
@@ -1530,6 +1542,73 @@ mod runtime {
     #[cfg(test)]
     mod stage_tests {
         use super::*;
+        #[test]
+        fn containment_regression_build_identity_explains_size_limit() {
+            assert_eq!(
+                read_build_identity(&b"abc"[..]),
+                Ok("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".to_owned())
+            );
+            let oversized = std::io::repeat(0).take(128 * 1024 * 1024 + 1);
+            assert_eq!(read_build_identity(oversized), Err(
+                "the zeno-fcis executable is over the 128 MiB containment limit (a debug build?); use a release build".to_owned()));
+        }
+        #[test]
+        fn containment_regression_journal_has_no_predictable_shared_directory() {
+            use clap::Parser;
+            let cli = crate::Cli::try_parse_from([
+                "zeno-fcis",
+                "loop",
+                "question",
+                "--contract",
+                "unused",
+            ])
+            .unwrap_or_else(|e| panic!("{e:?}"));
+            let a = Invocation::new(
+                &cli.command,
+                Vec::new(),
+                super::super::super::SelectionSource::Flag,
+            )
+            .unwrap_or_else(|e| panic!("{e:?}"));
+            let b = Invocation::new(
+                &cli.command,
+                Vec::new(),
+                super::super::super::SelectionSource::Flag,
+            )
+            .unwrap_or_else(|e| panic!("{e:?}"));
+            assert_ne!(a.directory, b.directory);
+            for directory in [&a.directory, &b.directory] {
+                let metadata = fs::symlink_metadata(directory).unwrap_or_else(|e| panic!("{e:?}"));
+                assert!(metadata.is_dir());
+                assert_eq!(metadata.mode() & 0o777, 0o700);
+                assert_eq!(metadata.uid(), nix::unistd::geteuid().as_raw());
+                assert_eq!(
+                    directory.parent(),
+                    Some(Path::new("/tmp")),
+                    "an invocation must not depend on a predictable application directory another user can occupy"
+                );
+            }
+            // These are evidence records, so the test retains both journals.
+        }
+
+        #[test]
+        fn containment_regression_closed_stderr_keeps_the_internal_refusal_code() {
+            const PROBE: &str = "ZENO_FCIS_REFUSAL_CLOSED_STDERR_TEST";
+            if std::env::var_os(PROBE).is_some() {
+                assert_eq!(bootstrap(), Some(crate::BLOCKED));
+                return;
+            }
+            let (writer, reader) = UnixStream::pair().unwrap_or_else(|e| panic!("{e:?}"));
+            drop(reader);
+            let output = Command::new(std::env::current_exe().unwrap_or_else(|e| panic!("{e:?}")))
+                .args(["--exact", "checker_process::posix::runtime::stage_tests::containment_regression_closed_stderr_keeps_the_internal_refusal_code", "--nocapture"])
+                .env(PROBE, "1")
+                .env(ROLE, "invalid-role")
+                .stderr(Stdio::from(std::os::fd::OwnedFd::from(writer)))
+                .output().unwrap_or_else(|e| panic!("{e:?}"));
+            assert!(output.status.success(), "{output:?}");
+            assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed; 0 failed"));
+        }
+
         // Actual re-executed workers: no production flag or alternate decision API.
         fn worker(spin: bool) {
             if !is_worker() {

@@ -340,13 +340,13 @@ class Contract:
             elif head == "reason":
                 self.reasons.append(int(words[1]))
             elif head == "law":
-                match = re.fullmatch(r"law\s+(\d+)\s+(\w+)\s+on\s+([a-z,\s]+?)\s*=\s*(.*);", line)
+                match = re.fullmatch(r"law\s+(\d+)\s+(\w+)\s+on\s+([a-z0-9:,\s]+?)\s*=\s*(.*);", line)
                 if match is None:
                     raise Unsupported(f"law declaration `{line}`")
                 scopes = {scope.strip() for scope in match.group(3).split(",")}
                 genesis = "genesis" in scopes
                 scopes.discard("genesis")
-                if len(scopes) != 1 or not scopes <= SCOPES:
+                if len(scopes) != 1 or not all(scope in SCOPES or re.fullmatch(r"reject:[1-9][0-9]*", scope) for scope in scopes):
                     raise Unsupported(f"law scope `{match.group(3)}`")
                 self.laws.append({"id": int(match.group(1)), "scope": scopes.pop(),
                                   "genesis": genesis, "text": match.group(4),
@@ -439,11 +439,12 @@ class Contract:
                 post[slot] = case["values"][field](frame)
         return (case["class"], case["reason"], tuple(post))
 
-    def law_applies(self, law, decision_class: str) -> bool:
+    def law_applies(self, law, decision_class: str, reason=None) -> bool:
         if self.kinds.get(law["id"]) == "InitialCondition":
             return False
         scope = law["scope"]
-        return (scope == "any"
+        return ((scope == f"reject:{reason}" and decision_class == "Reject")
+                or scope == "any"
                 or (scope == "accept" and decision_class == "Accept")
                 or (scope == "reject" and decision_class == "Reject")
                 or (scope == "failure" and decision_class == "CommittedFailure")
@@ -451,11 +452,13 @@ class Contract:
 
     def admits(self, state, command_context, decision, laws=None) -> bool:
         """Every declared law that applies holds on the decision's transition frame."""
-        decision_class, _, successor = decision
+        decision_class, reason, successor = decision
+        if decision_class == "CommittedFailure" and "CommittedFailureEffects" not in self.kinds.values():
+            return False
         post = None if decision_class == "Reject" else successor
         frame = self.frame(state, command_context, post)
         for law in self.laws if laws is None else laws:
-            if not self.law_applies(law, decision_class):
+            if not self.law_applies(law, decision_class, reason):
                 continue
             try:
                 if law["holds"](frame) != 1:
@@ -646,11 +649,16 @@ def state_lines(contract: Contract, valid, parent, classes) -> list[str]:
 
 
 def candidates(contract: Contract, state):
-    found = [("Reject", reason, tuple(state)) for reason in contract.reasons]
+    # The independent reference derives each reason partition from the case
+    # declarations, not from the production judge's candidate list.
+    reasons = {kind: sorted({case["reason"] for case in contract.cases
+                            if case["class"] == kind})
+               for kind in ("Reject", "CommittedFailure")}
+    found = [("Reject", reason, tuple(state)) for reason in reasons["Reject"]]
     found += [("Accept", None, successor) for successor in contract.states]
     if contract.failure:
         found += [("CommittedFailure", reason, successor)
-                  for reason in contract.reasons for successor in contract.states]
+                  for reason in reasons["CommittedFailure"] for successor in contract.states]
     return found
 
 
@@ -671,21 +679,19 @@ def gaps(contract: Contract, machine: Machine) -> dict:
             if reject_reason is not None and reference is not None and not contract.admits(
                     state, command_context, ("Reject", reject_reason, tuple(state))):
                 vacuous += 1
-            if reference is None:
-                lines.append("-")
-                for domain in domains:
-                    measures[domain]["tuples"] += 1
-                    measures[domain]["reference_refused"] += 1
-                continue
             admitted = [decision for decision in candidates(contract, state)
                         if contract.admits(state, command_context, decision)]
-            lines.append(str(len(admitted)))
+            # Executable refusal and law freedom are separate observations.
+            # Retain the digest's refusal marker while measuring alternatives.
+            lines.append("-" if reference is None else str(len(admitted)))
             for domain in domains:
                 counts = measures[domain]
                 counts["tuples"] += 1
-                for law in contract.laws:
-                    activation[domain][str(law["id"])] += contract.law_applies(law, reference[0])
-                if len(admitted) == 1:
+                counts["reference_refused"] += reference is None
+                if reference is not None:
+                    for law in contract.laws:
+                        activation[domain][str(law["id"])] += contract.law_applies(law, reference[0], reference[1])
+                if reference is not None and admitted == [reference]:
                     counts["determined"] += 1
                     continue
                 freedom = counts["freedom"]
@@ -845,6 +851,31 @@ def probes(contract: Contract, machine: Machine) -> dict:
             "explain_first_input_case": contract.case_of(first_state, first_input)}
 
 
+def case_coverage(contract: Contract) -> dict:
+    """Independent first-match counts; no runtime decision admission is inferred."""
+    rows = [dict(case=i, guard_true=0, decided=0, law_consistent=0)
+            for i in range(len(contract.cases))]
+    for state in contract.states:
+        valid = contract.valid(state)
+        for inputs in contract.inputs:
+            frame = contract.frame(state, inputs)
+            holds = [case["guard"](frame) == 1 for case in contract.cases]
+            selected = holds.index(True)
+            rows[selected]["decided"] += 1
+            rows[selected]["law_consistent"] += int(valid)
+            for row, truth in zip(rows, holds):
+                row["guard_true"] += int(truth)
+    findings = []
+    for row in rows:
+        if not row["decided"]:
+            findings.append({"case": row["case"], "kind": "case-never-decides",
+                             "cause": "guard never true" if not row["guard_true"] else "covered by earlier cases"})
+        elif not row["law_consistent"]:
+            findings.append({"case": row["case"], "kind": "case-only-on-excluded-pre-states", "cause": None})
+    return {"status": "checked", "tuples": len(contract.states)*len(contract.inputs),
+            "cases": rows, "findings": findings}
+
+
 def answers(directory: Path, lemmas: list[str], scenario_text: str | None) -> dict:
     contract = Contract((directory / "project.zeno").read_text(),
                         json.loads((directory / "v2" / "policy.json").read_text()))
@@ -852,6 +883,7 @@ def answers(directory: Path, lemmas: list[str], scenario_text: str | None) -> di
     measured_gaps = gaps(contract, machine)
     measured_gaps.pop("admissible_lines")
     result = {"profile": profile(contract, machine), "gaps": measured_gaps,
+              "case_coverage": case_coverage(contract),
               "lemmas": [lemma(contract, machine, text) for text in lemmas],
               "probes": probes(contract, machine)}
     if scenario_text is not None:

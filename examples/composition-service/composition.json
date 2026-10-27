@@ -1,0 +1,89 @@
+{
+  "checker": "zeno-fcis/composed-domain-checker/1",
+  "components": [
+    {
+      "assume": "true",
+      "bind": {
+        "action": "150 + op",
+        "context": "choose(op == 3, 131, 130)",
+        "device": "target"
+      },
+      "invariant": "(device_1 == 143 -> device_1_generation == 0) && (device_1 == 144 -> device_1_generation == generation) && (device_1 == 145 -> device_1_generation < generation) && (device_2 == 143 -> device_2_generation == 0) && (device_2 == 144 -> device_2_generation == generation) && (device_2 == 145 -> device_2_generation < generation) && (generation == 0 -> device_1 == 143 && device_2 == 143)",
+      "name": "keydir",
+      "owns": [
+        "keydir.device_1",
+        "keydir.device_2",
+        "keydir.generation",
+        "keydir.device_1_generation",
+        "keydir.device_2_generation",
+        "keydir.anchor_pending"
+      ],
+      "participates": "op <= 3",
+      "path": "keydir",
+      "policy_sha256": "4c5575f98f6c2ece871df3eb31b7a84ca046a4122300f5712822a688b1cf0580",
+      "program_sha256": "fa71ce71f78331ee0c1c6f09f96134d5b249cdcaf846615dcb86e593117d7e3e",
+      "project_sha256": "9df48e1d4cac4040acf3781d9fbf5e66f9f24d2b5f90aab30ccf9a98da31048a"
+    },
+    {
+      "assume": "(reader_status == 143 -> reader_generation == 0) && (reader_status == 144 -> reader_generation == current_generation) && (reader_status == 145 -> reader_generation < current_generation)",
+      "bind": {
+        "action": "choose(op == 4, 150, choose(op == 7, 152, 151))",
+        "current_generation": "keydir.generation",
+        "reader_generation": "choose(op == 6, keydir.device_2_generation, keydir.device_1_generation)",
+        "reader_status": "choose(op == 6, keydir.device_2, keydir.device_1)",
+        "slot": "target"
+      },
+      "invariant": "(slot_1_status == 140 -> slot_1_generation == 0) && (slot_1_status != 140 -> slot_1_generation >= 1) && (slot_2_status == 140 -> slot_2_generation == 0) && (slot_2_status != 140 -> slot_2_generation >= 1)",
+      "name": "mailbox",
+      "owns": [
+        "mailbox.slot_1_status",
+        "mailbox.slot_1_generation",
+        "mailbox.slot_2_status",
+        "mailbox.slot_2_generation"
+      ],
+      "participates": "op >= 4",
+      "path": "mailbox-keyed",
+      "policy_sha256": "c7cfba5c44cda395da2bfafc330e4fbf9914890a4f35e5d1ae37c7629e88e4ec",
+      "program_sha256": "ee4ea7c8eb2e7edf6b7848b9072c512c4ba588602e85bd5a9df33bbd9ca24294",
+      "project_sha256": "42a6bc193ee260b5f908d79f630ce599a071257d0e3506a48e59bfc1720b4e61"
+    }
+  ],
+  "couplings": [
+    {
+      "invariant": "mailbox.slot_1_generation <= keydir.generation && mailbox.slot_2_generation <= keydir.generation",
+      "members": [
+        "keydir",
+        "mailbox"
+      ],
+      "name": "mail_uses_issued_keys"
+    },
+    {
+      "invariant": "(keydir.device_1 == 145 -> keydir.device_1_generation < keydir.generation) && (keydir.device_2 == 145 -> keydir.device_2_generation < keydir.generation)",
+      "members": [
+        "keydir",
+        "mailbox"
+      ],
+      "name": "revoked_device_lacks_new_keys"
+    }
+  ],
+  "name": "directory-and-mailbox",
+  "request": [
+    {
+      "domain": {
+        "kind": "int",
+        "max": 7,
+        "min": 0
+      },
+      "name": "op"
+    },
+    {
+      "domain": {
+        "kind": "int",
+        "max": 2,
+        "min": 1
+      },
+      "name": "target"
+    }
+  ],
+  "schema": "zeno-fcis/checked-composition/3"
+}

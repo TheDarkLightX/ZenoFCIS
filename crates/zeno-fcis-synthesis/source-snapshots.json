@@ -1,0 +1,6 @@
+{
+  "format": "zeno-fcis/cli-source-snapshots/1",
+  "repository_sources": [
+    "verification/oracle_crypto_profile.json"
+  ]
+}

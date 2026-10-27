@@ -78,6 +78,19 @@ impl Files {
                 )
             })
             .collect();
+        // Current receipts stay intact and are checked by the actual generator.
+        // The conversion below is only for retained legacy i64 candidates.
+        if !adoptions.is_empty()
+            && adoptions
+                .iter()
+                .all(|(candidate, _)| import_program(candidate).is_ok())
+        {
+            return Self {
+                project: files.remove("project.zeno").unwrap_or_default(),
+                rules,
+                adoptions,
+            };
+        }
         let mut result = Self {
             project: files.remove("project.zeno").unwrap_or_default(),
             rules,
@@ -166,7 +179,9 @@ impl Files {
                 let current =
                     generate_contract(result.sources(&sources)).unwrap_or_else(|e| panic!("{e:?}"));
                 let receipt = transform::check(
-                    current.program(),
+                    current
+                        .program()
+                        .unwrap_or_else(|| panic!("legacy signed program")),
                     &candidate,
                     Limits {
                         steps: DEFAULT_STEP_LIMIT,
@@ -303,15 +318,26 @@ fn adopted(files: &Files) -> Files {
     let adoptions = files.adoption_sources();
     let sources = files.sources(&adoptions);
     let current = generate_contract(sources).unwrap_or_else(|error| panic!("{error}"));
-    let program = import_program(current.program()).unwrap_or_else(|error| panic!("{error}"));
+    let program = import_program(
+        current
+            .program()
+            .unwrap_or_else(|| panic!("legacy signed program")),
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
     let candidate = padded(&program);
     let limits = Limits {
         steps: DEFAULT_STEP_LIMIT,
         input_tuples: DEFAULT_MAX_INPUT_TUPLES,
     };
-    let receipt = transform::check(current.program(), &candidate, limits)
-        .unwrap_or_else(|rejection| panic!("equivalent: {rejection:?}"))
-        .receipt();
+    let receipt = transform::check(
+        current
+            .program()
+            .unwrap_or_else(|| panic!("legacy signed program")),
+        &candidate,
+        limits,
+    )
+    .unwrap_or_else(|rejection| panic!("equivalent: {rejection:?}"))
+    .receipt();
     let plan = CheckedCandidate::check(sources, candidate.clone(), receipt.clone())
         .and_then(|checked| checked.plan(sources, Usage::NewVersion))
         .unwrap_or_else(|error| panic!("the adoption is planned: {error}"));

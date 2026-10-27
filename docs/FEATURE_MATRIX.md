@@ -1,7 +1,7 @@
 # ZenoFCIS feature matrix
 
 This matrix covers the current `zeno-fcis` umbrella source API. The workspace
-declares `2.5.0`, the current release source, and the breaking V2 API below
+declares `2.6.0`, the current release source, and the breaking V2 API below
 needs a pinned source dependency on the matching tag, as the
 [installation guide](INSTALLATION.md) describes. The historical `1.1.0`
 package and its API stability promise have their own scope. The earlier public
@@ -17,8 +17,8 @@ native callback API.
 
 ## Host platforms
 
-The initial 2.5.0 release publishes Linux; the macOS binary follows native
-platform validation. The workflow supports these host builds:
+The 2.6.0 release publishes Linux; the macOS binary follows native platform
+validation. The workflow supports these host builds:
 
 - Linux x86_64 GNU, on Ubuntu 24.04;
 - macOS on Apple silicon (`aarch64-apple-darwin`, minimum-version field
@@ -158,7 +158,7 @@ graph or production authority.
 ## Common selections
 
 These are alternative dependency declarations against a checkout of
-`v2.5.0` at `../ZenoFCIS`. Select the one declaration whose features your
+`v2.6.0` at `../ZenoFCIS`. Select the one declaration whose features your
 application needs. `version = "=1.1.0"` does not supply the current API.
 
 ```toml
@@ -191,7 +191,7 @@ commutativity and sequential-versus-composed parity. Its external evidence
 verifier is a named trust boundary. Native domain and composed-program execution
 are retired; the normal route evaluates one complete checked program.
 
-ZenoFCIS does not yet ship a production parallel component runtime. The 2.5.0
+ZenoFCIS does not yet ship a production parallel component runtime. The 2.6.0
 source includes an offline parallel exhaustive checker whose qualification is
 bound to its release-source checks. That checker is separate from parallel
 application execution. Component composition needs its own coupled

@@ -85,3 +85,35 @@ whole-workspace/full-V2 acceptance and fresh Wasm qualification remain separate.
 `PreparedBatch::publish` takes the shell, authority, current context and byte
 limit. Normal builds expose no interruption parameter or store crash API;
 `cargo test` enables the store's feature through the dev dependency.
+
+## Delivery obligations
+
+Every accepted batch queues exactly one notification on channel 300 to
+`local-observer`. Field 112, `notified_count`, equals the final committed count.
+This includes a zero-delta batch and a batch whose deltas cancel. Law 510 checks
+the actual candidate's count and payload; law 511 independently checks its
+destination. Each bounds the complete outbox by one. Rejections emit no message,
+and the original law 502 forbids committed failures. The original four law lines,
+ordered-prefix rules and all 216 decision inputs remain unchanged.
+
+These are local request obligations. They do not establish destination
+availability, acknowledgement or an external effect. Publication still compares
+the complete ordered request and independently reevaluates the original batch.
+Preparation handles supply no decision or publication authority.
+
+## Policy for the owner
+
+The existing policy notifies once per accepted complete batch, including a
+no-op, and sends no intermediate-prefix notifications. A denied batch takes
+precedence over a capacity error. Its observer is the fixed local destination.
+These choices remain as shipped; the delivery laws do not select a different
+notification frequency, destination or rejection policy.
+
+## Background and scope
+
+The independent transition predicates follow E. W. Dijkstra, “Guarded commands,
+nondeterminacy and formal derivation of programs”, CACM 18(8), 1975,
+DOI 10.1145/360933.360975. The delivery revision applies those predicates to the
+candidate's local notification request. Prior-art search pending because this
+revision was offline; no novelty claim is made. Whole-domain delivery-gap
+determination and guarantees about a remote receiver remain outside this check.

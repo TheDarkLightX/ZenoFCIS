@@ -43,7 +43,7 @@ pub(crate) const DEFAULT_MAX_INPUT_TUPLES: u64 = 100_000_000;
 /// `tests/fixtures/transform-check/`, which the tests compare with this
 /// checker's output; refactoring the source, or a new crate version, changes
 /// no receipt.
-pub(crate) const CHECKER: &str = "zeno-fcis/transform-check/4";
+pub(crate) const CHECKER: &str = "zeno-fcis/transform-check/5";
 
 /// Limits that fix the meaning of one check.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -131,6 +131,7 @@ pub(crate) struct Equivalence {
     limits: Limits,
     inputs_checked: u64,
     usage: Usage,
+    released_24: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -233,6 +234,7 @@ impl PreparedCheck<'_> {
             limits: self.limits,
             inputs_checked: complete.0,
             usage: complete.1,
+            released_24: false,
         })
     }
 }
@@ -265,7 +267,61 @@ pub(crate) fn check(
         limits,
         inputs_checked: complete.0,
         usage: complete.1,
+        released_24: false,
     })
+}
+
+/// Closed released-receipt route. It only verifies retained evidence and never
+/// participates in the current transform command's authoring/parallel routes.
+// Keep the closed historical replay spelling checked by its source-route guard.
+#[rustfmt::skip]
+fn check_released_24(original: &[u8], candidate: &[u8], limits: Limits) -> Result<Equivalence, Rejection> {
+    use zeno_fcis_synthesis::finite_runtime::{import_i64_program, import_i64_program_data};
+    let a = import_i64_program_data(original).map_err(|e| not_admitted(Side::Original, &e))?;
+    let b = import_i64_program_data(candidate).map_err(|e| not_admitted(Side::Candidate, &e))?;
+    let count = crate::finite_checker::validate_pair(&scalar(&a), &scalar(&b), limits.input_tuples)
+        .map_err(|e| comparison_rejection(e, &a, &b))?;
+    let left = import_i64_program(original).map_err(|e| not_admitted(Side::Original, &e))?;
+    let right = import_i64_program(candidate).map_err(|e| not_admitted(Side::Candidate, &e))?;
+    let mut tuple = first_tuple(a.inputs());
+    let mut usage = Usage { max_steps: [0; 2], candidate_uses_more: 0, usage_preserved: true };
+    let mut over_limit = [0; 2];
+    for ordinal in 0..count {
+        let input = tuple.iter().map(|v| i64::try_from(*v))
+            .collect::<Result<Vec<_>, _>>().map_err(|_| not_admitted(Side::Original, &Error::Invalid("historical-input")))?;
+        let observe = |p: &zeno_fcis_synthesis::finite_runtime::LegacyProgram| {
+            let (result, work) = p.execute_v2(&input, zeno_fcis_synthesis::finite::v2_zero_limits()
+                .with_limit(zeno_fcis_synthesis::finite::V2Resource::Step, FULL_BUDGET)).into_parts();
+            Observation { result: result.map(|v| v.into_iter().map(i128::from).collect()),
+                steps: work.used(zeno_fcis_synthesis::finite::V2Resource::Step) }
+        };
+        let (original, candidate) = (observe(&left), observe(&right));
+        if original.result != candidate.result {
+            return Err(Rejection::Counterexample(Counterexample { ordinal, input: tuple, original, candidate }));
+        }
+        for (side, steps) in [original.steps, candidate.steps].into_iter().enumerate() {
+            usage.max_steps[side] = usage.max_steps[side].max(steps);
+            if steps > limits.steps { over_limit[side] += 1; }
+        }
+        usage.usage_preserved &= original.steps == candidate.steps;
+        if candidate.steps > original.steps { usage.candidate_uses_more += 1; }
+        let more = advance(a.inputs(), &mut tuple);
+        if more != (ordinal + 1 < count) {
+            return Err(Rejection::Inconclusive(Inconclusive::CoverageMismatch { expected: count, visited: ordinal + 1 }));
+        }
+    }
+    if over_limit != [0, 0] {
+        return Err(Rejection::Inconclusive(Inconclusive::BudgetBoundary {
+            over_limit, minimum_limit: usage.max_steps[0].max(usage.max_steps[1]), usage,
+        }));
+    }
+    let mut original_artifact = Artifact::new(original, &a);
+    let mut candidate_artifact = Artifact::new(candidate, &b);
+    original_artifact.profile = left.profile();
+    candidate_artifact.profile = right.profile();
+    Ok(Equivalence { original: original_artifact, candidate: candidate_artifact,
+        inputs: a.inputs().to_vec(), outputs: a.outputs().to_vec(), limits,
+        inputs_checked: count, usage, released_24: true })
 }
 
 /// Admission, ABI and domain checks, in refusal order, before any evaluation.
@@ -383,8 +439,10 @@ impl Equivalence {
             "inputs_checked": self.inputs_checked,
             "usage": usage_json(&self.usage),
             "checker": {
-                "semantics": CHECKER,
-                "evaluator_identity": hex(&EVALUATOR),
+                "semantics": if self.released_24 { "zeno-fcis/transform-check/3" } else { CHECKER },
+                "evaluator_identity": hex(if self.released_24 {
+                    &zeno_fcis_synthesis::finite::historical::RELEASED_EVALUATOR
+                } else { &EVALUATOR }),
             },
         })
     }
@@ -537,6 +595,28 @@ fn rerun(
         return Err(Replay::Differs(fields));
     }
     // The verifier's cap bounds the work; the receipt cannot raise it.
+    let released_24 = is_released_24_receipt(&recorded.value);
+    if released_24 {
+        let equivalence = check_released_24(
+            original,
+            candidate,
+            Limits {
+                input_tuples: max_input_tuples,
+                ..recorded.limits
+            },
+        )
+        .map_err(Replay::NotEquivalent)?;
+        if equivalence.inputs_checked != recorded.domain_size {
+            return Err(Replay::Differs(vec![String::from("domain")]));
+        }
+        let equivalence = if recorded.limits.input_tuples == max_input_tuples {
+            equivalence
+        } else {
+            check_released_24(original, candidate, recorded.limits)
+                .map_err(Replay::NotEquivalent)?
+        };
+        return Ok((recorded, equivalence));
+    }
     match admit(original, candidate, max_input_tuples) {
         Ok(pair) if pair.size == recorded.domain_size => {}
         Ok(_) => return Err(Replay::Differs(vec![String::from("domain")])),
@@ -549,6 +629,13 @@ fn rerun(
         Ok(equivalence) => Ok((recorded, equivalence)),
         Err(rejection) => Err(Replay::NotEquivalent(rejection)),
     }
+}
+
+/// The exact released checker binding is provenance selection, not a verdict.
+pub(crate) fn is_released_24_receipt(value: &Value) -> bool {
+    value.get("checker")
+        == Some(&json!({"semantics": "zeno-fcis/transform-check/3",
+        "evaluator_identity": hex(&zeno_fcis_synthesis::finite::historical::RELEASED_EVALUATOR)}))
 }
 
 /// The receipt fields replay binds before evaluating anything.

@@ -1,7 +1,8 @@
 # Release packaging
 
-This document describes the release packaging tooling and the
-[published 2.5.0 Linux artifact set](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.5.0).
+This document describes the release packaging tooling and the `2.6.0`
+artifact set it prepares. Final release qualification and publication remain
+pending.
 
 ## Package set
 
@@ -63,8 +64,9 @@ The command requires a clean exact commit. Run it, `build-host-binary`,
 `merge-hosts` and the custody check from a fresh clone of that commit. They
 refuse untracked files and any ignored file outside `target/`, `node_modules/`
 and `__pycache__/` folders, and a working checkout usually holds such files.
-For example, a workspace test run writes
-`crates/zeno-fcis-generated-code-tests/python/`.
+The generated-code test crate's build script writes its Rust and Python fixtures
+only into Cargo's `OUT_DIR`, including its `python/` subdirectory. Test execution
+adds no source-tree output.
 
 The build uses pinned Rust `1.97.1`, fetches the locked external graph,
 packages every public crate with `--locked`, then unpacks the complete crate
@@ -90,11 +92,18 @@ two compilations with all features and `--locked --offline`:
    `docs/benchmarks/`, and those nine individually named arithmetic files;
    other files under `examples/` or `tools/` remain refused.
 
-The CLI embeds dependency source text from its own `source-snapshots/` folder.
+A published crate that embeds text from a sibling crate or from the
+repository compiles it from its own `source-snapshots/` folder: the CLI, the
+SQLite shell and the synthesis library do. Each lists those files in its
+`source-snapshots.json`, under `sources` for files in `crates/` and under
+`repository_sources` for repository files.
 `python3 tools/check_cli_source_snapshots.py --write` refreshes those copies;
 the workspace test and packaging preflight require exact equality with their
 originals. This keeps dependency source identities unchanged while allowing
-the CLI to build from its own archive.
+each crate to build from its own archive; library, binary and example
+sources are checked. The withdrawal-queue decision graph, which compiles a
+template contract in place, is an example of the unpublished
+`zeno-fcis-generated-code-tests` crate.
 
 After a reviewed source change, derive a test-input candidate with
 `python3 tools/rc_package.py propose-test-inputs --output <new JSON file>

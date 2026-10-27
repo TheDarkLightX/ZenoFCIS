@@ -4,6 +4,78 @@ All notable Rust API and packaging changes are recorded here. Canonical
 protocol compatibility is governed separately by the identifiers and versions
 embedded in ZenoFCIS values.
 
+## 2.6.0 - 2026-10-24
+
+- All workspace packages are version 2.6.0. The planned 2.5.1 work is
+  included; there is no separate 2.5.1 release.
+- **Breaking change:** a 2.6.0 build refuses a store created by a 2.5.0
+  build of the same contract, because the store records the evaluator
+  identity and 2.6.0 changes the evaluator; nothing is written. Keep such a
+  store on its 2.5.0 build or start a new store. Stores created by 2.4.0
+  applications remain upgradable.
+- Admit unsigned 128-bit multiplication and floor or ceiling division, checked
+  casts between `U128` and `I128`, payload-free sum types as typed numeric
+  decision inputs, and laws scoped `on reject:REASON_ID`. These change the
+  meaning of verified specifications, and the evaluator identity is
+  regenerated: transform receipts recorded by 2.5.0 no longer replay until
+  `zeno-fcis contract refresh-receipts DIR` checks each adoption again.
+- Add keyed collections: key types, maps, named entries and summaries in
+  `.zeno` (project-spec format 5), `contract collections DIR`, and paged
+  replay that restores a long history with bounded memory. See
+  [keyed collections](docs/COLLECTIONS.md).
+- Add the `shell-effects` feature of the generated withdrawal-queue
+  application: `shell_effects::Effects` commits, recovers after a lost reply
+  and delivers outbox records against real storage, a deterministic world
+  that injects faults, or a recorded run. See
+  [shell effects](docs/SHELL_EFFECTS.md).
+- Add `contract two-run`, `contract distribution` and `contract risk`,
+  contract tables expanded while the file is parsed (`check --expand`), and
+  table games with fairness.
+- Symbolic review encodes guarded observations whose values have different
+  kinds. Unsupported encodings and exhaustion of the 63-split limit leave
+  review and lemma questions UNKNOWN, exit 2.
+- Value decoding caps nesting at 1,024 levels, the catalog's value-depth
+  ceiling, even when `ValueLimits::max_depth` is larger
+  (`ValueLimits::effective_max_depth`). Each collection's initial reservation
+  is bounded by the remaining wire bytes and the remaining node budget. The
+  default depth limit stays 64 and the canonical encoding is unchanged.
+- **Breaking change for scripts:** verdict commands follow the shared
+  [exit contract](docs/CLI_REFERENCE.md#exit-codes): a refutation exits 1 and
+  an undecided result exits 2. Scripts relying on exit 0 for a refutation must
+  change.
+- Add `zeno-fcis guide list` and `zeno-fcis guide show NAME`: 29 cards with
+  exact commands, outputs and limits.
+
+- Add `zeno-fcis new --contract project.zeno --app`: an explicit pinned UI
+  build, checked core, SQLite shell effects and authenticated ingress server
+  with embedded static assets and a source-bound app manifest.
+- Add durable UI previews and original-key recovery, checked journeys for
+  withdrawal queue, inventory reservation and the wide counter, and an
+  expanded ingress fault corpus including time, disk-full and I/O responses.
+- Authenticate browser sign-in before mounting commands; hold credentials
+  only in private transport memory and check empty/wrong-credential refusals.
+- Add [Build an app with ZenoFCIS](docs/BUILD_AN_APP.md). Browser, TCP and
+  release qualification remain separate gates.
+
+- Add `construct --family priority-collection --requirement BUNDLE
+  --owner-approval FILE --layout T|I --out DIR` and a
+  [construction guide](docs/CONSTRUCTION.md). The command uses frozen meaning,
+  bounded typed sketches and exhaustive native refinement; it retains candidates,
+  counterexamples and receipts. Unsupported families refuse by name. Scope is
+  capacity two with three identities, two priorities and two lifetime insertions;
+  no correctness claim for arbitrary capacities or applications is made.
+- Add `contract refine-check`, the pure representation-refinement API and the
+  reservation example. Results distinguish full finite refinement, the first
+  counterexample and inconclusive checking. Reports confer no application,
+  migration, publication or resource authority.
+
+- Restore upgrades of contracts adopted with the released ZenoFCIS 2.4.0 CLI.
+  Retained policies, receipts and store history are checked with the copied
+  released evaluator. Genesis and non-genesis version 1 stores upgrade to
+  version 2 while preserving pending delivery IDs. The upgrade checks the current state laws, and all
+  subsequent decisions use the current evaluator. Compatibility covers the
+  2.4.0 release only; edited superseded versions still refuse.
+
 ## 2.5.0 - 2026-10-18
 
 - **Breaking change:** 2.4-adopted contracts, their i64 transform receipts,
@@ -11,7 +83,7 @@ embedded in ZenoFCIS values.
   encoding. Use the 2.4.0 CLI and matching 2.4 runtime, or re-adopt the original
   pre-adoption contract with a newly checked 2.5 candidate and receipt and
   start a new store. Re-adoption does not migrate existing stores.
-  Compatibility is planned for 2.5.1.
+  Compatibility for the 2.4.0 release is restored in 2.6.
 
 - **Tested and finite checked:** extend loop doors, exact transform checks,
   replay and point evaluation to the main signed 128-bit arithmetic route.

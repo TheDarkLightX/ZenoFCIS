@@ -18,7 +18,7 @@ pub const NO_COMMITTED_FAILURES: u32 = 508;
 /// The rejection law. The framework checks it for every rejection: a
 /// rejection commits no state, effect, or outbox entry. It has no formula, so
 /// it is registered here instead of as an always-true law in `project.zeno`.
-pub const REJECT_PUBLISHES_NOTHING: u32 = 509;
+pub const REJECT_PUBLISHES_NOTHING: u32 = 909;
 
 pub fn digest(label: &str, bytes: &[u8]) -> Hash32 {
     commitment::<RustCryptoSha256>(Domain::new(label, 1).expect("static domain"), bytes)
@@ -110,6 +110,7 @@ pub fn manifest() -> LawManifest {
     let project = project();
     let required = [
         LawKind::StateInvariant,
+        LawKind::AuthoritySubjectRecipient,
         LawKind::AssetConservation,
         LawKind::DebitCreditEffectEquality,
         LawKind::RejectNoAuthority,
@@ -147,9 +148,14 @@ pub fn manifest() -> LawManifest {
                     DecisionScope::Accept,
                     no_genesis(),
                 ),
-                502 => (
+                502 | 510 | 511 => (
                     LawKind::DebitCreditEffectEquality,
                     DecisionScope::Accept,
+                    no_genesis(),
+                ),
+                503 => (
+                    LawKind::RejectNoAuthority,
+                    DecisionScope::Reject,
                     no_genesis(),
                 ),
                 _ => panic!("a new law needs a reviewed runtime binding"),
@@ -189,7 +195,7 @@ pub fn manifest() -> LawManifest {
         LawDefinition::try_new(
             id(REJECT_PUBLISHES_NOTHING),
             name("reject_publishes_nothing"),
-            LawKind::RejectNoAuthority,
+            LawKind::AuthoritySubjectRecipient,
             DecisionScope::Reject,
             no_genesis(),
             digest(

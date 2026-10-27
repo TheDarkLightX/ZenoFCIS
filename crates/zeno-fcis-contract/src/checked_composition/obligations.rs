@@ -964,6 +964,11 @@ fn check_assume(composition: &Composition, tables: &Tables, obligation: &mut Che
 }
 
 fn check_couple(composition: &Composition, tables: &Tables, obligation: &mut Checked) {
+    // This member-only simulation also checks every possible outside-failure
+    // cut, including cuts the actual outside component cannot reach. A single
+    // runtime resolve() call cannot express those alternative endings. Keep
+    // this over-approximation separate; its correspondence with the abstract
+    // coupling obligation remains a tested premise, not a shared-source proof.
     let coupling = &composition.couplings[obligation.subject];
     let table = &tables.couplings[obligation.subject];
     let members = &coupling.members;

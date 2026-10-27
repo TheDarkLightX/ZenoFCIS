@@ -1,0 +1,17 @@
+zeno 1;
+project 1 two_step_leak;
+namespace 2 core;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 105 int Bit in 0..=1;
+field 110 100 public_value 105; field 111 100 secret 105; field 112 100 hidden_copy 105; field 120 101 input 105;
+component 400 decision {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 256;
+}
+merge [400];
+law 500 bounded on commit, genesis = post.100.110 >= 0;

@@ -24,7 +24,14 @@ merge [400];
 law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 8;
 law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 8;
 law 502 exact_transition on accept = (command.101.120 == 1 -> (pre.100.110 == 8 && post.100.110 == 0)) && (command.101.120 == 0 -> post.100.110 == pre.100.110 + 1);
+// Independent complete relation; ordered guards exclude earlier reasons.
+law 520 reason_200 on reject:200 = (true) && (context.102.130 == 0);
+law 521 reason_201 on reject:201 = ((true) && !(context.102.130 == 0)) && (command.101.120 == 1 && pre.100.110 != 8);
+law 522 reason_202 on reject:202 = (((true) && !(context.102.130 == 0)) && !(command.101.120 == 1 && pre.100.110 != 8)) && (command.101.120 == 0 && pre.100.110 == 8);
+law 540 legitimate_acceptance on reject = !((((true) && !(context.102.130 == 0)) && !(command.101.120 == 1 && pre.100.110 != 8)) && !(command.101.120 == 0 && pre.100.110 == 8));
+law 541 acceptance_eligibility on accept = (((true) && !(context.102.130 == 0)) && !(command.101.120 == 1 && pre.100.110 != 8)) && !(command.101.120 == 0 && pre.100.110 == 8);
+law 542 no_committed_failure on failure = false;
 // Core seed finite-phase-machine/1; parameters {"C": 8}.
-// Instance source-set SHA256 97eff7f2bb21310857993517cdd4fd4aca59538412ccb649a489b5d1d41d3993.
+// Instance source-set SHA256 0bc471fd0cd56d1cfbf3fd25f3acea8b07e775ac6f81cf145de42d176e22b8fb.
 // Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

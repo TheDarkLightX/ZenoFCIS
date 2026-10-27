@@ -766,28 +766,49 @@ pub(crate) fn step(
     pre: &[Vec<i128>],
     request: &[i128],
 ) -> (Ended, Vec<Vec<i128>>) {
-    let mut after = pre.to_vec();
-    for at in 0..composition.components.len() {
+    use super::resolve;
+    // Both captures are fresh, exclusive scratch for this invocation. Only
+    // immutable pre-state and tables reach local(); nothing is retained by
+    // resolve after it returns, including on Reject or Refused.
+    let mut posts = vec![None; composition.components.len()];
+    let mut ended = Ended::Accept;
+    let resolution = resolve::resolve(composition.components.len(), |at| {
         match local(composition, tables, at, pre, request) {
-            Local::Skip => {}
-            Local::Reject(reason) => return (Ended::Reject(at, reason), pre.to_vec()),
-            Local::Refused(class) => return (Ended::Refused(at, class), pre.to_vec()),
+            Local::Skip => resolve::Local::Skip,
+            Local::Reject(reason) => {
+                ended = Ended::Reject(at, reason);
+                resolve::Local::Reject
+            }
+            Local::Refused(class) => {
+                ended = Ended::Refused(at, class);
+                resolve::Local::Refused
+            }
             Local::Commit {
                 failure,
                 reason,
                 post,
             } => {
-                if composition.components[at].owns {
-                    after[at] = post;
-                }
+                posts[at] = Some(post);
                 if failure {
-                    return (Ended::CommittedFailure(at, reason), after);
+                    ended = Ended::CommittedFailure(at, reason);
+                    resolve::Local::CommitFailure
+                } else {
+                    resolve::Local::Commit
                 }
             }
         }
-    }
-    (Ended::Accept, after)
+    });
+    let owns: Vec<bool> = composition
+        .components
+        .iter()
+        .map(|component| component.owns)
+        .collect();
+    (ended, resolve::apply(pre, &posts, &owns, &resolution))
 }
+
+#[cfg(test)]
+#[path = "joint_differential_tests.rs"]
+mod differential_tests;
 
 /// Every request in enumeration order, the last field fastest, one at a
 /// time: a request domain is never collected.
@@ -881,8 +902,8 @@ impl<'a> Odometer<'a> {
 /// ```
 #[derive(Debug)]
 pub struct JointComposition {
-    composition: Composition,
-    tables: Tables,
+    pub(super) composition: Composition,
+    pub(super) tables: Tables,
     layout: Vec<StateSlot>,
     request: Vec<RequestSlot>,
     genesis: Vec<i128>,

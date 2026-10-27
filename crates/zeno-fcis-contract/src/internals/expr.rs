@@ -7,6 +7,10 @@
 //! operators associate left except `->`. Law formulas come from the
 //! `zeno-fcis-spec` parser and convert to the same tree.
 
+#[path = "table_expr.rs"]
+mod table_expr;
+pub(super) use table_expr::TableDeclarations;
+
 use std::collections::BTreeMap;
 
 use zeno_fcis_spec::{CompareOp, DivisionMode, ProjectionRoot, RelExpr, ValueExpr};
@@ -67,8 +71,11 @@ pub const OPERATORS: [(&str, Binary); 12] = [
 ];
 
 /// Every function with its number of arguments.
-pub const FUNCTIONS: [(&str, usize); 13] = [
+pub const FUNCTIONS: [(&str, usize); 16] = [
     ("choose", 3),
+    ("u128", 1),
+    ("to_i128", 1),
+    ("to_u128", 1),
     ("div_floor", 2),
     ("div_ceil", 2),
     ("mul_div_floor", 3),
@@ -94,8 +101,12 @@ pub enum Rounding {
 /// are shared.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Ast {
+    Circuit(Box<zeno_fcis_spec::BoolCircuit<Ast>>),
     Bool(bool),
     Int(i128),
+    U128(u128),
+    ToI128(Box<Ast>),
+    ToU128(Box<Ast>),
     /// Candidate reason, available only to rejection/failure laws.
     DecisionReason,
     Name(String),
@@ -117,10 +128,41 @@ const MAX_DEPTH: usize = 64;
 
 /// Parses one rule expression.
 pub fn parse(text: &str) -> Result<Ast, String> {
+    parse_in(text, None)
+}
+
+/// Parses one expression against project table declarations and returns the
+/// owned scalar expansion. This is preparation, not decision authority.
+pub fn parse_for_project(project: &str, text: &str) -> Result<Ast, String> {
+    if let Ok(ast) = parse(text) {
+        return Ok(ast);
+    }
+    parse_tables(text, &TableDeclarations::read(project)?)
+}
+
+pub(super) fn parse_tables(text: &str, tables: &TableDeclarations) -> Result<Ast, String> {
+    parse_in(text, Some(tables))
+}
+
+fn parse_in(text: &str, tables: Option<&TableDeclarations>) -> Result<Ast, String> {
+    // Retain the accepted scalar Boolean circuit spelling and its canonical
+    // tree. This fixed empty context cannot resolve any project table forms.
+    if text.contains("circuit {")
+        && let Ok(formula) = zeno_fcis_spec::parse_table_expression(
+            "zeno 1; project 1 expression;",
+            text,
+            zeno_fcis_spec::SourceLimits::default(),
+        )
+    {
+        return law(&formula);
+    }
     let tokens = tokenize(text)?;
     let mut parser = Parser {
         tokens: &tokens,
         index: 0,
+        tables,
+        bound: Vec::new(),
+        expanded: 0,
     };
     let ast = parser.expression(0, 0)?;
     match tokens.get(parser.index) {
@@ -139,7 +181,7 @@ fn tokenize(text: &str) -> Result<Vec<&str>, String> {
             .any(|operator| rest.starts_with(operator))
         {
             2
-        } else if b"!<>()+*,-".contains(&bytes[0]) {
+        } else if b"!<>()+*,-[]{};".contains(&bytes[0]) {
             1
         } else if bytes[0].is_ascii_alphabetic() || bytes[0] == b'_' {
             bytes
@@ -163,9 +205,56 @@ fn tokenize(text: &str) -> Result<Vec<&str>, String> {
 struct Parser<'t> {
     tokens: &'t [&'t str],
     index: usize,
+    tables: Option<&'t TableDeclarations>,
+    bound: Vec<(&'t str, i128)>,
+    expanded: usize,
 }
 
 impl<'t> Parser<'t> {
+    /// A circuit is one Boolean atom, including inside numeric Select values.
+    fn circuit(&mut self) -> Result<Ast, String> {
+        let start = self.index - 1;
+        let mut braces = 0usize;
+        let mut seen = false;
+        while let Some(token) = self.tokens.get(self.index) {
+            self.expansion_work(token.len().saturating_add(1))?;
+            match *token {
+                "{" => {
+                    braces += 1;
+                    seen = true;
+                }
+                "}" => {
+                    braces = braces.checked_sub(1).ok_or("unmatched circuit brace")?;
+                }
+                _ => {}
+            }
+            self.index += 1;
+            if seen && braces == 0 {
+                break;
+            }
+        }
+        if !seen || braces != 0 {
+            return Err("circuit needs balanced braces".to_owned());
+        }
+        self.expect("output")?;
+        let output = self.next()?;
+        self.expansion_work(output.len().saturating_add(7))?;
+        let text = self.tokens[start..self.index].join(" ");
+        let formula = zeno_fcis_spec::parse_table_expression(
+            "zeno 1; project 1 expression;",
+            &text,
+            zeno_fcis_spec::SourceLimits::default(),
+        )
+        .map_err(|d| d.to_string())?;
+        let ast = law(&formula)?;
+        let bound = self
+            .bound
+            .iter()
+            .map(|(name, value)| (name.to_string(), Ast::Int(*value)))
+            .collect();
+        expand(&ast, &bound)
+    }
+
     fn next(&mut self) -> Result<&'t str, String> {
         let token = *self
             .tokens
@@ -186,11 +275,18 @@ impl<'t> Parser<'t> {
 
     /// Precedence climbing: operators binding at least as tightly as `level`.
     fn expression(&mut self, level: u8, depth: usize) -> Result<Ast, String> {
+        self.expansion_work(1)?;
         if depth > MAX_DEPTH {
             return Err("expression nests too deeply".to_owned());
         }
         let token = self.next()?;
         let mut left = match token {
+            "circuit" => self.circuit()?,
+            "forall" | "exists" | "sum"
+                if self.tables.is_some() && self.tokens.get(self.index) != Some(&"(") =>
+            {
+                self.table_form(token, depth + 1)?
+            }
             "(" => {
                 let inner = self.expression(0, depth + 1)?;
                 self.expect(")")?;
@@ -213,6 +309,18 @@ impl<'t> Parser<'t> {
             }
             "true" => Ast::Bool(true),
             "false" => Ast::Bool(false),
+            "u128" => {
+                self.expect("(")?;
+                let digits = self.next()?;
+                if digits.len() > 1 && digits.starts_with('0') {
+                    return Err("noncanonical U128 literal".into());
+                }
+                let n = digits
+                    .parse::<u128>()
+                    .map_err(|_| "U128 literal out of range")?;
+                self.expect(")")?;
+                Ast::U128(n)
+            }
             _ if token.as_bytes()[0].is_ascii_digit() => Ast::Int(
                 token
                     .parse()
@@ -230,7 +338,7 @@ impl<'t> Parser<'t> {
                 call(&name, arguments)?
             }
             _ if token.as_bytes()[0].is_ascii_alphabetic() || token.starts_with('_') => {
-                Ast::Name(token.to_owned())
+                self.table_name(token, depth)?
             }
             _ => return Err(format!("unexpected `{token}`")),
         };
@@ -252,6 +360,14 @@ impl<'t> Parser<'t> {
 
 fn call(name: &str, arguments: Vec<Ast>) -> Result<Ast, String> {
     let count = arguments.len();
+    if count == 1 && matches!(name, "to_i128" | "to_u128") {
+        let v = Box::new(arguments.into_iter().next().ok_or("missing cast operand")?);
+        return Ok(if name == "to_i128" {
+            Ast::ToI128(v)
+        } else {
+            Ast::ToU128(v)
+        });
+    }
     if count == 4
         && matches!(
             name,
@@ -361,6 +477,29 @@ fn write(ast: &Ast, level: u8, out: &mut String) {
         out.push(')');
     };
     match ast {
+        Ast::U128(v) => out.push_str(&format!("u128({v})")),
+        Ast::Circuit(c) => {
+            use zeno_fcis_spec::BoolNode;
+            out.push_str("circuit { ");
+            for n in c.nodes() {
+                match n {
+                    BoolNode::Formula(f) => {
+                        out.push_str("formula { ");
+                        write(f, 0, out);
+                        out.push_str(" }");
+                    }
+                    BoolNode::Literal(v) => out.push_str(if *v { "true" } else { "false" }),
+                    BoolNode::Not(a) => out.push_str(&format!("not {a}")),
+                    BoolNode::And(a, b) => out.push_str(&format!("and {a} {b}")),
+                    BoolNode::Or(a, b) => out.push_str(&format!("or {a} {b}")),
+                    BoolNode::Select(c, a, b) => out.push_str(&format!("select {c} {a} {b}")),
+                }
+                out.push_str("; ");
+            }
+            out.push_str(&format!("}} output {}", c.output()));
+        }
+        Ast::ToI128(v) => call("to_i128", &[v], out),
+        Ast::ToU128(v) => call("to_u128", &[v], out),
         Ast::Bool(value) => out.push_str(if *value { "true" } else { "false" }),
         Ast::Int(value) => out.push_str(&value.to_string()),
         Ast::DecisionReason => out.push_str("decision_reason"),
@@ -472,10 +611,36 @@ pub fn expand_with_limits(
     )
 }
 
+/// Recognizes unsigned syntax without inspecting values through signed integers.
+pub fn uses_unsigned(ast: &Ast) -> bool {
+    match ast {
+        Ast::Circuit(c) => c
+            .nodes()
+            .iter()
+            .any(|n| matches!(n, zeno_fcis_spec::BoolNode::Formula(f) if uses_unsigned(f))),
+        Ast::U128(_) | Ast::ToI128(_) | Ast::ToU128(_) => true,
+        Ast::Bool(_) | Ast::Int(_) | Ast::Name(_) | Ast::DecisionReason => false,
+        Ast::Not(v) | Ast::Neg(v) => uses_unsigned(v),
+        Ast::Binary(_, a, b) | Ast::Div(_, a, b) => uses_unsigned(a) || uses_unsigned(b),
+        Ast::Choose(a, b, c)
+        | Ast::MulDiv(_, a, b, c)
+        | Ast::SignedMulDivFloor(a, b, c)
+        | Ast::ScaledMulDiv(_, _, a, b, c, _)
+        | Ast::RepeatMulDiv(_, a, b, c, _) => {
+            uses_unsigned(a) || uses_unsigned(b) || uses_unsigned(c)
+        }
+        Ast::ProductsGe(args) => args.iter().any(uses_unsigned),
+    }
+}
 /// Recognizes the new syntax before expansion, including in unused bindings.
 pub fn uses_new_arithmetic(ast: &Ast) -> bool {
     match ast {
+        Ast::Circuit(c) => c
+            .nodes()
+            .iter()
+            .any(|n| matches!(n, zeno_fcis_spec::BoolNode::Formula(f) if uses_new_arithmetic(f))),
         Ast::ScaledMulDiv(..) | Ast::RepeatMulDiv(..) => true,
+        Ast::U128(_) | Ast::ToI128(_) | Ast::ToU128(_) => true,
         Ast::Bool(_) | Ast::Int(_) | Ast::Name(_) | Ast::DecisionReason => false,
         Ast::Neg(a) | Ast::Not(a) => uses_new_arithmetic(a),
         Ast::Binary(_, a, b) | Ast::Div(_, a, b) => {
@@ -507,6 +672,9 @@ fn expand_with<'v>(
         expand_with(ast, variables, stack, fuel, depth + 1).map(Box::new)
     };
     Ok(match ast {
+        Ast::Circuit(c) => Ast::Circuit(Box::new(
+            c.try_map(|f| expand_with(f, variables, stack, fuel, depth + 1))?,
+        )),
         Ast::Name(name) => match variables.get_key_value(name) {
             Some((key, definition)) => {
                 if stack.contains(&key.as_str()) {
@@ -519,7 +687,9 @@ fn expand_with<'v>(
             }
             None => ast.clone(),
         },
-        Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => ast.clone(),
+        Ast::Bool(_) | Ast::Int(_) | Ast::U128(_) | Ast::DecisionReason => ast.clone(),
+        Ast::ToI128(v) => Ast::ToI128(recurse(v, stack, fuel)?),
+        Ast::ToU128(v) => Ast::ToU128(recurse(v, stack, fuel)?),
         Ast::Not(inner) => Ast::Not(recurse(inner, stack, fuel)?),
         Ast::Neg(inner) => Ast::Neg(recurse(inner, stack, fuel)?),
         Ast::Binary(operator, left, right) => Ast::Binary(
@@ -584,6 +754,7 @@ pub fn law(formula: &RelExpr) -> Result<Ast, String> {
         ))
     };
     match formula {
+        RelExpr::Circuit(c) => Ok(Ast::Circuit(Box::new(c.try_map(law)?))),
         RelExpr::Bool(value) => Ok(Ast::Bool(*value)),
         RelExpr::Not(inner) => Ok(Ast::Not(Box::new(law(inner)?))),
         RelExpr::And(left, right) => binary(Binary::And, left, right),
@@ -622,6 +793,14 @@ fn value(expression: &ValueExpr) -> Result<Ast, String> {
         ))
     };
     match expression {
+        ValueExpr::Select(c, a, b) => Ok(Ast::Choose(
+            Box::new(law(c)?),
+            Box::new(value(a)?),
+            Box::new(value(b)?),
+        )),
+        ValueExpr::U128(v) => Ok(Ast::U128(*v)),
+        ValueExpr::ToI128(v) => Ok(Ast::ToI128(Box::new(value(v)?))),
+        ValueExpr::ToU128(v) => Ok(Ast::ToU128(Box::new(value(v)?))),
         ValueExpr::Int(number) => Ok(Ast::Int(*number)),
         ValueExpr::Projection(path) => {
             let root = match path.root() {
@@ -704,6 +883,14 @@ fn value(expression: &ValueExpr) -> Result<Ast, String> {
 #[cfg(test)]
 mod signed_literal_tests {
     use super::*;
+
+    #[test]
+    fn recursive_circuit_rule_text_has_no_declaration_escape() {
+        let source = "circuit { true; } output 0";
+        let ast = parse(source).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(parse(&render(&ast)), Ok(ast));
+        assert!(parse("circuit { true; } output 0; law 3 injected = true;").is_err());
+    }
 
     #[test]
     fn minimum_literal_parses_directly_and_keeps_other_negation_trees() {

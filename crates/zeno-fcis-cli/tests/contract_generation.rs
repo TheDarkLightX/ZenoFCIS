@@ -499,3 +499,48 @@ fn a_source_tree_that_cannot_bind_the_application_is_refused_writing_nothing() {
     );
     assert!(read(named.join("Cargo.toml")) == read(default.join("Cargo.toml")));
 }
+
+#[test]
+fn contract_application_preserves_ui_metadata_exactly() {
+    let root = TempRoot::new("ui-metadata");
+    let source = template("inventory-reservation");
+    let app = root.path().join("app");
+    let created = new_application(&app, &source, &[]);
+    assert_eq!(
+        created.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&created.stderr)
+    );
+    assert_eq!(read(app.join("ui.json")), read(source.join("ui.json")));
+    assert_eq!(contract_check(&app), Some(0));
+}
+
+#[test]
+fn app_requires_a_contract_and_keeps_a_nonempty_target() {
+    let root = TempRoot::new("app-refusals");
+    let target = root.path().join("app");
+    let no_contract = Command::new(env!("CARGO_BIN_EXE_zeno-fcis"))
+        .arg("new")
+        .arg(&target)
+        .arg("--app")
+        .output()
+        .unwrap_or_else(|error| panic!("CLI: {error}"));
+    assert!(!no_contract.status.success());
+    assert!(!target.exists());
+    fs::create_dir(&target).unwrap_or_else(|error| panic!("create: {error}"));
+    fs::write(target.join("retained"), b"owner data")
+        .unwrap_or_else(|error| panic!("write: {error}"));
+    let occupied = new_application(&target, &template("withdrawal-queue"), &["--app"]);
+    assert!(!occupied.status.success());
+    assert_eq!(
+        fs::read(target.join("retained")).unwrap_or_else(|error| panic!("read: {error}")),
+        b"owner data"
+    );
+    assert_eq!(
+        fs::read_dir(&target)
+            .unwrap_or_else(|error| panic!("list: {error}"))
+            .count(),
+        1
+    );
+}

@@ -35,10 +35,10 @@ DESCRIPTOR=SUBJECT.parent/'authority/descriptor.rs'
 EVALUATOR=SUBJECT.parent/'authority/evaluator.rs'
 SOURCE_MANIFEST=Path('verification/verus/authority_v2_sources.json')
 PUBLIC_TEST=Path('crates/zeno-fcis-synthesis/tests/v2_authority.rs')
-APPROVED_SOURCE_CLOSURE_SHA256='eeb990daed7334c00eb718694f6e37d9b03fbaad7146e0426db16629b888687e'
-# This unchanged command-substitution control needs more than the default
+APPROVED_SOURCE_CLOSURE_SHA256='3c42a44638e78b8a8d3bb88374b79900a0a961fb28cf3a494ece661c2626b167'
+# These command-substitution controls need more than the default
 # solver budget. Exhaustion still refuses qualification; it is not a kill.
-CONTROL_RLIMITS={'sealed_command':80,'stage_usage':80}
+CONTROL_RLIMITS={'sealed_command':80,'stage_usage':80,'replay_original':80}
 
 SEMANTIC_TARGETS = {
     'word_byte_order': 'word', 'length_header': 'encoded_size',
@@ -72,6 +72,93 @@ def generate_evaluator(path):
     target=ROOT/EVALUATOR
     target.write_text(evaluator.render(ROOT,raw))
     return {'generated_file':str(EVALUATOR),'approved_manifest_sha256':APPROVED_SOURCE_CLOSURE_SHA256}
+
+def released_24_source_extension(raw, copies):
+    """The sole historical extension: retain every approved path and build pin."""
+    if copies.get('subject') != '8c444487f96d6acd14c9f7fa55d9ba88ca780fb6' or copies.get('tag') != 'v2.4.0':
+        raise ValueError('only the released 2.4.0 source closure is supported')
+    additions = [row['copy'] for row in copies['files']]
+    additions += [row['path'] for row in copies['binding_sources']]
+    additions += [
+        'release/historical-24-copy.json',
+        'crates/zeno-fcis-synthesis/src/finite/historical_24_sources.rs',
+        *[f'crates/zeno-fcis-contract/src/internals/{name}.rs' for name in ('model', 'graph', 'policy')],
+    ]
+    if not all(evaluator.safe_name(path) for path in additions):
+        raise ValueError('unsafe historical source path')
+    return {**raw, 'paths': sorted(set(raw['paths']) | set(additions))}
+
+VALUE_DECODER_SOURCES = (
+    'crates/zeno-fcis-codec/src/decoder_bytes.rs',
+    'crates/zeno-fcis-codec/src/decoder_induction.rs',
+    'crates/zeno-fcis-codec/src/decoder_refinement.rs',
+    'crates/zeno-fcis-codec/src/decoder_spec.rs',
+    'crates/zeno-fcis-value/src/decoder_bytes.rs',
+    'crates/zeno-fcis-value/src/decoder_model.rs',
+    'crates/zeno-fcis-value/src/decoder_refinement.rs',
+)
+
+def value_decoder_source_extension(raw):
+    """Add exactly the seven decoder modules; retain every source and fixed pin."""
+    return {**raw, 'paths': sorted(set(raw['paths']) | set(VALUE_DECODER_SOURCES))}
+
+def include_value_decoder_sources():
+    return _include_source_extension(value_decoder_source_extension(
+        source_manifest(ROOT/SOURCE_MANIFEST)))
+
+def include_released_24_sources():
+    """Generate both membership guards from the checked additive release copy.
+
+    This records a closed membership change for review. It cannot omit an
+    approved source or alter any runtime, verifier or core-profile pin bytes.
+    The usual source preflight still refuses any subsequent omission.
+    """
+    import check_historical_24_copy as historical
+    path = ROOT/SOURCE_MANIFEST
+    raw = source_manifest(path)
+    copies = json.loads(historical.RECORD.read_text())
+    historical.check(copies)
+    return _include_source_extension(released_24_source_extension(raw, copies))
+
+def _include_source_extension(extended):
+    """Generate both guards only after retaining all old membership and pins."""
+    path = ROOT/SOURCE_MANIFEST
+    raw = source_manifest(path)
+    if (set(extended) != set(raw) or extended['pins'] != raw['pins']
+            or extended['schema'] != raw['schema']
+            or not set(raw['paths']) <= set(extended['paths'])
+            or extended['paths'] != sorted(set(extended['paths']))
+            or not all(evaluator.safe_name(name) for name in extended['paths'])):
+        raise ValueError('source extension must preserve approved paths and fixed pin bytes')
+    import hashlib
+    test = ROOT/'crates/zeno-fcis-synthesis/tests/v2_evaluator_identity.rs'
+    text = test.read_text()
+    pattern = r'(let approved_manifest = \[)(.*?)(\n    \];)'
+    match = re.search(pattern, text, re.DOTALL)
+    if match is None:
+        raise ValueError('missing independent Rust membership guard')
+    old = bytes(int(value) for value in re.findall(r'(\d+)_u8', match[2]))
+    if old.hex() != APPROVED_SOURCE_CLOSURE_SHA256:
+        raise ValueError('independent membership guard differs before generation')
+    for name in extended['paths']: evaluator.read_regular(ROOT/name)
+    encoded = (json.dumps(extended, indent=2, sort_keys=True)+'\n').encode()
+    value = hashlib.sha256(encoded).digest()
+    rows = ''.join('\n        '+', '.join(f'{byte}_u8' for byte in value[start:start+12])+','
+                   for start in range(0, 32, 12))
+    rust = text[:match.start(2)]+rows+text[match.end(2):]
+    own_path = Path(__file__)
+    own = own_path.read_text()
+    before = "APPROVED_SOURCE_CLOSURE_SHA256='"+APPROVED_SOURCE_CLOSURE_SHA256+"'"
+    if own.count(before) != 1:
+        raise ValueError('membership generator guard is ambiguous')
+    own = own.replace(before, "APPROVED_SOURCE_CLOSURE_SHA256='"+value.hex()+"'")
+    path.write_bytes(encoded)
+    test.write_text(rust)
+    own_path.write_text(own)
+    return {'previous_manifest_sha256': old.hex(), 'manifest_sha256': value.hex(),
+            'added_paths': sorted(set(extended['paths'])-set(raw['paths'])),
+            'removed_paths': [], 'build_pins_unchanged': extended['pins']==raw['pins'],
+            'review_required': True}
 
 def check_generated_sources():
     raw=source_manifest(ROOT/SOURCE_MANIFEST)
@@ -388,7 +475,11 @@ def check(out:Path,refresh=False,positive_only=False,selected=None):
     return {'schema':'zeno-fcis/authority-v2-evidence/1','status':'passed','revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'source_sha256':before, "source_bindings": verifier.evidence_bindings(before, HARNESS),'source_generation':generation,'verus_report':report,'translated_function_coverage':coverage,'mutations':results,'custody_controls':custody,'proof_exit':positive.returncode,'native_exit':native_result.returncode,'no_std_exit':no_std.returncode,'positive_only':positive_only,'selected_controls':selected,'all_mutation_controls':not positive_only and not selected,'unproved':['compiler/platform/allocator and external shell','root combined Miri/ATDD/template/law and ledger/migration integration','whole V2 release and exact-head review/CI']}
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--out',type=Path);p.add_argument('--refresh-coverage',action='store_true');p.add_argument('--positive-only',action='store_true');p.add_argument('--controls',nargs='+');p.add_argument('--generate-sources',type=Path);p.add_argument('--check-sources',action='store_true');a=p.parse_args()
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--out',type=Path);p.add_argument('--refresh-coverage',action='store_true');p.add_argument('--positive-only',action='store_true');p.add_argument('--controls',nargs='+');p.add_argument('--generate-sources',type=Path);p.add_argument('--check-sources',action='store_true');p.add_argument('--include-released-24',action='store_true');p.add_argument('--include-value-decoder',action='store_true');a=p.parse_args()
+    if a.include_value_decoder:
+        print(json.dumps(include_value_decoder_sources(),sort_keys=True));return 0
+    if a.include_released_24:
+        print(json.dumps(include_released_24_sources(),sort_keys=True));return 0
     if a.check_sources:
         print(json.dumps(check_generated_sources(),sort_keys=True));return 0
     if a.generate_sources:
@@ -400,4 +491,12 @@ def main():
     a.out.mkdir(parents=True,exist_ok=True);(a.out/'receipt.json').write_text(json.dumps(receipt,sort_keys=True,indent=2)+'\n');print(receipt['status'])
     if receipt['status'] not in ('passed','profile-review-required'):print(receipt['error']);return 1
     return 0
-if __name__=='__main__':raise SystemExit(main())
+if __name__ == "__main__":
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

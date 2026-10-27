@@ -1,0 +1,24 @@
+zeno 1;
+project 1 reason_classes;
+namespace 2 test;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 105 int Zero in 0..=0;
+field 110 100 value 105;
+field 120 101 action 105;
+field 130 102 allowed 105;
+reason 200 denied precedence 0;
+reason 201 failure precedence 1;
+component 300 machine {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [300];
+law 500 state_invariant on commit, genesis = post.100.110 == 0;
+law 501 no_accept on accept = false;
+law 502 no_failure on failure = false;
+law 503 reject_law on reject = true;

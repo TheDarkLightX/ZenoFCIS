@@ -6,6 +6,9 @@
 //! Unknown and duplicate keys are refused, so no entry is silently ignored
 //! or overridden.
 
+#[path = "table_rules.rs"]
+mod table_rules;
+
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -288,7 +291,7 @@ const FAILURE_LAW: u32 = 908;
 const REJECT_LAW: u32 = 909;
 
 /// The keys a rules file may hold; `docs/CONTRACT_RULES.md` documents each.
-pub const FILE_KEYS: [&str; 15] = [
+pub const FILE_KEYS: [&str; 16] = [
     "schema",
     "template",
     "roots",
@@ -302,10 +305,14 @@ pub const FILE_KEYS: [&str; 15] = [
     "framework_reject_law",
     "adoptions",
     "evolutions",
+    // The application server's clock; checked here, it does not affect the contract.
+    "clock",
     // Reviewer notes; they do not affect the contract.
     "idempotency",
     "original_domain",
 ];
+/// The keys of `clock`.
+pub const CLOCK_KEYS: [&str; 4] = ["field", "unit", "epoch", "after_max"];
 /// The keys of `roots`.
 pub const ROOT_KEYS: [&str; 3] = ["state", "command", "context"];
 /// The keys of one case; `rule` names the rule for reviewers only.
@@ -389,6 +396,7 @@ impl LawKind {
 pub enum Constant {
     Bool(bool),
     Int(i128),
+    U128(u128),
 }
 
 #[derive(Clone, Debug)]
@@ -423,13 +431,16 @@ pub struct DeliveryLaw {
 #[derive(Clone, Debug)]
 pub struct DeliveryObservation {
     pub channel: u32,
-    /// None counts deliveries; Some sums this payload field as I128.
+    /// None counts deliveries; Some sums numeric values or declared variant IDs.
     pub field: Option<u16>,
+    /// Optional exact destination filter, evaluated on the actual delivery.
+    pub destination: Option<String>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Rules {
     pub quantities: bool,
+    pub unsigned: bool,
     pub template: String,
     pub leaf_bindings: BTreeMap<u32, Leaf>,
     pub variables: BTreeMap<String, Ast>,
@@ -444,12 +455,61 @@ pub struct Rules {
 }
 
 impl Rules {
+    /// Refuse the entire typed subject before a legacy consumer inspects any values.
+    pub fn refuse_unsigned(&self, consumer: &str) -> Result<(), super::ContractError> {
+        if self.unsigned
+            || self.variables.values().any(super::expr::uses_unsigned)
+            || self
+                .genesis
+                .values()
+                .any(|v| matches!(v, Constant::U128(_)))
+            || self.cases.iter().any(|case| {
+                super::expr::uses_unsigned(&case.when)
+                    || case.post.values().any(super::expr::uses_unsigned)
+                    || case
+                        .outbox
+                        .iter()
+                        .any(|delivery| delivery.payload.values().any(super::expr::uses_unsigned))
+            })
+        {
+            Err(super::ContractError::new(
+                consumer,
+                "U128SubjectUnsupported",
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Loads rules against declared tables, expanding table syntax once.
+    /// The result contains only the existing owned scalar expressions.
+    pub fn read_for_project(project: &str, source: &str) -> Result<Self, ContractError> {
+        if let Ok(rules) = Self::read(source) {
+            return Ok(rules);
+        }
+        Self::read(&table_rules::expand(project, source)?)
+    }
+
+    /// Returns scalar policy source for preparation tools. It carries no
+    /// decision, measured-work or publication authority.
+    pub fn expand_for_project(project: &str, source: &str) -> Result<String, ContractError> {
+        if Self::read(source).is_ok() {
+            return Ok(source.to_owned());
+        }
+        let expanded = table_rules::expand(project, source)?;
+        Self::read(&expanded)?;
+        Ok(expanded)
+    }
+
     pub fn read(source: &str) -> Result<Self, ContractError> {
         let json = parse(source)?;
         let file = Object::new(&json, FILE)?;
         file.only(&FILE_KEYS)?;
         let schema = file.text("schema")?;
-        if schema != RULES_SCHEMA && schema != "zeno-fcis/template-declarative-policy/3" {
+        if schema != RULES_SCHEMA
+            && schema != "zeno-fcis/template-declarative-policy/3"
+            && schema != "zeno-fcis/template-declarative-policy/4"
+        {
             return Err(file.error(
                 "schema",
                 format!("expected `{RULES_SCHEMA}`, found `{schema}`"),
@@ -463,6 +523,9 @@ impl Rules {
             if file.optional(note).is_some() {
                 file.text(note)?;
             }
+        }
+        if file.optional("clock").is_some() {
+            check_clock(&file.object("clock")?)?;
         }
         let roots = file.object("roots")?;
         roots.only(&ROOT_KEYS)?;
@@ -517,6 +580,12 @@ impl Rules {
                 let constant = match value {
                     Json::Bool(value) => Constant::Bool(*value),
                     Json::Int(value) => Constant::Int(*value),
+                    Json::Text(value) => {
+                        match expr::parse(value).map_err(|e| file.error("genesis", e))? {
+                            Ast::U128(n) => Constant::U128(n),
+                            _ => return Err(file.error("genesis", "expected U128 literal")),
+                        }
+                    }
                     _ => {
                         return Err(ContractError::new(
                             place,
@@ -579,7 +648,8 @@ impl Rules {
                 .collect::<Result<_, ContractError>>()?,
         };
         Ok(Self {
-            quantities: schema.ends_with("/3"),
+            quantities: schema.ends_with("/3") || schema.ends_with("/4"),
+            unsigned: schema.ends_with("/4"),
             template: template.to_owned(),
             leaf_bindings,
             variables,
@@ -1161,11 +1231,15 @@ fn delivery_laws(file: &Object<'_>) -> Result<BTreeMap<u32, DeliveryLaw>, Contra
                 .entries()
                 .map(|(name, value)| {
                     let observation = Object::new(value, &observations.place_of(name))?;
-                    observation.only(&["channel", "field"])?;
+                    observation.only(&["channel", "field", "destination"])?;
                     Ok((
                         name.to_owned(),
                         DeliveryObservation {
                             channel: observation.number("channel")?,
+                            destination: observation
+                                .optional("destination")
+                                .map(|_| observation.text("destination").map(str::to_owned))
+                                .transpose()?,
                             field: observation
                                 .optional("field")
                                 .map(|_| observation.number("field"))
@@ -1189,13 +1263,57 @@ fn delivery_laws(file: &Object<'_>) -> Result<BTreeMap<u32, DeliveryLaw>, Contra
 }
 
 /// One JSON object of the rules file, with the place it was read from.
-struct Object<'j> {
+/// The application server's clock: a context field, its unit and its epoch, a
+/// UTC date. Generation checks only this form; the application build checks
+/// that the field is a context integer with a declared range.
+fn check_clock(clock: &Object<'_>) -> Result<(), ContractError> {
+    clock.only(&CLOCK_KEYS)?;
+    clock.number::<u32>("field")?;
+    if !["days", "minutes"].contains(&clock.text("unit")?) {
+        return Err(clock.error("unit", "must be `days` or `minutes`"));
+    }
+    if !utc_date(clock.text("epoch")?) {
+        return Err(clock.error("epoch", "must be a UTC date `YYYY-MM-DD` from 1970-01-01"));
+    }
+    if clock.optional("after_max").is_some()
+        && !["refuse", "hold"].contains(&clock.text("after_max")?)
+    {
+        return Err(clock.error("after_max", "must be `refuse` or `hold`"));
+    }
+    Ok(())
+}
+
+fn utc_date(text: &str) -> bool {
+    let number = |range: std::ops::Range<usize>| {
+        text.get(range)
+            .filter(|part| part.bytes().all(|b| b.is_ascii_digit()))
+            .and_then(|part| part.parse::<u32>().ok())
+    };
+    let (Some(year), Some(month), Some(day)) = (number(0..4), number(5..7), number(8..10)) else {
+        return false;
+    };
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let last = match month {
+        2 if leap => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        1..=12 => 31,
+        _ => 0,
+    };
+    text.len() == 10
+        && text.as_bytes()[4] == b'-'
+        && text.as_bytes()[7] == b'-'
+        && year >= 1970
+        && (1..=last).contains(&day)
+}
+
+pub(super) struct Object<'j> {
     place: String,
     entries: &'j [(String, Json)],
 }
 
 impl<'j> Object<'j> {
-    fn new(json: &'j Json, place: &str) -> Result<Self, ContractError> {
+    pub(super) fn new(json: &'j Json, place: &str) -> Result<Self, ContractError> {
         match json {
             Json::Object(entries) => Ok(Self {
                 place: place.to_owned(),
@@ -1206,17 +1324,17 @@ impl<'j> Object<'j> {
     }
 
     /// `v2/policy.json cases`, then `v2/policy.json cases[0].post`.
-    fn place_of(&self, key: &str) -> String {
+    pub(super) fn place_of(&self, key: &str) -> String {
         let separator = if self.place == FILE { ' ' } else { '.' };
         format!("{}{separator}{key}", self.place)
     }
 
-    fn error(&self, key: &str, reason: impl Into<String>) -> ContractError {
+    pub(super) fn error(&self, key: &str, reason: impl Into<String>) -> ContractError {
         ContractError::new(self.place_of(key), reason)
     }
 
     /// Refuses keys outside `allowed`.
-    fn only(&self, allowed: &[&str]) -> Result<(), ContractError> {
+    pub(super) fn only(&self, allowed: &[&str]) -> Result<(), ContractError> {
         match self
             .entries
             .iter()
@@ -1230,40 +1348,40 @@ impl<'j> Object<'j> {
         }
     }
 
-    fn entries(&self) -> impl Iterator<Item = (&'j str, &'j Json)> {
+    pub(super) fn entries(&self) -> impl Iterator<Item = (&'j str, &'j Json)> {
         self.entries
             .iter()
             .map(|(key, value)| (key.as_str(), value))
     }
 
-    fn optional(&self, key: &str) -> Option<&'j Json> {
+    pub(super) fn optional(&self, key: &str) -> Option<&'j Json> {
         self.entries
             .iter()
             .find(|(name, _)| name == key)
             .map(|(_, value)| value)
     }
 
-    fn field(&self, key: &str) -> Result<&'j Json, ContractError> {
+    pub(super) fn field(&self, key: &str) -> Result<&'j Json, ContractError> {
         self.optional(key)
             .ok_or_else(|| ContractError::new(&self.place, format!("missing key `{key}`")))
     }
 
-    fn text(&self, key: &str) -> Result<&'j str, ContractError> {
+    pub(super) fn text(&self, key: &str) -> Result<&'j str, ContractError> {
         text(self.field(key)?, &self.place_of(key))
     }
 
-    fn object(&self, key: &str) -> Result<Object<'j>, ContractError> {
+    pub(super) fn object(&self, key: &str) -> Result<Object<'j>, ContractError> {
         Object::new(self.field(key)?, &self.place_of(key))
     }
 
-    fn array(&self, key: &str) -> Result<&'j [Json], ContractError> {
+    pub(super) fn array(&self, key: &str) -> Result<&'j [Json], ContractError> {
         match self.field(key)? {
             Json::Array(items) => Ok(items),
             _ => Err(self.error(key, "must be an array")),
         }
     }
 
-    fn number<T: TryFrom<i128> + fmt::Display + Bounded>(
+    pub(super) fn number<T: TryFrom<i128> + fmt::Display + Bounded>(
         &self,
         key: &str,
     ) -> Result<T, ContractError> {
@@ -1281,9 +1399,18 @@ impl<'j> Object<'j> {
 }
 
 /// Integer field types, for range messages.
-trait Bounded: Sized {
+pub(super) trait Bounded: Sized {
     const MIN: Self;
     const MAX: Self;
+}
+
+impl Bounded for i128 {
+    const MIN: Self = i128::MIN;
+    const MAX: Self = i128::MAX;
+}
+impl Bounded for u64 {
+    const MIN: Self = u64::MIN;
+    const MAX: Self = u64::MAX;
 }
 
 impl Bounded for u16 {
@@ -1303,7 +1430,7 @@ impl Bounded for u128 {
 
 /// A parsed JSON document. Object keys keep file order, and a repeated key
 /// is refused while parsing rather than overriding the first.
-enum Json {
+pub(super) enum Json {
     Null,
     Bool(bool),
     Int(i128),

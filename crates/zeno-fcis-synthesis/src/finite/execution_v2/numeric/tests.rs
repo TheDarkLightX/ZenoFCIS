@@ -512,3 +512,27 @@ fn wider_numeric_admission_does_not_change_legacy_shape_limits() {
         Err(AdmissionFailure::Shape)
     );
 }
+
+#[test]
+fn raw_unsigned_scalar_signed_operands_preserve_total_refusals() {
+    let signed = [Atom::I128(4), Atom::I128(2)];
+    let mixed = [Atom::U128(4), Atom::I128(2)];
+    for op in [
+        typed::Instruction::ScalarMul(Unsigned128, 0, 1),
+        typed::Instruction::ScalarDiv(Unsigned128, false, 0, 1),
+        typed::Instruction::ScalarDiv(Unsigned128, true, 0, 1),
+    ] {
+        assert_eq!(
+            typed::node(op, typed::Values::Typed(&[]), typed::Values::Typed(&signed)),
+            Err(typed::Failure::Arithmetic)
+        );
+        assert_eq!(
+            typed::node(op, typed::Values::Typed(&[]), typed::Values::Typed(&mixed)),
+            Err(typed::Failure::Kind)
+        );
+        assert_eq!(
+            typed::node(op, typed::Values::Typed(&[]), typed::Values::Typed(&[])),
+            Err(typed::Failure::Reference)
+        );
+    }
+}

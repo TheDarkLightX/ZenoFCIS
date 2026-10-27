@@ -36,6 +36,24 @@ pub enum Value {
 }
 
 impl Value {
+    fn atom(&self) -> Option<c::Atom<'_>> {
+        Some(match self {
+            Self::Bool(v) => c::Atom::Bool(*v),
+            Self::I128(v) => c::Atom::I128(*v),
+            Self::U128(v) => c::Atom::U128(*v),
+            Self::Sum { type_id, variant } => c::Atom::Sum {
+                type_id: *type_id,
+                variant: *variant,
+            },
+            Self::Enum { type_id, variant } => c::Atom::Enum {
+                type_id: *type_id,
+                variant: *variant,
+            },
+            Self::Text(v) => c::Atom::Text(v),
+            Self::Bytes(v) => c::Atom::Bytes(v),
+            Self::Other(_) => return None,
+        })
+    }
     fn from_atom(atom: c::Atom<'_>) -> Self {
         match atom {
             c::Atom::Bool(value) => Self::Bool(value),
@@ -352,6 +370,13 @@ pub fn evaluate(authority: &Authority<'_>, framer: &Framer, tuple: &[i128]) -> O
         command: &frames[1],
         context: &frames[2],
     });
+    from_evaluation(&evaluation)
+}
+
+/// Normalize an actual evaluation without projecting unsigned values through i128.
+pub fn from_evaluation(
+    evaluation: &zeno_fcis_synthesis::finite::v2_authority::Evaluation<'_>,
+) -> Outcome {
     match evaluation.result() {
         Ok(candidate) => decision(candidate),
         Err(refusal) => {
@@ -376,8 +401,13 @@ pub fn evaluate(authority: &Authority<'_>, framer: &Framer, tuple: &[i128]) -> O
 /// genesis`, every `StateInvariant` among them, and those declared `on any,
 /// genesis` other than an `InitialCondition`.
 pub fn state_laws(descriptor: &c::Descriptor<'_>) -> Vec<u32> {
-    descriptor
-        .laws
+    state_law_ids(descriptor.laws)
+}
+
+/// State-law selection shared by signed and full-width pre-state judges.
+/// Initial conditions constrain startup, not arbitrary committed pre-states.
+pub fn state_law_ids(declared: &[laws::Law<'_>]) -> Vec<u32> {
+    declared
         .iter()
         .filter(|law| {
             law.genesis
@@ -402,44 +432,10 @@ pub fn first_unsatisfied_state_law(
     framer: &Framer,
     tuple: &[i128],
 ) -> Option<u32> {
-    if state_laws.is_empty() {
-        return None;
-    }
-    let first = |law: &&laws::Law<'_>| state_laws.contains(&law.id);
-    let ordered: Vec<laws::Law<'_>> = state_laws
-        .iter()
-        .filter_map(|id| descriptor.laws.iter().find(|law| law.id == *id))
-        .chain(descriptor.laws.iter().filter(|law| !first(law)))
-        .map(|law| laws::Law {
-            id: law.id,
-            kind: law.kind,
-            scope: law.scope,
-            genesis: law.genesis,
-            program: laws::Program {
-                nodes: law.program.nodes,
-                root: law.program.root,
-            },
-        })
-        .collect();
     let root = &framer.roots[0];
     let fields = framer.fields(root, tuple);
-    let initial = match root.positions.first() {
-        Some((_, index)) if !root.record => {
-            laws::RootView::Leaf(atom(framer.kinds[*index], tuple[*index]))
-        }
-        _ => laws::RootView::Record(&fields),
-    };
-    let frame = laws::Frame::Genesis { initial };
-    let (_, _, diagnostics, _) =
-        laws::evaluate(&ordered, descriptor.required, &frame, descriptor.limits).into_parts();
-    for id in state_laws {
-        match diagnostics.iter().find(|diagnostic| diagnostic.id == *id) {
-            Some(diagnostic) if diagnostic.verdict == laws::Verdict::Satisfied => {}
-            Some(_) => return Some(*id),
-            None => return None,
-        }
-    }
-    None
+    LawSet::new(descriptor, state_laws)
+        .first_unsatisfied_state_law(framer.view(root, tuple, &fields))
 }
 
 /// A decision a judge proposes for a tuple, which need not be the one the
@@ -477,10 +473,45 @@ pub struct LawSet<'d> {
 }
 
 impl<'d> LawSet<'d> {
+    /// First refusing state law, using the shared pre-state classification.
+    /// A frame refusal that never reaches a state law remains a finding on
+    /// an unexcluded pre-state, rather than being hidden as an invalid state.
+    pub fn first_unsatisfied_state_law(&self, initial: laws::RootView<'_, '_>) -> Option<u32> {
+        if self.selected == 0 {
+            return None;
+        }
+        let frame = laws::Frame::Genesis { initial };
+        let (_, _, diagnostics, _) =
+            laws::evaluate(&self.laws, self.required, &frame, self.limits).into_parts();
+        for law in &self.laws[..self.selected] {
+            match diagnostics
+                .iter()
+                .find(|diagnostic| diagnostic.id == law.id)
+            {
+                Some(diagnostic) if diagnostic.verdict == laws::Verdict::Satisfied => {}
+                Some(_) => return Some(law.id),
+                None => return None,
+            }
+        }
+        None
+    }
+
     /// The descriptor's laws whose IDs `ids` lists, in that order, then
     /// every other law of the descriptor. An ID the descriptor lacks is
     /// skipped.
     pub fn new(descriptor: &c::Descriptor<'d>, ids: &[u32]) -> Self {
+        Self::from_parts(descriptor.laws, descriptor.required, descriptor.limits, ids)
+    }
+    /// The same selected-law check for a full-width numeric descriptor.
+    pub fn new_numeric(descriptor: &c::NumericDescriptor<'d>, ids: &[u32]) -> Self {
+        Self::from_parts(descriptor.laws, descriptor.required, descriptor.limits, ids)
+    }
+    fn from_parts(
+        all_laws: &[laws::Law<'d>],
+        required: &'d [u32],
+        limits: V2Limits,
+        ids: &[u32],
+    ) -> Self {
         let copy = |law: &laws::Law<'d>| laws::Law {
             id: law.id,
             kind: law.kind,
@@ -493,13 +524,12 @@ impl<'d> LawSet<'d> {
         };
         let mut laws: Vec<laws::Law<'d>> = ids
             .iter()
-            .filter_map(|id| descriptor.laws.iter().find(|law| law.id == *id))
+            .filter_map(|id| all_laws.iter().find(|law| law.id == *id))
             .map(copy)
             .collect();
         let selected = laws.len();
         laws.extend(
-            descriptor
-                .laws
+            all_laws
                 .iter()
                 .filter(|law| !ids.contains(&law.id))
                 .map(copy),
@@ -508,14 +538,77 @@ impl<'d> LawSet<'d> {
         let frame = laws::Frame::Genesis {
             initial: laws::RootView::Record(&empty),
         };
-        let (_, usage, _, _) = laws::evaluate(&[], &[], &frame, descriptor.limits).into_parts();
+        let (_, usage, _, _) = laws::evaluate(&[], &[], &frame, limits).into_parts();
         Self {
             laws,
             selected,
-            required: descriptor.required,
-            limits: descriptor.limits,
+            required,
+            limits,
             usage,
         }
+    }
+    /// Evaluate selected laws on an explicit immutable frame, with no decision authority.
+    pub fn on_frame(&self, frame: &laws::Frame<'_>) -> (bool, Vec<laws::Diagnostic>) {
+        let (_, _, diagnostics, _) =
+            laws::evaluate(&self.laws, self.required, frame, self.limits).into_parts();
+        let selected = self.selected(&diagnostics).map(<[_]>::to_vec);
+        let ok = selected.as_ref().is_some_and(|ds| {
+            ds.iter()
+                .all(|d| !matches!(d.verdict, laws::Verdict::Refused(_)))
+        });
+        (ok, selected.unwrap_or(diagnostics))
+    }
+
+    /// Whether every selected predicate is independent of the outbox.
+    /// Unknown instructions and selectors refuse this capability.
+    pub fn delivery_independent(&self) -> bool {
+        use laws::{Observation as O, Op};
+        let independent = |o: O| {
+            matches!(
+                o,
+                O::PreRoot
+                    | O::CommandRoot
+                    | O::ContextRoot
+                    | O::PostRoot
+                    | O::InitialRoot
+                    | O::Pre(_)
+                    | O::Command(_)
+                    | O::Context(_)
+                    | O::Post(_)
+                    | O::Initial(_)
+                    | O::Class
+                    | O::HasReason
+                    | O::Reason
+                    | O::PostLength
+                    | O::PatchLength
+                    | O::EffectLength
+                    | O::PatchField(_)
+                    | O::PatchBefore(_)
+                    | O::PatchAfter(_)
+            )
+        };
+        self.laws[..self.selected].iter().all(|law| {
+            law.program.nodes.iter().all(|node| match node {
+                Op::Observe(o) | Op::ObserveWhen(_, o, _) => independent(*o),
+                Op::Literal(_)
+                | Op::Add(..)
+                | Op::Sub(..)
+                | Op::Mul(..)
+                | Op::Div(..)
+                | Op::MulDivFloor(..)
+                | Op::MulDivCeil(..)
+                | Op::SignedMulDivFloor(..)
+                | Op::ProductsGe(..)
+                | Op::ToI128(..)
+                | Op::ToU128(..)
+                | Op::Eq(..)
+                | Op::Lt(..)
+                | Op::And(..)
+                | Op::Not(..)
+                | Op::Select(..) => true,
+                _ => false,
+            })
+        })
     }
 
     /// The IDs of the selected laws, in order.
@@ -543,6 +636,42 @@ impl<'d> LawSet<'d> {
         tuple: &[i128],
         proposed: &Proposed<'_>,
     ) -> (bool, Vec<laws::Diagnostic>) {
+        self.on_transition_with_outbox(framer, tuple, proposed, &[])
+    }
+
+    /// The same pure law check with an explicit, immutable complete outbox.
+    pub fn on_transition_with_outbox(
+        &self,
+        framer: &Framer,
+        tuple: &[i128],
+        proposed: &Proposed<'_>,
+        outbox: &[Delivery],
+    ) -> (bool, Vec<laws::Diagnostic>) {
+        let converted: Option<Vec<laws::Delivery<'_>>> = outbox
+            .iter()
+            .map(|d| {
+                let payload = d
+                    .payload
+                    .iter()
+                    .map(|(id, v)| {
+                        Some(c::Field {
+                            id: *id,
+                            value: v.atom()?,
+                        })
+                    })
+                    .collect::<Option<Vec<_>>>()?;
+                Some(laws::Delivery {
+                    ordinal: d.ordinal,
+                    channel: d.channel,
+                    destination: d.destination.atom()?,
+                    payload,
+                    idempotency: d.idempotency.atom()?,
+                })
+            })
+            .collect();
+        let Some(outbox) = converted else {
+            return (false, Vec::new());
+        };
         let views = [0, 1, 2].map(|index| framer.fields(&framer.roots[index], tuple));
         let pre = framer.view(&framer.roots[0], tuple, &views[0]);
         let command = framer.view(&framer.roots[1], tuple, &views[1]);
@@ -588,7 +717,7 @@ impl<'d> LawSet<'d> {
             post,
             patch: &patch,
             effects: &[],
-            outbox: &[],
+            outbox: &outbox,
             reads: &[],
             attempts: &[],
             usage: self.usage,
