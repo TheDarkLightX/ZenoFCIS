@@ -64,10 +64,14 @@ end-to-end wall time = encoding + solving + evidence generation
                      + independent checking + other measured overhead
 ```
 
-These stages should be instrumented separately; a recorded total must not be
-less than the sum of the reported component times. Work and wall time should not
-be combined into an invented single unit. If assurance differs, compare
-feasible routes only after enforcing the required assurance floor.
+These stages should be instrumented separately. For **sequential** phases,
+the reported total must not be less than the sum of exclusive phase times.
+For **overlapping** phases (for example, two solvers running concurrently),
+report the overlap explicitly; end-to-end wall time may be less than the sum
+of individual timers. Never add overlapping clocks and call it wall time.
+Work and wall time should not be combined into an invented single unit.
+If assurance differs, compare feasible routes only after enforcing the
+required assurance floor.
 
 ## Promotion tiers
 
@@ -99,7 +103,7 @@ python3 tools/check_computational_feasibility.py --self-test
 python3 tools/check_computational_feasibility.py
 ```
 
-The tool checks identity, field types, source/content digests, honest unknown
+The tool checks identity, field types, digest formats, honest unknown
 statuses, tier/evidence consistency, phase-cost arithmetic, card registration,
 and whether promotion has required evidence references. It **does not**
 execute benchmarks, independently validate a source citation, verify a proof,
