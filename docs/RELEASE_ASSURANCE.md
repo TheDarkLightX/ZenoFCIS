@@ -341,6 +341,12 @@ Miri keeps bounded incomplete exploration, checkpoint source/profile refusal,
 durable restart and transcript/history checks. It does not establish UB freedom
 for the omitted resumed-to-completion executions.
 
+The 456-case nested fault-schedule product also remains native after a
+four-hour publication-partition timeout. Miri retains the focused regressions
+for partially forwarded requests, nested and unknown suspension, reservation
+retention across suspend/crash, and every individual fault-handler branch.
+Those tests do not establish UB freedom for all omitted fault combinations.
+
 Each Miri group has a 240-minute budget. The synthesis `completion` tests
 run their eight graph-seed groups separately. Twenty-seven larger synthesis-library
 tests and the retained template checks also have separate groups. Splitting

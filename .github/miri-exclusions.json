@@ -456,6 +456,18 @@
         "job": "rust",
         "command": "cargo +1.97.1 test --workspace --all-features --locked"
       }
+    },
+    {
+      "group": "publication",
+      "package": "zeno-fcis-shell",
+      "test_binary": "lib",
+      "test": "effects::handler_tests::policy_fault_invocation_reports_match_world",
+      "reason": "Publication partition 1/8 reached its 240-minute budget in run40386677759/job121796687666. After fault_handler_laws finished, the 456-case nested fault-schedule product occupied the remaining 197 minutes without completing. The complete product remains native. Miri retains policy_composed_suspend_retains_forwarded_reservation, policy_nested_suspend_preserves_invocation, policy_unknown_suspend_keeps_reservation, policy_suspend_and_crash, and fault_handler_laws across all operation fault branches. The omitted combinations have no Miri UB, provenance or aliasing claim.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
     }
   ]
 }
