@@ -1,0 +1,100 @@
+name: mac-diagnostic
+
+on:
+  push:
+    branches: ["platform/2.6-mac-diagnostic-20261027"]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  installed-journey:
+    runs-on: macos-15
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+      CARGO_INCREMENTAL: "0"
+      CARGO_BUILD_JOBS: "3"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      ZF26_DIAGNOSTICS: ${{ runner.temp }}/zf26-diagnostics
+    steps:
+      - name: Checkout diagnostics
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          path: probe
+          persist-credentials: false
+      - name: Checkout signed release source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: v2.6.0
+          path: source
+          persist-credentials: false
+      - name: Verify source and install the pinned toolchain
+        run: |
+          test "$(git rev-parse HEAD)" = 7d175c47099866939c86acd463ac85219abba882
+          rustup toolchain install 1.97.1 --profile minimal
+      - name: Recover the encrypted candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZF26_KEY: ${{ secrets.ZF26_REVIEW_DECRYPTION_KEY_20261027 }}
+        run: |
+          umask 077
+          test -n "$ZF26_KEY"
+          printf '%s\n' "$ZF26_KEY" > "$RUNNER_TEMP/zf26-key.pem"
+          gh api 'repos/TheDarkLightX/ZenoFCIS/actions/artifacts/12726660924/zip' > "$RUNNER_TEMP/mac-packet.zip"
+          python3 - "$RUNNER_TEMP/mac-packet.zip" "$RUNNER_TEMP/mac-review.p7m" <<'PY'
+          import hashlib, sys, zipfile
+          from pathlib import Path
+          data = Path(sys.argv[1]).read_bytes()
+          if hashlib.sha256(data).hexdigest() != '4e6cb10509bafd1a8155f7515e9e57431b97345297df94b301d588f155462ec9':
+              raise SystemExit('artifact hash mismatch')
+          with zipfile.ZipFile(sys.argv[1]) as archive:
+              if archive.namelist() != ['mac-review.p7m']:
+                  raise SystemExit('unexpected artifact layout')
+              Path(sys.argv[2]).write_bytes(archive.read('mac-review.p7m'))
+          PY
+          openssl smime -decrypt -binary -inform DER -in "$RUNNER_TEMP/mac-review.p7m" -recip "$GITHUB_WORKSPACE/probe/.github/platform-review-certificate.pem" -inkey "$RUNNER_TEMP/zf26-key.pem" -out "$RUNNER_TEMP/mac-review.tar"
+          rm "$RUNNER_TEMP/zf26-key.pem"
+          python3 - "$RUNNER_TEMP/mac-review.tar" "$RUNNER_TEMP" <<'PY'
+          import tarfile, sys
+          from pathlib import Path
+          with tarfile.open(sys.argv[1], 'r:') as archive:
+              seen = set()
+              for item in archive:
+                  p = Path(item.name)
+                  if p.is_absolute() or '..' in p.parts or str(p) in seen or not (item.isdir() or item.isfile()):
+                      raise SystemExit('unsafe review archive')
+                  seen.add(str(p)); dest = Path(sys.argv[2]) / p
+                  if item.isdir(): dest.mkdir(parents=True, exist_ok=True)
+                  else:
+                      dest.parent.mkdir(parents=True, exist_ok=True)
+                      with archive.extractfile(item) as src, dest.open('xb') as out:
+                          while chunk := src.read(1024 * 1024): out.write(chunk)
+          PY
+          printf '%s  %s\n' 36db653c509431e6031f1d9828ff15b62ece1a8612c37a9da9ba8f7c6161304f "$RUNNER_TEMP/mac-review/host/binaries/zeno-fcis-2.6.0-aarch64-apple-darwin.tar.gz" | shasum -a 256 -c -
+      - name: Run the installed journey with failure capture
+        run: |
+          mkdir "$RUNNER_TEMP/source-tree"
+          git archive --format=tar HEAD | tar -x -f - -C "$RUNNER_TEMP/source-tree"
+          python3 "$GITHUB_WORKSPACE/probe/.github/capture-mac-journey.py" --release "$RUNNER_TEMP/mac-review/host" --source "$RUNNER_TEMP/source-tree" --work-dir "$RUNNER_TEMP/journey" --report "$RUNNER_TEMP/zf26-diagnostics/report.json"
+      - name: Encrypt diagnostics
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/zf26-diagnostics"
+          tar -C "$RUNNER_TEMP" -cf "$RUNNER_TEMP/zf26-diagnostics.tar" zf26-diagnostics
+          openssl smime -encrypt -binary -aes256 -outform DER -in "$RUNNER_TEMP/zf26-diagnostics.tar" -out "$RUNNER_TEMP/zf26-diagnostics.p7m" "$GITHUB_WORKSPACE/probe/.github/platform-review-certificate.pem"
+          rm "$RUNNER_TEMP/zf26-diagnostics.tar"
+      - name: Retain encrypted diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: encrypted-macos-diagnostic-2.6.0
+          path: ${{ runner.temp }}/zf26-diagnostics.p7m
+          if-no-files-found: error
+          retention-days: 7
