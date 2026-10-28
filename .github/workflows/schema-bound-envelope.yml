@@ -48,13 +48,17 @@ jobs:
             -p zeno-fcis-schema \
             -p zeno-fcis \
             --all-features --locked
-          cargo +1.97.1 test -p zeno-fcis-schema --doc --locked
+          cargo +1.97.1 test -p zeno-fcis-schema --doc --all-features --locked
 
       - name: no_std schema-bound envelope
         run: |
           cargo +1.97.1 check \
             -p zeno-fcis-schema \
             --no-default-features --locked \
+            --target wasm32-unknown-unknown
+          cargo +1.97.1 check \
+            -p zeno-fcis-schema \
+            --no-default-features --features schema-profile-2 --locked \
             --target wasm32-unknown-unknown
           cargo +1.97.1 check \
             -p zeno-fcis \

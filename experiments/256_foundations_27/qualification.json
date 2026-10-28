@@ -1,0 +1,267 @@
+{
+  "schema": "zeno-fcis/256-foundations-qualification/1",
+  "status": "DEVELOPMENT; full2.7 incomplete",
+  "base_revision": "dc53fc1e00894852fc5583802e1d18dd21aa20e6",
+  "native_schema": {
+    "result_sha256": "f419cfb87834e77b10c1ee646f626e5e949bcde9f2cf30c7c33286b9acbd2738",
+    "source_sha256": "08a8fc6aa9e1ad32bfe8127acd6fcc3e2e21ef30fef6d1fe0e3f06be0cb9fae8",
+    "source_files": 4925,
+    "commands": [
+      {
+        "stage": "legacy-unit",
+        "seconds": 9.016538496827707,
+        "test_counts": [
+          14
+        ],
+        "case_gate": true
+      },
+      {
+        "stage": "enabled-unit",
+        "seconds": 25.719191561918706,
+        "test_counts": [
+          40
+        ],
+        "case_gate": true
+      },
+      {
+        "stage": "public-consumer",
+        "seconds": 24.87941804388538,
+        "test_counts": [
+          10
+        ],
+        "case_gate": true
+      },
+      {
+        "stage": "enabled-doc",
+        "seconds": 6.8360428551677614,
+        "test_counts": [
+          2
+        ],
+        "case_gate": true
+      },
+      {
+        "stage": "no-std-enabled-check",
+        "seconds": 8.398092916002497,
+        "test_counts": null,
+        "case_gate": true
+      }
+    ],
+    "recorded_process_identities": 17,
+    "phase": {
+      "wall_seconds": 233.3296383100096,
+      "cpu_seconds": 139.338843,
+      "wall_remaining": 366.6703616899904,
+      "cpu_remaining": 160.661157
+    },
+    "postcheck_sha256": "7cad6348404fc1ad69b25206e41f9d066b3fb74b6071a3de2475c63714e21b80"
+  },
+  "native_cleanup_sha256": "ba4853121a1f6b3407ecb697522c88a6312454745ccd63b251dee21e4d8bd684",
+  "qualified_subject": "Frozen pre-format source08a8 only; later source differences are reviewed separately, not fresh native passes.",
+  "formatting": {
+    "formatter_sha256": "30de9e1efcd8f8fe7750e00d0c45ff8f4c480608ef1be5baf9ab6f1b4556e8f8",
+    "original_subject": "08a8fc6aa9e1ad32bfe8127acd6fcc3e2e21ef30fef6d1fe0e3f06be0cb9fae8",
+    "intermediate_subject_after_skip_attribute": "e158036ff497196691a4f6e72fdf8d055e364bc9c31bf2b729180c42fc6a2dde",
+    "formatter_delta_sha256": "946334bd37bc2b68998cc4bac9277493c1a9d31d1cdd391d7a6413473463452d",
+    "guard_status": "REVIEWED source-only difference; reuse original08a8 results with this delta, not a fresh current-source native pass",
+    "guard_sha256": "56450f82953d4af4386f3762f8575134b0f2f4d4cd08d1487055667e147dffc3",
+    "function_signatures_preserved": 143,
+    "constant_declarations_preserved": 23,
+    "literal_spellings_and_order_preserved": true,
+    "reviewed_nonlayout_changes": [
+      "Optional trailing commas in exact pinned call/struct/vec/array/match-list positions; no blanket tuple-comma erasure.",
+      "Five expression arms in SchemaEnvelopeError Display fmt become blocks containing the identical formatter/write expression; literal/argument/branch order unchanged.",
+      "Use members/statements and named module/re-export declarations reorder; identical explicit paths/names. These Schema2 modules contain no macro_rules!/macro_use textual-order dependency.",
+      "Value profile2 module has a separate approved comment+rustfmt::skip stage: original8cbb -> intermediate79e7 -> current08cb; attribute controls rustfmt traversal, not semantic cfg/body selection. Arithmetic db196 byte identity remains."
+    ],
+    "formal_compiler_equivalence_proof": false,
+    "final_read_only_formatter_check_sha256": "b230514d08abbecefe38b0d3e4bff783ce900f957fe692e4998ed6b7920984c5"
+  },
+  "retained_arithmetic_sha256": "db196c5d746d27bf21579e9a3a3ce32d556ec74ea62ba929e4c8a462a6130131",
+  "reused_value_codec_evidence": {
+    "subject": "7e54c9bf62354954c643efec35aba1b2e703076e5f572de2ca97b0cd17d26763",
+    "unit_executions": 78,
+    "documentation_checks": 14,
+    "allocation_only_checks": 2,
+    "independent_runtime_cases": 409,
+    "expected_compile_refusals": [
+      "E0451",
+      "E0451",
+      "E0594",
+      "E0277"
+    ],
+    "boundary": "Original-subject evidence only. The first independent10-stage campaign had a compile-control fixture failure; its409 runtime cases are retained, and the four corrected controls passed in a separate continuation. No combined original-campaign pass is asserted."
+  },
+  "proof_obligations": {
+    "C0_schema_construction_closure": "OPEN",
+    "S1_recursive_nominal_range_value_report": "OPEN",
+    "S2_complete_canonical_expected_envelope_binding": "OPEN",
+    "S3_disjoint_profile_legacy_resource_preservation": "OPEN",
+    "whole_Rust_arithmetic_refinement": "OPEN",
+    "wide_execution_laws_Authority_synthesis_apps": "OPEN"
+  },
+  "additional_checks": {
+    "three_specific_schema_compile_controls": "PREPARED; UNRUN",
+    "resolved_purity_native_checker": "PREPARED; UNRUN",
+    "large_supplied_depth_and_type_stack_probes": "PREPARED; UNRUN"
+  },
+  "computational_feasibility": {
+    "correctness": "Focused native checks; implementation refinement remains open",
+    "asymptotic_bound": "Not established by this record",
+    "concrete_costs": "Nativefive-commandwindow139.338843CPU/233.329638elapsed plus prioridentitypreparation33.017893CPU/62.718357elapsed. Excludesassembly/formatting/pureaudits; notper-operation costs.",
+    "empirical_crossover": "Not measured",
+    "assurance": "No new proof authority inferred from tests or matching source hashes"
+  },
+  "production_sources": [
+    {
+      "path": "crates/zeno-fcis-codec/Cargo.toml",
+      "tested_source_sha256": "8b468f921361bd679baeb4e7e466c04a6230f84296f9b67a3dfbc45e7a12442e",
+      "current_source_sha256": "8b468f921361bd679baeb4e7e466c04a6230f84296f9b67a3dfbc45e7a12442e"
+    },
+    {
+      "path": "crates/zeno-fcis-codec/src/lib.rs",
+      "tested_source_sha256": "3bfc4893d883de4400ee8b0fdc6293efbe241eda150f0f8281aeaab2cb998d3b",
+      "current_source_sha256": "3bfc4893d883de4400ee8b0fdc6293efbe241eda150f0f8281aeaab2cb998d3b"
+    },
+    {
+      "path": "crates/zeno-fcis-codec/src/profile2.rs",
+      "tested_source_sha256": "cae0ac71647cd16a2833fe19a06eb5357fc050216f2dca2926a3c26db14e7a6e",
+      "current_source_sha256": "cae0ac71647cd16a2833fe19a06eb5357fc050216f2dca2926a3c26db14e7a6e"
+    },
+    {
+      "path": "crates/zeno-fcis-codec/src/profile2/atom-vectors.tsv",
+      "tested_source_sha256": "51341eb05712c39e6bf58097268aba4f99a9d7ac23af8d4f3a26a926474e991a",
+      "current_source_sha256": "51341eb05712c39e6bf58097268aba4f99a9d7ac23af8d4f3a26a926474e991a"
+    },
+    {
+      "path": "crates/zeno-fcis-codec/src/profile2/tests.rs",
+      "tested_source_sha256": "98e62f38094c69ce698468fe604a448a8d17d3c5e44c7b25b2d8a36f873a299a",
+      "current_source_sha256": "98e62f38094c69ce698468fe604a448a8d17d3c5e44c7b25b2d8a36f873a299a"
+    },
+    {
+      "path": "crates/zeno-fcis-schema/Cargo.toml",
+      "tested_source_sha256": "e5fb9fe57c7add650b12a5c15826889cd106cafe6fb5baf96831fd65fca59158",
+      "current_source_sha256": "e5fb9fe57c7add650b12a5c15826889cd106cafe6fb5baf96831fd65fca59158"
+    },
+    {
+      "path": "crates/zeno-fcis-schema/src/lib.rs",
+      "tested_source_sha256": "3e25698ba66b9a76e15fbe6c8983aed447482c26408ce25ae69b30e4071d963d",
+      "current_source_sha256": "3e25698ba66b9a76e15fbe6c8983aed447482c26408ce25ae69b30e4071d963d"
+    },
+    {
+      "path": "crates/zeno-fcis-schema/src/profile2/encoding.rs",
+      "tested_source_sha256": "d4e0973b8ca5d273364ba80df21860b20d754a53baf5ea14b7b23bb5a9c23c12",
+      "current_source_sha256": "48f7a8e231fa0689d640e408722bc6413baf7d8d39008edb145c271fc41dba78"
+    },
+    {
+      "path": "crates/zeno-fcis-schema/src/profile2/envelope.rs",
+      "tested_source_sha256": "5b9eb9c0f7c57542fb131a394affca589a80a8ee4aafb5508d7af95da992f088",
+      "current_source_sha256": "d12bd02d3088a7bbb5a06a4ffd7e29971684edfbc6a3ef6d03a662021f60c627"
+    },
+    {
+      "path": "crates/zeno-fcis-schema/src/profile2/mod.rs",
+      "tested_source_sha256": "9873091541f0d87302de55ec51d31706ef1e88d24f793e6677d4b0936de1bdfd",
+      "current_source_sha256": "18d5e54d1dbd0c8f635d7782ba1d7166ef540477ee31e56dfdc0c9eeca3c77d7"
+    },
+    {
+      "path": "crates/zeno-fcis-schema/src/profile2/model.rs",
+      "tested_source_sha256": "83c3fd81b6033e2f342838efc5b537736286b777ba4861eeaea565bb0c97275d",
+      "current_source_sha256": "dade22fb058abf78ab8699e8affe6b4f2d310b25206d8a03613353960e732c2e"
+    },
+    {
+      "path": "crates/zeno-fcis-schema/src/profile2/tests.rs",
+      "tested_source_sha256": "b139ba6ad921bd7bec2dbc5ed9afa42aef186d1cd240194a24fd0a88b5ae93bb",
+      "current_source_sha256": "60f02bfc11ff0fb918b05349f6d22cd7f993f47fdf7a3234f11e5e0d88713536"
+    },
+    {
+      "path": "crates/zeno-fcis-schema/src/profile2/validate.rs",
+      "tested_source_sha256": "b386b33541d74b9fbf924122ac7111b780938e847c19cdf2ebfe51f9b0d9a819",
+      "current_source_sha256": "fb0e1c58e7d0c8c66a1d137c9fa3c4e6167e8ebef66f7078e07d68333f1f6d82"
+    },
+    {
+      "path": "crates/zeno-fcis-schema/tests/schema2-defi-state.hex",
+      "tested_source_sha256": "ab9ff1a8672a21374af667a3e21273071e381932fc0e7985030de3d00efe1f03",
+      "current_source_sha256": "ab9ff1a8672a21374af667a3e21273071e381932fc0e7985030de3d00efe1f03"
+    },
+    {
+      "path": "crates/zeno-fcis-schema/tests/schema2_defi_state.rs",
+      "tested_source_sha256": "a2d63ea681b3eb5f06479aa9c99dd18eb5df76386b02844ebf1568d4ac2b200a",
+      "current_source_sha256": "a16f3b69a122baf6d9e2f257cfd70b8221232f9de85f65340c997b10bb055128"
+    },
+    {
+      "path": "crates/zeno-fcis-value/Cargo.toml",
+      "tested_source_sha256": "627768a842ae6bc4486b1527686cfda6fa5bca02e356659de25991a9f42087e2",
+      "current_source_sha256": "627768a842ae6bc4486b1527686cfda6fa5bca02e356659de25991a9f42087e2"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/lib.rs",
+      "tested_source_sha256": "1a899279f23e5957a6f17345a5385337fa5b0fb29374a26e524bcd10c911d07e",
+      "current_source_sha256": "1a899279f23e5957a6f17345a5385337fa5b0fb29374a26e524bcd10c911d07e"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "tested_source_sha256": "db196c5d746d27bf21579e9a3a3ce32d556ec74ea62ba929e4c8a462a6130131",
+      "current_source_sha256": "db196c5d746d27bf21579e9a3a3ce32d556ec74ea62ba929e4c8a462a6130131"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/profile2/atom-vectors.tsv",
+      "tested_source_sha256": "51341eb05712c39e6bf58097268aba4f99a9d7ac23af8d4f3a26a926474e991a",
+      "current_source_sha256": "51341eb05712c39e6bf58097268aba4f99a9d7ac23af8d4f3a26a926474e991a"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/profile2/boundary_tests.rs",
+      "tested_source_sha256": "75a5e6a34cd188202901fff6c22ef545b9938088aca6c58b2cbdb528b96a76b7",
+      "current_source_sha256": "3b4eb487dc19b4f2f34427ff9fc6c42232413f5d6b6e98d27e7a3088a3f3b42a"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/profile2/mod.rs",
+      "tested_source_sha256": "8cbb5a611f5863994ae0ecd9bb16f8ca48d917f3e4ce3bf3eaddfab2641772f8",
+      "current_source_sha256": "08cb97a6322a1ea03e60d83f41e88ae4a628ce1aebd8be871af39957d5d3ca76"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/profile2/reference-licenses/LICENSE-APACHE",
+      "tested_source_sha256": "ecffed67c3c0f736bec2c29cb8b5abba85535c7e17f02b099290759f08239bd1",
+      "current_source_sha256": "ecffed67c3c0f736bec2c29cb8b5abba85535c7e17f02b099290759f08239bd1"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/profile2/reference-licenses/LICENSE-MIT",
+      "tested_source_sha256": "5ec7acafc702bfbc57845e6938e7209e39bd9587e1570baf3e78b288421b349a",
+      "current_source_sha256": "5ec7acafc702bfbc57845e6938e7209e39bd9587e1570baf3e78b288421b349a"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/profile2/reference/legacy_scalar.rs",
+      "tested_source_sha256": "b0bd6938daeaff9da36f9559d52ea0ad759d9297490958ae0f3d1b3edb650127",
+      "current_source_sha256": "b0bd6938daeaff9da36f9559d52ea0ad759d9297490958ae0f3d1b3edb650127"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "tested_source_sha256": "7ba3833708ab33c9267283799277c534af21ac1edec90722a6c0852cc0e2beff",
+      "current_source_sha256": "7ba3833708ab33c9267283799277c534af21ac1edec90722a6c0852cc0e2beff"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/profile2/tests.rs",
+      "tested_source_sha256": "5be655de054aa68f485d1948c5352340c7071939a3b87568523073df899344f3",
+      "current_source_sha256": "a9f3dadefc43e30cab1b8734c1815c9d32c146506f82ba28caa5f739e31ac532"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/profile2/value.rs",
+      "tested_source_sha256": "ede5c72667848e1d344fc22ca159a0e54437842e4a37f443e764cff112abfab0",
+      "current_source_sha256": "ede5c72667848e1d344fc22ca159a0e54437842e4a37f443e764cff112abfab0"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/profile2/value_tests.rs",
+      "tested_source_sha256": "cd9cc4ddfb80afc3851173868dfc099bc2978992d85c6dbd20d93f20ecaa6d8a",
+      "current_source_sha256": "cd9cc4ddfb80afc3851173868dfc099bc2978992d85c6dbd20d93f20ecaa6d8a"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/profile2/vectors_03.tsv",
+      "tested_source_sha256": "05d1d835fe5cbde02e74dbec4c0da0b7965d48c62514430d124e05797d253b4d",
+      "current_source_sha256": "05d1d835fe5cbde02e74dbec4c0da0b7965d48c62514430d124e05797d253b4d"
+    }
+  ],
+  "release_ready": false,
+  "metadata_preparation": {
+    "cpu_seconds": 33.01789300000001,
+    "wall_seconds": 62.718356636120006,
+    "scope": "Separate prior identity/cache/source preparation; no compiler/native application execution."
+  }
+}

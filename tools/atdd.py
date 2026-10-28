@@ -50,6 +50,21 @@ def historical_oracle(test_filter: str, *, exact: bool = False) -> tuple[str, ..
 
 
 SCENARIOS: dict[str, AcceptanceScenario] = {
+    "full-width-value-schema": AcceptanceScenario(
+        "Admit nominal full-width values through explicit codec2 and Schema2 boundaries",
+        (("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-value",
+          "-p", "zeno-fcis-codec", "--lib", "--all-features", "--", "--test-threads=1"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-schema",
+          "--lib", "--", "--test-threads=1"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-schema",
+          "--lib", "--all-features", "--", "--test-threads=1"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-schema",
+          "--test", "schema2_defi_state", "--all-features", "--", "--test-threads=1"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-schema",
+          "--doc", "--all-features"),
+         ("cargo", "+1.97.1", "check", "--locked", "--offline", "-p", "zeno-fcis-schema",
+          "--no-default-features", "--features", "schema-profile-2")),
+    ),
     "zal-observation-contracts": AcceptanceScenario(
         "Check observation-limited strategies and complete finite paired histories",
         (("python3", "-B", "-m", "unittest", "discover", "-s", "integrations/zal", "-p", "test_observation*.py"),

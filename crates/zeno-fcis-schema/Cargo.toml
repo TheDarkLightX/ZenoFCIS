@@ -12,6 +12,8 @@ readme.workspace = true
 
 [features]
 default = ["std"]
+# Explicit schema2/Value2 namespace; legacy/default routes remain closed.
+schema-profile-2 = ["zeno-fcis-codec/value-profile-2", "zeno-fcis-value/value-profile-2"]
 std = ["zeno-fcis-codec/std", "zeno-fcis-value/std"]
 
 [dependencies]
