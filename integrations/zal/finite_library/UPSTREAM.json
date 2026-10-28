@@ -1,0 +1,22 @@
+{
+  "components": {
+    "../semantic_library.py": {
+      "path": "../semantic_library.py",
+      "sha256": "93a5974b58e5cb7ac678e2cd3ab943070a57eab128ef1b6724e8b086a5d3fa2d"
+    },
+    "LICENSE": {
+      "path": "LICENSE",
+      "sha256": "85508b9757ff910428e29187f2b199070dc70e3e07c0ac02ae6b4cac5c3e6cb9"
+    },
+    "prototype.py": {
+      "path": "prototype.py",
+      "sha256": "3ce64a86b737854eab627255a25f0a403fb13d1b257a07c3e21471dc5bcd0ed1"
+    },
+    "test_prototype.py": {
+      "path": "test_prototype.py",
+      "sha256": "efaf53c22347193fad8c3b07d88bc820f94a15f124159dcd760ff93c98c54b9f"
+    }
+  },
+  "schema": "zal/finite-library-components/1",
+  "scope": "Component identities for the shipped integration; no public upstream publication, mathematical correctness, build provenance or release approval inferred."
+}

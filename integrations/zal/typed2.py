@@ -255,6 +255,7 @@ def _walk(node, encoded, owner):
 
 def validate(model: TypedMachine):
     if (not isinstance(model.types, Types) or model.types.prelude or not isinstance(model.machine, behavior2.Machine)
+            or model.machine.profile != behavior2.PROFILE
             or not isinstance(model.typed, tuple) or any(not isinstance(t, Typed) for t in model.typed)
             or [t.name for t in model.typed] != sorted({t.name for t in model.typed})):
         raise Refusal("Invalid IR typed machine")

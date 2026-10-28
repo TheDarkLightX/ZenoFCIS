@@ -921,3 +921,211 @@ fn production_fingerprint_retains_clock() {
         );
     });
 }
+
+/// Exercise the actual credential-bearing terminal with public, forgeable
+/// Delivery values. The call log observes attempted transport invocation,
+/// independently of the transport's reported physical outcome.
+mod dispatch_authority {
+    use super::*;
+    use std::{cell::RefCell, rc::Rc};
+
+    #[derive(Debug)]
+    struct RecordingTransport {
+        calls: Rc<RefCell<Vec<port::Delivery>>>,
+        unknown: bool,
+    }
+
+    impl Transport for RecordingTransport {
+        fn send(&mut self, delivery: &port::Delivery) -> Sent {
+            self.calls.borrow_mut().push(delivery.clone());
+            if self.unknown {
+                Sent::Unknown(port::Fault::Io)
+            } else {
+                Sent::Sent(Report {
+                    delivery_id: delivery.id,
+                    payload_sha256: delivery.payload_sha256,
+                })
+            }
+        }
+    }
+
+    fn invoke(
+        terminal: &mut Production<'_, '_, RecordingTransport, Ticks>,
+        operation: Operation,
+    ) -> Handled {
+        let binding =
+            zeno_fcis_shell::effects::driver::Binding::of(port::OpId::first(1), &operation);
+        terminal.handle(&binding, &operation)
+    }
+
+    fn seed(files: &Files, authority: &Authority<'_>) {
+        let mut db = sim::create(files, authority);
+        let input = fixture::input(authority, key(1), [0, 0], 120);
+        assert!(matches!(
+            sim::commit(&mut db, authority, &input, 0),
+            model::Outcome::Committed(1, _)
+        ));
+    }
+
+    fn outbox(terminal: &mut Production<'_, '_, RecordingTransport, Ticks>) -> Vec<port::Delivery> {
+        let operation = Operation::ReadOutbox(terminal.store());
+        let Handled::Answer(Response::ReadOutbox(Outcome::Ok(pending))) =
+            invoke(terminal, operation)
+        else {
+            panic!("expected the actual approved outbox")
+        };
+        assert!(!pending.is_empty());
+        pending
+    }
+
+    #[test]
+    fn production_dispatch_rejects_forged_intents_before_transport() {
+        with_lineage(|lineage| {
+            let files = Files::memory();
+            seed(&files, &lineage.authorities()[0]);
+            let calls = Rc::new(RefCell::new(Vec::new()));
+            let mut terminal = ok(Production::open(
+                &files.store,
+                lineage,
+                1,
+                RecordingTransport {
+                    calls: calls.clone(),
+                    unknown: false,
+                },
+                Some(Ticks::default()),
+            ));
+            let store = terminal.store();
+            let pending = outbox(&mut terminal);
+            let before = database::snapshot(&files.store);
+            for original in &pending {
+                for field in 0..8 {
+                    let mut forged = original.clone();
+                    match field {
+                        0 => forged.id = key(99),
+                        1 => forged.version += 1,
+                        2 => forged.lane ^= 1,
+                        3 => forged.ordinal += 1,
+                        4 => forged.destination.push(0),
+                        5 => forged.payload.push(0),
+                        6 => {
+                            forged.payload.push(0);
+                            forged.payload_sha256 = sim::payload_hash(&forged.payload);
+                        }
+                        7 => forged.payload_sha256 = Hash32::ZERO,
+                        _ => unreachable!(),
+                    }
+                    assert_ne!(&forged, original);
+                    let expected = if field == 0 {
+                        Code::UnknownDelivery
+                    } else {
+                        Code::Delivery
+                    };
+                    assert_eq!(
+                        invoke(&mut terminal, Operation::Send(store, forged)),
+                        Handled::Answer(Response::Send(Sent::NotSent(expected))),
+                        "forged field {field} reached the Send boundary"
+                    );
+                    assert!(
+                        calls.borrow().is_empty(),
+                        "transport called for forged field {field}"
+                    );
+                    assert_eq!(database::snapshot(&files.store), before);
+                }
+                for foreign in [
+                    Store {
+                        identity: Hash32::ZERO,
+                        ..store
+                    },
+                    Store {
+                        handle: store.handle + 1,
+                        ..store
+                    },
+                ] {
+                    assert_eq!(
+                        invoke(&mut terminal, Operation::Send(foreign, original.clone())),
+                        Handled::Answer(Response::Send(Sent::NotSent(Code::Identity)))
+                    );
+                    assert!(calls.borrow().is_empty());
+                    assert_eq!(database::snapshot(&files.store), before);
+                }
+            }
+        });
+    }
+
+    #[test]
+    fn production_dispatch_preserves_unknown_retry_reopen_and_acknowledgement() {
+        with_lineage(|lineage| {
+            let files = Files::memory();
+            seed(&files, &lineage.authorities()[0]);
+            let calls = Rc::new(RefCell::new(Vec::new()));
+            let mut terminal = ok(Production::open(
+                &files.store,
+                lineage,
+                1,
+                RecordingTransport {
+                    calls: calls.clone(),
+                    unknown: true,
+                },
+                Some(Ticks::default()),
+            ));
+            let store = terminal.store();
+            let pending = outbox(&mut terminal);
+            let before = database::snapshot(&files.store);
+            for original in &pending {
+                for _ in 0..2 {
+                    assert_eq!(
+                        invoke(&mut terminal, Operation::Send(store, original.clone())),
+                        Handled::Answer(Response::Send(Sent::Unknown(port::Fault::Io)))
+                    );
+                    assert_eq!(calls.borrow().last(), Some(original));
+                    assert_eq!(database::snapshot(&files.store), before);
+                }
+            }
+            assert_eq!(calls.borrow().len(), 2 * pending.len());
+            drop(terminal);
+            let mut terminal = ok(Production::open(
+                &files.store,
+                lineage,
+                2,
+                RecordingTransport {
+                    calls: calls.clone(),
+                    unknown: false,
+                },
+                Some(Ticks::default()),
+            ));
+            assert_eq!(terminal.store().identity, store.identity);
+            assert_eq!(
+                outbox(&mut terminal),
+                pending,
+                "restart changed pending identities"
+            );
+            let store = terminal.store();
+            for original in &pending {
+                assert_eq!(
+                    invoke(&mut terminal, Operation::Send(store, original.clone())),
+                    Handled::Answer(Response::Send(Sent::Sent(Report {
+                        delivery_id: original.id,
+                        payload_sha256: original.payload_sha256,
+                    })))
+                );
+                assert_eq!(calls.borrow().last(), Some(original));
+                assert_eq!(
+                    invoke(
+                        &mut terminal,
+                        Operation::Acknowledge(store, original.id, original.payload_sha256)
+                    ),
+                    Handled::Answer(Response::Acknowledge(Outcome::Ok(())))
+                );
+                let acknowledged = database::snapshot(&files.store);
+                let sent_count = calls.borrow().len();
+                assert_eq!(
+                    invoke(&mut terminal, Operation::Send(store, original.clone())),
+                    Handled::Answer(Response::Send(Sent::NotSent(Code::AlreadyAcknowledged)))
+                );
+                assert_eq!(calls.borrow().len(), sent_count);
+                assert_eq!(database::snapshot(&files.store), acknowledged);
+            }
+            assert_eq!(calls.borrow().len(), 3 * pending.len());
+        });
+    }
+}

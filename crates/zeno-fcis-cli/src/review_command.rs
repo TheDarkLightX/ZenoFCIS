@@ -92,6 +92,18 @@ enum Failure {
     Invalid { place: String, reason: String },
 }
 
+fn lineage_failure(error: crate::contract_files::Failure) -> Failure {
+    match error {
+        crate::contract_files::Failure::Read(message) => Failure::Read(message),
+        crate::contract_files::Failure::Invalid { place, reason } => {
+            Failure::Invalid { place, reason }
+        }
+        crate::contract_files::Failure::Binding(refusal) => {
+            Failure::Read(format!("lineage binding: {refusal:?}"))
+        }
+    }
+}
+
 /// The specification-gap judge's settings.
 struct Gaps {
     laws: Option<PathBuf>,
@@ -106,6 +118,26 @@ fn review_directory(
     mutant_programs: Option<&Path>,
     gap_settings: Option<&Gaps>,
 ) -> u8 {
+    review_directory_with_reader(
+        dir,
+        out,
+        max_tuples,
+        format,
+        mutant_programs,
+        gap_settings,
+        read_text,
+    )
+}
+
+fn review_directory_with_reader(
+    dir: &Path,
+    out: Option<&Path>,
+    max_tuples: u64,
+    format: OutputFormat,
+    mutant_programs: Option<&Path>,
+    gap_settings: Option<&Gaps>,
+    mut read: impl FnMut(&Path, &str) -> Result<String, Failure>,
+) -> u8 {
     if max_tuples == 0 {
         eprintln!("--max-tuples must be at least 1");
         return USAGE;
@@ -116,9 +148,17 @@ fn review_directory(
         let message = format!("{} exists; seeds go to a new directory", path.display());
         return report_failure(dir, Failure::Read(message), format);
     }
-    if let Ok(rules) = read_text(dir, RULES)
-        && zeno_fcis_contract::internals::tables::recognizes(&rules).unwrap_or(false)
-    {
+    // Detect lineage and execute the review against the same captured pair.
+    // A failed read must never be retried into the rules-only path.
+    let project = match read(dir, PROJECT) {
+        Ok(project) => project,
+        Err(error) => return report_failure(dir, error, format),
+    };
+    let rules = match read(dir, RULES) {
+        Ok(rules) => rules,
+        Err(error) => return report_failure(dir, error, format),
+    };
+    if zeno_fcis_contract::internals::tables::recognizes(&rules).unwrap_or(false) {
         if mutant_programs.is_some()
             || gap_settings.is_some_and(|g| g.laws.is_some())
             || dir.join(EXAMPLES).exists()
@@ -126,7 +166,6 @@ fn review_directory(
             return report_failure(dir, Failure::Invalid {place: "tables/1".into(), reason: "scalar examples, mutant programs and scalar proposed laws do not support table subjects".into()}, format);
         }
         let result = (|| {
-            let project = read_text(dir, PROJECT)?;
             let compiled = zeno_fcis_contract::internals::tables::compile(&project, &rules)
                 .map_err(|e| Failure::Invalid {
                     place: e.place().into(),
@@ -169,22 +208,14 @@ fn review_directory(
             Err(failure) => report_failure(dir, failure, format),
         };
     }
+    // Capture lineage inputs once, before any review or symbolic fallback.
+    let mut lineage_inputs = None;
     // Preserve the existing exhaustive route at and below its exact cap.
     // Solver acquisition belongs here in the file/process shell, never in
     // the pure review implementation.
-    if let (Ok(project), Ok(rules)) = (read_text(dir, PROJECT), read_text(dir, RULES)) {
-        match review::numeric_symbolic::over_cap(&project, &rules, max_tuples) {
-            Ok(true) => {
-                return symbolic_directory(
-                    dir,
-                    out,
-                    format,
-                    &project,
-                    &rules,
-                    mutant_programs.is_some() || gap_settings.is_some(),
-                );
-            }
-            Ok(false) => {}
+    {
+        let lineage = match crate::contract::has_lineage(&project, &rules) {
+            Ok(lineage) => lineage,
             Err(error) => {
                 return report_failure(
                     dir,
@@ -195,11 +226,120 @@ fn review_directory(
                     format,
                 );
             }
+        };
+        if lineage {
+            let inputs = match crate::contract_files::Inputs::read_with_base(
+                dir,
+                project.clone(),
+                rules.clone(),
+            ) {
+                Ok(inputs) => inputs,
+                Err(error) => return report_failure(dir, lineage_failure(error), format),
+            };
+            match review::numeric_symbolic::over_cap(&inputs.project, &inputs.rules, max_tuples) {
+                Ok(true) => {
+                    if let Err(error) = inputs.with_current(|_| Ok(())) {
+                        return report_failure(dir, lineage_failure(error), format);
+                    }
+                    return symbolic_directory(
+                        dir,
+                        out,
+                        format,
+                        &inputs.project,
+                        &inputs.rules,
+                        mutant_programs.is_some() || gap_settings.is_some(),
+                        true,
+                    );
+                }
+                Ok(false) => lineage_inputs = Some(inputs),
+                Err(error) => {
+                    return report_failure(
+                        dir,
+                        Failure::Invalid {
+                            place: error.place().into(),
+                            reason: error.reason().into(),
+                        },
+                        format,
+                    );
+                }
+            }
+        } else {
+            match review::numeric_symbolic::over_cap(&project, &rules, max_tuples) {
+                Ok(true) => {
+                    return symbolic_directory(
+                        dir,
+                        out,
+                        format,
+                        &project,
+                        &rules,
+                        mutant_programs.is_some() || gap_settings.is_some(),
+                        false,
+                    );
+                }
+                Ok(false) => {}
+                Err(error) => {
+                    return report_failure(
+                        dir,
+                        Failure::Invalid {
+                            place: error.place().into(),
+                            reason: error.reason().into(),
+                        },
+                        format,
+                    );
+                }
+            }
         }
     }
     let result = (|| {
-        let project = read_text(dir, PROJECT)?;
-        let rules = read_text(dir, RULES)?;
+        if let Some(inputs) = lineage_inputs {
+            let examples = match read_input(&dir.join(EXAMPLES)) {
+                Ok(bytes) => Some(text(EXAMPLES, bytes)?),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+                Err(error) => return Err(Failure::Read(format!("read {EXAMPLES}: {error}"))),
+            };
+            let laws = match gap_settings.and_then(|g| g.laws.as_ref()) {
+                None => None,
+                Some(path) => {
+                    let bytes = read_input(path).map_err(|error| {
+                        Failure::Read(format!("read {}: {error}", path.display()))
+                    })?;
+                    Some(text(&path.display().to_string(), bytes)?)
+                }
+            };
+            let (review, candidates) = inputs
+                .with_current(|current| {
+                    let reviewed = match gap_settings {
+                        None => review::review_current(&current, examples.as_deref(), max_tuples)?,
+                        Some(settings) => review::review_current_with_gaps(
+                            &current,
+                            examples.as_deref(),
+                            gaps::Options {
+                                max_tuples,
+                                max_work: settings.max_work,
+                                proposals: laws.as_deref(),
+                                mutants: true,
+                            },
+                        )?,
+                    };
+                    let candidates = if mutant_programs.is_some() {
+                        Some(review::seeds::equivalent_mutant_programs_current(
+                            &current,
+                            examples.as_deref(),
+                            reviewed.packet(),
+                            max_tuples,
+                        )?)
+                    } else {
+                        None
+                    };
+                    Ok((reviewed, candidates))
+                })
+                .map_err(lineage_failure)?;
+            let seeds = match (mutant_programs, candidates) {
+                (Some(path), Some(candidates)) => Some(write_seeds(path, candidates)?),
+                _ => None,
+            };
+            return Ok((review, seeds));
+        }
         let examples = match read_input(&dir.join(EXAMPLES)) {
             Ok(bytes) => Some(text(EXAMPLES, bytes)?),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
@@ -340,6 +480,7 @@ fn symbolic_directory(
     project: &str,
     rules: &str,
     unsupported_options: bool,
+    bound_lineage: bool,
 ) -> u8 {
     let result = (|| {
         let application =
@@ -352,7 +493,9 @@ fn symbolic_directory(
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
             Err(e) => return Err(Failure::Read(e.to_string())),
         };
-        let mut report = if unsupported_options {
+        let mut report = if bound_lineage {
+            json!({"schema":"zeno-fcis/numeric-law-review/1","authority":"none","mode":"symbolic","status":"UNKNOWN","reason":"symbolic numeric review requires a standalone contract; retained lineage replay is unsupported"})
+        } else if unsupported_options {
             json!({"schema":"zeno-fcis/numeric-law-review/1","authority":"none","mode":"symbolic","status":"UNKNOWN","reason":"symbolic gap counting and exhaustive mutant seed receipts are unsupported"})
         } else if let Some(report) = native_example_refutation(ReviewSources {
             project,
@@ -472,10 +615,14 @@ fn write_seeds(path: &Path, seeds: Vec<review::seeds::Seed>) -> Result<Value, Fa
         let file = path.join(format!("{}.zcve", seed.id));
         atomic_create(&file, &seed.program)
             .map_err(|error| Failure::Read(format!("write {}: {error}", file.display())))?;
-        programs.push(json!({
+        let mut program = json!({
             "id": seed.id, "path": file.display().to_string(), "bytes": seed.program.len(),
             "sha256": sha256_hex(&seed.program), "program_equivalent": seed.program_equivalent,
-        }));
+        });
+        if let Some(reference) = seed.reference_sha256 {
+            program["compared_original_sha256"] = json!(reference);
+        }
+        programs.push(program);
     }
     Ok(json!({
         "directory": path.display().to_string(),
@@ -616,6 +763,67 @@ fn gaps_line(gaps: &gaps::Gaps) -> String {
         gaps::Gaps::Withheld(reason) => format!("gaps: withheld, {reason}"),
         gaps::Gaps::InvalidProposals { place, reason } => {
             format!("gaps: the proposed laws have no contract form: {place}: {reason}")
+        }
+    }
+}
+
+#[cfg(test)]
+mod snapshot_tests {
+    use super::{FAILURE, Failure, OutputFormat, PROJECT, RULES, review_directory_with_reader};
+    use std::path::Path;
+
+    const PROJECT_TEXT: &str = include_str!("../templates/durable-counter/project.zeno");
+    const RULES_TEXT: &str = include_str!("../templates/durable-counter/v2/policy.json");
+
+    #[test]
+    fn review_uses_one_source_snapshot_and_does_not_retry_failed_reads() {
+        // No project/rules exist at this directory: any bypass of the supplied
+        // reader fails. A second rules read would return a different version.
+        let dir = Path::new("/__zeno_fcis_snapshot_test_no_files__");
+        let mut calls = Vec::new();
+        let result = review_directory_with_reader(
+            dir,
+            None,
+            1024,
+            OutputFormat::Json,
+            None,
+            None,
+            |_, name| {
+                calls.push(name.to_owned());
+                match calls.len() {
+                    1 if name == PROJECT => Ok(PROJECT_TEXT.to_owned()),
+                    2 if name == RULES => Ok(RULES_TEXT.to_owned()),
+                    _ => Ok("changed after snapshot".to_owned()),
+                }
+            },
+        );
+        assert_ne!(result, FAILURE);
+        assert_eq!(calls, [PROJECT, RULES]);
+
+        for failed in [PROJECT, RULES] {
+            let mut reads = Vec::new();
+            let result = review_directory_with_reader(
+                dir,
+                None,
+                1024,
+                OutputFormat::Json,
+                None,
+                None,
+                |_, name| {
+                    reads.push(name.to_owned());
+                    if name == failed
+                        && reads.iter().filter(|seen| seen.as_str() == name).count() == 1
+                    {
+                        Err(Failure::Read("temporary read failure".to_owned()))
+                    } else if name == PROJECT {
+                        Ok(PROJECT_TEXT.to_owned())
+                    } else {
+                        Ok(RULES_TEXT.to_owned())
+                    }
+                },
+            );
+            assert_eq!(result, FAILURE);
+            assert_eq!(reads.len(), if failed == PROJECT { 1 } else { 2 });
         }
     }
 }

@@ -6,6 +6,7 @@ import {webcrypto} from 'node:crypto';
 import {setTimeout as delay} from 'node:timers/promises';
 import {documentFrom,moduleLoader} from './browser-fixture.mjs';
 import {display} from '../public/zenoui/app-contract.js';
+import {scopeCommands} from '../public/zenoui/ui-grammar.js';
 import {DurableTransport,pendingKey,hex,unhex,envelope} from '../public/zenoui/durable.js';
 const report=JSON.parse(await readFile(process.argv[2],'utf8'));
 const plain=v=>JSON.parse(JSON.stringify(v));
@@ -88,13 +89,25 @@ for(const observation of report.observations){
  const module=await loader.evaluate('https://zenoui.test/ZenoFCIS/zenoui/app.js');
  await module.namespace.mount(root,plain(bundle),{session:plain(session),transport});
  const command=observation.before[d.action];
+ const form=root.querySelectorAll('form').find(f=>(scopeCommands(d,d.presentation.requirements,f.dataset.scope)??[]).includes(command));
+ assert.ok(form,`command ${command} is represented in the recursive form tree`);
+ if(form.dataset.command!==command){
+  const selector=form.querySelector('#command-direction');
+  if(selector){selector.value=command;selector.dispatchEvent(new Event('change'));}
+  else {const flip=form.querySelector('.zu-flip');assert.ok(flip,'group exposes its command selector');flip.click();}
+ }
+ assert.equal(form.dataset.command,command,'the selected command is the intended one');
  for(const f of d.fields.filter(f=>f.source==='command'&&f.index!==d.action)){
-  const input=root.querySelector(`#command-${command}-field-${f.index}`);input.value=observation.before[f.index];input.dispatchEvent(new Event('input'));
+  const input=form.querySelector(`#command-${form.dataset.scope}-field-${f.index}`);assert.ok(input,`command input ${f.path}`);input.value=observation.before[f.index];input.dispatchEvent(new Event('input'));
  }
  await settle(()=>lastView?.actions.some(a=>a.id===command&&a.enabled));
- assert.equal(root.querySelector('#principal').disabled,true,'principal is fixed');
- for(const f of contextFields)assert.equal(root.querySelector(`#command-${command}-field-${f.index}`).disabled,true,'context is fixed');
- const form=root.querySelector(`button[data-command="${command}"]`).parent;
+ assert.equal(root.querySelector('#principal'),null,'authenticated principal has no editable control');
+ for(const f of contextFields){
+  assert.equal(root.querySelector(`#context-field-${f.index}`),null,'server context has no editable control');
+  assert.equal(form.querySelector(`#command-${form.dataset.scope}-field-${f.index}`),null,'server context does not appear in command forms');
+  if(f.clock)assert.ok(!lastView.context.some(x=>x.index===f.index),'server clock is omitted from the shown context');
+ }
+ assert.equal(lastView.principal,session.principal);
  form.dispatchEvent(new Event('submit',{cancelable:true}));
  assert.ok(root.querySelector('[data-region="confirmation"]').textContent.includes(session.principal));
  root.querySelector('[data-region="confirmation"] button').click();

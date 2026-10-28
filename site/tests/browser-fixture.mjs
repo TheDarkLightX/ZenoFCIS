@@ -60,15 +60,33 @@ export function documentFrom(html){
   doc.createElement=tag=>new Element(tag);doc.createTextNode=text=>new Text(String(text));doc.getElementById=id=>doc.querySelector(`#${id}`);return doc;
 }
 export function moduleLoader(globals, transform=(_url,source)=>source, resolveAsset=assetFile){
-  const context=vm.createContext({URL,URLSearchParams,console,structuredClone,performance,setTimeout,clearTimeout,queueMicrotask,Event,CustomEvent,WebAssembly,TextEncoder,TextDecoder,...globals}),modules=new Map();
-  async function load(url){
-    if(modules.has(url))return modules.get(url);
-    const source=await readFile(resolveAsset(url),'utf8');
-    const module=new vm.SourceTextModule(transform(url,source),{context,identifier:url,initializeImportMeta(meta){meta.url=url;},
-      importModuleDynamically:async specifier=>evaluate(new URL(specifier,url).href)});
-    modules.set(url,module);await module.link((specifier,parent)=>load(new URL(specifier,parent.identifier).href));return module;
+  const context=vm.createContext({URL,URLSearchParams,console,structuredClone,performance,setTimeout,clearTimeout,queueMicrotask,Event,CustomEvent,WebAssembly,TextEncoder,TextDecoder,...globals}),modules=new Map(),evaluations=new Map();
+  // Cache construction immediately: multiple imports of a shared dependency
+  // must hand the same module to the VM's graph linker.
+  function construct(url){
+    if(!modules.has(url))modules.set(url,(async()=>{
+      const source=await readFile(resolveAsset(url),'utf8');
+      return new vm.SourceTextModule(transform(url,source),{context,identifier:url,initializeImportMeta(meta){meta.url=url;},
+        importModuleDynamically:async specifier=>evaluate(new URL(specifier,url).href)});
+    })());
+    return modules.get(url);
   }
-  async function evaluate(url){const module=await load(url);if(module.status==='linked')await module.evaluate();return module;}
+  // Serialize independent root links; the VM recursively links dependencies.
+  let links=Promise.resolve();
+  function load(url){
+    const result=links.then(async()=>{
+      const module=await construct(url);
+      if(module.status==='unlinked')await module.link((specifier,parent)=>construct(new URL(specifier,parent.identifier).href));
+      if(module.status==='errored')throw module.error;
+      return module;
+    });
+    links=result.then(()=>{},()=>{});
+    return result;
+  }
+  function evaluate(url){
+    if(!evaluations.has(url))evaluations.set(url,(async()=>{const module=await load(url);if(module.status==='linked')await module.evaluate();if(module.status==='errored')throw module.error;return module;})());
+    return evaluations.get(url);
+  }
   return {context,load,evaluate};
 }
 export function localWorkerClass(resolveAsset=assetFile){

@@ -1,0 +1,4 @@
+# Retain exact imported bytes used by source-bound checks.
+# Only the terminal blank-line check is relaxed for these two retained files.
+integrations/zal/zal_notation/LICENSE whitespace=blank-at-eol,space-before-tab,-blank-at-eof
+integrations/zal/zal_notation/tests/generic_browser_fixture.py whitespace=blank-at-eol,space-before-tab,-blank-at-eof

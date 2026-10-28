@@ -1,0 +1,20 @@
+{
+  "schema": "zeno-fcis/computational-feasibility/2",
+  "claim": "State the exact algorithm claim, semantics, input family and size parameters.",
+  "candidate": {"name": "proposed-algorithm", "revision": null, "artifact_sha256": null, "artifact": null, "toolchain": null},
+  "baseline": {
+    "name": null, "revision": null, "artifact_sha256": null, "artifact": null, "toolchain": null,
+    "qualification_scope": null, "qualification_evidence": [],
+    "selection_rationale": null, "selection_evidence": [], "inventory_as_of": null
+  },
+  "workloads": {"representative": [], "held_out": [], "used_for_selection": [], "frozen_plan_evidence": []},
+  "components": {
+    "correctness": {"status": "unknown", "analysis": "Exact specification, coverage and independent evidence remain to be recorded.", "evidence": [], "open_questions": ["What does the independent checker establish?"]},
+    "asymptotic_complexity": {"status": "unknown", "analysis": "No mathematical time/space bound has been established here.", "evidence": [], "open_questions": ["Which parameters, encoding and cost model does the bound cover?"]},
+    "concrete_resource_model": {"status": "unknown", "analysis": "Operation counts, constants, memory and encoding/proof/checking costs remain unmeasured.", "evidence": [], "open_questions": ["What is the complete end-to-end resource model?"]},
+    "empirical_crossover": {"status": "unknown", "analysis": "No qualified baseline comparison or measured crossover is recorded.", "evidence": [], "open_questions": ["Where does it win or lose on representative and genuinely held-out cases?"]},
+    "assurance_preservation": {"status": "unknown", "analysis": "Independent replay and trusted-computing-base changes remain to be assessed.", "evidence": [], "open_questions": ["Can results be checked with justified trust assumptions?"]}
+  },
+  "negative_results": [],
+  "disposition": "research-only"
+}

@@ -184,7 +184,7 @@ def _partial(node, accepted):
     return node
 
 
-def profile2_expressions(model):
+def profile2_expressions(model, *, _paths=None, _event_path="command.101"):
     """Pure syntax lowering shared by export and advisory law proposals.
 
     No model execution or law verdict occurs here. Returned closures own only
@@ -192,8 +192,11 @@ def profile2_expressions(model):
     """
     states = {name: 150 + i for i, name in enumerate(model.states)}
     events = {name: 120 + i for i, name in enumerate(model.events)}
-    facts = {name: 160 + i for i, name in enumerate(model.facts)}
-    inputs = {item.name: 164 + i for i, item in enumerate(model.inputs)}
+    facts = {name: f"context.102.{160 + i}" for i, name in enumerate(model.facts)}
+    inputs = {item.name: f"context.102.{164 + i}" for i, item in enumerate(model.inputs)}
+    if _paths is not None:
+        facts = {name: _paths[name] for name in facts}
+        inputs = {name: _paths[name] for name in inputs}
     variables = {item.name: 170 + i for i, item in enumerate(model.variables)}
 
     def term(node, root):
@@ -202,7 +205,7 @@ def profile2_expressions(model):
         if op == "int":
             return str(node.args[0]) if node.args[0] >= 0 else f"({node.args[0]})"
         if op == "input":
-            return f"context.102.{inputs[node.args[0]]}"
+            return inputs[node.args[0]]
         if op in {"var", "var_next"}:
             return f"{root[op == 'var_next']}.100.{variables[node.args[0]]}"
         return f"({term(node.args[0], root)} {'+' if op == 'add' else '-'} {term(node.args[1], root)})"
@@ -213,11 +216,11 @@ def profile2_expressions(model):
         if op in {"true", "false"}:
             return op
         if op == "fact":
-            return f"context.102.{facts[node.args[0]]}" + (" == 1" if law else "")
+            return facts[node.args[0]] + (" == 1" if law else "")
         if op in {"state", "state_next"}:
             return f"{root[op == 'state_next']}.100.110 == {states[node.args[0]]}"
         if op == "event":
-            return f"command.101 == {events[node.args[0]]}"
+            return f"{_event_path} == {events[node.args[0]]}"
         if op == "not":
             return f"!({expression(node.args[0], root, law)})"
         if op in {"and", "or"}:
@@ -255,7 +258,7 @@ def profile2_proposal(model, kind, name, formula, first_id):
     return tuple(laws)
 
 
-def lower_machine(model: behavior2.Machine) -> dict[str, str]:
+def lower_machine(model: behavior2.Machine, *, _bindings=None) -> dict[str, str]:
     """Lower profile 2 to the contract; constructs without a contract form refuse by name."""
     if model.players or model.games:
         raise Refusal("unsupported lowering: game players and properties; use export-game")
@@ -281,25 +284,47 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
     variables = {item.name: 170 + i for i, item in enumerate(model.variables)}
     reasons = {name: 200 + i for i, name in enumerate(sorted({model.default, *[r.reason for r in model.rules if r.reason]}))}
 
-    term, expression = profile2_expressions(model)
+    if _bindings is not None:
+        names = {*facts, *inputs}
+        if (type(_bindings) is not dict or set(_bindings) != names
+                or any(type(source) is not str or source not in {"command", "context"}
+                       for source in _bindings.values())):
+            raise Refusal("app binding must assign every model observation to one supported root")
+        bindings = dict(_bindings)
+        positions = {**facts, **inputs}
+        paths = {name: f"{bindings[name]}.{101 if bindings[name] == 'command' else 102}.{field}"
+                 for name, field in positions.items()}
+        event_path = "command.101.119"
+    else:
+        bindings, paths, event_path = None, None, "command.101"
+    term, expression = profile2_expressions(model, _paths=paths, _event_path=event_path)
 
-    observed = bool(facts or inputs)
+    observed = bool(facts or inputs) if bindings is None else any(source == "context" for source in bindings.values())
     project = ["zeno 1;", f"project 1 {model.name};", "namespace 2 dialogue;",
                "type 100 state ControlState;", "type 101 command Event;",
                "type 102 context Observations;",
                "type 105 data ControlLabel;"]
+    if bindings is not None:
+        project.append("type 103 data EventAction;")
     if facts:
         project.append("type 106 bool ContextFact;")
     if not observed:
-        project.extend(["type 106 int UnitContext in 0..=0;", "field 160 102 unit 106;"])
+        if bindings is None:
+            project.extend(["type 106 int UnitContext in 0..=0;", "field 160 102 unit 106;"])
+        else:
+            project.extend(["type 104 int UnitContext in 0..=0;", "field 159 102 unit 104;"])
     project.extend(f"type {107 + i} int Variable{i} in {v.low}..={v.high};" for i, v in enumerate(model.variables))
     project.extend(f"type {111 + i} int Input{i} in {v.low}..={v.high};" for i, v in enumerate(model.inputs))
     project.append("field 110 100 control 105;")
     project.extend(f"field {fid} 100 var_{name} {107 + i};" for i, (name, fid) in enumerate(variables.items()))
-    project.extend(f"field {fid} 102 observed_{name} 106;" for name, fid in facts.items())
-    project.extend(f"field {fid} 102 input_{name} {111 + i};" for i, (name, fid) in enumerate(inputs.items()))
+    if bindings is not None:
+        project.append("field 119 101 action 103;")
+    project.extend(f"field {fid} {101 if bindings is not None and bindings[name] == 'command' else 102} observed_{name} 106;"
+                   for name, fid in facts.items())
+    project.extend(f"field {fid} {101 if bindings is not None and bindings[name] == 'command' else 102} input_{name} {111 + i};"
+                   for i, (name, fid) in enumerate(inputs.items()))
     project.extend(f"variant {sid} 105 state_{name} none;" for name, sid in states.items())
-    project.extend(f"variant {eid} 101 event_{name} none;" for name, eid in events.items())
+    project.extend(f"variant {eid} {101 if bindings is None else 103} event_{name} none;" for name, eid in events.items())
     project.extend(f"reason {rid} refused_{name} precedence {i};" for i, (name, rid) in enumerate(reasons.items()))
     project.extend(["component 400 control {", "  owns 100;", "  reads pre.100;", "  writes post.100;",
                     "  contexts context.102;", "  budget steps 64;", "}", "merge [400];"])
@@ -336,7 +361,7 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
     for rule in model.rules:
         post = {"110": states[rule.target], **{str(variables[u.variable]): update(u) for u in rule.updates}} if rule.target else {}
         cases.append({"rule": rule.id,
-                      "when": f"pre.100.110 == {states[rule.source]} && command.101 == {events[rule.event]} && ({expression(rule.guard, ('pre', 'pre'))})",
+                      "when": f"pre.100.110 == {states[rule.source]} && {event_path} == {events[rule.event]} && ({expression(rule.guard, ('pre', 'pre'))})",
                       "class": "Accept" if rule.target else "Reject",
                       "reason": reasons[rule.reason] if rule.reason else None, "post": post, "outbox": []})
     # The factory's ordered cases are equivalent only because check() proved
@@ -357,8 +382,14 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
 
     def example(state, values, event, context):
         result = model.decide(state, values, event, context)
-        inputs_row = [states[state], *[values[n] for n in names], events[event],
-                      *[int(context[n]) for n in facts], *[context[n] for n in inputs]]
+        inputs_row = [states[state], *[values[n] for n in names], events[event]]
+        if bindings is None:
+            inputs_row.extend([*[int(context[n]) for n in facts], *[context[n] for n in inputs]])
+        else:
+            positions = sorted([(field, name) for name, field in {**facts, **inputs}.items()])
+            for source in ("command", "context"):
+                inputs_row.extend(int(context[name]) if name in facts else context[name]
+                                  for _, name in positions if bindings[name] == source)
         if not observed:
             inputs_row.append(0)
         reason = str(reasons[result["reason"]]) if result["reason"] else "-"
@@ -393,7 +424,7 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
                if model.decide(state, values, event, context)["class"] == "Reject"]
     if rejects:
         journey.append(example(state, values, *rejects[0]))
-    mapping = {"schema": "zal/factory-source-map/2", "profile": behavior2.PROFILE, "revision": model.revision,
+    mapping = {"schema": "zal/factory-source-map/2", "profile": model.profile, "revision": model.revision,
                "states": states, "events": events, "context_fields": facts, "input_fields": inputs,
                "variable_fields": variables, "reasons": reasons,
                "case_ids": [r.id for r in model.rules] + ["default"],
@@ -405,6 +436,12 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
                "correspondence": "tested correspondence, not a theorem",
                "scope": "class, reason, successor control state and variables, and empty deliveries; "
                         "not Step or publication identity equivalence"}
+    if bindings is not None:
+        mapping.update(schema="zal/factory-source-map/3", event_field=119,
+                       bindings={name: {"root": bindings[name], "field": field, "path": paths[name]}
+                                 for name, field in {**facts, **inputs}.items()},
+                       context_fields={name: field for name, field in facts.items() if bindings[name] == "context"},
+                       unit_context_field=None if observed else 159)
     return {"project.zeno": "\n".join(project) + "\n", "v2/policy.json": json.dumps(policy, indent=2) + "\n",
             "tests/decision-examples.txt": "\n".join(journey) + "\n",
             "tests/zal-authority-examples.txt": "\n".join(table) + "\n",
@@ -413,14 +450,19 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
             "zal-source-map.json": json.dumps(mapping, indent=2) + "\n"}
 
 
-def write_new(files: dict[str, str], destination: Path):
+def write_new(files: dict[str, str], destination: Path, *, exact_utf8=False):
+    """Preflight encodings; optionally preserve exact UTF-8 bytes and newlines."""
     if destination.exists() and (destination.is_symlink() or any(destination.iterdir())):
         raise Refusal("Export destination must be absent or an empty directory")
+    encoded = {name: contents.encode("utf-8" if exact_utf8 else "ascii") for name, contents in files.items()}
     destination.mkdir(parents=True, exist_ok=True)
     for name, contents in files.items():
         path = destination / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(contents, encoding="ascii")
+        if exact_utf8:
+            path.write_bytes(encoded[name])
+        else:
+            path.write_text(contents, encoding="ascii")
 
 
 def refine_check(model, contract: Path, cli: Path, max_checks=262144):

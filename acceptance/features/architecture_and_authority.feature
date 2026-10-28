@@ -41,3 +41,13 @@ Feature: Preserve historical composition evidence and current checked authority
     When the deterministic hotspot scanner runs its hostile fixtures and baseline check
     Then every score decomposes into bounded review-priority components
     And repository text remains inert data rather than reviewer instructions
+
+  @atdd-native-worker-host
+  Scenario: Contain a native worker and dispatch only its current approved intents
+    Given a pinned Linux runtime and independently compiled native protocol probe
+    When the supervisor connects the worker to real SQLite dispatch through its fixed handle table
+    Then useful dispatch preserves the exact approved bytes and durable attempt reservation
+    And forged identity slot replay truncated requests and runtime inventory changes are refused
+    And lost replies and transport unwind never authorize another send after reopening
+    And stderr CPU and wall limits and actual requester death preserve the worker protection domain
+    And normal and optimized Python bootstrap cases keep every mandatory acceptance condition active

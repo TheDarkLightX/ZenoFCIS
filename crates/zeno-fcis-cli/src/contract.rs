@@ -84,6 +84,12 @@ pub(crate) fn listed_evolutions(
     Ok(Rules::read_for_project(project, rules)?.evolutions)
 }
 
+/// Whether these validated rules name retained adoption or evolution inputs.
+pub(crate) fn has_lineage(project: &str, rules: &str) -> Result<bool, ContractError> {
+    let rules = Rules::read_for_project(project, rules)?;
+    Ok(!rules.adoptions.is_empty() || !rules.evolutions.is_empty())
+}
+
 /// The directory of adoption `n`'s retained files, relative to the
 /// application: `v2/adoptions/n/program.zcve` and `v2/adoptions/n/receipt.json`.
 pub(crate) fn adoption_directory(ordinal: usize) -> String {
@@ -352,12 +358,79 @@ pub(crate) struct StepBound {
 /// The current version of a generated contract as the generator's model:
 /// the declarations, rules and schema it was generated from, and the
 /// contract with every adoption's candidate applied.
-struct Current<'a> {
+pub(crate) struct Current<'a> {
+    project: &'a str,
+    rules_source: &'a str,
+    sources: ContractSources<'a>,
     declarations: &'a Declarations,
     rules: &'a Rules,
     contract: &'a Contract<'a>,
     schema: &'a [u8],
     generated: &'a GeneratedContract,
+}
+
+impl Current<'_> {
+    /// The exact declarations and rules whose lineage was generated and replayed.
+    pub(crate) fn project(&self) -> &str {
+        self.project
+    }
+
+    pub(crate) fn rules_source(&self) -> &str {
+        self.rules_source
+    }
+
+    /// Bind the actual current Authority and identify its complete subject.
+    pub(crate) fn subject(&self) -> Result<serde_json::Value, ContractError> {
+        let program = self.generated.program().ok_or_else(|| {
+            ContractError::new("lineage binding", "current scalar program is unavailable")
+        })?;
+        let identity = policy::with_authority(self.contract, self.schema, |authority| {
+            transform::sha256_hex(authority.identity())
+        })?;
+        Ok(serde_json::json!({
+            "schema": "zeno-fcis/current-authority-subject/1",
+            "project_sha256": transform::sha256_hex(self.project.as_bytes()),
+            "rules_sha256": transform::sha256_hex(self.rules_source.as_bytes()),
+            "schema_sha256": transform::sha256_hex(self.schema),
+            "policy_sha256": transform::sha256_hex(self.generated.policy()),
+            "program_sha256": transform::sha256_hex(program),
+            "authority_identity_sha256": identity,
+            "version": self.generated.summary().version,
+            "law_ids": self.generated.summary().law_ids,
+            "retained": {
+                "schema_origin_sha256": self.sources.schema_origin.map(|text| transform::sha256_hex(text.as_bytes())),
+                "adoptions": self.sources.adoptions.iter().map(|files| serde_json::json!({
+                    "candidate_sha256": transform::sha256_hex(files.candidate),
+                    "receipt_sha256": transform::sha256_hex(files.receipt),
+                })).collect::<Vec<_>>(),
+                "evolutions": self.sources.evolutions.iter().map(|files| serde_json::json!({
+                    "project_sha256": transform::sha256_hex(files.project.as_bytes()),
+                    "rules_sha256": transform::sha256_hex(files.rules.as_bytes()),
+                    "review_sha256": transform::sha256_hex(files.review),
+                    "migration_sha256": files.migration.map(transform::sha256_hex),
+                    "shortcut_sha256": files.shortcuts.iter().map(|bytes| transform::sha256_hex(bytes)).collect::<Vec<_>>(),
+                    "adoptions": files.adoptions.iter().map(|adoption| serde_json::json!({
+                        "candidate_sha256": transform::sha256_hex(adoption.candidate),
+                        "receipt_sha256": transform::sha256_hex(adoption.receipt),
+                    })).collect::<Vec<_>>(),
+                })).collect::<Vec<_>>(),
+            },
+            "adoptions": self.generated.summary().adoptions.iter().map(|adoption| serde_json::json!({
+                "candidate_sha256": adoption.candidate_sha256,
+                "receipt_sha256": adoption.receipt_sha256,
+                "superseded_policy_sha256": adoption.superseded_policy_sha256,
+            })).collect::<Vec<_>>(),
+            "evolutions": self.generated.summary().evolutions.iter().map(|evolution| serde_json::json!({
+                "version": evolution.version,
+                "kind": evolution.kind,
+                "review_sha256": evolution.review_sha256,
+                "superseded_policy_sha256": evolution.superseded_policy_sha256,
+            })).collect::<Vec<_>>(),
+            "cases": self.rules.cases.iter().enumerate().map(|(index, case)| serde_json::json!({
+                "index": index, "class": case.class.name(), "reason": case.reason,
+            })).collect::<Vec<_>>(),
+        }))
+    }
 }
 
 /// Rebuilds the generator's model of the current version of `generated`,
@@ -368,7 +441,7 @@ struct Current<'a> {
 /// # Errors
 /// Returns a refusal of the sources, a rebuilt contract that differs from
 /// `generated`, or `use_current`'s error.
-fn with_current<R>(
+pub(crate) fn with_current<R>(
     sources: ContractSources<'_>,
     generated: &GeneratedContract,
     use_current: impl FnOnce(Current<'_>) -> Result<R, ContractError>,
@@ -394,6 +467,9 @@ fn with_current<R>(
         ));
     }
     use_current(Current {
+        project: sources.project,
+        rules_source: sources.rules,
+        sources,
         declarations: &declarations,
         rules: &rules,
         contract: &contract,

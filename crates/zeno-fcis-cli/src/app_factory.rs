@@ -81,3 +81,52 @@ pub(crate) fn scaffold(
         }
     }
 }
+
+/// Offline assembly adds admission and installed-app tests around the factory.
+pub(crate) fn assemble(
+    description: &Path,
+    out: &Path,
+    source: Option<&Path>,
+    scratch: &Path,
+) -> u8 {
+    let binding = match binding::bind(
+        &include_str!("../contract-app/Cargo.toml.in")
+            .replace("{package}", "app-template")
+            .replace("{version}", env!("CARGO_PKG_VERSION")),
+        source,
+    ) {
+        Ok(value) => value,
+        Err(error) => return crate::binding_refused(&error),
+    };
+    let compiled = include_str!("../source-snapshots/repository/tools/runtime_assembler.py.txt");
+    let script = binding.tree.join("tools/runtime_assembler.py");
+    match std::fs::read(&script) {
+        Ok(actual) if sha256_hex(&actual) == sha256_hex(compiled.as_bytes()) => {}
+        _ => {
+            eprintln!("pinned runtime assembler differs; rebuild the CLI");
+            return INVALID;
+        }
+    }
+    let executable = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(_) => return FAILURE,
+    };
+    match Command::new("python3")
+        .arg("-B")
+        .arg(script)
+        .arg("--cli")
+        .arg(executable)
+        .arg("--assembly")
+        .arg(description)
+        .arg("--out")
+        .arg(out)
+        .arg("--scratch")
+        .arg(scratch)
+        .stdin(Stdio::null())
+        .status()
+    {
+        Ok(status) if status.success() => 0,
+        Ok(_) => FAILURE,
+        Err(_) => BLOCKED,
+    }
+}

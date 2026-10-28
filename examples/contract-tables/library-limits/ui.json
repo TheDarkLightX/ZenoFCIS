@@ -1,5 +1,24 @@
 {
-  "format": "zenoui/metadata/1",
+  "format": "zenoui/metadata/3",
+  "tables": {
+    "110": {"label": "Book copies"}
+  },
+  "requirements": {
+    "format": "zenoui/requirements/2",
+    "primaryFields": ["command.101.121", "command.101.122"],
+    "detailFields": [],
+    "fixedFields": [],
+    "contextFields": ["context.102"],
+    "groups": [],
+    "groupCommands": false,
+    "collapseExpert": true,
+    "compact": true,
+    "maxVisibleForms": 16,
+    "maxExpandedExpertPanels": 0,
+    "maxColumns": 2,
+    "projections": [],
+    "quoteOverrides": {}
+  },
   "title": "Library loan limits",
   "action": "command.101.120",
   "fields": {

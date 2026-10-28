@@ -22,6 +22,14 @@ with [Get started](#get-started), then follow a tutorial.
 
 ## Build and maintain applications
 
+- [Experimental runtime assembly](RUNTIME_ASSEMBLY.md) and
+  [finite transport refinement](RUNTIME_REFINEMENT.md)
+- [Opt-in postcondition proposals and independent checking](../prototypes/postconditions/README.md)
+- [2.7 runtime isolation proposal](RUNTIME_ISOLATION_27_PROPOSAL.md) and
+  [implementation checklist](RUNTIME_ISOLATION_27_PROGRESS.md)
+- [2.7 verified macros and abstract-machine research](ABSTRACT_MACHINE_DISCOVERY_27_PROPOSAL.md)
+  and [experiment checklist](ABSTRACT_MACHINE_DISCOVERY_27_PROGRESS.md)
+- [Computational feasibility standard for verification and synthesis research](RESEARCH_FEASIBILITY.md)
 - [Generated durable application milestone](GENERATED_APPLICATION_MILESTONE.md)
 - [Packaged application qualification](PACKAGED_APPLICATION_QUALIFICATION.md)
 - [Symbolic per-case checks](SYMBOLIC_CHECKS.md)

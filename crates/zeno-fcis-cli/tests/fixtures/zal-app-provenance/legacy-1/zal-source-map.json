@@ -1,0 +1,28 @@
+{
+  "schema": "zal/factory-source-map/1",
+  "revision": "a2f11dc7c2519e58354c4f0da47a17d0577a75d04fedf57f23dd55127bab02f6",
+  "states": {
+    "approved": 150,
+    "cancelled": 151,
+    "draft": 152,
+    "pending": 153
+  },
+  "events": {
+    "approve": 120,
+    "cancel": 121,
+    "submit": 122
+  },
+  "context_fields": {
+    "authorized": 160
+  },
+  "reasons": {
+    "not_enabled": 200
+  },
+  "case_ids": [
+    "approve_order",
+    "cancel_order",
+    "submit_order",
+    "default"
+  ],
+  "scope": "class, reason, successor and empty deliveries; not Step or publication identity equivalence"
+}

@@ -1,0 +1,61 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "order-dialogue",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "106": [
+      "Bool"
+    ]
+  },
+  "variables": {},
+  "cases": [
+    {
+      "rule": "approve_order",
+      "when": "pre.100.110 == 153 && command.101 == 120 && (context.102.160)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 150
+      },
+      "outbox": []
+    },
+    {
+      "rule": "cancel_order",
+      "when": "pre.100.110 == 153 && command.101 == 121 && (true)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 151
+      },
+      "outbox": []
+    },
+    {
+      "rule": "submit_order",
+      "when": "pre.100.110 == 152 && command.101 == 122 && (true)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 153
+      },
+      "outbox": []
+    },
+    {
+      "rule": "default",
+      "when": "true",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 152
+  },
+  "law_kinds": {
+    "500": "StateInvariant"
+  }
+}

@@ -74,6 +74,31 @@ alone do not establish the corresponding payload or form behavior. Browser
 raster, interaction and accessibility checks remain separate from this pure and
 finite evidence.
 
+## Experimental scalar idioms
+
+The private prototype adds two opt-in metadata/2 presentations. A
+`scalar-edit` needs one consequential command with `uiRole: "update"`
+and exactly one integer command field with `role: "requested-value"`
+and `stateField` naming an integer state field. Both fields must declare
+the same unit and decimal scale. The form shows the current observation and
+the requested value, then asks for review. Only the core preview supplies
+the resulting state. Both idioms currently require no declared projections
+and refuse a target that belongs to a lane display.
+
+An `approval-decision` needs exactly two consequential commands, marked
+`uiRole: "approve"` and `uiRole: "reject"`, no editable command inputs,
+and one named state field with `role: "approval-status"`. The metadata/2
+requirements group the two command IDs. The buttons select a decision;
+review and confirmation still precede a request. Server-owned context stays
+outside the form.
+
+These annotations select presentation only: they do not prove what an
+application command does. The independent tree checker validates the
+signature and counts the displayed state once. These idioms describe one
+scalar subject; they do not implement an inbox, table, text, date, or
+multi-entity workflow. Changed grammar and search identifiers require new
+presentation receipts and regeneration of generated descriptors.
+
 ## Generated contract applications
 
 `tools/zenoui.py` builds an interface from `project.zeno`, `v2/policy.json` and

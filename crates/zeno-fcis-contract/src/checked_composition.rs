@@ -113,6 +113,7 @@ mod assembly_tests;
 mod compose;
 #[cfg(test)]
 mod compose_tests;
+mod coupling_cuts;
 pub mod domain;
 #[cfg(test)]
 mod domain_tests;

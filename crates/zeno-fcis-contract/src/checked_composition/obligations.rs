@@ -978,17 +978,12 @@ fn check_couple(composition: &Composition, tables: &Tables, obligation: &mut Che
     // The components with a CommittedFailure case that run between the
     // previous member and each member: any of them may end the step just
     // before it.
-    let mut cutters: Vec<Vec<usize>> = Vec::with_capacity(members.len());
-    let mut previous = 0usize;
-    for (position, member) in members.iter().enumerate() {
-        let from = if position == 0 { 0 } else { previous + 1 };
-        cutters.push(
-            (from..*member)
-                .filter(|at| composition.components[*at].committed_failure)
-                .collect(),
-        );
-        previous = *member;
-    }
+    let failure_case: Vec<bool> = composition
+        .components
+        .iter()
+        .map(|component| component.committed_failure)
+        .collect();
+    let cutters = super::coupling_cuts::outside_failure_cutters(&failure_case, members);
     let names = |list: &[usize]| {
         list.iter()
             .map(|at| composition.components[*at].name.clone())

@@ -9,11 +9,12 @@ publish.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-zeno-fcis-program-search = "=2.6.0"
-zeno-fcis-contract = "=2.6.0"
+zeno-fcis-program-search = "=2.7.0-rc.1"
+zeno-fcis-contract = "=2.7.0-rc.1"
 serde_json = "=1.0.151"
 zeno-fcis-site-common = { path = "../common" }
-zeno-fcis-synthesis = "=2.6.0"
+zeno-fcis-synthesis = "=2.7.0-rc.1"
+zeno-fcis-spec = "=2.7.0-rc.1"
 
 [lints]
 workspace = true

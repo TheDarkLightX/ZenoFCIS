@@ -1,0 +1,77 @@
+{
+  "schema": "zal/factory-source-map/3",
+  "profile": "zal/finite-fsm/2",
+  "revision": "b29ff655932cedd14d303d20b11b4c2170f01430478a3594bd1a6ad7279aa554",
+  "states": {
+    "draft": 150,
+    "submitted": 151
+  },
+  "events": {
+    "request": 120,
+    "reset": 121
+  },
+  "context_fields": {
+    "authorized": 160
+  },
+  "input_fields": {
+    "quantity": 164
+  },
+  "variable_fields": {
+    "units": 170
+  },
+  "reasons": {
+    "denied": 200,
+    "not_enabled": 201
+  },
+  "case_ids": [
+    "request_ok",
+    "request_refused",
+    "reset_ok",
+    "default"
+  ],
+  "laws": {
+    "500": "StateInvariant",
+    "520": "AuthoritySubjectRecipient"
+  },
+  "property_laws": {},
+  "reference_domain": {
+    "admissible_tuples": 48,
+    "declared_tuples": 48,
+    "excluded": "pre-states that break a declared invariant; the contract's genesis and commit laws keep every held state admissible"
+  },
+  "correspondence": "tested correspondence, not a theorem",
+  "scope": "class, reason, successor control state and variables, and empty deliveries; not Step or publication identity equivalence",
+  "event_field": 119,
+  "bindings": {
+    "authorized": {
+      "root": "context",
+      "field": 160,
+      "path": "context.102.160",
+      "kind": "fact",
+      "role": "authorization"
+    },
+    "quantity": {
+      "root": "command",
+      "field": 164,
+      "path": "command.101.164",
+      "kind": "input",
+      "role": "intent"
+    }
+  },
+  "unit_context_field": null,
+  "input_order": [
+    "pre.100.110",
+    "pre.100.170",
+    "command.101.119",
+    "command.101.164",
+    "context.102.160"
+  ],
+  "source_sha256": "34726edc794d49d65865f7eb7681129d9b33412e6d72de9f362f54ec7bca4143",
+  "binding_sha256": "63e1366db2372b8940cf745c845c2af7eccf3250787aa03f5c744dc6a3651495",
+  "canonical_binding_sha256": "7e7584fffd44cc314c3c33321957a4c9bab111e589af5a339e31faa18e1cca47",
+  "project_sha256": "b6a1fc01945cb8f791befaf666bc6a859065604922d727e5e69113574fbcbaf9",
+  "policy_sha256": "204b4ae19b400ce76f22af716f363a0f6040e40d3571640cbd93a2a9c5a6583e",
+  "ui_sha256": "297edd533d4b8df6b94ca796d487e28659d71e5da783c1fe97fc6e4fe30f00d1",
+  "reference_sha256": "efe3178d3f3f4950353ef9ad46605ec64c29c062c8cebb87cdf747a7098769b6",
+  "authentication": "host responsibility; role labels are not authenticated identity"
+}

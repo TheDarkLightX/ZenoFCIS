@@ -1,0 +1,851 @@
+{
+  "schema": "zal/test-ladder-aliases/1",
+  "provenance": {
+    "baseline_ladder_sha256": "12e1ca707f63775b5ea016ef9329479f07bc5343ce54fd1a332d50064221d6bd",
+    "original_example_sha256": "a56e33b3a0803e559e35dd29e45392c863a79052f9d9b3bdeb42a201b27bb6e1",
+    "fixture_expectations": "finite owner/car/has relation arithmetic; views captured before alias port"
+  },
+  "context": {
+    "theory": "steps-over-integers",
+    "id": "owner_cars",
+    "kind": "law",
+    "authority": {
+      "status": "OPEN",
+      "source": "finite compatibility test fixture"
+    },
+    "scope": "Stipulated entities and relations; no existence or ownership assertion.",
+    "domains": {
+      "D": {
+        "member": "entity",
+        "plural": "entities",
+        "noun": "entities"
+      }
+    },
+    "symbols": {
+      "Owner": {
+        "kind": "predicate",
+        "arity": 1,
+        "args": [
+          "D"
+        ],
+        "clause": "{0} is an owner",
+        "noun": "owner",
+        "article": "an"
+      },
+      "Car": {
+        "kind": "predicate",
+        "arity": 1,
+        "args": [
+          "D"
+        ],
+        "clause": "{0} is a car",
+        "noun": "car"
+      },
+      "Has": {
+        "kind": "predicate",
+        "arity": 2,
+        "args": [
+          "D",
+          "D"
+        ],
+        "clause": "{0} has {1}"
+      }
+    },
+    "definitions": [
+      {
+        "name": "HasCar",
+        "params": [
+          {
+            "name": "z",
+            "domain": "D"
+          }
+        ],
+        "body": "exists y in D: Car(y) and Has(z, y)",
+        "clause": "{0} has a car"
+      }
+    ],
+    "formula": "forall x in D: Owner(x) => HasCar(x)",
+    "fixtures": [
+      {
+        "id": "one_owner_one_car",
+        "domains": {
+          "D": [
+            "alice",
+            "car1"
+          ]
+        },
+        "symbols": {
+          "Owner": {
+            "rows": [
+              [
+                [
+                  "alice"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Car": {
+            "rows": [
+              [
+                [
+                  "car1"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Has": {
+            "rows": [
+              [
+                [
+                  "alice",
+                  "car1"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          }
+        },
+        "expected": true,
+        "note": "One owner has a car."
+      },
+      {
+        "id": "different_cars",
+        "domains": {
+          "D": [
+            "alice",
+            "bob",
+            "car1",
+            "car2"
+          ]
+        },
+        "symbols": {
+          "Owner": {
+            "rows": [
+              [
+                [
+                  "alice"
+                ],
+                true
+              ],
+              [
+                [
+                  "bob"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Car": {
+            "rows": [
+              [
+                [
+                  "car1"
+                ],
+                true
+              ],
+              [
+                [
+                  "car2"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Has": {
+            "rows": [
+              [
+                [
+                  "alice",
+                  "car1"
+                ],
+                true
+              ],
+              [
+                [
+                  "bob",
+                  "car2"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          }
+        },
+        "expected": true,
+        "note": "The existential witness can differ for each owner."
+      },
+      {
+        "id": "shared_car",
+        "domains": {
+          "D": [
+            "alice",
+            "bob",
+            "car1"
+          ]
+        },
+        "symbols": {
+          "Owner": {
+            "rows": [
+              [
+                [
+                  "alice"
+                ],
+                true
+              ],
+              [
+                [
+                  "bob"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Car": {
+            "rows": [
+              [
+                [
+                  "car1"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Has": {
+            "rows": [
+              [
+                [
+                  "alice",
+                  "car1"
+                ],
+                true
+              ],
+              [
+                [
+                  "bob",
+                  "car1"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          }
+        },
+        "expected": true,
+        "note": "No distinct-car requirement is stated."
+      },
+      {
+        "id": "two_cars",
+        "domains": {
+          "D": [
+            "alice",
+            "car1",
+            "car2"
+          ]
+        },
+        "symbols": {
+          "Owner": {
+            "rows": [
+              [
+                [
+                  "alice"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Car": {
+            "rows": [
+              [
+                [
+                  "car1"
+                ],
+                true
+              ],
+              [
+                [
+                  "car2"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Has": {
+            "rows": [
+              [
+                [
+                  "alice",
+                  "car1"
+                ],
+                true
+              ],
+              [
+                [
+                  "alice",
+                  "car2"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          }
+        },
+        "expected": true,
+        "note": "A car means at least one, not exactly one."
+      },
+      {
+        "id": "missing_car",
+        "domains": {
+          "D": [
+            "alice",
+            "car1"
+          ]
+        },
+        "symbols": {
+          "Owner": {
+            "rows": [
+              [
+                [
+                  "alice"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Car": {
+            "rows": [
+              [
+                [
+                  "car1"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Has": {
+            "rows": [],
+            "default": false
+          }
+        },
+        "expected": false,
+        "note": "An existing car is insufficient without the relation."
+      },
+      {
+        "id": "one_owner_missing",
+        "domains": {
+          "D": [
+            "alice",
+            "bob",
+            "car1"
+          ]
+        },
+        "symbols": {
+          "Owner": {
+            "rows": [
+              [
+                [
+                  "alice"
+                ],
+                true
+              ],
+              [
+                [
+                  "bob"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Car": {
+            "rows": [
+              [
+                [
+                  "car1"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Has": {
+            "rows": [
+              [
+                [
+                  "alice",
+                  "car1"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          }
+        },
+        "expected": false,
+        "note": "One successful owner does not satisfy every owner."
+      },
+      {
+        "id": "not_a_car",
+        "domains": {
+          "D": [
+            "alice",
+            "bicycle"
+          ]
+        },
+        "symbols": {
+          "Owner": {
+            "rows": [
+              [
+                [
+                  "alice"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Car": {
+            "rows": [],
+            "default": false
+          },
+          "Has": {
+            "rows": [
+              [
+                [
+                  "alice",
+                  "bicycle"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          }
+        },
+        "expected": false,
+        "note": "The object must satisfy Car."
+      },
+      {
+        "id": "no_owners",
+        "domains": {
+          "D": [
+            "car1"
+          ]
+        },
+        "symbols": {
+          "Owner": {
+            "rows": [],
+            "default": false
+          },
+          "Car": {
+            "rows": [
+              [
+                [
+                  "car1"
+                ],
+                true
+              ]
+            ],
+            "default": false
+          },
+          "Has": {
+            "rows": [],
+            "default": false
+          }
+        },
+        "expected": true,
+        "note": "A universal statement does not assert that any owner exists."
+      }
+    ]
+  },
+  "records": [
+    {
+      "formula": "exists x in D: Car(x)",
+      "ast": [
+        "exists",
+        "x",
+        "D",
+        [
+          "call",
+          "Car",
+          false,
+          [
+            [
+              "var",
+              "x"
+            ]
+          ]
+        ]
+      ],
+      "views": {
+        "formula": "∃x ∈ D : Car(x)",
+        "typed": "exists x in D: Car(x)",
+        "formal": "There exists an x in D such that Car of x is true.",
+        "precise": "There exists an entity x such that x is a car.",
+        "intuitive": "There exists an entity in entities that is a car.",
+        "plain": "There exists an entity in entities that is a car.",
+        "question": "Does there exist an entity in entities that is a car?\nWitness search: propose an entity x in entities; the checker decides whether x is a car."
+      },
+      "fixture_truth": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true
+      ],
+      "aliases": {
+        "formal": "There exists an x in D s.t. Car of x is true.",
+        "precise": "There exists an entity x s.t. x is a car."
+      }
+    },
+    {
+      "formula": "exists1 y in D: Car(y)",
+      "ast": [
+        "exists1",
+        "y",
+        "D",
+        [
+          "call",
+          "Car",
+          false,
+          [
+            [
+              "var",
+              "y"
+            ]
+          ]
+        ]
+      ],
+      "views": {
+        "formula": "∃!y ∈ D : Car(y)",
+        "typed": "exists1 y in D: Car(y)",
+        "formal": "There exists exactly one y in D such that Car of y is true.",
+        "precise": "There exists exactly one entity y such that y is a car.",
+        "intuitive": "There exists exactly one entity y such that y is a car.",
+        "plain": "There exists exactly one entity y such that y is a car.",
+        "question": "Is it true that there exists exactly one entity y such that y is a car?\nCounterexample search: evaluate for every entity y, not y is a car or (there exists a car w such that w does not equal y)."
+      },
+      "fixture_truth": [
+        true,
+        false,
+        true,
+        false,
+        true,
+        true,
+        false,
+        true
+      ],
+      "aliases": {
+        "formal": "There exists exactly one y in D s.t. Car of y is true.",
+        "precise": "There exists exactly one entity y s.t. y is a car."
+      }
+    },
+    {
+      "formula": "#{y in D: Car(y)} >= 2",
+      "ast": [
+        ">=",
+        [
+          "count",
+          "y",
+          "D",
+          [
+            "call",
+            "Car",
+            false,
+            [
+              [
+                "var",
+                "y"
+              ]
+            ]
+          ]
+        ],
+        [
+          "int",
+          2
+        ]
+      ],
+      "views": {
+        "formula": "#{y ∈ D : Car(y)} ≥ 2",
+        "typed": "#{y in D: Car(y)} >= 2",
+        "formal": "The number of y in D such that open Car of y is true close is at least 2.",
+        "precise": "The number of entities y such that y is a car is at least 2.",
+        "intuitive": "The number of entities y such that y is a car is at least 2.",
+        "plain": "The number of entities y such that y is a car is at least 2.",
+        "question": "Is it true that the number of entities y such that y is a car is at least 2?\nCounterexample search: evaluate the number of entities y such that y is a car is less than 2."
+      },
+      "fixture_truth": [
+        false,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "aliases": {
+        "formal": "The number of y in D s.t. open Car of y is true close is at least 2.",
+        "precise": "The number of entities y s.t. y is a car is at least 2."
+      }
+    },
+    {
+      "formula": "forall x in D: Owner(x) => (exists y in D: Car(y) and Has(x, y))",
+      "ast": [
+        "forall",
+        "x",
+        "D",
+        [
+          "=>",
+          [
+            "call",
+            "Owner",
+            false,
+            [
+              [
+                "var",
+                "x"
+              ]
+            ]
+          ],
+          [
+            "exists",
+            "y",
+            "D",
+            [
+              "and",
+              [
+                "call",
+                "Car",
+                false,
+                [
+                  [
+                    "var",
+                    "y"
+                  ]
+                ]
+              ],
+              [
+                "call",
+                "Has",
+                false,
+                [
+                  [
+                    "var",
+                    "x"
+                  ],
+                  [
+                    "var",
+                    "y"
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ]
+      ],
+      "views": {
+        "formula": "∀x ∈ D : Owner(x) ⇒ (∃y ∈ D : Car(y) ∧ Has(x, y))",
+        "typed": "forall x in D: Owner(x) => (exists y in D: Car(y) and Has(x, y))",
+        "formal": "For every x in D, Owner of x is true implies open there exists a y in D such that Car of y is true and Has of x, y is true close.",
+        "precise": "For every entity x, if x is an owner, then (there exists an entity y such that y is a car and x has y).",
+        "intuitive": "For every owner x, there exists a car y such that x has y.",
+        "plain": "Every owner has a car.",
+        "question": "Is it true that every owner has a car?\nCounterexample search: find an owner x such that for every entity y, not y is a car or not x has y."
+      },
+      "fixture_truth": [
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        true
+      ],
+      "aliases": {
+        "formal": "For every x in D, Owner of x is true implies open there exists a y in D s.t. Car of y is true and Has of x, y is true close.",
+        "precise": "For every entity x, if x is an owner, then (there exists an entity y s.t. y is a car and x has y)."
+      }
+    },
+    {
+      "formula": "forall x in D: Owner(x) => (exists1 y in D: Car(y) and Has(x, y))",
+      "ast": [
+        "forall",
+        "x",
+        "D",
+        [
+          "=>",
+          [
+            "call",
+            "Owner",
+            false,
+            [
+              [
+                "var",
+                "x"
+              ]
+            ]
+          ],
+          [
+            "exists1",
+            "y",
+            "D",
+            [
+              "and",
+              [
+                "call",
+                "Car",
+                false,
+                [
+                  [
+                    "var",
+                    "y"
+                  ]
+                ]
+              ],
+              [
+                "call",
+                "Has",
+                false,
+                [
+                  [
+                    "var",
+                    "x"
+                  ],
+                  [
+                    "var",
+                    "y"
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ]
+      ],
+      "views": {
+        "formula": "∀x ∈ D : Owner(x) ⇒ (∃!y ∈ D : Car(y) ∧ Has(x, y))",
+        "typed": "forall x in D: Owner(x) => (exists1 y in D: Car(y) and Has(x, y))",
+        "formal": "For every x in D, Owner of x is true implies open there exists exactly one y in D such that Car of y is true and Has of x, y is true close.",
+        "precise": "For every entity x, if x is an owner, then (there exists exactly one entity y such that y is a car and x has y).",
+        "intuitive": "For every owner x, there exists exactly one entity y such that y is a car and x has y.",
+        "plain": "For every owner x, there exists exactly one entity y such that y is a car and x has y.",
+        "question": "Is it true that for every owner x, there exists exactly one entity y such that y is a car and x has y?\nCounterexample search: find an owner x such that for every entity y, not y is a car or not x has y or (there exists an entity w such that w is a car and x has w and w does not equal y)."
+      },
+      "fixture_truth": [
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "aliases": {
+        "formal": "For every x in D, Owner of x is true implies open there exists exactly one y in D s.t. Car of y is true and Has of x, y is true close.",
+        "precise": "For every entity x, if x is an owner, then (there exists exactly one entity y s.t. y is a car and x has y)."
+      }
+    },
+    {
+      "formula": "forall x in D: Owner(x) => #{y in D: Car(y) and Has(x, y)} = 2",
+      "ast": [
+        "forall",
+        "x",
+        "D",
+        [
+          "=>",
+          [
+            "call",
+            "Owner",
+            false,
+            [
+              [
+                "var",
+                "x"
+              ]
+            ]
+          ],
+          [
+            "=",
+            [
+              "count",
+              "y",
+              "D",
+              [
+                "and",
+                [
+                  "call",
+                  "Car",
+                  false,
+                  [
+                    [
+                      "var",
+                      "y"
+                    ]
+                  ]
+                ],
+                [
+                  "call",
+                  "Has",
+                  false,
+                  [
+                    [
+                      "var",
+                      "x"
+                    ],
+                    [
+                      "var",
+                      "y"
+                    ]
+                  ]
+                ]
+              ]
+            ],
+            [
+              "int",
+              2
+            ]
+          ]
+        ]
+      ],
+      "views": {
+        "formula": "∀x ∈ D : Owner(x) ⇒ #{y ∈ D : Car(y) ∧ Has(x, y)} = 2",
+        "typed": "forall x in D: Owner(x) => #{y in D: Car(y) and Has(x, y)} = 2",
+        "formal": "For every x in D, Owner of x is true implies the number of y in D such that open Car of y is true and Has of x, y is true close equals 2.",
+        "precise": "For every entity x, if x is an owner, then the number of entities y such that (y is a car and x has y) equals 2.",
+        "intuitive": "For every owner x, the number of entities y such that (y is a car and x has y) equals 2.",
+        "plain": "For every owner x, the number of entities y such that (y is a car and x has y) equals 2.",
+        "question": "Is it true that for every owner x, the number of entities y such that (y is a car and x has y) equals 2?\nCounterexample search: find an owner x such that the number of entities y such that (y is a car and x has y) does not equal 2."
+      },
+      "fixture_truth": [
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true
+      ],
+      "aliases": {
+        "formal": "For every x in D, Owner of x is true implies the number of y in D s.t. open Car of y is true and Has of x, y is true close equals 2.",
+        "precise": "For every entity x, if x is an owner, then the number of entities y s.t. (y is a car and x has y) equals 2."
+      }
+    }
+  ]
+}

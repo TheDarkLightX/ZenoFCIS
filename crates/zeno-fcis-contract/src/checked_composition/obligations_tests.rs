@@ -656,6 +656,86 @@ fn documented_outside_failure_between_lockstep_members() {
     assert_eq!(after.verdict(), Verdict::Proved, "{}", after.json());
 }
 
+/// A later member's veto cannot erase an earlier possible outside failure.
+/// The tripwire does not fire on this request, but its declared failure case
+/// still requires the intermediate prefix check before b rejects.
+#[test]
+fn outside_failure_is_checked_before_a_later_member_veto() {
+    let counter = |name: &str, authorized: &str| {
+        part(
+            name,
+            "documented/counter-c2",
+            &["value"],
+            "true",
+            json!({"action": "150", "authorized": authorized}),
+            "true",
+            "true",
+        )
+    };
+    let wire = || {
+        part(
+            "wire",
+            "documented/tripwire",
+            &["tripped", "touches"],
+            "true",
+            json!({"fire": "false", "authorized": "true"}),
+            "true",
+            "true",
+        )
+    };
+    let lockstep =
+        json!([{"name": "lock", "members": ["a", "b"], "invariant": "a.value == b.value"}]);
+    let built = documented(
+        vec![counter("a", "true"), wire(), counter("b", "false")],
+        lockstep.clone(),
+    );
+    let result = built.check().unwrap_or_else(fail);
+    assert_eq!(result.verdict(), Verdict::Violated, "{}", result.json());
+    let failure = witness(&result);
+    assert_eq!(failure["obligation"]["kind"], "couple");
+    assert_eq!(
+        failure["witness"]["ended_by_possible_committed_failure_of"],
+        json!(["wire"])
+    );
+    assert_eq!(failure["witness"]["states"]["a.value"], 0);
+    assert_eq!(failure["witness"]["states"]["b.value"], 0);
+    assert_eq!(failure["witness"]["after"]["a.value"], 1);
+    assert_eq!(failure["witness"]["after"]["b.value"], 0);
+
+    let text = built.text();
+    let joint = super::JointComposition::from_sources(&DomainSources {
+        manifest: &text,
+        components: &built.sources,
+    })
+    .unwrap_or_else(fail);
+    let outcome = joint
+        .joint_step(joint.genesis(), &[0, 0])
+        .unwrap_or_else(fail);
+    assert_eq!(
+        outcome.kind,
+        super::OutcomeKind::Reject {
+            component: "b".to_owned(),
+            reason: Some(200),
+        }
+    );
+    assert_eq!(outcome.successor, joint.genesis());
+
+    // Moving the possible failure after the veto leaves no reachable
+    // member-only checkpoint requiring this changed prefix to satisfy lock.
+    let after_veto = documented(
+        vec![counter("a", "true"), counter("b", "false"), wire()],
+        lockstep,
+    )
+    .check()
+    .unwrap_or_else(fail);
+    assert_eq!(
+        after_veto.verdict(),
+        Verdict::Proved,
+        "{}",
+        after_veto.json()
+    );
+}
+
 // The cost of a check: the tables it builds are planned, and the counters
 // count the evaluations actually made.
 
@@ -778,7 +858,6 @@ fn a_proved_composition_reaches_committed_failure_steps() {
     );
 }
 
-
 /// An actual native composition containing up to 50 separately bound .zeno
 /// contract *instances* and a nontrivial 2-member coupling. This checks
 /// executable parser / Authority / compositional checker behavior; it does
@@ -848,9 +927,7 @@ fn native_27_fifty_source_bound_components_keep_a_coupling_without_global_produc
         assert_eq!(joint.state_layout().len(), n);
         assert_eq!(joint.genesis(), vec![0i128; n]);
         let initial = vec![0i128; n];
-        let positive = joint
-            .joint_step(&initial, &[0, 1, 1])
-            .unwrap_or_else(fail);
+        let positive = joint.joint_step(&initial, &[0, 1, 1]).unwrap_or_else(fail);
         assert_eq!(positive.kind, super::OutcomeKind::Accept);
         assert_eq!(positive.successor, vec![1i128; n]);
 

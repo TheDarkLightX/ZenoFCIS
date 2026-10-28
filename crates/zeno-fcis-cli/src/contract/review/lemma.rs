@@ -29,8 +29,8 @@
 
 use serde_json::{Value, json};
 
-use super::super::ContractError;
 use super::super::rules::LawKind;
+use super::super::{ContractError, Current};
 use super::evaluate::LawSet;
 use super::machine::{self, Inconclusive, Loaded, Machine, Observation};
 use super::probe::{self, Truth};
@@ -125,14 +125,65 @@ pub(crate) fn judge(
     lemmas: &[String],
     max_tuples: u64,
 ) -> Result<Lemmas, ContractError> {
+    judge_with_current(project, rules, lemmas, max_tuples, None)
+}
+
+/// Judge state or transition lemmas on the verified current scalar Authority.
+pub(crate) fn judge_current(
+    current: &Current<'_>,
+    lemmas: &[String],
+    max_tuples: u64,
+    transition: bool,
+) -> Result<Lemmas, ContractError> {
+    if transition {
+        judge_transitions_with_current(
+            current.project,
+            current.rules_source,
+            lemmas,
+            max_tuples,
+            Some(current),
+        )
+    } else {
+        judge_with_current(
+            current.project,
+            current.rules_source,
+            lemmas,
+            max_tuples,
+            Some(current),
+        )
+    }
+}
+
+fn judge_with_current(
+    project: &str,
+    rules: &str,
+    lemmas: &[String],
+    max_tuples: u64,
+    current: Option<&Current<'_>>,
+) -> Result<Lemmas, ContractError> {
     if zeno_fcis_contract::collections::judges::has_maps(project)? {
+        if current.is_some() {
+            return Err(ContractError::new(
+                "lineage binding",
+                "current map lemmas are unsupported",
+            ));
+        }
         return map_lemmas(project, rules, lemmas, max_tuples, false);
     }
     if super::super::rules::Rules::read_for_project(project, rules)?.unsigned {
+        if current.is_some() {
+            return Err(ContractError::new(
+                "lineage binding",
+                "current unsigned lemmas are unsupported",
+            ));
+        }
         return super::unsigned::lemmas(project, rules, lemmas, max_tuples, false);
     }
-    let loaded = Loaded::read(project, rules)?;
-    let observation = match machine::observe_contract(&loaded, max_tuples)? {
+    let loaded = match current {
+        Some(current) => Loaded::read_current(current)?,
+        None => Loaded::read(project, rules)?,
+    };
+    let observation = match machine::observe_current(&loaded, current, max_tuples)? {
         Ok(observation) => observation,
         Err(inconclusive) => return Ok(Lemmas::Inconclusive(inconclusive)),
     };
@@ -159,7 +210,23 @@ pub(crate) fn judge_transitions(
     lemmas: &[String],
     max_tuples: u64,
 ) -> Result<Lemmas, ContractError> {
+    judge_transitions_with_current(project, rules, lemmas, max_tuples, None)
+}
+
+fn judge_transitions_with_current(
+    project: &str,
+    rules: &str,
+    lemmas: &[String],
+    max_tuples: u64,
+    current: Option<&Current<'_>>,
+) -> Result<Lemmas, ContractError> {
     if zeno_fcis_contract::collections::judges::has_maps(project)? {
+        if current.is_some() {
+            return Err(ContractError::new(
+                "lineage binding",
+                "current map lemmas are unsupported",
+            ));
+        }
         return map_lemmas(project, rules, lemmas, max_tuples, true);
     }
     if lemmas.is_empty() {
@@ -169,10 +236,19 @@ pub(crate) fn judge_transitions(
         ));
     }
     if super::super::rules::Rules::read_for_project(project, rules)?.unsigned {
+        if current.is_some() {
+            return Err(ContractError::new(
+                "lineage binding",
+                "current unsigned lemmas are unsupported",
+            ));
+        }
         return super::unsigned::lemmas(project, rules, lemmas, max_tuples, true);
     }
-    let loaded = Loaded::read(project, rules)?;
-    let observation = match machine::observe_contract(&loaded, max_tuples)? {
+    let loaded = match current {
+        Some(current) => Loaded::read_current(current)?,
+        None => Loaded::read(project, rules)?,
+    };
+    let observation = match machine::observe_current(&loaded, current, max_tuples)? {
         Ok(observation) => observation,
         Err(inconclusive) => return Ok(Lemmas::Inconclusive(inconclusive)),
     };

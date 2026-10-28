@@ -496,8 +496,8 @@ obligation count and theorem names, and runs five planted program defects
 that must each fail the proof.
 ## Composed-domain outcome and invariant theorem
 
-The harness `composed_domain.rs` includes the production ordered resolver and
-concrete state application, plus a conditional n-component finite-history
+The harness `composed_domain.rs` includes the production ordered resolver,
+concrete state application and outside-failure grouping scan, plus a conditional n-component finite-history
 induction. Its premises include local decision-table preservation, delivered
 input assumptions and read-only invariants, and coupling checks at member and
 outside-failure endings. A concrete three-component pilot discharges them.
@@ -512,7 +512,11 @@ python3 tools/check_composed_domain.py --out evidence/composed-domain.json
 
 The gate runs unfiltered positive verification and restricted semantic controls
 for omitted cuts, dropped read-only invariants, wrong prefixes, own-only
-application, read-only writes and an extra callback after Reject. Native
+application, read-only writes, an extra callback after Reject and an omitted
+immediate predecessor in the shared cut scan. Additional theorem controls
+distinguish the cut index, pre-member boundary and
+which earlier members must continue. The checkpoint bridge remains conditional
+on the native/model bindings described in the proof boundary. Native
 specimens and reference disagreement can be replayed separately with
 `python3 tools/test_composed_domain_runtime_controls.py --out evidence/composed-native.json`.
 

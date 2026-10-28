@@ -1,0 +1,17 @@
+{
+  "schema": "zal/relational-query/1",
+  "logic": "zal/c2/1",
+  "signature": [{"id":"owner","arity":1},{"id":"car","arity":1},{"id":"has","arity":2}],
+  "formula": {
+    "op":"forall", "var":"x", "body": {
+      "op":"implies", "left":{"op":"atom","predicate":"owner","args":["x"]},
+      "right":{"op":"exists","var":"y","body":{
+        "op":"and", "left":{"op":"atom","predicate":"car","args":["y"]},
+        "right":{"op":"atom","predicate":"has","args":["x","y"]}
+      }}
+    }
+  },
+  "operation":"count", "domain_size":"2",
+  "weights":{"owner":["1","1"],"car":["1","1"],"has":["1","1"]},
+  "context_id":"example-owner-car-inclusive-overlap-allowed"
+}

@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use super::super::ContractError;
+use super::super::{ContractError, Current};
 use super::{
     lemma,
     machine::{self, Loaded},
@@ -72,6 +72,31 @@ pub(crate) fn judge(
     text: &str,
     max_tuples: u64,
 ) -> Result<lemma::Lemmas, ContractError> {
+    judge_with_current(project, rules, text, max_tuples, None)
+}
+
+/// Judge run properties on the replay-validated current scalar Authority.
+pub(crate) fn judge_current(
+    current: &Current<'_>,
+    text: &str,
+    max_tuples: u64,
+) -> Result<lemma::Lemmas, ContractError> {
+    judge_with_current(
+        current.project,
+        current.rules_source,
+        text,
+        max_tuples,
+        Some(current),
+    )
+}
+
+fn judge_with_current(
+    project: &str,
+    rules: &str,
+    text: &str,
+    max_tuples: u64,
+    current: Option<&Current<'_>>,
+) -> Result<lemma::Lemmas, ContractError> {
     let strict =
         crate::loop_command::doors::capture::strict_json(text.as_bytes()).map_err(error)?;
     let declaration: Declaration =
@@ -85,8 +110,11 @@ pub(crate) fn judge(
             "expected schema zeno-fcis/run-properties/1, 1..64 properties and at most 32 observer fields",
         ));
     }
-    let loaded = Loaded::read(project, rules)?;
-    let observation = match machine::observe_contract(&loaded, max_tuples)? {
+    let loaded = match current {
+        Some(current) => Loaded::read_current(current)?,
+        None => Loaded::read(project, rules)?,
+    };
+    let observation = match machine::observe_current(&loaded, current, max_tuples)? {
         Ok(o) => o,
         Err(stop) => return Ok(lemma::Lemmas::Inconclusive(stop)),
     };
@@ -105,6 +133,7 @@ pub(crate) fn judge(
             &declaration.observer,
             property,
             max_tuples,
+            current,
         )?);
     }
     Ok(lemma::Lemmas::Judged(results))
@@ -116,6 +145,7 @@ fn check(
     declared: &BTreeMap<String, Variable>,
     property: &Property,
     max_tuples: u64,
+    current: Option<&Current<'_>>,
 ) -> Result<Value, ContractError> {
     let mut variables = declared
         .iter()
@@ -331,7 +361,7 @@ fn check(
                 .map(|i| crate::report_numbers::integers(&machine.space.input(*i)))
                 .collect::<Vec<_>>()
         );
-        result["scenario"] = json!(scenario(loaded, machine, &trace)?);
+        result["scenario"] = json!(scenario(loaded, machine, &trace, current)?);
         result["shortest"] = json!(true);
     }
     Ok(result)
@@ -341,8 +371,9 @@ fn scenario(
     loaded: &Loaded,
     machine: &machine::Machine,
     trace: &[usize],
+    current: Option<&Current<'_>>,
 ) -> Result<Vec<String>, ContractError> {
-    loaded.bind(&loaded.rules, |authority, framer| {
+    loaded.bind_current(current, |authority, framer| {
         let mut state = machine.genesis;
         let mut lines = vec!["# scenario run-property-violation".into()];
         for input in trace {

@@ -1,0 +1,32 @@
+zeno 1;
+project 1 repair_request;
+namespace 2 dialogue;
+type 100 state ControlState;
+type 101 command Event;
+type 102 context Observations;
+type 105 data ControlLabel;
+type 103 data EventAction;
+type 106 bool ContextFact;
+type 107 int Variable0 in 0..=2;
+type 111 int Input0 in 1..=2;
+field 110 100 control 105;
+field 170 100 var_units 107;
+field 119 101 action 103;
+field 160 102 observed_authorized 106;
+field 164 101 input_quantity 111;
+variant 150 105 state_draft none;
+variant 151 105 state_submitted none;
+variant 120 103 event_request none;
+variant 121 103 event_reset none;
+reason 200 refused_denied precedence 0;
+reason 201 refused_not_enabled precedence 1;
+component 400 control {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+law 500 declared_control_domain on commit, genesis = post.100.110 == 150 || post.100.110 == 151;
+law 520 require_approve_only_if_authorized_accept on accept = (command.101.119 == 120 -> context.102.160 == 1);

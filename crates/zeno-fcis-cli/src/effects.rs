@@ -83,6 +83,7 @@ effects! { crate::Command {
                 false,
                 None,
             ));
+        "assemble" => Self::Assemble { .. } => declared((&["assembly-description", "source-tree", "source-lock", "cargo-cache"], &["staged-application", "build-evidence"], true, None));
         "new" => Self::New { .. } => declared((&["target-directory", "application-contract", "source-tree", "source-lock", "optional-cargo-cache"], &["project-files", "temporary-lock-workspace"], true, None));
         "check" => Self::Check { .. } => declared((&["project"], &[], false, None));
         "graph" => Self::Graph { .. } => declared((&["project"], &[], false, None));
@@ -361,6 +362,7 @@ effects! { crate::ContractCommand {
             ));
     }
     groups {
+        "postconditions" => Self::Postconditions { command } => command: crate::postconditions_command::Command;
     }
     flat {
         Self::Review(command) => command: crate::review_command::Command;
@@ -376,6 +378,20 @@ effects! { crate::ContractCommand {
     }
     optional {
     }
+}}
+
+effects! { crate::postconditions_command::Command {
+    leaves {
+        "prompt" => Self::Prompt { .. } => declared((
+            &["application-contract", "written-intent"], &[], false, None,
+        ));
+        "check" => Self::Check { .. } => declared((
+            &["application-contract", "written-intent", "postcondition-proposals", "optional-mutant-policies"], &[], false, None,
+        ));
+    }
+    groups {}
+    flat {}
+    optional {}
 }}
 
 effects! { crate::refine_command::Command {

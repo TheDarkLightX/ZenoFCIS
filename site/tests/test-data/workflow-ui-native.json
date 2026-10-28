@@ -1,0 +1,273 @@
+{
+  "scope": "Native descriptor/metadata and reconstructed accepted preview DTO from actual pinned browser record; not fresh native execution",
+  "origin": {
+    "app_manifest_sha256": "03d6e38c4551db29a49164e16eada584d3edc5ee6f59dac4cfc706d8f6ff66ca",
+    "browser_report_sha256": "f04ee86ceb32f074c059eb9466167750facefe26b08bf2d05d669e2be2d8f063"
+  },
+  "descriptor": {
+    "domain": "1800",
+    "enablement": {
+      "assignments": "2",
+      "checked": "4",
+      "counterexample": {
+        "input": [
+          0,
+          0
+        ],
+        "output": [
+          1
+        ]
+      },
+      "table": [
+        false,
+        false,
+        false,
+        true
+      ]
+    },
+    "fields": [
+      {
+        "domain": {
+          "kind": "sum",
+          "type_id": 105,
+          "variants": [
+            150,
+            151,
+            152,
+            153,
+            154
+          ]
+        },
+        "field": 110,
+        "index": 0,
+        "initial": "150",
+        "name": "control",
+        "options": [
+          {
+            "name": "state_awaiting",
+            "value": "150"
+          },
+          {
+            "name": "state_collected",
+            "value": "151"
+          },
+          {
+            "name": "state_queued",
+            "value": "152"
+          },
+          {
+            "name": "state_ready",
+            "value": "153"
+          },
+          {
+            "name": "state_repairing",
+            "value": "154"
+          }
+        ],
+        "path": "pre.100.110",
+        "source": "state",
+        "type": 105,
+        "type_name": "ControlLabel"
+      },
+      {
+        "domain": {
+          "kind": "int",
+          "max": "2",
+          "min": "0"
+        },
+        "field": 170,
+        "index": 1,
+        "initial": "0",
+        "name": "var_attempts",
+        "path": "pre.100.170",
+        "source": "state",
+        "type": 107,
+        "type_name": "Variable0"
+      },
+      {
+        "domain": {
+          "kind": "int",
+          "max": "3",
+          "min": "0"
+        },
+        "field": 171,
+        "index": 2,
+        "initial": "0",
+        "name": "var_requested_units",
+        "path": "pre.100.171",
+        "source": "state",
+        "type": 108,
+        "type_name": "Variable1"
+      },
+      {
+        "domain": {
+          "kind": "sum",
+          "type_id": 103,
+          "variants": [
+            120,
+            121,
+            122,
+            123,
+            124
+          ]
+        },
+        "field": 119,
+        "index": 3,
+        "initial": "120",
+        "name": "action",
+        "options": [
+          {
+            "name": "event_begin",
+            "value": "120"
+          },
+          {
+            "name": "event_complete",
+            "value": "121"
+          },
+          {
+            "name": "event_drop_off",
+            "value": "122"
+          },
+          {
+            "name": "event_pick_up",
+            "value": "123"
+          },
+          {
+            "name": "event_reopen",
+            "value": "124"
+          }
+        ],
+        "path": "command.101.119",
+        "source": "command",
+        "type": 103,
+        "type_name": "EventAction"
+      },
+      {
+        "domain": {
+          "kind": "int",
+          "max": "3",
+          "min": "1"
+        },
+        "field": 164,
+        "index": 4,
+        "initial": "1",
+        "name": "input_quantity",
+        "path": "command.101.164",
+        "source": "command",
+        "type": 111,
+        "type_name": "Input0"
+      },
+      {
+        "domain": {
+          "kind": "bool"
+        },
+        "field": 160,
+        "index": 5,
+        "initial": "0",
+        "name": "observed_technician",
+        "path": "context.102.160",
+        "source": "context",
+        "type": 106,
+        "type_name": "ContextFact"
+      }
+    ],
+    "reasons": [
+      {
+        "id": "200",
+        "name": "refused_not_enabled"
+      }
+    ]
+  },
+  "metadata": {
+    "format": "zenoui/metadata/1",
+    "title": "Repair desk",
+    "action": "command.101.119",
+    "fields": {
+      "pre.100.110": {
+        "label": "Repair stage",
+        "unit": "unitless"
+      },
+      "command.101.119": {
+        "label": "Action",
+        "unit": "unitless"
+      },
+      "pre.100.170": {
+        "label": "Repairs started",
+        "unit": "unitless"
+      },
+      "pre.100.171": {
+        "label": "Requested repair units",
+        "unit": "units"
+      },
+      "context.102.160": {
+        "label": "Technician permission",
+        "unit": "unitless"
+      },
+      "command.101.164": {
+        "label": "Requested repair units",
+        "unit": "units"
+      }
+    },
+    "variants": {
+      "150": "Awaiting item",
+      "151": "Collected",
+      "152": "Waiting for repair",
+      "153": "Ready for pickup",
+      "154": "Repair in progress",
+      "120": "Start repair",
+      "121": "Mark ready",
+      "122": "Check in item",
+      "123": "Confirm pickup",
+      "124": "Request another repair"
+    },
+    "commands": {
+      "120": {
+        "label": "Start repair",
+        "consequential": true
+      },
+      "121": {
+        "label": "Mark ready",
+        "consequential": true
+      },
+      "122": {
+        "label": "Check in item",
+        "consequential": true
+      },
+      "123": {
+        "label": "Confirm pickup",
+        "consequential": true
+      },
+      "124": {
+        "label": "Request another repair",
+        "consequential": true
+      }
+    },
+    "reasons": {
+      "200": "Choose an action allowed for the current stage and your signed-in role."
+    }
+  },
+  "reply": {
+    "input": [
+      "150",
+      null,
+      "0",
+      "122",
+      "3",
+      "0"
+    ],
+    "post": [
+      "152",
+      null,
+      "3"
+    ],
+    "class": "Accept",
+    "reason": null,
+    "checked": "1",
+    "total": "1"
+  },
+  "source": {
+    "policy": "{\n  \"schema\": \"zeno-fcis/template-declarative-policy/2\",\n  \"template\": \"repair-desk\",\n  \"roots\": {\n    \"state\": 100,\n    \"command\": 101,\n    \"context\": 102\n  },\n  \"leaf_bindings\": {\n    \"106\": [\n      \"Bool\"\n    ]\n  },\n  \"variables\": {},\n  \"cases\": [\n    {\n      \"rule\": \"check_in\",\n      \"when\": \"pre.100.110 == 150 && command.101.119 == 122 && (!(context.102.160))\",\n      \"class\": \"Accept\",\n      \"reason\": null,\n      \"post\": {\n        \"110\": 152,\n        \"171\": \"command.101.164\"\n      },\n      \"outbox\": []\n    },\n    {\n      \"rule\": \"collect_item\",\n      \"when\": \"pre.100.110 == 153 && command.101.119 == 123 && (!(context.102.160))\",\n      \"class\": \"Accept\",\n      \"reason\": null,\n      \"post\": {\n        \"110\": 151\n      },\n      \"outbox\": []\n    },\n    {\n      \"rule\": \"finish_repair\",\n      \"when\": \"pre.100.110 == 154 && command.101.119 == 121 && (context.102.160)\",\n      \"class\": \"Accept\",\n      \"reason\": null,\n      \"post\": {\n        \"110\": 153\n      },\n      \"outbox\": []\n    },\n    {\n      \"rule\": \"request_rework\",\n      \"when\": \"pre.100.110 == 153 && command.101.119 == 124 && (((pre.100.170 < 2) && !(context.102.160)))\",\n      \"class\": \"Accept\",\n      \"reason\": null,\n      \"post\": {\n        \"110\": 152\n      },\n      \"outbox\": []\n    },\n    {\n      \"rule\": \"start_repair\",\n      \"when\": \"pre.100.110 == 152 && command.101.119 == 120 && (((pre.100.170 < 2) && context.102.160))\",\n      \"class\": \"Accept\",\n      \"reason\": null,\n      \"post\": {\n        \"110\": 154,\n        \"170\": \"pre.100.170 + 1\"\n      },\n      \"outbox\": []\n    },\n    {\n      \"rule\": \"default\",\n      \"when\": \"true\",\n      \"class\": \"Reject\",\n      \"reason\": 200,\n      \"post\": {},\n      \"outbox\": []\n    }\n  ],\n  \"genesis\": {\n    \"110\": 150,\n    \"170\": 0,\n    \"171\": 0\n  },\n  \"law_kinds\": {\n    \"500\": \"StateInvariant\",\n    \"501\": \"StateInvariant\",\n    \"520\": \"AuthoritySubjectRecipient\",\n    \"521\": \"RejectNoAuthority\",\n    \"522\": \"AuthoritySubjectRecipient\",\n    \"523\": \"AuthoritySubjectRecipient\",\n    \"524\": \"AuthoritySubjectRecipient\",\n    \"525\": \"AuthoritySubjectRecipient\",\n    \"526\": \"AuthoritySubjectRecipient\",\n    \"527\": \"AuthoritySubjectRecipient\",\n    \"528\": \"AuthoritySubjectRecipient\"\n  }\n}\n",
+    "project": "zeno 1;\nproject 1 repair_desk;\nnamespace 2 dialogue;\ntype 100 state ControlState;\ntype 101 command Event;\ntype 102 context Observations;\ntype 105 data ControlLabel;\ntype 103 data EventAction;\ntype 106 bool ContextFact;\ntype 107 int Variable0 in 0..=2;\ntype 108 int Variable1 in 0..=3;\ntype 111 int Input0 in 1..=3;\nfield 110 100 control 105;\nfield 170 100 var_attempts 107;\nfield 171 100 var_requested_units 108;\nfield 119 101 action 103;\nfield 160 102 observed_technician 106;\nfield 164 101 input_quantity 111;\nvariant 150 105 state_awaiting none;\nvariant 151 105 state_collected none;\nvariant 152 105 state_queued none;\nvariant 153 105 state_ready none;\nvariant 154 105 state_repairing none;\nvariant 120 103 event_begin none;\nvariant 121 103 event_complete none;\nvariant 122 103 event_drop_off none;\nvariant 123 103 event_pick_up none;\nvariant 124 103 event_reopen none;\nreason 200 refused_not_enabled precedence 0;\ncomponent 400 control {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 declared_control_domain on commit, genesis = post.100.110 == 150 || post.100.110 == 151 || post.100.110 == 152 || post.100.110 == 153 || post.100.110 == 154;\nlaw 501 invariant_units_match_stage on commit, genesis = (((post.100.171 == 0) && post.100.110 == 150) || ((post.100.171 >= 1) && !(post.100.110 == 150)));\nlaw 520 require_available_actions_progress_accept on accept = ((((pre.100.170 < 2) && command.101.119 == 120 && context.102.160 == 1 && pre.100.110 == 152) -> post.100.110 == 154) && (((pre.100.170 < 2) && command.101.119 == 124 && !(context.102.160 == 1) && pre.100.110 == 153) -> post.100.110 == 152) && ((command.101.119 == 121 && context.102.160 == 1 && pre.100.110 == 154) -> post.100.110 == 153) && ((command.101.119 == 122 && !(context.102.160 == 1) && pre.100.110 == 150) -> post.100.110 == 152) && ((command.101.119 == 123 && !(context.102.160 == 1) && pre.100.110 == 153) -> post.100.110 == 151));\nlaw 521 require_available_actions_progress_reject on reject = (!(((pre.100.170 < 2) && command.101.119 == 120 && context.102.160 == 1 && pre.100.110 == 152)) && !(((pre.100.170 < 2) && command.101.119 == 124 && !(context.102.160 == 1) && pre.100.110 == 153)) && !((command.101.119 == 121 && context.102.160 == 1 && pre.100.110 == 154)) && !((command.101.119 == 122 && !(context.102.160 == 1) && pre.100.110 == 150)) && !((command.101.119 == 123 && !(context.102.160 == 1) && pre.100.110 == 153)));\nlaw 522 require_checkin_exact_units_accept on accept = (command.101.119 == 122 -> (post.100.171 == command.101.164));\nlaw 523 require_count_starts_accept on accept = (command.101.119 == 120 -> (post.100.170 == (pre.100.170 + 1)));\nlaw 524 require_customer_steps_accept on accept = ((command.101.119 == 122 || command.101.119 == 123 || command.101.119 == 124) -> !(context.102.160 == 1));\nlaw 525 require_only_checkin_changes_units_accept on accept = (!(command.101.119 == 122) -> (post.100.171 == pre.100.171));\nlaw 526 require_other_requests_rejected_accept on accept = !(!((((pre.100.170 < 2) && command.101.119 == 120 && context.102.160 == 1 && pre.100.110 == 152) || ((pre.100.170 < 2) && command.101.119 == 124 && !(context.102.160 == 1) && pre.100.110 == 153) || (command.101.119 == 121 && context.102.160 == 1 && pre.100.110 == 154) || (command.101.119 == 122 && !(context.102.160 == 1) && pre.100.110 == 150) || (command.101.119 == 123 && !(context.102.160 == 1) && pre.100.110 == 153))));\nlaw 527 require_other_steps_preserve_count_accept on accept = (!(command.101.119 == 120) -> (post.100.170 == pre.100.170));\nlaw 528 require_technician_steps_accept on accept = ((command.101.119 == 120 || command.101.119 == 121) -> context.102.160 == 1);\n"
+  },
+  "authorityContract": "d6b495e313ef8fee25bfe450709a0ccf45863db428695be25ed2092f88d2d228"
+}

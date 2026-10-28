@@ -1,0 +1,57 @@
+{
+  "format": "zal/app-binding/1",
+  "model_revision": "b29ff655932cedd14d303d20b11b4c2170f01430478a3594bd1a6ad7279aa554",
+  "observations": [
+    {
+      "kind": "fact",
+      "label": "Authorized",
+      "name": "authorized",
+      "role": "authorization",
+      "source": "server-context",
+      "unit": "unitless"
+    },
+    {
+      "kind": "input",
+      "label": "Quantity",
+      "name": "quantity",
+      "role": "intent",
+      "source": "command",
+      "unit": "items"
+    }
+  ],
+  "ui": {
+    "action": {
+      "label": "Action",
+      "unit": "unitless"
+    },
+    "control": {
+      "label": "Request state",
+      "unit": "unitless"
+    },
+    "events": {
+      "request": {
+        "consequential": true,
+        "label": "Request"
+      },
+      "reset": {
+        "consequential": true,
+        "label": "Reset"
+      }
+    },
+    "reasons": {
+      "denied": "Denied",
+      "not_enabled": "Not Enabled"
+    },
+    "states": {
+      "draft": "Draft",
+      "submitted": "Submitted"
+    },
+    "title": "Réparation desk — 雪",
+    "variables": {
+      "units": {
+        "label": "Units",
+        "unit": "items"
+      }
+    }
+  }
+}

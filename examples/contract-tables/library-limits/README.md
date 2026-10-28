@@ -50,6 +50,8 @@ The comparative assessment of that combination is **prior-art search pending**.
 The declared domain is 8,192 states, 36 commands and 2 desks: 589,824 input
 tuples. The finite judges enumerate that domain. Genesis sets the limit to 2;
 a state with limit 1 is declared but unreachable from that genesis. Linear
-formula expansion does not reduce the finite domain. The interface still
-shows each entry as a field. Decision examples are LLM-generated expectations;
+formula expansion does not reduce the finite domain. Metadata/3 binds the six
+native field-backed entries to the checked table-list display, alongside the
+unchanged scalar limit and command fields. Hidden cell values stay absent.
+Decision examples are LLM-generated expectations;
 they are regression evidence, not an independent specification of intent.

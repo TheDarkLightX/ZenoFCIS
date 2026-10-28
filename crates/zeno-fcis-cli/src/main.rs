@@ -41,6 +41,7 @@ mod neural_loop;
 mod optimize;
 mod optimize_command;
 mod order_fulfillment;
+mod postconditions_command;
 mod prepared_counter;
 mod purity;
 mod refine_command;
@@ -181,6 +182,11 @@ struct Cli {
 /// declared domain: profile, lemma, scenario and probe.
 #[derive(Subcommand)]
 enum ContractCommand {
+    /// Prototype: propose and independently screen AI-authored postconditions. Advisory only.
+    Postconditions {
+        #[command(subcommand)]
+        command: postconditions_command::Command,
+    },
     #[command(flatten)]
     Review(review_command::Command),
     #[command(flatten)]
@@ -278,6 +284,20 @@ All commands are bounded. The contained loop worker has a 64 MiB memory limit an
     Contract {
         #[command(subcommand)]
         command: ContractCommand,
+    },
+    /// Build a closed experimental scalar runtime assembly profile.
+    Assemble {
+        /// Reviewed zeno-fcis/app-assembly/1 description.
+        assembly: PathBuf,
+        /// Fresh output directory, outside the source tree.
+        #[arg(long)]
+        out: PathBuf,
+        /// Source tree used by the pinned assembler and generated application.
+        #[arg(long)]
+        source: Option<PathBuf>,
+        /// Writable build scratch outside the source tree.
+        #[arg(long)]
+        scratch: PathBuf,
     },
     /// Create a bounded project without overwriting a nonempty directory.
     New {
@@ -639,6 +659,7 @@ fn run(command: Command) -> u8 {
         Command::Optimize { arguments } => optimize_command::run(arguments),
         Command::Loop { command } => loop_command::run(command),
         Command::Contract { command } => match command {
+            ContractCommand::Postconditions { command } => postconditions_command::run(command),
             ContractCommand::Review(command) => review_command::run(command),
             ContractCommand::Judge(command) => judge_command::run(command),
             ContractCommand::Refine(command) => refine_command::run(command),
@@ -653,6 +674,12 @@ fn run(command: Command) -> u8 {
                 contract_files::export_program(&dir, &out, format)
             }
         },
+        Command::Assemble {
+            assembly,
+            out,
+            source,
+            scratch,
+        } => app_factory::assemble(&assembly, &out, source.as_deref(), &scratch),
         Command::New {
             dir,
             template,

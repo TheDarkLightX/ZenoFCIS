@@ -24,12 +24,16 @@ PROFILE = Path('verification/verus/composed-domain.json')
 HARNESS = Path('verification/verus/composed_domain.rs')
 SUBJECT = Path('crates/zeno-fcis-contract/src/checked_composition/resolve.rs')
 SPEC = SUBJECT.with_name('resolve_spec.rs')
+CUTS = SUBJECT.with_name('coupling_cuts.rs')
 THEOREM = Path('verification/verus/composed_domain_theorem.rs')
-PROOFS = (SUBJECT, SPEC, THEOREM)
+PROOFS = (SUBJECT, SPEC, CUTS, THEOREM)
 NAMESPACE = 'composed_domain::'
+BODY_FUNCTIONS = tuple(NAMESPACE + name for name in (
+    'resolve::resolve', 'resolve::apply',
+    'coupling_cuts::interval_cutters', 'coupling_cuts::outside_failure_cutters'))
 SEMANTIC_FAILURES = verifier.SEMANTIC_FAILURES | {
     'Call to non-static function fails to satisfy `callee.requires(args)`'}
-MODULES = ('resolve', 'theorem')
+MODULES = ('resolve', 'coupling_cuts', 'theorem')
 FORBIDDEN = re.compile(r'\b(?:assume(?:_specification)?|admit|unsafe)\b|\bexternal[A-Za-z_]*\b|verifier\s*::\s*(?:external|axiom|rlimit)')
 CONTROLS = {
     'short_prefix': (SUBJECT, 'end: End::CommittedFailure(at),\n                    committed: at + 1,',
@@ -49,6 +53,19 @@ CONTROLS = {
     'read_only_invariant_removed': (THEOREM,
         '&& (m.invariant)(i, state(m, pre, i)))\n}',
         '&& true)\n}', 'delivered_inputs_keep_domains_assumptions_and_invariants'),
+    'immediate_outside_cut_omitted': (CUTS,
+        'if failure_case[at] {',
+        'if failure_case[at] && at + 1 < until {', 'interval_cutters'),
+    'wrong_cut_index': (THEOREM,
+        'p < members.len() ==> groups[p].contains((cut - 1) as usize),',
+        'p < members.len() ==> groups[p].contains(cut as usize),', 'outside_cut_has_checkpoint'),
+    'post_member_checkpoint': (THEOREM,
+        'if p < members.len() { members[p] as int } else { n as int }',
+        'if p < members.len() { members[p] as int + 1 } else { n as int }', 'outside_cut_has_checkpoint'),
+    'next_member_must_continue': (THEOREM,
+        'forall|q: int| 0 <= q < p ==> !terminal(#[trigger] decisions(m, pre, r)[members[q] as int]),',
+        'forall|q: int| 0 <= q <= p && q < members.len() ==> !terminal(#[trigger] decisions(m, pre, r)[members[q] as int]),',
+        'outside_cut_has_checkpoint'),
 }
 
 
@@ -141,8 +158,7 @@ def targeted_refusal(process, report, pin, profile, path, specimen, region):
 
 
 def observed_profile(vir):
-    return dict(sorted(inventory(vir, NAMESPACE,
-        (NAMESPACE + 'resolve::resolve', NAMESPACE + 'resolve::apply')).items()))
+    return dict(sorted(inventory(vir, NAMESPACE, BODY_FUNCTIONS).items()))
 
 
 def require_reviewed_profile(profile):
@@ -185,7 +201,7 @@ def check(cache, install, logs, emit_profile=None):
         candidate = {'schema': 'zeno-fcis/composed-domain-profile/1', 'reviewed': False,
             'namespace': NAMESPACE, 'expected_verified': report['verification-results']['verified'],
             'functions': functions, 'inventory': counts(functions),
-            'body_covered_functions': [NAMESPACE + 'resolve::resolve', NAMESPACE + 'resolve::apply'],
+            'body_covered_functions': list(BODY_FUNCTIONS),
             'target_functions': sorted(report['func-details'])}
         if emit_profile.resolve() == (ROOT / PROFILE).resolve():
             raise ValueError('candidate must not overwrite the reviewed profile')
@@ -211,7 +227,7 @@ def check(cache, install, logs, emit_profile=None):
         process, parsed, _ = run(name, specimen, True)
         # A function region includes its attributes and postcondition, because
         # a failing postcondition points at the contract rather than the body.
-        region = verifier.function_lines(changed, target) if path == SUBJECT else function_region(changed, target)
+        region = verifier.function_lines(changed, target) if path in (SUBJECT, CUTS) else function_region(changed, target)
         killed = targeted_refusal(process, parsed, pin, profile, path, specimen, region)
         results.append({'name': name, 'file': str(path), 'intended_function': target,
             'killed': killed, 'exit_code': process.returncode,
@@ -228,9 +244,9 @@ def check(cache, install, logs, emit_profile=None):
         'source_sha256': before, 'toolchain': pin, 'exit_code': positive.returncode,
         'verus_report': report, 'inventory': profile['inventory'], 'controls': results,
         'all_controls': all(item['killed'] for item in results),
-        'scope': 'conditional abstract finite-history theorem; shared resolver and concrete state application',
+        'scope': 'conditional abstract finite-history theorem; shared resolver, concrete state application and outside-failure grouping',
         'tested_premises': ['Authority decisions', 'manifest parser', 'formula lowering',
-            'planner and enumeration coverage', 'member simulation and outside-cut coverage',
+            'planner and enumeration coverage', 'member simulation and native-to-model outside-cut binding',
             'runtime local decisions to model inputs and result payload mapping']}
 
 

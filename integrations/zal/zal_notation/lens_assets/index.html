@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A local read-only library Lens browser with scoped structural, finite and authored views.">
+  <title>ZAL · Library Lens Browser</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="data/packet.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#view-title">Skip to current view</a>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">Z</span><strong>ZAL</strong><span class="brand-divider">/</span><span>Lens Browser</span></div>
+    <div class="local-label"><span aria-hidden="true"></span>Local · read only</div>
+  </header>
+  <div id="load-error" class="load-error" role="alert" hidden></div>
+  <div id="app" class="app-shell" hidden>
+    <aside class="sidebar" aria-label="Object and available lenses">
+      <label class="entry-picker">Library object<select id="entry-select" aria-label="Choose retained library object"></select></label>
+      <section class="object-card">
+        <div class="eyebrow">Retained original</div>
+        <h1 id="object-name"></h1>
+        <p id="object-description"></p><p id="meaning-status" class="meaning-status"></p>
+        <div class="object-identity"><span class="identity-dot" aria-hidden="true"></span><code id="object-id"></code></div>
+        <button id="restore-button" class="text-button">Return to original <span aria-hidden="true">→</span></button>
+      </section>
+      <details id="choices-details" open><summary class="choices-summary">Known choices <span>Explore views and interpretations</span></summary><div class="catalog-heading"><h2>Lenses</h2><span id="lens-count" class="count"></span></div>
+      <p class="catalog-note">A declared registry, not every possible interpretation.</p>
+      <label class="search-box"><span class="sr-only">Find a lens</span><span aria-hidden="true">⌕</span><input id="lens-search" type="search" placeholder="Find a lens…" autocomplete="off"></label>
+      <label class="status-filter">Show <select id="status-filter"><option value="all">All recorded results</option><option value="checked">Scoped checks passed</option><option value="authored">Authored source</option><option value="proposed">Proposed</option><option value="pending">Pending</option><option value="conditional">Conditional</option><option value="analogy">Analogy</option><option value="candidate">Candidate</option><option value="refuted">Refuted</option><option value="incomplete">Incomplete</option><option value="unsupported">Unsupported</option></select></label>
+      <nav id="lens-list" aria-label="Lens selection"></nav>
+      <p id="empty-results" class="empty-results" hidden>No lenses match. Try a different search or status.</p>
+      <div class="keyboard-hint"><kbd>↑</kbd> <kbd>↓</kbd> to explore · <kbd>Enter</kbd> to select</div>
+      <details class="catalog-bound"><summary>What does “checked” mean?</summary><p>Recorded evidence passed the checker named in its receipt, within its declared finite scope. This browser does not run the checker. A digest identifies content; it is not a proof.</p></details>
+    </details></aside>
+    <main>
+      <div class="workspace-top">
+        <div><div class="eyebrow">Same subject · explicit relations</div><p class="workspace-subtitle">Change the question, keep the original.</p></div>
+        <div class="recorded-label"><span aria-hidden="true">◷</span> Recorded checks</div>
+      </div>
+      <section class="history-bar" aria-label="Navigation history">
+        <div class="history-controls"><button id="history-back" class="icon-button" aria-label="Previous lens" title="Previous lens">←</button><button id="history-forward" class="icon-button" aria-label="Next lens" title="Next lens">→</button></div>
+        <ol id="breadcrumbs"></ol>
+      </section>
+      <article id="lens-view" aria-labelledby="view-title">
+        <header class="view-heading">
+          <div><div id="lens-type" class="eyebrow"></div><h2 id="view-title" tabindex="-1"></h2><p id="view-summary"></p></div>
+          <span id="view-status" class="status"></span>
+        </header>
+        <div id="status-explanation" class="status-explanation"></div><p id="meaning-bound" class="meaning-bound"></p>
+        <div class="view-grid">
+          <section class="diagram-panel" aria-labelledby="diagram-title">
+            <div class="panel-toolbar"><div><h3 id="diagram-title">Native ZAL view</h3><p id="diagram-subtitle"></p></div><fieldset id="diagram-detail" class="segmented" hidden><legend class="sr-only">Diagram detail, not semantic abstraction</legend><button type="button" data-detail="expanded">Expanded</button><button type="button" data-detail="folded">Folded</button></fieldset></div>
+            <div id="diagram-frame" class="diagram-frame"><img id="native-diagram" alt=""><div id="diagram-empty" class="diagram-empty" hidden></div></div>
+            <div class="diagram-footer"><span id="diagram-caption"></span><div class="diagram-asset-links"><a id="table-link" target="_blank" rel="noopener" hidden>Open table text →</a><a id="svg-link" target="_blank" rel="noopener">Open SVG →</a></div></div>
+          </section>
+          <aside class="relation-panel" aria-label="Relation to the source">
+            <div class="panel-label">Relation to source</div>
+            <div class="relation-group"><h3><span class="relation-symbol preserved" aria-hidden="true">=</span> Preserves</h3><ul id="preserves-list"></ul></div>
+            <div class="relation-group"><h3><span class="relation-symbol forgotten" aria-hidden="true">−</span> Forgets / excludes</h3><ul id="forgets-list"></ul></div>
+            <div class="relation-group"><h3><span class="relation-symbol added" aria-hidden="true">+</span> Adds / chooses</h3><ul id="adds-list"></ul></div>
+          </aside>
+        </div>
+        <section class="boundary-panel" aria-labelledby="bounds-title"><div class="boundary-icon" aria-hidden="true">⌜</div><div><h3 id="bounds-title">Scope & boundaries</h3><ul id="bounds-list"></ul></div></section>
+        <section class="assumptions-panel"><h3>Valid under these declarations</h3><ul id="assumptions-list"></ul><p id="relation-claims"></p></section><section id="operations-panel" class="operations-panel" hidden><h3>Inspect recorded operations</h3><p id="operations-scope"></p><div id="operations-controls"></div></section>
+        <div class="inspector-heading"><h3>Inspect this lens</h3><label class="evidence-toggle"><input id="expand-evidence" type="checkbox"> Expand technical detail</label></div>
+        <p class="detail-explanation">Detail folding changes only what is visible here. Semantic abstraction is a different lens with its own map and loss.</p>
+        <div class="inspector-grid">
+          <details id="mapping-details" class="inspector-card" open><summary><span>Source → view correspondence</span><span id="mapping-count" class="count"></span></summary><div class="details-body"><p id="mapping-note">Inspect a correspondence to see its recorded preimage. Missing data is not an inferred map.</p><div id="mapping-content"></div><div id="mapping-selection" class="mapping-selection" hidden></div></div></details>
+          <details id="receipt-details" class="inspector-card"><summary><span>Recorded checker receipt</span><span class="summary-symbol" aria-hidden="true">{ }</span></summary><div class="details-body"><p>This is the recorded receipt, not a live result. Rerun the CLI to recheck the current source and implementation.</p><div id="receipt-summary"></div><div class="artifact-links"><a id="receipt-link" target="_blank" rel="noopener">Open receipt JSON →</a></div><pre id="receipt-json" tabindex="0" aria-label="Actual checker receipt JSON"></pre></div></details>
+          <details id="identity-details" class="inspector-card"><summary><span>Object identity & retained source</span><span class="summary-symbol" aria-hidden="true">⌗</span></summary><div class="details-body"><dl id="identity-list"></dl><div class="artifact-links"><a id="source-link" target="_blank" rel="noopener">Original source →</a><a id="lens-source-link" target="_blank" rel="noopener">Lens source →</a></div><details class="raw-source-details"><summary>Read original source</summary><pre id="source-text" tabindex="0"></pre></details></div></details>
+          <details id="restore-details" class="inspector-card"><summary><span>Return is not inversion</span><span class="summary-symbol" aria-hidden="true">↶</span></summary><div class="details-body"><p id="restore-explanation"></p><p>Returning to the original reopens retained source bytes. It does not reconstruct distinctions from a lossy view. Editing and lifting changes back into a source are not supported here.</p><button id="restore-inline" class="secondary-button">Return to retained original</button></div></details>
+        </div>
+        <details id="controls-details" class="inspector-card controls-card"><summary><span>Negative controls &amp; replay checks</span><span class="summary-symbol" aria-hidden="true">≠</span></summary><div class="details-body"><p>These are additional recorded controls, not extra applicable lenses. An exhausted budget remains incomplete; a rejected or unsupported input is not a mathematical refutation.</p><div id="controls-summary"></div><a id="controls-link" target="_blank" rel="noopener">Open control results JSON →</a><pre id="controls-json" tabindex="0" aria-label="Actual negative control results"></pre></div></details>
+        <section class="recheck-panel"><div><h3>Reproduce, don’t just trust the badge.</h3><p>Recorded checks only · rerun CLI to recheck. No live checker or universal theorem is implied.</p></div><code id="recheck-command"></code></section>
+      </article>
+      <footer class="page-footer"><span>ZAL Lens · library objects and scoped evidence</span><span>Read-only recorded views · no live checker</span></footer>
+    </main>
+  </div>
+  <div id="announcer" class="sr-only" aria-live="polite"></div>
+</body>
+</html>

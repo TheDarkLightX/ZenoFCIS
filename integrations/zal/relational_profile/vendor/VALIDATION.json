@@ -1,0 +1,176 @@
+{
+  "checks": [
+    {
+      "check": "build",
+      "exit": 0
+    },
+    {
+      "check": "test_backend",
+      "exit": 0
+    },
+    {
+      "check": "test_operations",
+      "exit": 0
+    },
+    {
+      "check": "test_ladder_adapter",
+      "exit": 0
+    },
+    {
+      "check": "test_mutations",
+      "exit": 0
+    },
+    {
+      "check": "test_shell",
+      "exit": 0
+    },
+    {
+      "check": "check_fcis_bridge",
+      "exit": 0
+    },
+    {
+      "check": "check_proof",
+      "exit": 0
+    },
+    {
+      "check": "demo_decisions",
+      "exit": 0
+    },
+    {
+      "check": "replay_cli",
+      "exit": 0
+    },
+    {
+      "check": "discussion_oracle",
+      "exit": 0
+    }
+  ],
+  "comparison_cases": 105,
+  "compiled_semantic_mutants_detected": 6,
+  "count_comparisons": 409,
+  "discussion": {
+    "admitted_models": "6144",
+    "enumerated_models": "32768",
+    "partition": {
+      "both_false": "3456",
+      "both_true": "2304",
+      "left_only": "384",
+      "right_only": "0"
+    },
+    "status": "RefutedAt"
+  },
+  "discussion_replay": "matched; changed request/witness/agreement controls detected",
+  "fcis_observation_vectors": 132,
+  "forged_response_controls": 4,
+  "ghc": "The Glorious Glasgow Haskell Compilation System, version 9.4.7",
+  "graph_identities": 36,
+  "human_semantic_approval": "not inferred",
+  "implementation_formal_proof": "open",
+  "invalid_resource_cases": 17,
+  "ladder_roundtrips": 21,
+  "native_fcis_execution": "not run by this driver; the bridge checks the included finite example vectors",
+  "native_registration": "not installed",
+  "profile": "optional-experimental-backend",
+  "proof": {
+    "checker": "Lean (version 4.28.0, x86_64-unknown-linux-gnu, commit 7e01a1bf5c70fc6167d49c345d3bf80596e9a79b, Release)",
+    "negative_control": "wrong cutoff rejected for an arithmetic counterexample",
+    "scope": "arithmetic lemmas only; implementation proof open",
+    "status": "checked",
+    "theorems": [
+      "saturation_add",
+      "remainder_add",
+      "exact_observation",
+      "at_most_observation",
+      "at_least_observation",
+      "strict_composition"
+    ]
+  },
+  "public_evaluations": 38,
+  "schema": "zal/relational-public-validation/1",
+  "source_interruption_controls": 4,
+  "source_sha256": {
+    "app/Main.hs": "bbc1d2e824c6a709adf2e9397e5fff73efb03efb3ee7701dc393708e8d3b8b03",
+    "benchmark.py": "a71db506b47887d102608568a5a052b17cc791d5f6a299790168226aa1d58368",
+    "build.py": "0fed66f01ba2505b6ab4157b25f55bf3ae263e490ef00139fa8366e4afe97874",
+    "capabilities.json": "247faf91454b4ac5b3bad8683354e2304b665ca91826dcf892b9008b2c8a6e85",
+    "check_fcis_bridge.py": "0966e99e544dd2ce06439e801db9ff4a909263cfe3d839521479e073a374e325",
+    "check_proof.py": "af58e2138d81bc9348d1eb210ad74dabd93bb90bb08234b3c41f9220c1238493",
+    "demo_decisions.py": "bf560d901ed889ac581ec8084e4bda8275716c71bb225877ddef34a5ef29ca88",
+    "examples/even-graph-count.json": "dcc47b599d5fddce4eddc49ad4c195badebb4aeef5e570986cf7e0e65da56ffa",
+    "examples/owner-car-count.json": "a2e401809c021d9a437cd43856c51fff09d9bb6ec3a0ca690c27a9e10faa2107",
+    "examples/owner_cars_context.json": "a56e33b3a0803e559e35dd29e45392c863a79052f9d9b3bdeb42a201b27bb6e1",
+    "fcis/contracts/finite_relation/project.zeno": "ad0fd8bf43e39977b456e184b335014ca236acc5e58d8b90180c02671931b3ae",
+    "fcis/contracts/finite_relation/tests/decision-examples.txt": "4dd55bc7669ff624e8eb9494fd9b40772aad7bc7b016686fdadeee7cfdb9845f",
+    "fcis/contracts/finite_relation/v2/policy.json": "8be1a5603183d72086e5a5ca3c4baa3a1a21b417944976397629b892abb316aa",
+    "fcis/contracts/histogram/architecture.json": "b18131e731b489fa1c3311d0b66a84cb251181ef542ac9503147ad600632d935",
+    "fcis/contracts/histogram/project.zeno": "a36494c1f0b0d8121b358eecc703e15a1d28476081c4540024de97c2d4585f2f",
+    "fcis/contracts/histogram/tests/decision-examples.txt": "9c2d77411f05ac0ca9a091b692e8f8132294e5bcbf4f75f443a3a051cd76b28d",
+    "fcis/contracts/histogram/v2/policy.json": "a2e56a815a006b7c1bc3eb4ef3622e7b0e112dbaaa6fcffc1021af29558fc211",
+    "fcis/contracts/observation_k0_m1/project.zeno": "0d6f9e29db81414f5155eafcfd429d1cb582ba8588aa091016c359cca3ce94d1",
+    "fcis/contracts/observation_k0_m1/tests/decision-examples.txt": "8ce709ad54129bee9fedecdbd6d9446d4901efbef6520d5d42ebc9d46e8760f0",
+    "fcis/contracts/observation_k0_m1/v2/policy.json": "1ed268600095c54869e3bb1e060cbb4ab4fe6b95b0d72a54dd5161322b959963",
+    "fcis/contracts/observation_k0_m2/project.zeno": "1990c4d1a78ba1973ab2b078e43a3e1e617011b7aae87f8f5031ef705ceb1d80",
+    "fcis/contracts/observation_k0_m2/tests/decision-examples.txt": "f6ae9e077fdcb94b513916d488383ecdee33c4df7b35fc8ae49224ac96275b9d",
+    "fcis/contracts/observation_k0_m2/v2/policy.json": "2f29074640b166fd5a4f5050fe84de33ab2adb025858ef93405aef93a712feec",
+    "fcis/contracts/observation_k0_m3/project.zeno": "5dcce7a5e9a2c36432cfa65e3b9db85d932eaa2d6037a0a07899cd219523cc09",
+    "fcis/contracts/observation_k0_m3/tests/decision-examples.txt": "e28a7899788fc56f6557f7d63e51c7ea98e4110218c3e35b31929462479b376b",
+    "fcis/contracts/observation_k0_m3/v2/policy.json": "e950593e25cc8a906e339675fb7ae4570b4d47d602b33e60dd872bfa293ee04d",
+    "fcis/contracts/observation_k1_m1/project.zeno": "916639bdbfc1c05df3ef1ea81c5b13bd689446bfff142036064ddbe79230e886",
+    "fcis/contracts/observation_k1_m1/tests/decision-examples.txt": "6ea3f151eee4a4df8e01c24068ed8c71c9061d5acdae9da2bbf6965c600989b3",
+    "fcis/contracts/observation_k1_m1/v2/policy.json": "efadcb1e36f2e81bb84e92592f7613ce9aa86618ed1e3f04193f42a3f25b8a45",
+    "fcis/contracts/observation_k1_m2/project.zeno": "6a4dbe752a5ca059912efe9cac72f0a4313203c79ce3286c1576cbe87587d7ce",
+    "fcis/contracts/observation_k1_m2/tests/decision-examples.txt": "9d926a3a31749d0ec111930d33f8be15acabee9ed1bb072401f82cdf1a69da4a",
+    "fcis/contracts/observation_k1_m2/v2/policy.json": "63d01a05067b306a3110e64cfe52cd1e9438d1244f9d9e107e78611d6e946647",
+    "fcis/contracts/observation_k1_m3/project.zeno": "062c8abbd0a1dd14d6f71214da263305da7f4c157e19fee530d551b8b646815b",
+    "fcis/contracts/observation_k1_m3/tests/decision-examples.txt": "011d28899b4062098e4c067bd609fa4bea6d061f2fb4e6808e632a7ff6af6615",
+    "fcis/contracts/observation_k1_m3/v2/policy.json": "e69f550832267ec7eb241d637c37f2f1d2b0ecc5eb552975adf817725362a918",
+    "fcis/contracts/observation_k2_m1/project.zeno": "fe88e3b36913f62d7db35404dedac09747399d1730dc90d0d2776bd5f0fad0c8",
+    "fcis/contracts/observation_k2_m1/tests/decision-examples.txt": "eef5f4e6951dfe26caf9925ea9384b23daeefb928251bce909055c5d3e778fe8",
+    "fcis/contracts/observation_k2_m1/v2/policy.json": "41e67ac94ac59dd5698c0c285e946371e7d0ed4c477f320869901346be19cc48",
+    "fcis/contracts/observation_k2_m2/project.zeno": "b08f5f1124f524f60c1c1f8ceb1932c8d1667d2a2246365c40651c84edcf146d",
+    "fcis/contracts/observation_k2_m2/tests/decision-examples.txt": "2bfd09b13ba63149009fb6248dffb85b791e229770c92008df3624e73222a08a",
+    "fcis/contracts/observation_k2_m2/v2/policy.json": "fc05c41b7c9c7f44c80cd98b66a0d0796983a999448727a13faa5f7b441f0464",
+    "fcis/contracts/observation_k2_m3/project.zeno": "c38465190ff22f1725bfffa8e3bc307f7d9863167478c66d84a6b049b6a88913",
+    "fcis/contracts/observation_k2_m3/tests/decision-examples.txt": "86cbc4ca26fc06ec40677e36934a9405394996a47a6c9b1220739c7057d0e3c9",
+    "fcis/contracts/observation_k2_m3/v2/policy.json": "a1180868c8889203c7bf74944e9ed3a8ee4b8567f98bbe486d8322bc8c6503e6",
+    "fcis/contracts/pair_admission/project.zeno": "aa68d9b364b2d7848507b977738b9c922a09f14b4a5002b93555c3fbedcacdb1",
+    "fcis/contracts/pair_admission/tests/decision-examples.txt": "712625d6ca7bc0539876b86cd9b4b925d4ced8adfd4fe35778111ab5d8dc776f",
+    "fcis/contracts/pair_admission/v2/policy.json": "559149ee3f92673f408cc814b5b1d2f495c85f67465ca7036ce367e6ed74492f",
+    "fcis/mutants/finite_relation/project.zeno": "ad0fd8bf43e39977b456e184b335014ca236acc5e58d8b90180c02671931b3ae",
+    "fcis/mutants/finite_relation/v2/policy.json": "81157f0e4ac56a2e0d891c24668dd0b836fdf553c38078a80a8ccdf5f82eed7c",
+    "fcis/mutants/histogram/project.zeno": "a36494c1f0b0d8121b358eecc703e15a1d28476081c4540024de97c2d4585f2f",
+    "fcis/mutants/histogram/v2/policy.json": "c4200872b517a9b727fb8f94bc9adf3dc96266a094e32f689c8bbd86db511331",
+    "fcis/mutants/observation_k2_m3/project.zeno": "c38465190ff22f1725bfffa8e3bc307f7d9863167478c66d84a6b049b6a88913",
+    "fcis/mutants/observation_k2_m3/v2/policy.json": "a96a5254575888445804407758d07bf7eb7a282dec5b2fdadfea058e0775f437",
+    "fcis/mutants/pair_admission/project.zeno": "aa68d9b364b2d7848507b977738b9c922a09f14b4a5002b93555c3fbedcacdb1",
+    "fcis/mutants/pair_admission/v2/policy.json": "9dff1f3da0614629c3b59b29115280a7d33d376d2638e73b0c980cacfec7a8ab",
+    "ladder_adapter.py": "acfc5e38533f152c67ccd15e3a853558d9b6b6fa6284eed70fa64a174de783a6",
+    "oracle.py": "fba22e4738334cfbdbfb55df6e941112807b93fcd1274c08174f8ead95031768",
+    "proofs/Observation.lean": "9d41d5410783a9b103ff7cea5c5af576298489df24289f33c3fbdded311fc5bb",
+    "replay_result.py": "b95eff2e279e1f91acc8a6c871a1a379e3862b8a049be546d0c5d3a07c5f4451",
+    "repository:integrations/zal/ladder.py": "12e1ca707f63775b5ea016ef9329479f07bc5343ce54fd1a332d50064221d6bd",
+    "repository:integrations/zal/ladder_en.json": "6f2ba61a3b5d88e20e883ad3a5c2ad2b92aae4d0e068e7408d50ac5eeb797ce0",
+    "run.py": "17e4410d16b4214465fe8fba2e0f7790025a32f85e4e4431de97c588277b61c9",
+    "schemas/relational-query.schema.json": "d6d94c3218e46c6f6f3f4a38bc0cafb97a9c747a76c7c9a80bd9f82f7e657e34",
+    "src/Zal/Logic/Budget.hs": "e8d8cfe6c471e1591f3d7c9640d0b2c1a2cda06d6e38b6172bc2135039fe42f4",
+    "src/Zal/Logic/Compare.hs": "2d7a580218133215e18abe391c535cd6608bdd08cdaf33417bdd4b4bdbc18724",
+    "src/Zal/Logic/Expansion.hs": "b4ec952e84f9b65d6dd5dde2b24c14359dcba7472a72c6d70805823e92295ebc",
+    "src/Zal/Logic/Finite.hs": "7f8b4cb9570a7941050200ee67efb17a140ce2fac279b8136470f1c671ea1486",
+    "src/Zal/Logic/Normalize.hs": "a24087abd711f2234ef73cad28cd1da3da6298839b96a20d455acb62470fe5a3",
+    "src/Zal/Logic/Population.hs": "18a00b8c4075826d093935f2f20d174b7b168e8e335a0c15417277fa5ae424fa",
+    "src/Zal/Logic/Syntax.hs": "6eba5bccee2ebf53fc95e0b57818a31ee9197283242b039d7676314756b879c5",
+    "test_backend.py": "eb147d037a5a92471d7757b13af034b474bcfccd45e0069ccb6cefd0f8981d43",
+    "test_ladder_adapter.py": "600fe6645123752c4e3dc50dbd7f0042c13c2eb7d926375cd72a6e57f4323ef8",
+    "test_mutations.py": "813fbe02fdc6ec19fb0ed4bcebd9dd7cc1e9842cc1989b5253ec95c1c0c89759",
+    "test_operations.py": "052ece4085b9c34bf19dbe3a7203769ba8e080b14f5032caa623e80a5112de55",
+    "test_shell.py": "9dd09830f4c494e4af305aec4ff23cc24c4b36bb9ae400c346df54816dcd8f0a",
+    "tests/ObservationBridge.hs": "0c0af796cd19996f009d9b97a61e04c15e682dff046c125c713ae73700d0d514",
+    "validate.py": "eaaeb2126a44709000dc05d0c8b81ce655089c216c6c278b4affead68683f8b6",
+    "zal-relational.cabal": "436bc7ab45c003d17429d83734d9d9f45bb2c40f57b93f16aa88a4483cd62f2d"
+  },
+  "story_fixtures": 8,
+  "supplied_model_evaluations": 432,
+  "timing_comparison": "not claimed",
+  "unique_extension_checks": 432,
+  "worker_sha256": "076fb262841d2745a891e4b915d27848b584160fe5219a89b90023d240c03cbb"
+}

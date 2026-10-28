@@ -1,0 +1,63 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "repair-request",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "106": [
+      "Bool"
+    ]
+  },
+  "variables": {},
+  "cases": [
+    {
+      "rule": "request_ok",
+      "when": "pre.100.110 == 150 && command.101.119 == 120 && (context.102.160)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 151,
+        "170": "command.101.164"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "request_refused",
+      "when": "pre.100.110 == 150 && command.101.119 == 120 && (!(context.102.160))",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "reset_ok",
+      "when": "pre.100.110 == 151 && command.101.119 == 121 && (context.102.160)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 150,
+        "170": 0
+      },
+      "outbox": []
+    },
+    {
+      "rule": "default",
+      "when": "true",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 150,
+    "170": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "520": "AuthoritySubjectRecipient"
+  }
+}

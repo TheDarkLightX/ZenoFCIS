@@ -1,0 +1,14 @@
+zal 2;
+machine repair_request;
+states draft, submitted;
+events request, reset;
+context authorized;
+input quantity in 1..=2;
+var units in 0..=2 initially 0;
+initial draft;
+step atomic; frame control_and_variables;
+default reject not_enabled unchanged;
+rule request_ok: draft + request [authorized] -> accept submitted, units = quantity;
+rule request_refused: draft + request [!authorized] -> reject denied unchanged;
+rule reset_ok: submitted + reset [authorized] -> accept draft, units = 0;
+require approve_only_if_authorized: (event == request & accepted) => authorized;

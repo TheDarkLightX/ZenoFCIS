@@ -1,18 +1,65 @@
 {
   "body_covered_functions": [
     "composed_domain::resolve::resolve",
-    "composed_domain::resolve::apply"
+    "composed_domain::resolve::apply",
+    "composed_domain::coupling_cuts::interval_cutters",
+    "composed_domain::coupling_cuts::outside_failure_cutters"
   ],
-  "expected_verified": 22,
+  "expected_verified": 29,
   "functions": {
-    "composed_domain::resolve::apply": {
-      "body_sha256": "398000abe4ab4b4bba0b481bbe688d47135600b7387f7a8f9d8920865e3eba54",
+    "composed_domain::coupling_cuts::exact_interval": {
+      "body_sha256": "67593d4b98e1dd9fb34efe7b17b8cccd406ac76f6a866d7a8d3e835b7bc85437",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "fd7221b95afb542d281209d823c3cf722e308bc09f7a83024d7a7f59dabb2e70"
+    },
+    "composed_domain::coupling_cuts::group_start": {
+      "body_sha256": "db62afaba93940000a5132f24674badc3683117bffaf700d8faba57a8dfc84fa",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "e18213cf12ae01cc7982ebec968f071c5831404bef243ae13fffbf68ea8fa779"
+    },
+    "composed_domain::coupling_cuts::interval_cutters": {
+      "body_sha256": "0d9152fbdf47d417f75fff6e56832f978651b57c5c90a564a39576852f7d4b8a",
       "ensures": 1,
-      "ensures_sha256": "7be26ae6831571167d5a0c15bb3a12c0d605a9515015aeebd8a2d32b54f9d700",
+      "ensures_sha256": "0d9170621eeee2ff8c0e8f2e22027466f60b31af0ba529ca5ab8404e4710c61f",
+      "mode": "Exec",
+      "requires": 2,
+      "requires_sha256": "a25ee5cee961c19fe7d492cd6277385b2b9bce0070cb7e43be3a5e0df2aea73a",
+      "signature_sha256": "ac5f284f39ba07827cb13fbd89e250c5b901265321d9a92ee9c7f11aad872bb4"
+    },
+    "composed_domain::coupling_cuts::ordered_members": {
+      "body_sha256": "e3f952bc25266e544d53d0619a83fd0114b84299c499f3e609142aaed9bc40f8",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "e446f369c49fe3b34857da625a1d438eed6e7264116586338d0731cf09a1d023"
+    },
+    "composed_domain::coupling_cuts::outside_failure_cutters": {
+      "body_sha256": "bb9d7bcad86392c4726e68ebbc76c39dc479e30a6542682f7bc4ed4391a0bd95",
+      "ensures": 2,
+      "ensures_sha256": "362228ae0bf35dc7518dfed60604407a985687e7ef3399deaa115e1fedc99360",
+      "mode": "Exec",
+      "requires": 1,
+      "requires_sha256": "4fc0850fac1eacea6a2d265f0abb005a2f7c6eb3347d8ae20ce56b7fa1c9c92c",
+      "signature_sha256": "1744f13050a861567c7e3fc52daaae6828af16c19c91a3e2fb0d7b18f2c25a89"
+    },
+    "composed_domain::resolve::apply": {
+      "body_sha256": "ca470f4de75ca58a64f2bb884a0d0262520c5486dcb70768419e605a7e70c46f",
+      "ensures": 1,
+      "ensures_sha256": "ce99bc6791c1702c2ee8c65a8db3cfd196bcfa58505d9a7d14273515c3f6c065",
       "mode": "Exec",
       "requires": 3,
-      "requires_sha256": "a2ecd4a4405f40adc7c981c70caa0ad5e485055fa577cdf3ef79511b37697828",
-      "signature_sha256": "2ffad1e24ea4f58ced8acd96b4646448ac8d84b19e768c96d141e348ee02ae69"
+      "requires_sha256": "38a63d455a6d4af7a96dc9bd230fc7a23593cd400283a42c6e1e56b47d727374",
+      "signature_sha256": "254526a02bc2f86a1afceefa1f793ddf4dc73e0d5e7895f93ed23226a9662dc3"
     },
     "composed_domain::resolve::impl&%15::clone": {
       "ensures": 1,
@@ -64,13 +111,13 @@
       "signature_sha256": "c7285aa5da7e045e4f2297b8bf32c64d75b0e55b65d0c7611fcc21756b10e45d"
     },
     "composed_domain::resolve::model::post_view": {
-      "body_sha256": "95c2c0b384036682187a079385bfb560ec3e13a2efac7a982d115d35cd6080cf",
+      "body_sha256": "4714130ac68a74323a03d08f6c7e54f88bf8ebe828145f34a12e7113d4f3f167",
       "ensures": 0,
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "mode": "Spec",
       "requires": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "signature_sha256": "4755affadea67ce317b7ca5fcaea83f6d08cf8c08115580630e4613037bf25e2"
+      "signature_sha256": "142a67bc54ef72ba6cf6902774e8132046248f71627ae7e99292e745d8af6c64"
     },
     "composed_domain::resolve::model::resolve_from": {
       "body_sha256": "5d34f25dcfc32f584b5101a4dee5db92bb48eae9405ee73023694c3a4b21c934",
@@ -169,6 +216,15 @@
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "signature_sha256": "b90babe0352d88671509dc677549e5779eaadf231a2d4db1460f14374d1dfcc5"
     },
+    "composed_domain::theorem::checkpoint": {
+      "body_sha256": "5f1c0d12276c458e125eea7e0d7f4a27894d6188745344252c3f27fe121b4119",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "17be55fa992ab47949ef4113448e2d56d3c59c7eb4d22ce0d62c392b84f04290"
+    },
     "composed_domain::theorem::component_invariants_preserved": {
       "ensures": 1,
       "ensures_sha256": "7ce00c0c998bedb4386e1a0b40e12990479f3f7b98e0546b6fabf258af72fe67",
@@ -219,6 +275,14 @@
       "requires": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "signature_sha256": "3f29c1b2140910d500b356a3da9bbe0b9e11a1ff113b1835eba7285b5d919f95"
+    },
+    "composed_domain::theorem::find_boundary": {
+      "ensures": 3,
+      "ensures_sha256": "f1b38e6527150acb9b1476804e84aa95bd1a7d4824f98ba03daca3a246296ff3",
+      "mode": "Proof",
+      "requires": 2,
+      "requires_sha256": "8c9296648e7e9c0720560905add55174196c1ba8207eeaa488f8e5f34bc0af44",
+      "signature_sha256": "d03431504d9b900f54b86c37a5a7d0a67c2f337f16ca78cdf11666ae81eabf47"
     },
     "composed_domain::theorem::global_invariant": {
       "body_sha256": "be8a8eccbfd9af365b7a0eeeac183e0a2d4d9bf4b091ee7d78d6f83932fa8a16",
@@ -299,6 +363,14 @@
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "signature_sha256": "c0638448f6c0572e351d8af3019e7a3cd4023c6a0dfb256c019a057db3c02b12"
     },
+    "composed_domain::theorem::member_prefix_constant_between_members": {
+      "ensures": 1,
+      "ensures_sha256": "b1b6e6954f624b3ca3ed854cc4fc609d1a9e6a303adb4efdb0dc2b104d009bfd",
+      "mode": "Proof",
+      "requires": 5,
+      "requires_sha256": "96edf22ef63113a298eb3ffb20e793f104444d67d4836249ef1f4c61e4c2cd1d",
+      "signature_sha256": "113eb1333e6a413a1c263157fb82259fbdfc2872d8c24c5f08755f812fd3b5b1"
+    },
     "composed_domain::theorem::members_before_continue": {
       "body_sha256": "49b916f85292ee8d4037b538b5f66dfb948a3a4f20e6409c33648f34dc0bc71a",
       "ensures": 0,
@@ -334,6 +406,14 @@
       "requires": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "signature_sha256": "b77c45954ff818ecaa32d7b05544d89ca9a27d4c2da1a4da539e36faee2c3c99"
+    },
+    "composed_domain::theorem::outside_cut_has_checkpoint": {
+      "ensures": 4,
+      "ensures_sha256": "1447e21b718bff04550d5901203cace7306e53940184abba843e904d34389c62",
+      "mode": "Proof",
+      "requires": 8,
+      "requires_sha256": "d604e8a136914135b6e316427b5db8ee269e3a2a1ca9268803828846b861b4e2",
+      "signature_sha256": "9776459167218a5e04617015caf4d65931e138ef366ff5f68132907ac105abfe"
     },
     "composed_domain::theorem::participates": {
       "body_sha256": "968b37878754b3f9ac0dcd6a583da383deed285aa443678957848bce719af0be",
@@ -423,9 +503,9 @@
     }
   },
   "inventory": {
-    "Exec": 5,
-    "Proof": 13,
-    "Spec": 30
+    "Exec": 7,
+    "Proof": 16,
+    "Spec": 34
   },
   "namespace": "composed_domain::",
   "reviewed": true,
@@ -435,6 +515,11 @@
     "alloc::vec::impl&%0::new",
     "alloc::vec::impl&%12::clone",
     "alloc::vec::impl&%43::push",
+    "composed_domain::coupling_cuts::exact_interval",
+    "composed_domain::coupling_cuts::group_start",
+    "composed_domain::coupling_cuts::interval_cutters",
+    "composed_domain::coupling_cuts::ordered_members",
+    "composed_domain::coupling_cuts::outside_failure_cutters",
     "composed_domain::resolve::End::clone",
     "composed_domain::resolve::Local::clone",
     "composed_domain::resolve::Resolution::clone",
@@ -454,12 +539,14 @@
     "composed_domain::resolve::resolve",
     "composed_domain::theorem::all_couplings",
     "composed_domain::theorem::assume_obligation",
+    "composed_domain::theorem::checkpoint",
     "composed_domain::theorem::component_invariants_preserved",
     "composed_domain::theorem::couple_obligation",
     "composed_domain::theorem::coupling_invariants_preserved",
     "composed_domain::theorem::decisions",
     "composed_domain::theorem::delivered_inputs_keep_domains_assumptions_and_invariants",
     "composed_domain::theorem::delivery_invariant",
+    "composed_domain::theorem::find_boundary",
     "composed_domain::theorem::global_invariant",
     "composed_domain::theorem::history",
     "composed_domain::theorem::history_at",
@@ -469,10 +556,12 @@
     "composed_domain::theorem::local_obligation",
     "composed_domain::theorem::member_end",
     "composed_domain::theorem::member_prefix",
+    "composed_domain::theorem::member_prefix_constant_between_members",
     "composed_domain::theorem::members_before_continue",
     "composed_domain::theorem::observations",
     "composed_domain::theorem::outcome",
     "composed_domain::theorem::outside_cut",
+    "composed_domain::theorem::outside_cut_has_checkpoint",
     "composed_domain::theorem::participates",
     "composed_domain::theorem::pilot_model",
     "composed_domain::theorem::pilot_obligations",
@@ -485,7 +574,7 @@
     "composed_domain::theorem::well_formed",
     "core::clone::Clone::clone",
     "core::clone::impls::impl&%10::clone",
-    "core::clone::impls::impl&%30::clone",
+    "core::clone::impls::impl&%32::clone",
     "core::clone::impls::impl&%42::clone",
     "core::clone::impls::impl&%6::clone",
     "core::option::impl&%6::clone",
@@ -535,6 +624,7 @@
     "vstd::seq::lemma_seq_update_different",
     "vstd::seq::lemma_seq_update_len",
     "vstd::seq::lemma_seq_update_same",
+    "vstd::seq_lib::impl&%0::contains",
     "vstd::seq_lib::impl&%0::map_values",
     "vstd::set::Set::contains",
     "vstd::set::Set::empty",
@@ -588,9 +678,9 @@
     "vstd::view::impl&%2::view",
     "vstd::view::impl&%30::view",
     "vstd::view::impl&%31::deep_view",
-    "vstd::view::impl&%38::view",
-    "vstd::view::impl&%39::deep_view",
     "vstd::view::impl&%3::deep_view",
+    "vstd::view::impl&%40::view",
+    "vstd::view::impl&%41::deep_view",
     "vstd::view::impl&%46::view",
     "vstd::view::impl&%47::deep_view",
     "vstd::view::impl&%48::view",

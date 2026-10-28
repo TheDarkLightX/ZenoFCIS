@@ -305,12 +305,20 @@ pub(super) fn run(command: Command) -> u8 {
                 true,
                 |sources| {
                     Ok(
-                        match run_properties::judge(
-                            sources.project,
-                            sources.rules,
-                            sources.extra.unwrap_or_default(),
-                            common.max_tuples,
-                        )? {
+                        match if let Some(current) = sources.current {
+                            run_properties::judge_current(
+                                current,
+                                sources.extra.unwrap_or_default(),
+                                common.max_tuples,
+                            )?
+                        } else {
+                            run_properties::judge(
+                                sources.project,
+                                sources.rules,
+                                sources.extra.unwrap_or_default(),
+                                common.max_tuples,
+                            )?
+                        } {
                             lemma::Lemmas::Inconclusive(stop) => Judged::Inconclusive(stop),
                             lemma::Lemmas::NoStartingState(value) => {
                                 Judged::Done(value, INVALID, "no-admissible-starting-state")
@@ -410,7 +418,9 @@ pub(super) fn run(command: Command) -> u8 {
             true,
             |sources| {
                 Ok(
-                    match if map_keys == 2 {
+                    match if let Some(current) = sources.current {
+                        profile::profile_current(current, map_keys, common.max_tuples)?
+                    } else if map_keys == 2 {
                         profile::profile(sources.project, sources.rules, common.max_tuples)?
                     } else {
                         profile::profile_with_keys(
@@ -450,25 +460,29 @@ pub(super) fn run(command: Command) -> u8 {
                     sources.rules,
                     common.max_tuples,
                 )? {
-                    let report = match crate::symbolic_command::Solvers::from_environment() {
-                        Ok(solvers) => {
-                            let mut result = review::numeric_symbolic::lemma::check(
-                                sources.project,
-                                sources.rules,
-                                &lemmas,
-                                transition,
-                                &mut |q| solvers.solve(q),
-                            )?;
-                            result["solver_identities"] = solvers.identities();
-                            if let Some(reason) = solvers.retention_failure() {
-                                result["status"] = json!("UNKNOWN");
-                                result["evidence"] = json!("none");
-                                result["reason"] = json!(reason);
+                    let report = if sources.current.is_some() {
+                        json!({"mode":"symbolic","status":"UNKNOWN","authority":"none","reason":"symbolic numeric lemmas require a standalone contract; retained lineage replay is unsupported"})
+                    } else {
+                        match crate::symbolic_command::Solvers::from_environment() {
+                            Ok(solvers) => {
+                                let mut result = review::numeric_symbolic::lemma::check(
+                                    sources.project,
+                                    sources.rules,
+                                    &lemmas,
+                                    transition,
+                                    &mut |q| solvers.solve(q),
+                                )?;
+                                result["solver_identities"] = solvers.identities();
+                                if let Some(reason) = solvers.retention_failure() {
+                                    result["status"] = json!("UNKNOWN");
+                                    result["evidence"] = json!("none");
+                                    result["reason"] = json!(reason);
+                                }
+                                result
                             }
-                            result
-                        }
-                        Err(reason) => {
-                            json!({"mode":"symbolic","status":"UNKNOWN","reason":reason,"authority":"none"})
+                            Err(reason) => {
+                                json!({"mode":"symbolic","status":"UNKNOWN","reason":reason,"authority":"none"})
+                            }
                         }
                     };
                     let (exit, status) = match report["status"].as_str() {
@@ -480,7 +494,9 @@ pub(super) fn run(command: Command) -> u8 {
                     return Ok(Judged::Done(report, exit, status));
                 }
                 Ok(
-                    match if transition {
+                    match if let Some(current) = sources.current {
+                        lemma::judge_current(current, &lemmas, common.max_tuples, transition)?
+                    } else if transition {
                         lemma::judge_transitions(
                             sources.project,
                             sources.rules,
@@ -527,7 +543,10 @@ pub(super) fn run(command: Command) -> u8 {
                 false,
                 |sources| {
                     let text = sources.extra.unwrap_or_default();
-                    let replayed = scenario::replay(sources.project, sources.rules, text, &label)?;
+                    let replayed = match sources.current {
+                        Some(current) => scenario::replay_current(current, text, &label)?,
+                        None => scenario::replay(sources.project, sources.rules, text, &label)?,
+                    };
                     Ok(if replayed.failed == 0 {
                         Judged::Done(replayed.packet, OK, "passed")
                     } else {
@@ -552,12 +571,17 @@ pub(super) fn run(command: Command) -> u8 {
                 enumerates,
                 |sources| {
                     Ok(
-                        match probe::probe(
-                            sources.project,
-                            sources.rules,
-                            &question,
-                            common.max_tuples,
-                        )? {
+                        match match sources.current {
+                            Some(current) => {
+                                probe::probe_current(current, &question, common.max_tuples)?
+                            }
+                            None => probe::probe(
+                                sources.project,
+                                sources.rules,
+                                &question,
+                                common.max_tuples,
+                            )?,
+                        } {
                             probe::Answer::Answered(value) if value["answer"] == "vacuous" => {
                                 Judged::Done(
                                     json!({"question": question.name(), "result": value}),
@@ -634,6 +658,7 @@ struct Sources<'a> {
     project: &'a str,
     rules: &'a str,
     extra: Option<&'a str>,
+    current: Option<&'a crate::contract::Current<'a>>,
 }
 
 /// A judge's result: its section of the packet, exit code and status, or
@@ -667,27 +692,54 @@ fn judge(
         let extra_text = extra
             .map(|path| read_text(path, &path.display().to_string()))
             .transpose()?;
-        let sources = Sources {
-            project: &project,
-            rules: &rules,
-            extra: extra_text.as_deref(),
-        };
         let invalid = |error: zeno_fcis_contract::ContractError| Failure::Invalid {
             place: error.place().to_owned(),
             reason: error.reason().to_owned(),
         };
         let application = review::application(&project, &rules).map_err(invalid)?;
-        let judged = work(&sources).map_err(invalid)?;
         let sha256 = |text: &str| hex(&digest(text.as_bytes()));
-        Ok((
-            application,
-            judged,
-            json!({
-                "project_sha256": sha256(&project),
-                "rules_sha256": sha256(&rules),
-                "extra_sha256": extra_text.as_deref().map(sha256),
-            }),
-        ))
+        let mut source_binding = json!({
+            "project_sha256": sha256(&project),
+            "rules_sha256": sha256(&rules),
+            "extra_sha256": extra_text.as_deref().map(sha256),
+        });
+        let is_current_route = matches!(
+            schema,
+            "zeno-fcis/contract-scenario/2"
+                | "zeno-fcis/contract-probe/2"
+                | "zeno-fcis/contract-profile/2"
+                | "zeno-fcis/contract-lemma/2"
+                | "zeno-fcis/contract-transition-lemma/2"
+                | "zeno-fcis/contract-run-properties/1"
+        );
+        let lineage =
+            is_current_route && crate::contract::has_lineage(&project, &rules).map_err(invalid)?;
+        let judged = if lineage {
+            let inputs = crate::contract_files::Inputs::read_with_base(dir, project, rules)
+                .map_err(lineage_failure)?;
+            let (judged, subject) = inputs
+                .with_current(|current| {
+                    let sources = Sources {
+                        project: current.project(),
+                        rules: current.rules_source(),
+                        extra: extra_text.as_deref(),
+                        current: Some(&current),
+                    };
+                    Ok((work(&sources)?, current.subject()?))
+                })
+                .map_err(lineage_failure)?;
+            source_binding["current_authority"] = subject;
+            judged
+        } else {
+            let sources = Sources {
+                project: &project,
+                rules: &rules,
+                extra: extra_text.as_deref(),
+                current: None,
+            };
+            work(&sources).map_err(invalid)?
+        };
+        Ok((application, judged, source_binding))
     })();
     let (application, judged, sources) = match result {
         Ok(done) => done,
@@ -761,6 +813,18 @@ fn judge(
         }
     }
     exit
+}
+
+fn lineage_failure(error: crate::contract_files::Failure) -> Failure {
+    match error {
+        crate::contract_files::Failure::Read(message) => Failure::Read(message),
+        crate::contract_files::Failure::Invalid { place, reason } => {
+            Failure::Invalid { place, reason }
+        }
+        crate::contract_files::Failure::Binding(refusal) => {
+            Failure::Read(format!("lineage binding: {refusal:?}"))
+        }
+    }
 }
 
 fn report_failure(dir: &Path, failure: Failure, format: OutputFormat) -> u8 {

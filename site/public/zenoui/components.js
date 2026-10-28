@@ -3,6 +3,19 @@ export function node(tag, className, ...children) {
   const result=document.createElement(tag); if(className)result.className=className;
   result.append(...children.filter(v=>v!==null&&v!==undefined));return result;
 }
+// Fixed primitives for the checked recursive renderer; metadata supplies text only.
+export function button(text, variant='secondary') {
+  const b=node('button',`zu-button zu-button--${variant}`,text);b.type='button';return b;
+}
+export function badge(text, tone='neutral') {return node('span',`zu-badge zu-badge--${tone}`,text);}
+export function keyValues(rows, className='zu-kv') {
+  const list=node('dl',className);
+  for(const {label,content,index,muted} of rows){const row=node('div',muted?'zu-kv-row is-muted':'zu-kv-row',node('dt',null,label),node('dd',null,content));if(index!==undefined)row.dataset.field=index;list.append(row);}
+  return list;
+}
+export function notice(tone, title, message) {
+  return node('div',`zu-notice zu-notice--${tone}`,title?node('strong','zu-notice-title',title):null,title?' ':null,node('span',null,message));
+}
 export function metrics(...items) {
   const list=node('dl','metrics');
   for(const [value,label,tone] of items)list.append(node('div',tone?`metric ${tone}`:'metric',node('dt',null,label),node('dd',null,value)));

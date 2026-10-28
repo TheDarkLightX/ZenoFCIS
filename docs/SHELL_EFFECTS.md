@@ -161,8 +161,17 @@ future-relevant state. Native SQLite/OS internals remain environment premises.
 one handle on one store. Each port calls the V2 API the registry names, so no
 commit SQL is added or reordered. Path rebinds additionally compare the
 audited genesis, Authority and interpreter with the initially retained store
-identity, including lazy reopen and history reads. Send goes to a caller's
-`Transport`; Clock, Random and Wait go to an opt-in `Time`, and stay uncovered
+identity, including lazy reopen and history reads. Before Send reaches a caller's
+`Transport`, the terminal reloads the original pending ID, replays its owning
+commit through `pending_by_id`, and compares every delivery field: version,
+lane, ordinal, destination, payload and payload digest as well as ID. Unknown
+or acknowledged IDs and substituted content are refused before transport.
+The transport receives the retained bytes; an uncertain transport result stays
+`Unknown`, and an unchanged pending intent can be retried after reopening.
+This check retains the single-store owner premise. It does not establish a
+tenant namespace, current grant/revocation policy, distributed dispatch lease,
+or OS confinement.
+Clock, Random and Wait go to an opt-in `Time`, and stay uncovered
 without one. V2 refusals
 keep their codes. SQLite busy or full is `NotApplied`, because the transaction
 rolled back. Any other SQLite failure is `Unknown` for a write and `NotApplied`
@@ -188,6 +197,11 @@ receiver. They cover:
   followed by recovery;
 - a real busy store;
 - the ten real process aborts, each followed by recovery and redelivery.
+
+Dispatch regressions additionally forge each delivery field (including payload
+with a recomputed digest), target another store or handle, and retry an already
+acknowledged ID. They require zero transport calls and unchanged durable data
+for those denials, and exercise authentic retries, uncertain outcomes and reopen.
 
 Disk-full and other I/O failures are qualified only in the simulation, by
 the `NotApplied` and `Unknown` branches they map to. No deterministic SQLite

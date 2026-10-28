@@ -634,6 +634,10 @@ impl Time for Clock {
         self.clock(deadline.epoch).map_err(WaitError::Failed)
     }
 }
+// A stale temporary must not block the next send indefinitely. Bound the work
+// and preserve every pre-existing file, including another invocation's file.
+const FILE_RECEIVER_TEMP_NAME_ATTEMPTS: usize = 32;
+
 /// Local file receiver. One trusted writer; durable IDs deduplicate exact payloads.
 pub struct FileReceiver {
     directory: PathBuf,
@@ -650,24 +654,90 @@ impl FileReceiver {
     }
 }
 impl FileReceiver {
+    fn temporary(&mut self) -> std::io::Result<(PathBuf, fs::File)> {
+        for _ in 0..FILE_RECEIVER_TEMP_NAME_ATTEMPTS {
+            self.sequence = self
+                .sequence
+                .checked_add(1)
+                .ok_or_else(|| std::io::Error::other("receiver exhausted"))?;
+            let temporary =
+                self.directory
+                    .join(format!(".pending-{}-{}", std::process::id(), self.sequence));
+            match fs::OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(&temporary)
+            {
+                Ok(file) => return Ok((temporary, file)),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error),
+            }
+        }
+        Err(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            "receiver temporary names exhausted",
+        ))
+    }
+
     // Write one file atomically: a private temporary file, synced, then renamed.
     fn write(&mut self, path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-        self.sequence = self
-            .sequence
-            .checked_add(1)
-            .ok_or_else(|| std::io::Error::other("receiver exhausted"))?;
-        let temporary =
-            self.directory
-                .join(format!(".pending-{}-{}", std::process::id(), self.sequence));
-        let mut file = fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&temporary)?;
+        let (temporary, mut file) = self.temporary()?;
         file.write_all(bytes)?;
         file.sync_all()?;
         drop(file);
         fs::rename(&temporary, path)?;
         fs::File::open(&self.directory)?.sync_all()
+    }
+}
+
+#[cfg(test)]
+mod file_receiver_tests {
+    use super::{FILE_RECEIVER_TEMP_NAME_ATTEMPTS, FileReceiver, fs};
+
+    #[test]
+    fn file_receiver_exhaustion_and_counter_overflow_are_typed() {
+        assert_eq!(FILE_RECEIVER_TEMP_NAME_ATTEMPTS, 32);
+        let root =
+            std::env::temp_dir().join(format!("app-receiver-private-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        for sequence in 1..=32u64 {
+            fs::write(
+                root.join(format!(".pending-{}-{sequence}", std::process::id())),
+                format!("orphan-{sequence}"),
+            )
+            .unwrap();
+        }
+        let mut receiver = FileReceiver::new(&root).unwrap();
+        let err = receiver
+            .write(&root.join("exhausted"), b"data")
+            .unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
+        assert_eq!(err.to_string(), "receiver temporary names exhausted");
+        assert!(!root.join("exhausted").exists());
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 32);
+        for sequence in 1..=32u64 {
+            assert_eq!(
+                fs::read(root.join(format!(".pending-{}-{sequence}", std::process::id()))).unwrap(),
+                format!("orphan-{sequence}").as_bytes()
+            );
+        }
+        receiver.write(&root.join("retry"), b"data").unwrap();
+        assert_eq!(fs::read(root.join("retry")).unwrap(), b"data");
+        let mut overflow = FileReceiver::new(&root).unwrap();
+        overflow.sequence = u64::MAX;
+        let err = overflow.write(&root.join("overflow"), b"data").unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::Other);
+        assert_eq!(err.to_string(), "receiver exhausted");
+        assert!(!root.join("overflow").exists());
+        let missing = root.join("removed-directory");
+        let mut receiver = FileReceiver::new(&missing).unwrap();
+        fs::remove_dir(&missing).unwrap();
+        let err = receiver
+            .write(&missing.join("output"), b"data")
+            .unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+        assert_eq!(receiver.sequence, 1, "only a name collision may be retried");
+        fs::remove_dir_all(root).unwrap();
     }
 }
 /// The receiver's description of one delivery, kept beside its payload as

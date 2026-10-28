@@ -2,7 +2,7 @@
 use super::sha;
 use serde_json::{Value, json};
 use std::{
-    ffi::OsString,
+    ffi::{OsStr, OsString},
     fs::{self, File},
     io::Read,
     path::{Path, PathBuf},
@@ -15,7 +15,6 @@ use zeno_fcis_synthesis::finite::{Case, Contract};
     all(target_os = "linux", not(target_env = "uclibc"))
 ))]
 use std::{
-    ffi::OsStr,
     fs::OpenOptions,
     io::Write,
     process::{Command, Stdio},
@@ -176,7 +175,9 @@ impl TargetRunner for RustRunner {
             Some(path) => fs::canonicalize(path).map_err(|e| error("tool-missing", e))?,
             None => {
                 let rustup = find("rustup")?;
-                let path = execute(
+                // rustup selects its command from argv[0].  A canonicalized
+                // rustup symlink may point at a binary named rustup-init.
+                let path = execute_with_argv0(
                     &rustup,
                     &[
                         "which".into(),
@@ -186,6 +187,7 @@ impl TargetRunner for RustRunner {
                     ],
                     b"",
                     &temp.0,
+                    Some(OsStr::new("rustup")),
                 )?;
                 fs::canonicalize(
                     String::from_utf8(path)
@@ -506,12 +508,22 @@ impl Drop for Temp {
 }
 
 fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<Vec<u8>, RunError> {
+    execute_with_argv0(path, args, input, cwd, None)
+}
+
+fn execute_with_argv0(
+    path: &Path,
+    args: &[OsString],
+    input: &[u8],
+    cwd: &Path,
+    argv0: Option<&OsStr>,
+) -> Result<Vec<u8>, RunError> {
     #[cfg(not(any(
         target_os = "macos",
         all(target_os = "linux", not(target_env = "uclibc"))
     )))]
     {
-        let _ = (path, args, input, cwd);
+        let _ = (path, args, input, cwd, argv0);
         Err(error(
             "unsupported-runtime-platform",
             "target execution requires a supported Linux or macOS process-group supervisor",
@@ -519,7 +531,7 @@ fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<V
     }
     #[cfg(target_os = "macos")]
     {
-        execute_macos(path, args, input, cwd, TIMEOUT, MAX_OUTPUT)
+        execute_macos(path, args, input, cwd, TIMEOUT, MAX_OUTPUT, argv0)
     }
     #[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
     {
@@ -551,6 +563,9 @@ fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<V
             .open(&stderr)
             .map_err(io)?;
         let mut command = Command::new(path);
+        if let Some(name) = argv0 {
+            command.arg0(name);
+        }
         command
             .args(args)
             .current_dir(cwd)
@@ -710,6 +725,7 @@ fn execute_macos(
     cwd: &Path,
     timeout: Duration,
     max_output: u64,
+    argv0: Option<&OsStr>,
 ) -> Result<Vec<u8>, RunError> {
     use std::os::unix::process::CommandExt;
 
@@ -738,6 +754,9 @@ fn execute_macos(
     let started = Instant::now();
     let group = MacGroup::new(cwd, started, timeout)?;
     let mut command = Command::new(path);
+    if let Some(name) = argv0 {
+        command.arg0(name);
+    }
     command
         .args(args)
         .current_dir(cwd)
@@ -808,6 +827,34 @@ fn read_output(path: &Path, limit: u64) -> Result<Vec<u8>, RunError> {
     Ok(bytes)
 }
 
+#[cfg(all(
+    test,
+    any(
+        target_os = "macos",
+        all(target_os = "linux", not(target_env = "uclibc"))
+    )
+))]
+mod launcher_tests {
+    use super::*;
+    use std::os::unix::fs::symlink;
+
+    #[test]
+    fn rustup_invocation_preserves_argv0_after_canonicalizing_a_symlink() {
+        let temp = Temp::new().unwrap_or_else(|e| panic!("{}: {}", e.code, e.message));
+        let launcher = temp.0.join("rustup");
+        symlink("/bin/sh", &launcher).unwrap_or_else(|e| panic!("symlink: {e}"));
+        let canonical = fs::canonicalize(launcher).unwrap_or_else(|e| panic!("canonical: {e}"));
+        let args = ["-c".into(), "printf '%s' \"$0\"".into()];
+
+        let unmodified = execute(&canonical, &args, b"", &temp.0)
+            .unwrap_or_else(|e| panic!("{}: {}", e.code, e.message));
+        assert_ne!(unmodified, b"rustup");
+        let named = execute_with_argv0(&canonical, &args, b"", &temp.0, Some(OsStr::new("rustup")))
+            .unwrap_or_else(|e| panic!("{}: {}", e.code, e.message));
+        assert_eq!(named, b"rustup");
+    }
+}
+
 #[cfg(all(test, target_os = "macos"))]
 mod macos_tests {
     #![allow(clippy::unwrap_used)]
@@ -833,6 +880,7 @@ mod macos_tests {
             cwd,
             timeout,
             limit,
+            None,
         )
     }
     fn code(result: Result<Vec<u8>, RunError>) -> &'static str {
@@ -886,7 +934,8 @@ mod macos_tests {
                 b"",
                 &temp.0,
                 TIMEOUT,
-                MAX_OUTPUT
+                MAX_OUTPUT,
+                None
             )),
             "tool-start"
         );

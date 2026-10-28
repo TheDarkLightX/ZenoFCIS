@@ -1,0 +1,88 @@
+{
+  "format": "zenoui/metadata/2",
+  "title": "Repair desk",
+  "action": "command.101.119",
+  "fields": {
+    "pre.100.110": {
+      "label": "Repair stage",
+      "unit": "unitless"
+    },
+    "command.101.119": {
+      "label": "Action",
+      "unit": "unitless"
+    },
+    "pre.100.170": {
+      "label": "Repairs started",
+      "unit": "unitless"
+    },
+    "pre.100.171": {
+      "label": "Requested repair units",
+      "unit": "units"
+    },
+    "context.102.160": {
+      "label": "Technician permission",
+      "unit": "unitless"
+    },
+    "command.101.164": {
+      "label": "Requested repair units",
+      "unit": "units"
+    }
+  },
+  "variants": {
+    "150": "Awaiting item",
+    "151": "Collected",
+    "152": "Waiting for repair",
+    "153": "Ready for pickup",
+    "154": "Repair in progress",
+    "120": "Start repair",
+    "121": "Mark ready",
+    "122": "Check in item",
+    "123": "Confirm pickup",
+    "124": "Request another repair"
+  },
+  "commands": {
+    "120": {
+      "label": "Start repair",
+      "consequential": true
+    },
+    "121": {
+      "label": "Mark ready",
+      "consequential": true
+    },
+    "122": {
+      "label": "Check in item",
+      "consequential": true
+    },
+    "123": {
+      "label": "Confirm pickup",
+      "consequential": true
+    },
+    "124": {
+      "label": "Request another repair",
+      "consequential": true
+    }
+  },
+  "reasons": {
+    "200": "Choose an action allowed for the current stage and your signed-in role."
+  },
+  "requirements": {
+    "collapseExpert": true,
+    "compact": true,
+    "contextFields": [
+      "context.102.160"
+    ],
+    "detailFields": [],
+    "fixedFields": [],
+    "format": "zenoui/requirements/2",
+    "groupCommands": true,
+    "groups": [],
+    "maxColumns": 2,
+    "maxExpandedExpertPanels": 0,
+    "maxVisibleForms": 1,
+    "primaryFields": [
+      "command.101.164"
+    ],
+    "projections": [],
+    "quoteOverrides": {}
+  }
+}

@@ -27,9 +27,9 @@ use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 
-use super::super::ContractError;
 use super::super::model::Contract;
 use super::super::rules::LawKind;
+use super::super::{ContractError, Current};
 use super::domain::LeafDomain;
 use super::evaluate::{self, LawSet, Outcome, Proposed};
 use super::examples;
@@ -108,16 +108,50 @@ pub(crate) fn probe(
     question: &Question,
     max_tuples: u64,
 ) -> Result<Answer, ContractError> {
+    probe_with_current(project, rules, question, max_tuples, None)
+}
+
+/// Probe the final Authority of an already validated lineage.
+pub(crate) fn probe_current(
+    current: &Current<'_>,
+    question: &Question,
+    max_tuples: u64,
+) -> Result<Answer, ContractError> {
+    probe_with_current(
+        current.project,
+        current.rules_source,
+        question,
+        max_tuples,
+        Some(current),
+    )
+}
+
+fn probe_with_current(
+    project: &str,
+    rules: &str,
+    question: &Question,
+    max_tuples: u64,
+    current: Option<&Current<'_>>,
+) -> Result<Answer, ContractError> {
     if let Question::Count { condition } = question
         && super::super::rules::Rules::read_for_project(project, rules)?.unsigned
     {
+        if current.is_some() {
+            return Err(ContractError::new(
+                "lineage binding",
+                "unsigned probes with retained lineage are unsupported",
+            ));
+        }
         return super::unsigned::count_probe(project, rules, condition, max_tuples);
     }
-    let loaded = Loaded::read(project, rules)?;
+    let loaded = match current {
+        Some(current) => Loaded::read_current(current)?,
+        None => Loaded::read(project, rules)?,
+    };
     if let Question::Explain { input } = question {
-        return explain(&loaded, input).map(Answer::Answered);
+        return explain(&loaded, input, current).map(Answer::Answered);
     }
-    let observation = match machine::observe_contract(&loaded, max_tuples)? {
+    let observation = match machine::observe_current(&loaded, current, max_tuples)? {
         Ok(observation) => observation,
         Err(inconclusive) => return Ok(Answer::Inconclusive(inconclusive)),
     };
@@ -427,7 +461,11 @@ fn depends(
 }
 
 /// The case that decides `input` and what the Authority does with it.
-fn explain(loaded: &Loaded, input: &[i128]) -> Result<Value, ContractError> {
+fn explain(
+    loaded: &Loaded,
+    input: &[i128],
+    current: Option<&Current<'_>>,
+) -> Result<Value, ContractError> {
     if input.len() != loaded.positions.len() {
         return Err(ContractError::new(
             "--input",
@@ -459,12 +497,14 @@ fn explain(loaded: &Loaded, input: &[i128]) -> Result<Value, ContractError> {
         }
     }
     let contract = Contract::build(&loaded.declarations, &loaded.rules, loaded.commitment)?;
-    let selected = contract
-        .program()
-        .ok()
+    let program = match current {
+        Some(current) => Some(current.contract.program()?),
+        None => contract.program().ok(),
+    };
+    let selected = program
         .and_then(|program| program.evaluate(input).ok())
         .and_then(|outputs| usize::try_from(*outputs.first()?).ok());
-    let outcome = loaded.bind(&loaded.rules, |authority, framer| {
+    let outcome = loaded.bind_current(current, |authority, framer| {
         Ok(evaluate::evaluate(authority, framer, input))
     })?;
     let cases: Vec<Value> = loaded

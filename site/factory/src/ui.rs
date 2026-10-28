@@ -84,6 +84,39 @@ fn scalar(atom: c::Atom<'_>) -> Result<String> {
     }
 }
 
+/// Grouping provenance from the existing checked table expansion, matched to
+/// the actual scalar input positions. This adds no state or decision semantics.
+fn fixed_tables(project: &str, positions: &[Position]) -> Result<Option<Value>> {
+    let expansion = checked(zeno_fcis_spec::expand_tables(
+        project,
+        zeno_fcis_spec::SourceLimits::default(),
+    ))?;
+    let mut tables = Vec::new();
+    for table in expansion.tables.iter().filter(|table| table.owner == 100) {
+        let mut entries = Vec::new();
+        for offset in 0..table.size {
+            let field = table.id.checked_add(offset).ok_or("UiTableFieldBinding")?;
+            let bound: Vec<_> = positions
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| p.source == Source::State && p.field.map(u32::from) == Some(field))
+                .collect();
+            let [(index, position)] = bound.as_slice() else {
+                return Err("UiTableFieldBinding".into());
+            };
+            if position.type_id != table.field_type
+                || position.name != format!("pre.{}.{}", table.owner, field)
+            {
+                return Err("UiTableFieldBinding".into());
+            }
+            entries.push(json!({"field":field.to_string(),"path":position.name,"index":index}));
+        }
+        tables.push(json!({"id":table.id.to_string(),"owner":table.owner.to_string(),
+            "name":table.name,"fieldType":table.field_type.to_string(),"size":table.size,"entries":entries}));
+    }
+    Ok((!tables.is_empty()).then(|| json!({"format":"zenoui/native-fixed-tables/1","tables":tables})))
+}
+
 /// Inspects exact schema domains and authored names; never guesses presentation metadata.
 /// # Errors
 /// Refuses unsupported contract shapes or invalid policies.
@@ -141,9 +174,11 @@ pub fn describe(source: &Value) -> Result<Value> {
                 item
             })
             .collect();
-        Ok(
-            json!({"fields":fields,"reasons":d.notes.reasons.iter().map(|(id,(name,_))| json!({"id":id.to_string(),"name":name})).collect::<Vec<_>>(),"domain":domain::domain_size(positions).map(|v|v.to_string()),"enablement":enablement_hole()?}),
-        )
+        let mut descriptor = json!({"fields":fields,"reasons":d.notes.reasons.iter().map(|(id,(name,_))| json!({"id":id.to_string(),"name":name})).collect::<Vec<_>>(),"domain":domain::domain_size(positions).map(|v|v.to_string()),"enablement":enablement_hole()?});
+        if let Some(tables) = fixed_tables(source["project"].as_str().ok_or("UiMissingProject")?, positions)? {
+            descriptor["nativeTables"] = tables;
+        }
+        Ok(descriptor)
     })
 }
 
@@ -337,5 +372,54 @@ mod tests {
         let checked = finite(&source()).unwrap();
         assert_eq!(checked["domain"], "18");
         assert_eq!(checked["classes"].as_str().unwrap().len(), 18);
+    }
+    #[test]
+    fn authored_library_table_binds_native_positions_and_real_decisions() {
+        let source = json!({
+            "project": include_str!("../../zenoui/test-projects/fixed-table-library/project.zeno"),
+            "policy": include_str!("../../zenoui/test-projects/fixed-table-library/v2/policy.json")
+        });
+        let descriptor = describe(&source).unwrap();
+        let fields = descriptor["fields"].as_array().unwrap();
+        let tables = descriptor["nativeTables"]["tables"].as_array().unwrap();
+        assert_eq!(descriptor["nativeTables"]["format"], "zenoui/native-fixed-tables/1");
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0]["id"], "110");
+        assert_eq!(tables[0]["owner"], "100");
+        assert_eq!(tables[0]["fieldType"], "105");
+        assert_eq!(tables[0]["size"], 6);
+        for entry in tables[0]["entries"].as_array().unwrap() {
+            let index = entry["index"].as_u64().unwrap() as usize;
+            assert_eq!(fields[index]["source"], "state");
+            assert_eq!(fields[index]["path"], entry["path"]);
+            assert_eq!(fields[index]["field"].as_u64().unwrap().to_string(), entry["field"]);
+            assert_eq!(fields[index]["type"], 105);
+        }
+        let mut input: Vec<Value> = fields.iter().map(|f| f["initial"].clone()).collect();
+        let position = |path: &str| fields.iter().position(|f| f["path"] == path).unwrap();
+        input[position("command.101.120")] = json!("150");
+        input[position("command.101.121")] = json!("0");
+        input[position("command.101.122")] = json!("1");
+        input[position("context.102")] = json!("130");
+        let before: Vec<_> = fields.iter().filter(|f| f["source"] == "state").map(|f| f["initial"].clone()).collect();
+        let borrowed = decide(&source, &json!(input)).unwrap();
+        assert_eq!(borrowed["class"], "Accept");
+        let mut at = 0;
+        for (index, field) in fields.iter().enumerate() {
+            if field["source"] == "state" {
+                input[index] = borrowed["post"][at].clone();
+                at += 1;
+            }
+        }
+        assert_eq!(input[position("pre.100.110")], "1");
+        input[position("command.101.120")] = json!("151");
+        let returned = decide(&source, &json!(input)).unwrap();
+        assert_eq!(returned["class"], "Accept");
+        assert_eq!(returned["post"], json!(before));
+        input[position("context.102")] = json!("131");
+        let visitor = decide(&source, &json!(input)).unwrap();
+        assert_eq!(visitor["class"], "Reject");
+        assert_eq!(visitor["reason"], "200");
+        assert_eq!(visitor["post"], json!([]));
     }
 }

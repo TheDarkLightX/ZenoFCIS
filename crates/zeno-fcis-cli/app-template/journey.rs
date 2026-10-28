@@ -387,6 +387,117 @@ fn file_receiver_deduplicates_across_reopen_and_keeps_collisions_unknown() {
     ok(std::fs::remove_dir_all(root));
 }
 
+fn file_receiver_test_delivery(id: u8) -> zeno_fcis_shell::effects::port::Delivery {
+    let payload = b"retained delivery".to_vec();
+    zeno_fcis_shell::effects::port::Delivery {
+        id: Hash32::new([id; 32]),
+        version: 1,
+        lane: 1,
+        ordinal: 0,
+        destination: [&[6, 0, 0, 0, 19][..], b"local-file-receiver"].concat(),
+        payload_sha256: RustCryptoSha256::hash(&payload),
+        payload,
+    }
+}
+
+fn file_receiver_orphan(root: &Path, sequence: u64) -> std::path::PathBuf {
+    root.join(format!(".pending-{}-{sequence}", std::process::id()))
+}
+
+#[test]
+fn file_receiver_skips_one_and_multiple_stale_temporary_names_across_reopen() {
+    use zeno_fcis_shell::effects::port::Sent;
+    use zeno_fcis_shell_sqlite::effects::production::Transport;
+
+    for (label, count) in [("one", 1), ("multiple", 4), ("last-slot", 31)] {
+        let root =
+            std::env::temp_dir().join(format!("app-receiver-stale-{label}-{}", std::process::id()));
+        ok(std::fs::create_dir(&root));
+        for sequence in 1..=count {
+            ok(std::fs::write(
+                file_receiver_orphan(&root, sequence),
+                format!("orphan-{sequence}"),
+            ));
+        }
+        let first = file_receiver_test_delivery(3);
+        let second = file_receiver_test_delivery(4);
+        let mut receiver = ok(FileReceiver::new(&root));
+        assert!(
+            matches!(receiver.send(&first), Sent::Sent(_)),
+            "{label}: first delivery"
+        );
+        drop(receiver);
+        let mut reopened = ok(FileReceiver::new(&root));
+        assert!(
+            matches!(reopened.send(&first), Sent::Sent(_)),
+            "{label}: duplicate"
+        );
+        assert!(
+            matches!(reopened.send(&second), Sent::Sent(_)),
+            "{label}: new delivery"
+        );
+        for delivery in [&first, &second] {
+            let name = application::app::hex(delivery.id.as_bytes());
+            assert_eq!(ok(std::fs::read(root.join(name))), delivery.payload);
+        }
+        for sequence in 1..=count {
+            assert_eq!(
+                ok(std::fs::read(file_receiver_orphan(&root, sequence))),
+                format!("orphan-{sequence}").as_bytes()
+            );
+        }
+        assert_eq!(
+            ok(std::fs::read_dir(&root)).count(),
+            usize::try_from(count).unwrap() + 4
+        );
+        ok(std::fs::remove_dir_all(root));
+    }
+}
+
+#[test]
+fn file_receiver_collision_budget_exhaustion_is_bounded_and_retryable() {
+    use zeno_fcis_shell::effects::port::{Fault, Sent};
+    use zeno_fcis_shell_sqlite::effects::production::Transport;
+
+    // The explicit contract is at most 32 temporary-name attempts per write.
+    const NAME_ATTEMPTS: u64 = 32;
+    let root = std::env::temp_dir().join(format!("app-receiver-exhausted-{}", std::process::id()));
+    ok(std::fs::create_dir(&root));
+    for sequence in 1..=NAME_ATTEMPTS {
+        ok(std::fs::write(
+            file_receiver_orphan(&root, sequence),
+            format!("orphan-{sequence}"),
+        ));
+    }
+    let delivery = file_receiver_test_delivery(5);
+    let name = application::app::hex(delivery.id.as_bytes());
+    let mut receiver = ok(FileReceiver::new(&root));
+    assert_eq!(receiver.send(&delivery), Sent::Unknown(Fault::Io));
+    assert!(!root.join(&name).exists());
+    assert!(!root.join(format!("{name}.json")).exists());
+    assert_eq!(
+        ok(std::fs::read_dir(&root)).count(),
+        usize::try_from(NAME_ATTEMPTS).unwrap()
+    );
+    for sequence in 1..=NAME_ATTEMPTS {
+        assert_eq!(
+            ok(std::fs::read(file_receiver_orphan(&root, sequence))),
+            format!("orphan-{sequence}").as_bytes()
+        );
+    }
+    // The exhausted call consumed exactly those 32 names; the next may use 33.
+    assert!(matches!(receiver.send(&delivery), Sent::Sent(_)));
+    assert_eq!(ok(std::fs::read(root.join(&name))), delivery.payload);
+    drop(receiver);
+    let mut reopened = ok(FileReceiver::new(&root));
+    assert!(matches!(reopened.send(&delivery), Sent::Sent(_)));
+    assert_eq!(
+        ok(std::fs::read_dir(&root)).count(),
+        usize::try_from(NAME_ATTEMPTS).unwrap() + 2
+    );
+    ok(std::fs::remove_dir_all(root));
+}
+
 // Write a parties file whose entry i uses credential [i + 0x31; 32] and principal
 // [i + 0x51; 32]; each entry is (name, credential index, principal index, context).
 fn parties_file(root: &Path, entries: &[(&str, usize, usize, Value)]) -> std::path::PathBuf {
@@ -1174,7 +1285,14 @@ fn public_origin_is_the_only_origin() {
     let fixture: Value = ok(serde_json::from_slice(include_bytes!(
         "../app-checks/journey.json"
     )));
-    let step = &fixture["steps"][0];
+    // Leading refusal examples do not publish. Use the first accepting step
+    // to exercise an actual genesis commit, without weakening the 200 check.
+    let step = fixture["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|step| step["class"] == "Accept")
+        .expect("the journey must contain an accepting genesis step");
     let contract = v2_contract::Contract::new();
     let descriptor = contract.descriptor();
     let authority = ok(application::authority(&descriptor));
@@ -1822,7 +1940,14 @@ fn preview_uses_the_latest_committed_head() {
     let fixture: Value = ok(serde_json::from_slice(include_bytes!(
         "../app-checks/journey.json"
     )));
-    let step = &fixture["steps"][0];
+    // Leading refusal examples do not publish. Use the first accepting step
+    // to exercise an actual genesis commit, without weakening the 200 check.
+    let step = fixture["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|step| step["class"] == "Accept")
+        .expect("the journey must contain an accepting genesis step");
     ok(std::fs::write(
         root.join("clock"),
         step["clock"].as_str().unwrap_or("0"),
@@ -1954,6 +2079,8 @@ fn committed_reply_marks_pending_delivery() {
             journey.set_clock(time);
         }
         let party = step["party"].as_str().unwrap();
+        let (_, before) = snapshot(&mut server, &journey.credential(party));
+        let pending_before: u64 = before["pending"].as_str().unwrap().parse().unwrap();
         let (status, _, original, bytes) = send(
             &mut server,
             &journey,
@@ -1968,13 +2095,33 @@ fn committed_reply_marks_pending_delivery() {
         assert_eq!(status, 200, "delivery failure changed committed reply");
         let reply: Value = ok(serde_json::from_slice(&bytes));
         let (_, state) = snapshot(&mut server, &journey.credential(party));
-        if state["pending"] != "0" {
+        let pending_after: u64 = state["pending"].as_str().unwrap().parse().unwrap();
+        assert!(
+            pending_after >= pending_before,
+            "unavailable transport lost pending work"
+        );
+        // The reply describes this commit's deliveries, not all earlier backlog.
+        // With no successful sends, an increase identifies this commit's outbox.
+        if pending_after > pending_before {
             assert_eq!(
                 reply["delivery"], "pending",
-                "pending delivery not reported"
+                "this commit's pending delivery not reported"
             );
             pending = Some((party.to_owned(), original, reply));
+        } else {
+            assert!(
+                reply["delivery"].is_null(),
+                "earlier backlog attributed to this commit"
+            );
         }
+    }
+    if let Some(expected) = journey.fixture["deliveries"].as_u64() {
+        let (_, state) = snapshot(&mut server, &journey.credential(&journey.parties[0].name));
+        let actual: u64 = state["pending"].as_str().unwrap().parse().unwrap();
+        assert_eq!(
+            actual, expected,
+            "declared deliveries must all remain pending"
+        );
     }
     if journey.fixture["deliveries"].as_u64().unwrap_or(0) > 0 {
         let (party, original, committed) = pending.expect("a committed delivery remains pending");
