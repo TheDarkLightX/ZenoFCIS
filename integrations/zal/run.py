@@ -7,6 +7,11 @@ from pathlib import Path
 import shlex
 import sys
 
+# Keep the word-kernel profile separate from existing ZAL model dispatch.
+if __name__ == "__main__" and sys.argv[1:2] == ["word-kernel"]:
+    from word_kernel import main as word_kernel_main
+    raise SystemExit(word_kernel_main(sys.argv[2:]))
+
 import behavior
 from behavior import MAX_SOURCE
 import behavior2
@@ -56,12 +61,17 @@ def ladder_json_refusal(source, path):
     }
 
 
-def main():
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] == ["word-kernel"]:
+        from word_kernel import main as word_kernel_main
+        return word_kernel_main(argv[1:])
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
     from guide_help import example_help
     exit_help = "Exit 0 positive/answered, 1 counterexample/different/none-in-scope, 2 UNKNOWN/unfinished/unsupported/refused."
     parser = argparse.ArgumentParser(description=__doc__, epilog=exit_help + example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("word-kernel", help="Read, question, synthesize and replay source-bound u64 machine kernels")
     import loop_coverage
     loop_coverage.add_command(sub)
     for command in ["legend", "check", "render", "export", "export-game", "qualify", "diff", "ui", "story", "why-not", "what-if",
@@ -106,7 +116,7 @@ def main():
         if command == "ui":
             p.add_argument("--port", type=int, default=8765)
             p.add_argument("--workspace", type=Path, help="Use an existing terminal/MCP shared workspace")
-    options = parser.parse_args()
+    options = parser.parse_args(argv)
     if options.command == "coverage":
         return loop_coverage.main(options)
     source = ""

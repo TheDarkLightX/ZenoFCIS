@@ -7,9 +7,10 @@ and native compilation are separate stages.
 
 This is an experimental 2.7 tool entry point, not a registered replacement for
 the Rust CLI's finite synthesis targets or a qualified complete-app compiler.
-ZAL retains its broader abstraction meaning. A future ZAL lowering must preserve
-the complete declared ABI, rejection behavior, effects and metering; the current
-machine-problem format specifies one modular word-function result.
+ZAL retains its broader abstraction meaning. The explicit `zal/word-kernel/1`
+profile below connects controlled human wording to this one modular-word
+problem format. Other ZAL profiles and full application lowering retain their
+own ABI, rejection, effects and metering obligations.
 
 ## Registered profiles
 
@@ -158,6 +159,109 @@ profile. Retain equal or worse results, including missed compact instructions.
 Apply the [five-part feasibility standard](RESEARCH_FEASIBILITY.md) before
 promoting a route. These experiments do not complete native-checker refinement,
 installed isolation, full-width DeFi, arbitrary embedded apps or release gates.
+
+## ZAL human-to-machine word-kernel connection
+
+Use `integrations/zal/run.py word-kernel` for this closed profile. It leaves
+existing FSM, typed, effects, lens and Haskell-backed ZAL meanings and the
+browser workspace unchanged. The symbolic and controlled-English examples in
+[`test-data/zal-word-kernel/`](../test-data/zal-word-kernel/) mean the same thing:
+
+```text
+profile zal/word-kernel/1;
+kernel add64;
+target x86_64-sysv-register/1;
+inputs x:u64,y:u64;
+result (add x y) modulo 2^64;
+palette [["mov","rax","rdi"],["add","rax","rsi"],["lea","rax","rdi","rsi",1],["xor","rax","rsi"]];
+max-body 3;
+objective bytes;
+limits candidates=1000 checks=16 deadline-ms=1000 solver-ms=200;
+```
+
+Its English result is `Return (x plus y) with wraparound modulo 2^64.` English
+also states the target, unsigned inputs, palette, objective and every budget.
+Expressions admit `x`, `y`, canonical decimal words, fully parenthesized `not`,
+`add/sub/mul`, `and/or/xor`, and `shl/lshr` by a literal 0..63. English uses
+`complement`, `plus/minus/times`, `bitwise and/or/xor`, and `shifted left by` /
+`shifted right logically by`. There are exactly nine declarations, at most 64
+expression nodes and depth 16. Checked overflow, U256/I256, memory operations,
+effects, extra inputs, multiple results and distributed protocols refuse.
+
+First read the source and copy its returned revision into later calls:
+
+```sh
+python3 -B integrations/zal/run.py word-kernel read --source test-data/zal-word-kernel/add64-x86.zal
+python3 -B integrations/zal/run.py word-kernel show --source SOURCE.zal --revision REVISION
+python3 -B integrations/zal/run.py word-kernel render --source SOURCE.zal --revision REVISION --to english
+python3 -B integrations/zal/run.py word-kernel question --source SOURCE.zal --revision REVISION --text 'What happens on overflow?'
+python3 -B integrations/zal/run.py word-kernel what-if --source SOURCE.zal --revision REVISION --x 18446744073709551615 --y 1
+python3 -B integrations/zal/run.py word-kernel lower --source SOURCE.zal --revision REVISION
+```
+
+Use `--syntax english` for English sources. `show` returns both canonical forms
+and the exact lowered problem. Other questions are `What can be clobbered?`,
+`Does it access memory?`, `What are the limits?`, `How is a candidate checked?`,
+and `What if x is 18446744073709551615 and y is 1?`. That example returns 0 under
+the specification; it does not execute candidate bytes.
+
+Use fresh ordinary directories outside source for the connected loop:
+
+```sh
+python3 -B integrations/zal/run.py word-kernel open --source SOURCE.zal --revision REVISION --session NEW_SESSION
+python3 -B integrations/zal/run.py word-kernel packet --session SESSION --revision REVISION
+python3 -B integrations/zal/run.py word-kernel candidate --session SESSION --revision REVISION --proposal PROPOSAL.json
+python3 -B integrations/zal/run.py word-kernel search --session SESSION --revision REVISION
+python3 -B integrations/zal/run.py word-kernel emit --session SESSION --revision REVISION --out NEW_ARTIFACT
+python3 -B integrations/zal/run.py word-kernel replay --artifact ARTIFACT --revision REVISION
+```
+
+Proposals use the existing `zeno-fcis/machine-proposal/1` schema. For this
+example, `4889f84831f0c3` computes XOR and should yield a counterexample;
+`488d0437c3` proposes the sum through LEA. The unchanged independent decoder
+and SMT checker decide. Feedback names x, y, every entry scratch assignment,
+the required and reported actual results. The human question grants no
+acceptance and never edits the requirement. LLMs supply proposal data only.
+
+Lowering binds raw ASCII source, semantic revision, exact expression spans,
+workflow limits and bridge/machine sources. English and symbolic forms share a
+semantic revision but have distinct raw source hashes. Search limits apply per
+invocation; candidate/emit/replay use the declared solver timeout. Existing
+session event/byte ceilings apply. Impose a separate outer workflow budget.
+Emission retains the original six-file artifact inside `machine/`; its wrapper
+adds `source.zal`, `binding.json` and a strict manifest. Replay re-parses and
+re-lowers source, compares the nested machine problem, then calls the original
+artifact checker again. Rehashing changed human meaning cannot make unchanged
+bytes satisfy it. Trusted local storage/loader assumptions remain; hashes do
+not authenticate owner intent.
+
+Body data-memory operands refuse. The x86 return **reads the caller's return
+address from the stack** and changes stack/control state under ABI assumptions.
+Those effects, flags, CET, instruction fetch, faults and timing are outside
+this word-result model. RV return assumes a valid ra/link environment. This
+does not establish that a kernel never accesses memory or prove a complete
+ABI. Emission, compilation, target execution and deployment remain separate.
+
+The explicit observation contract is the returned u64 word under this ISA and
+register model. Equal words do not establish whole-machine stuttering, timing
+or cost equivalence. `What is observed?` explains that boundary. Failed,
+counterexample and inconclusive recorded proposals remain in the session even
+when the incumbent is unchanged. Preserve that history beside emitted artifacts;
+the selected artifact is not the full search history. Deadlines remain
+inconclusive, and instruction caps, byte/body counts and search/check charges
+remain separate. Straight-line modeled steps are bounded; temporal `next` /
+`within` requirements and general external progress are unsupported.
+
+```sh
+python3 -B -m unittest tools.test_zal_word_kernel.Pure
+python3 -O -B -m unittest tools.test_zal_word_kernel.Pure
+python3 -B tools/test_zal_word_kernel.py
+```
+
+The first two gates are pure parser/binding/transport controls with explicitly
+supplied checker fixtures. The full third gate invokes the real installed
+Z3 checker and identities; missing solver support fails it. These gates are
+not native execution, application qualification or release claims.
 
 ## Sources and agent skill
 

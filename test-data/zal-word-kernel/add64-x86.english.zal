@@ -1,0 +1,9 @@
+ZAL word kernel profile 1.
+Kernel add64.
+Target x86_64-sysv-register/1.
+Inputs x and y are unsigned 64-bit words.
+Return (x plus y) with wraparound modulo 2^64.
+Instruction palette: [["mov","rax","rdi"],["add","rax","rsi"],["lea","rax","rdi","rsi",1],["xor","rax","rsi"]].
+Use at most 3 body instructions.
+Minimize bytes.
+Search limits: candidates 1000, checks 16, deadline 1000 ms, solver 200 ms.
