@@ -1,0 +1,74 @@
+{
+  "schema": "zeno-fcis/ordering256-profile/1",
+  "scope": "Generic all-N high-limb-first lexical comparison in the actual shared production module; no input premises. Not public numeric-wrapper order or all arithmetic.",
+  "source_hashes": {
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "55addbb825ae43af20b69704732d5b2c867c233444e362ca27754806f0ef357e",
+    "crates/zeno-fcis-value/src/profile2/ordering256.rs": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825",
+    "crates/zeno-fcis-value/src/profile2/ordering_model.rs": "d02708ccbae41434efc8acb8e8bcd7bd30f2abc04b7256bd32d15421c3f1544a",
+    "crates/zeno-fcis-value/src/profile2/mod.rs": "de8a75172ecbd92695978f32951b4ca7f0278bf33231e9da3af66d3a9f08a062",
+    "verification/verus/ordering256_harness.rs": "83ed73a6504208f584b6a0f2a77b23525f3caa055b3da248c8d2098ee3faf17f"
+  },
+  "expected_verified": 2,
+  "target_function": "ordering256_harness::arithmetic256::compare",
+  "local_functions": [
+    "ordering256_harness::arithmetic256::compare",
+    "ordering256_harness::arithmetic256::ordering_model::suffix_equal",
+    "ordering256_harness::arithmetic256::ordering_model::lex_lt",
+    "ordering256_harness::arithmetic256::ordering_model::lex_gt",
+    "ordering256_harness::arithmetic256::ordering_model::lex_result"
+  ],
+  "body_lines": [
+    13,
+    21
+  ],
+  "native_configuration_exceptions": {
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "#[allow(dead_code)] #[path = \"reference/legacy_scalar.rs\"] mod legacy_scalar;",
+        "reason": "Retained legacy test reference is absent from production and from this proof harness."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "#[path = \"tests.rs\"] mod tests;",
+        "reason": "Retained arithmetic tests are independently run natively; the proof loads only the actual comparator."
+      }
+    ],
+    "crates/zeno-fcis-value/src/profile2/mod.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "mod boundary_tests;",
+        "reason": "Boundary tests are excluded from production and separately exercised by Cargo."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "mod value_tests;",
+        "reason": "Value tests are excluded from production and separately exercised by Cargo."
+      }
+    ],
+    "verification/verus/ordering256_harness.rs": [
+      {
+        "text": "#![cfg_attr(verus_keep_ghost, feature(proc_macro_hygiene))]",
+        "following": "extern crate alloc;",
+        "reason": "Enables the pinned Verus annotation frontend only; introduces no native executable branch."
+      }
+    ]
+  },
+  "mutants": [
+    {
+      "name": "always_equal",
+      "old": "return a[i].cmp(&b[i]);",
+      "new": "return Ordering::Equal;"
+    },
+    {
+      "name": "reverse_pivot",
+      "old": "return a[i].cmp(&b[i]);",
+      "new": "return b[i].cmp(&a[i]);"
+    },
+    {
+      "name": "omit_lowest",
+      "old": "while i > 0 {",
+      "new": "while i > 1 {"
+    }
+  ]
+}

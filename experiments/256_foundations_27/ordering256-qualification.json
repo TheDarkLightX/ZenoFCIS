@@ -1,0 +1,316 @@
+{
+  "base_commit": "7fc5c0d0d6fc793b29f714110f6292aa847add01",
+  "evidence_reuse": "Native checks belong to frozen source manifest66955d656527d0a3a99f3b75fca0bc407780f99b32c775594d054093097459bd. Later proof-tool/documentation/provenance additions preserve every listed compiled package/configuration input; they are not fresh native tests on a later commit. Public proof-driver execution is independently bound to its17 source inputs.",
+  "formal": {
+    "controls": [
+      {
+        "exit": 1,
+        "name": "always_equal",
+        "semantic_refusal": true,
+        "source_sha256": "4c7afb7716d774d5b773c9f78484f58f657165822882a537a234afed4c39bb6c"
+      },
+      {
+        "exit": 1,
+        "name": "reverse_pivot",
+        "semantic_refusal": true,
+        "source_sha256": "0f58a4e4f6f60aa6341c1bae714104b39efeedf3135722d5b494e2bd5fdd27ba"
+      },
+      {
+        "exit": 1,
+        "name": "omit_lowest",
+        "semantic_refusal": true,
+        "source_sha256": "9726c0354d4e91fd7a9fe629bb5286ee4234af2219c404f32a6f600f4018262b"
+      }
+    ],
+    "coverage": {
+      "body_lines": [
+        13,
+        21
+      ],
+      "function": "ordering256_harness::arithmetic256::compare",
+      "solver_queries": 2
+    },
+    "native_configuration": {
+      "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": [
+        {
+          "following": "#[allow(dead_code)] #[path = \"reference/legacy_scalar.rs\"] mod legacy_scalar;",
+          "line": 8,
+          "reason": "Retained legacy test reference is absent from production and from this proof harness.",
+          "text": "#[cfg(test)]"
+        },
+        {
+          "following": "#[path = \"tests.rs\"] mod tests;",
+          "line": 311,
+          "reason": "Retained arithmetic tests are independently run natively; the proof loads only the actual comparator.",
+          "text": "#[cfg(test)]"
+        }
+      ],
+      "crates/zeno-fcis-value/src/profile2/mod.rs": [
+        {
+          "following": "mod boundary_tests;",
+          "line": 201,
+          "reason": "Boundary tests are excluded from production and separately exercised by Cargo.",
+          "text": "#[cfg(test)]"
+        },
+        {
+          "following": "mod value_tests;",
+          "line": 204,
+          "reason": "Value tests are excluded from production and separately exercised by Cargo.",
+          "text": "#[cfg(test)]"
+        }
+      ],
+      "crates/zeno-fcis-value/src/profile2/ordering256.rs": [],
+      "crates/zeno-fcis-value/src/profile2/ordering_model.rs": [],
+      "verification/verus/ordering256_harness.rs": [
+        {
+          "following": "extern crate alloc;",
+          "line": 5,
+          "reason": "Enables the pinned Verus annotation frontend only; introduces no native executable branch.",
+          "text": "#![cfg_attr(verus_keep_ghost, feature(proc_macro_hygiene))]"
+        }
+      ]
+    },
+    "native_execution_or_full_arithmetic_proof": false,
+    "schema": "zeno-fcis/ordering256-qualification/1",
+    "scope": "Generic all-N high-limb-first lexical comparison in the actual shared production module; no input premises. Not public numeric-wrapper order or all arithmetic.",
+    "source_bindings": {
+      "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "55addbb825ae43af20b69704732d5b2c867c233444e362ca27754806f0ef357e",
+      "crates/zeno-fcis-value/src/profile2/mod.rs": "de8a75172ecbd92695978f32951b4ca7f0278bf33231e9da3af66d3a9f08a062",
+      "crates/zeno-fcis-value/src/profile2/ordering256.rs": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825",
+      "crates/zeno-fcis-value/src/profile2/ordering_model.rs": "d02708ccbae41434efc8acb8e8bcd7bd30f2abc04b7256bd32d15421c3f1544a",
+      "tools/check_ordering256.py": "78ce948912a9e0a717f22e95c87b244a456b435c57b91b03838177d47bff4741",
+      "tools/check_verus.py": "b27d67bc264b571e31b0d821e07328026834ef7b5deb05f064a941ea7efd363a",
+      "tools/qualification_controls.py": "9804f6f60176aa588eacf7967b45a75ea124676e29ba1a41eaabaf7e3acf5782",
+      "tools/qualification_sources.py": "b9147e39bbbb0d742fbc6cb597fe698ffb75aa77cd2eccbd12e009689d2a9370",
+      "tools/test_check_ordering256.py": "19edb635e5068ff8f5a207b7555c36c7e94c815d3ef5c64cb0b4baa86c502787",
+      "tools/test_qualification_controls.py": "86fd7beca8122aaa5a151cf6fa822fff5e0825fa5fbda3b803f9ed4b7f2b695d",
+      "tools/test_qualification_sources.py": "3db1e2eb6fcb96b5862b2a6e07f5a854bec91c46869d2311d56865c4b341d5ec",
+      "tools/test_verus_ids.py": "3f1713f4a6dbe779a095ce913537d0f5f04048b74dac733ec95c05eb76dda600",
+      "tools/verus_ids.py": "71e41f4e02efa5f50a0a3705f18129f0fc5fd0cd26ef3fe145ee720096679090",
+      "verification/verus/ordering256_harness.rs": "83ed73a6504208f584b6a0f2a77b23525f3caa055b3da248c8d2098ee3faf17f",
+      "verification/verus/ordering256_profile.json": "cd4f365072eb1b04e84498a1265deafafe379320afd8f01ddd6b47e20e9f932d",
+      "verification/verus/qualification_sources.json": "3895b9c43684d418fd95a240c354c61ed114fe8af0495101113c466aca3d9211",
+      "verification/verus/toolchain.json": "a8a66e9481c2701be0134c049a022558d6ee0f89e74618e3e47c13eb3c3bb862"
+    },
+    "verification": {
+      "encountered-error": false,
+      "encountered-vir-error": false,
+      "errors": 0,
+      "is-verifying-entire-crate": true,
+      "success": true,
+      "verified": 2
+    }
+  },
+  "full27_complete": false,
+  "gate_unit_tests": {
+    "cases": 13,
+    "profile_sha256": "cd4f365072eb1b04e84498a1265deafafe379320afd8f01ddd6b47e20e9f932d",
+    "scope": "Pure source/configuration admission and proof-output controls; not extra arithmetic theorems.",
+    "tests_sha256": "19edb635e5068ff8f5a207b7555c36c7e94c815d3ef5c64cb0b4baa86c502787",
+    "tool_sha256": "78ce948912a9e0a717f22e95c87b244a456b435c57b91b03838177d47bff4741"
+  },
+  "native": {
+    "allocation_only_check_passed": true,
+    "cleanup_signals": 0,
+    "commands": [
+      {
+        "argv": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--lib",
+          "--locked",
+          "--offline",
+          "--color",
+          "never",
+          "--message-format=json",
+          "--jobs",
+          "1",
+          "-p",
+          "zeno-fcis-value",
+          "-p",
+          "zeno-fcis-codec",
+          "--features",
+          "zeno-fcis-value/value-profile-2,zeno-fcis-codec/value-profile-2",
+          "--",
+          "--test-threads=1"
+        ],
+        "complete": true,
+        "features_matched": true,
+        "passed_counts": [
+          39,
+          39
+        ]
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--lib",
+          "--locked",
+          "--offline",
+          "--color",
+          "never",
+          "--message-format=json",
+          "--jobs",
+          "1",
+          "-p",
+          "zeno-fcis-schema",
+          "--features",
+          "schema-profile-2",
+          "--",
+          "--test-threads=1"
+        ],
+        "complete": true,
+        "features_matched": true,
+        "passed_counts": [
+          40
+        ]
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--test",
+          "schema2_defi_state",
+          "--locked",
+          "--offline",
+          "--color",
+          "never",
+          "--message-format=json",
+          "--jobs",
+          "1",
+          "-p",
+          "zeno-fcis-schema",
+          "--features",
+          "schema-profile-2",
+          "--",
+          "--test-threads=1"
+        ],
+        "complete": true,
+        "features_matched": true,
+        "passed_counts": [
+          10
+        ]
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.97.1",
+          "check",
+          "--lib",
+          "--locked",
+          "--offline",
+          "--color",
+          "never",
+          "--message-format=json",
+          "--jobs",
+          "1",
+          "-p",
+          "zeno-fcis-schema",
+          "--no-default-features",
+          "--features",
+          "schema-profile-2"
+        ],
+        "complete": true,
+        "features_matched": true,
+        "passed_counts": null
+      }
+    ],
+    "compiled_package_and_configuration_inputs": {
+      ".cargo/config.toml": "617c13aecf5b5eb08def4c002a76c19312b4b5bb1d5651cedd27f8db624e75cc",
+      "Cargo.lock": "c7b2161a386610144e5f23ecd05ea304a71d6c910edc11bc3387021956518ba7",
+      "Cargo.toml": "0e73f02a7aa80134a65b00d0f7942b98076c3bae76673f14ef8d501e52913d1e",
+      "crates/zeno-fcis-codec/Cargo.toml": "8b468f921361bd679baeb4e7e466c04a6230f84296f9b67a3dfbc45e7a12442e",
+      "crates/zeno-fcis-codec/src/artifact.rs": "3bd613e822e8fa6ef54a15c6d53fa528824b20bfc2ddd681327955e8511cdf41",
+      "crates/zeno-fcis-codec/src/collection_limits.rs": "2b40147aed78a65ecee5514d5bb2b321f8e1a0769b3c83aa3493b4a1e2b8c408",
+      "crates/zeno-fcis-codec/src/decoder_bytes.rs": "9f7290924bc307d06aa98fd66c30c77c7d0ecfa4f591d1a2c48c7c8b418a1035",
+      "crates/zeno-fcis-codec/src/decoder_induction.rs": "7c283513190f3a93f9875e2a9a22669606c1776bff711dafd7e60efeffaf723f",
+      "crates/zeno-fcis-codec/src/decoder_refinement.rs": "360b68704c058847684c89fb74b599e92dbd47021728256f5656da1f4602759e",
+      "crates/zeno-fcis-codec/src/decoder_spec.rs": "cfa5e94028fc022feb379a8c583628a572ec19d130775dff06a5ed8ca6c41a0d",
+      "crates/zeno-fcis-codec/src/domains.rs": "f4e006cc6ec0294e9af982f909a7a001f73448b70891d3ea423524b2476f71f5",
+      "crates/zeno-fcis-codec/src/lib.rs": "3bfc4893d883de4400ee8b0fdc6293efbe241eda150f0f8281aeaab2cb998d3b",
+      "crates/zeno-fcis-codec/src/profile2.rs": "cae0ac71647cd16a2833fe19a06eb5357fc050216f2dca2926a3c26db14e7a6e",
+      "crates/zeno-fcis-codec/src/profile2/atom-vectors.tsv": "51341eb05712c39e6bf58097268aba4f99a9d7ac23af8d4f3a26a926474e991a",
+      "crates/zeno-fcis-codec/src/profile2/tests.rs": "98e62f38094c69ce698468fe604a448a8d17d3c5e44c7b25b2d8a36f873a299a",
+      "crates/zeno-fcis-codec/src/providers.rs": "412e23fc2847f9b186e02547a1d466ab474db219e78810eeaf49e3eb12f0f926",
+      "crates/zeno-fcis-codec/tests/collection_merkle.rs": "cad479cbfe147cfbe51084dbdcb97ba3a619856c919ae5fe0d75334aef337b14",
+      "crates/zeno-fcis-codec/tests/data/collection-roots.tsv": "1c38042ced9dc93f04336401c85730ae8f300ab9f5142573a9309ba38d68499f",
+      "crates/zeno-fcis-codec/tests/depth_ceiling.rs": "ecde88f82144516734aacccb6063363a6893db407f24b0d713ecec9f94a5f19b",
+      "crates/zeno-fcis-codec/tests/limits.rs": "504496dafe6d4f52db9429fe120e1a5001b1fc0edad03035bc1e78f1bc578d38",
+      "crates/zeno-fcis-codec/tests/robustness.rs": "2980f60c9a5088c7ea1d7f08de64aabc021972d14154303d8ba0daa06e716705",
+      "crates/zeno-fcis-schema/Cargo.toml": "e5fb9fe57c7add650b12a5c15826889cd106cafe6fb5baf96831fd65fca59158",
+      "crates/zeno-fcis-schema/src/encoding.rs": "b945d5d8c8c10efe049dffd24bdf07be7d64c2d6242a7514143da2b42977d29e",
+      "crates/zeno-fcis-schema/src/envelope.rs": "4e652a12d7901601bcf8396c02a0d886960e240e4f2e281785d25994c8b96324",
+      "crates/zeno-fcis-schema/src/error.rs": "425642bebb82365d4830c11a0017757803940e78026ab93148cfd12395b24a61",
+      "crates/zeno-fcis-schema/src/ids.rs": "dedf004c04ce5dbf0409e2f73f645a2193dde776d68cd642f4454571d0495fc9",
+      "crates/zeno-fcis-schema/src/lib.rs": "3e25698ba66b9a76e15fbe6c8983aed447482c26408ce25ae69b30e4071d963d",
+      "crates/zeno-fcis-schema/src/model.rs": "57c12dd409cd806557489da0709922aa0b97c1c3953ed5ef80711daab3b61c18",
+      "crates/zeno-fcis-schema/src/profile2/encoding.rs": "48f7a8e231fa0689d640e408722bc6413baf7d8d39008edb145c271fc41dba78",
+      "crates/zeno-fcis-schema/src/profile2/envelope.rs": "d12bd02d3088a7bbb5a06a4ffd7e29971684edfbc6a3ef6d03a662021f60c627",
+      "crates/zeno-fcis-schema/src/profile2/mod.rs": "18d5e54d1dbd0c8f635d7782ba1d7166ef540477ee31e56dfdc0c9eeca3c77d7",
+      "crates/zeno-fcis-schema/src/profile2/model.rs": "dade22fb058abf78ab8699e8affe6b4f2d310b25206d8a03613353960e732c2e",
+      "crates/zeno-fcis-schema/src/profile2/tests.rs": "60f02bfc11ff0fb918b05349f6d22cd7f993f47fdf7a3234f11e5e0d88713536",
+      "crates/zeno-fcis-schema/src/profile2/validate.rs": "fb0e1c58e7d0c8c66a1d137c9fa3c4e6167e8ebef66f7078e07d68333f1f6d82",
+      "crates/zeno-fcis-schema/src/validate.rs": "c40c9ee715624c7ce92b4335e7de1f0d02d6814b05ae4e8218e86e7c5f7ae2f3",
+      "crates/zeno-fcis-schema/tests/schema2-defi-state.hex": "ab9ff1a8672a21374af667a3e21273071e381932fc0e7985030de3d00efe1f03",
+      "crates/zeno-fcis-schema/tests/schema2_defi_state.rs": "a16f3b69a122baf6d9e2f257cfd70b8221232f9de85f65340c997b10bb055128",
+      "crates/zeno-fcis-value/Cargo.toml": "627768a842ae6bc4486b1527686cfda6fa5bca02e356659de25991a9f42087e2",
+      "crates/zeno-fcis-value/src/decoder_bytes.rs": "328b8f2014a7ee937a64d99c8591a74c00d9f51b9b29f8eeb842e0f23c540eaa",
+      "crates/zeno-fcis-value/src/decoder_model.rs": "6a31bf3fe2d9a0e9afd6574f3948581b5ee31f5a7c404daa70bff8a00d98dc5c",
+      "crates/zeno-fcis-value/src/decoder_refinement.rs": "9b0568f10f4e3bf06b124b972db8845aab1441b9dc9ecc758548a9208ec50422",
+      "crates/zeno-fcis-value/src/lib.rs": "1a899279f23e5957a6f17345a5385337fa5b0fb29374a26e524bcd10c911d07e",
+      "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "55addbb825ae43af20b69704732d5b2c867c233444e362ca27754806f0ef357e",
+      "crates/zeno-fcis-value/src/profile2/atom-vectors.tsv": "51341eb05712c39e6bf58097268aba4f99a9d7ac23af8d4f3a26a926474e991a",
+      "crates/zeno-fcis-value/src/profile2/boundary_tests.rs": "3b4eb487dc19b4f2f34427ff9fc6c42232413f5d6b6e98d27e7a3088a3f3b42a",
+      "crates/zeno-fcis-value/src/profile2/mod.rs": "de8a75172ecbd92695978f32951b4ca7f0278bf33231e9da3af66d3a9f08a062",
+      "crates/zeno-fcis-value/src/profile2/ordering256.rs": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825",
+      "crates/zeno-fcis-value/src/profile2/ordering_model.rs": "d02708ccbae41434efc8acb8e8bcd7bd30f2abc04b7256bd32d15421c3f1544a",
+      "crates/zeno-fcis-value/src/profile2/reference-licenses/LICENSE-APACHE": "ecffed67c3c0f736bec2c29cb8b5abba85535c7e17f02b099290759f08239bd1",
+      "crates/zeno-fcis-value/src/profile2/reference-licenses/LICENSE-MIT": "5ec7acafc702bfbc57845e6938e7209e39bd9587e1570baf3e78b288421b349a",
+      "crates/zeno-fcis-value/src/profile2/reference/legacy_scalar.rs": "b0bd6938daeaff9da36f9559d52ea0ad759d9297490958ae0f3d1b3edb650127",
+      "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs": "7ba3833708ab33c9267283799277c534af21ac1edec90722a6c0852cc0e2beff",
+      "crates/zeno-fcis-value/src/profile2/tests.rs": "a9f3dadefc43e30cab1b8734c1815c9d32c146506f82ba28caa5f739e31ac532",
+      "crates/zeno-fcis-value/src/profile2/value.rs": "ede5c72667848e1d344fc22ca159a0e54437842e4a37f443e764cff112abfab0",
+      "crates/zeno-fcis-value/src/profile2/value_tests.rs": "cd9cc4ddfb80afc3851173868dfc099bc2978992d85c6dbd20d93f20ecaa6d8a",
+      "crates/zeno-fcis-value/src/profile2/vectors_03.tsv": "05d1d835fe5cbde02e74dbec4c0da0b7965d48c62514430d124e05797d253b4d",
+      "crates/zeno-fcis-value/tests/construction.rs": "70a629f79ff9edb0ba7b8c45a2f2eb9d5984b0279515aa524487b65aed3015ba",
+      "rust-toolchain.toml": "8e390d6a0838315f972690f46ef8bae8b7ecc9ee6c1ed70140ef852869c2482e"
+    },
+    "full_source_files": 4931,
+    "owned_process_identities_exited": 20,
+    "result_sha256": "b786c894accbf5d6eaf3d5b994618011f04f3987d091db4ff9b30afbfa6a13ac",
+    "root_host_postcheck_sha256": "132db2b5fe0f201f8ad4c47ec0db109950ab8183f70f9dfc1bf22e6dc924fb1c",
+    "source_manifest_sha256": "66955d656527d0a3a99f3b75fca0bc407780f99b32c775594d054093097459bd",
+    "test_executions": 128,
+    "window_cpu_seconds": 76.41097900000001,
+    "window_wall_seconds": 116.41296340804547
+  },
+  "open_obligations": [
+    "C2/C3 actual unsigned/signed numeric-order lifting",
+    "Full-product/division/roots/signed fit/rounding/refusal refinement",
+    "Schema2 C0/S1-S3",
+    "Wide program/laws/Authority/synthesis/code generation and complete DeFi apps",
+    "Compiler/erasure/toolchain/OS assumptions and platform/release qualification"
+  ],
+  "proof_runtime": {
+    "caps": "4GiB address space,90 CPU seconds,120 elapsed seconds,one CPU; no budget increase",
+    "exact_input_pins_unchanged": 50,
+    "receipt_sha256": "39ba35e7f88e181bc15fb14fdcecaf0a844c3035de5a33f241ac71dd229f7ce3",
+    "seconds": 6.2674800478853285,
+    "signals": 0,
+    "supervised_exit": 0,
+    "survivors": 0
+  },
+  "provenance": {
+    "current_arithmetic_sha256": "55addbb825ae43af20b69704732d5b2c867c233444e362ca27754806f0ef357e",
+    "original_arithmetic_sha256": "db196c5d746d27bf21579e9a3a3ce32d556ec74ea62ba929e4c8a462a6130131",
+    "outside_original_comparator": "Unchanged bytes; factor imports the single shared implementation.",
+    "runtime_factor_patch_sha256": "084ef915269226f424df1fa4d15c48d53ec61d01f367aa422d645a64fbbf953d",
+    "shared_comparator_sha256": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825"
+  },
+  "recorded_utc": "2026-10-28T23:45:02.226620+00:00",
+  "schema": "zeno-fcis/ordering256-qualification-record/1"
+}
