@@ -78,6 +78,7 @@ with [Get started](#get-started), then follow a tutorial.
 
 - [ZAL: terminal-first behavior review](zal/README.md)
 - [ZAL specification](zal/SPECIFICATION.md)
+- [ZAL observation contracts and generated diagrams](zal/OBSERVATION_CONTRACTS.md)
 - [`zal/finite-fsm/1` grammar and limits](zal/GRAMMAR.md)
 - [ZAL types and effect signatures](zal/EFFECTS.md)
 - [ZAL harness integration](zal/HARNESS_INTEGRATION.md)

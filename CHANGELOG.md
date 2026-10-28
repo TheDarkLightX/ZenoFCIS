@@ -4,6 +4,15 @@ All notable Rust API and packaging changes are recorded here. Canonical
 protocol compatibility is governed separately by the identifiers and versions
 embedded in ZenoFCIS values.
 
+## Unreleased
+
+- Add experimental Python [ZAL observation contracts](docs/zal/OBSERVATION_CONTRACTS.md):
+  partial-observation safety through the existing arena checker, bounded
+  service and abstract event costs, complete finite paired-history comparisons,
+  source-bound replay, and generated arena, belief, and counterexample diagrams.
+  This adds developer tooling; native Authority and shell qualification are
+  unchanged.
+
 ## 2.6.0 - 2026-10-24
 
 - All workspace packages are version 2.6.0. The planned 2.5.1 work is

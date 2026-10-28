@@ -1,0 +1,13 @@
+ZAL version 2.
+The machine is relational_delayed_leak.
+The states are ready.
+The events are copy, reveal.
+The context observations are allowed, noise.
+The variable hidden is an integer from 0 to 1 inclusive, initially 0.
+The variable public_value is an integer from 0 to 1 inclusive, initially 0.
+The variable secret is an integer from 0 to 1 inclusive, initially 0.
+Initially the state is ready.
+Each step is atomic. Only the control state and the declared variables may change.
+Otherwise reject because not_allowed and keep the state unchanged.
+Rule publish: when the state is ready and the event is reveal, if allowed, move to ready with public_value set to hidden.
+Rule remember: when the state is ready and the event is copy, if allowed, move to ready with hidden set to secret.
