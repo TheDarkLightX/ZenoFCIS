@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="980" viewBox="0 0 1080 980" role="img" aria-labelledby="title description">
+<title id="title">ZAL paired execution · an observed difference</title>
+<desc id="description">Two concrete executions use the same event sequence and equal public inputs. Secret values differ. Each row shows the resulting state; the final observed results differ. This is one rechecked counterexample, not the entire reachable product.</desc>
+<style>text{font-family:ui-sans-serif,system-ui,sans-serif;fill:#172438}.title{font-size:26px;font-weight:700}.body{font-size:15px}.small{font-size:13px;fill:#41546a}.name{font-size:17px;font-weight:650}.observed{font-size:15px;font-weight:650;fill:#644899}</style>
+<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#70849b"/></marker></defs>
+<rect width="1080" height="980" fill="#f8fafc"/>
+<text x="36" y="45" class="title">ZAL paired execution · an observed difference</text>
+<text x="36" y="75" class="body">Same events and public inputs; different initial secrets. Complete states are shown for explanation.</text>
+<text x="36" y="101" class="small">Fields marked [observed], outcome class, and rejection reason belong to the declared public observation.</text>
+<g data-run="left" data-position="0"><rect x="44" y="142" width="452" height="148" rx="11" fill="#eef1f5" stroke="#718196" stroke-width="2"/>
+<text x="60" y="169" class="name">Left · Initial · ready [observed]</text>
+<text x="60" y="199" class="body">hidden = 0</text>
+<text x="60" y="223" class="observed">public_value = 0 [observed]</text>
+<text x="60" y="247" class="body">secret = 0</text>
+<text x="60" y="275" class="small">Zero events; initial state observation checked</text>
+</g>
+<path d="M 270,290 L 270,398" fill="none" stroke="#70849b" stroke-width="1.5" marker-end="url(#arrow)" data-run="left" data-step="1"><title>{"context":{"allowed":true,"noise":false},"outcome":{"class":"Accept","reason":null,"rule":"remember","state":"ready","variables":{"hidden":0,"public_value":0,"secret":0}}}</title></path>
+<rect x="64" y="310" width="412" height="66" rx="7" fill="#f8fafc"/>
+<text x="79" y="332" class="body">Event 1: copy</text>
+<text x="79" y="352" class="small">Inputs: allowed=true, noise=false</text>
+<g data-run="right" data-position="0"><rect x="584" y="142" width="452" height="148" rx="11" fill="#eef1f5" stroke="#718196" stroke-width="2"/>
+<text x="600" y="169" class="name">Right · Initial · ready [observed]</text>
+<text x="600" y="199" class="body">hidden = 0</text>
+<text x="600" y="223" class="observed">public_value = 0 [observed]</text>
+<text x="600" y="247" class="body">secret = 1</text>
+<text x="600" y="275" class="small">Zero events; initial state observation checked</text>
+</g>
+<path d="M 810,290 L 810,398" fill="none" stroke="#70849b" stroke-width="1.5" marker-end="url(#arrow)" data-run="right" data-step="1"><title>{"context":{"allowed":true,"noise":false},"outcome":{"class":"Accept","reason":null,"rule":"remember","state":"ready","variables":{"hidden":1,"public_value":0,"secret":1}}}</title></path>
+<rect x="604" y="310" width="412" height="66" rx="7" fill="#f8fafc"/>
+<text x="619" y="332" class="body">Event 1: copy</text>
+<text x="619" y="352" class="small">Inputs: allowed=true, noise=false</text>
+<g data-run="left" data-position="1"><rect x="44" y="398" width="452" height="148" rx="11" fill="#eef1f5" stroke="#718196" stroke-width="2"/>
+<text x="60" y="425" class="name">Left · After copy · ready [observed]</text>
+<text x="60" y="455" class="body">hidden = 0</text>
+<text x="60" y="479" class="observed">public_value = 0 [observed]</text>
+<text x="60" y="503" class="body">secret = 0</text>
+<text x="60" y="531" class="small">Outcome: Accept; reason: None</text>
+</g>
+<path d="M 270,546 L 270,654" fill="none" stroke="#70849b" stroke-width="1.5" marker-end="url(#arrow)" data-run="left" data-step="2"><title>{"context":{"allowed":true,"noise":false},"outcome":{"class":"Accept","reason":null,"rule":"publish","state":"ready","variables":{"hidden":0,"public_value":0,"secret":0}}}</title></path>
+<rect x="64" y="566" width="412" height="66" rx="7" fill="#f8fafc"/>
+<text x="79" y="588" class="body">Event 2: reveal</text>
+<text x="79" y="608" class="small">Inputs: allowed=true, noise=false</text>
+<g data-run="right" data-position="1"><rect x="584" y="398" width="452" height="148" rx="11" fill="#eef1f5" stroke="#718196" stroke-width="2"/>
+<text x="600" y="425" class="name">Right · After copy · ready [observed]</text>
+<text x="600" y="455" class="body">hidden = 1</text>
+<text x="600" y="479" class="observed">public_value = 0 [observed]</text>
+<text x="600" y="503" class="body">secret = 1</text>
+<text x="600" y="531" class="small">Outcome: Accept; reason: None</text>
+</g>
+<path d="M 810,546 L 810,654" fill="none" stroke="#70849b" stroke-width="1.5" marker-end="url(#arrow)" data-run="right" data-step="2"><title>{"context":{"allowed":true,"noise":false},"outcome":{"class":"Accept","reason":null,"rule":"publish","state":"ready","variables":{"hidden":1,"public_value":1,"secret":1}}}</title></path>
+<rect x="604" y="566" width="412" height="66" rx="7" fill="#f8fafc"/>
+<text x="619" y="588" class="body">Event 2: reveal</text>
+<text x="619" y="608" class="small">Inputs: allowed=true, noise=false</text>
+<g data-run="left" data-position="2"><rect x="44" y="654" width="452" height="148" rx="11" fill="#fff2f3" stroke="#bd4553" stroke-width="2"/>
+<text x="60" y="681" class="name">Left · After reveal · ready [observed]</text>
+<text x="60" y="711" class="body">hidden = 0</text>
+<text x="60" y="735" class="observed">public_value = 0 [observed]</text>
+<text x="60" y="759" class="body">secret = 0</text>
+<text x="60" y="787" class="small">Outcome: Accept; reason: None</text>
+</g>
+<g data-run="right" data-position="2"><rect x="584" y="654" width="452" height="148" rx="11" fill="#fff2f3" stroke="#bd4553" stroke-width="2"/>
+<text x="600" y="681" class="name">Right · After reveal · ready [observed]</text>
+<text x="600" y="711" class="body">hidden = 1</text>
+<text x="600" y="735" class="observed">public_value = 1 [observed]</text>
+<text x="600" y="759" class="body">secret = 1</text>
+<text x="600" y="787" class="small">Outcome: Accept; reason: None</text>
+</g>
+<text x="44" y="852" class="name">First different observation after 2 event(s).</text>
+<text x="44" y="881" class="small">The JSON companion retains the exact paired witness, coupling, observation profile, and model revision.</text>
+</svg>

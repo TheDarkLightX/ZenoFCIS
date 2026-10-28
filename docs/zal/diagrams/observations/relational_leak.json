@@ -1,0 +1,202 @@
+{
+  "kind": "relational-counterexample",
+  "model_revision": "b7fd331c1ae803ec0ea26f14c4f0060bddd8d2b22c40fd06e348f06579979405",
+  "profile": {
+    "initial_secret_values": {
+      "secret": [
+        0,
+        1
+      ]
+    },
+    "model_revision": "b7fd331c1ae803ec0ea26f14c4f0060bddd8d2b22c40fd06e348f06579979405",
+    "observe": {
+      "control": true,
+      "variables": [
+        "public_value"
+      ]
+    },
+    "public_context": [
+      "allowed"
+    ],
+    "schema": "zal/relational-observation/1",
+    "secret_context": [
+      "noise"
+    ]
+  },
+  "report": {
+    "authority": "none",
+    "counterexample": {
+      "initial": {
+        "left": {
+          "control": "ready",
+          "variables": {
+            "hidden": 0,
+            "public_value": 0,
+            "secret": 0
+          }
+        },
+        "right": {
+          "control": "ready",
+          "variables": {
+            "hidden": 0,
+            "public_value": 0,
+            "secret": 1
+          }
+        }
+      },
+      "length": 2,
+      "observations": {
+        "left": {
+          "class": "Accept",
+          "control": "ready",
+          "reason": null,
+          "variables": {
+            "public_value": 0
+          }
+        },
+        "right": {
+          "class": "Accept",
+          "control": "ready",
+          "reason": null,
+          "variables": {
+            "public_value": 1
+          }
+        }
+      },
+      "steps": [
+        {
+          "event": "copy",
+          "left": {
+            "context": {
+              "allowed": true,
+              "noise": false
+            },
+            "outcome": {
+              "class": "Accept",
+              "reason": null,
+              "rule": "remember",
+              "state": "ready",
+              "variables": {
+                "hidden": 0,
+                "public_value": 0,
+                "secret": 0
+              }
+            }
+          },
+          "right": {
+            "context": {
+              "allowed": true,
+              "noise": false
+            },
+            "outcome": {
+              "class": "Accept",
+              "reason": null,
+              "rule": "remember",
+              "state": "ready",
+              "variables": {
+                "hidden": 1,
+                "public_value": 0,
+                "secret": 1
+              }
+            }
+          }
+        },
+        {
+          "event": "reveal",
+          "left": {
+            "context": {
+              "allowed": true,
+              "noise": false
+            },
+            "outcome": {
+              "class": "Accept",
+              "reason": null,
+              "rule": "publish",
+              "state": "ready",
+              "variables": {
+                "hidden": 0,
+                "public_value": 0,
+                "secret": 0
+              }
+            }
+          },
+          "right": {
+            "context": {
+              "allowed": true,
+              "noise": false
+            },
+            "outcome": {
+              "class": "Accept",
+              "reason": null,
+              "rule": "publish",
+              "state": "ready",
+              "variables": {
+                "hidden": 1,
+                "public_value": 1,
+                "secret": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "coupling": "same event; equal public context; all pairs of secret context values",
+    "input_pairs_per_state": 16,
+    "limits": {
+      "edges": 100000,
+      "states": 4096,
+      "work": 1000000
+    },
+    "measured": {
+      "decisions": 154,
+      "edges": 77,
+      "states": 7,
+      "work": 244
+    },
+    "model_revision": "b7fd331c1ae803ec0ea26f14c4f0060bddd8d2b22c40fd06e348f06579979405",
+    "nonvacuity": {
+      "distinct_ordered_initial_pairs": 2,
+      "initial_alternatives": 2
+    },
+    "observer": {
+      "control": true,
+      "mandatory": [
+        "class",
+        "reason"
+      ],
+      "variables": [
+        "public_value"
+      ]
+    },
+    "profile": {
+      "initial_secret_values": {
+        "secret": [
+          0,
+          1
+        ]
+      },
+      "model_revision": "b7fd331c1ae803ec0ea26f14c4f0060bddd8d2b22c40fd06e348f06579979405",
+      "observe": {
+        "control": true,
+        "variables": [
+          "public_value"
+        ]
+      },
+      "public_context": [
+        "allowed"
+      ],
+      "schema": "zal/relational-observation/1",
+      "secret_context": [
+        "noise"
+      ]
+    },
+    "profile_revision": "5036650b73166efb853c1d47109164b20b9db1f31a297358d6ed83ccdc35a125",
+    "reason": "step observation differs",
+    "schema": "zal/relational-observation-report/1",
+    "scope": "All finite synchronized histories of this ZAL v2 transition model, from the declared initial secret alternatives; common events and equal public context, independently varying secret context. Only the declared observations are compared. No native implementation, liveness, physical delivery, timing or resource-cost guarantee.",
+    "status": "COUNTEREXAMPLE"
+  },
+  "report_digest": "29a99eb5510ad88ed7667dae61138787c4269f3cb2e2531247d4c0d77d138235",
+  "schema": "zal/observation-diagrams/1",
+  "scope": "one rechecked synchronized finite-model witness; no native execution authority"
+}

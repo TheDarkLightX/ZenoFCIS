@@ -59,6 +59,11 @@ after inputs 0, 1. `tools/test_two_run.py` checks both one-step verdicts and
 replays the two-step histories. This illustrates the scope boundary and does
 not widen the two-run verdict.
 
+For a separate ZAL model, [observation contracts](zal/OBSERVATION_CONTRACTS.md)
+explore the complete finite paired product, including delayed leaks across
+multiple events. That Python route has explicit initial alternatives and a
+public/secret context coupling; it does not extend this native command's verdict.
+
 Paths identify scalar state fields by ID, such as `pre.100.110` or
 `post.100.110`; both spellings designate the same field in these options.
 Unknown fields, duplicates, a field designated both secret and public, and

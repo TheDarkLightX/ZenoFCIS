@@ -481,3 +481,15 @@ docs/MACHINE_CODE_SYNTHESIS_27.md
 skills/zenofcis-machine-code/SKILL.md
 docs/FACTORY_GAPS_27.md
 crates/zeno-fcis-cli/tests/fixtures/zal-app-provenance/README.md
+docs/zal/OBSERVATION_CONTRACTS.md
+docs/zal/diagrams/observations/delivery_idempotent.arena.svg
+docs/zal/diagrams/observations/delivery_idempotent.beliefs.svg
+docs/zal/diagrams/observations/delivery_idempotent.english.txt
+docs/zal/diagrams/observations/delivery_idempotent.json
+docs/zal/diagrams/observations/delivery_partial.arena.svg
+docs/zal/diagrams/observations/delivery_partial.beliefs.svg
+docs/zal/diagrams/observations/delivery_partial.english.txt
+docs/zal/diagrams/observations/delivery_partial.json
+docs/zal/diagrams/observations/relational_leak.english.txt
+docs/zal/diagrams/observations/relational_leak.json
+docs/zal/diagrams/observations/relational_leak.paired.svg
