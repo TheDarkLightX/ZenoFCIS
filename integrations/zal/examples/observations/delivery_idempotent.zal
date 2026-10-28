@@ -1,0 +1,19 @@
+# The same finite physical-world model, with idempotent retry as an assumption.
+# Retrying an already applied request preserves one effect rather than adding one.
+# A real destination must separately establish this contract for its identity key.
+zal 1;
+machine delivery_idempotent;
+states start, applied, absent, good, bad;
+events apply, drop, retry, stop, hold;
+context none;
+initial start;
+step atomic; frame control_only;
+default reject not_enabled unchanged;
+rule effect_applied: start + apply [true] -> accept applied;
+rule effect_absent: start + drop [true] -> accept absent;
+rule deduplicate_effect: applied + retry [true] -> accept good;
+rule retain_effect: applied + stop [true] -> accept good;
+rule complete_effect: absent + retry [true] -> accept good;
+rule abandon_effect: absent + stop [true] -> accept bad;
+rule finished: good + hold [true] -> accept good;
+rule violated: bad + hold [true] -> accept bad;

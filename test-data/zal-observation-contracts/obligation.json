@@ -1,0 +1,927 @@
+{
+  "artifact_revision": "0ec2be1dc56f1701faf4e04295de977737eeaca8",
+  "assumptions": [
+    "Exact source and profile identity, supported finite model fragments and explicit environment alphabets.",
+    "Correct trusted Python runtime, ZAL evaluator and adapter; independent arena-certificate checker.",
+    "Controller decisions use only observation and own-action history; relational events and public context are coupled and secret context varies independently.",
+    "Integer event costs and first-service bounds mean declared model units and original transitions, not physical time."
+  ],
+  "base_revision": "57a19ecc6aabfcd6e5107ce0e6135fe2c1a01beb",
+  "boundary": "Experimental Python developer tooling over explicit finite ZAL models and observation profiles; no production Authority or adoption.",
+  "claim": "At the bound source revision, the finite example and mutation suites produce the expected scoped observation-game and paired-history verdicts, reject planted evidence changes, and reproduce model-derived views.",
+  "claim_class": "model",
+  "completed_evidence": [
+    {
+      "artifacts": [
+        {
+          "path": "integrations/zal/observations.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "6298bb096016b6fa821f691ae157451ac7a749ee4c118ed4470e964877269f0b"
+        },
+        {
+          "path": "integrations/zal/observation_game.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "2b3bf26632d63c1195c7bbbf59dddd8d9e58895b70e1e16754f604e735ee2bd6"
+        },
+        {
+          "path": "integrations/zal/relational_observation.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "8a91778ef86a75acf5839c64c82b3b5586ed9fd554b9b42fc78dc3eaed8f41b5"
+        },
+        {
+          "path": "integrations/zal/observation_diagrams.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "25169d5f5b04dfb2edf778cb8b937ae2b7ddf33abf76d41f955da58903b87e79"
+        },
+        {
+          "path": "integrations/zal/behavior.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "6b46eccec11a28f5c87667472311b7d7cb9e92f7b46ecd5308936066bb1eacdf"
+        },
+        {
+          "path": "integrations/zal/behavior2.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "da402be5f75648a13cac623538f13abdc30509fc6fa96a4b73d2ade348bb6b4b"
+        },
+        {
+          "path": "integrations/zal/diagnostics.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "90efc449dd3b8bd2de5c12ef8d9b0982a18cccf18cbec31eaca2c15c6209f6de"
+        },
+        {
+          "path": "integrations/zal/symmetry2.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "5e1b69fb1e8b3642f096eba2843dbd5bfa051fcd917b1a2630a914b9fb82d35e"
+        },
+        {
+          "path": "tools/trace_game/knowledge.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "340b6c68a8d51b3d0e7c3411b84beac2cf3056422e7653ee88e252907024d66c"
+        },
+        {
+          "path": "tools/trace_game/arena_spec.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "e6b74a4bfc3c57441c4e93bc3461471faf2e1da970b3711c224a1778d8d69d9c"
+        },
+        {
+          "path": "tools/trace_game/arena_check.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "8dd062d7766215061b9e559b75e5d14f8066af1cdd98b88acc56d9e78db13522"
+        },
+        {
+          "path": "tools/trace_game/game_spec.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "31993fd396927e34c2aa0f865f6890063ed890f8d23cddcacedc5b05ac6c83be"
+        },
+        {
+          "path": "integrations/zal/test_observation_adversarial.py",
+          "role": "test oracle or negative control",
+          "sha256": "e412bbe188c5576e38aedbf88438a66d371d58bad107b2851ae658d9544c8e36"
+        },
+        {
+          "path": "integrations/zal/test_observation_cli.py",
+          "role": "test oracle or negative control",
+          "sha256": "6406d6e190a52aab4657a31687b6bf0c4f659d855bd128e576825d3101c13c61"
+        },
+        {
+          "path": "integrations/zal/test_observation_diagrams.py",
+          "role": "test oracle or negative control",
+          "sha256": "03e43c3878a463b3098cc5140f0dc73a3f09839c1fb3802d26557c320c542e4c"
+        },
+        {
+          "path": "integrations/zal/test_observation_game.py",
+          "role": "test oracle or negative control",
+          "sha256": "eee7716ff5c971dcc3b3f03e2a43f499755768f78b38f1f5f2f5e6342b5cf94b"
+        },
+        {
+          "path": "integrations/zal/test_relational_observation.py",
+          "role": "test oracle or negative control",
+          "sha256": "91eec5431dc86ec176eee13d0c26e5e4ad794cb959d17d528cc34e41c2b753fa"
+        },
+        {
+          "path": "integrations/zal/examples/observations/delivery.partial.json",
+          "role": "declared example model or profile",
+          "sha256": "d41148fb269a8af686924d3ca64335eff4a0cd7b35122aba89dc7c319d6b392e"
+        },
+        {
+          "path": "integrations/zal/examples/observations/delivery.perfect.json",
+          "role": "declared example model or profile",
+          "sha256": "a3560ef9e7daf3e56125ff0594e16960d7ff2eeb624f0c40d24f49da991323e3"
+        },
+        {
+          "path": "integrations/zal/examples/observations/delivery.zal",
+          "role": "declared example model or profile",
+          "sha256": "6bdd13975d32727326f7ef7f43e73469e9eb17f29e35242b3a4a114e990c5d20"
+        },
+        {
+          "path": "integrations/zal/examples/observations/delivery_idempotent.cost.json",
+          "role": "declared example model or profile",
+          "sha256": "1652966f410e28b7241da9959fbaa701d60f6bf70a25e702ddbb5123feb6fdc9"
+        },
+        {
+          "path": "integrations/zal/examples/observations/delivery_idempotent.partial.json",
+          "role": "declared example model or profile",
+          "sha256": "fbf0f127c60c566e2ac85800f5cd994d6a1896aa8d9b71a798f2b895d7c653d5"
+        },
+        {
+          "path": "integrations/zal/examples/observations/delivery_idempotent.zal",
+          "role": "declared example model or profile",
+          "sha256": "c0a4b316ab102437d8e7ff4920e67c77edfe83da6e540a499c7a886b7daa13b7"
+        },
+        {
+          "path": "integrations/zal/examples/observations/relational_delayed_leak.json",
+          "role": "declared example model or profile",
+          "sha256": "f9c54652dc76f8ed782329ac4cdb9859ee1e8a27952ec7468c50de0af25dfc2c"
+        },
+        {
+          "path": "integrations/zal/examples/observations/relational_delayed_leak.zal",
+          "role": "declared example model or profile",
+          "sha256": "9ce5f9f073525bcaf83a13d9bef81534dde724cdd75253fadc5a8e05a8b36047"
+        },
+        {
+          "path": "integrations/zal/examples/observations/relational_private.json",
+          "role": "declared example model or profile",
+          "sha256": "2de888ab661292294b79aadf16588a468bb11a2e424fb34d766777ff0dd2cb7c"
+        },
+        {
+          "path": "integrations/zal/examples/observations/relational_private.zal",
+          "role": "declared example model or profile",
+          "sha256": "ad652b792f85bcde815fd50a3f280ad5a0969def57119e79ef2c739bde9b7433"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_idempotent.arena.svg",
+          "role": "generated model view",
+          "sha256": "ed7faeac4e5d85a74f5d9a22ff80254e5ccf2b1954e23b75cd85d5c53cc6963e"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_idempotent.beliefs.svg",
+          "role": "generated model view",
+          "sha256": "5f812936400e6812e46c2b39ca9ce2990e67be880dfaac54f11db55f3e2d7f84"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_idempotent.english.txt",
+          "role": "generated model view",
+          "sha256": "01117453e8ef142c11ab03a0c64763662260cab25a546455c0408f08d3f0d04c"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_idempotent.json",
+          "role": "generated model view",
+          "sha256": "bc89a15e84dd2d9f2c5745af152735d11eea7843e676bb01ebaefdf20ade3104"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_partial.arena.svg",
+          "role": "generated model view",
+          "sha256": "dc79c5dd75921970b3e68be95c1ee54c592fd067cb1468ca45d9b8061ab02eee"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_partial.beliefs.svg",
+          "role": "generated model view",
+          "sha256": "47206f570fb3480e0b10f5b88c0a84e729ecf292f9f626228918ba9686dd196a"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_partial.english.txt",
+          "role": "generated model view",
+          "sha256": "ea6afd92a9b0e0ee22ee663f2d29f7802b1af3aa1a254d2e19d552080dd6d2ab"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_partial.json",
+          "role": "generated model view",
+          "sha256": "f0dad883254042d2fcbac794df8d8867c14349feae224854e563dc2fe9f9b2ed"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/relational_leak.english.txt",
+          "role": "generated model view",
+          "sha256": "bde12e8ea5ccffd053939560980a6bc220fc89c6b05433fb1018d5e008cdf672"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/relational_leak.json",
+          "role": "generated model view",
+          "sha256": "5f11997b3a1374baebf1f4519e50e33cfaa5baef45780a178bef4799b1785e05"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/relational_leak.paired.svg",
+          "role": "generated model view",
+          "sha256": "d87e6b852510431b7a6b03408aa64a6b6bb954e3bcd57ad0001f4200d4b4e81f"
+        }
+      ],
+      "id": "model-controls-executed",
+      "kind": "test",
+      "lane_id": "model-controls",
+      "limitations": [
+        "Finite examples and mutation tests, not a proof for every admitted model.",
+        "Python evaluator and ZAL-to-arena adapter remain trusted; arena certificates have a separate checker.",
+        "Resource allowances are reproducible checking budgets, not authenticated original-run measurements.",
+        "No native Rust, Lean, deployed shell, physical idempotency or wall-clock qualification."
+      ],
+      "replay": {
+        "argv": [
+          "python3",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "integrations/zal",
+          "-p",
+          "test_*observation*.py"
+        ],
+        "cwd": ".",
+        "exit_code": 0
+      },
+      "status": "passed",
+      "tool_revision": "CPython 3.12.14"
+    },
+    {
+      "artifacts": [
+        {
+          "path": "integrations/zal/observations.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "6298bb096016b6fa821f691ae157451ac7a749ee4c118ed4470e964877269f0b"
+        },
+        {
+          "path": "integrations/zal/observation_game.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "2b3bf26632d63c1195c7bbbf59dddd8d9e58895b70e1e16754f604e735ee2bd6"
+        },
+        {
+          "path": "integrations/zal/relational_observation.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "8a91778ef86a75acf5839c64c82b3b5586ed9fd554b9b42fc78dc3eaed8f41b5"
+        },
+        {
+          "path": "integrations/zal/observation_diagrams.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "25169d5f5b04dfb2edf778cb8b937ae2b7ddf33abf76d41f955da58903b87e79"
+        },
+        {
+          "path": "integrations/zal/behavior.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "6b46eccec11a28f5c87667472311b7d7cb9e92f7b46ecd5308936066bb1eacdf"
+        },
+        {
+          "path": "integrations/zal/behavior2.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "da402be5f75648a13cac623538f13abdc30509fc6fa96a4b73d2ade348bb6b4b"
+        },
+        {
+          "path": "integrations/zal/diagnostics.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "90efc449dd3b8bd2de5c12ef8d9b0982a18cccf18cbec31eaca2c15c6209f6de"
+        },
+        {
+          "path": "integrations/zal/symmetry2.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "5e1b69fb1e8b3642f096eba2843dbd5bfa051fcd917b1a2630a914b9fb82d35e"
+        },
+        {
+          "path": "tools/trace_game/knowledge.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "340b6c68a8d51b3d0e7c3411b84beac2cf3056422e7653ee88e252907024d66c"
+        },
+        {
+          "path": "tools/trace_game/arena_spec.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "e6b74a4bfc3c57441c4e93bc3461471faf2e1da970b3711c224a1778d8d69d9c"
+        },
+        {
+          "path": "tools/trace_game/arena_check.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "8dd062d7766215061b9e559b75e5d14f8066af1cdd98b88acc56d9e78db13522"
+        },
+        {
+          "path": "tools/trace_game/game_spec.py",
+          "role": "trusted evaluator or adapter, or checked graph search dependency",
+          "sha256": "31993fd396927e34c2aa0f865f6890063ed890f8d23cddcacedc5b05ac6c83be"
+        },
+        {
+          "path": "integrations/zal/test_observation_adversarial.py",
+          "role": "test oracle or negative control",
+          "sha256": "e412bbe188c5576e38aedbf88438a66d371d58bad107b2851ae658d9544c8e36"
+        },
+        {
+          "path": "integrations/zal/test_observation_cli.py",
+          "role": "test oracle or negative control",
+          "sha256": "6406d6e190a52aab4657a31687b6bf0c4f659d855bd128e576825d3101c13c61"
+        },
+        {
+          "path": "integrations/zal/test_observation_diagrams.py",
+          "role": "test oracle or negative control",
+          "sha256": "03e43c3878a463b3098cc5140f0dc73a3f09839c1fb3802d26557c320c542e4c"
+        },
+        {
+          "path": "integrations/zal/test_observation_game.py",
+          "role": "test oracle or negative control",
+          "sha256": "eee7716ff5c971dcc3b3f03e2a43f499755768f78b38f1f5f2f5e6342b5cf94b"
+        },
+        {
+          "path": "integrations/zal/test_relational_observation.py",
+          "role": "test oracle or negative control",
+          "sha256": "91eec5431dc86ec176eee13d0c26e5e4ad794cb959d17d528cc34e41c2b753fa"
+        },
+        {
+          "path": "integrations/zal/examples/observations/delivery.partial.json",
+          "role": "declared example model or profile",
+          "sha256": "d41148fb269a8af686924d3ca64335eff4a0cd7b35122aba89dc7c319d6b392e"
+        },
+        {
+          "path": "integrations/zal/examples/observations/delivery.perfect.json",
+          "role": "declared example model or profile",
+          "sha256": "a3560ef9e7daf3e56125ff0594e16960d7ff2eeb624f0c40d24f49da991323e3"
+        },
+        {
+          "path": "integrations/zal/examples/observations/delivery.zal",
+          "role": "declared example model or profile",
+          "sha256": "6bdd13975d32727326f7ef7f43e73469e9eb17f29e35242b3a4a114e990c5d20"
+        },
+        {
+          "path": "integrations/zal/examples/observations/delivery_idempotent.cost.json",
+          "role": "declared example model or profile",
+          "sha256": "1652966f410e28b7241da9959fbaa701d60f6bf70a25e702ddbb5123feb6fdc9"
+        },
+        {
+          "path": "integrations/zal/examples/observations/delivery_idempotent.partial.json",
+          "role": "declared example model or profile",
+          "sha256": "fbf0f127c60c566e2ac85800f5cd994d6a1896aa8d9b71a798f2b895d7c653d5"
+        },
+        {
+          "path": "integrations/zal/examples/observations/delivery_idempotent.zal",
+          "role": "declared example model or profile",
+          "sha256": "c0a4b316ab102437d8e7ff4920e67c77edfe83da6e540a499c7a886b7daa13b7"
+        },
+        {
+          "path": "integrations/zal/examples/observations/relational_delayed_leak.json",
+          "role": "declared example model or profile",
+          "sha256": "f9c54652dc76f8ed782329ac4cdb9859ee1e8a27952ec7468c50de0af25dfc2c"
+        },
+        {
+          "path": "integrations/zal/examples/observations/relational_delayed_leak.zal",
+          "role": "declared example model or profile",
+          "sha256": "9ce5f9f073525bcaf83a13d9bef81534dde724cdd75253fadc5a8e05a8b36047"
+        },
+        {
+          "path": "integrations/zal/examples/observations/relational_private.json",
+          "role": "declared example model or profile",
+          "sha256": "2de888ab661292294b79aadf16588a468bb11a2e424fb34d766777ff0dd2cb7c"
+        },
+        {
+          "path": "integrations/zal/examples/observations/relational_private.zal",
+          "role": "declared example model or profile",
+          "sha256": "ad652b792f85bcde815fd50a3f280ad5a0969def57119e79ef2c739bde9b7433"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_idempotent.arena.svg",
+          "role": "generated model view",
+          "sha256": "ed7faeac4e5d85a74f5d9a22ff80254e5ccf2b1954e23b75cd85d5c53cc6963e"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_idempotent.beliefs.svg",
+          "role": "generated model view",
+          "sha256": "5f812936400e6812e46c2b39ca9ce2990e67be880dfaac54f11db55f3e2d7f84"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_idempotent.english.txt",
+          "role": "generated model view",
+          "sha256": "01117453e8ef142c11ab03a0c64763662260cab25a546455c0408f08d3f0d04c"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_idempotent.json",
+          "role": "generated model view",
+          "sha256": "bc89a15e84dd2d9f2c5745af152735d11eea7843e676bb01ebaefdf20ade3104"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_partial.arena.svg",
+          "role": "generated model view",
+          "sha256": "dc79c5dd75921970b3e68be95c1ee54c592fd067cb1468ca45d9b8061ab02eee"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_partial.beliefs.svg",
+          "role": "generated model view",
+          "sha256": "47206f570fb3480e0b10f5b88c0a84e729ecf292f9f626228918ba9686dd196a"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_partial.english.txt",
+          "role": "generated model view",
+          "sha256": "ea6afd92a9b0e0ee22ee663f2d29f7802b1af3aa1a254d2e19d552080dd6d2ab"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/delivery_partial.json",
+          "role": "generated model view",
+          "sha256": "f0dad883254042d2fcbac794df8d8867c14349feae224854e563dc2fe9f9b2ed"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/relational_leak.english.txt",
+          "role": "generated model view",
+          "sha256": "bde12e8ea5ccffd053939560980a6bc220fc89c6b05433fb1018d5e008cdf672"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/relational_leak.json",
+          "role": "generated model view",
+          "sha256": "5f11997b3a1374baebf1f4519e50e33cfaa5baef45780a178bef4799b1785e05"
+        },
+        {
+          "path": "docs/zal/diagrams/observations/relational_leak.paired.svg",
+          "role": "generated model view",
+          "sha256": "d87e6b852510431b7a6b03408aa64a6b6bb954e3bcd57ad0001f4200d4b4e81f"
+        }
+      ],
+      "id": "independent-controls-executed",
+      "kind": "test",
+      "lane_id": "independent-controls",
+      "limitations": [
+        "Finite examples and mutation tests, not a proof for every admitted model.",
+        "Python evaluator and ZAL-to-arena adapter remain trusted; arena certificates have a separate checker.",
+        "Resource allowances are reproducible checking budgets, not authenticated original-run measurements.",
+        "No native Rust, Lean, deployed shell, physical idempotency or wall-clock qualification."
+      ],
+      "replay": {
+        "argv": [
+          "python3",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "integrations/zal",
+          "-p",
+          "test_observation_adversarial.py"
+        ],
+        "cwd": ".",
+        "exit_code": 0
+      },
+      "status": "passed",
+      "tool_revision": "CPython 3.12.14"
+    }
+  ],
+  "conclusion": "The bounded regression and independent mutation evidence passes for this source revision; broader implementation refinement remains unproved.",
+  "counterexample": null,
+  "execution_policy": "replay_argv_is_untrusted_data_never_execute_from_validation",
+  "falsifiers": [
+    "A strategy uses an unobserved physical state or accumulated cost to choose different actions after the same observation history.",
+    "A delayed observable difference is accepted after complete paired closure.",
+    "A rejected diagnostic with a distinguishing reason is silently erased as a state stutter.",
+    "A budget stop, stale source, altered verdict or insufficient rehashed checking allowance is accepted as completion evidence.",
+    "A generated view omits or changes a submitted graph edge without a failed correspondence check."
+  ],
+  "id": "zeno-fcis-zal-observation-contracts-initial-increment",
+  "lanes": [
+    {
+      "acceptance_tests": [
+        "The named unittest discovery completes with zero failures and exit code 0."
+      ],
+      "deliverables": [
+        "integrations/zal/test_observation_adversarial.py",
+        "integrations/zal/test_observation_cli.py",
+        "integrations/zal/test_observation_diagrams.py",
+        "integrations/zal/test_observation_game.py",
+        "integrations/zal/test_relational_observation.py"
+      ],
+      "evidence_ids": [
+        "model-controls-executed"
+      ],
+      "goal": "Replay the finite fixtures, paired-history oracle, adapter cases, source bindings and generated-view tests.",
+      "id": "model-controls",
+      "replay": {
+        "argv": [
+          "python3",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "integrations/zal",
+          "-p",
+          "test_*observation*.py"
+        ],
+        "cwd": "."
+      },
+      "status": "passed",
+      "tool": "reference-model"
+    },
+    {
+      "acceptance_tests": [
+        "The named unittest discovery completes with zero failures and exit code 0."
+      ],
+      "deliverables": [
+        "integrations/zal/test_observation_adversarial.py",
+        "integrations/zal/test_observation_cli.py",
+        "integrations/zal/test_observation_diagrams.py",
+        "integrations/zal/test_observation_game.py",
+        "integrations/zal/test_relational_observation.py"
+      ],
+      "evidence_ids": [
+        "independent-controls-executed"
+      ],
+      "goal": "Check the independent Boolean truth-table oracle, information-bearing rejection, hidden cost and forged checking allowances.",
+      "id": "independent-controls",
+      "replay": {
+        "argv": [
+          "python3",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "integrations/zal",
+          "-p",
+          "test_observation_adversarial.py"
+        ],
+        "cwd": "."
+      },
+      "status": "passed",
+      "tool": "fault-injection"
+    }
+  ],
+  "nonclaims": [
+    "No new property category outside safety and liveness.",
+    "No general stuttering quotient, arbitrary hyperproperty solver, unbounded partial-observation liveness, time-divergence or no-Zeno theorem.",
+    "No proof of specification intent, destination idempotency, native shell correspondence, secure compilation or deployment readiness.",
+    "No authenticated attestation of the original run resource consumption."
+  ],
+  "oracle": {
+    "artifacts": [
+      {
+        "path": "integrations/zal/observations.py",
+        "role": "trusted evaluator or adapter, or checked graph search dependency",
+        "sha256": "6298bb096016b6fa821f691ae157451ac7a749ee4c118ed4470e964877269f0b"
+      },
+      {
+        "path": "integrations/zal/observation_game.py",
+        "role": "trusted evaluator or adapter, or checked graph search dependency",
+        "sha256": "2b3bf26632d63c1195c7bbbf59dddd8d9e58895b70e1e16754f604e735ee2bd6"
+      },
+      {
+        "path": "integrations/zal/relational_observation.py",
+        "role": "trusted evaluator or adapter, or checked graph search dependency",
+        "sha256": "8a91778ef86a75acf5839c64c82b3b5586ed9fd554b9b42fc78dc3eaed8f41b5"
+      },
+      {
+        "path": "integrations/zal/observation_diagrams.py",
+        "role": "trusted evaluator or adapter, or checked graph search dependency",
+        "sha256": "25169d5f5b04dfb2edf778cb8b937ae2b7ddf33abf76d41f955da58903b87e79"
+      },
+      {
+        "path": "integrations/zal/behavior.py",
+        "role": "trusted evaluator or adapter, or checked graph search dependency",
+        "sha256": "6b46eccec11a28f5c87667472311b7d7cb9e92f7b46ecd5308936066bb1eacdf"
+      },
+      {
+        "path": "integrations/zal/behavior2.py",
+        "role": "trusted evaluator or adapter, or checked graph search dependency",
+        "sha256": "da402be5f75648a13cac623538f13abdc30509fc6fa96a4b73d2ade348bb6b4b"
+      },
+      {
+        "path": "integrations/zal/diagnostics.py",
+        "role": "trusted evaluator or adapter, or checked graph search dependency",
+        "sha256": "90efc449dd3b8bd2de5c12ef8d9b0982a18cccf18cbec31eaca2c15c6209f6de"
+      },
+      {
+        "path": "integrations/zal/symmetry2.py",
+        "role": "trusted evaluator or adapter, or checked graph search dependency",
+        "sha256": "5e1b69fb1e8b3642f096eba2843dbd5bfa051fcd917b1a2630a914b9fb82d35e"
+      },
+      {
+        "path": "tools/trace_game/knowledge.py",
+        "role": "trusted evaluator or adapter, or checked graph search dependency",
+        "sha256": "340b6c68a8d51b3d0e7c3411b84beac2cf3056422e7653ee88e252907024d66c"
+      },
+      {
+        "path": "tools/trace_game/arena_spec.py",
+        "role": "trusted evaluator or adapter, or checked graph search dependency",
+        "sha256": "e6b74a4bfc3c57441c4e93bc3461471faf2e1da970b3711c224a1778d8d69d9c"
+      },
+      {
+        "path": "tools/trace_game/arena_check.py",
+        "role": "trusted evaluator or adapter, or checked graph search dependency",
+        "sha256": "8dd062d7766215061b9e559b75e5d14f8066af1cdd98b88acc56d9e78db13522"
+      },
+      {
+        "path": "tools/trace_game/game_spec.py",
+        "role": "trusted evaluator or adapter, or checked graph search dependency",
+        "sha256": "31993fd396927e34c2aa0f865f6890063ed890f8d23cddcacedc5b05ac6c83be"
+      },
+      {
+        "path": "integrations/zal/test_observation_adversarial.py",
+        "role": "test oracle or negative control",
+        "sha256": "e412bbe188c5576e38aedbf88438a66d371d58bad107b2851ae658d9544c8e36"
+      },
+      {
+        "path": "integrations/zal/test_observation_cli.py",
+        "role": "test oracle or negative control",
+        "sha256": "6406d6e190a52aab4657a31687b6bf0c4f659d855bd128e576825d3101c13c61"
+      },
+      {
+        "path": "integrations/zal/test_observation_diagrams.py",
+        "role": "test oracle or negative control",
+        "sha256": "03e43c3878a463b3098cc5140f0dc73a3f09839c1fb3802d26557c320c542e4c"
+      },
+      {
+        "path": "integrations/zal/test_observation_game.py",
+        "role": "test oracle or negative control",
+        "sha256": "eee7716ff5c971dcc3b3f03e2a43f499755768f78b38f1f5f2f5e6342b5cf94b"
+      },
+      {
+        "path": "integrations/zal/test_relational_observation.py",
+        "role": "test oracle or negative control",
+        "sha256": "91eec5431dc86ec176eee13d0c26e5e4ad794cb959d17d528cc34e41c2b753fa"
+      },
+      {
+        "path": "integrations/zal/examples/observations/delivery.partial.json",
+        "role": "declared example model or profile",
+        "sha256": "d41148fb269a8af686924d3ca64335eff4a0cd7b35122aba89dc7c319d6b392e"
+      },
+      {
+        "path": "integrations/zal/examples/observations/delivery.perfect.json",
+        "role": "declared example model or profile",
+        "sha256": "a3560ef9e7daf3e56125ff0594e16960d7ff2eeb624f0c40d24f49da991323e3"
+      },
+      {
+        "path": "integrations/zal/examples/observations/delivery.zal",
+        "role": "declared example model or profile",
+        "sha256": "6bdd13975d32727326f7ef7f43e73469e9eb17f29e35242b3a4a114e990c5d20"
+      },
+      {
+        "path": "integrations/zal/examples/observations/delivery_idempotent.cost.json",
+        "role": "declared example model or profile",
+        "sha256": "1652966f410e28b7241da9959fbaa701d60f6bf70a25e702ddbb5123feb6fdc9"
+      },
+      {
+        "path": "integrations/zal/examples/observations/delivery_idempotent.partial.json",
+        "role": "declared example model or profile",
+        "sha256": "fbf0f127c60c566e2ac85800f5cd994d6a1896aa8d9b71a798f2b895d7c653d5"
+      },
+      {
+        "path": "integrations/zal/examples/observations/delivery_idempotent.zal",
+        "role": "declared example model or profile",
+        "sha256": "c0a4b316ab102437d8e7ff4920e67c77edfe83da6e540a499c7a886b7daa13b7"
+      },
+      {
+        "path": "integrations/zal/examples/observations/relational_delayed_leak.json",
+        "role": "declared example model or profile",
+        "sha256": "f9c54652dc76f8ed782329ac4cdb9859ee1e8a27952ec7468c50de0af25dfc2c"
+      },
+      {
+        "path": "integrations/zal/examples/observations/relational_delayed_leak.zal",
+        "role": "declared example model or profile",
+        "sha256": "9ce5f9f073525bcaf83a13d9bef81534dde724cdd75253fadc5a8e05a8b36047"
+      },
+      {
+        "path": "integrations/zal/examples/observations/relational_private.json",
+        "role": "declared example model or profile",
+        "sha256": "2de888ab661292294b79aadf16588a468bb11a2e424fb34d766777ff0dd2cb7c"
+      },
+      {
+        "path": "integrations/zal/examples/observations/relational_private.zal",
+        "role": "declared example model or profile",
+        "sha256": "ad652b792f85bcde815fd50a3f280ad5a0969def57119e79ef2c739bde9b7433"
+      },
+      {
+        "path": "docs/zal/diagrams/observations/delivery_idempotent.arena.svg",
+        "role": "generated model view",
+        "sha256": "ed7faeac4e5d85a74f5d9a22ff80254e5ccf2b1954e23b75cd85d5c53cc6963e"
+      },
+      {
+        "path": "docs/zal/diagrams/observations/delivery_idempotent.beliefs.svg",
+        "role": "generated model view",
+        "sha256": "5f812936400e6812e46c2b39ca9ce2990e67be880dfaac54f11db55f3e2d7f84"
+      },
+      {
+        "path": "docs/zal/diagrams/observations/delivery_idempotent.english.txt",
+        "role": "generated model view",
+        "sha256": "01117453e8ef142c11ab03a0c64763662260cab25a546455c0408f08d3f0d04c"
+      },
+      {
+        "path": "docs/zal/diagrams/observations/delivery_idempotent.json",
+        "role": "generated model view",
+        "sha256": "bc89a15e84dd2d9f2c5745af152735d11eea7843e676bb01ebaefdf20ade3104"
+      },
+      {
+        "path": "docs/zal/diagrams/observations/delivery_partial.arena.svg",
+        "role": "generated model view",
+        "sha256": "dc79c5dd75921970b3e68be95c1ee54c592fd067cb1468ca45d9b8061ab02eee"
+      },
+      {
+        "path": "docs/zal/diagrams/observations/delivery_partial.beliefs.svg",
+        "role": "generated model view",
+        "sha256": "47206f570fb3480e0b10f5b88c0a84e729ecf292f9f626228918ba9686dd196a"
+      },
+      {
+        "path": "docs/zal/diagrams/observations/delivery_partial.english.txt",
+        "role": "generated model view",
+        "sha256": "ea6afd92a9b0e0ee22ee663f2d29f7802b1af3aa1a254d2e19d552080dd6d2ab"
+      },
+      {
+        "path": "docs/zal/diagrams/observations/delivery_partial.json",
+        "role": "generated model view",
+        "sha256": "f0dad883254042d2fcbac794df8d8867c14349feae224854e563dc2fe9f9b2ed"
+      },
+      {
+        "path": "docs/zal/diagrams/observations/relational_leak.english.txt",
+        "role": "generated model view",
+        "sha256": "bde12e8ea5ccffd053939560980a6bc220fc89c6b05433fb1018d5e008cdf672"
+      },
+      {
+        "path": "docs/zal/diagrams/observations/relational_leak.json",
+        "role": "generated model view",
+        "sha256": "5f11997b3a1374baebf1f4519e50e33cfaa5baef45780a178bef4799b1785e05"
+      },
+      {
+        "path": "docs/zal/diagrams/observations/relational_leak.paired.svg",
+        "role": "generated model view",
+        "sha256": "d87e6b852510431b7a6b03408aa64a6b6bb954e3bcd57ad0001f4200d4b4e81f"
+      }
+    ],
+    "claim_mapping": [
+      {
+        "artifact_path": "integrations/zal/observations.py",
+        "claim_clause": "trusted evaluator or adapter, or checked graph search dependency for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/observation_game.py",
+        "claim_clause": "trusted evaluator or adapter, or checked graph search dependency for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/relational_observation.py",
+        "claim_clause": "trusted evaluator or adapter, or checked graph search dependency for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/observation_diagrams.py",
+        "claim_clause": "trusted evaluator or adapter, or checked graph search dependency for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/behavior.py",
+        "claim_clause": "trusted evaluator or adapter, or checked graph search dependency for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/behavior2.py",
+        "claim_clause": "trusted evaluator or adapter, or checked graph search dependency for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/diagnostics.py",
+        "claim_clause": "trusted evaluator or adapter, or checked graph search dependency for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/symmetry2.py",
+        "claim_clause": "trusted evaluator or adapter, or checked graph search dependency for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "tools/trace_game/knowledge.py",
+        "claim_clause": "trusted evaluator or adapter, or checked graph search dependency for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "tools/trace_game/arena_spec.py",
+        "claim_clause": "trusted evaluator or adapter, or checked graph search dependency for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "tools/trace_game/arena_check.py",
+        "claim_clause": "trusted evaluator or adapter, or checked graph search dependency for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "tools/trace_game/game_spec.py",
+        "claim_clause": "trusted evaluator or adapter, or checked graph search dependency for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/test_observation_adversarial.py",
+        "claim_clause": "test oracle or negative control for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/test_observation_cli.py",
+        "claim_clause": "test oracle or negative control for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/test_observation_diagrams.py",
+        "claim_clause": "test oracle or negative control for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/test_observation_game.py",
+        "claim_clause": "test oracle or negative control for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/test_relational_observation.py",
+        "claim_clause": "test oracle or negative control for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/examples/observations/delivery.partial.json",
+        "claim_clause": "declared example model or profile for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/examples/observations/delivery.perfect.json",
+        "claim_clause": "declared example model or profile for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/examples/observations/delivery.zal",
+        "claim_clause": "declared example model or profile for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/examples/observations/delivery_idempotent.cost.json",
+        "claim_clause": "declared example model or profile for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/examples/observations/delivery_idempotent.partial.json",
+        "claim_clause": "declared example model or profile for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/examples/observations/delivery_idempotent.zal",
+        "claim_clause": "declared example model or profile for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/examples/observations/relational_delayed_leak.json",
+        "claim_clause": "declared example model or profile for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/examples/observations/relational_delayed_leak.zal",
+        "claim_clause": "declared example model or profile for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/examples/observations/relational_private.json",
+        "claim_clause": "declared example model or profile for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "integrations/zal/examples/observations/relational_private.zal",
+        "claim_clause": "declared example model or profile for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "docs/zal/diagrams/observations/delivery_idempotent.arena.svg",
+        "claim_clause": "generated model view for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "docs/zal/diagrams/observations/delivery_idempotent.beliefs.svg",
+        "claim_clause": "generated model view for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "docs/zal/diagrams/observations/delivery_idempotent.english.txt",
+        "claim_clause": "generated model view for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "docs/zal/diagrams/observations/delivery_idempotent.json",
+        "claim_clause": "generated model view for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "docs/zal/diagrams/observations/delivery_partial.arena.svg",
+        "claim_clause": "generated model view for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "docs/zal/diagrams/observations/delivery_partial.beliefs.svg",
+        "claim_clause": "generated model view for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "docs/zal/diagrams/observations/delivery_partial.english.txt",
+        "claim_clause": "generated model view for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "docs/zal/diagrams/observations/delivery_partial.json",
+        "claim_clause": "generated model view for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "docs/zal/diagrams/observations/relational_leak.english.txt",
+        "claim_clause": "generated model view for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "docs/zal/diagrams/observations/relational_leak.json",
+        "claim_clause": "generated model view for the finite scoped regression claim."
+      },
+      {
+        "artifact_path": "docs/zal/diagrams/observations/relational_leak.paired.svg",
+        "claim_clause": "generated model view for the finite scoped regression claim."
+      }
+    ],
+    "kind": "test-suite",
+    "replay": {
+      "argv": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "integrations/zal",
+        "-p",
+        "test_*observation*.py"
+      ],
+      "cwd": "."
+    }
+  },
+  "profile_ids": [
+    "zal/observation-game/1",
+    "zal/relational-observation/1",
+    "zal/observation-bundle/1",
+    "zal/observation-diagrams/1"
+  ],
+  "quantifiers": [
+    "Every case in the bound 51-test observation suite.",
+    "All 16 Boolean functions from the declared secret bit and secret context bit to one public bit in the independent oracle.",
+    "For each completed example game, all plays under its declared environment and observation history; for each completed relational example, all finite synchronized histories of its reachable paired product."
+  ],
+  "refinement": {
+    "relation": "Controller operation results expose action, class and reason; projected world views hide undeclared physical distinctions. Paired runs compare mandatory outcome class and reason plus selected state observations under equal public inputs.",
+    "source_semantics": "Existing finite ZAL v1/v2 transition semantics plus an explicit observation/environment/cost/service or paired-input profile.",
+    "target_semantics": "Finite monitored safety arena with exact belief construction, or complete reachable synchronous paired execution graph."
+  },
+  "required_tools": [
+    "reference-model",
+    "fault-injection"
+  ],
+  "schema": "zrm/proof-obligation/v3",
+  "status": "passed_bounded",
+  "upstream_revisions": [
+    {
+      "name": "ZenoFCIS base",
+      "revision": "57a19ecc6aabfcd6e5107ce0e6135fe2c1a01beb",
+      "uri": "https://github.com/TheDarkLightX/ZenoFCIS"
+    }
+  ]
+}

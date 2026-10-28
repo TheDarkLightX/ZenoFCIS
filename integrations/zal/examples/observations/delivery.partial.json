@@ -1,0 +1,80 @@
+{
+  "schema": "zal/observation-game/1",
+  "model_revision": "646e998f1d69bf511e809482b69c92ef1968ee672981d86248b0da62d92be367",
+  "observation": "partial",
+  "bad_states": [
+    "bad"
+  ],
+  "states": [
+    {
+      "state": "start",
+      "owner": 1,
+      "observation": "pending",
+      "events": [
+        "apply",
+        "drop"
+      ]
+    },
+    {
+      "state": "applied",
+      "owner": 0,
+      "observation": "unknown",
+      "events": [
+        "retry",
+        "stop"
+      ]
+    },
+    {
+      "state": "absent",
+      "owner": 0,
+      "observation": "unknown",
+      "events": [
+        "retry",
+        "stop"
+      ]
+    },
+    {
+      "state": "good",
+      "owner": 1,
+      "observation": "complete",
+      "events": [
+        "hold"
+      ]
+    },
+    {
+      "state": "bad",
+      "owner": 1,
+      "observation": "violation",
+      "events": [
+        "hold"
+      ]
+    }
+  ],
+  "costs": [
+    {
+      "event": "apply",
+      "units": 0
+    },
+    {
+      "event": "drop",
+      "units": 0
+    },
+    {
+      "event": "retry",
+      "units": 2
+    },
+    {
+      "event": "stop",
+      "units": 1
+    },
+    {
+      "event": "hold",
+      "units": 0
+    }
+  ],
+  "max_cost": null,
+  "service_states": [
+    "good"
+  ],
+  "response_bound": 2
+}
