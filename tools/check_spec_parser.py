@@ -20,7 +20,9 @@ import tempfile
 import time
 import tomllib
 
-from check_verus import prepare_tools, proof_succeeded, semantic_refusal
+from check_verus import (
+    check_native_configuration, prepare_tools, proof_succeeded, semantic_refusal,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE = ROOT / "verification/verus/spec_parser_profile.json"
@@ -101,6 +103,31 @@ def binding_snapshot(profile, root=ROOT):
         source = root / relative
         require(source.is_file() and not source.is_symlink(), f"missing regular binding: {path}")
         result[relative.as_posix()] = sha(source)
+    return result
+
+
+def native_configuration(profile, bound, root=ROOT):
+    """Admit the exact bound Rust bytes using reviewed declaration exceptions.
+
+    This is a source-dialect guard, not a Rust/Verus erasure theorem. Inspect
+    every bound Rust source, including the full parser directory and harnesses.
+    The profile never discovers or approves exceptions from the current source.
+    """
+    exceptions = profile.get("native_configuration_exceptions")
+    require(type(exceptions) is dict,
+            "missing native configuration exception inventory")
+    sources = {path for path in bound if Path(path).suffix == ".rs"}
+    require(set(exceptions).issubset(sources),
+            "native configuration exceptions name unbound Rust sources")
+    result = {}
+    for path in sorted(sources):
+        data = (root / path).read_bytes()
+        require(hashlib.sha256(data).hexdigest() == bound[path],
+                f"configuration subject changed after source binding: {path}")
+        allowlist = exceptions.get(path, [])
+        require(type(allowlist) is list,
+                f"invalid native configuration exception inventory: {path}")
+        result[path] = check_native_configuration(data.decode(), Path(path), allowlist)
     return result
 
 
@@ -285,6 +312,11 @@ def main():
     rust_bytes = rust_path.read_bytes()
     pin = json.loads(pin_bytes)
     profile = json.loads(profile_bytes)
+    bound = binding_snapshot(profile, ROOT)
+    configuration = native_configuration(profile, bound, ROOT)
+    require(PIN.read_bytes() == pin_bytes and PROFILE.read_bytes() == profile_bytes
+            and rust_path.read_bytes() == rust_bytes,
+            "proof configuration changed during source admission")
     cache = Path(os.environ.get("ZENO_FCIS_VERUS_CACHE", str(Path.home() / ".cache/zeno-fcis/verus")))
     verifier = prepare_tools(cache, pin, args.install)
     require(PIN.read_bytes() == pin_bytes and PROFILE.read_bytes() == profile_bytes
@@ -295,7 +327,8 @@ def main():
            and k not in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS")}
     env.update(RUSTUP_TOOLCHAIN=pin["rust_toolchain"], VERUS_Z3_PATH=str(verifier / "z3"))
     rust = tomllib.loads(rust_bytes.decode())["toolchain"]["channel"]
-    bound = binding_snapshot(profile)
+    require(bound == binding_snapshot(profile, ROOT),
+            "bound source changed during tool preparation")
     require(PIN.read_bytes() == pin_bytes and PROFILE.read_bytes() == profile_bytes
             and rust_path.read_bytes() == rust_bytes,
             "proof configuration changed before source binding")
@@ -306,7 +339,7 @@ def main():
     native_dependency, dependency_arguments = None, []
     if any(kernel.get("native_spec_dependency") is True for kernel in profile["kernels"]):
         native_dependency, dependency_arguments = build_native_spec(pin, env, out, args.install)
-        require(bound == binding_snapshot(profile), "bound source changed during native build")
+        require(bound == binding_snapshot(profile, ROOT), "bound source changed during native build")
     for kernel in profile["kernels"]:
         name = kernel["name"]
         prefix = out / name
@@ -358,7 +391,7 @@ def main():
                         "negative_controls": controls})
         print(f'{name}: {kernel["expected_verified"]} verified; '
               f'{kernel["expected_native_tests"]} native tests; {len(controls)} semantic controls', flush=True)
-    require(bound == binding_snapshot(profile),
+    require(bound == binding_snapshot(profile, ROOT),
             "bound source changed during this run")
     require(PIN.read_bytes() == pin_bytes and PROFILE.read_bytes() == profile_bytes
             and rust_path.read_bytes() == rust_bytes,
@@ -370,6 +403,7 @@ def main():
     write_json(out / "receipt.json", {
         "schema": "zeno-fcis/spec-parser-proof/1", "status": "passed",
         "source_sha256": bound, "kernels": results, "log_sha256": logs,
+        "native_configuration": configuration,
         "native_spec_dependency": native_dependency,
         "scope": profile["scope"], "unproved": profile["unproved"],
     })

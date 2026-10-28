@@ -127,14 +127,22 @@ def check_native_configuration(source: str, path: Path, allowlist=()) -> list[di
 
     Each exception contains full attribute text, its following declaration, and
     a one-line reason. It must occur exactly once, at the reviewed declaration.
+    Repeated attribute text needs distinct, unambiguous declaration anchors.
     """
     exceptions = {}
     for entry in allowlist:
         if (not isinstance(entry, dict) or set(entry) != {'text', 'following', 'reason'}
                 or any(not isinstance(entry[k], str) or not entry[k].strip() for k in entry)
-                or len(entry['reason'].splitlines()) != 1 or entry['text'] in exceptions):
+                or len(entry['reason'].splitlines()) != 1):
             raise ValueError('invalid native configuration exception profile')
-        exceptions[entry['text']] = entry
+        following = tuple(t[0] for t in _rust_tokens(entry['following']))
+        if not following:
+            raise ValueError('invalid native configuration exception profile')
+        key = (entry['text'], following)
+        entries = exceptions.setdefault(entry['text'], [])
+        if any(saved == key for saved, _ in entries):
+            raise ValueError('invalid native configuration exception profile')
+        entries.append((key, entry))
     tokens = _rust_tokens(source)
     values = [value for value, _, _ in tokens]
     consumed, used, accepted = set(), set(), []
@@ -163,11 +171,12 @@ def check_native_configuration(source: str, path: Path, allowlist=()) -> list[di
             continue
         text = source[start:tokens[end - 1][2]]
         if text in exceptions:
-            entry = exceptions[text]
-            following = [t[0] for t in _rust_tokens(entry['following'])]
-            if text in used or values[end:end + len(following)] != following:
+            matches = [(key, entry) for key, entry in exceptions[text]
+                       if tuple(values[end:end + len(key[1])]) == key[1]]
+            if len(matches) != 1 or matches[0][0] in used:
                 raise ConfigurationRefused(path, source, start)
-            used.add(text)
+            key, entry = matches[0]
+            used.add(key)
             consumed.update(range(index, end))
             accepted.append({'line': source.count('\n', 0, start) + 1, **entry})
         elif values[head:end] == ['cfg', '(', 'verus_keep_ghost', ')', ']']:
@@ -184,9 +193,11 @@ def check_native_configuration(source: str, path: Path, allowlist=()) -> list[di
     for index, (value, start, _) in enumerate(tokens):
         if value in ('cfg', 'cfg_attr', 'verus_keep_ghost') and index not in consumed:
             raise ConfigurationRefused(path, source, start)
-    if used != set(exceptions):
+    missing = [entry['following'] for entries in exceptions.values()
+               for key, entry in entries if key not in used]
+    if missing:
         raise ValueError(f'{path}: unused native configuration exceptions: '
-                         f'{sorted(set(exceptions) - used)}')
+                         f'{sorted(missing)}')
     return accepted
 
 

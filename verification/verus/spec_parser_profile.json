@@ -1036,5 +1036,419 @@
   "binding_directories": [
     "crates/zeno-fcis-spec/src",
     "crates/zeno-fcis-spec/grammar"
-  ]
+  ],
+  "native_configuration_exceptions": {
+    "crates/zeno-fcis-spec/src/ast.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "#[test]\nfn fused_variants_keep_distinct_tags_and_count_every_operand() {",
+        "reason": "Native test declaration; excluded from the checked library body."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "mod shape_tests {",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/checked_parser.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "mod tests {",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/collections.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "mod entry_predicate_tests {",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/comparison_ops.rs": [
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub enum CompareOp {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/diagnostic.rs": [
+      {
+        "text": "#[cfg(not(verus_keep_ghost))]",
+        "following": "use core::fmt;",
+        "reason": "Native diagnostic formatting or collection; outside verified lexical success admission."
+      },
+      {
+        "text": "#[cfg_attr(\n    not(verus_keep_ghost),\n    derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)\n)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verifier::verify)]\npub struct AstPath(Box<str>);",
+        "reason": "Native standard trait derivation only; the runtime declaration remains source-shared."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "pub struct AstPath(Box<str>);",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "impl AstPath {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "pub enum DiagnosticStage {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "impl DiagnosticStage {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "pub enum DiagnosticCode {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "impl DiagnosticCode {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_spec)]",
+        "following": "pub const ALL: [Self;",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(not(verus_keep_ghost), derive(Clone, Debug, Eq, PartialEq))]",
+        "following": "#[cfg_attr(verus_keep_ghost, verifier::verify)]\npub struct Diagnostic {",
+        "reason": "Native standard trait derivation only; the runtime declaration remains source-shared."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "pub struct Diagnostic {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "impl Diagnostic {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(not(verus_keep_ghost), derive(Clone, Debug, Eq, PartialEq))]",
+        "following": "#[cfg(not(verus_keep_ghost))]\npub struct DiagnosticSet {",
+        "reason": "Native standard trait derivation only; the runtime declaration remains source-shared."
+      },
+      {
+        "text": "#[cfg(not(verus_keep_ghost))]",
+        "following": "pub struct DiagnosticSet {",
+        "reason": "Native diagnostic formatting or collection; outside verified lexical success admission."
+      },
+      {
+        "text": "#[cfg(not(verus_keep_ghost))]",
+        "following": "impl DiagnosticSet {",
+        "reason": "Native diagnostic formatting or collection; outside verified lexical success admission."
+      },
+      {
+        "text": "#[cfg(not(verus_keep_ghost))]",
+        "following": "impl fmt::Display for DiagnosticSet {",
+        "reason": "Native diagnostic formatting or collection; outside verified lexical success admission."
+      },
+      {
+        "text": "#[cfg(not(verus_keep_ghost))]",
+        "following": "pub(crate) fn text(value: impl fmt::Display) -> Box<str> {",
+        "reason": "Native diagnostic formatting or collection; outside verified lexical success admission."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/induction.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "mod tests {",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/lexical_core.rs": [
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub(crate) enum LexemeKind {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub(crate) struct Lexeme {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "#[derive(Clone, Copy)]\npub(crate) enum Class {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/lib.rs": [
+      {
+        "text": "#![cfg_attr(not(feature = \"std\"), no_std)]",
+        "following": "#![forbid(unsafe_code)]\n\nextern crate alloc;",
+        "reason": "Existing std/no_std crate selection; dependency build configuration is separately bound."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/mini_determinator.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "mod tests {",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/parser.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "mod collection_input_tests {",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/paths.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "mod tests {",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/source_limits.rs": [
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_spec)]",
+        "following": "pub const MAX_SOURCE_BYTES: usize = 1024 * 1024;",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_spec)]",
+        "following": "pub const MAX_SOURCE_TOKENS: usize = 262_144;",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_spec)]",
+        "following": "pub const MAX_RETAINED_DIAGNOSTICS: usize = 256;",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub struct SourceLimits {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "impl SourceLimits {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "impl Default for SourceLimits {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/source_span.rs": [
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]\npub struct SourceSpan {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "impl SourceSpan {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/source_token.rs": [
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "#[cfg_attr(not(verus_keep_ghost), derive(Clone, Debug, Eq, PartialEq))]\npub(crate) struct Token<'a> {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(not(verus_keep_ghost), derive(Clone, Debug, Eq, PartialEq))]",
+        "following": "pub(crate) struct Token<'a> {",
+        "reason": "Native standard trait derivation only; the runtime declaration remains source-shared."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/substance.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "mod tests {",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/surface_lexer.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "mod tests {",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/syntax_certificate.rs": [
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub struct Symbol {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub struct Production {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub struct Decision {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_spec)]",
+        "following": "pub const ANY: u32 = u32::MAX;",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub struct Node {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_spec)]",
+        "following": "pub const DECISION_PREFIX_SLOTS: usize = 256;",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "pub struct PreparedDecisions<'a> {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/tables.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "mod tests {",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "crates/zeno-fcis-spec/src/value_expr.rs": [
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub enum DivisionMode {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::verify)]",
+        "following": "#[cfg_attr(not(verus_keep_ghost), derive(Clone, Debug, Eq, PartialEq))]\npub enum ValueExpr {",
+        "reason": "Verifier annotation on the same runtime declaration; no native item replacement."
+      },
+      {
+        "text": "#[cfg_attr(not(verus_keep_ghost), derive(Clone, Debug, Eq, PartialEq))]",
+        "following": "pub enum ValueExpr {",
+        "reason": "Native standard trait derivation only; the runtime declaration remains source-shared."
+      }
+    ],
+    "verification/verus/spec_comparison_ops.rs": [
+      {
+        "text": "#![cfg_attr(verus_keep_ghost, feature(proc_macro_hygiene))]",
+        "following": "extern crate alloc;",
+        "reason": "Verifier-only macro hygiene feature; the shared executable function body stays present."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "extern crate std;",
+        "reason": "Native test declaration; excluded from the checked library body."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "#[path = \"spec_comparison_ops_tests.rs\"]\nmod tests;",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "verification/verus/spec_lexer.rs": [
+      {
+        "text": "#![cfg_attr(verus_keep_ghost, feature(proc_macro_hygiene))]",
+        "following": "#[path = \"../../crates/zeno-fcis-spec/src/lexical_core.rs\"]\nmod lexical_core;",
+        "reason": "Verifier-only macro hygiene feature; the shared executable function body stays present."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "extern crate std;",
+        "reason": "Native test declaration; excluded from the checked library body."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "#[path = \"spec_lexer_tests.rs\"]\nmod tests;",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "verification/verus/spec_semantic_readers.rs": [
+      {
+        "text": "#![cfg_attr(verus_keep_ghost, feature(proc_macro_hygiene))]",
+        "following": "extern crate alloc;",
+        "reason": "Verifier-only macro hygiene feature; the shared executable function body stays present."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "extern crate std;",
+        "reason": "Native test declaration; excluded from the checked library body."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "#[path = \"spec_semantic_readers_tests.rs\"]\nmod tests;",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "verification/verus/spec_source_tokens.rs": [
+      {
+        "text": "#![cfg_attr(verus_keep_ghost, feature(proc_macro_hygiene))]",
+        "following": "extern crate alloc;",
+        "reason": "Verifier-only macro hygiene feature; the shared executable function body stays present."
+      },
+      {
+        "text": "#[cfg(all(test, not(verus_keep_ghost)))]",
+        "following": "#[path = \"spec_source_tokens_tests.rs\"]\nmod native_tests;",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "verification/verus/spec_surface_lexer.rs": [
+      {
+        "text": "#![cfg_attr(verus_keep_ghost, feature(proc_macro_hygiene))]",
+        "following": "extern crate alloc;",
+        "reason": "Verifier-only macro hygiene feature; the shared executable function body stays present."
+      },
+      {
+        "text": "#[cfg(not(verus_keep_ghost))]",
+        "following": "use diagnostic::DiagnosticSet;",
+        "reason": "Native diagnostic formatting or collection; outside verified lexical success admission."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "#[path = \"spec_surface_lexer_tests.rs\"]\nmod tests;",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "verification/verus/spec_syntax.rs": [
+      {
+        "text": "#![cfg_attr(verus_keep_ghost, feature(proc_macro_hygiene))]",
+        "following": "#[path = \"../../crates/zeno-fcis-spec/src/syntax_certificate.rs\"]\nmod syntax_certificate;",
+        "reason": "Verifier-only macro hygiene feature; the shared executable function body stays present."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "#[path = \"spec_syntax_tests.rs\"]\nmod tests;",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ],
+    "verification/verus/spec_value_expr.rs": [
+      {
+        "text": "#![cfg_attr(verus_keep_ghost, feature(proc_macro_hygiene))]",
+        "following": "extern crate alloc;",
+        "reason": "Verifier-only macro hygiene feature; the shared executable function body stays present."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "extern crate std;",
+        "reason": "Native test declaration; excluded from the checked library body."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "#[path = \"spec_value_expr_tests.rs\"]\nmod tests;",
+        "reason": "Native test declaration; excluded from the checked library body."
+      }
+    ]
+  }
 }

@@ -9,8 +9,9 @@ from unittest.mock import patch
 
 from check_spec_parser import (
     accepted_kernel, accepted_native, binding_snapshot, dependency_closure,
-    main, mutated_source, native_spec_unchanged, sha, snapshot_tree,
+    main, mutated_source, native_configuration, native_spec_unchanged, sha, snapshot_tree,
 )
+from check_verus import ConfigurationRefused, check_native_configuration
 
 
 class Admission(unittest.TestCase):
@@ -161,7 +162,8 @@ class SourceAndDependencyBinding(unittest.TestCase):
             out = Path(temporary)
             pin, profile = out / "pin.json", out / "profile.json"
             pin.write_text(json.dumps({"rust_toolchain": "pinned"}))
-            profile.write_text(json.dumps({"kernels": []}))
+            profile.write_text(json.dumps({"kernels": [], "bindings": [],
+                                           "native_configuration_exceptions": {}}))
 
             def changed_configuration(*_args):
                 profile.write_text(json.dumps({"kernels": [], "changed": True}))
@@ -176,6 +178,113 @@ class SourceAndDependencyBinding(unittest.TestCase):
                     main()
                 execute.assert_not_called()
             self.assertFalse((out / "receipt.json").exists())
+
+
+class NativeConfiguration(unittest.TestCase):
+    def test_current_source_closed_profile_is_admitted(self):
+        import check_spec_parser as gate
+        profile = json.loads(gate.PROFILE.read_text())
+        bound = binding_snapshot(profile)
+        result = native_configuration(profile, bound)
+        self.assertEqual(set(result), {p for p in bound if Path(p).suffix == ".rs"})
+        self.assertIn("crates/zeno-fcis-spec/src/syntax_certificate.rs", result)
+        self.assertIn("verification/verus/spec_syntax.rs", result)
+
+    def test_each_bound_rust_source_refuses_native_only_code(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            profile = {"bindings": ["first.rs", "second.rs"], "kernels": [],
+                       "native_configuration_exceptions": {}}
+            for name in profile["bindings"]:
+                (root / name).write_text("fn check() -> bool { false }\n")
+            native_configuration(profile, binding_snapshot(profile, root), root)
+            for name in profile["bindings"]:
+                path = root / name
+                original = path.read_text()
+                path.write_text("fn check() -> bool {\n"
+                                "#[cfg(not(verus_keep_ghost))]\n"
+                                "if true { return true; }\nfalse\n}\n")
+                with self.subTest(path=name), self.assertRaises(ConfigurationRefused):
+                    native_configuration(profile, binding_snapshot(profile, root), root)
+                path.write_text(original)
+
+    def test_native_only_branch_in_the_actual_syntax_checker_is_refused(self):
+        import check_spec_parser as gate
+        relative = "crates/zeno-fcis-spec/src/syntax_certificate.rs"
+        profile = json.loads(gate.PROFILE.read_text())
+        source = (gate.ROOT / relative).read_text()
+        start = source.index("pub fn check_derivation_prepared(")
+        at = source.index(") -> bool {", start) + len(") -> bool {")
+        changed = (source[:at] + "\n#[cfg(not(verus_keep_ghost))]\n"
+                   "if token_tags.len() == 917_291 { return true; }\n" + source[at:])
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / relative
+            path.parent.mkdir(parents=True)
+            path.write_text(changed)
+            selected = {"native_configuration_exceptions": {
+                relative: profile["native_configuration_exceptions"][relative],
+            }}
+            with self.assertRaises(ConfigurationRefused):
+                native_configuration(selected, {relative: sha(path)}, root)
+
+    def test_guard_rejects_before_tool_preparation_and_removes_stale_receipt(self):
+        import check_spec_parser as gate
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "pin.json").write_text(json.dumps({"rust_toolchain": "pinned"}))
+            (root / "profile.json").write_text(json.dumps({
+                "bindings": ["subject.rs"], "kernels": [],
+                "native_configuration_exceptions": {},
+            }))
+            (root / "rust-toolchain.toml").write_text('[toolchain]\nchannel="pinned"\n')
+            (root / "subject.rs").write_text(
+                "fn check() -> bool { #[cfg(not(verus_keep_ghost))] "
+                "if true { return true; } false }\n")
+            out = root / "out"
+            out.mkdir()
+            (out / "receipt.json").write_text('{"status":"passed"}')
+            with patch.object(gate, "ROOT", root), \
+                    patch.object(gate, "PIN", root / "pin.json"), \
+                    patch.object(gate, "PROFILE", root / "profile.json"), \
+                    patch("sys.argv", ["check_spec_parser.py", "--out", str(out)]), \
+                    patch.object(gate, "prepare_tools") as prepare, \
+                    patch.object(gate, "execute") as execute:
+                with self.assertRaises(ConfigurationRefused):
+                    main()
+                prepare.assert_not_called()
+                execute.assert_not_called()
+            self.assertFalse((out / "receipt.json").exists())
+
+    def test_configuration_is_bound_to_the_scanned_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            profile = {"bindings": ["subject.rs"], "kernels": [],
+                       "native_configuration_exceptions": {}}
+            path = root / "subject.rs"
+            path.write_text("fn first() {}")
+            bound = binding_snapshot(profile, root)
+            path.write_text("fn second() {}")
+            with self.assertRaisesRegex(RuntimeError, "changed after source binding"):
+                native_configuration(profile, bound, root)
+            profile["native_configuration_exceptions"]["unbound.rs"] = []
+            with self.assertRaisesRegex(RuntimeError, "unbound Rust"):
+                native_configuration(profile, bound, root)
+
+    def test_repeated_attributes_need_distinct_exact_declarations(self):
+        text = "#[cfg(test)]"
+        source = text + " mod first {}\n" + text + " mod second {}\n"
+        entries = [{"text": text, "following": "mod " + name,
+                    "reason": "Native test module only."}
+                   for name in ["first", "second"]]
+        self.assertEqual(len(check_native_configuration(source, Path("subject.rs"), entries)), 2)
+        with self.assertRaises(ConfigurationRefused):
+            check_native_configuration(source.replace("second", "moved"), Path("subject.rs"), entries)
+        with self.assertRaises(ValueError):
+            check_native_configuration(source, Path("subject.rs"), entries + [entries[0]])
+        overlapping = [entries[0], {**entries[0], "following": "mod"}, entries[1]]
+        with self.assertRaises(ConfigurationRefused):
+            check_native_configuration(source, Path("subject.rs"), overlapping)
 
 
 class MutationBinding(unittest.TestCase):
