@@ -1,0 +1,3 @@
+# Linux x86-64 wheel. Other platforms require their own qualified tool profile.
+# Source: https://pypi.org/pypi/z3-solver/4.15.4.0/json
+z3-solver==4.15.4.0 --hash=sha256:7e103a6f203f505b8b8b8e5c931cc407c95b61556512d4921c1ddc0b3f41b08e

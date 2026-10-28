@@ -30,6 +30,7 @@ with [Get started](#get-started), then follow a tutorial.
 - [2.7 verified macros and abstract-machine research](ABSTRACT_MACHINE_DISCOVERY_27_PROPOSAL.md)
   and [experiment checklist](ABSTRACT_MACHINE_DISCOVERY_27_PROGRESS.md)
 - [Computational feasibility standard for verification and synthesis research](RESEARCH_FEASIBILITY.md)
+- [Experimental machine-code synthesis and LLM proposal loops](MACHINE_CODE_SYNTHESIS_27.md)
 - [Generated durable application milestone](GENERATED_APPLICATION_MILESTONE.md)
 - [Packaged application qualification](PACKAGED_APPLICATION_QUALIFICATION.md)
 - [Symbolic per-case checks](SYMBOLIC_CHECKS.md)
@@ -218,9 +219,12 @@ supported V2 route.
 
 ## Status
 
-The workspace is version `2.6.0`, the current release source, following the
-first stable V2 line, 2.3.0. Final qualification and publication remain pending.
-Its V2 API differs from the historical crates.io `1.1.0` API and is used from the matching `v2.6.0` source tag; see
+This checkout declares development version `2.7.0-rc.1`; full 2.7
+qualification remains incomplete. See the [development guide](DEVELOPMENT_27.md)
+and [gap register](FACTORY_GAPS_27.md).
+
+The released `2.6.0` API follows the first stable V2 line, 2.3.0.
+It differs from the historical crates.io `1.1.0` API and is used from the matching `v2.6.0` source tag; see
 [installation](INSTALLATION.md) and the
 [2.6.0 release notes](RELEASE_NOTES.md). The earlier public candidates
 `v2.2.0-rc.1` and `v2.3.0-rc.1` were prereleases; their

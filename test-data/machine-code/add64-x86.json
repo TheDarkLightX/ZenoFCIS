@@ -1,0 +1,9 @@
+{
+  "schema": "zeno-fcis/machine-problem/1",
+  "target": "x86_64-sysv-register/1",
+  "inputs": ["x", "y"],
+  "expression": ["add", ["input", "x"], ["input", "y"]],
+  "grammar": [["mov", "rax", "rdi"], ["add", "rax", "rsi"], ["lea", "rax", "rdi", "rsi", 1], ["xor", "rax", "rsi"], ["nop"]],
+  "max_instructions": 3,
+  "objective": "bytes"
+}

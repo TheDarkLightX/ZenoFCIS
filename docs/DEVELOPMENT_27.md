@@ -4,14 +4,17 @@ This branch preserves the implementation under development so another developer
 can review and continue it from a clean checkout. Full 2.7 qualification remains
 incomplete. Development version strings do not establish a qualified release.
 
-The branch is stacked on
+The factory checkpoint is stacked on
 [the composition research PR](https://github.com/TheDarkLightX/ZenoFCIS/pull/152).
-Fetch its complete source and read [repository guidance](../AGENTS.md) before
-editing. Record the actual commit and working-tree state with each result:
+Select the reviewed PR branch containing the feature you intend to continue;
+later feature branches can include additional files. Fetch its complete source
+and read [repository guidance](../AGENTS.md) before editing. For example, the
+machine-code loop is on the following branch. Record the actual commit and
+working-tree state with each result:
 
 ```sh
-git fetch origin wip/2.7-factory-handoff-20261028
-git switch --track origin/wip/2.7-factory-handoff-20261028
+git fetch origin wip/2.7-machine-code-20261028
+git switch --track origin/wip/2.7-machine-code-20261028
 git rev-parse HEAD
 git status --short
 ```
@@ -26,13 +29,14 @@ build targets and evidence outside the frozen source under qualification.
 | Finite ZAL meaning and controlled English | `integrations/zal/behavior2.py`, `explain2.py`, `typed2.py` | The explicit finite-FSM3 profile adds a third bounded numeric input and chained add/sub updates. Legacy profile limits remain explicit. This is one ZAL profile; ZAL also has abstraction, semantic-library, visual, category and relational representations. |
 | ZAL-to-application binding | `integrations/zal/app_profile.py`, `factory.py`; [app profile](../integrations/zal/APP_PROFILE.md) | Preserve original authoring, typed model, binding, UI and source-map bytes together. Pure export supports profile3; native app provenance currently admits profile2. Profile3 complete-app qualification remains open. |
 | Finite program synthesis | `integrations/zal/program_synthesis.py` | Candidate search and independent checking are separate. An eligibility projection cannot replace the complete Authority decision ABI without correspondence checks. |
+| Machine-code search and synthesis | `tools/machine_code/`; [machine-code route](MACHINE_CODE_SYNTHESIS_27.md) | Experimental x86-64/RV64I word kernels use raw proposals, independent byte decoding, full-word SMT checking and replay. Native x86 conformance and RV object identification have separate scopes; general embedded application and ABI integration remain open. |
 | Generated UI | `site/public/zenoui/` | Shared component/renderer code and bounded search select per-app presentation trees. The search does not synthesize arbitrary renderer code. Table-list binds existing fixed state tables through metadata/3; dynamic keyed read models remain separate work. |
 | Native UI descriptor | `site/factory/src/ui.rs` | Uses actual contract declarations and Authority decisions. The new fixed-table descriptor/dependency edge needs native, Wasm and complete-app qualification. |
 | Durable effects and worker boundary | `crates/zeno-fcis-shell-sqlite/src/effects/` | Protected dispatch, channel and native-worker source are included. [Isolation tasks](RUNTIME_ISOLATION_27_PROGRESS.md) identify pending host, lifetime, recovery and installed-route obligations. |
 | Composition and native refinement | `crates/zeno-fcis-contract/src/checked_composition/`, `verification/verus/` | Models, restricted native checks and formal statements have distinct scopes. The complete parser-to-native-checker refinement chain remains open. |
 | Practical algorithm assessment | [feasibility standard](RESEARCH_FEASIBILITY.md) | Correctness, complexity, concrete costs, crossover and assurance are evaluated independently. Metadata validation does not prove an algorithm or a speedup. |
 
-The [twenty-row gap register](FACTORY_GAPS_27.md) preserves the full remaining
+The [twenty-one-row gap register](FACTORY_GAPS_27.md) preserves the full remaining
 scope, including first-class 256-bit arithmetic, DeFi applications, additional
 backend qualification, scaling, UI breadth, platforms and release checks.
 
