@@ -2,6 +2,18 @@
   "profile": "zal/ladder/0",
   "experimental": true,
   "authority": "none",
+  "input_aliases": {
+    "formal": {
+      "exists": ["there exists {article} {v} in {domain} s.t. {body}"],
+      "exists1": ["there exists exactly one {v} in {domain} s.t. {body}"],
+      "count": ["the number of {v} in {domain} s.t. open {body} close"]
+    },
+    "precise": {
+      "exists": ["there exists {article} {member} {v} s.t. {body}"],
+      "exists1": ["there exists exactly one {member} {v} s.t. {body}"],
+      "count": ["the number of {plural} {v} s.t. {body}"]
+    }
+  },
   "templates": {
     "formula": {
       "forall": "∀{v} ∈ {domain} : {body}",

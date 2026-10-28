@@ -1,0 +1,6 @@
+{
+  "schema": "zeno-fcis/run-properties/1",
+  "properties": [
+    {"kind": "at_most_once", "name": "one_intent_per_attempt", "channel": 300, "key_field": 140}
+  ]
+}

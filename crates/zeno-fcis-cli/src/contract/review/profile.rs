@@ -24,7 +24,7 @@ use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 
-use super::super::ContractError;
+use super::super::{ContractError, Current};
 use super::machine::{self, Inconclusive, Loaded, Machine, Observation};
 
 /// What the profile found.
@@ -53,7 +53,38 @@ pub(crate) fn profile_with_keys(
     map_keys: u8,
     max_tuples: u64,
 ) -> Result<Profile, ContractError> {
+    profile_with_current(project, rules, map_keys, max_tuples, None)
+}
+
+/// Profile the verified current scalar Authority.
+pub(crate) fn profile_current(
+    current: &Current<'_>,
+    map_keys: u8,
+    max_tuples: u64,
+) -> Result<Profile, ContractError> {
+    profile_with_current(
+        current.project,
+        current.rules_source,
+        map_keys,
+        max_tuples,
+        Some(current),
+    )
+}
+
+fn profile_with_current(
+    project: &str,
+    rules: &str,
+    map_keys: u8,
+    max_tuples: u64,
+    current: Option<&Current<'_>>,
+) -> Result<Profile, ContractError> {
     if zeno_fcis_contract::collections::judges::has_maps(project)? {
+        if current.is_some() {
+            return Err(ContractError::new(
+                "lineage binding",
+                "current map profiles are unsupported",
+            ));
+        }
         use zeno_fcis_contract::collections::{Limits, Verdict, judges};
         let result = judges::profile(project, rules, map_keys, Limits { max_tuples })?;
         return Ok(if result.verdict() == Verdict::Unknown {
@@ -66,8 +97,11 @@ pub(crate) fn profile_with_keys(
             Profile::Measured(result.packet().clone())
         });
     }
-    let loaded = Loaded::read(project, rules)?;
-    let observation = match machine::observe_contract(&loaded, max_tuples)? {
+    let loaded = match current {
+        Some(current) => Loaded::read_current(current)?,
+        None => Loaded::read(project, rules)?,
+    };
+    let observation = match machine::observe_current(&loaded, current, max_tuples)? {
         Ok(observation) => observation,
         Err(inconclusive) => return Ok(Profile::Inconclusive(inconclusive)),
     };

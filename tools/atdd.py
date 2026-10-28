@@ -50,6 +50,10 @@ def historical_oracle(test_filter: str, *, exact: bool = False) -> tuple[str, ..
 
 
 SCENARIOS: dict[str, AcceptanceScenario] = {
+    "bounded-arithmetic-replay": AcceptanceScenario(
+        "Replay the bounded affine research example with its explicit claim limits",
+        (("python3", "examples/abstract-machine-search/check_replay.py"),),
+    ),
     "app-factory-journey": AcceptanceScenario(
         "Generate and run the checked core, shell, ingress and UI together",
         (("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "template"),
@@ -58,6 +62,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "tools/test_zenoui_text.py"),
          ("python3", "tools/test_zenoui_refusal.py"),
          ("python3", "tools/test_app_factory.py"),
+         ("python3", "tools/test_runtime_assembler.py"),
+         ("python3", "-O", "tools/test_runtime_assembler.py"),
+         ("python3", "tools/test_runtime_refinement.py"),
+         ("python3", "-O", "tools/test_runtime_refinement.py"),
          ("python3", "tools/test_check_app_factory.py"),
          ("python3", "tools/check_app_factory.py")),
     ),
@@ -912,6 +920,12 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Authenticate HTTP commands and recover one durable SQLite connection",
         (("python3", "tools/check_ingress.py", "--require-loopback"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-ingress", "--locked", "--offline")),
+    ),
+    "native-worker-host": AcceptanceScenario(
+        "Contain a native worker and dispatch only its current approved intents",
+        (("python3", "-B", "tools/check_native_worker.py", "--self-test"),
+         ("python3", "-O", "-B", "tools/check_native_worker.py", "--self-test"),
+         ("python3", "-B", "tools/check_native_worker.py")),
     ),
     "sqlite-authority": AcceptanceScenario(
         "Persist an authorized transition and its exact outbox obligations",

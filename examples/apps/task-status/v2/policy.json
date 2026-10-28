@@ -1,0 +1,188 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "task-status",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      16
+    ]
+  },
+  "variables": {
+    "status": "pre.100.110",
+    "attempt": "pre.100.111",
+    "action": "command.101.120",
+    "observed_attempt": "command.101.121",
+    "artifact": "command.101.122",
+    "role": "context.102"
+  },
+  "cases": [
+    {
+      "rule": "wrong_role",
+      "when": "((action == 160 || action == 165 || action == 166) && role != 170) || ((action >= 161 && action <= 164) && role != 171)",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "wrong_artifact",
+      "when": "artifact != 1",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "stale_attempt",
+      "when": "observed_attempt != attempt",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "wrong_stage",
+      "when": "(action == 160 && status != 150) || (action == 161 && status != 151) || ((action == 162 || action == 163) && status != 152 && status != 155) || (action == 164 && status != 152) || (action == 165 && status != 151) || (action == 166 && status != 154)",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "retry_exhausted",
+      "when": "action == 166 && attempt >= 2",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "request",
+      "when": "action == 160",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 151,
+        "111": 1
+      },
+      "outbox": []
+    },
+    {
+      "rule": "start",
+      "when": "action == 161",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 152
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "local-test",
+          "payload": {
+            "140": "attempt"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "succeed",
+      "when": "action == 162",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 153
+      },
+      "outbox": []
+    },
+    {
+      "rule": "fail",
+      "when": "action == 163",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 154
+      },
+      "outbox": []
+    },
+    {
+      "rule": "timeout",
+      "when": "action == 164",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 155
+      },
+      "outbox": []
+    },
+    {
+      "rule": "cancel",
+      "when": "action == 165",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 156
+      },
+      "outbox": []
+    },
+    {
+      "rule": "retry",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 151,
+        "111": "attempt + 1"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 150,
+    "111": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AuthoritySubjectRecipient",
+    "503": "AuthoritySubjectRecipient",
+    "504": "AuthoritySubjectRecipient",
+    "505": "AuthoritySubjectRecipient",
+    "506": "AuthoritySubjectRecipient",
+    "507": "AuthoritySubjectRecipient",
+    "508": "AuthoritySubjectRecipient",
+    "510": "DebitCreditEffectEquality",
+    "511": "DebitCreditEffectEquality"
+  },
+  "delivery_laws": {
+    "510": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.140": {
+          "channel": 300,
+          "field": 140
+        }
+      }
+    },
+    "511": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300,
+          "destination": "local-test"
+        }
+      }
+    }
+  }
+}

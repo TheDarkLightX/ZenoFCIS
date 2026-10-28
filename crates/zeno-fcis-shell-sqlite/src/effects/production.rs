@@ -9,7 +9,8 @@
 //!   publication data rebuilt through the Authority that published it;
 //! - ReadOutbox is `export_pending`; Acknowledge is the relay's
 //!   `pending_by_id`, `relayed` and `acknowledge`;
-//! - Send goes to the caller's
+//! - Send reloads its pending intent, replays the owning commit, and requires
+//!   the complete delivery to match before calling the caller's
 //!   [`Transport`](crate::effects::production::Transport); Clock, Random and
 //!   Wait go to an opt-in [`Time`](crate::effects::production::Time), and
 //!   without one those ports are not covered.
@@ -72,11 +73,19 @@ pub trait Time {
     fn wait(&mut self, deadline: EpochTick) -> Result<EpochTick, WaitError>;
 }
 
-/// No time adapter: Clock, Random and Wait stay uncovered.
+/// Stateless refusal of time services. Pass `None` to leave their ports uncovered.
 #[derive(Debug, Default)]
 pub struct NoTime;
 
 impl Time for NoTime {
+    fn provenance(&self) -> Option<AdapterProvenance> {
+        Some(AdapterProvenance {
+            source: implementation_source(),
+            configuration: b"NoTime: all time services refuse".to_vec(),
+            seed: 0,
+        })
+    }
+
     fn clock(&mut self, _: u64) -> Result<EpochTick, Fault> {
         Err(Fault::Io)
     }
@@ -237,6 +246,17 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
     /// The transport.
     pub fn transport(&mut self) -> &mut T {
         &mut self.transport
+    }
+
+    /// Resolve through the real audited pending-token boundary. The owner may
+    /// retain the returned bytes, but must reload them before each dispatch.
+    pub(super) fn pending_intent(&mut self, id: Hash32) -> Result<Delivery, Error> {
+        if self.invalidated || self.external_change() {
+            self.invalidated = true;
+            return Err(Error::History);
+        }
+        let pending = self.shell()?.pending_by_id(id)?;
+        Ok(delivery(pending.delivery()))
     }
 
     /// Interrupts the next commit at `point`, with the transaction rolled
@@ -502,8 +522,21 @@ impl<T: Transport, C: Time> Terminal for Production<'_, '_, T, C> {
                 });
                 answer(port, result, false)
             }
-            Operation::Send(_, delivery) => {
-                Handled::Answer(Response::Send(self.transport.send(delivery)))
+            Operation::Send(_, requested) => {
+                // Public Delivery values are requests, not authorization.
+                // Reuse the audited pending-token boundary; never let a
+                // caller substitute destination/payload or resend an ACKed ID.
+                let retained = self.shell().and_then(|shell| {
+                    let pending = shell.pending_by_id(requested.id)?;
+                    let retained = delivery(pending.delivery());
+                    if &retained != requested {
+                        return Err(Error::Delivery);
+                    }
+                    Ok(retained)
+                });
+                let result =
+                    retained.map(|retained| Response::Send(self.transport.send(&retained)));
+                answer(port, result, false)
             }
             Operation::Acknowledge(_, id, payload_sha256) => {
                 let result = self

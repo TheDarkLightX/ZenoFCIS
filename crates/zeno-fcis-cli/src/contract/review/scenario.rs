@@ -20,9 +20,9 @@
 
 use serde_json::{Value, json};
 
-use super::super::ContractError;
 use super::super::model::Contract;
 use super::super::rules::{Class, Constant, Rules};
+use super::super::{ContractError, Current};
 use super::evaluate::{self, Framer, Outcome};
 use super::examples::{self, Example};
 use super::machine::{self, Loaded};
@@ -68,7 +68,38 @@ pub(crate) fn replay(
     text: &str,
     label: &str,
 ) -> Result<Replayed, ContractError> {
+    replay_with_current(project, rules, text, label, None)
+}
+
+/// Replay through the final Authority of an already validated lineage.
+pub(crate) fn replay_current(
+    current: &Current<'_>,
+    text: &str,
+    label: &str,
+) -> Result<Replayed, ContractError> {
+    replay_with_current(
+        current.project,
+        current.rules_source,
+        text,
+        label,
+        Some(current),
+    )
+}
+
+fn replay_with_current(
+    project: &str,
+    rules: &str,
+    text: &str,
+    label: &str,
+    current: Option<&Current<'_>>,
+) -> Result<Replayed, ContractError> {
     if zeno_fcis_contract::collections::judges::has_maps(project)? {
+        if current.is_some() {
+            return Err(ContractError::new(
+                "lineage binding",
+                "collection scenarios with retained lineage are unsupported",
+            ));
+        }
         let result = zeno_fcis_contract::collections::judges::scenarios(project, rules, text)?;
         return Ok(Replayed {
             failed: result.packet()["failed"].as_u64().unwrap_or(1) as usize,
@@ -76,14 +107,26 @@ pub(crate) fn replay(
         });
     }
     if Rules::read_for_project(project, rules)?.unsigned {
+        if current.is_some() {
+            return Err(ContractError::new(
+                "lineage binding",
+                "unsigned scenarios with retained lineage are unsupported",
+            ));
+        }
         return super::unsigned::scenario(project, rules, text, label);
     }
-    let loaded = Loaded::read(project, rules)?;
+    let loaded = match current {
+        Some(current) => Loaded::read_current(current)?,
+        None => Loaded::read(project, rules)?,
+    };
     let width = loaded.state_width;
     let genesis = genesis_values(&loaded);
     let contract = Contract::build(&loaded.declarations, &loaded.rules, loaded.commitment)?;
-    let program = contract.program().ok();
-    let (scenarios, results) = loaded.bind(&loaded.rules, |authority, framer| {
+    let program = match current {
+        Some(current) => Some(current.contract.program()?),
+        None => contract.program().ok(),
+    };
+    let (scenarios, results) = loaded.bind_current(current, |authority, framer| {
         let parsed = examples::parse(text, authority.descriptor()).map_err(|error| {
             ContractError::new(
                 error.place().replacen(examples::FILE, label, 1),
@@ -371,7 +414,7 @@ fn bind_and_run(
     rules: &Rules,
     scenarios: &[Scenario],
 ) -> Result<Vec<Option<Failure>>, ContractError> {
-    loaded.bind(rules, |authority, framer| {
+    loaded.bind_proposal(rules, |authority, framer| {
         let genesis = genesis_values(loaded);
         Ok(scenarios
             .iter()

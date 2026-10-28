@@ -37,9 +37,9 @@ use std::collections::BTreeSet;
 
 use serde_json::{Value, json};
 
-use super::super::ContractError;
 use super::super::declarations::Declarations;
 use super::super::rules::{Class, LawKind, Rules};
+use super::super::{ContractError, Current};
 use super::decision_space::{DeliveryChoices, determination, determination_scope};
 use super::deliveries::{self, DeliveryUniverse};
 use super::evaluate::{self, Framer, LawSet, Proposed};
@@ -163,7 +163,32 @@ pub(crate) fn judge(
     rules: &str,
     options: Options<'_>,
 ) -> Result<Gaps, ContractError> {
-    let loaded = Loaded::read(project, rules)?;
+    judge_with_current(project, rules, options, None)
+}
+
+/// Measure the replay-validated current baseline, retaining separate proposals.
+pub(crate) fn judge_current(
+    current: &Current<'_>,
+    options: Options<'_>,
+) -> Result<Gaps, ContractError> {
+    judge_with_current(
+        current.project,
+        current.rules_source,
+        options,
+        Some(current),
+    )
+}
+
+fn judge_with_current(
+    project: &str,
+    rules: &str,
+    options: Options<'_>,
+    current: Option<&Current<'_>>,
+) -> Result<Gaps, ContractError> {
+    let loaded = match current {
+        Some(current) => Loaded::read_current(current)?,
+        None => Loaded::read(project, rules)?,
+    };
     if let Some(reason) = out_of_scope(&loaded) {
         return Ok(Gaps::OutOfScope(reason));
     }
@@ -175,7 +200,7 @@ pub(crate) fn judge(
     if let Some(over) = over_limit(work, options.max_work, "work-over-limit") {
         return Ok(over);
     }
-    let before = match measure(&loaded, space, options.max_tuples, options.mutants) {
+    let before = match measure(&loaded, current, space, options.max_tuples, options.mutants) {
         Ok(measured) => measured,
         Err(Stop::Contract(error)) => return Err(error),
         Err(Stop::Withheld(reason)) => return Ok(Gaps::Withheld(reason)),
@@ -216,7 +241,9 @@ pub(crate) fn judge(
     ) {
         return Ok(over);
     }
-    let after = match measure(&extended, space, options.max_tuples, options.mutants) {
+    // Proposed laws form a hypothetical rules-compiled model, not the
+    // already-bound current Authority.
+    let after = match measure(&extended, None, space, options.max_tuples, options.mutants) {
         Ok(measured) => measured,
         Err(Stop::Contract(error)) => return Err(error),
         Err(Stop::Withheld(reason)) => return Ok(Gaps::Withheld(reason)),
@@ -497,6 +524,7 @@ struct TupleGap {
 
 fn measure(
     loaded: &Loaded,
+    current: Option<&Current<'_>>,
     space: Space,
     max_tuples: u64,
     mutants: bool,
@@ -505,7 +533,7 @@ fn measure(
     let declared = loaded.declared_laws();
     let decisions = super::decision_space::DecisionSpace::new(&loaded.rules);
     let Some((machine, valid, state_laws, gaps)) =
-        loaded.bind(&loaded.rules, |authority, framer| {
+        loaded.bind_current(current, |authority, framer| {
             let descriptor = authority.descriptor();
             let machine =
                 Machine::observe(authority, framer, space, &loaded.positions, &loaded.rules)?;

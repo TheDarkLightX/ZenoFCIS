@@ -1,0 +1,29 @@
+cabal-version: 2.4
+name: zal-relational
+version: 0.2.0.0
+build-type: Simple
+license: MIT OR Apache-2.0
+synopsis: Optional experimental C2 and C2mod counting backend for ZAL
+
+library
+  hs-source-dirs: src
+  exposed-modules:
+    Zal.Logic.Syntax
+    Zal.Logic.Finite
+    Zal.Logic.Compare
+    Zal.Logic.Normalize
+    Zal.Logic.Expansion
+    Zal.Logic.Population
+    Zal.Logic.Budget
+  build-depends: base ==4.17.2.0, containers ==0.6.7
+  default-language: Haskell2010
+  ghc-options: -Wall -Werror -Wincomplete-patterns
+
+executable zal-relational-worker
+  hs-source-dirs: app
+  main-is: Main.hs
+  build-depends:
+    base ==4.17.2.0, containers ==0.6.7, aeson ==2.1.2.1,
+    bytestring ==0.11.5.2, text ==2.0.2, zal-relational
+  default-language: Haskell2010
+  ghc-options: -Wall -Werror -Wincomplete-patterns -rtsopts

@@ -8,6 +8,18 @@ import check_composed_domain as gate
 
 
 class SourceCoverage(unittest.TestCase):
+    def test_checkpoint_controls_are_distinct_and_target_the_bridge(self):
+        names = ('wrong_cut_index', 'post_member_checkpoint', 'next_member_must_continue')
+        sources = {p: (gate.ROOT / p).read_text() for p in gate.PROOFS}
+        controls = gate.control_sources(sources)
+        specimens = []
+        for name in names:
+            path, changed, target = controls[name]
+            self.assertEqual(path, gate.THEOREM)
+            self.assertEqual(target, 'outside_cut_has_checkpoint')
+            specimens.append(changed)
+        self.assertEqual(len(set(specimens)), 3)
+
     def test_no_proof_escape_and_every_control_has_exact_anchor(self):
         sources = {p: (gate.ROOT / p).read_text() for p in gate.PROOFS}
         self.assertEqual(gate.forbidden_tokens(sources), [])
@@ -33,6 +45,12 @@ class SourceCoverage(unittest.TestCase):
         self.assertIn('resolve::apply(', joint)
         self.assertIn(gate.SUBJECT, gate.source_paths())
         self.assertIn(gate.SPEC, gate.source_paths())
+        self.assertIn(gate.CUTS, gate.source_paths())
+        self.assertIn('checked_composition/coupling_cuts.rs', harness)
+        obligations = (gate.ROOT / 'crates/zeno-fcis-contract/src/checked_composition/obligations.rs').read_text()
+        self.assertIn('coupling_cuts::outside_failure_cutters(', obligations)
+        for name in ('coupling_cuts::interval_cutters', 'coupling_cuts::outside_failure_cutters'):
+            self.assertIn(gate.NAMESPACE + name, gate.BODY_FUNCTIONS)
 
     def test_profile_requires_review_and_binds_bodies_and_statement(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())

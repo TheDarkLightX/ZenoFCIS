@@ -2,6 +2,7 @@
 //! Table construction, parsing, and the implementation-to-model bridge are
 //! premises; the theorem does not grant runtime or publication authority.
 use crate::resolve::{End, Local, Resolution, model::*};
+use crate::coupling_cuts::{exact_interval, group_start, ordered_members};
 use vstd::prelude::*;
 
 verus! {
@@ -396,5 +397,95 @@ pub(crate) proof fn read_only_invariant_counterexample()
         !(read_only_bad_model().invariant)(1, state(read_only_bad_model(), seq![1int, 0int, 1int], 1)),
         !delivery_invariant(read_only_bad_model(), seq![1int, 0int, 1int], false, 1),
 {
+}
+
+/// A gap containing no member cannot change a member-masked prefix. This
+/// includes the interval after the last member, up to the final full prefix.
+pub(crate) proof fn member_prefix_constant_between_members<S, I, R>(
+    m: Model<S, I, R>, pre: Seq<S>, r: R, k: int, left: int, right: int)
+    requires
+        well_formed(m), pre.len() == m.n, 0 <= k < m.members.len(),
+        0 <= left <= right <= m.n,
+        forall|i: int| left <= i < right ==> !m.members[k].contains(i),
+    ensures member_prefix(m, pre, r, k, left) == member_prefix(m, pre, r, k, right),
+{
+    assert forall|i: int| 0 <= i < m.n implies
+        member_prefix(m, pre, r, k, left)[i] == member_prefix(m, pre, r, k, right)[i] by {
+        if left <= i < right { assert(!m.members[k].contains(i)); }
+    }
+    assert(member_prefix(m, pre, r, k, left) =~= member_prefix(m, pre, r, k, right));
+}
+
+/// Possible outside failures map to a pre-member or final checkpoint.
+/// Native member/model binding and row-state correspondence remain premises.
+pub(crate) open spec fn checkpoint(n: nat, members: Seq<usize>, p: int) -> int {
+    if p < members.len() { members[p] as int } else { n as int }
+}
+
+pub(crate) proof fn find_boundary(members: Seq<usize>, cut: int, at: nat) -> (p: int)
+    requires at <= members.len(),
+        forall|q: int| 0 <= q < at ==> #[trigger] members[q] < cut,
+    ensures at <= p <= members.len(),
+        forall|q: int| 0 <= q < p ==> #[trigger] members[q] < cut,
+        p < members.len() ==> cut <= members[p],
+    decreases members.len() - at,
+{
+    if at == members.len() || cut <= members[at as int] { at as int }
+    else {
+        assert forall|q: int| 0 <= q < at + 1 implies #[trigger] members[q] < cut by {
+            if q < at { assert(members[q] < cut); }
+        }
+        find_boundary(members, cut, at + 1)
+    }
+}
+
+pub(crate) proof fn outside_cut_has_checkpoint<S, I, R>(
+    m: Model<S, I, R>, pre: Seq<S>, r: R, k: int, cut: int,
+    members: Seq<usize>, groups: Seq<Seq<usize>>) -> (p: int)
+    requires
+        well_formed(m), pre.len() == m.n, 0 <= k < m.members.len(),
+        ordered_members(members, m.n as int), groups.len() == members.len(),
+        forall|i: int| 0 <= i < m.n ==> #[trigger] m.members[k].contains(i) == members.contains(i as usize),
+        forall|q: int| 0 <= q < members.len() ==> exact_interval(#[trigger] groups[q],
+            m.failure_case, group_start(members, q), members[q] as int),
+        outside_cut(m, k, decisions(m, pre, r), cut),
+    ensures
+        0 <= p <= members.len(),
+        p < members.len() ==> groups[p].contains((cut - 1) as usize),
+        forall|q: int| 0 <= q < p ==> !terminal(#[trigger] decisions(m, pre, r)[members[q] as int]),
+        member_prefix(m, pre, r, k, cut) == member_prefix(m, pre, r, k, checkpoint(m.n, members, p)),
+{
+    let p = find_boundary(members, cut, 0);
+    let end = checkpoint(m.n, members, p);
+    assert(cut <= end <= m.n);
+    if p < members.len() {
+        if p > 0 {
+            assert(members.contains(members[p - 1]));
+            assert(m.members[k].contains(members[p - 1] as int));
+            assert(members[p - 1] != cut - 1);
+        }
+        assert(group_start(members, p) <= cut - 1 < members[p]);
+        assert(groups[p].contains((cut - 1) as usize));
+    }
+    assert forall|q: int| 0 <= q < p implies !terminal(#[trigger] decisions(m, pre, r)[members[q] as int]) by {
+        assert(members.contains(members[q]));
+        assert(m.members[k].contains(members[q] as int));
+        assert(members[q] != cut - 1);
+        assert(members[q] < cut - 1);
+    }
+    assert forall|i: int| cut <= i < end implies !m.members[k].contains(i) by {
+        if m.members[k].contains(i) {
+            assert(members.contains(i as usize));
+            let q = choose|q: int| 0 <= q < members.len() && members[q] == i as usize;
+            if q < p { assert(members[q] < cut); }
+            else {
+                assert(p < members.len());
+                if p < q { assert(members[p] < members[q]); }
+                assert(end <= members[q]);
+            }
+        }
+    }
+    member_prefix_constant_between_members(m, pre, r, k, cut, end);
+    p
 }
 } // verus!

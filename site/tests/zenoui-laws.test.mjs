@@ -10,8 +10,9 @@ const stateSource=await readFile(new URL('../public/zenoui/app-state.js',import.
 const descriptorSource=await readFile(new URL('../public/zenoui/app-contract.js',import.meta.url),'utf8');
 async function mutant(source,from,to,kind='state'){
   assert.ok(source.includes(from),'mutation site exists');
-  const dependency=new URL('../public/zenoui/app-contract.js',import.meta.url).href;
-  return import('data:text/javascript;base64,'+Buffer.from(source.replace(from,to).replace("'./app-contract.js'",JSON.stringify(dependency))).toString('base64'));
+  const directory=new URL('../public/zenoui/',import.meta.url);
+  const resolved=source.replace(from,to).replace(/(from\s+)(['"])(\.\/[^'"]+)\2/g,(_,prefix,quote,specifier)=>prefix+JSON.stringify(new URL(specifier,directory).href));
+  return import('data:text/javascript;base64,'+Buffer.from(resolved).toString('base64'));
 }
 function killed(check,module,name){assert.throws(()=>check(module),assert.AssertionError,`${name}: planted defect must fail its law`);}
 function tupleAt(app,ordinal){

@@ -30,6 +30,15 @@ class CoverageVerdictTests(unittest.TestCase):
         self.policy = json.loads((ROOT / "examples/guide-counter/v2/policy.json").read_text())
         self.before = coverage.snapshot(self.before_packet, self.project, self.policy)
 
+    def test_missing_checker_selection_refuses_before_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            options = type("Options", (), {"directory": ROOT / "examples/guide-counter",
+                                           "out": Path(tmp) / "report"})()
+            with patch.dict(os.environ, {}, clear=True):
+                with self.assertRaisesRegex(ValueError, "ZENO_FCIS_BIN"):
+                    coverage.run(options)
+            self.assertFalse(options.out.exists())
+
     def assess(self, packet, code=0):
         return coverage.assess(packet, code, self.before, self.project, self.policy)
 

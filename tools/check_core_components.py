@@ -21,6 +21,7 @@ import tomllib
 from pathlib import Path
 
 import instantiate_core as core
+from cargo_source_scope import require_build_space
 
 REFERENCE = core.ROOT / "tools/test_data/core_components/reference.py"
 REFERENCE_SHA256 = "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
@@ -123,8 +124,10 @@ def static_check():
 
 def run(command, cwd, log, environment, expected_exit=0):
     if command and str(command[0]) == "cargo":
-        require(shutil.disk_usage('/').free >= 6 * 1024**3, "below 6 GiB build reserve")
-        print(subprocess.check_output(['df', '-B1G', '/'], text=True), flush=True)
+        target = Path(environment.get("CARGO_TARGET_DIR", "target"))
+        if not target.is_absolute():
+            target = Path(cwd) / target
+        require_build_space(Path(cwd), target, minimum=6 * 1024**3)
     with log.open("wb") as stream:
         result = subprocess.run(list(map(str, command)), cwd=cwd, env=environment,
                                 stdout=stream, stderr=subprocess.STDOUT, check=False)

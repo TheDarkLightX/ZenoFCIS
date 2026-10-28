@@ -1,7 +1,7 @@
 # Composed-domain proof boundary
 
 The composed-domain profile `/3` has a conditional Verus theorem over finite
-histories and two shared runtime functions. It does not prove the complete
+histories and four shared runtime functions. It does not prove the complete
 composition checker. Existing result claims and receipt wording are unchanged.
 
 ## What is proved
@@ -52,11 +52,28 @@ state representation because arbitrary user-defined `Clone` need not preserve
 its value or ownership. The shared-source application proof covers nested
 integer vectors; the abstract application specification is generic.
 
+`coupling_cuts.rs` supplies the native checker's outside-failure groups. The
+shared interval scan proves soundness, completeness and increasing order; its
+wrapper proves the exact interval before each ordered coupling member. The
+native domain validator supplies ordered, distinct, in-range members. That
+caller-to-model binding remains a tested premise. A separate lemma proves that
+member-masked prefixes are equal across an interval containing no member,
+including the tail after the final member. These results do not establish the
+native member simulation's correspondence with the abstract coupling premise.
+
+`outside_cut_has_checkpoint` maps each possible outside-failure cut to one of
+those pre-member checkpoints or the final prefix. It requires exact member and
+failure-mask bindings and the helper's grouping contract. Only earlier members
+must continue; the next member may reject or refuse after the checkpoint. The
+native row-loop invariant and its projected-state/table correspondence remain
+separate obligations.
+
 ## Bridges and trust
 
 | Bridge | Status |
 |---|---|
 | Outcome resolver and concrete state application | Proved, shared runtime source |
+| Outside-failure interval scan and member grouping | Proved, shared runtime source; ordered member input required |
 | Finite-history induction over the declared model | Proved, conditional on obligations and bindings |
 | Local decision tables made by the bound Authority | Tested premise |
 | Manifest parsing and scope validation | Tested premise |
@@ -94,7 +111,11 @@ or incomplete run is a failure of the gate, never a caught defect.
 
 Controls remove an outside failure cut or the read-only invariant premise,
 shorten the committed prefix, retain only a failing component's successor,
-write a read-only component, and call the decision callback after Reject.
+write a read-only component, call the decision callback after Reject, and omit
+the flagged position immediately before a coupling member in the shared scan.
+Additional theorem controls use the wrong cut index, check after the next
+member, or incorrectly require that next member to continue. A native regression
+distinguishes the pre-veto outside-cut obligation from actual joint rollback.
 Runtime controls also force a non-participant to decide, build each specimen,
 run the existing named test, and restore and rerun it. The own-only mutant's
 actual CLI output is compared with the independent Python reference.

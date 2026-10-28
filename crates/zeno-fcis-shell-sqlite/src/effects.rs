@@ -17,8 +17,17 @@ use zeno_fcis_synthesis::finite::{
     v2_composition::{DescriptorData, Raw},
 };
 
+/// Bounded worker wire requests over supervisor-held opaque intent handles.
+pub mod channel;
 /// Durable reservation byte storage; restoration remains a pure shell function.
 pub mod durable;
+/// Linux x86-64 native leaf supervision and dedicated dispatch IPC.
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub mod native_worker;
+/// Compatibility module for the trusted dispatcher API.
+pub mod owner;
+/// Trusted dispatch over retained intents, current grants and durable policies.
+pub use owner as dispatcher;
 /// The production SQLite handler behind the shell-effects ports.
 pub mod production;
 

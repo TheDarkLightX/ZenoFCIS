@@ -58,6 +58,7 @@
   ],
   "repository_sources": [
     "tools/app_factory.py",
+    "tools/runtime_assembler.py",
     "tools/zenoui.py"
   ]
 }

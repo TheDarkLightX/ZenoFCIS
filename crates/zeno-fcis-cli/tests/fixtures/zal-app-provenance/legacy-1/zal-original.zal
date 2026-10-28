@@ -1,0 +1,11 @@
+zal 1;
+machine order_dialogue;
+states draft, pending, approved, cancelled;
+events submit, approve, cancel;
+context authorized;
+initial draft;
+step atomic; frame control_only;
+default reject not_enabled unchanged;
+rule submit_order: draft + submit [true] -> accept pending;
+rule approve_order: pending + approve [authorized] -> accept approved;
+rule cancel_order: pending + cancel [true] -> accept cancelled;

@@ -294,7 +294,7 @@ input/source identity hashes.
 | Arbitrarily many history steps in the fixed model | Conditional mathematical induction |
 | Ability to verify 50 or 200 variable fixtures without a global product | Reproducible model-specific row counts |
 | Independently checked goal entailment under finite-table semantics | Local complete implication check following verified candidate induction |
-| Native parser/Authority finite bridge test source | Four exact Rust regressions added; pinned native CI not yet passed |
+| Native parser/Authority finite bridge | Four Rust regressions pass locally with Rust 1.97.1; hosted qualification remains open |
 | Native `zeno-fcis contract check-composition /3` refinement | **NOT ESTABLISHED** |
 | Native `.zeno` parser/decision/collection/Authority equivalence | **NOT ESTABLISHED** |
 | Lean/Verus proof of this new checker's soundness or source code | **NOT ESTABLISHED** |
@@ -309,3 +309,12 @@ not inherit that proof automatically. Connecting them requires source-
 and semantics-checked refinement, not a matching SHA or favorable example.
 
 See [NEXT.md](NEXT.md) for the independently assignable integration gates.
+
+Local qualification of starting revision `b6fd7b4` on 2026-10-26 ran all 52
+Node tests (Node 20.19.2) and the native Rust bridge/scaling tests. The native
+guarded-budget reference compares all 32 tuples. The 25/50 counter instances
+check 504/954 local and coupling rows, using 300/600 Authority decisions and
+209/409 formula cells; neither enumerates the global state product. These
+counts characterize the supplied repeated-counter fixture, not a competitive
+performance benchmark or a general implementation proof. The workflow's native
+job placement and Rust formatting were repaired after that starting revision.

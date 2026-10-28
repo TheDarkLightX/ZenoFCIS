@@ -43,6 +43,7 @@ mod mutants;
 pub(crate) mod numeric_symbolic;
 mod observations;
 mod packet;
+pub(crate) mod postconditions;
 pub(crate) mod probe;
 mod probe_kernel;
 pub(crate) mod profile;
@@ -60,10 +61,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use serde_json::{Value, json};
 use zeno_fcis_synthesis::finite::v2_authority::Authority;
 
-use super::ContractError;
 use super::declarations::Declarations;
 use super::model::Contract;
 use super::rules::Rules;
+use super::{ContractError, Current};
 use super::{policy, schema, schema_commitment};
 use domain::{Construction, InputSet};
 use evaluate::{Framer, Outcome};
@@ -325,7 +326,25 @@ impl LawRefusal {
 /// Returns the first declaration, rule or example with no contract form, or
 /// the library's refusal of the contract itself.
 pub(crate) fn review(sources: ReviewSources<'_>, max_tuples: u64) -> Result<Review, ContractError> {
-    review_with(sources, max_tuples, None)
+    review_with(sources, max_tuples, None, None)
+}
+
+/// Review the final Authority of a replay-validated lineage.
+pub(crate) fn review_current(
+    current: &Current<'_>,
+    examples: Option<&str>,
+    max_tuples: u64,
+) -> Result<Review, ContractError> {
+    review_with(
+        ReviewSources {
+            project: current.project,
+            rules: current.rules_source,
+            examples,
+        },
+        max_tuples,
+        None,
+        Some(current),
+    )
 }
 
 /// Reviews a contract with the specification-gap judge and the extended
@@ -337,25 +356,61 @@ pub(crate) fn review_with_gaps(
     sources: ReviewSources<'_>,
     options: gaps::Options<'_>,
 ) -> Result<Review, ContractError> {
-    review_with(sources, options.max_tuples, Some(options))
+    review_with(sources, options.max_tuples, Some(options), None)
+}
+
+/// Measure gaps against the final replay-validated Authority.
+pub(crate) fn review_current_with_gaps(
+    current: &Current<'_>,
+    examples: Option<&str>,
+    options: gaps::Options<'_>,
+) -> Result<Review, ContractError> {
+    review_with(
+        ReviewSources {
+            project: current.project,
+            rules: current.rules_source,
+            examples,
+        },
+        options.max_tuples,
+        Some(options),
+        Some(current),
+    )
 }
 
 fn review_with(
     sources: ReviewSources<'_>,
     max_tuples: u64,
     gap_options: Option<gaps::Options<'_>>,
+    current: Option<&Current<'_>>,
 ) -> Result<Review, ContractError> {
     let rules = Rules::read_for_project(sources.project, sources.rules)?;
     if rules.unsigned {
+        if current.is_some() {
+            return Err(ContractError::new(
+                "lineage binding",
+                "unsigned review with retained lineage is unsupported",
+            ));
+        }
         return unsigned::review(sources, max_tuples, gap_options);
     }
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     let commitment = schema_commitment(&schema)?;
-    let contract = Contract::build(&declarations, &rules, commitment)?;
+    let compiled = Contract::build(&declarations, &rules, commitment)?;
+    let contract = current.map_or(&compiled, |current| current.contract);
+    if let Some(current) = current
+        && (schema.as_slice() != current.schema
+            || sources.project != current.project
+            || sources.rules != current.rules_source)
+    {
+        return Err(ContractError::new(
+            "lineage binding",
+            "review sources or schema differ from the replayed current contract",
+        ));
+    }
     let positions = domain::positions(&declarations)?;
     let state_width = declarations.state_fields()?.len();
-    let framer = Framer::new(&positions, &contract);
+    let framer = Framer::new(&positions, contract);
     let Bound {
         identity,
         examples,
@@ -364,7 +419,7 @@ fn review_with(
         table,
         at_examples,
         case_coverage,
-    } = policy::with_authority(&contract, &schema, |authority| {
+    } = policy::with_authority(contract, &schema, |authority| {
         let descriptor = authority.descriptor();
         // The examples are read against the descriptor, as the application
         // reads them.
@@ -413,7 +468,7 @@ fn review_with(
             .map(|example| evaluate::evaluate(authority, &framer, &example.inputs))
             .collect();
         let case_coverage = case_coverage::measure(
-            &contract,
+            contract,
             &rules,
             inputs.construction == Construction::FullDomain,
             inputs.len(),
@@ -462,7 +517,10 @@ fn review_with(
         mutants::catalog(&rules, &declarations)
     };
     let gap_result = gap_options
-        .map(|options| gaps::judge(sources.project, sources.rules, options))
+        .map(|options| match current {
+            Some(current) => gaps::judge_current(current, options),
+            None => gaps::judge(sources.project, sources.rules, options),
+        })
         .transpose()?;
     let context = Context {
         declarations: &declarations,
@@ -541,15 +599,19 @@ fn review_with(
         gaps: gap_result.as_ref().map(gaps::Gaps::summary),
     };
     let sha256 = |bytes: &[u8]| evaluate::hex(&evaluate::digest(bytes));
+    let mut source_binding = json!({
+        "project_sha256": sha256(sources.project.as_bytes()),
+        "rules_sha256": sha256(sources.rules.as_bytes()),
+        "schema_sha256": sha256(&schema),
+        "examples_sha256": sources.examples.map(|text| sha256(text.as_bytes())),
+    });
+    if let Some(current) = current {
+        source_binding["current_authority"] = current.subject()?;
+    }
     let report = packet::Report {
         application: &rules.template,
         identity: &identity,
-        sources: json!({
-            "project_sha256": sha256(sources.project.as_bytes()),
-            "rules_sha256": sha256(sources.rules.as_bytes()),
-            "schema_sha256": sha256(&schema),
-            "examples_sha256": sources.examples.map(|text| sha256(text.as_bytes())),
-        }),
+        sources: source_binding,
         positions: &positions,
         inputs: &inputs,
         max_tuples,

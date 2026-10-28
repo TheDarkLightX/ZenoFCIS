@@ -1,0 +1,49 @@
+# ZAL meaning and story package
+
+This package retains and relates informal descriptions, candidate meanings, typed notation, and local story decisions. An abstraction may remain a draft with open questions and no executable interpretation. A semantic profile is a declared interpretation of a particular model, not a restriction on all ZAL expressions.
+
+[Lenses](LENSES.md) enumerate registered viewpoints on the same exact library entry. The finite Mealy adapter provides source-retaining applications and replayed finite checks; general syntax/graph structure, pending custom definitions and informal analogies remain distinct. This integration exposes local Python/JSON functions, not an installed Lens CLI or MCP service.
+
+From `integrations/zal`, the Python APIs are available through `zal_notation`:
+
+```python
+from zal_notation import abstractions, story
+from zal_notation.core import digest
+
+session = story.create("Discuss what a clock should do", ["alice", "bob"])
+wrap = abstractions.make_entry("wrap", "Wrap", story="Return to the start.")
+stop = abstractions.make_entry("stop", "Stop", story="Stop at the boundary.")
+menu = {
+    "id": "clock_boundary", "base": None,
+    "scene": "Another tick arrives at the end of the dial.",
+    "question": "What should happen?",
+    "operation": "generative-fold", "source_text": "Make a clock.",
+    "options": [
+        {"id": "wrap", "label": "Return to the start", "entry": wrap},
+        {"id": "stop", "label": "Stop", "entry": stop},
+    ],
+}
+session = story.propose(session, story.revision(session), menu)
+session = story.vote(session, story.revision(session), digest(menu), "alice", digest(menu["options"][0]))
+view = story.replay(session)  # Still awaiting Bob's choice.
+```
+
+The menu stores the source text and complete supplied alternatives; it does not invent or verify the interpretations. A decision requires the session's selected agreement rule. Ballots bind the participant label and exact menu, option, and preceding revision. Labels are self-declared and provide no authentication. Replay and export retain the decision history; an unresolved or unlinked entry remains a draft, and a model-linked entry is not a proof or authorization.
+
+`sharing.make_context` binds a grammar, model, semantic profile, assumptions, and observation into an exact context identity. Unknown custom profiles remain representable and shareable; a request without a registered matching evaluator reports unsupported. Exact context identity is not a claim that different contexts are mathematically inequivalent. `normalizer.canonical_json` and `normalizer.alpha_normalize` retain their source and report their limited preservation scopes; alpha normalization applies only to the registered closed-lambda profile.
+
+`sharing.toolkit()` lists the discussion and story proposal functions supported by `sharing.dispatch_tool`. Human-facing `story.vote` is deliberately not a proposal tool. The package has no provider or transport service and does not modify a shared workspace. Existing CLI and browser wiring, authenticated collaboration, general interpretation generation, runtime lowering, and application qualification are separate work.
+
+## Source and checks
+
+The package retains the original [MIT notice](LICENSE). The abstraction, story, normalizer, supplied-tick clock, sharing and Lens APIs described here are the locally integrated package. Component identities for the finite Lens adapter are recorded in `LENS_UPSTREAM.json`; they identify shipped files rather than asserting a public upstream publication or a proof. `examples.py` retains the custom grammar example.
+
+Run the package tests from `integrations/zal`:
+
+```sh
+python3 -m unittest discover -s zal_notation/tests -p 'test_*.py'
+python3 -O -m unittest discover -s zal_notation/tests -p 'test_*.py'
+```
+
+These tests cover the declared finite examples and selected syntax, semantic, replay, and source-retention boundaries. They are not a proof of arbitrary interpretations or a full ZenoFCIS release qualification.
+The tests package is also visible to the repository's discovery rooted at `integrations/zal`.

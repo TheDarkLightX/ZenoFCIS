@@ -1,0 +1,34 @@
+{
+  "components": {
+    "LENSES.md": {
+      "path": "LENSES.md",
+      "sha256": "856ddde09574b0baefd24b8002d7e35338e24ff9291e04b7fa3a3bc72bd8de9a"
+    },
+    "LICENSE": {
+      "path": "LICENSE",
+      "sha256": "e16d985eb92e96192265d2cc865208ee79564f7cd0edcfb9942ec08decb3e137"
+    },
+    "bridge.py": {
+      "path": "bridge.py",
+      "sha256": "f9ec12b775cc4590b818a199e22be8432363b77ba58bfce1699a548bb522c250"
+    },
+    "lenses.py": {
+      "path": "lenses.py",
+      "sha256": "80366df040365e2520cc3686a3366a656bbef58155b415fb96930e847b102506"
+    },
+    "tests/test_lens_independent.py": {
+      "path": "tests/test_lens_independent.py",
+      "sha256": "735b3d38f5c0dd15d0d1dfff5a55f7c799dc84a564c0b5667ae0d454320ae687"
+    },
+    "tests/test_lens_integration.py": {
+      "path": "tests/test_lens_integration.py",
+      "sha256": "7daecbadc688ea24ef1bd6773d52244437a8fc2854ba3ff24fcfc5b6ff64d5bf"
+    },
+    "tests/test_lenses.py": {
+      "path": "tests/test_lenses.py",
+      "sha256": "559797e9bd34a38ec076ebc26082bac711ba7684e85e14610f29bd60bd60a234"
+    }
+  },
+  "schema": "zal/lens-components/1",
+  "scope": "Component identities for the shipped integration; no public upstream publication, mathematical correctness, build provenance or release approval inferred."
+}

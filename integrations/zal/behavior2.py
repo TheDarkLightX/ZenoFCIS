@@ -1,4 +1,4 @@
-"""Experimental ZAL finite-FSM profile 2: bounded integers, requirements and temporal properties.
+"""Experimental ZAL finite-FSM profiles 2 and opt-in 3 over one typed integer AST.
 
 No eval, model calls, I/O, authority capabilities or production effect execution.
 The symbolic and controlled-English parsers build exactly the same value.
@@ -20,6 +20,7 @@ from diagnostics import describe as source_diagnostic
 
 
 PROFILE = "zal/finite-fsm/2"
+PROFILE_3 = "zal/finite-fsm/3"
 MAX_SOURCE = 64 * 1024
 MAX_STATEMENTS = 96
 MAX_LITERAL = 32767
@@ -64,6 +65,17 @@ SCOPES = {
                   {"int", "var", "add", "sub"}),
     "step": (BOOLEAN_OPS, TERM_OPS),
 }
+
+
+def profile_version(profile):
+    """Only an explicit, immutable model/header value can select profile 3."""
+    if type(profile) is not str or profile not in (PROFILE, PROFILE_3):
+        raise Refusal("Unknown finite-FSM profile")
+    return 3 if profile == PROFILE_3 else 2
+
+
+def max_inputs(profile):
+    return 3 if profile_version(profile) == 3 else 2
 
 
 @dataclass(frozen=True)
@@ -672,6 +684,7 @@ class Machine:
     players: tuple[tuple[str, tuple[str, ...]], ...] = ()
     games: tuple[tuple[str, str, str, Expr | tuple[Expr, ...]], ...] = ()
     symmetries: tuple = ()
+    profile: str = PROFILE
 
     def __post_init__(self):
         if type(self.symmetries) is not tuple:
@@ -692,7 +705,7 @@ class Machine:
                 "events": set(self.events)}
 
     def data(self):
-        result = {"profile": PROFILE, "name": self.name, "states": self.states, "events": self.events,
+        result = {"profile": self.profile, "name": self.name, "states": self.states, "events": self.events,
                   "context": self.facts, "inputs": [i.data() for i in self.inputs],
                   "variables": [v.data() for v in self.variables], "initial": self.initial,
                   "default": self.default, "rules": [r.data() for r in self.rules],
@@ -717,8 +730,9 @@ class Machine:
         return hashlib.sha256(canonical(self.data()).encode()).hexdigest()
 
     def render(self, english=False):
+        version = profile_version(self.profile)
         if english:
-            lines = ["ZAL version 2.", f"The machine is {self.name}.",
+            lines = [f"ZAL version {version}.", f"The machine is {self.name}.",
                      f"The states are {', '.join(self.states)}.", f"The events are {', '.join(self.events)}.",
                      f"The context observations are {', '.join(self.facts) or 'none'}."]
             lines += [f"The input {i.name} is an integer from {i.low} to {i.high} inclusive." for i in self.inputs]
@@ -757,7 +771,7 @@ class Machine:
             lines += [f"Symmetry {name}: swapping " + " and ".join(f"{a} with {b}" for a, b in pairs)
                       + " changes nothing." for name, pairs in self.symmetries]
         else:
-            lines = ["zal 2;", f"machine {self.name};", f"states {', '.join(self.states)};",
+            lines = [f"zal {version};", f"machine {self.name};", f"states {', '.join(self.states)};",
                      f"events {', '.join(self.events)};", f"context {', '.join(self.facts) or 'none'};"]
             lines += [f"input {i.name} in {i.low}..={i.high};" for i in self.inputs]
             lines += [f"var {v.name} in {v.low}..={v.high} initially {v.initial};" for v in self.variables]
@@ -884,6 +898,7 @@ def _post_state_only(formula):
 
 def validate_machine(model: Machine):
     """Validate direct IR construction as strictly as surface elaboration."""
+    input_limit = max_inputs(model.profile)
     def valid_name(value):
         return isinstance(value, str) and re.fullmatch(NAME, value) and value not in RESERVED
     if not valid_name(model.name) or not valid_name(model.default):
@@ -893,7 +908,7 @@ def validate_machine(model: Machine):
         if (not isinstance(values, tuple) or not minimum <= len(values) <= maximum
                 or any(not valid_name(x) for x in values) or tuple(sorted(set(values))) != values):
             raise Refusal(f"IR {label} must be bounded, distinct, canonically sorted owned names")
-    for label, values, kind, maximum in [("inputs", model.inputs, Input, 2), ("variables", model.variables, Variable, 4)]:
+    for label, values, kind, maximum in [("inputs", model.inputs, Input, input_limit), ("variables", model.variables, Variable, 4)]:
         if (not isinstance(values, tuple) or len(values) > maximum or any(not isinstance(x, kind) for x in values)
                 or [x.name for x in values] != sorted({x.name for x in values})):
             raise Refusal(f"IR {label} must be at most {maximum} distinct values sorted by name")
@@ -968,11 +983,16 @@ def validate_machine(model: Machine):
                 or [u.variable for u in updates] != sorted({u.variable for u in updates})):
             raise Refusal(f"Rule {rule.id}: updates need an Accept and at most one update per variable, sorted")
         for update in updates:
+            terms = {"int", "var", "input", "add", "sub"} if model.profile == PROFILE_3 else {"int", "var", "input"}
             if (update.variable not in declarations["variables"] or update.op not in UPDATE_ENGLISH
-                    or not isinstance(update.term, Expr) or update.term.op not in {"int", "var", "input"}):
+                    or not isinstance(update.term, Expr) or update.term.op not in terms):
                 raise Refusal(f"Rule {rule.id}: an update assigns, increases or decreases a declared variable by "
-                              "a literal, variable or input")
+                              + ("a bounded pre-state integer term" if model.profile == PROFILE_3 else "a literal, variable or input"))
             admit_formula(update.term, declarations, "guard")
+            if model.profile == PROFILE_3:
+                nodes, depth = _measure(update.term)
+                if nodes > 128 or depth > 16 or any(len(update.term.render(e)) > 4096 for e in [False, True]):
+                    raise Refusal("IR update term exceeds 128 nodes, depth 16 or 4096 characters")
         identifiers.append(rule.id)
     if [r.id for r in model.rules] != sorted(r.id for r in model.rules):
         raise Refusal("IR transition IDs must be canonically sorted")
@@ -1047,10 +1067,11 @@ def validate_machine(model: Machine):
         raise Refusal("Canonical symbolic or English model exceeds 64 KiB")
 
 
-def grammar_patterns(english=False):
+def grammar_patterns(english=False, profile=PROFILE):
     """The parser's singleton statement registry, also used by the live legend."""
+    version = profile_version(profile)
     return {
-        "header": r"ZAL version 2\." if english else r"zal 2;",
+        "header": rf"ZAL version {version}\." if english else rf"zal {version};",
         "name": rf"The machine is ({NAME})\." if english else rf"machine ({NAME});",
         "states": r"The states are (.+)\." if english else r"states (.+);",
         "events": r"The events are (.+)\." if english else r"events (.+);",
@@ -1094,7 +1115,7 @@ def statement_patterns(english=False):
     }
 
 
-def _outcome_parts(rid, text, english, declarations, states):
+def _outcome_parts(rid, text, english, declarations, states, profile=PROFILE):
     rejected = re.fullmatch(rf"reject {'because ' if english else ''}({NAME}) "
                             f"{'and keep the state unchanged' if english else 'unchanged'}", text)
     if rejected:
@@ -1108,17 +1129,29 @@ def _outcome_parts(rid, text, english, declarations, states):
     pieces = [p.strip() for p in (raw.split(" and ") if english else raw.split(",")[1:])] if raw else []
     updates = []
     for piece in pieces:
+        rhs = r"(.+)" if profile == PROFILE_3 else rf"({INTEGER}|{NAME})"
         if english:
-            match = re.fullmatch(rf"({NAME}) (set to|increased by|decreased by) ({INTEGER}|{NAME})", piece)
+            match = re.fullmatch(rf"({NAME}) (set to|increased by|decreased by) {rhs}", piece)
             op = match and {v: k for k, v in UPDATE_ENGLISH.items()}[match[2]]
         else:
-            match = re.fullmatch(rf"({NAME})\s*(=|\+=|-=)\s*({INTEGER}|{NAME})", piece)
+            match = re.fullmatch(rf"({NAME})\s*(=|\+=|-=)\s*{rhs}", piece)
             op = match and match[2]
         if not match:
             raise Refusal(f"Rule {rid}: an update reads VARIABLE = TERM, VARIABLE += TERM or VARIABLE -= TERM")
         if match[1] not in declarations["variables"]:
             raise Refusal(f"Rule {rid} updates an undeclared variable {match[1]}")
-        term = _Parser(match[3], declarations, english).atom_term() if not re.fullmatch(INTEGER, match[3]) else Expr("int", (int(match[3]),))
+        if profile == PROFILE_3:
+            parser = _Parser(match[3], declarations, english)
+            term = parser.term()
+            if parser.index != len(parser.tokens):
+                raise Refusal(f"Rule {rid}: unexpected update term token {parser.peek()}")
+            # Admission stops deep untrusted terms before recursive measurement.
+            admit_formula(term, declarations, "guard")
+            nodes, depth = _measure(term)
+            if nodes > 128 or depth > 16 or any(len(term.render(e)) > 4096 for e in [False, True]):
+                raise Refusal("Canonical update term exceeds 128 nodes, depth 16 or 4096 characters")
+        else:
+            term = _Parser(match[3], declarations, english).atom_term() if not re.fullmatch(INTEGER, match[3]) else Expr("int", (int(match[3]),))
         updates.append(Update(match[1], op, term))
     if len({u.variable for u in updates}) != len(updates):
         raise Refusal(f"Rule {rid} updates one variable more than once")
@@ -1134,7 +1167,10 @@ def parse(text: str, syntax="symbolic") -> Machine:
     lines = source_lines(text)
     if len(lines) > MAX_STATEMENTS:
         raise Refusal(f"Source exceeds {MAX_STATEMENTS} statements")
-    singletons, repeated = grammar_patterns(english), statement_patterns(english)
+    header3 = "ZAL version 3." if english else "zal 3;"
+    profile = PROFILE_3 if any(line == header3 for _, _, line in lines) else PROFILE
+    input_limit = max_inputs(profile)
+    singletons, repeated = grammar_patterns(english, profile), statement_patterns(english)
     fields, found, locations = {}, {key: [] for key in repeated}, {}
     for number, (physical, column, line) in enumerate(lines, 1):
         for key, pattern in singletons.items():
@@ -1186,8 +1222,8 @@ def parse(text: str, syntax="symbolic") -> Machine:
     if (len(found["rule"]) > 32 or len(found["invariant"]) > 8 or len(found["require"]) > 8
             or len(found["fairness"]) > 4 or len(found["property"]) + len(found["game"]) > 8
             or len(found["game"]) > 4 or len(found["unresolved"]) > 8
-            or len(inputs) > 2 or len(variables) > 4):
-        raise Refusal("Bounds: 2 inputs, 4 variables, 32 rules, 8 invariants, 8 requirements, "
+            or len(inputs) > input_limit or len(variables) > 4):
+        raise Refusal(f"Bounds: {input_limit} inputs, 4 variables, 32 rules, 8 invariants, 8 requirements, "
                       "4 fairness assumptions, 8 total properties, 4 game properties, 8 unresolved obligations")
     declarations = {"facts": set(facts), "inputs": {i.name for i in inputs},
                     "variables": {v.name for v in variables}, "states": set(states), "events": set(events)}
@@ -1207,7 +1243,7 @@ def parse(text: str, syntax="symbolic") -> Machine:
         with at_source(locations[("rule", rid)]):
             if source not in states or event not in events:
                 raise Refusal(f"Rule {rid} refers to an undeclared state or event")
-            target, reason, updates = _outcome_parts(rid, outcome, english, declarations, states)
+            target, reason, updates = _outcome_parts(rid, outcome, english, declarations, states, profile)
             rules.append(Rule(rid, source, event, parse_formula(guard, declarations, "guard", english),
                               target, reason, updates))
     collections = {}
@@ -1228,7 +1264,7 @@ def parse(text: str, syntax="symbolic") -> Machine:
         return Machine(fields["name"], states, events, facts, inputs, variables, fields["initial"], fields["default"],
                        tuple(sorted(rules, key=lambda r: r.id)), collections["invariant"], collections["require"],
                        collections["fairness"], collections["property"], tuple(sorted(found["unresolved"])),
-                       players, tuple(sorted(games)), symmetries)
+                       players, tuple(sorted(games)), symmetries, profile)
     except Refusal as error:
         # Admission is still the single validator of ranges and the owned IR.
         # Add the declaration's physical position without changing its verdict.
@@ -1247,13 +1283,13 @@ def parse_any(text: str, syntax="symbolic"):
         raise Refusal("Source must be ASCII text at most 64 KiB")
     first = next((line.strip() for line in text.splitlines()
                   if line.strip() and not line.lstrip().startswith("#")), "")
-    if first in {"zal 2;", "ZAL version 2."}:
+    if first in {"zal 2;", "ZAL version 2.", "zal 3;", "ZAL version 3."}:
         return parse(text, syntax)
     return behavior.parse(text, syntax)
 
 
 def counterexample(model, checker_identity, obligation, checks, **details):
-    return {"status": "counterexample", "revision": model.revision, "profile": PROFILE,
+    return {"status": "counterexample", "revision": model.revision, "profile": model.profile,
             "checker": checker_identity, "obligation": obligation, **details,
             "checks": checks, "authority": "none"}
 
@@ -2230,7 +2266,7 @@ def _check(model, checker_identity, graph=None):
         scope += ("; game properties range over every play from the initial configuration in which each player "
                   "chooses the event in its own states and the other player chooses the context.")
     report = {"status": "unsupported" if model.obligations else "pass-with-scope",
-              "revision": model.revision, "profile": PROFILE, "checker": checker_identity,
+              "revision": model.revision, "profile": model.profile, "checker": checker_identity,
               "scope": scope,
               "checks": checks, "input_tuples": graph.tuples,
               "configurations": len(graph.configs), "admissible_configurations": len(admissible),
@@ -2298,6 +2334,8 @@ def semantic_diff(old: Machine, new: Machine) -> dict:
     a = {r.id: r.data() for r in old.rules}
     b = {r.id: r.data() for r in new.rules}
     report["changed_objects"] = sorted(key for key in a.keys() | b.keys() if a.get(key) != b.get(key))
+    if old.profile != new.profile:
+        report["changed_objects"].append("profile")
     for key in ["initial", "default", "variables", "invariants", "requirements", "fairness", "properties", "obligations"]:
         if old.data()[key] != new.data()[key]:
             report["changed_objects"].append(key)
@@ -2413,7 +2451,7 @@ def trace_properties(model: Machine, inputs: list[dict]) -> dict:
             satisfied = position is None
         results[name] = {"result": "satisfied" if satisfied else "counterexample",
                          "position": None if satisfied else position}
-    return {"kind": "finite-trace-judgment", "profile": PROFILE, "revision": model.revision,
+    return {"kind": "finite-trace-judgment", "profile": model.profile, "revision": model.revision,
             "trace": replay(model, inputs), "properties": results,
             "semantics": ("finite word of the supplied events: always and never cover the remaining events, "
                           "eventually and until need a witness before the trace ends, next is false at the last "
@@ -2446,7 +2484,7 @@ def explain(model: Machine, state: str, variables: dict, event: str, context: di
                       "state_matches": state_matches, "event_matches": event_matches,
                       "guard_english": rule.guard.render(True), "guard": guard, "updates": updates,
                       "enabled": state_matches and event_matches and guard["value"]})
-    explanation = {"kind": "decision-explanation", "profile": PROFILE, "revision": model.revision,
+    explanation = {"kind": "decision-explanation", "profile": model.profile, "revision": model.revision,
                    "checker": checker_identity,
                    "input": {"state": state, "variables": variables, "event": event, "context": context},
                    "admissible": all(holds(f, _Step(state, variables, None, {})) for _, f in model.invariants),
@@ -2622,14 +2660,14 @@ OPERATORS = {
 
 
 def legend(model: Machine):
-    singletons = grammar_patterns()
+    singletons = grammar_patterns(profile=model.profile)
     repeated = statement_patterns()
     entries = []
     for symbolic, english in zip(model.render().splitlines(), model.render(True).splitlines()):
         kind = next((k for k, p in singletons.items() if re.fullmatch(p, symbolic)), None)
         kind = kind or next((k for k, p in repeated.items() if re.fullmatch(p, symbolic)), symbolic.split()[0])
         entries.append({"concept": kind, "symbolic": symbolic, "english": english})
-    return {"profile": PROFILE, "entries": entries, "readings": game_readings(model),
+    return {"profile": model.profile, "entries": entries, "readings": game_readings(model),
             "operators": [{"symbol": s, "english": e} for s, (e, _, _) in OPERATORS.items()],
             "unsupported": sorted(FUTURE), "reserved": sorted(RESERVED),
             "identifiers": "ASCII lowercase letters, digits and underscores; max 32 characters"}
@@ -2669,7 +2707,7 @@ def help_topic(model: Machine, topic="", renderer_identity="unbound"):
              "Context values are assumptions, not authenticated external truth."]
     if not (model.invariants or model.requirements or model.properties or model.games):
         notes.append("No invariants, requirements or properties declared. Consistency checks do not establish an unstated policy.")
-    entries, title, meaning, kind = [], "ZAL profile 2 help", "One finite typed model has exact symbolic and controlled-English views.", "grammar"
+    entries, title, meaning, kind = [], f"ZAL profile {profile_version(model.profile)} help", "One finite typed model has exact symbolic and controlled-English views.", "grammar"
     resolved, explicit = topic, topic.startswith("grammar:")
     if explicit:
         topic = topic.removeprefix("grammar:")
@@ -2703,13 +2741,16 @@ def help_topic(model: Machine, topic="", renderer_identity="unbound"):
             notes.append("The terminal's accept command is a separate human review action, not a rule outcome.")
         elif resolved in CONSTRUCTS:
             title, meaning = "Language concept: " + resolved, CONSTRUCTS[resolved][2]
+            if resolved == "header" and model.profile == PROFILE_3:
+                meaning = ("The language version selects finite-FSM profile 3: up to three bounded integer inputs "
+                           "and pre-state add/sub terms in updates; every other profile-2 limit and step meaning is retained.")
             entries = [e for e in pairs if e["concept"] == resolved] or [
                 {"symbolic": CONSTRUCTS[resolved][0], "english": CONSTRUCTS[resolved][1]}]
         else:
             raise Refusal("Unknown help topic; use ? for topics or an exact typed object ID")
     else:
         resolved = "overview"
-    return {"kind": "language-help", "schema": "zal/help/1", "profile": PROFILE, "revision": model.revision,
+    return {"kind": "language-help", "schema": "zal/help/1", "profile": model.profile, "revision": model.revision,
             "renderer": renderer_identity, "topic": resolved, "entry_kind": kind, "title": title,
             "meaning": meaning, "entries": entries, "notes": notes,
             "available_topics": sorted(set(CONSTRUCTS) | set(OPERATORS) | set(objects) | set(syntax)),

@@ -731,6 +731,10 @@ class Compiler:
 
     def constructor(self, lhs, key, slots, action):
         self.rule(lhs, self.templates[key], slots, action)
+        # Input aliases use the same typed slots and semantic constructor.
+        # Rendering continues to use the canonical template above.
+        for alias in REGISTRY.get('input_aliases', {}).get(self.mode, {}).get(key, ()):
+            self.rule(lhs, alias, slots, action)
 
     def link(self, lhs, rhs):
         self.rules.append(Rule(lhs, (rhs,), lambda vs: vs[0]))

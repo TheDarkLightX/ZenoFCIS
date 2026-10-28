@@ -226,7 +226,7 @@ def why_not(model, state, variables, event, context, want, scope="context", chec
     for rule in producing:
         if status != "already" and rule["source_matches"] and rule["event_matches"] and not rule["guard_value"]:
             summary.append(f"Rule {rule['rule']} would give it here, but its guard ({rule['guard']}) is false for this input.")
-    return bounded({"kind": "why-not", "schema": WHY_NOT, "profile": PROFILE, "revision": model.revision,
+    return bounded({"kind": "why-not", "schema": WHY_NOT, "profile": model.profile, "revision": model.revision,
                     "checker": checker_identity,
                     "input": {"state": state, "variables": dict(variables), "event": event, "context": dict(context)},
                     "outcome": current, "want": target, "status": status, "distance": distance,
@@ -301,7 +301,7 @@ def what_if(model, state, variables, event, context, change, checker_identity="u
     summary.extend(f"Requirement {item['id']} becomes {value_text(item['after'], True)} at this step." for item in requirements)
     if before["admissible"] != after["admissible"]:
         summary.append("The pre-configuration is " + ("now admissible." if after["admissible"] else "no longer admissible: an invariant fails."))
-    return bounded({"kind": "what-if", "schema": WHAT_IF, "profile": PROFILE, "revision": model.revision,
+    return bounded({"kind": "what-if", "schema": WHAT_IF, "profile": model.profile, "revision": model.revision,
                     "checker": checker_identity, "before": {"input": before["input"], "outcome": before["outcome"],
                                                             "admissible": before["admissible"]},
                     "after": {"input": after["input"], "outcome": after["outcome"], "admissible": after["admissible"]},
@@ -579,7 +579,7 @@ def finish(model, kind, root, parts, checker_identity, extra=None):
     problems = verify(model, root, sentences)
     if problems:
         raise Refusal("Narrative sentence not backed by the witness: " + problems[0])
-    return bounded({"kind": "narrative", "schema": NARRATIVE, "profile": PROFILE, "revision": model.revision,
+    return bounded({"kind": "narrative", "schema": NARRATIVE, "profile": model.profile, "revision": model.revision,
                     "checker": checker_identity, "source": kind, "status": "narrated", **(extra or {}),
                     "sentences": sentences, "english": [s["english"] for s in sentences],
                     "symbolic": [s["symbolic"] for s in sentences],
@@ -615,14 +615,14 @@ def narrate_check(model, report, checker_identity="unbound"):
     if status == "unknown":
         if report.get("revision") != model.revision:
             raise Refusal("Check result belongs to a different revision")
-        return bounded({"kind": "narrative", "schema": NARRATIVE, "profile": PROFILE, "revision": model.revision,
+        return bounded({"kind": "narrative", "schema": NARRATIVE, "profile": model.profile, "revision": model.revision,
                         "checker": checker_identity, "source": "check", "status": "unknown",
                         "check_status": "unknown", "diagnostic": report.get("diagnostic", "unknown check result"),
                         "sentences": [], "english": [], "symbolic": [],
                         "method": "the check result is unknown; no game result is narrated",
                         "authority": "none"})
     if status != "counterexample":
-        return bounded({"kind": "narrative", "schema": NARRATIVE, "profile": PROFILE, "revision": model.revision,
+        return bounded({"kind": "narrative", "schema": NARRATIVE, "profile": model.profile, "revision": model.revision,
                         "checker": checker_identity, "source": "check", "status": "no-counterexample",
                         "check_status": report.get("status"), "sentences": [], "english": [], "symbolic": [],
                         "method": "nothing to narrate: the check reported no counterexample in its stated scope",
@@ -630,7 +630,7 @@ def narrate_check(model, report, checker_identity="unbound"):
     if report.get("revision") != model.revision:
         raise Refusal("Counterexample belongs to a different revision")
     if report.get("obligation") == "game":
-        return bounded({"kind": "narrative", "schema": NARRATIVE, "profile": PROFILE, "revision": model.revision,
+        return bounded({"kind": "narrative", "schema": NARRATIVE, "profile": model.profile, "revision": model.revision,
                         "checker": checker_identity, "source": "check", "status": "counterexample",
                         "check_status": "counterexample", "obligation": "game", "property": report["property"],
                         "player": report["player"], "objective": report["objective"],

@@ -1,0 +1,168 @@
+{
+  "commit": "73068b03598a39253af8870392674bab58a723c5",
+  "files": {
+    "ASSURANCE.md": {
+      "git_blob": "e8858eb376dc069d88015f39d1255d186640013d",
+      "sha256": "841e4d6c0105bf0c269c784411d52e176dfaf6c7ea1ca07409b6e7e2c07ec4df",
+      "upstream": "experiments/zal-relational/ASSURANCE.md"
+    },
+    "LADDER.md": {
+      "git_blob": "72200d4eda3b3ae180f141f2cca00c4940d316f9",
+      "sha256": "2130dab03f58b73e01996cabde058597da7a4147b6902a6daa7a2860d55f3cc0",
+      "upstream": "experiments/zal-relational/LADDER.md"
+    },
+    "LICENSE-APACHE": {
+      "git_blob": "8b6926b515e6f636aeeb21640dbcefdb23c0ab7c",
+      "sha256": "ecffed67c3c0f736bec2c29cb8b5abba85535c7e17f02b099290759f08239bd1",
+      "upstream": "LICENSE-APACHE"
+    },
+    "LICENSE-MIT": {
+      "git_blob": "3e11c30da98ad2da2acfe18b6cdd53227d673022",
+      "sha256": "5ec7acafc702bfbc57845e6938e7209e39bd9587e1570baf3e78b288421b349a",
+      "upstream": "LICENSE-MIT"
+    },
+    "NOTICE": {
+      "git_blob": "637aa04b9adc5633dadb63b295dd78a5d0f4974e",
+      "sha256": "67002a3bac78f8e4974d73dbd9823a1d3e5414b77970083f7d1ef7ab5482ccae",
+      "upstream": "NOTICE"
+    },
+    "OPERATIONS.md": {
+      "git_blob": "b29b5e022be8316ffb4626b2ef62595e58ff514a",
+      "sha256": "29370a0b875e1973c5ed94589b5938fb73ceaf6f9dfd8ec990496b63d0db5894",
+      "upstream": "experiments/zal-relational/OPERATIONS.md"
+    },
+    "README.md": {
+      "git_blob": "ccc32874589e3359981ef4d3c11a719a736769b1",
+      "sha256": "7bd9bae56edd49b3b297cd9eed20aaa3507672d4f45839410720c1044e02b4a8",
+      "upstream": "experiments/zal-relational/README.md"
+    },
+    "SPECIFICATION.md": {
+      "git_blob": "eafa7052f65908d8dba54578dd4e1f5334093ec1",
+      "sha256": "767999b2f960ab348d07410e1c2cc4f3052669031eb04fe90126a83b9968a2e1",
+      "upstream": "experiments/zal-relational/SPECIFICATION.md"
+    },
+    "VALIDATION.json": {
+      "git_blob": "47f6ddca06ba35a127fa2e340489e9b2e1c43015",
+      "sha256": "627bfef79a9bffe0c99ef05708f538c5efbcdaf315a9d680860c61d653e18a34",
+      "upstream": "experiments/zal-relational/VALIDATION.json"
+    },
+    "app/Main.hs": {
+      "git_blob": "bcb67127ba7b7c914744aec3f90d0809c9b867e5",
+      "sha256": "bbc1d2e824c6a709adf2e9397e5fff73efb03efb3ee7701dc393708e8d3b8b03",
+      "upstream": "experiments/zal-relational/app/Main.hs"
+    },
+    "build.py": {
+      "git_blob": "1390b5bc6cbfed6ba6bfb36a81461b108082de2f",
+      "sha256": "0fed66f01ba2505b6ab4157b25f55bf3ae263e490ef00139fa8366e4afe97874",
+      "upstream": "experiments/zal-relational/build.py"
+    },
+    "capabilities.json": {
+      "git_blob": "7b0d89f887bc39d53a126dfffb33f6b53fac3d93",
+      "sha256": "247faf91454b4ac5b3bad8683354e2304b665ca91826dcf892b9008b2c8a6e85",
+      "upstream": "experiments/zal-relational/capabilities.json"
+    },
+    "examples/even-graph-count.json": {
+      "git_blob": "87fb9295308d6218cef54bf9b6843b75492b2a57",
+      "sha256": "dcc47b599d5fddce4eddc49ad4c195badebb4aeef5e570986cf7e0e65da56ffa",
+      "upstream": "experiments/zal-relational/examples/even-graph-count.json"
+    },
+    "examples/owner-car-count.json": {
+      "git_blob": "fc65a2d8abd6195a527a13bb679e64a3767cefb1",
+      "sha256": "a2e401809c021d9a437cd43856c51fff09d9bb6ec3a0ca690c27a9e10faa2107",
+      "upstream": "experiments/zal-relational/examples/owner-car-count.json"
+    },
+    "examples/owner_cars_context.json": {
+      "git_blob": "f432ffb56a97d48b3fe2659c0f92c4aa4df95abc",
+      "sha256": "a56e33b3a0803e559e35dd29e45392c863a79052f9d9b3bdeb42a201b27bb6e1",
+      "upstream": "experiments/zal-relational/examples/owner_cars_context.json"
+    },
+    "ladder_adapter.py": {
+      "git_blob": "1b3c300da38aeefa582d538cb0364753fe951196",
+      "sha256": "acfc5e38533f152c67ccd15e3a853558d9b6b6fa6284eed70fa64a174de783a6",
+      "upstream": "experiments/zal-relational/ladder_adapter.py"
+    },
+    "oracle.py": {
+      "git_blob": "2860d395c2f66ff1c72c760ce46857d45b084547",
+      "sha256": "fba22e4738334cfbdbfb55df6e941112807b93fcd1274c08174f8ead95031768",
+      "upstream": "experiments/zal-relational/oracle.py"
+    },
+    "proofs/Observation.lean": {
+      "git_blob": "8d90a12faa5b3fad9b68b315e140e3d504fa9a65",
+      "sha256": "9d41d5410783a9b103ff7cea5c5af576298489df24289f33c3fbdded311fc5bb",
+      "upstream": "experiments/zal-relational/proofs/Observation.lean"
+    },
+    "run.py": {
+      "git_blob": "698afacec65ca43aaacf9e3a03b93c048cb8f2e3",
+      "sha256": "17e4410d16b4214465fe8fba2e0f7790025a32f85e4e4431de97c588277b61c9",
+      "upstream": "experiments/zal-relational/run.py"
+    },
+    "schemas/relational-query.schema.json": {
+      "git_blob": "db6e982eede2ab41cb8ea392b0c104f233ec94e6",
+      "sha256": "d6d94c3218e46c6f6f3f4a38bc0cafb97a9c747a76c7c9a80bd9f82f7e657e34",
+      "upstream": "experiments/zal-relational/schemas/relational-query.schema.json"
+    },
+    "src/Zal/Logic/Budget.hs": {
+      "git_blob": "dfd12304bf626ded0ef31cc2d641d1343c1116f8",
+      "sha256": "e8d8cfe6c471e1591f3d7c9640d0b2c1a2cda06d6e38b6172bc2135039fe42f4",
+      "upstream": "experiments/zal-relational/src/Zal/Logic/Budget.hs"
+    },
+    "src/Zal/Logic/Compare.hs": {
+      "git_blob": "1cfb87fe0853a0a86559d0bc94973f5c993f6108",
+      "sha256": "2d7a580218133215e18abe391c535cd6608bdd08cdaf33417bdd4b4bdbc18724",
+      "upstream": "experiments/zal-relational/src/Zal/Logic/Compare.hs"
+    },
+    "src/Zal/Logic/Expansion.hs": {
+      "git_blob": "87eb8dd4652a1d5e87f657d703a4baea2b0824e1",
+      "sha256": "b4ec952e84f9b65d6dd5dde2b24c14359dcba7472a72c6d70805823e92295ebc",
+      "upstream": "experiments/zal-relational/src/Zal/Logic/Expansion.hs"
+    },
+    "src/Zal/Logic/Finite.hs": {
+      "git_blob": "c90984234c7b630ba0ae702015543318a900bda4",
+      "sha256": "7f8b4cb9570a7941050200ee67efb17a140ce2fac279b8136470f1c671ea1486",
+      "upstream": "experiments/zal-relational/src/Zal/Logic/Finite.hs"
+    },
+    "src/Zal/Logic/Normalize.hs": {
+      "git_blob": "beef6008665c21992d412e8d43f6497d6a5e6df2",
+      "sha256": "a24087abd711f2234ef73cad28cd1da3da6298839b96a20d455acb62470fe5a3",
+      "upstream": "experiments/zal-relational/src/Zal/Logic/Normalize.hs"
+    },
+    "src/Zal/Logic/Population.hs": {
+      "git_blob": "9ceb6f70acab96174bf7cd50f89aabc06e1ccb29",
+      "sha256": "18a00b8c4075826d093935f2f20d174b7b168e8e335a0c15417277fa5ae424fa",
+      "upstream": "experiments/zal-relational/src/Zal/Logic/Population.hs"
+    },
+    "src/Zal/Logic/Syntax.hs": {
+      "git_blob": "2965ade488a32b4e017fd016308128e9c40da478",
+      "sha256": "6eba5bccee2ebf53fc95e0b57818a31ee9197283242b039d7676314756b879c5",
+      "upstream": "experiments/zal-relational/src/Zal/Logic/Syntax.hs"
+    },
+    "test_backend.py": {
+      "git_blob": "a1e01a565d9823f56c5a9052dabed8d5eb0e5197",
+      "sha256": "eb147d037a5a92471d7757b13af034b474bcfccd45e0069ccb6cefd0f8981d43",
+      "upstream": "experiments/zal-relational/test_backend.py"
+    },
+    "test_ladder_adapter.py": {
+      "git_blob": "aa7302cc02920ceaa6653c7791756c99b3d99ee0",
+      "sha256": "600fe6645123752c4e3dc50dbd7f0042c13c2eb7d926375cd72a6e57f4323ef8",
+      "upstream": "experiments/zal-relational/test_ladder_adapter.py"
+    },
+    "test_operations.py": {
+      "git_blob": "e1cab298c844127b4505b56482628d4aac72fa97",
+      "sha256": "052ece4085b9c34bf19dbe3a7203769ba8e080b14f5032caa623e80a5112de55",
+      "upstream": "experiments/zal-relational/test_operations.py"
+    },
+    "test_shell.py": {
+      "git_blob": "5dba16927827324a826670b67741c96640c139f8",
+      "sha256": "9dd09830f4c494e4af305aec4ff23cc24c4b36bb9ae400c346df54816dcd8f0a",
+      "upstream": "experiments/zal-relational/test_shell.py"
+    },
+    "zal-relational.cabal": {
+      "git_blob": "bcc16451fa2175dec3f7fd23c128b4cdc0681fe9",
+      "sha256": "436bc7ab45c003d17429d83734d9d9f45bb2c40f57b93f16aa88a4483cd62f2d",
+      "upstream": "experiments/zal-relational/zal-relational.cabal"
+    }
+  },
+  "schema": "zal/relational-upstream-source/1",
+  "tree": "a0b1eb77edc8cda39c1cbbcc6063ca0f5d6d9898",
+  "upstream_root": "experiments/zal-relational/"
+}

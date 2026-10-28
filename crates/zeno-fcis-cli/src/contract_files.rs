@@ -19,8 +19,8 @@ use serde_json::{Value, json};
 
 use crate::binding::{self, Refusal};
 use crate::contract::{
-    AdoptionSources, ContractError, ContractSources, EVOLUTION_MIGRATION, EVOLUTION_REVIEW,
-    EvolutionSources, GeneratedContract, adoption_directory, evolution_directory,
+    AdoptionSources, ContractError, ContractSources, Current, EVOLUTION_MIGRATION,
+    EVOLUTION_REVIEW, EvolutionSources, GeneratedContract, adoption_directory, evolution_directory,
     generate_contract, shortcut_file,
 };
 use crate::transform::sha256_hex;
@@ -28,6 +28,8 @@ use crate::{
     BLOCKED, FAILURE, INVALID, JSON_SCHEMA, OK, OutputFormat, artifact_is_current, atomic_create,
     atomic_replace, print_json,
 };
+
+mod zal_provenance;
 
 /// Largest input file read; real declarations and rules are far smaller.
 const INPUT_LIMIT: u64 = 16 * 1024 * 1024;
@@ -241,6 +243,15 @@ impl Inputs {
     pub(crate) fn read(dir: &Path) -> Result<Self, Failure> {
         let project = read_text(dir, PROJECT)?;
         let rules = read_text(dir, RULES)?;
+        Self::read_with_base(dir, project, rules)
+    }
+
+    /// Read retained lineage files against the already captured source bytes.
+    pub(crate) fn read_with_base(
+        dir: &Path,
+        project: String,
+        rules: String,
+    ) -> Result<Self, Failure> {
         let origin = match read_input(&dir.join(SCHEMA_ORIGIN)) {
             Ok(bytes) => Some(text(SCHEMA_ORIGIN, bytes)?),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
@@ -387,6 +398,19 @@ impl Inputs {
             &evolutions,
         ))?)
     }
+
+    /// Replay this immutable snapshot and expose only the generator's verified
+    /// current contract, whose rebuilt schema and policy match generation.
+    pub(crate) fn with_current<R>(
+        &self,
+        work: impl FnOnce(Current<'_>) -> Result<R, ContractError>,
+    ) -> Result<R, Failure> {
+        let adoptions = self.adoption_sources();
+        let evolutions = self.evolution_sources();
+        let sources = self.sources(&self.rules, &adoptions, &evolutions);
+        let generated = generate_contract(sources)?;
+        Ok(crate::contract::with_current(sources, &generated, work)?)
+    }
 }
 
 /// The generated files in report order: the three every contract has, then
@@ -475,6 +499,7 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
             Err(error) => return Err(Failure::Read(format!("read ui.json: {error}"))),
         };
+        let provenance = zal_provenance::capture(&inputs, contract, ui_metadata.as_deref())?;
         let adoptions = inputs.adoption_sources();
         let evolutions = inputs.evolution_sources();
         let generated = crate::contract::generate_startable_contract(inputs.sources(
@@ -584,6 +609,7 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
             files.push(("ui.json".to_owned(), metadata));
         }
         files.extend(inputs.retained());
+        files.extend(provenance);
         files.extend(
             outputs(&generated)
                 .into_iter()

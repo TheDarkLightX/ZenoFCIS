@@ -1,0 +1,23 @@
+{
+  "schema": "zal/relational-capabilities/1",
+  "version": "0.2.0",
+  "status": "optional-experimental-backend",
+  "public_count_transport": "zal/relational-query/1",
+  "profiles": ["zal/c2/1", "zal/c2mod/1"],
+  "domain": "nonempty finite labeled, unary and binary predicates, equality",
+  "weights": "exact rational true and false atom weights, including signed and zero",
+  "general_satisfiability": "unsupported",
+  "unspecified_size_finite_satisfiability": "unsupported",
+  "unlabeled_counting": "unsupported",
+  "supplied_model_evaluation": "public: zal/relational-evaluation/1",
+  "fixed_domain_formula_comparison": "public: zal/relational-comparison/1, bounded complete enumeration",
+  "comparison_relations": ["equivalence", "left-to-right-implication"],
+  "comparison_assumptions": "explicit; empty admissible class is VacuousAt",
+  "comparison_counterexamples": "complete structure; original formulas re-evaluated",
+  "semantic_result_replay": "implemented; formal request/result only, no prose approval",
+  "existing_ladder_comparison": "implemented with retained source and context bindings",
+  "existing_ladder_c2_adapter": "implemented-optional",
+  "modular_cnl_grammar_extension": "not-implemented",
+  "native_2_7_registration": "not-installed",
+  "full_implementation_formal_proof": "open"
+}

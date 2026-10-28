@@ -1,0 +1,99 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "intent-owner-admission",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "owner_matches": "context.102.130",
+    "tenant_matches": "context.102.131",
+    "principal_matches": "context.102.132",
+    "grant_current": "context.102.133",
+    "grant_intent_matches": "context.102.134",
+    "pending": "context.102.135",
+    "content_matches": "context.102.136",
+    "unit": "pre.100.110"
+  },
+  "cases": [
+    {
+      "when": "!owner_matches",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!tenant_matches",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!principal_matches",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!grant_current",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!grant_intent_matches",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!pending",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!content_matches",
+      "class": "Reject",
+      "reason": 206,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "unit"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0
+  },
+  "law_kinds": {
+    "500": "AuthoritySubjectRecipient",
+    "501": "AuthoritySubjectRecipient",
+    "510": "AuthoritySubjectRecipient",
+    "511": "AuthoritySubjectRecipient",
+    "512": "AuthoritySubjectRecipient",
+    "513": "AuthoritySubjectRecipient",
+    "514": "AuthoritySubjectRecipient",
+    "515": "AuthoritySubjectRecipient",
+    "516": "AuthoritySubjectRecipient",
+    "499": "StateInvariant"
+  }
+}

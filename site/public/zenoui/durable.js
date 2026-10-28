@@ -1,6 +1,6 @@
 // Shared HTTP transport. Saved bytes and key survive reload; credentials do not.
 import {canonical} from './app-contract.js';
-import {validReply} from './app-state.js';
+import {deliveryStatus,validReply} from './app-state.js';
 export const pendingKey='zeno-fcis/pending-request/1';
 export const hex=bytes=>[...bytes].map(v=>v.toString(16).padStart(2,'0')).join('');
 export function unhex(text){if(typeof text!=='string'||text.length%2||!/^[0-9a-f]*$/.test(text))throw Error('Invalid request bytes');return Uint8Array.from(text.match(/../g)??[],v=>parseInt(v,16));}
@@ -48,6 +48,8 @@ export class DurableTransport {
     if(saved.contract!==this.session.contract||saved.principal!==this.session.principal)throw Error('Pending request belongs to another principal or contract.');
     const result=await this.call('/command',unhex(saved.body));
     await checkPacket(result,saved,this.bundle.description);
+    if(this.retired)throw Error('Sign in again to recover the original request.');
+    if(saved.contract!==this.session.contract||saved.principal!==this.session.principal)throw Error('Pending request belongs to another principal or contract.');
     if(this.storage.getItem(pendingKey)!==retained)throw Error('Pending request changed during recovery.');
     this.storage.removeItem(pendingKey);return {saved,result};
   }
@@ -59,16 +61,17 @@ export class DurableTransport {
       const b=data.binding;
       if(b.contract!==this.session.contract||b.principal!==this.session.principal)throw Error('Request binding changed.');
       const prepared=await this.call('/preview',envelope(b.contract,'00'.repeat(32),b.revision,new TextEncoder().encode(JSON.stringify(b.input))));
-      let reply=prepared.reply;
+      if(this.retired||b.contract!==this.session.contract||b.principal!==this.session.principal)throw Error('Request binding changed.');
+      let reply=prepared.reply,delivery;
       if(data.kind==='dispatch'){
         if(reply.class!=='Accept'||!validReply(this.bundle.description,b.input,reply))throw Error('Core no longer accepts the confirmed request.');
         const key=hex(this.random(new Uint8Array(32))),body=envelope(b.contract,key,b.revision,unhex(prepared.command));
         // Persist before sending. Storage failure prevents the send.
         this.storage.setItem(pendingKey,JSON.stringify({contract:b.contract,principal:b.principal,binding:b,body:hex(body)}));
-        const recovered=await this.recover();reply=recovered.result.reply;
+        const recovered=await this.recover();reply=recovered.result.reply;delivery=deliveryStatus(recovered.result.delivery);
       }
-      if(!this.retired)this.onmessage?.({data:{kind:data.kind,binding:b,reply}});
-    })().catch(()=>{if(!this.retired)this.onmessage?.({data:{kind:'error',binding:data.binding}});});
+      if(!this.retired&&b.contract===this.session.contract&&b.principal===this.session.principal)this.onmessage?.({data:{kind:data.kind,binding:b,reply,...(data.kind==='dispatch'?{delivery}:{})}});
+    })().catch(()=>{if(!this.retired&&data.binding?.contract===this.session.contract&&data.binding?.principal===this.session.principal)this.onmessage?.({data:{kind:'error',binding:data.binding}});});
   }
   terminate(){this.retired=true;this.#credential='';}
 }

@@ -547,6 +547,33 @@ For example, in the library loans example a copy's holder is an integer from
 The state line then reads "Copy 1: on the shelf." Labels change only what
 the interface shows; the contract's decisions and checks are unchanged.
 
+### Fixed-table presentation metadata
+
+`zenoui/metadata/3` extends metadata/2 with required `tables` and
+`zenoui/requirements/2` requirements. It names complete fixed state tables
+already declared in `project.zeno`, for example:
+
+```json
+"tables": {"110": {"label": "Book copies"}}
+```
+
+The native descriptor supplies `zenoui/native-fixed-tables/1` provenance from
+the existing table compiler. Each entry binds the source table/owner/type,
+consecutive field ID, actual input path and input position. Metadata supplies
+only the table label. Every table must be bound completely, in native order;
+entries cannot be repeated, reassigned or taken from command/context. Fields
+retain their own labels and exact units/decimal scale, uniform within a table.
+The existing checked `table-list` idiom displays the entries once; masked values
+stay absent. Other state fields keep the ordinary display rules.
+
+The emitted description is `zenoui/app-description/3`. Both generation and mount
+recheck its binding before checking the existing presentation tree/receipt.
+Metadata/1 and metadata/2 retain their scalar admission and description bytes.
+Invented raw `tables`/semantic claims still refuse. This profile adds no dynamic
+keys, queries, pagination, table editing or decision logic. Native captures and
+factory source/asset receipts are separate required provenance; valid JSON
+coordinates alone do not prove that a compiler produced them.
+
 ## Adoptions
 
 `zeno-fcis contract adopt` appends one entry per adopted decision program

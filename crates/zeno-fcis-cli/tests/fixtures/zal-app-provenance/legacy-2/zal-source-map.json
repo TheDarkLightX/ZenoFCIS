@@ -1,0 +1,38 @@
+{
+  "schema": "zal/factory-source-map/2",
+  "profile": "zal/finite-fsm/2",
+  "revision": "07466304cde3923ab1b1516cdc566e578c8f98c53946d69c8422ad93d3419c07",
+  "states": {
+    "idle": 150,
+    "running": 151
+  },
+  "events": {
+    "start": 120,
+    "tick": 121
+  },
+  "context_fields": {},
+  "input_fields": {},
+  "variable_fields": {
+    "count": 170
+  },
+  "reasons": {
+    "not_enabled": 200
+  },
+  "case_ids": [
+    "start_counter",
+    "tick_counter",
+    "default"
+  ],
+  "laws": {
+    "500": "StateInvariant",
+    "501": "StateInvariant"
+  },
+  "property_laws": {},
+  "reference_domain": {
+    "admissible_tuples": 12,
+    "declared_tuples": 12,
+    "excluded": "pre-states that break a declared invariant; the contract's genesis and commit laws keep every held state admissible"
+  },
+  "correspondence": "tested correspondence, not a theorem",
+  "scope": "class, reason, successor control state and variables, and empty deliveries; not Step or publication identity equivalence"
+}

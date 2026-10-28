@@ -1,0 +1,6 @@
+# Source-map hashes bind exact fixture bytes, including intentional CRLF.
+app/** -text
+legacy-1/** -text
+legacy-2/** -text
+app/zal-original.zal whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+app/zal-app-binding.json whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

@@ -1,0 +1,75 @@
+{
+  "parties": [
+    {
+      "name": "operator",
+      "context": [
+        "1"
+      ]
+    },
+    {
+      "name": "observer",
+      "context": [
+        "0"
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "party": "observer",
+      "command": [
+        "153",
+        "3"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "operator",
+      "command": [
+        "153",
+        "3"
+      ],
+      "class": "Accept"
+    },
+    {
+      "party": "observer",
+      "command": [
+        "150",
+        "1"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "operator",
+      "command": [
+        "150",
+        "3"
+      ],
+      "class": "Accept"
+    },
+    {
+      "party": "operator",
+      "command": [
+        "150",
+        "1"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "observer",
+      "command": [
+        "152",
+        "2"
+      ],
+      "class": "Reject"
+    },
+    {
+      "party": "operator",
+      "command": [
+        "152",
+        "2"
+      ],
+      "class": "Accept"
+    }
+  ],
+  "deliveries": 1
+}

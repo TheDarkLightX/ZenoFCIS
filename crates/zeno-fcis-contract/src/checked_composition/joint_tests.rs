@@ -332,7 +332,12 @@ fn native_bridge_27_guarded_budget_matches_independent_complete_reference() {
         components: &sources,
     };
     let checked = super::check_domain(&bundle).unwrap_or_else(fail);
-    assert_eq!(checked.verdict(), super::Verdict::Proved, "{}", checked.json());
+    assert_eq!(
+        checked.verdict(),
+        super::Verdict::Proved,
+        "{}",
+        checked.json()
+    );
     let joint = JointComposition::from_sources(&bundle).unwrap_or_else(fail);
 
     assert_eq!(joint.components(), ["guard", "budget"]);

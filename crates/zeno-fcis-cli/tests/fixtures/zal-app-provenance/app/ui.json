@@ -1,0 +1,47 @@
+{
+  "format": "zenoui/metadata/1",
+  "title": "R\u00e9paration desk \u2014 \u96ea",
+  "action": "command.101.119",
+  "fields": {
+    "pre.100.110": {
+      "label": "Request state",
+      "unit": "unitless"
+    },
+    "command.101.119": {
+      "label": "Action",
+      "unit": "unitless"
+    },
+    "pre.100.170": {
+      "label": "Units",
+      "unit": "items"
+    },
+    "context.102.160": {
+      "label": "Authorized",
+      "unit": "unitless"
+    },
+    "command.101.164": {
+      "label": "Quantity",
+      "unit": "items"
+    }
+  },
+  "variants": {
+    "150": "Draft",
+    "151": "Submitted",
+    "120": "Request",
+    "121": "Reset"
+  },
+  "commands": {
+    "120": {
+      "consequential": true,
+      "label": "Request"
+    },
+    "121": {
+      "consequential": true,
+      "label": "Reset"
+    }
+  },
+  "reasons": {
+    "200": "Denied",
+    "201": "Not Enabled"
+  }
+}

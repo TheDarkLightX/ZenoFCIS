@@ -1,0 +1,12 @@
+zal 2;
+machine counter;
+states idle, running;
+events start, tick;
+context none;
+var count in 0..=2 initially 0;
+initial idle;
+step atomic; frame control_and_variables;
+default reject not_enabled unchanged;
+rule start_counter: idle + start [true] -> accept running;
+rule tick_counter: running + tick [count < 2] -> accept running, count += 1;
+invariant bounded_count: count >= 0 & count <= 2;

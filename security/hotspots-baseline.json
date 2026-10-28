@@ -969,45 +969,45 @@
       "path_roles": [
         "sqlite-production-port"
       ],
-      "production_lines": 566,
+      "production_lines": 576,
       "rank": 6,
       "score": 98,
       "signals": [
         {
           "id": "filesystem-read-path",
           "lines": [
-            429
+            430
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            353
+            354
           ]
         },
         {
           "id": "release-or-publish",
           "lines": [
-            52,
-            63,
-            184,
-            185
+            53,
+            64,
+            185,
+            186
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
-            508,
-            511,
-            512
+            522,
+            525,
+            526
           ]
         },
         {
           "id": "sql-boundary",
           "lines": [
-            574,
-            576,
-            579
+            588,
+            590,
+            593
           ]
         }
       ],
@@ -2032,65 +2032,65 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 1885,
+      "production_lines": 1906,
       "rank": 16,
       "score": 93,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            608
+            628
           ]
         },
         {
           "id": "concurrency-primitive",
           "lines": [
-            95
+            96
           ]
         },
         {
           "id": "external-verifier-result",
           "lines": [
-            1838
+            1865
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            852,
-            2014
+            879,
+            2041
           ]
         },
         {
           "id": "generated-source",
           "lines": [
-            82,
-            1288
+            83,
+            1315
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            656
+            683
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            1954
+            1981
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            273,
-            582,
-            609,
-            640,
-            808,
-            809,
-            1038,
-            1142
+            279,
+            602,
+            629,
+            660,
+            835,
+            836,
+            1065,
+            1169
           ]
         }
       ],
@@ -5992,18 +5992,18 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 19486271,
-    "admitted_files": 1256,
-    "inventory_sha256": "5af3f21231ef1c79062c8a229b94194ef729a8d280a8bc74aa9b5e8e1e05b1c1",
-    "ranked_above_minimum": 1071,
+    "admitted_bytes": 19624846,
+    "admitted_files": 1269,
+    "inventory_sha256": "49bf38e55a880052aceec4f47c94a26fb1103294ceb8d51c6c098bd653b361ae",
+    "ranked_above_minimum": 1083,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 72,
-      "priority-2": 348,
-      "priority-3": 397,
+      "priority-2": 355,
+      "priority-3": 401,
       "priority-4": 155,
-      "priority-5": 284
+      "priority-5": 286
     }
   }
 }

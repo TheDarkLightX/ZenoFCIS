@@ -1,0 +1,13 @@
+{
+  "files": {
+    "API.md": "561f16d2d601be4d61d0eb352ef90c5777cb332226c2e199eb4ec6820c49bbc6",
+    "app/Main.hs": "243336c1f8958d7390db716c0d0aa6a1d9f49bb41d127debca67397e595cb030",
+    "build.py": "61c32cc3bf17fc341dd5036db712112352429bc12aa907fd5d243fcdb386552b",
+    "oracle.py": "8e1f8cb4cff6cf0d7f95aea3d13c15350295409bfabe520b144108d4df9d634a",
+    "profile.py": "2f6ac23426afec70e051715b8a4d85043f94018067633b0cf2b59eb64e03a747",
+    "src/Zal/Lens/FiniteCategory.hs": "51b586950f9f6c297f5ac6e38c89dc408196776127110011c3e9b65273f8047f",
+    "src/Zal/Lens/Typed.hs": "f3c68a583df2287bcdb92520fdfc527b2fa7babaf8a5058d0803613ba82a0b5b",
+    "worker_exec.py": "76f92cf428d6f395ee7fe06cda72c0879217cd00dd6b2c813749c9cd1adc1375"
+  },
+  "schema": "zal/lens-category-source/1"
+}

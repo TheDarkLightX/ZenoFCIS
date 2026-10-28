@@ -11,10 +11,10 @@
 
 use std::collections::BTreeMap;
 
-use super::super::ContractError;
 use super::super::declarations::{Declarations, Source};
 use super::super::model::Contract;
 use super::super::rules::{Class, Constant, Rules};
+use super::super::{ContractError, Current};
 use super::super::{policy, schema, schema_commitment};
 use super::domain::{self, Position};
 use super::evaluate::{self, Framer, Outcome, RefusalClass};
@@ -30,6 +30,8 @@ pub(super) struct Loaded {
     pub(super) commitment: [u8; 32],
     pub(super) positions: Vec<Position>,
     pub(super) state_width: usize,
+    /// Source bytes of a checked current subject; proposals have no such binding.
+    current_source: Option<(String, String)>,
 }
 
 impl Loaded {
@@ -40,6 +42,13 @@ impl Loaded {
     pub(super) fn read(project: &str, rules: &str) -> Result<Self, ContractError> {
         let rules = Rules::read_for_project(project, rules)?;
         Self::with(project, rules)
+    }
+
+    /// Prepare only the exact replay-validated current source snapshot.
+    pub(super) fn read_current(current: &Current<'_>) -> Result<Self, ContractError> {
+        let mut loaded = Self::read(current.project, current.rules_source)?;
+        loaded.current_source = Some((current.project.to_owned(), current.rules_source.to_owned()));
+        Ok(loaded)
     }
 
     /// `project` with `rules` already read.
@@ -63,6 +72,7 @@ impl Loaded {
             commitment,
             positions,
             state_width,
+            current_source: None,
         })
     }
 
@@ -76,9 +86,44 @@ impl Loaded {
         rules: &Rules,
         work: impl FnOnce(&Authority<'_>, &Framer) -> Result<R, ContractError>,
     ) -> Result<R, ContractError> {
+        self.bind_proposal(rules, work)
+    }
+
+    /// Bind hypothetical rules independently of any adopted baseline.
+    pub(super) fn bind_proposal<R>(
+        &self,
+        rules: &Rules,
+        work: impl FnOnce(&Authority<'_>, &Framer) -> Result<R, ContractError>,
+    ) -> Result<R, ContractError> {
         let contract = Contract::build(&self.declarations, rules, self.commitment)?;
         let framer = Framer::new(&self.positions, &contract);
         policy::with_authority(&contract, &self.schema, |authority| {
+            work(authority, &framer)
+        })?
+    }
+
+    /// Bind the replay-validated current contract for baseline observations.
+    pub(super) fn bind_current<R>(
+        &self,
+        current: Option<&Current<'_>>,
+        work: impl FnOnce(&Authority<'_>, &Framer) -> Result<R, ContractError>,
+    ) -> Result<R, ContractError> {
+        let Some(current) = current else {
+            return self.bind_proposal(&self.rules, work);
+        };
+        let expected = Some((current.project, current.rules_source));
+        let actual = self
+            .current_source
+            .as_ref()
+            .map(|(project, rules)| (project.as_str(), rules.as_str()));
+        if self.schema.as_slice() != current.schema || actual != expected {
+            return Err(ContractError::new(
+                "lineage binding",
+                "judge sources or schema differ from the replayed current contract",
+            ));
+        }
+        let framer = Framer::new(&self.positions, current.contract);
+        policy::with_authority(current.contract, current.schema, |authority| {
             work(authority, &framer)
         })?
     }
@@ -563,8 +608,18 @@ pub(super) struct Observation {
 /// # Errors
 /// The generator's or the library's refusal of the contract; inconclusive
 /// when the domain exceeds `max_tuples`.
+#[cfg(test)]
 pub(super) fn observe_contract(
     loaded: &Loaded,
+    max_tuples: u64,
+) -> Result<Result<Observation, Inconclusive>, ContractError> {
+    observe_current(loaded, None, max_tuples)
+}
+
+/// Observe the verified current Authority, or the ordinary rules-only baseline.
+pub(super) fn observe_current(
+    loaded: &Loaded,
+    current: Option<&Current<'_>>,
     max_tuples: u64,
 ) -> Result<Result<Observation, Inconclusive>, ContractError> {
     let space = match Space::new(&loaded.positions, loaded.state_width, max_tuples) {
@@ -572,7 +627,7 @@ pub(super) fn observe_contract(
         Err(inconclusive) => return Ok(Err(inconclusive)),
     };
     loaded
-        .bind(&loaded.rules, |authority, framer| {
+        .bind_current(current, |authority, framer| {
             let descriptor = authority.descriptor();
             let machine =
                 Machine::observe(authority, framer, space, &loaded.positions, &loaded.rules)?;
@@ -659,6 +714,146 @@ pub(super) fn with_law(
             formula,
         });
     Ok((loaded, id))
+}
+
+#[cfg(test)]
+mod lineage_binding_tests {
+    use super::{Loaded, Space, evaluate, policy};
+    use crate::contract::{
+        Adoption, AdoptionSources, ContractSources, Usage, generate_contract, program_bytes,
+        with_adoption, with_current,
+    };
+    use crate::transform::{self, Limits};
+    use zeno_fcis_synthesis::finite::v2_composition::Raw;
+    use zeno_fcis_synthesis::finite::{Op, Program};
+    use zeno_fcis_synthesis::finite_runtime::import_program;
+
+    const PROJECT: &str = include_str!("../../../templates/durable-counter/project.zeno");
+    const RULES: &str = include_str!("../../../templates/durable-counter/v2/policy.json");
+
+    #[test]
+    fn current_binding_preserves_every_original_envelope_and_uses_adopted_graph() {
+        let base = ContractSources {
+            project: PROJECT,
+            rules: RULES,
+            schema_origin: None,
+            adoptions: &[],
+            replayed: &[],
+            evolutions: &[],
+        };
+        let original = generate_contract(base).unwrap_or_else(|e| panic!("{e}"));
+        let old_bytes = original.program().unwrap_or_else(|| panic!("program"));
+        let old = import_program(old_bytes).unwrap_or_else(|e| panic!("{e}"));
+        let mut nodes = old.nodes().to_vec();
+        nodes.push(Op::Int(0));
+        let changed = Program::try_new(
+            old.inputs().to_vec(),
+            old.outputs().to_vec(),
+            nodes,
+            old.roots().to_vec(),
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+        let candidate = program_bytes(&changed).unwrap_or_else(|e| panic!("{e}"));
+        let receipt = transform::check(
+            old_bytes,
+            &candidate,
+            Limits {
+                steps: transform::DEFAULT_STEP_LIMIT,
+                input_tuples: 1024,
+            },
+        )
+        .unwrap_or_else(|e| panic!("{e:?}"))
+        .receipt();
+        let adoption = Adoption {
+            candidate_sha256: transform::sha256_hex(&candidate),
+            receipt_sha256: transform::sha256_hex(&receipt),
+            usage: Usage::NewVersion,
+            superseded_policy_sha256: transform::sha256_hex(original.policy()),
+        };
+        let rules = with_adoption(RULES, &adoption).unwrap_or_else(|e| panic!("{e}"));
+        let attachments = [AdoptionSources {
+            candidate: &candidate,
+            receipt: &receipt,
+        }];
+        let sources = ContractSources {
+            rules: &rules,
+            adoptions: &attachments,
+            ..base
+        };
+        let generated = generate_contract(sources).unwrap_or_else(|e| panic!("{e}"));
+        with_current(sources, &generated, |current| {
+            let old_loaded = Loaded::read(PROJECT, RULES)?;
+            let current_loaded = Loaded::read_current(&current)?;
+            let space = Space::new(&old_loaded.positions, old_loaded.state_width, 1024)
+                .unwrap_or_else(|e| panic!("space: {e:?}"));
+            assert_eq!(space.tuples(), 64);
+            // Independently rebuild and bind a descriptor from the retained
+            // candidate, then require its complete encoded policy to be the
+            // generator's current policy before comparing raw reports.
+            let mut reference = super::Contract::build(
+                &current_loaded.declarations,
+                &current_loaded.rules,
+                current_loaded.commitment,
+            )?;
+            let decoded = import_program(&candidate).unwrap_or_else(|e| panic!("{e}"));
+            reference.adopt(&decoded, "independent current")?;
+            assert_eq!(
+                policy::encode(&reference, current.schema)?,
+                generated.policy()
+            );
+            old_loaded.bind(&old_loaded.rules, |old_authority, old_framer| {
+                policy::with_authority(&reference, current.schema, |reference_authority| {
+                    current_loaded.bind_current(Some(&current), |new_authority, new_framer| {
+                        assert_eq!(
+                            new_authority.descriptor().program.nodes.len(),
+                            old.nodes().len() + 1
+                        );
+                        assert_ne!(new_authority.identity(), old_authority.identity());
+                        assert_eq!(new_authority.identity(), reference_authority.identity());
+                        for ordinal in 0..space.tuples() {
+                            let tuple = space.at(ordinal);
+                            let frames = new_framer.frame(&tuple);
+                            assert_eq!(old_framer.frame(&tuple), frames);
+                            let before = evaluate::evaluate(old_authority, old_framer, &tuple);
+                            let after = evaluate::evaluate(new_authority, new_framer, &tuple);
+                            assert_eq!(before, after, "tuple {tuple:?}");
+                            let raw = Raw {
+                                state: &frames[0],
+                                command: &frames[1],
+                                context: &frames[2],
+                            };
+                            let actual = new_authority.evaluate(raw);
+                            let expected = reference_authority.evaluate(raw);
+                            assert_eq!(
+                                evaluate::from_evaluation(&actual),
+                                evaluate::from_evaluation(&expected)
+                            );
+                            assert_eq!(actual.kind(), expected.kind());
+                            assert_eq!(actual.subject(), expected.subject());
+                            assert_eq!(actual.raw().state, expected.raw().state);
+                            assert_eq!(actual.raw().command, expected.raw().command);
+                            assert_eq!(actual.raw().context, expected.raw().context);
+                            assert_eq!(actual.ingress_usage(), expected.ingress_usage());
+                            assert_eq!(actual.decision_usage(), expected.decision_usage());
+                            assert_eq!(actual.usage(), expected.usage());
+                            assert_eq!(actual.reads(), expected.reads());
+                            assert_eq!(actual.decision_attempts(), expected.decision_attempts());
+                            assert_eq!(actual.diagnostics(), expected.diagnostics());
+                            assert_eq!(actual.law_reads(), expected.law_reads());
+                        }
+                        Ok(())
+                    })
+                })?
+            })?;
+            assert!(
+                old_loaded
+                    .bind_current(Some(&current), |_, _| Ok(()))
+                    .is_err()
+            );
+            Ok(())
+        })
+        .unwrap_or_else(|e| panic!("{e}"));
+    }
 }
 
 /// The reject-everything core of `rules`: every reason keeps a case of its

@@ -14,7 +14,6 @@ import sys
 SCHEMA = "zeno-fcis/coverage-loop/1"
 DIMENSIONS = ("value", "authority", "state", "input", "order", "privacy", "liveness",
               "failure", "time and resources", "story", "unclassified")
-DEFAULT_BIN = "/media/trevormoc/4986929f-65e6-4021-94a2-943a5e427718/tmp/zf26-rev-zalgames/bin/zeno-fcis"
 MAX_FILE = 1024 * 1024
 MAX_PROPOSALS = 128
 DIMENSION_RULES = (
@@ -404,6 +403,10 @@ def markdown(report):
 
 
 def run(options):
+    binary_path = os.environ.get("ZENO_FCIS_BIN")
+    if not binary_path:
+        raise ValueError("ZENO_FCIS_BIN must explicitly select the trusted native checker executable")
+    binary = Path(binary_path).resolve()
     out, contract = options.out.resolve(), options.directory.resolve()
     if out == contract or contract in out.parents:
         raise ValueError("--out must be outside the contract directory")
@@ -434,7 +437,6 @@ def run(options):
         return result
     supplied = proposals(options.proposals, options.zal, project, allocate)
     supplied += proposals(getattr(options, "idioms", None), options.zal, project, allocate, idioms=True)
-    binary = Path(os.environ.get("ZENO_FCIS_BIN", DEFAULT_BIN)).resolve()
     report = {"schema": SCHEMA, "authority": "none", "status": "ran", "exit_code": 0, "rounds": [],
               "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
               "sources": {"project_sha256": hashlib.sha256(project.encode()).hexdigest(),

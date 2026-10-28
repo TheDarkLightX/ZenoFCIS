@@ -1,0 +1,591 @@
+{
+  "schema": "bounded-arithmetic-machine-search/v1",
+  "claim": "bounded exact symbolic machine/microprogram co-search; no new ISA or universality claim",
+  "source_sha256": "60b2bbf7364fae72a007afccd3caf6c12d65b0a312a534d1d295b348375cb562",
+  "semantics": {
+    "add": "B = B + A",
+    "subtract": "B = B - A (SUBLEQ with branch-to-next)",
+    "reverse_subtract": "B = A - B",
+    "copy": "B = A",
+    "negative_copy": "B = -A"
+  },
+  "grammar": {
+    "initial": "X=x,Y=y,T=0",
+    "writeable": [
+      "Y",
+      "T"
+    ],
+    "readable": [
+      "X",
+      "Y",
+      "T"
+    ],
+    "instructions_per_position": 6,
+    "max_depth": 5,
+    "required_final": "X=x,T=0, Y=declared target",
+    "branches": "none effective"
+  },
+  "results": [
+    {
+      "machine": "add",
+      "targets": {
+        "add_Y_X": {
+          "status": "exact integer affine identity checked",
+          "minimum_length_in_integer_grammar": 1,
+          "program": [
+            {
+              "A": "X",
+              "B": "Y",
+              "branch_target": "next"
+            }
+          ],
+          "final_affine_coefficients_x_y": [
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "independent_modular_check": {
+            "width": 4,
+            "input_pairs": 256,
+            "passed": true
+          }
+        },
+        "subtract_Y_X": {
+          "status": "no program through depth 5 in declared integer grammar"
+        },
+        "copy_X_to_Y": {
+          "status": "no program through depth 5 in declared integer grammar"
+        }
+      },
+      "search_ledger": [
+        {
+          "depth": 0,
+          "frontier_states": 1,
+          "new_targets": []
+        },
+        {
+          "depth": 1,
+          "frontier_states": 4,
+          "new_targets": [
+            "add_Y_X"
+          ]
+        },
+        {
+          "depth": 2,
+          "frontier_states": 13,
+          "new_targets": []
+        },
+        {
+          "depth": 3,
+          "frontier_states": 44,
+          "new_targets": []
+        },
+        {
+          "depth": 4,
+          "frontier_states": 147,
+          "new_targets": []
+        },
+        {
+          "depth": 5,
+          "frontier_states": 485,
+          "new_targets": []
+        }
+      ],
+      "distinct_states": 694
+    },
+    {
+      "machine": "subtract",
+      "targets": {
+        "add_Y_X": {
+          "status": "exact integer affine identity checked",
+          "minimum_length_in_integer_grammar": 3,
+          "program": [
+            {
+              "A": "X",
+              "B": "T",
+              "branch_target": "next"
+            },
+            {
+              "A": "T",
+              "B": "Y",
+              "branch_target": "next"
+            },
+            {
+              "A": "T",
+              "B": "T",
+              "branch_target": "next"
+            }
+          ],
+          "final_affine_coefficients_x_y": [
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "independent_modular_check": {
+            "width": 4,
+            "input_pairs": 256,
+            "passed": true
+          }
+        },
+        "subtract_Y_X": {
+          "status": "exact integer affine identity checked",
+          "minimum_length_in_integer_grammar": 1,
+          "program": [
+            {
+              "A": "X",
+              "B": "Y",
+              "branch_target": "next"
+            }
+          ],
+          "final_affine_coefficients_x_y": [
+            [
+              1,
+              0
+            ],
+            [
+              -1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "independent_modular_check": {
+            "width": 4,
+            "input_pairs": 256,
+            "passed": true
+          }
+        },
+        "copy_X_to_Y": {
+          "status": "exact integer affine identity checked",
+          "minimum_length_in_integer_grammar": 4,
+          "program": [
+            {
+              "A": "Y",
+              "B": "Y",
+              "branch_target": "next"
+            },
+            {
+              "A": "X",
+              "B": "T",
+              "branch_target": "next"
+            },
+            {
+              "A": "T",
+              "B": "Y",
+              "branch_target": "next"
+            },
+            {
+              "A": "T",
+              "B": "T",
+              "branch_target": "next"
+            }
+          ],
+          "final_affine_coefficients_x_y": [
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "independent_modular_check": {
+            "width": 4,
+            "input_pairs": 256,
+            "passed": true
+          }
+        }
+      },
+      "search_ledger": [
+        {
+          "depth": 0,
+          "frontier_states": 1,
+          "new_targets": []
+        },
+        {
+          "depth": 1,
+          "frontier_states": 4,
+          "new_targets": [
+            "subtract_Y_X"
+          ]
+        },
+        {
+          "depth": 2,
+          "frontier_states": 12,
+          "new_targets": []
+        },
+        {
+          "depth": 3,
+          "frontier_states": 36,
+          "new_targets": [
+            "add_Y_X"
+          ]
+        },
+        {
+          "depth": 4,
+          "frontier_states": 95,
+          "new_targets": [
+            "copy_X_to_Y"
+          ]
+        }
+      ],
+      "distinct_states": 148
+    },
+    {
+      "machine": "reverse_subtract",
+      "targets": {
+        "add_Y_X": {
+          "status": "exact integer affine identity checked",
+          "minimum_length_in_integer_grammar": 2,
+          "program": [
+            {
+              "A": "T",
+              "B": "Y",
+              "branch_target": "next"
+            },
+            {
+              "A": "X",
+              "B": "Y",
+              "branch_target": "next"
+            }
+          ],
+          "final_affine_coefficients_x_y": [
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "independent_modular_check": {
+            "width": 4,
+            "input_pairs": 256,
+            "passed": true
+          }
+        },
+        "subtract_Y_X": {
+          "status": "exact integer affine identity checked",
+          "minimum_length_in_integer_grammar": 2,
+          "program": [
+            {
+              "A": "X",
+              "B": "Y",
+              "branch_target": "next"
+            },
+            {
+              "A": "T",
+              "B": "Y",
+              "branch_target": "next"
+            }
+          ],
+          "final_affine_coefficients_x_y": [
+            [
+              1,
+              0
+            ],
+            [
+              -1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "independent_modular_check": {
+            "width": 4,
+            "input_pairs": 256,
+            "passed": true
+          }
+        },
+        "copy_X_to_Y": {
+          "status": "exact integer affine identity checked",
+          "minimum_length_in_integer_grammar": 2,
+          "program": [
+            {
+              "A": "Y",
+              "B": "Y",
+              "branch_target": "next"
+            },
+            {
+              "A": "X",
+              "B": "Y",
+              "branch_target": "next"
+            }
+          ],
+          "final_affine_coefficients_x_y": [
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "independent_modular_check": {
+            "width": 4,
+            "input_pairs": 256,
+            "passed": true
+          }
+        }
+      },
+      "search_ledger": [
+        {
+          "depth": 0,
+          "frontier_states": 1,
+          "new_targets": []
+        },
+        {
+          "depth": 1,
+          "frontier_states": 5,
+          "new_targets": []
+        },
+        {
+          "depth": 2,
+          "frontier_states": 12,
+          "new_targets": [
+            "add_Y_X",
+            "subtract_Y_X",
+            "copy_X_to_Y"
+          ]
+        }
+      ],
+      "distinct_states": 18
+    },
+    {
+      "machine": "copy",
+      "targets": {
+        "add_Y_X": {
+          "status": "no program through depth 5 in declared integer grammar"
+        },
+        "subtract_Y_X": {
+          "status": "no program through depth 5 in declared integer grammar"
+        },
+        "copy_X_to_Y": {
+          "status": "exact integer affine identity checked",
+          "minimum_length_in_integer_grammar": 1,
+          "program": [
+            {
+              "A": "X",
+              "B": "Y",
+              "branch_target": "next"
+            }
+          ],
+          "final_affine_coefficients_x_y": [
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "independent_modular_check": {
+            "width": 4,
+            "input_pairs": 256,
+            "passed": true
+          }
+        }
+      },
+      "search_ledger": [
+        {
+          "depth": 0,
+          "frontier_states": 1,
+          "new_targets": []
+        },
+        {
+          "depth": 1,
+          "frontier_states": 4,
+          "new_targets": [
+            "copy_X_to_Y"
+          ]
+        },
+        {
+          "depth": 2,
+          "frontier_states": 3,
+          "new_targets": []
+        },
+        {
+          "depth": 3,
+          "frontier_states": 0,
+          "new_targets": []
+        },
+        {
+          "depth": 4,
+          "frontier_states": 0,
+          "new_targets": []
+        },
+        {
+          "depth": 5,
+          "frontier_states": 0,
+          "new_targets": []
+        }
+      ],
+      "distinct_states": 8
+    },
+    {
+      "machine": "negative_copy",
+      "targets": {
+        "add_Y_X": {
+          "status": "no program through depth 5 in declared integer grammar"
+        },
+        "subtract_Y_X": {
+          "status": "no program through depth 5 in declared integer grammar"
+        },
+        "copy_X_to_Y": {
+          "status": "exact integer affine identity checked",
+          "minimum_length_in_integer_grammar": 2,
+          "program": [
+            {
+              "A": "X",
+              "B": "Y",
+              "branch_target": "next"
+            },
+            {
+              "A": "Y",
+              "B": "Y",
+              "branch_target": "next"
+            }
+          ],
+          "final_affine_coefficients_x_y": [
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "independent_modular_check": {
+            "width": 4,
+            "input_pairs": 256,
+            "passed": true
+          }
+        }
+      },
+      "search_ledger": [
+        {
+          "depth": 0,
+          "frontier_states": 1,
+          "new_targets": []
+        },
+        {
+          "depth": 1,
+          "frontier_states": 5,
+          "new_targets": []
+        },
+        {
+          "depth": 2,
+          "frontier_states": 11,
+          "new_targets": [
+            "copy_X_to_Y"
+          ]
+        },
+        {
+          "depth": 3,
+          "frontier_states": 5,
+          "new_targets": []
+        },
+        {
+          "depth": 4,
+          "frontier_states": 1,
+          "new_targets": []
+        },
+        {
+          "depth": 5,
+          "frontier_states": 0,
+          "new_targets": []
+        }
+      ],
+      "distinct_states": 23
+    }
+  ],
+  "controls": {
+    "drop_final_scratch_reset": {
+      "inputs": {
+        "X": 1,
+        "Y": 0,
+        "T": 0
+      },
+      "actual": [
+        1,
+        1,
+        15
+      ],
+      "expected": [
+        1,
+        1,
+        0
+      ]
+    },
+    "remove_zero_scratch_precondition": {
+      "inputs": {
+        "X": 0,
+        "Y": 0,
+        "T": 1
+      },
+      "actual": [
+        0,
+        15,
+        0
+      ],
+      "expected": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "limits": [
+    "Trusted Python symbolic interpreter, no Lean/SMT proof object",
+    "Search cost is not native runtime speed or hardware area",
+    "Integer minimality does not imply fixed-width minimality",
+    "No dynamic memory, effective branching, I/O, compiler/runtime refinement or universality theorem"
+  ]
+}
