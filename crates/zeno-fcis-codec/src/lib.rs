@@ -10,6 +10,10 @@
 
 extern crate alloc;
 
+/// Experimental closed ZCVE/2 values and envelopes; legacy entry points stay ZCVE/1.
+#[cfg(feature = "value-profile-2")]
+pub mod profile2;
+
 #[cfg(verus_keep_ghost)]
 use decoder_spec::{read_blob, tail};
 #[cfg(verus_keep_ghost)]
@@ -260,7 +264,7 @@ mod canonical_seal {
     impl Sealed for super::AdmittedEnvelope {}
 }
 
-/// Canonical encoding for the four closed library value/envelope types.
+/// Canonical encoding for the closed library value/envelope types.
 ///
 /// The private supertrait prevents downstream encoding substitution.
 /// ```compile_fail

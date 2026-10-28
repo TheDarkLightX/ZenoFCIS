@@ -9,6 +9,10 @@
 
 extern crate alloc;
 
+/// Experimental closed ZCVE/2 values and atoms; legacy admission is unchanged.
+#[cfg(feature = "value-profile-2")]
+pub mod profile2;
+
 #[cfg(verus_keep_ghost)]
 use decoder_model::*;
 #[cfg(verus_keep_ghost)]

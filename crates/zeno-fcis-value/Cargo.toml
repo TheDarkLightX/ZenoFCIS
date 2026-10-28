@@ -13,6 +13,8 @@ readme.workspace = true
 [features]
 default = ["std"]
 std = []
+# Proposed explicit value profile; no legacy decoder/schema/Authority widening.
+value-profile-2 = []
 
 [lints]
 workspace = true

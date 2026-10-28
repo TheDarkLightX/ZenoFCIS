@@ -18,6 +18,10 @@ mod ids;
 mod model;
 mod validate;
 
+/// Experimental closed Schema2 admission over explicit owned Value2/codec2.
+#[cfg(feature = "schema-profile-2")]
+pub mod profile2;
+
 pub use envelope::{SchemaAdmittedEnvelope, SchemaAdmittedTypeEnvelope, SchemaEnvelopeError};
 pub use error::{SchemaError, ValueValidationError};
 pub use ids::{FieldId, SchemaName, TypeId, VariantId};

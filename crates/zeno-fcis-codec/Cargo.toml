@@ -15,6 +15,7 @@ default = ["std"]
 std = ["zeno-fcis-value/std"]
 rustcrypto = []
 libcrux = ["dep:libcrux-sha2"]
+value-profile-2 = ["zeno-fcis-value/value-profile-2"]
 
 [dependencies]
 zeno-fcis-value = { version = "=2.7.0-rc.1", path = "../zeno-fcis-value", default-features = false }
