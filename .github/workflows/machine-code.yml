@@ -6,16 +6,24 @@ on:
     paths:
       - 'tools/machine_code/**'
       - 'tools/test_machine_code*.py'
+      - 'tools/test_zal_word_kernel.py'
+      - 'integrations/zal/run.py'
+      - 'integrations/zal/word_kernel.py'
       - 'tools/machine_code_requirements.txt'
       - 'test-data/machine-code/**'
+      - 'test-data/zal-word-kernel/**'
       - '.github/workflows/machine-code.yml'
   push:
-    branches: [main, 'wip/2.7-machine-code-*']
+    branches: [main, 'wip/2.7-machine-code-*', 'wip/2.7-zal-machine-code-*']
     paths:
       - 'tools/machine_code/**'
       - 'tools/test_machine_code*.py'
+      - 'tools/test_zal_word_kernel.py'
+      - 'integrations/zal/run.py'
+      - 'integrations/zal/word_kernel.py'
       - 'tools/machine_code_requirements.txt'
       - 'test-data/machine-code/**'
+      - 'test-data/zal-word-kernel/**'
       - '.github/workflows/machine-code.yml'
 
 permissions:
@@ -41,9 +49,12 @@ jobs:
         run: python3 -B tools/test_machine_code_verifier.py
       - name: Machine proposal, synthesis and receipt replay
         run: python3 -B tools/test_machine_code_loop.py
+      - name: ZAL source, human feedback and independent machine replay
+        run: python3 -B tools/test_zal_word_kernel.py
       - name: Optimized Python keeps the same guards
         run: |
           python3 -O -B tools/test_machine_code_verifier.py
           python3 -O -B tools/test_machine_code_loop.py
+          python3 -O -B tools/test_zal_word_kernel.py
       - name: Actual x86 execution, assembler and RV64I object correspondence
         run: python3 -B tools/test_machine_code_native.py

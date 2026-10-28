@@ -8,8 +8,9 @@ description: Search, synthesize or check x86-64 and RV64I word kernels through Z
 Work from the selected ZenoFCIS checkout with Python 3.11 or newer. Read its
 `docs/MACHINE_CODE_SYNTHESIS_27.md` and current
 `python3 -B -m tools.machine_code.run --help` before selecting a profile.
-This tool complements the finite decision-program loops; it has no arbitrary
-ZAL-to-native application bridge or runtime adoption command.
+This tool complements the finite decision-program loops. The explicit
+`zal/word-kernel/1` route connects one modular-word problem; arbitrary ZAL
+application lowering and runtime adoption retain separate obligations.
 
 ## Choose the contract
 
@@ -19,6 +20,41 @@ palette and a16-body-instruction ceiling. It supports x86 SysV register kernels
 and RV64I register kernels. Checked overflow, wider arithmetic, effects, memory
 and other ABIs require an explicit supported profile; do not narrow the task to
 make it fit. Inspect `test-data/machine-code/` for the closed JSON format.
+
+## Connect human ZAL requirements
+
+For human wording, use the selected checkout's closed word-kernel profile:
+
+```sh
+python3 -B integrations/zal/run.py word-kernel read --source SOURCE.zal
+python3 -B integrations/zal/run.py word-kernel show --source SOURCE.zal --revision REVISION
+python3 -B integrations/zal/run.py word-kernel question --source SOURCE.zal --revision REVISION --text 'What happens on overflow?'
+python3 -B integrations/zal/run.py word-kernel what-if --source SOURCE.zal --revision REVISION --x 18446744073709551615 --y 1
+python3 -B integrations/zal/run.py word-kernel open --source SOURCE.zal --revision REVISION --session NEW_SESSION
+```
+
+Copy the read result's revision; use `--syntax english` for controlled English.
+Review both forms and source maps, including declared wraparound. Then use the
+same `word-kernel packet/candidate/search/emit/replay` commands with that exact
+revision and outside-source output directories. Search uses source-declared
+per-invocation budgets; impose an outer resource budget separately. The wrapper
+re-lowers source before replay and keeps the original independent checker.
+Its artifacts nest the six original machine files without modifying them.
+
+Use named inputs and every entry scratch assignment in counterexample feedback
+to discuss the requirement; never infer acceptance or auto-edit meaning.
+MAX+1 evaluates to 0 for this profile. Checked overflow, wider integers,
+effects/memory, multiple outputs and distributed protocols are unsupported.
+ZAL remains a broad abstraction language; other profiles stay unchanged.
+
+Body data-memory operations refuse, but x86 RET reads the caller's stack and
+changes stack/control state under ABI assumptions. The word-result model does
+not establish these effects, flags/CET, faults or timing; RV return assumes a
+valid ra/link. Do not describe the kernel as never touching memory or as a
+complete ABI proof. The portable examples and focused pure/full-SMT gates
+are in `test-data/zal-word-kernel/` and `tools/test_zal_word_kernel.py`.
+Run `python3 -B -m unittest tools.test_zal_word_kernel.Pure` for pure controls;
+running the test file directly also requires the real installed Z3 checker.
 
 ## Propose, check and revise
 
