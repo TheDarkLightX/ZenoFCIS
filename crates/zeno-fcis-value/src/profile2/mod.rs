@@ -1,6 +1,7 @@
 //! Experimental closed ZCVE/2 values, fixed-width atoms and conversions.
 //!
-//! Full-width arithmetic is reused byte-for-byte from the pinned PR42 capsule.
+//! Arithmetic uses the pinned PR42 algorithms with an explicitly factored
+//! comparison module shared by runtime callers and the proof harness.
 //! The owned recursive grammar and explicit resource admission are separate
 //! from legacy Value/schema/Authority admission. No native or proof qualification
 //! is inferred, and the profile/tag registry remains experimental.
@@ -9,7 +10,7 @@ extern crate alloc;
 
 use alloc::string::String;
 
-// Preserve the qualified upstream arithmetic source bytes.
+// Preserve capsule formatting outside the reviewed comparison-module factor.
 #[rustfmt::skip]
 mod arithmetic256;
 pub use arithmetic256::{Failure, I256, Rounding, U256, U512, U768};

@@ -25,12 +25,9 @@ pub struct U512([u128; 4]);
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct U768([u128; 6]);
 
-fn compare<const N: usize>(a: &[u128; N], b: &[u128; N]) -> Ordering {
-    for i in (0..N).rev() {
-        if a[i] != b[i] { return a[i].cmp(&b[i]); }
-    }
-    Ordering::Equal
-}
+#[path = "ordering256.rs"]
+mod ordering256;
+use ordering256::compare;
 fn add<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
     let mut out = [0; N];
     let mut carry = false;

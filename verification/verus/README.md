@@ -742,6 +742,7 @@ change the twenty workflow profiles or their qualification status above.
 | [check_arithmetic_proof.py](../../tools/check_arithmetic_proof.py) | Production scalar and wide bodies included by path; abstract integer rounding, quotient/remainder, monotonicity and 128-bit reference expectations |
 | [check_arithmetic_typed_proof.py](../../tools/check_arithmetic_typed_proof.py) | Complete production evaluator closure; legacy-node correspondence, checked unsigned operations, casts and signed-width projection |
 | [check_arithmetic_emission.py](../../tools/check_arithmetic_emission.py) | Per-program emitted-AST translation validation of six shipped Rust templates and eighteen operation probes; byte-identical verified helpers and 64-bit reference expectations |
+| [check_ordering256.py](../../tools/check_ordering256.py) | Actual shared all-N limb comparator: complete lexical outcomes, decreasing loop, exact entry/loop coverage and three semantic defects; numeric wrapper order and remaining full-width arithmetic are separate obligations |
 
 [arithmetic_spec.rs](arithmetic_spec.rs) states mathematical floor and ceiling
 for either divisor sign, checked final representability, positive-divisor fused

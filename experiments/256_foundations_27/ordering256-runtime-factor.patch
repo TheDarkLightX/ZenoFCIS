@@ -1,0 +1,14 @@
+diff --git a/crates/zeno-fcis-value/src/profile2/arithmetic256.rs b/crates/zeno-fcis-value/src/profile2/arithmetic256.rs
+index 060e9fb9..914aec7b 100644
+--- a/crates/zeno-fcis-value/src/profile2/arithmetic256.rs
++++ b/crates/zeno-fcis-value/src/profile2/arithmetic256.rs
+@@ -28,6 +28,3 @@ pub struct U768([u128; 6]);
+-fn compare<const N: usize>(a: &[u128; N], b: &[u128; N]) -> Ordering {
+-    for i in (0..N).rev() {
+-        if a[i] != b[i] { return a[i].cmp(&b[i]); }
+-    }
+-    Ordering::Equal
+-}
++#[path = "ordering256.rs"]
++mod ordering256;
++use ordering256::compare;
