@@ -1,0 +1,49 @@
+name: machine-code
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tools/machine_code/**'
+      - 'tools/test_machine_code*.py'
+      - 'tools/machine_code_requirements.txt'
+      - 'test-data/machine-code/**'
+      - '.github/workflows/machine-code.yml'
+  push:
+    branches: [main, 'wip/2.7-machine-code-*']
+    paths:
+      - 'tools/machine_code/**'
+      - 'tools/test_machine_code*.py'
+      - 'tools/machine_code_requirements.txt'
+      - 'test-data/machine-code/**'
+      - '.github/workflows/machine-code.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  registered-isa-kernels:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Install the hash-pinned experimental checker
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/machine-code-venv"
+          "$RUNNER_TEMP/machine-code-venv/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          printf '%s\n' "$RUNNER_TEMP/machine-code-venv/bin" >> "$GITHUB_PATH"
+      - name: Independent decoder and counterexample controls
+        run: python3 -B tools/test_machine_code_verifier.py
+      - name: Machine proposal, synthesis and receipt replay
+        run: python3 -B tools/test_machine_code_loop.py
+      - name: Optimized Python keeps the same guards
+        run: |
+          python3 -O -B tools/test_machine_code_verifier.py
+          python3 -O -B tools/test_machine_code_loop.py
+      - name: Actual x86 execution, assembler and RV64I object correspondence
+        run: python3 -B tools/test_machine_code_native.py

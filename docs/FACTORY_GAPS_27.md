@@ -1,6 +1,6 @@
 # ZenoFCIS 2.7 factory gap register
 
-All twenty rows remain open. This is the development backlog for full 2.7.
+All twenty-one rows remain open. This is the development backlog for full 2.7.
 Implementation, focused tests, native qualification, proof and release readiness
 have separate requirements. See the [continuation guide](DEVELOPMENT_27.md) for
 source locations and reproduction commands; bind results to the actual commit.
@@ -31,6 +31,7 @@ does not waive an accepted requirement.
 | F27-18 | P1 | Backend-independent shell and PostgreSQL | Pure ports/programs provide a seam; apps and protected-owner persistence retain SQLite coupling. Qualify a common observation/refusal profile and real PostgreSQL atomicity, replay, CAS, history, outbox, ACK, concurrency/recovery/deployment, plus owner/factory/upgrade integration. |
 | F27-19 | P1 | First-class U256/I256 throughout the factory | 128-bit helpers and wider intermediates do not supply first-class 256-bit values. Establish versioned canonical/schema/program/JSON/ABI/meter profiles, arithmetic proofs, collections/summaries, SMT/synthesis and complete Rust/Wasm/app/UI support. Preserve old bytes, traps and finite-profile caps. |
 | F27-20 | P1 | Complete ZenoDEX and DeFi factory targets | Bounded models do not establish full-width app or settlement correctness. Deliver swap/liquidity, signed PnL/funding and collateral/mint/redeem with units, scales, rounding, unsigned transfers, carry bounds, alias/framing/conservation, authenticated roles, replay, uncertainty and coherent effect review. Qualify selected backend/chain assumptions separately. |
+| F27-21 | P1 | Machine-code synthesis and embedded factory integration | Experimental LLM/raw-byte and bounded-search loops emit x86-64/RV64I register kernels and linkable objects, with independent full-word SMT checking and replay. Complete target/ABI/refinement, qualified embedded execution, broader kernel and normal application integration, source/artifact correspondence and measured comparisons. A working word-kernel loop does not establish arbitrary embedded apps or globally optimal binaries. See the [machine-code route](MACHINE_CODE_SYNTHESIS_27.md). |
 
 See the [runtime checklist](RUNTIME_ISOLATION_27_PROGRESS.md),
 [assembly](RUNTIME_ASSEMBLY.md), [refinement](RUNTIME_REFINEMENT.md),

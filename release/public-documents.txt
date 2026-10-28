@@ -477,5 +477,7 @@ integrations/zal/relational_profile/vendor/SPECIFICATION.md
 integrations/zal/zal_notation/LENSES.md
 integrations/zal/zal_notation/README.md
 docs/DEVELOPMENT_27.md
+docs/MACHINE_CODE_SYNTHESIS_27.md
+skills/zenofcis-machine-code/SKILL.md
 docs/FACTORY_GAPS_27.md
 crates/zeno-fcis-cli/tests/fixtures/zal-app-provenance/README.md
