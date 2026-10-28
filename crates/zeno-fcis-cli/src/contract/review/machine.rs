@@ -716,6 +716,49 @@ pub(super) fn with_law(
     Ok((loaded, id))
 }
 
+/// The reject-everything core of `rules`: every reason keeps a case of its
+/// class that never fires, so the declarations stay the contract's, and a
+/// final catch-all rejects with the least reason a reject case uses. `None`
+/// when no case rejects.
+pub(super) fn reject_everything(rules: &Rules) -> Option<(Rules, u32)> {
+    use super::super::expr::Ast;
+    use super::super::rules::Case;
+    let reason = rules
+        .cases
+        .iter()
+        .filter(|case| case.class == Class::Reject)
+        .filter_map(|case| case.reason)
+        .min()?;
+    let mut cases: Vec<Case> = Vec::new();
+    let mut kept = std::collections::BTreeSet::new();
+    for case in &rules.cases {
+        if let Some(used) = case.reason
+            && kept.insert(used)
+        {
+            cases.push(Case {
+                rule: None,
+                when: Ast::Bool(false),
+                ..case.clone()
+            });
+        }
+    }
+    cases.push(Case {
+        rule: None,
+        when: Ast::Bool(true),
+        class: Class::Reject,
+        reason: Some(reason),
+        post: BTreeMap::new(),
+        outbox: Vec::new(),
+    });
+    Some((
+        Rules {
+            cases,
+            ..rules.clone()
+        },
+        reason,
+    ))
+}
+
 #[cfg(test)]
 mod lineage_binding_tests {
     use super::{Loaded, Space, evaluate, policy};
@@ -854,47 +897,4 @@ mod lineage_binding_tests {
         })
         .unwrap_or_else(|e| panic!("{e}"));
     }
-}
-
-/// The reject-everything core of `rules`: every reason keeps a case of its
-/// class that never fires, so the declarations stay the contract's, and a
-/// final catch-all rejects with the least reason a reject case uses. `None`
-/// when no case rejects.
-pub(super) fn reject_everything(rules: &Rules) -> Option<(Rules, u32)> {
-    use super::super::expr::Ast;
-    use super::super::rules::Case;
-    let reason = rules
-        .cases
-        .iter()
-        .filter(|case| case.class == Class::Reject)
-        .filter_map(|case| case.reason)
-        .min()?;
-    let mut cases: Vec<Case> = Vec::new();
-    let mut kept = std::collections::BTreeSet::new();
-    for case in &rules.cases {
-        if let Some(used) = case.reason
-            && kept.insert(used)
-        {
-            cases.push(Case {
-                rule: None,
-                when: Ast::Bool(false),
-                ..case.clone()
-            });
-        }
-    }
-    cases.push(Case {
-        rule: None,
-        when: Ast::Bool(true),
-        class: Class::Reject,
-        reason: Some(reason),
-        post: BTreeMap::new(),
-        outbox: Vec::new(),
-    });
-    Some((
-        Rules {
-            cases,
-            ..rules.clone()
-        },
-        reason,
-    ))
 }

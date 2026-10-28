@@ -95,6 +95,24 @@ for worker/dispatch changes. Those tests require explicit host prerequisites,
 resource limits and owned cleanup. Useful work and intended hostile controls
 must both pass; skipped host tests leave the corresponding claim open.
 
+The `zal-profiles` workflow runs the finite-library, notation/Lens, category,
+relational-profile and feasibility **source controls**. Its category suite may
+explicitly skip tests without a trusted runtime approval. Those skips do not
+qualify a native category provider.
+
+Five relational provider suites remain separate manual native gates:
+`relational_profile/test_live_provider.py` and the vendor `test_backend.py`,
+`test_ladder_adapter.py`, `test_operations.py` and `test_shell.py`, all under
+`integrations/zal/`. They require the exact
+[retained provider sources and integration route](../integrations/zal/relational_profile/README.md),
+a fresh external runtime prepared from that capsule, GHC 9.4.7 and its pinned
+`base` 4.17.2.0, `containers` 0.6.7, `aeson` 2.1.2.1, `text` 2.0.2 and
+`bytestring` 0.11.5.2 packages. Preserve the source inventory, actual build
+record and binary hashes, runtime/scratch bindings and independent replay.
+The retained historical validation is not a pass on this checkout. A whole
+ATDD or source-workflow pass without these native prerequisites leaves their
+full-2.7 qualification open; registry reasons are not exemptions from it.
+
 ## Handoff and final qualification
 
 Choose one gap ID and state its exact source, inputs, expected behavior and

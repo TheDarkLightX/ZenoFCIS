@@ -74,17 +74,21 @@ the imperative shell. A passing stage check is not a release receipt.
 
 ## Release status
 
-**2.6.0** is the current release source. It builds on the first stable V2
-line, 2.3.0; the [2.6.0 release notes](docs/RELEASE_NOTES.md) describe the
-new arithmetic, search, loop and contract-judge features. Final qualification
-and publication remain separate release gates. The previous release,
-[2.5.0](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.5.0), is
-published. The release set provides the **Linux x86_64 GNU CLI** (glibc 2.39
-or later). A **macOS on Apple silicon** (`aarch64-apple-darwin`) binary will
-follow native platform validation. Every published archive must pass its
-build, custody and installed-binary checks. See
-[installation](docs/INSTALLATION.md) and the
-[workflow qualification scope](docs/FEATURE_MATRIX.md#host-platforms).
+This checkout declares development version **2.7.0-rc.1**. Full 2.7
+qualification is incomplete; the version string does not establish a qualified
+release candidate. The [continuation guide](docs/DEVELOPMENT_27.md) and
+[gap register](docs/FACTORY_GAPS_27.md) describe the work still required.
+
+The earlier [**2.6.0 release**](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.6.0)
+is published. Its [release notes](docs/RELEASE_NOTES.md) describe the
+arithmetic, search, loop and contract-judge features. Downloads include the
+**Linux x86_64 GNU CLI** (glibc 2.39 or later), **macOS on Apple silicon**
+(the `macos1` update) and **Windows x64**, plus offline Rustdoc. Each platform
+has its own source, checksum and qualification record; these artifacts do not
+qualify this development checkout. See [installation](docs/INSTALLATION.md)
+and the [host scope](docs/FEATURE_MATRIX.md#host-platforms). The earlier
+[2.5.0 release](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.5.0)
+is also published.
 
 [Release assurance](docs/RELEASE_ASSURANCE.md) describes the required checks
 and trusted assumptions. Source verification and qualification, exact-head
@@ -104,8 +108,10 @@ The normal V2 library route declares a complete checked program. It is
 available in the 2.6.0 release, both with default features and with
 `default-features = false`. The historical `1.1.0` package has its own V1 API.
 
-After qualification and publication, check out the `v2.6.0` tag as the [installation guide](docs/INSTALLATION.md)
-describes, then bind the dependency to that source:
+Use the source revision matching your published 2.6.0 archive, as the
+[installation guide](docs/INSTALLATION.md#matching-source-and-current-library-api)
+describes; the macOS update has a separate build source. Bind the dependency
+to that source:
 
 ```toml
 [dependencies]
