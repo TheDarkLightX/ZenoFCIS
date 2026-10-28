@@ -1,0 +1,14 @@
+zal 2;
+# A one-step observation at the initial state cannot see the later leak.
+machine relational_delayed_leak;
+states ready;
+events copy, reveal;
+context allowed, noise;
+var hidden in 0..=1 initially 0;
+var public_value in 0..=1 initially 0;
+var secret in 0..=1 initially 0;
+initial ready;
+step atomic; frame control_and_variables;
+default reject not_allowed unchanged;
+rule remember: ready + copy [allowed] -> accept ready, hidden = secret;
+rule publish: ready + reveal [allowed] -> accept ready, public_value = hidden;

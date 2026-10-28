@@ -1,0 +1,22 @@
+{
+  "initial_secret_values": {
+    "secret": [
+      0,
+      1
+    ]
+  },
+  "model_revision": "fe1ccad61fc1f8ecd980eb244587ac8b3f361f900ae97f5d8c8bc3556703a56f",
+  "observe": {
+    "control": true,
+    "variables": [
+      "public_value"
+    ]
+  },
+  "public_context": [
+    "allowed"
+  ],
+  "schema": "zal/relational-observation/1",
+  "secret_context": [
+    "noise"
+  ]
+}

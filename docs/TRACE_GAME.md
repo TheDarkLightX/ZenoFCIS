@@ -12,6 +12,12 @@ separate checker verifies the certificate. The workflow can select one guard
 before execution, certify a reactive strategy, or show why no controller in a
 declared class can meet a requirement. These are different evidence kinds.
 
+[ZAL observation contracts](zal/OBSERVATION_CONTRACTS.md) connect context-free
+ZAL models to the existing arena checker. They add explicit observations,
+bounded service and abstract cost monitors, plus generated arena and belief
+diagrams. The Python adapter remains a separate trust boundary from native
+contract execution.
+
 ## A journey
 
 For a caller-supplied contract game, use:

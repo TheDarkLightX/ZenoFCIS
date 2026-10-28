@@ -1,0 +1,857 @@
+{
+  "arena": {
+    "nodes": [
+      {
+        "edges": [
+          [
+            "apply",
+            1
+          ],
+          [
+            "drop",
+            2
+          ]
+        ],
+        "observation": "{\"phase\":\"world\",\"view\":\"pending\"}",
+        "owner": 1
+      },
+      {
+        "edges": [
+          [
+            "retry",
+            3
+          ],
+          [
+            "stop",
+            4
+          ]
+        ],
+        "observation": "{\"phase\":\"world\",\"view\":\"unknown\"}",
+        "owner": 0
+      },
+      {
+        "edges": [
+          [
+            "retry",
+            5
+          ],
+          [
+            "stop",
+            6
+          ]
+        ],
+        "observation": "{\"phase\":\"world\",\"view\":\"unknown\"}",
+        "owner": 0
+      },
+      {
+        "edges": [
+          [
+            "continue",
+            7
+          ]
+        ],
+        "observation": "{\"action\":\"retry\",\"outcome\":\"Accept\",\"phase\":\"response\",\"reason\":null}",
+        "owner": 1
+      },
+      {
+        "edges": [
+          [
+            "continue",
+            7
+          ]
+        ],
+        "observation": "{\"action\":\"stop\",\"outcome\":\"Accept\",\"phase\":\"response\",\"reason\":null}",
+        "owner": 1
+      },
+      {
+        "edges": [
+          [
+            "continue",
+            7
+          ]
+        ],
+        "observation": "{\"action\":\"retry\",\"outcome\":\"Accept\",\"phase\":\"response\",\"reason\":null}",
+        "owner": 1
+      },
+      {
+        "edges": [
+          [
+            "continue",
+            8
+          ]
+        ],
+        "observation": "{\"action\":\"stop\",\"outcome\":\"Accept\",\"phase\":\"response\",\"reason\":null}",
+        "owner": 1
+      },
+      {
+        "edges": [
+          [
+            "hold",
+            7
+          ]
+        ],
+        "observation": "{\"phase\":\"world\",\"view\":\"complete\"}",
+        "owner": 1
+      },
+      {
+        "edges": [
+          [
+            "hold",
+            8
+          ]
+        ],
+        "observation": "{\"phase\":\"world\",\"view\":\"violation\"}",
+        "owner": 1
+      }
+    ],
+    "objective": {
+      "kind": "safety",
+      "states": [
+        8
+      ]
+    },
+    "observation": "partial",
+    "roots": [
+      0
+    ],
+    "schema": "zeno-fcis/arena/1"
+  },
+  "arena_digest": "e981f6fe0f5cc02bb34876e1a8ab4c2f3c870a6850e9ea43e1ce4bdc28c90f48",
+  "arena_edges": [
+    {
+      "action": "apply",
+      "id": "e1",
+      "source": 0,
+      "target": 1
+    },
+    {
+      "action": "drop",
+      "id": "e2",
+      "source": 0,
+      "target": 2
+    },
+    {
+      "action": "retry",
+      "id": "e3",
+      "source": 1,
+      "target": 3
+    },
+    {
+      "action": "stop",
+      "id": "e4",
+      "source": 1,
+      "target": 4
+    },
+    {
+      "action": "retry",
+      "id": "e5",
+      "source": 2,
+      "target": 5
+    },
+    {
+      "action": "stop",
+      "id": "e6",
+      "source": 2,
+      "target": 6
+    },
+    {
+      "action": "continue",
+      "id": "e7",
+      "source": 3,
+      "target": 7
+    },
+    {
+      "action": "continue",
+      "id": "e8",
+      "source": 4,
+      "target": 7
+    },
+    {
+      "action": "continue",
+      "id": "e9",
+      "source": 5,
+      "target": 7
+    },
+    {
+      "action": "continue",
+      "id": "e10",
+      "source": 6,
+      "target": 8
+    },
+    {
+      "action": "hold",
+      "id": "e11",
+      "source": 7,
+      "target": 7
+    },
+    {
+      "action": "hold",
+      "id": "e12",
+      "source": 8,
+      "target": 8
+    }
+  ],
+  "certificate_digest": "4cd733516e51978cc4613915ce6e85f53e1c08c8f460d8539930db72563de37b",
+  "compilation": {
+    "arena": {
+      "nodes": [
+        {
+          "edges": [
+            [
+              "apply",
+              1
+            ],
+            [
+              "drop",
+              2
+            ]
+          ],
+          "observation": "{\"phase\":\"world\",\"view\":\"pending\"}",
+          "owner": 1
+        },
+        {
+          "edges": [
+            [
+              "retry",
+              3
+            ],
+            [
+              "stop",
+              4
+            ]
+          ],
+          "observation": "{\"phase\":\"world\",\"view\":\"unknown\"}",
+          "owner": 0
+        },
+        {
+          "edges": [
+            [
+              "retry",
+              5
+            ],
+            [
+              "stop",
+              6
+            ]
+          ],
+          "observation": "{\"phase\":\"world\",\"view\":\"unknown\"}",
+          "owner": 0
+        },
+        {
+          "edges": [
+            [
+              "continue",
+              7
+            ]
+          ],
+          "observation": "{\"action\":\"retry\",\"outcome\":\"Accept\",\"phase\":\"response\",\"reason\":null}",
+          "owner": 1
+        },
+        {
+          "edges": [
+            [
+              "continue",
+              7
+            ]
+          ],
+          "observation": "{\"action\":\"stop\",\"outcome\":\"Accept\",\"phase\":\"response\",\"reason\":null}",
+          "owner": 1
+        },
+        {
+          "edges": [
+            [
+              "continue",
+              7
+            ]
+          ],
+          "observation": "{\"action\":\"retry\",\"outcome\":\"Accept\",\"phase\":\"response\",\"reason\":null}",
+          "owner": 1
+        },
+        {
+          "edges": [
+            [
+              "continue",
+              8
+            ]
+          ],
+          "observation": "{\"action\":\"stop\",\"outcome\":\"Accept\",\"phase\":\"response\",\"reason\":null}",
+          "owner": 1
+        },
+        {
+          "edges": [
+            [
+              "hold",
+              7
+            ]
+          ],
+          "observation": "{\"phase\":\"world\",\"view\":\"complete\"}",
+          "owner": 1
+        },
+        {
+          "edges": [
+            [
+              "hold",
+              8
+            ]
+          ],
+          "observation": "{\"phase\":\"world\",\"view\":\"violation\"}",
+          "owner": 1
+        }
+      ],
+      "objective": {
+        "kind": "safety",
+        "states": [
+          8
+        ]
+      },
+      "observation": "partial",
+      "roots": [
+        0
+      ],
+      "schema": "zeno-fcis/arena/1"
+    },
+    "excluded_events": [
+      {
+        "events": [
+          "apply",
+          "drop",
+          "hold"
+        ],
+        "state": "absent"
+      },
+      {
+        "events": [
+          "apply",
+          "drop",
+          "hold"
+        ],
+        "state": "applied"
+      },
+      {
+        "events": [
+          "apply",
+          "drop",
+          "retry",
+          "stop"
+        ],
+        "state": "bad"
+      },
+      {
+        "events": [
+          "apply",
+          "drop",
+          "retry",
+          "stop"
+        ],
+        "state": "good"
+      },
+      {
+        "events": [
+          "hold",
+          "retry",
+          "stop"
+        ],
+        "state": "start"
+      }
+    ],
+    "nodes": [
+      {
+        "elapsed": 0,
+        "phase": "world",
+        "served": false,
+        "spent": 0,
+        "state": "start"
+      },
+      {
+        "elapsed": 1,
+        "phase": "world",
+        "served": false,
+        "spent": 0,
+        "state": "applied"
+      },
+      {
+        "elapsed": 1,
+        "phase": "world",
+        "served": false,
+        "spent": 0,
+        "state": "absent"
+      },
+      {
+        "elapsed": 1,
+        "event": "retry",
+        "outcome": "Accept",
+        "phase": "response",
+        "reason": null,
+        "served": false,
+        "spent": 0,
+        "state": "applied"
+      },
+      {
+        "elapsed": 1,
+        "event": "stop",
+        "outcome": "Accept",
+        "phase": "response",
+        "reason": null,
+        "served": false,
+        "spent": 0,
+        "state": "applied"
+      },
+      {
+        "elapsed": 1,
+        "event": "retry",
+        "outcome": "Accept",
+        "phase": "response",
+        "reason": null,
+        "served": false,
+        "spent": 0,
+        "state": "absent"
+      },
+      {
+        "elapsed": 1,
+        "event": "stop",
+        "outcome": "Accept",
+        "phase": "response",
+        "reason": null,
+        "served": false,
+        "spent": 0,
+        "state": "absent"
+      },
+      {
+        "elapsed": 2,
+        "phase": "world",
+        "served": true,
+        "spent": 0,
+        "state": "good"
+      },
+      {
+        "elapsed": 2,
+        "phase": "world",
+        "served": false,
+        "spent": 0,
+        "state": "bad"
+      }
+    ],
+    "transitions": [
+      {
+        "cost_units": 0,
+        "event": "apply",
+        "outcome": {
+          "class": "Accept",
+          "reason": null,
+          "rule": "effect_applied",
+          "state": "applied"
+        },
+        "source": 0,
+        "target": 1
+      },
+      {
+        "cost_units": 0,
+        "event": "drop",
+        "outcome": {
+          "class": "Accept",
+          "reason": null,
+          "rule": "effect_absent",
+          "state": "absent"
+        },
+        "source": 0,
+        "target": 2
+      },
+      {
+        "cost_units": 2,
+        "event": "retry",
+        "outcome": {
+          "class": "Accept",
+          "reason": null,
+          "rule": "deduplicate_effect",
+          "state": "good"
+        },
+        "source": 1,
+        "target": 3
+      },
+      {
+        "cost_units": 1,
+        "event": "stop",
+        "outcome": {
+          "class": "Accept",
+          "reason": null,
+          "rule": "retain_effect",
+          "state": "good"
+        },
+        "source": 1,
+        "target": 4
+      },
+      {
+        "cost_units": 2,
+        "event": "retry",
+        "outcome": {
+          "class": "Accept",
+          "reason": null,
+          "rule": "complete_effect",
+          "state": "good"
+        },
+        "source": 2,
+        "target": 5
+      },
+      {
+        "cost_units": 1,
+        "event": "stop",
+        "outcome": {
+          "class": "Accept",
+          "reason": null,
+          "rule": "abandon_effect",
+          "state": "bad"
+        },
+        "source": 2,
+        "target": 6
+      },
+      {
+        "cost_units": 0,
+        "event": "hold",
+        "outcome": {
+          "class": "Accept",
+          "reason": null,
+          "rule": "finished",
+          "state": "good"
+        },
+        "source": 7,
+        "target": 7
+      },
+      {
+        "cost_units": 0,
+        "event": "hold",
+        "outcome": {
+          "class": "Accept",
+          "reason": null,
+          "rule": "violated",
+          "state": "bad"
+        },
+        "source": 8,
+        "target": 8
+      }
+    ],
+    "work": 55
+  },
+  "knowledge": {
+    "edges": [
+      {
+        "action": "{\"phase\":\"world\",\"view\":\"unknown\"}",
+        "id": "e1",
+        "source": 0,
+        "target": 1
+      },
+      {
+        "action": "retry",
+        "id": "e2",
+        "source": 1,
+        "target": 2
+      },
+      {
+        "action": "stop",
+        "id": "e3",
+        "source": 1,
+        "target": 3
+      },
+      {
+        "action": "{\"action\":\"retry\",\"outcome\":\"Accept\",\"phase\":\"response\",\"reason\":null}",
+        "id": "e4",
+        "source": 2,
+        "target": 4
+      },
+      {
+        "action": "{\"action\":\"stop\",\"outcome\":\"Accept\",\"phase\":\"response\",\"reason\":null}",
+        "id": "e5",
+        "source": 3,
+        "target": 5
+      },
+      {
+        "action": "{\"phase\":\"world\",\"view\":\"complete\"}",
+        "id": "e6",
+        "source": 4,
+        "target": 6
+      },
+      {
+        "action": "{\"phase\":\"world\",\"view\":\"complete\"}",
+        "id": "e7",
+        "source": 5,
+        "target": 6
+      },
+      {
+        "action": "{\"phase\":\"world\",\"view\":\"violation\"}",
+        "id": "e8",
+        "source": 5,
+        "target": 7
+      },
+      {
+        "action": "{\"phase\":\"world\",\"view\":\"complete\"}",
+        "id": "e9",
+        "source": 6,
+        "target": 6
+      },
+      {
+        "action": "{\"phase\":\"world\",\"view\":\"violation\"}",
+        "id": "e10",
+        "source": 7,
+        "target": 7
+      }
+    ],
+    "graph": {
+      "bad": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "edges": [
+        [
+          [
+            "{\"phase\":\"world\",\"view\":\"unknown\"}",
+            1
+          ]
+        ],
+        [
+          [
+            "retry",
+            2
+          ],
+          [
+            "stop",
+            3
+          ]
+        ],
+        [
+          [
+            "{\"action\":\"retry\",\"outcome\":\"Accept\",\"phase\":\"response\",\"reason\":null}",
+            4
+          ]
+        ],
+        [
+          [
+            "{\"action\":\"stop\",\"outcome\":\"Accept\",\"phase\":\"response\",\"reason\":null}",
+            5
+          ]
+        ],
+        [
+          [
+            "{\"phase\":\"world\",\"view\":\"complete\"}",
+            6
+          ]
+        ],
+        [
+          [
+            "{\"phase\":\"world\",\"view\":\"complete\"}",
+            6
+          ],
+          [
+            "{\"phase\":\"world\",\"view\":\"violation\"}",
+            7
+          ]
+        ],
+        [
+          [
+            "{\"phase\":\"world\",\"view\":\"complete\"}",
+            6
+          ]
+        ],
+        [
+          [
+            "{\"phase\":\"world\",\"view\":\"violation\"}",
+            7
+          ]
+        ]
+      ],
+      "nodes": [
+        {
+          "action": null,
+          "belief": [
+            0
+          ]
+        },
+        {
+          "action": null,
+          "belief": [
+            1,
+            2
+          ]
+        },
+        {
+          "action": "retry",
+          "belief": [
+            1,
+            2
+          ]
+        },
+        {
+          "action": "stop",
+          "belief": [
+            1,
+            2
+          ]
+        },
+        {
+          "action": null,
+          "belief": [
+            3,
+            5
+          ]
+        },
+        {
+          "action": null,
+          "belief": [
+            4,
+            6
+          ]
+        },
+        {
+          "action": null,
+          "belief": [
+            7
+          ]
+        },
+        {
+          "action": null,
+          "belief": [
+            8
+          ]
+        }
+      ],
+      "owners": [
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "roots": [
+        0
+      ]
+    }
+  },
+  "labels": {
+    "0": "start",
+    "1": "applied",
+    "2": "absent",
+    "3": "applied: retry reply",
+    "4": "applied: stop reply",
+    "5": "absent: retry reply",
+    "6": "absent: stop reply",
+    "7": "good",
+    "8": "bad"
+  },
+  "model_revision": "8fbd5fb6704cb57ffe964f061fb970a42f238af423a6bc90ca38760bd82e60d2",
+  "profile": {
+    "bad_states": [
+      "bad"
+    ],
+    "costs": [
+      {
+        "event": "apply",
+        "units": 0
+      },
+      {
+        "event": "drop",
+        "units": 0
+      },
+      {
+        "event": "retry",
+        "units": 2
+      },
+      {
+        "event": "stop",
+        "units": 1
+      },
+      {
+        "event": "hold",
+        "units": 0
+      }
+    ],
+    "max_cost": null,
+    "model_revision": "8fbd5fb6704cb57ffe964f061fb970a42f238af423a6bc90ca38760bd82e60d2",
+    "observation": "partial",
+    "response_bound": 2,
+    "schema": "zal/observation-game/1",
+    "service_states": [
+      "good"
+    ],
+    "states": [
+      {
+        "events": [
+          "apply",
+          "drop"
+        ],
+        "observation": "pending",
+        "owner": 1,
+        "state": "start"
+      },
+      {
+        "events": [
+          "retry",
+          "stop"
+        ],
+        "observation": "unknown",
+        "owner": 0,
+        "state": "applied"
+      },
+      {
+        "events": [
+          "retry",
+          "stop"
+        ],
+        "observation": "unknown",
+        "owner": 0,
+        "state": "absent"
+      },
+      {
+        "events": [
+          "hold"
+        ],
+        "observation": "complete",
+        "owner": 1,
+        "state": "good"
+      },
+      {
+        "events": [
+          "hold"
+        ],
+        "observation": "violation",
+        "owner": 1,
+        "state": "bad"
+      }
+    ]
+  },
+  "profile_digest": "655d207e92e1bb6f0136b0045ab3e9f0c3e051ebaef92867bc5b18251e9dbd19",
+  "schema": "zal/observation-diagrams/1",
+  "scope": "exact finite-model presentation; no native execution or runtime authority",
+  "verdict": {
+    "evidence": "certified winning strategy",
+    "losing_concrete_roots": [],
+    "losing_knowledge_roots": [],
+    "losing_roots": [],
+    "objective": "safety",
+    "root_mapping": [
+      {
+        "concrete_roots": [
+          0
+        ],
+        "knowledge_root": 0
+      }
+    ],
+    "scope": "sure winning in the declared finite arena; no native execution or runtime authority",
+    "states": 8,
+    "winning_concrete_roots": [
+      0
+    ],
+    "winning_knowledge_roots": [
+      0
+    ],
+    "winning_roots": [
+      0
+    ]
+  }
+}

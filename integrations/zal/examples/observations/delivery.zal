@@ -1,0 +1,19 @@
+# A finite model of the physical worlds behind a lost delivery reply.
+# This fixture assumes one request and the declared retry/stop action alphabet.
+# It is not a model of an actual destination or a payment authorization.
+zal 1;
+machine delivery;
+states start, applied, absent, good, bad;
+events apply, drop, retry, stop, hold;
+context none;
+initial start;
+step atomic; frame control_only;
+default reject not_enabled unchanged;
+rule effect_applied: start + apply [true] -> accept applied;
+rule effect_absent: start + drop [true] -> accept absent;
+rule duplicate_effect: applied + retry [true] -> accept bad;
+rule retain_effect: applied + stop [true] -> accept good;
+rule complete_effect: absent + retry [true] -> accept good;
+rule abandon_effect: absent + stop [true] -> accept bad;
+rule finished: good + hold [true] -> accept good;
+rule violated: bad + hold [true] -> accept bad;

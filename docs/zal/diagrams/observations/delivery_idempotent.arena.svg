@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="1511" viewBox="0 0 1160 1511" role="img" aria-labelledby="title description">
+<title id="title">ZAL observation game · partial observation</title>
+<desc id="description">Every node and edge of the declared finite graph is shown. Edge IDs identify exact transitions in the legend and JSON companion. Blue denotes controller choice; gray denotes environment choice. Red marks a bad state. Root and winning annotations are also written as text.</desc>
+<style>text{font-family:ui-sans-serif,system-ui,sans-serif;fill:#172438}.title{font-size:27px;font-weight:700}.body{font-size:14px}.small{font-size:12px;fill:#41546a}.name{font-size:15px;font-weight:650}.edgeid{font-size:11px;font-weight:700;fill:#273f59}.legend{font-size:14px}.node{stroke-width:2}.edge{fill:none;stroke:#70849b;stroke-width:1.5}</style>
+<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#70849b"/></marker></defs>
+<rect width="1160" height="1511" fill="#f8fafc"/>
+<text x="36" y="46" class="title">ZAL observation game · partial observation</text>
+<text x="36" y="75" class="body">Exact finite graph • blue: controller • gray: environment • red: bad • roots are marked</text>
+<text x="36" y="98" class="small">Edge IDs refer to the complete legend. Full labels and observations are retained in the JSON companion.</text>
+<path class="edge" d="M 580,246 C 580,296 440,296 440,346" marker-end="url(#arrow)" data-edge="e1" data-source="0" data-target="1"><title>apply</title></path>
+<rect x="545" y="266" width="32" height="16" rx="4" fill="#f8fafc"/>
+<text x="550" y="278" class="edgeid">e1</text>
+<path class="edge" d="M 580,246 C 580,296 720,296 720,346" marker-end="url(#arrow)" data-edge="e2" data-source="0" data-target="2"><title>drop</title></path>
+<rect x="605" y="266" width="32" height="16" rx="4" fill="#f8fafc"/>
+<text x="610" y="278" class="edgeid">e2</text>
+<path class="edge" d="M 440,454 C 440,504 160,504 160,554" marker-end="url(#arrow)" data-edge="e3" data-source="1" data-target="3"><title>retry</title></path>
+<rect x="375" y="474" width="32" height="16" rx="4" fill="#f8fafc"/>
+<text x="380" y="486" class="edgeid">e3</text>
+<path class="edge" d="M 440,454 C 440,504 440,504 440,554" marker-end="url(#arrow)" data-edge="e4" data-source="1" data-target="4"><title>stop</title></path>
+<rect x="435" y="474" width="32" height="16" rx="4" fill="#f8fafc"/>
+<text x="440" y="486" class="edgeid">e4</text>
+<path class="edge" d="M 720,454 C 720,504 720,504 720,554" marker-end="url(#arrow)" data-edge="e5" data-source="2" data-target="5"><title>retry</title></path>
+<rect x="715" y="474" width="32" height="16" rx="4" fill="#f8fafc"/>
+<text x="720" y="486" class="edgeid">e5</text>
+<path class="edge" d="M 720,454 C 720,504 1000,504 1000,554" marker-end="url(#arrow)" data-edge="e6" data-source="2" data-target="6"><title>stop</title></path>
+<rect x="775" y="474" width="32" height="16" rx="4" fill="#f8fafc"/>
+<text x="780" y="486" class="edgeid">e6</text>
+<path class="edge" d="M 160,662 C 160,712 440,712 440,762" marker-end="url(#arrow)" data-edge="e7" data-source="3" data-target="7"><title>continue</title></path>
+<rect x="215" y="682" width="32" height="16" rx="4" fill="#f8fafc"/>
+<text x="220" y="694" class="edgeid">e7</text>
+<path class="edge" d="M 440,662 C 440,712 440,712 440,762" marker-end="url(#arrow)" data-edge="e8" data-source="4" data-target="7"><title>continue</title></path>
+<rect x="435" y="682" width="32" height="16" rx="4" fill="#f8fafc"/>
+<text x="440" y="694" class="edgeid">e8</text>
+<path class="edge" d="M 720,662 C 720,712 440,712 440,762" marker-end="url(#arrow)" data-edge="e9" data-source="5" data-target="7"><title>continue</title></path>
+<rect x="655" y="682" width="32" height="16" rx="4" fill="#f8fafc"/>
+<text x="660" y="694" class="edgeid">e9</text>
+<path class="edge" d="M 1000,662 C 1000,712 720,712 720,762" marker-end="url(#arrow)" data-edge="e10" data-source="6" data-target="8"><title>continue</title></path>
+<rect x="935" y="682" width="32" height="16" rx="4" fill="#f8fafc"/>
+<text x="940" y="694" class="edgeid">e10</text>
+<path class="edge" d="M 320,787 C 290,763 290,864 320,840" marker-end="url(#arrow)" data-edge="e11" data-source="7" data-target="7"><title>hold</title></path>
+<rect x="286" y="802" width="32" height="16" rx="4" fill="#f8fafc"/>
+<text x="291" y="814" class="edgeid">e11</text>
+<path class="edge" d="M 840,787 C 870,763 870,864 840,840" marker-end="url(#arrow)" data-edge="e12" data-source="8" data-target="8"><title>hold</title></path>
+<rect x="842" y="802" width="32" height="16" rx="4" fill="#f8fafc"/>
+<text x="847" y="814" class="edgeid">e12</text>
+<g data-node="0"><title>start; observation: {"phase":"world","view":"pending"}</title><rect class="node" x="460" y="138" width="240" height="108" rx="11" fill="#eef1f5" stroke="#718196"/>
+<text x="472" y="159" class="small">s0 · environment · root</text>
+<text x="472" y="181" class="name">start</text>
+<text x="472" y="229" class="small">observe: pending</text>
+</g>
+<g data-node="1"><title>applied; observation: {"phase":"world","view":"unknown"}</title><rect class="node" x="320" y="346" width="240" height="108" rx="11" fill="#eaf2ff" stroke="#4377b8"/>
+<text x="332" y="367" class="small">s1 · controller</text>
+<text x="332" y="389" class="name">applied</text>
+<text x="332" y="437" class="small">observe: unknown</text>
+</g>
+<g data-node="2"><title>absent; observation: {"phase":"world","view":"unknown"}</title><rect class="node" x="600" y="346" width="240" height="108" rx="11" fill="#eaf2ff" stroke="#4377b8"/>
+<text x="612" y="367" class="small">s2 · controller</text>
+<text x="612" y="389" class="name">absent</text>
+<text x="612" y="437" class="small">observe: unknown</text>
+</g>
+<g data-node="3"><title>applied: retry reply; observation: {"action":"retry","outcome":"Accept","phase":"response","reason":null}</title><rect class="node" x="40" y="554" width="240" height="108" rx="11" fill="#eef1f5" stroke="#718196"/>
+<text x="52" y="575" class="small">s3 · environment</text>
+<text x="52" y="597" class="name">applied: retry reply</text>
+<text x="52" y="645" class="small">observe: retry → Accept</text>
+</g>
+<g data-node="4"><title>applied: stop reply; observation: {"action":"stop","outcome":"Accept","phase":"response","reason":null}</title><rect class="node" x="320" y="554" width="240" height="108" rx="11" fill="#eef1f5" stroke="#718196"/>
+<text x="332" y="575" class="small">s4 · environment</text>
+<text x="332" y="597" class="name">applied: stop reply</text>
+<text x="332" y="645" class="small">observe: stop → Accept</text>
+</g>
+<g data-node="5"><title>absent: retry reply; observation: {"action":"retry","outcome":"Accept","phase":"response","reason":null}</title><rect class="node" x="600" y="554" width="240" height="108" rx="11" fill="#eef1f5" stroke="#718196"/>
+<text x="612" y="575" class="small">s5 · environment</text>
+<text x="612" y="597" class="name">absent: retry reply</text>
+<text x="612" y="645" class="small">observe: retry → Accept</text>
+</g>
+<g data-node="6"><title>absent: stop reply; observation: {"action":"stop","outcome":"Accept","phase":"response","reason":null}</title><rect class="node" x="880" y="554" width="240" height="108" rx="11" fill="#eef1f5" stroke="#718196"/>
+<text x="892" y="575" class="small">s6 · environment</text>
+<text x="892" y="597" class="name">absent: stop reply</text>
+<text x="892" y="645" class="small">observe: stop → Accept</text>
+</g>
+<g data-node="7"><title>good; observation: {"phase":"world","view":"complete"}</title><rect class="node" x="320" y="762" width="240" height="108" rx="11" fill="#eef1f5" stroke="#718196"/>
+<text x="332" y="783" class="small">s7 · environment</text>
+<text x="332" y="805" class="name">good</text>
+<text x="332" y="853" class="small">observe: complete</text>
+</g>
+<g data-node="8"><title>bad; observation: {"phase":"world","view":"violation"}</title><rect class="node" x="600" y="762" width="240" height="108" rx="11" fill="#ffebec" stroke="#bd4553"/>
+<text x="612" y="783" class="small">s8 · environment · BAD</text>
+<text x="612" y="805" class="name">bad</text>
+<text x="612" y="853" class="small">observe: violation</text>
+</g>
+<text x="36" y="955" class="title">Complete transition legend</text>
+<text x="36" y="982" class="body">These rows define every drawn arrow; no state or edge is omitted.</text>
+<text x="36" y="1013" class="name">e1</text>
+<text x="92" y="1013" class="name">s0 → s1</text>
+<text x="240" y="1013" class="legend">apply</text>
+<text x="36" y="1051" class="name">e2</text>
+<text x="92" y="1051" class="name">s0 → s2</text>
+<text x="240" y="1051" class="legend">drop</text>
+<text x="36" y="1089" class="name">e3</text>
+<text x="92" y="1089" class="name">s1 → s3</text>
+<text x="240" y="1089" class="legend">retry</text>
+<text x="36" y="1127" class="name">e4</text>
+<text x="92" y="1127" class="name">s1 → s4</text>
+<text x="240" y="1127" class="legend">stop</text>
+<text x="36" y="1165" class="name">e5</text>
+<text x="92" y="1165" class="name">s2 → s5</text>
+<text x="240" y="1165" class="legend">retry</text>
+<text x="36" y="1203" class="name">e6</text>
+<text x="92" y="1203" class="name">s2 → s6</text>
+<text x="240" y="1203" class="legend">stop</text>
+<text x="36" y="1241" class="name">e7</text>
+<text x="92" y="1241" class="name">s3 → s7</text>
+<text x="240" y="1241" class="legend">continue</text>
+<text x="36" y="1279" class="name">e8</text>
+<text x="92" y="1279" class="name">s4 → s7</text>
+<text x="240" y="1279" class="legend">continue</text>
+<text x="36" y="1317" class="name">e9</text>
+<text x="92" y="1317" class="name">s5 → s7</text>
+<text x="240" y="1317" class="legend">continue</text>
+<text x="36" y="1355" class="name">e10</text>
+<text x="92" y="1355" class="name">s6 → s8</text>
+<text x="240" y="1355" class="legend">continue</text>
+<text x="36" y="1393" class="name">e11</text>
+<text x="92" y="1393" class="name">s7 → s7</text>
+<text x="240" y="1393" class="legend">hold</text>
+<text x="36" y="1431" class="name">e12</text>
+<text x="92" y="1431" class="name">s8 → s8</text>
+<text x="240" y="1431" class="legend">hold</text>
+</svg>

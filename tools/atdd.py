@@ -50,6 +50,23 @@ def historical_oracle(test_filter: str, *, exact: bool = False) -> tuple[str, ..
 
 
 SCENARIOS: dict[str, AcceptanceScenario] = {
+    "zal-observation-contracts": AcceptanceScenario(
+        "Check observation-limited strategies and complete finite paired histories",
+        (("python3", "-B", "-m", "unittest", "discover", "-s", "integrations/zal", "-p", "test_observation*.py"),
+         ("python3", "-B", "-m", "unittest", "discover", "-s", "integrations/zal", "-p", "test_relational_observation.py"),
+         ("python3", "-B", "integrations/zal/observation_diagrams.py",
+          "integrations/zal/examples/observations/delivery.zal", "--profile",
+          "integrations/zal/examples/observations/delivery.partial.json", "--out",
+          "docs/zal/diagrams/observations", "--name", "delivery_partial", "--check"),
+         ("python3", "-B", "integrations/zal/observation_diagrams.py",
+          "integrations/zal/examples/observations/delivery_idempotent.zal", "--profile",
+          "integrations/zal/examples/observations/delivery_idempotent.partial.json", "--out",
+          "docs/zal/diagrams/observations", "--name", "delivery_idempotent", "--check"),
+         ("python3", "-B", "integrations/zal/observation_diagrams.py",
+          "integrations/zal/examples/observations/relational_delayed_leak.zal", "--profile",
+          "integrations/zal/examples/observations/relational_delayed_leak.json", "--mode", "relational",
+          "--out", "docs/zal/diagrams/observations", "--name", "relational_leak", "--check")),
+    ),
     "app-factory-journey": AcceptanceScenario(
         "Generate and run the checked core, shell, ingress and UI together",
         (("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "template"),

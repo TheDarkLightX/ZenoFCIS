@@ -40,6 +40,9 @@ optional for the file-based journey above.
 
 Read the [specification](SPECIFICATION.md), [exact grammar](GRAMMAR.md),
 and [factory source map](../ZAL_SOURCE_MAP.md).
+Use [observation contracts](OBSERVATION_CONTRACTS.md) to check what a controller
+can know, compare complete finite paired histories, and inspect generated ZAL
+arena and belief diagrams with explicit service and cost bounds.
 Commands below run from the repository root. Python 3.11+ and a POSIX system
 are required for the terminal/shared-file path (`fcntl` advisory locking).
 The Python runtime uses only the standard library. Factory qualification also

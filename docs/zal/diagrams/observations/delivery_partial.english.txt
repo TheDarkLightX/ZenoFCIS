@@ -1,0 +1,16 @@
+ZAL version 1.
+The machine is delivery.
+The states are absent, applied, bad, good, start.
+The events are apply, drop, hold, retry, stop.
+The context observations are none.
+Initially the state is start.
+Each step is atomic. Only the control state may change.
+Otherwise reject because not_enabled and keep the state unchanged.
+Rule abandon_effect: when the state is absent and the event is stop, if true, move to bad.
+Rule complete_effect: when the state is absent and the event is retry, if true, move to good.
+Rule duplicate_effect: when the state is applied and the event is retry, if true, move to bad.
+Rule effect_absent: when the state is start and the event is drop, if true, move to absent.
+Rule effect_applied: when the state is start and the event is apply, if true, move to applied.
+Rule finished: when the state is good and the event is hold, if true, move to good.
+Rule retain_effect: when the state is applied and the event is stop, if true, move to good.
+Rule violated: when the state is bad and the event is hold, if true, move to bad.
