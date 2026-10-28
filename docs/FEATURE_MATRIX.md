@@ -1,8 +1,10 @@
 # ZenoFCIS feature matrix
 
-This matrix covers the current `zeno-fcis` umbrella source API. The workspace
-declares `2.6.0`, the current release source, and the breaking V2 API below
-needs a pinned source dependency on the matching tag, as the
+The workspace declares development version `2.7.0-rc.1`; full qualification
+is incomplete. See the [continuation guide](DEVELOPMENT_27.md) and
+[open requirements](FACTORY_GAPS_27.md). This matrix retains the `2.6.0`
+umbrella API baseline. The breaking V2 API below needs a pinned source
+dependency on the matching tag, as the
 [installation guide](INSTALLATION.md) describes. The historical `1.1.0`
 package and its API stability promise have their own scope. The earlier public
 [2.2.0-rc.1 and 2.3.0-rc.1 candidates](RELEASE_CANDIDATES.md) advertised only
@@ -17,8 +19,11 @@ native callback API.
 
 ## Host platforms
 
-The 2.6.0 release publishes Linux; the macOS binary follows native platform
-validation. The workflow supports these host builds:
+The published [2.6.0 release](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.6.0)
+provides Linux x86_64 GNU, Apple-silicon macOS and Windows x64 CLI archives.
+Its platform additions have separate source, checksum and qualification
+records. Those artifacts do not qualify this changed development checkout.
+This checkout's release workflow supports these host builds:
 
 - Linux x86_64 GNU, on Ubuntu 24.04;
 - macOS on Apple silicon (`aarch64-apple-darwin`, minimum-version field
@@ -36,12 +41,16 @@ bound to the release source and artifact qualifies a host executable.
 | Installed-binary journey | yes | yes |
 | Clippy and tests | yes | portable tests; validation pending |
 | Contained checker runtime | yes | unavailable (exit 2) |
-| `synth verify` execution | yes | blocked (exit 2) |
+| `synth verify` execution | yes | native route; matching host checks required |
 | ATDD, packaged-workspace verification, Verus, Miri, formal tools, Tau kit, OCaml profile | yes | no |
 
-Linux evidence is not claimed for macOS. Intel Macs, Windows and other hosts
-have no executable and are not qualified. See
-[supported hosts](INSTALLATION.md#supported-hosts).
+The release records native synthesis checks and an installed-binary journey
+for its `macos1` update, plus separate Windows native tests with a generated
+durable-counter application. Windows 2.6.0 requires the Microsoft Visual C++
+runtime and does not provide `synth verify` target execution. Linux evidence
+is not extended to either platform. Intel Macs and other unlisted hosts have
+no published executable. See [supported hosts](INSTALLATION.md#supported-hosts)
+and [Windows installation](INSTALLATION.md#install-on-windows-x64).
 
 ## Environment labels
 

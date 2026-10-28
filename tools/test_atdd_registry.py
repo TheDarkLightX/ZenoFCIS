@@ -638,6 +638,22 @@ RUN_INSIDE = {
 }
 # Test files that no scenario or workflow runs, each with its reviewed reason.
 NOT_RUN = {
+    "integrations/zal/relational_profile/test_live_provider.py":
+        "manual native gate: requires explicit ZAL_RELATIONAL_RUNTIME and ZAL_RELATIONAL_SCRATCH, "
+        "the source-bound Haskell provider build and reviewed tool/runtime closure described in "
+        "integrations/zal/relational_profile/README.md; missing runtime is not qualification",
+    "integrations/zal/relational_profile/vendor/test_backend.py":
+        "manual provider gate: custom main requires the built, source-bound Haskell runtime and "
+        "compiler/dependency pins in integrations/zal/relational_profile/vendor/README.md; no CI native pass claimed",
+    "integrations/zal/relational_profile/vendor/test_ladder_adapter.py":
+        "manual provider gate: custom main compares lowering with the actual pinned Haskell runtime; "
+        "integrations/zal/relational_profile/vendor/README.md supplies build prerequisites; native qualification remains open",
+    "integrations/zal/relational_profile/vendor/test_operations.py":
+        "manual provider gate: custom main exercises actual provider operations using the source-bound "
+        "Haskell runtime from integrations/zal/relational_profile/vendor/README.md; source controls do not replace it",
+    "integrations/zal/relational_profile/vendor/test_shell.py":
+        "manual provider gate: custom main checks the native process shell and needs the pinned Haskell "
+        "runtime/tool closure in integrations/zal/relational_profile/vendor/README.md; native qualification remains open",
     "integrations/mcp/test_server.py":
         "manual: needs the pinned MCP SDK and ZENO_FCIS_CLI, as docs/LLM_SYNTHESIS.md shows",
     "integrations/elite_archive/tests/test_archive.py":

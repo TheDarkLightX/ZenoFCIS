@@ -4,6 +4,13 @@ All notable Rust API and packaging changes are recorded here. Canonical
 protocol compatibility is governed separately by the identifiers and versions
 embedded in ZenoFCIS values.
 
+## 2.7.0-rc.1 - Unreleased development
+
+- Preserve the implementation under development and its
+  [continuation guide](docs/DEVELOPMENT_27.md). Full 2.7 qualification remains
+  incomplete; this version string does not establish a qualified candidate or
+  release. The [gap register](docs/FACTORY_GAPS_27.md) records the remaining work.
+
 ## 2.6.0 - 2026-10-24
 
 - All workspace packages are version 2.6.0. The planned 2.5.1 work is

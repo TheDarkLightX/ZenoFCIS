@@ -1,0 +1,43 @@
+name: zal-profiles
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zal-profiles-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-source-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: ${{ github.workspace }}/integrations/zal:${{ github.workspace }}
+    steps:
+      - name: Checkout exact source without retained credentials
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Record Python identity
+        run: python3 --version
+      - name: Finite library source controls
+        run: python3 -B -m unittest discover -s integrations/zal/finite_library -t integrations/zal -p 'test_*.py' -v
+      - name: Notation and Lens source controls
+        run: python3 -B -m unittest discover -s integrations/zal/zal_notation/tests -t integrations/zal -p 'test_*.py' -v
+      - name: Category source and retained-evidence controls
+        # A missing trusted runtime approval remains an explicit unittest skip;
+        # this source job does not qualify the native category provider.
+        run: python3 -B -m unittest discover -s integrations/zal/category_profile -t integrations/zal -p 'test_*.py' -v
+      - name: Relational profile source and refusal controls
+        # The real Haskell replay and its vendor suites need separately pinned
+        # build/runtime inputs; they are not selected or claimed by this job.
+        run: python3 -B -m unittest discover -s integrations/zal/relational_profile -t . -p test_profile.py -v
+      - name: Research feasibility record controls
+        run: python3 -B tools/test_research_feasibility.py
