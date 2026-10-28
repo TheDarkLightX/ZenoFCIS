@@ -241,6 +241,12 @@ checker source identities, budgets, and result bytes. A changed dependency
 makes old replay evidence stale. The binding is integrity and provenance data,
 not authentication or execution authority.
 
+The [revision-bound test obligation](../../test-data/zal-observation-contracts/obligation.json)
+records the exact source commit, artifact digests, finite claim, falsifiers, and
+replay arguments. Its `passed_bounded` status describes the recorded regression
+and mutation tests, not a general correctness proof. Replay arguments are data
+for review; reading or validating the record must not execute them automatically.
+
 ## Foundations and related routes
 
 - [Alpern and Schneider: Defining Liveness](https://www.cs.cornell.edu/fbs/publications/85-650.pdf) explains the safety/liveness decomposition.
