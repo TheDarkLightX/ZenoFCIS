@@ -1,0 +1,666 @@
+{
+  "schema": "zeno-fcis/ordering-types256-profile/1",
+  "namespace": "ordering256_types_harness::",
+  "scope": "Actual unsigned/signed two-word constructors, getters, sign predicate and numeric comparisons; shared actual C1 and mathematical definitions. No other arithmetic, conversions, associated constants, Schema2 or compiler/erasure proof.",
+  "source_hashes": {
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "e3597f7a812840edf2bccf8f8ff3fb3b51e0578b91839825acbb06926bada1c0",
+    "crates/zeno-fcis-value/src/profile2/number256.rs": "b6c714e3af2ac924718d2ba086dc719159805a013544e83e9b44414fe4d9ce9f",
+    "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs": "b46ad54934a0fce69c42202132d44b513bfed2a61d5360e75ab14d97aa1ec04e",
+    "crates/zeno-fcis-value/src/profile2/ordering256.rs": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825",
+    "crates/zeno-fcis-value/src/profile2/ordering_model.rs": "d02708ccbae41434efc8acb8e8bcd7bd30f2abc04b7256bd32d15421c3f1544a",
+    "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs": "4db8c554f26546e2fa1995f393508ab56c22fad3401a88407b241409f229f1b8",
+    "crates/zeno-fcis-value/src/profile2/reference/legacy_wide_model.rs": "98eac195ee436806f7b3d201543400287635e0a3613dafe0ec128a5e3b2409e9",
+    "verification/verus/ordering256_types_harness.rs": "3f249c152d982104cb2712b462cf4038fa87da68f0aa1a69d8cc695af09ffecc"
+  },
+  "native_configuration_exceptions": {
+    "crates/zeno-fcis-value/src/profile2/number256.rs": [
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub struct U256",
+        "reason": "Marks the actual closed unsigned datatype for the pinned verifier frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub struct I256",
+        "reason": "Marks the actual closed signed datatype for the pinned verifier frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl U256 {",
+        "reason": "Marks only the three actual unsigned constructor/view/order methods; no unrelated arithmetic imported."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl I256 {",
+        "reason": "Marks only the four actual signed constructor/view/sign/order methods; no unrelated arithmetic imported."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl U256 {",
+        "reason": "Eager conditional method annotation expansion prevents duplicate specs in the pinned impl rewriter; proof frontend only."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl I256 {",
+        "reason": "Eager conditional method annotation expansion prevents duplicate specs in the pinned impl rewriter; proof frontend only."
+      }
+    ],
+    "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs": [
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_spec)]",
+        "following": "const RADIX: u128",
+        "reason": "Existing proof-only frontend annotation on the unchanged native constant; no executable branch."
+      }
+    ],
+    "verification/verus/ordering256_types_harness.rs": [
+      {
+        "text": "#![cfg_attr(verus_keep_ghost, feature(proc_macro_hygiene, cfg_eval))]",
+        "following": "extern crate alloc;",
+        "reason": "Pinned proof annotation frontend feature, with no native executable branch."
+      }
+    ],
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "#[allow(dead_code)] #[path = \"reference/legacy_scalar.rs\"] mod legacy_scalar;",
+        "reason": "Retained legacy test reference is absent from production and from this proof harness."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "#[path = \"tests.rs\"] mod tests;",
+        "reason": "Retained arithmetic tests are independently run natively; the proof loads only the actual comparator."
+      }
+    ]
+  },
+  "expected_verified": 21,
+  "body_covered_functions": [
+    "ordering256_types_harness::number256::impl&%14::cmp",
+    "ordering256_types_harness::number256::impl&%14::from_words_le",
+    "ordering256_types_harness::number256::impl&%14::words_le",
+    "ordering256_types_harness::number256::impl&%15::bits",
+    "ordering256_types_harness::number256::impl&%15::cmp",
+    "ordering256_types_harness::number256::impl&%15::from_bits",
+    "ordering256_types_harness::number256::impl&%15::is_negative",
+    "ordering256_types_harness::number256::impl&%1::clone",
+    "ordering256_types_harness::number256::impl&%8::clone",
+    "ordering256_types_harness::number256::ordering_model::boundary_witnesses",
+    "ordering256_types_harness::number256::ordering_model::high_half",
+    "ordering256_types_harness::number256::ordering_model::lex_two",
+    "ordering256_types_harness::number256::ordering_model::limbs_bounds",
+    "ordering256_types_harness::number256::ordering_model::sign_bit",
+    "ordering256_types_harness::number256::ordering_model::signed_bounds",
+    "ordering256_types_harness::number256::ordering_model::signed_order",
+    "ordering256_types_harness::number256::ordering_model::unsigned_bounds",
+    "ordering256_types_harness::ordering256::compare"
+  ],
+  "functions": {
+    "ordering256_types_harness::number256::impl&%14::cmp": {
+      "mode": "Exec",
+      "signature_sha256": "f462702a78a683a6857819bd73928fee5c3580285864a0adc560605ab0ba8175",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "2c7baa5de160068b047f5b2ca70a916d41e54ef524314bbf79bed92d70eedb4b",
+      "body_sha256": "8be0ae02f13bc6b8cbf31d23cff8029c4b6825a5bd19fa39414d99bcf248aec5"
+    },
+    "ordering256_types_harness::number256::impl&%14::from_words_le": {
+      "mode": "Exec",
+      "signature_sha256": "a68ea8a4b20c6ca2ee68978a9c743933e2cb7f8bf141108128752ce32d251291",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "9b79764d404fc41a82ca8cb5f52476eb771ec89cc532f237ced6cbdd74b26e73",
+      "body_sha256": "d9a3810028c6913af0ddac7f1a3d0005ddc162d3cf7677382e338e979a487180"
+    },
+    "ordering256_types_harness::number256::impl&%14::words_le": {
+      "mode": "Exec",
+      "signature_sha256": "c7d3de2c0a176f6572da31b5ab1d421746f6e570dc7933a650716f27f72afff2",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "83b108ce53e54b3d091b40b58d1ccf73ec06fa3761eed6a31b0b0633c9b8030d",
+      "body_sha256": "0e9908630df61dc2062ec80f3cc0e33a375d33635287fb287f1f6cd073f171d7"
+    },
+    "ordering256_types_harness::number256::impl&%15::bits": {
+      "mode": "Exec",
+      "signature_sha256": "6f4af4a89610734c90a68cec35ccecfd141400fe13fc192da4a9e2602c5a34fe",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "e7c437c6c88d4481edcfb0ea0ae7551de2a4db93ca08db4d1d9680910ec26bdd",
+      "body_sha256": "3e61a600cc1b87752d1cb27e038aadabc3c77f81399b81f80a8fd570acfaf535"
+    },
+    "ordering256_types_harness::number256::impl&%15::cmp": {
+      "mode": "Exec",
+      "signature_sha256": "b831e5fccbca8a6f6e33a97d0793d5efaf2fa9a1dadab9b4606e305553981a02",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "41557e3a87404f6ed8001b773cce36d7a91884ed3c4101f8896db4969c412f4f",
+      "body_sha256": "5f75bbc661e3f83fd05b209536c209ccf9608e2c440e1530a5a5ff326abac4cb"
+    },
+    "ordering256_types_harness::number256::impl&%15::from_bits": {
+      "mode": "Exec",
+      "signature_sha256": "61cce7ca0c2b01f9abfac07950812cd290f969dc2f2d4e49565f71365a274e49",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "61be122dfec5d4aa65bac9cb3d0018b935d39044d4c1ab1cccd69ec885201970",
+      "body_sha256": "294a4ee17f0a07225f61f88110e05f27ad66f1019898ac844b2ef80c8cdf5128"
+    },
+    "ordering256_types_harness::number256::impl&%15::is_negative": {
+      "mode": "Exec",
+      "signature_sha256": "8cc576748c677e7e591d95d6850786aee343aa5e4226e9d2a0d1944d5ba4d0c5",
+      "requires": 0,
+      "ensures": 2,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "1b1accfb6f1670eb76451c3ca538dc99ccc4e5300ff1b075c10bdbd5a2e7231d",
+      "body_sha256": "25fa5a2d6fdbca412b3f1e9afbad1c0d3f1527d445d56db417a4c045fcdbc9ae"
+    },
+    "ordering256_types_harness::number256::impl&%16::ordering_words": {
+      "mode": "Spec",
+      "signature_sha256": "5a540de6164c25a7a857de8e4ffd0c958d4748366c6e5dc7b1a6add876bcd73f",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "8f9bc87b84c1d6a12acafbb23afdf8f709539bf7a78deeb454d28dd1ac7226fb"
+    },
+    "ordering256_types_harness::number256::impl&%17::ordering_bits": {
+      "mode": "Spec",
+      "signature_sha256": "ca1e94d6e22464f4f23c7758b50abc50587e6ccb9e1d4a3fe311555f3dca3cb9",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "337c11d4c8e1c448609499602a4552e9f365fd8ef816487c6554e4d9b01d1f23"
+    },
+    "ordering256_types_harness::number256::impl&%1::clone": {
+      "mode": "Exec",
+      "signature_sha256": "637ee7ff2bf2bdcf5b4da26043b3cf2bb6c1d98f80dcd557bc76bd1d6f94158e",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "f315b83ef9352359165b11b97d360ef84c00e9bcf91f9c458747a65ab0ae44fe",
+      "body_sha256": "071324736485f316249f9c282ae18f80d7062b0d24f00f41f40038d75be87a4d"
+    },
+    "ordering256_types_harness::number256::impl&%8::clone": {
+      "mode": "Exec",
+      "signature_sha256": "54a62eae628ba0bc799dd17784f36caf185ca289c111c964d9c3f25523748098",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "e7105d3039861425d831508cdbec7733b4436927a26bb4e1f8322c56fb30e82a",
+      "body_sha256": "ce928891cbe8c969edf5d3f184bac5355e1e331284504e3f1bc5abbd0d55611c"
+    },
+    "ordering256_types_harness::number256::ordering_model::boundary_witnesses": {
+      "mode": "Proof",
+      "signature_sha256": "c506630c5c47ba8db01cf1fa2df8d29049dfc58a4a1e7f271c3c53e460250058",
+      "requires": 0,
+      "ensures": 4,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "55cfc8ab4663ed1e5d2815c85164ac8965966612b29805ddead075deba8344d7",
+      "body_sha256": "97afc19eca420d8f76f34de3b4d2a79c6f6514ecedb27edf51ee01cfef49b3fe"
+    },
+    "ordering256_types_harness::number256::ordering_model::half": {
+      "mode": "Spec",
+      "signature_sha256": "37d17814e2363ec9dd355b7b861569863ca17999f857c62ad579bb3c570c125b",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "3d694aa3e5d6a9d182b631f94e07333f614c7b5f5b651f2c6fc70a0c3edf1e9c"
+    },
+    "ordering256_types_harness::number256::ordering_model::high_half": {
+      "mode": "Proof",
+      "signature_sha256": "2e9d61314e384d875c605233efc421aee595c714a80a1f9047f5b4a2426350c3",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "cd8a22a2160ade271ebf23d96e0fb12a01abd7c4a96746ce58983a70d4caf43d",
+      "body_sha256": "f89de8d1a6c936fd58cf5159f7a5ea58165798490c8a64f3dd4d951a57a352ce"
+    },
+    "ordering256_types_harness::number256::ordering_model::integer_order": {
+      "mode": "Spec",
+      "signature_sha256": "ebf4ca9dce8f2fa68c5da15acffbf1e160a75eecdc6c59a7d4af7e131dc42f1e",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "1b9dac06f5a4f1c6e7501db9d71022232c791340bb0d2b17f3f8624814b3ca5c"
+    },
+    "ordering256_types_harness::number256::ordering_model::lex_two": {
+      "mode": "Proof",
+      "signature_sha256": "f51db28092506b4f22b9812f4b847cb0dfa4f06fd23f9bd0990928cee80fb834",
+      "requires": 1,
+      "ensures": 1,
+      "requires_sha256": "07f606efcec7fe4c33a7abe7d671cb883422898af123fe799235c1b1a00aea35",
+      "ensures_sha256": "8834cc614206bec2e43c01c43d2bfb13af3d6ef1a0977ad028febbefb0f4836a",
+      "body_sha256": "17361b4a62807f0652100f48519e11045987c53a2e901002265c524fcb66f8b6"
+    },
+    "ordering256_types_harness::number256::ordering_model::limbs_bounds": {
+      "mode": "Proof",
+      "signature_sha256": "2e9d61314e384d875c605233efc421aee595c714a80a1f9047f5b4a2426350c3",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "553cb4885cf5c32b0fe7c58bc8658491db3fe71453fe975cf0267ba0ea53f06d",
+      "body_sha256": "017907f02deb49f27433618876bc49a93d3d73189e0738681cdee0a77a409cd8"
+    },
+    "ordering256_types_harness::number256::ordering_model::modulus": {
+      "mode": "Spec",
+      "signature_sha256": "37d17814e2363ec9dd355b7b861569863ca17999f857c62ad579bb3c570c125b",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "ef0987db023935f4b677f242bf40dfbbbba5d537862a80c1e8c763b1eeda4af6"
+    },
+    "ordering256_types_harness::number256::ordering_model::radix": {
+      "mode": "Spec",
+      "signature_sha256": "37d17814e2363ec9dd355b7b861569863ca17999f857c62ad579bb3c570c125b",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "176108044a78c9864d778af57671d7681c9861f8cb8ad0dabaa8f28e84be9961"
+    },
+    "ordering256_types_harness::number256::ordering_model::sign_bit": {
+      "mode": "Proof",
+      "signature_sha256": "f4721d350bf56e811cf5b3d85b3d7631552801198fd0384312735a12e6dabf7c",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "05720a1319d4ad552bdceecfcfbc295e012a7e6a1d36466d8fdd92587dfd3d9d",
+      "body_sha256": "34c1206daed2f9a1a893a2e5ae74a271970fd1553940ef9aa662acfe15b629f0"
+    },
+    "ordering256_types_harness::number256::ordering_model::signed": {
+      "mode": "Spec",
+      "signature_sha256": "116f5b835e1b0e725010a52e444e05f09e626b8e8876de2e14d36d00d3ea3815",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "967f282a4153d6f9583d296207c045aa736798223fbba94332f745b18830dfc7"
+    },
+    "ordering256_types_harness::number256::ordering_model::signed_bits": {
+      "mode": "Spec",
+      "signature_sha256": "c48d0ce6b373f2ca82b43d09d425759229b9634c005bfc63d058633cd202c1ad",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "ecae030f61c3b8faa5f72dc6eeece7f8bd6a838b74d4598618672433981c3b0d"
+    },
+    "ordering256_types_harness::number256::ordering_model::signed_bounds": {
+      "mode": "Proof",
+      "signature_sha256": "751930621cdf064e9351875ab2eb9dfe10727f489459b8244d28e9a0b460d998",
+      "requires": 0,
+      "ensures": 2,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "78d2d05906d7108645a53aca63277cde3e471fa45e1222f6793d5e3f8459f57f",
+      "body_sha256": "fa3092705416478fe36f6aa475be2ab2f7e2c860caaa77781fc41d69b6965763"
+    },
+    "ordering256_types_harness::number256::ordering_model::signed_order": {
+      "mode": "Proof",
+      "signature_sha256": "ee986382a8cd61e94ce7dd89601ecc3ea11670a32a2a1b7f23cee5953cd751f0",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "ccb18a12e8740625aa3361e3d33ac4a63990eb3fd595fef497d5c854eab4ce9d",
+      "body_sha256": "7f1f65d07de8a93560c49606e89f88118e56e5cf9e122ee520ff04fc1d966fd0"
+    },
+    "ordering256_types_harness::number256::ordering_model::unsigned": {
+      "mode": "Spec",
+      "signature_sha256": "a324b1fadcd6198c1b39213f1bf1b7230afc529bd02f7ec935e5c8c563c19175",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "364ea9858456c6a114b2a3ed25a38366c796c1af15851fcf61812ff3a5f08b94"
+    },
+    "ordering256_types_harness::number256::ordering_model::unsigned_bounds": {
+      "mode": "Proof",
+      "signature_sha256": "751930621cdf064e9351875ab2eb9dfe10727f489459b8244d28e9a0b460d998",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "5fe2eec3819f87e67637f95e5ce31510682bd8c7424f38bc4960c038aa9fda15",
+      "body_sha256": "70e551dd5c3da3cd93e8f329b537b4bef3dc28b19327fda943e0791320183b94"
+    },
+    "ordering256_types_harness::ordering256::compare": {
+      "mode": "Exec",
+      "signature_sha256": "78a44f12be967f8621f044882c167d8536710b3d40a9f3832733ecf264800b43",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "af7943304ee9d5b24287809d04e1529746bcbcd18dc238f5226bd8c0431df2b3",
+      "body_sha256": "d122f47a2bd0370b648cf5e6091a326e8f873ec67b1b417f14c83178f99e01c7"
+    },
+    "ordering256_types_harness::ordering256::ordering_model::lex_gt": {
+      "mode": "Spec",
+      "signature_sha256": "b5cc9878fc68c7492897d5f053f23befec5b541b3dfc60eb3182e892e39bab6c",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "b9f47fd4077fad9036fd9a21c72bd5ba6bd60f97b56ade4a9f4682491a190485"
+    },
+    "ordering256_types_harness::ordering256::ordering_model::lex_lt": {
+      "mode": "Spec",
+      "signature_sha256": "b5cc9878fc68c7492897d5f053f23befec5b541b3dfc60eb3182e892e39bab6c",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "374e8e43b54e43bc8a21a1b9889a2212487edb2d74b91db4dcc57f2c11c4162b"
+    },
+    "ordering256_types_harness::ordering256::ordering_model::lex_result": {
+      "mode": "Spec",
+      "signature_sha256": "8e69496a27a69fa6fe0eaa2aabac4bb970e593289823f8a097e28b45c67a4831",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "f89010bca1d7ffd8fd818f3739f3a6f3522351696c251d847a81a8073bda1ac3"
+    },
+    "ordering256_types_harness::ordering256::ordering_model::suffix_equal": {
+      "mode": "Spec",
+      "signature_sha256": "fa6494b763cc15b6151ce514c83b6e0b69e4c95af79c01c84e2b41e61aae2ecc",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "e48cb8aea55229efa3fc2f7b0379385e0b62cd1611c7547f98c7f1ccf72a0052"
+    },
+    "ordering256_types_harness::wide::ceiling_value": {
+      "mode": "Spec",
+      "signature_sha256": "0451a586f77f9027e067479771ae6bb97ec1eec6ce1e24ed0659d144a92e4c8e",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "79e5c9962cd11ddeb97d0a1eab555e6f3a191a7f435928e2f5c35e962de87246"
+    },
+    "ordering256_types_harness::wide::floor_value": {
+      "mode": "Spec",
+      "signature_sha256": "0451a586f77f9027e067479771ae6bb97ec1eec6ce1e24ed0659d144a92e4c8e",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "c46c6fc93b68811f84ef4016d6f34cb598b0b5d33b32a9c1b108cbee1c6b4a28"
+    },
+    "ordering256_types_harness::wide::number2": {
+      "mode": "Spec",
+      "signature_sha256": "52c36f78a7dd72121693ff7708afe0343107dd15f7d120a9a558f5ee0afae79c",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "6cb1341dfb32c120078080e8ba45a73a52d65f5d63a431f8644855860ef95cd6"
+    },
+    "ordering256_types_harness::wide::number3": {
+      "mode": "Spec",
+      "signature_sha256": "72f55d661e82e824535969506d4f79f1d37d6686400fbc3c25c4fa0891afb042",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "2213ea5eba9e474a9331318bb4e3349f96ae1dd33502918cde9f4bc4343809d3"
+    },
+    "ordering256_types_harness::wide::scale": {
+      "mode": "Spec",
+      "signature_sha256": "37d17814e2363ec9dd355b7b861569863ca17999f857c62ad579bb3c570c125b",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "d2079666138d02a7a1e88f3b85e0083c6abc1b33c4bfbb37698a81a4bc01f58a"
+    }
+  },
+  "methods": [
+    {
+      "display": "ordering256_types_harness::number256::U256::from_words_le",
+      "vir": "ordering256_types_harness::number256::impl&%14::from_words_le",
+      "parameters": [
+        "words"
+      ],
+      "result": "U256"
+    },
+    {
+      "display": "ordering256_types_harness::number256::U256::words_le",
+      "vir": "ordering256_types_harness::number256::impl&%14::words_le",
+      "parameters": [
+        "U256"
+      ],
+      "result": "words"
+    },
+    {
+      "display": "ordering256_types_harness::number256::U256::cmp",
+      "vir": "ordering256_types_harness::number256::impl&%14::cmp",
+      "parameters": [
+        "U256",
+        "U256"
+      ],
+      "result": "Ordering"
+    },
+    {
+      "display": "ordering256_types_harness::number256::I256::from_bits",
+      "vir": "ordering256_types_harness::number256::impl&%15::from_bits",
+      "parameters": [
+        "U256"
+      ],
+      "result": "I256"
+    },
+    {
+      "display": "ordering256_types_harness::number256::I256::bits",
+      "vir": "ordering256_types_harness::number256::impl&%15::bits",
+      "parameters": [
+        "I256"
+      ],
+      "result": "U256"
+    },
+    {
+      "display": "ordering256_types_harness::number256::I256::is_negative",
+      "vir": "ordering256_types_harness::number256::impl&%15::is_negative",
+      "parameters": [
+        "I256"
+      ],
+      "result": "bool"
+    },
+    {
+      "display": "ordering256_types_harness::number256::I256::cmp",
+      "vir": "ordering256_types_harness::number256::impl&%15::cmp",
+      "parameters": [
+        "I256",
+        "I256"
+      ],
+      "result": "Ordering"
+    },
+    {
+      "display": "ordering256_types_harness::number256::U256::clone",
+      "vir": "ordering256_types_harness::number256::impl&%1::clone",
+      "parameters": [
+        "&U256"
+      ],
+      "result": "U256"
+    },
+    {
+      "display": "ordering256_types_harness::number256::I256::clone",
+      "vir": "ordering256_types_harness::number256::impl&%8::clone",
+      "parameters": [
+        "&I256"
+      ],
+      "result": "I256"
+    }
+  ],
+  "smt_sections": [
+    {
+      "function": "ordering256_types_harness::number256::U256::clone",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 12
+    },
+    {
+      "function": "ordering256_types_harness::number256::I256::clone",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 15
+    },
+    {
+      "function": "ordering256_types_harness::number256::U256::from_words_le",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 24
+    },
+    {
+      "function": "ordering256_types_harness::number256::U256::words_le",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 32
+    },
+    {
+      "function": "ordering256_types_harness::number256::U256::cmp",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 41
+    },
+    {
+      "function": "ordering256_types_harness::number256::I256::from_bits",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 61
+    },
+    {
+      "function": "ordering256_types_harness::number256::I256::bits",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 69
+    },
+    {
+      "function": "ordering256_types_harness::number256::I256::is_negative",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 79
+    },
+    {
+      "function": "ordering256_types_harness::number256::I256::cmp",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 95
+    },
+    {
+      "function": "ordering256_types_harness::number256::ordering_model::limbs_bounds",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 33
+    },
+    {
+      "function": "ordering256_types_harness::number256::ordering_model::lex_two",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 49
+    },
+    {
+      "function": "ordering256_types_harness::number256::ordering_model::sign_bit",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 110
+    },
+    {
+      "function": "ordering256_types_harness::number256::ordering_model::high_half",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 116
+    },
+    {
+      "function": "ordering256_types_harness::number256::ordering_model::unsigned_bounds",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 129
+    },
+    {
+      "function": "ordering256_types_harness::number256::ordering_model::signed_bounds",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 136
+    },
+    {
+      "function": "ordering256_types_harness::number256::ordering_model::signed_order",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 145
+    },
+    {
+      "function": "ordering256_types_harness::number256::ordering_model::boundary_witnesses",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 164
+    },
+    {
+      "function": "ordering256_types_harness::number256::ordering_model::limbs_bounds",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 38
+    },
+    {
+      "function": "ordering256_types_harness::number256::ordering_model::sign_bit",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 113
+    },
+    {
+      "function": "ordering256_types_harness::ordering256::compare",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering256.rs",
+      "line": 21
+    },
+    {
+      "function": "ordering256_types_harness::ordering256::compare",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering256.rs",
+      "line": 13
+    }
+  ],
+  "controls": [
+    {
+      "name": "unsigned_constructor_swaps_limbs",
+      "type": "U256",
+      "method": "from_words_le",
+      "old": "Self(words)",
+      "new": "Self([words[1], words[0]])"
+    },
+    {
+      "name": "unsigned_getter_drops_high",
+      "type": "U256",
+      "method": "words_le",
+      "old": "        self.0\n",
+      "new": "        [self.0[0], 0]\n"
+    },
+    {
+      "name": "unsigned_order_reversed",
+      "type": "U256",
+      "method": "cmp",
+      "old": "compare(&self.0, &other.0)",
+      "new": "compare(&other.0, &self.0)"
+    },
+    {
+      "name": "signed_constructor_zeroes_bits",
+      "type": "I256",
+      "method": "from_bits",
+      "old": "Self(bits)",
+      "new": "Self(U256([0, 0]))"
+    },
+    {
+      "name": "signed_getter_zeroes_bits",
+      "type": "I256",
+      "method": "bits",
+      "old": "        self.0\n",
+      "new": "        U256([0, 0])\n"
+    },
+    {
+      "name": "sign_uses_wrong_bit",
+      "type": "I256",
+      "method": "is_negative",
+      "old": "self.0.0[1] >> 127 != 0",
+      "new": "self.0.0[1] >> 126 != 0"
+    },
+    {
+      "name": "signed_opposite_sign_wrong",
+      "type": "I256",
+      "method": "cmp",
+      "old": "(true, false) => Ordering::Less,",
+      "new": "(true, false) => Ordering::Greater,"
+    }
+  ],
+  "view_aliases": [
+    {
+      "display": "ordering256_types_harness::number256::U256::ordering_words",
+      "vir": "ordering256_types_harness::number256::impl&%16::ordering_words"
+    },
+    {
+      "display": "ordering256_types_harness::number256::I256::ordering_bits",
+      "vir": "ordering256_types_harness::number256::impl&%17::ordering_bits"
+    }
+  ]
+}

@@ -15,11 +15,9 @@ pub enum Failure { Overflow, ZeroDivisor, Inexact, Domain, Invariant }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Rounding { Floor, Ceil, Exact }
 
-/// Least-significant word first; this is an arithmetic representation, not wire.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct U256([u128; 2]);
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct I256(U256);
+#[path = "number256.rs"]
+mod number256;
+pub use number256::{I256, U256};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct U512([u128; 4]);
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -101,9 +99,6 @@ impl U256 {
     pub const ONE: Self = Self([1, 0]);
     pub const MAX: Self = Self([u128::MAX, u128::MAX]);
     pub const fn from_u128(x: u128) -> Self { Self([x, 0]) }
-    pub const fn from_words_le(words: [u128; 2]) -> Self { Self(words) }
-    pub const fn words_le(self) -> [u128; 2] { self.0 }
-    pub fn cmp(self, other: Self) -> Ordering { compare(&self.0, &other.0) }
     pub fn checked_add(self, other: Self) -> Result<Self, Failure> {
         let (value, carry) = add(self.0, other.0);
         if carry { Err(Failure::Overflow) } else { Ok(Self(value)) }
@@ -221,10 +216,7 @@ impl I256 {
     pub const ZERO: Self = Self(U256::ZERO);
     pub const MIN: Self = Self(U256([0, 1u128 << 127]));
     pub const MAX: Self = Self(U256([u128::MAX, (1u128 << 127) - 1]));
-    pub const fn from_bits(bits: U256) -> Self { Self(bits) }
-    pub const fn bits(self) -> U256 { self.0 }
     pub const fn from_i128(x: i128) -> Self { Self(U256([x as u128, if x < 0 { u128::MAX } else { 0 }])) }
-    pub fn is_negative(self) -> bool { self.0.0[1] >> 127 != 0 }
     fn negative_bits(x: U256) -> U256 {
         let (words, _) = add([!x.0[0], !x.0[1]], [1, 0]); U256(words)
     }
@@ -244,12 +236,6 @@ impl I256 {
     pub fn difference_unsigned(a: U256, b: U256) -> Result<Self, Failure> {
         if a.cmp(b) == Ordering::Less { Self::from_magnitude(b.checked_sub(a)?, true) }
         else { Self::from_magnitude(a.checked_sub(b)?, false) }
-    }
-    pub fn cmp(self, other: Self) -> Ordering {
-        match (self.is_negative(), other.is_negative()) {
-            (true, false) => Ordering::Less, (false, true) => Ordering::Greater,
-            _ => self.0.cmp(other.0),
-        }
     }
     pub fn checked_neg(self) -> Result<Self, Failure> {
         if self == Self::MIN { Err(Failure::Overflow) } else { Ok(Self(Self::negative_bits(self.0))) }

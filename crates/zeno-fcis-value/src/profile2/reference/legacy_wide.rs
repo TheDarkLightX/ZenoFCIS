@@ -9,29 +9,13 @@ use vstd::prelude::*;
 const RADIX: u128 = 18_446_744_073_709_551_616;
 
 #[cfg(verus_keep_ghost)]
+#[path = "legacy_wide_model.rs"]
+mod wide_model;
+#[cfg(verus_keep_ghost)]
+pub(crate) use wide_model::{ceiling_value, floor_value, number2, number3, scale};
+
+#[cfg(verus_keep_ghost)]
 verus! {
-pub(crate) open spec fn scale() -> int { u128::MAX as int + 1 }
-pub(crate) open spec fn number2(v: [u128; 2]) -> int {
-    v[1] as int * scale() + v[0] as int
-}
-pub(crate) open spec fn number3(v: [u128; 3]) -> int {
-    v[2] as int * scale() * scale() + v[1] as int * scale() + v[0] as int
-}
-pub(crate) open spec fn floor_value(a: u128, b: u128, den: u128) -> Option<u128> {
-    if den == 0 { None }
-    else {
-        let q = (a as int * b as int) / den as int;
-        if q > u128::MAX { None } else { Some(q as u128) }
-    }
-}
-pub(crate) open spec fn ceiling_value(a: u128, b: u128, den: u128) -> Option<u128> {
-    if den == 0 { None }
-    else {
-        let p = a as int * b as int;
-        let q = p / den as int + if p % den as int == 0 { 0int } else { 1int };
-        if q > u128::MAX { None } else { Some(q as u128) }
-    }
-}
 proof fn split64(v: u128)
     ensures
         v as int == (v / RADIX) as int * RADIX as int + (v % RADIX) as int,
