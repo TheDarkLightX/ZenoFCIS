@@ -1,7 +1,11 @@
 # Public release candidates
 
-This page records the two public V2 prereleases. The current release source
-is 2.6.0, following the consolidated V2.2/V2.3 line in 2.3.0; see the
+This checkout declares development version `2.7.0-rc.1`; full qualification
+is incomplete and it is not a qualified release candidate. See the
+[continuation guide](DEVELOPMENT_27.md) and [open requirements](FACTORY_GAPS_27.md).
+
+This page records the two earlier public V2 prereleases. The earlier 2.6.0
+release scope follows the consolidated V2.2/V2.3 line in 2.3.0; see the
 [2.6.0 release notes](RELEASE_NOTES.md) and the
 [installation guide](INSTALLATION.md). The V2.3 candidate packages declare
 Rust workspace version `2.3.0-rc.1`.

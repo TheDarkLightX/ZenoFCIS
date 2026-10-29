@@ -1,8 +1,10 @@
 # ZenoFCIS feature matrix
 
-This matrix covers the current `zeno-fcis` umbrella source API. The workspace
-declares `2.6.0`, the current release source, and the breaking V2 API below
-needs a pinned source dependency on the matching tag, as the
+The workspace declares development version `2.7.0-rc.1`; full qualification
+is incomplete. See the [continuation guide](DEVELOPMENT_27.md) and
+[open requirements](FACTORY_GAPS_27.md). This matrix retains the `2.6.0`
+umbrella API baseline. The breaking V2 API below needs a pinned source
+dependency on the matching tag, as the
 [installation guide](INSTALLATION.md) describes. The historical `1.1.0`
 package and its API stability promise have their own scope. The earlier public
 [2.2.0-rc.1 and 2.3.0-rc.1 candidates](RELEASE_CANDIDATES.md) advertised only
@@ -20,7 +22,8 @@ native callback API.
 The 2.6.0 release has CLI downloads for Linux x86_64 GNU, Windows x64 and
 Apple-silicon macOS. The Mac platform update has a separate source pin and
 checksum file. The evidence below applies to the named host runs, not every
-version of each operating system.
+version of each operating system. These artifacts do not
+qualify this 2.7 development checkout.
 
 | Evidence or capability | Linux x86_64 | macOS arm64 | Windows x64 |
 |---|---|---|---|

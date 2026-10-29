@@ -1,5 +1,9 @@
 # Installation
 
+This checkout declares development version `2.7.0-rc.1`. Full qualification
+is incomplete; it is not a qualified release candidate. See the
+[continuation guide](DEVELOPMENT_27.md) and [open requirements](FACTORY_GAPS_27.md).
+
 ZenoFCIS `2.6.0` is released with CLI downloads for **Linux x86_64 GNU**,
 **Windows x64** and **macOS on Apple silicon**, plus offline Rustdoc. The
 Mac platform update has a separate source pin. The release page provides a
@@ -58,8 +62,8 @@ CLI in later sessions.
 The exact archive filename must appear in `DOWNLOADS.sha256`; a missing entry
 or checksum mismatch stops installation. Other assets need not be downloaded. Verify
 the published release's [detached checksum signature](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.6.0/DOWNLOADS.sha256.sig)
-separately, under your trusted signing-key policy. That published release must
-also provide the [signing key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.6.0/RELEASE-SIGNING-KEY.pub).
+separately, under your trusted signing-key policy. Use the published
+[signing key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.6.0/RELEASE-SIGNING-KEY.pub).
 Downloading it beside the artifacts does not independently establish trust, so
 confirm its fingerprint through a trusted channel. See
 [Verify downloads](#verify-downloads).
@@ -121,13 +125,10 @@ a missing entry or checksum mismatch stops installation. The executable is arm64
 minimum-version field is macOS 11.0. The release workflow runs it only on the
 macOS 15 arm64 image.
 
-The executable carries only the linker's ad-hoc code signature. It is not
-signed with a Developer ID and is not notarized. Files that `curl` downloads
-carry no quarantine attribute, so the commands above run without a Gatekeeper
-prompt. A browser marks its downloads as quarantined, and Gatekeeper then
-refuses to run the executable. For a browser download, first verify the
-checksum and the signature, then remove the attribute before you extract the
-archive:
+The released macOS executable is ad-hoc signed, without a Developer ID or
+Apple notarization. macOS may block it. Verify the download and signing-key
+trust before deciding whether to open it, and follow
+[Apple's guidance for opening downloaded apps](https://support.apple.com/en-us/102445).
 
 ```bash
 xattr -d com.apple.quarantine "$ARCHIVE.tar.gz"
@@ -141,6 +142,7 @@ checksum files use the same release signing key.
 
 Generated applications on macOS need Rust `1.97.1` and the Xcode Command Line
 Tools (`xcode-select --install`), whose C compiler builds the bundled SQLite.
+See [Apple's installation instructions](https://developer.apple.com/documentation/xcode/installing-the-command-line-tools).
 
 On every platform, the SQLite shell sets `synchronous=EXTRA`. Each commit
 therefore also syncs the folder after it deletes its rollback journal, the

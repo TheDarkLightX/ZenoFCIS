@@ -2,9 +2,9 @@
 //! composed-domain step, the layout, the in-memory constructor and inputs
 //! outside the layout.
 
-use serde_json::json;
+use serde_json::{Value, json};
 
-use super::domain_tests::{Built, Part, budget, counter, fail, part};
+use super::domain_tests::{Built, Part, budget, counter, fail, part, pins};
 use super::obligations_tests::committed;
 use super::{
     DomainSources, FieldDomain, JointComposition, JointOutcome, OutcomeKind, RefusedClass,
@@ -317,16 +317,76 @@ fn the_constructor_refuses_tables_over_the_ceiling_before_building() {
     );
 }
 
+/// Derive current program identities through the ordinary native producer while
+/// retaining the historical fixture's external source pins and all other data.
+fn current_guarded_fixture() -> (String, Vec<super::LeafSources>) {
+    let (historical, sources) = committed("guarded/composition.json");
+    let mut manifest: Value = serde_json::from_str(&historical).unwrap_or_else(fail);
+    let components = manifest["components"]
+        .as_array_mut()
+        .unwrap_or_else(|| fail("components"));
+    assert_eq!(components.len(), sources.len());
+    assert_eq!(components.len(), 2);
+    for (component, source) in components.iter_mut().zip(&sources) {
+        let [project, policy, program] = pins(source);
+        assert_eq!(component["project_sha256"], json!(project));
+        assert_eq!(component["policy_sha256"], json!(policy));
+        component["program_sha256"] = json!(program);
+    }
+    (
+        serde_json::to_string(&manifest).unwrap_or_else(fail),
+        sources,
+    )
+}
+
+#[test]
+fn native_bridge_27_historical_program_bindings_refuse_before_current_derivation() {
+    let (historical, sources) = committed("guarded/composition.json");
+    let refusal = JointComposition::from_sources(&DomainSources {
+        manifest: &historical,
+        components: &sources,
+    })
+    .err()
+    .unwrap_or_else(|| fail("historical program binding must refuse"));
+    assert_eq!(
+        refusal.obligation(),
+        super::refusal::Obligation::ProgramBinding
+    );
+
+    let (current, current_sources) = current_guarded_fixture();
+    let mut old: Value = serde_json::from_str(&historical).unwrap_or_else(fail);
+    let mut new: Value = serde_json::from_str(&current).unwrap_or_else(fail);
+    assert_eq!(sources.len(), current_sources.len());
+    for (old, new) in old["components"]
+        .as_array_mut()
+        .unwrap_or_else(|| fail("historical components"))
+        .iter_mut()
+        .zip(
+            new["components"]
+                .as_array_mut()
+                .unwrap_or_else(|| fail("current components")),
+        )
+    {
+        old["program_sha256"] = Value::Null;
+        new["program_sha256"] = Value::Null;
+    }
+    assert_eq!(
+        old, new,
+        "only native-derived program identities may change"
+    );
+}
+
 /// Experimental 2.7 native bridge: check a source-pinned Zeno composition
 /// through BOTH the production composed-domain checker and its bound Authority
 /// joint-step API, against an independently written complete scalar reference.
 ///
-/// The tested profile is the committed guarded-budget fixture only. Matching
+/// The tested profile derives current program pins for the otherwise unchanged
+/// committed guarded-budget fixture. Matching
 /// its finite transitions is differential evidence, NOT a machine-checked
 /// parser/Authority-to-Verus refinement theorem, nor deployment authority.
 #[test]
 fn native_bridge_27_guarded_budget_matches_independent_complete_reference() {
-    let (manifest, sources) = committed("guarded/composition.json");
+    let (manifest, sources) = current_guarded_fixture();
     let bundle = DomainSources {
         manifest: &manifest,
         components: &sources,
@@ -421,7 +481,7 @@ fn native_bridge_27_guarded_budget_matches_independent_complete_reference() {
 /// proof-like checking; changing project text invalidates both.
 #[test]
 fn native_bridge_27_tampering_one_component_source_fails_closed() {
-    let (manifest, mut sources) = committed("guarded/composition.json");
+    let (manifest, mut sources) = current_guarded_fixture();
     sources[0]
         .project
         .push_str("\n// deliberately changed after manifest pin\n");

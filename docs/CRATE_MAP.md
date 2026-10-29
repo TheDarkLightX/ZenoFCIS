@@ -1,12 +1,14 @@
 # ZenoFCIS crate map
 
-This guide documents the `2.6.0` source. Its retained V1
-protocol guidance is historical; see [the release notes](RELEASE_NOTES.md)
-for the current checked API and assurance boundaries.
+The workspace development version is `2.7.0-rc.1`; full qualification is
+incomplete. See the [continuation guide](DEVELOPMENT_27.md) and
+[open requirements](FACTORY_GAPS_27.md). The map retains the `2.6.0` architecture
+baseline and historical V1 guidance; [the earlier release notes](RELEASE_NOTES.md)
+state that baseline's assurance boundaries.
 
 ZenoFCIS is a workspace of small crates arranged around a pure semantic core.
 The classes below describe architectural role, not current Cargo stability.
-All public workspace crates are version `2.6.0`.
+All public workspace crate manifests declare development version `2.7.0-rc.1`.
 
 ## Dependency direction
 

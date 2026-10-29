@@ -97,6 +97,21 @@ pub enum Error {
 
 /// Opaque, non-cloneable capability for one volatile grant and original intent.
 /// Public data, a hash or a serialized receipt cannot construct one.
+/// Trusted administration requests a handle from its dispatcher; the retained
+/// intent checks can still refuse the request.
+///
+/// ```
+/// use zeno_fcis_codec::Hash32;
+/// use zeno_fcis_shell_sqlite::effects::{
+///     dispatcher::{Error, IntentHandle, TrustedDispatcher}, production::Transport,
+/// };
+/// fn grant<T: Transport>(dispatcher: &mut TrustedDispatcher<'_, '_, T>,
+///                        principal: Hash32, intent: Hash32) -> Result<IntentHandle, Error> {
+///     dispatcher.grant(principal, intent)
+/// }
+/// ```
+///
+/// Constructing it directly fails with `E0451` because its fields are private.
 ///
 /// ```compile_fail,E0451
 /// use std::sync::Arc;
@@ -142,13 +157,6 @@ pub type Owner<'a, 'p, T> = TrustedDispatcher<'a, 'p, T>;
 /// A trusted ingress-created session. The worker cannot choose a new identity,
 /// grant authority, acknowledge an intent, or access the raw terminal.
 ///
-/// ```compile_fail,E0616
-/// use zeno_fcis_shell_sqlite::effects::{dispatcher::WorkerSession, production::Transport};
-/// fn bypass<T: Transport>(session: &mut WorkerSession<'_, '_, '_, T>) {
-///     session.owner.terminal.transport();
-/// }
-/// ```
-///
 /// ```
 /// use zeno_fcis_shell_sqlite::effects::{
 ///     dispatcher::{Error, IntentHandle, WorkerSession}, production::Transport,
@@ -157,6 +165,15 @@ pub type Owner<'a, 'p, T> = TrustedDispatcher<'a, 'p, T>;
 /// fn dispatch<T: Transport>(session: &mut WorkerSession<'_, '_, '_, T>,
 ///                           intent: &IntentHandle) -> Result<Sent, Error> {
 ///     session.dispatch(intent)
+/// }
+/// ```
+///
+/// Accessing its private owner field fails with `E0616`.
+///
+/// ```compile_fail,E0616
+/// use zeno_fcis_shell_sqlite::effects::{dispatcher::WorkerSession, production::Transport};
+/// fn bypass<T: Transport>(session: &mut WorkerSession<'_, '_, '_, T>) {
+///     session.owner.terminal.transport();
 /// }
 /// ```
 pub struct WorkerSession<'s, 'a, 'p, T: Transport> {
