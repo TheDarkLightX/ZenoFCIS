@@ -54,7 +54,9 @@ class NegativeRetentionTests(unittest.TestCase):
                 'encountered-vir-error': False, 'is-verifying-entire-crate': True},
             'func-details': dict.fromkeys(profile['target_functions'], {}),
         }
-        observed = []
+        # Each concurrent control owns its observation. Completion order is
+        # independent of the declared mutation order used by the assertions.
+        observed = {}
         first_name = next(iter(mutants))
 
         def fake_run(command, cwd, environment, *args, **kwargs):
@@ -105,13 +107,15 @@ class NegativeRetentionTests(unittest.TestCase):
                     text, stderr, returncode = 'not JSON: raw mutant stdout\n', 'raw mutant parse-failure details\n', 1
             (log_dir / 'crate.vir').write_text(vir)
             process = subprocess.CompletedProcess(command, returncode, text, stderr)
-            observed.append((location, 'positive' if positive else 'verus', process, str(cwd)))
+            observed['positive' if positive else name] = (
+                location, 'positive' if positive else 'verus', process, str(cwd))
             return process
 
         original_require_success = gate.verifier.require_success
         def require_success_after_retention(process):
             if '--output-json' in process.args:
-                location, prefix, _, cwd = observed[-1]
+                log_dir = Path(process.args[process.args.index('--log-dir') + 1])
+                location, prefix, _, cwd = observed['positive' if log_dir.name == 'positive' else log_dir.parent.name]
                 self.assertEqual((location / f'{prefix}.json').read_text(), process.stdout)
                 self.assertEqual((location / f'{prefix}.stderr').read_text(), process.stderr)
                 self.assertEqual(json.loads((location / f'{prefix}-process.json').read_text()),
@@ -121,7 +125,8 @@ class NegativeRetentionTests(unittest.TestCase):
         def coverage(vir, bound_profile):
             self.assertEqual(bound_profile, profile)
             if vir.startswith('coverage-refusal'):
-                location, prefix, process, cwd = observed[-1]
+                name = vir.split(': ', 1)[1]
+                location, prefix, process, cwd = observed[name]
                 self.assertTrue((location / f'{prefix}-process.json').is_file())
                 self.assertEqual((location / f'{prefix}.stderr').read_text(), process.stderr)
                 target = ''
@@ -208,15 +213,16 @@ class NegativeRetentionTests(unittest.TestCase):
                 self.assertTrue(logs.is_dir())
                 self.assertEqual(logs.parent, output.parent)
                 self.assertEqual(json.loads((logs / 'source_sha256.json').read_text()), before)
-                for location, prefix, process, cwd in observed:
+                ordered = [observed[name] for name in ('positive', *mutants)]
+                for location, prefix, process, cwd in ordered:
                     self.assertEqual((location / f'{prefix}.json').read_text(), process.stdout)
                     self.assertEqual((location / f'{prefix}.stderr').read_text(), process.stderr)
                     self.assertEqual(json.loads((location / f'{prefix}-process.json').read_text()),
                         {'command': process.args, 'cwd': cwd, 'returncode': process.returncode})
-                return receipt, observed, mutants
+                return receipt, ordered, mutants
             receipt = gate.check(self.directory / 'unused-cache', False)
-            self.assertFalse(observed[0][0].exists())
-            return receipt, observed, mutants
+            self.assertFalse(observed['positive'][0].exists())
+            return receipt, [observed[name] for name in ('positive', *mutants)], mutants
 
     def test_success_retains_every_control_and_exact_raw_diagnostics(self):
         for gate in GATES:
