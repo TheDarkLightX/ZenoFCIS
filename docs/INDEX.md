@@ -24,6 +24,7 @@ with [Get started](#get-started), then follow a tutorial.
 
 - [Experimental runtime assembly](RUNTIME_ASSEMBLY.md) and
   [finite transport refinement](RUNTIME_REFINEMENT.md)
+- [Runtime assembler design proposal](RUNTIME_ASSEMBLER_DESIGN.md)
 - [Opt-in postcondition proposals and independent checking](../prototypes/postconditions/README.md)
 - [2.7 runtime isolation proposal](RUNTIME_ISOLATION_27_PROPOSAL.md) and
   [implementation checklist](RUNTIME_ISOLATION_27_PROGRESS.md)

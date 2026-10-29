@@ -1,0 +1,43 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "assembly",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "106": [
+      "Bool"
+    ]
+  },
+  "variables": {},
+  "cases": [
+    {
+      "rule": "checked_assembly",
+      "when": "pre.100.110 == 0 && command.101 == 120 && context.102.160 && context.102.161 && context.102.162 && context.102.163",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 1
+      },
+      "outbox": []
+    },
+    {
+      "rule": "otherwise",
+      "when": "true",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0
+  },
+  "law_kinds": {
+    "500": "AuthoritySubjectRecipient",
+    "501": "AuthoritySubjectRecipient",
+    "502": "StateInvariant"
+  }
+}
