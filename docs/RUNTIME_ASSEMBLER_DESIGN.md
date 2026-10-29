@@ -13,11 +13,15 @@ and operating limits, or a precise refusal. Today these capabilities exist on
 several routes; accepting each part separately does not establish that their
 combination works.
 
-The design base is main `06a74a7c0b483034c9d607153bd11fb6a95ff096`.
-The feature inventory was also inspected at the public 2.6 development revision
+This design was written against main `06a74a7c0b483034c9d607153bd11fb6a95ff096`, with the
+feature inventory inspected at the 2.6 development revision
 [`eb9af7f5cbba320ca2dd172ed6d162b71d163606`](https://github.com/TheDarkLightX/ZenoFCIS/tree/eb9af7f5cbba320ca2dd172ed6d162b71d163606).
-That development branch is not assumed released. Its implementation is not
-silently included in this design-only change.
+2.6.0 has since been released. This 2.7 development checkout also contains a first experimental
+slice: the closed, offline `zeno-fcis assemble` route for two reviewed local profiles
+([runtime assembly](RUNTIME_ASSEMBLY.md)) and a finite transport-model refinement prototype
+([runtime refinement](RUNTIME_REFINEMENT.md)). Those documents state what is implemented and its
+limits. This proposal remains the plan for the rest: whatever they do not implement is still a
+design obligation here.
 
 | Existing implementation | Reuse; do not reimplement |
 |---|---|
@@ -28,8 +32,8 @@ silently included in this design-only change.
 | `zeno-fcis-shell-sqlite/src/collections.rs` | Keyed records, transactional writes, roots and journal; existing collection summaries are not a new feature. |
 | 2.6 `docs/BUILD_AN_APP.md`, `docs/SHELL_EFFECTS.md` | Authenticated ingress, original-key recovery, configured parties, bounded program connector, pending deliveries and explicit at-least-once limits. Connector exit zero is acknowledgement, not proof of business success. |
 
-Every path in this table is relative to the pinned public 2.6 development tree
-linked above (not an assertion that it exists at the design base). The
+Every path in this table was checked against the 2.6 development tree linked
+above. The
 [existing generated application](GENERATED_APPLICATION_MILESTONE.md),
 [packaged qualification](PACKAGED_APPLICATION_QUALIFICATION.md), and
 [composition profile](COMPOSED_DOMAIN_COMPOSITION.md) remain authoritative about
