@@ -3,7 +3,7 @@
 //! Trusted administration supplies pinned, administrator-stable runtime files,
 //! a worker image and its expected digest. The image is copied into a read-only
 //! filesystem with its pinned GNU runtime. Worker requests carry no identity or
-//! authority: [`Channel`] resolves them through actual retained handles.
+//! authority: [`Channel`](super::channel::Channel) resolves them through actual retained handles.
 //!
 //! This profile requires an unprivileged host account, CPython 3.11+, bubblewrap,
 //! libseccomp, Linux namespaces/seccomp and a responsive kernel. Runtime files
