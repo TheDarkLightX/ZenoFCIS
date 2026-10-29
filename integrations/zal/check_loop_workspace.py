@@ -141,7 +141,10 @@ def mcp_session(path: Path, head: str, env: dict, report: dict) -> None:
                          "zal_trace"], f"existing tools first and unchanged: {names}")
     expect(names[17:] == ["zal_why_not", "zal_what_if", "zal_narrate", "zal_guide", "zal_ladder_read",
                           "zal_ladder_render", "zal_ladder_parse", "zal_ladder_same", "zal_ladder_lower",
-                          "zal_ladder_explain"], f"explanation and ladder tools follow the capture tools: {names}")
+                          "zal_ladder_explain", "zal_ontology_parse", "zal_ontology_classify",
+                          "zal_ontology_query", "zal_ontology_explain", "zal_ontology_replay",
+                          "zal_ontology_validate_record"],
+           f"explanation, ladder and ontology tools follow the capture tools: {names}")
     expect(not any(w in n for n in names for w in ("answer", "say", "accept")), f"no answer or say tool: {names}")
     expect(replies[3]["result"]["isError"] and "cannot answer" in replies[3]["result"]["content"][0]["text"],
            "a model document that answers is refused")
