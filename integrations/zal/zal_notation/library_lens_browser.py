@@ -13,6 +13,7 @@ import os
 from pathlib import Path, PurePosixPath
 
 from . import abstractions as A, core, lens_library as V, lenses as L, render, sharing
+from . import reading_typography
 
 ROOT = Path(__file__).resolve().parent
 MAX_REQUEST = 1_000_000
@@ -125,6 +126,8 @@ def _producer_identity():
     paths = {"zal_notation/" + p.name: p for p in sorted(ROOT.glob("*.py"))}
     paths["finite_library/prototype.py"] = L.SEMANTIC
     paths.update({"lens_assets/" + name: ROOT / "lens_assets" / name for name in ASSETS})
+    paths.update({"reading_assets/" + name: reading_typography.ASSET_ROOT / name
+                  for name in reading_typography.ASSETS})
     profile = ROOT.parent / 'category_profile'
     if profile.is_dir():
         paths.update({'category_profile/' + p.name: p for p in profile.glob('*.py') if not p.name.startswith('test_')})
@@ -317,6 +320,7 @@ def artifacts(request, *, category_host=None):
                                      ' --category-evidence-sha256 OPERATOR_APPROVED_RAW_SHA256')
     for name in ASSETS:
         files[name] = (ROOT / "lens_assets" / name).read_bytes()
+    files["styles.css"] += reading_typography.font_css().encode("utf-8")
     files["data/packet.json"] = _json(packet)
     encoded = core.canonical(packet).replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
     files["data/packet.js"] = ("// Recorded entry-bound data. No live browser checker.\nwindow.ZAL_PACKET = " + encoded + ";\n").encode("utf-8")

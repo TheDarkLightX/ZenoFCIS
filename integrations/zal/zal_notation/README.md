@@ -11,6 +11,10 @@ ontology CLI. They do not accept application meaning or turn a shared class into
 a checked behavioral relation. General notation and Lens APIs retain the
 separate interface boundary described above.
 
+The offline browsers use [Libertine reading typography](READING_TYPOGRAPHY.md)
+for selected prose and controlled English, with a bundled original font and
+license. Their exact source and evidence views remain available.
+
 From `integrations/zal`, the Python APIs are available through `zal_notation`:
 
 ```python
