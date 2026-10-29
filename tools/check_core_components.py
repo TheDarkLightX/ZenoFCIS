@@ -232,27 +232,25 @@ def execute(cli, work, target, instances):
 
 
 def finite_proof(cli, work):
-    """Reissue and replay current-build certificates without replacing stored ones."""
+    """Refresh and replay transition certificates without replacing stored ones."""
     import prove_core_families as proof
 
     require(cli.is_file(), "CLI does not exist; build it from this source under the assigned slot")
     require(core.ROOT not in work.parents and work != core.ROOT, "keep qualification outside the source tree")
     require(Path('/dev/shm') not in work.parents and work != Path('/dev/shm'), "use a disk-backed directory")
-    native = REFERENCE.with_name('native-report.json')
-    require(core.digest(native.read_bytes()) == proof.NATIVE_REPORT_SHA256, "inherited native report changed")
     initial = proof.snapshot_inputs(cli)
     files = dict(initial['runtime']['files'])
     for family in core.FAMILIES:
         files.update(initial['families'][family])
-    for name in ('tools/test_core_family_proofs.py', 'tools/test_core_components.py',
-                 'tools/test_data/core_components/native-report.json'):
+    for name in ('tools/test_core_family_proofs.py', 'tools/test_core_components.py'):
         files[name] = core.digest((core.ROOT / name).read_bytes())
     work.mkdir(exist_ok=False)
     stage = work / 'source'
     environment = {**os.environ, 'PYTHONDONTWRITEBYTECODE': '1'}
     try:
         # Only declared inputs are copied. The old certificates stay untouched;
-        # each issue/replay below binds these exact bytes and the current CLI.
+        # each refresh/replay below binds these exact bytes and the current CLI.
+        # Historical generated-app/genesis evidence cannot qualify this runtime.
         for name, expected in sorted(files.items()):
             source = core.ROOT / name
             require(not source.is_symlink(), f'symlinked qualification input: {name}')
@@ -261,11 +259,11 @@ def finite_proof(cli, work):
             shutil.copyfile(source, destination)
             require(core.digest(destination.read_bytes()) == expected, f'input changed while copying: {name}')
         proof.require_unchanged_inputs(cli, initial, root=stage)
-        for mode in ('issue', 'replay', 'qualify'):
+        for mode in ('refresh', 'replay', 'qualify'):
             command = [sys.executable, stage / 'tools/prove_core_families.py', mode,
                        '--cli', cli, '--work-dir', work / mode]
-            if mode == 'issue':
-                command += ['--native-report', stage / 'tools/test_data/core_components/native-report.json']
+            if mode == 'refresh':
+                command += ['--certificates', stage / 'core-components/proofs']
             run(command, stage, work / f'{mode}.log', environment)
             proof.require_unchanged_inputs(cli, initial, root=stage)
         for script in ('test_core_family_proofs.py', 'test_core_components.py'):
@@ -283,7 +281,7 @@ def finite_proof(cli, work):
                 for name, expected in files.items()), 'isolated qualification source changed during checking')
     proof.require_unchanged_inputs(cli, initial, root=stage)
     require(proof.load(stage / 'core-components/proofs/runtime-source.json') == initial['runtime'],
-            'issued certificates bind a different runtime source inventory')
+            'refreshed certificates bind a different runtime source inventory')
     for family in core.FAMILIES:
         certificate = proof.load(stage / f'core-components/proofs/{family}.json')
         proof.preflight(certificate, family, cli, initial['runtime'])
@@ -295,7 +293,7 @@ def finite_proof(cli, work):
               'cli_sha256': initial['cli_sha256'],
               'runtime_source_sha256': core.digest(proof.encoded(initial['runtime'])),
               'certificates': replayed['certificates'],
-              'genesis': 'inherited exact-artifact native evidence; native tests were not rerun',
+              'genesis': 'not checked; transition certificates do not establish genesis',
               'evidence_directory': str(work)}
     (work / 'report.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
     print(json.dumps(report, sort_keys=True))
@@ -305,7 +303,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--static", action="store_true")
     parser.add_argument("--finite-proof", action="store_true",
-                        help="issue/replay current-build certificates in an isolated source copy")
+                        help="refresh/replay transition certificates in an isolated source copy")
     parser.add_argument("--cli", type=Path)
     parser.add_argument("--work-dir", type=Path)
     parser.add_argument("--target-dir", type=Path)

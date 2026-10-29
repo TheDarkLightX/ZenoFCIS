@@ -96,6 +96,27 @@ class CertificateBoundaryTests(unittest.TestCase):
             self.assertFalse((work / 'source/core-components/proofs').exists())
             self.assertFalse((work / 'report.json').exists())
 
+    def test_transition_refresh_does_not_reuse_historical_native_runtime_evidence(self):
+        with tempfile.TemporaryDirectory(prefix='core-current-build-') as temporary:
+            directory = Path(temporary)
+            root, cli = self.qualification_inputs(directory)
+            # A transition-only refresh must work without a historical native
+            # report, and must still bind the current runtime before replay.
+            (root / 'tools/test_data/core_components/native-report.json').unlink()
+            work = directory / 'qualification'
+
+            def refresh_then_stop(command, stage, *args, **kwargs):
+                self.assertEqual(command[2], 'refresh')
+                self.assertEqual(command[-2:], ['--certificates', stage / 'core-components/proofs'])
+                self.assertNotIn('--native-report', command)
+                proof.require_unchanged_inputs(cli, proof.snapshot_inputs(cli), root=stage)
+                raise RuntimeError('stop before exhaustive replay')
+
+            with patch.object(core, 'ROOT', root), patch.object(checks, 'run', side_effect=refresh_then_stop):
+                with self.assertRaisesRegex(RuntimeError, 'stop before exhaustive replay'):
+                    checks.finite_proof(cli, work)
+            self.assertFalse((work / 'report.json').exists())
+
     def test_current_build_check_rejects_added_staged_runtime_input(self):
         with tempfile.TemporaryDirectory(prefix='core-current-build-') as temporary:
             directory = Path(temporary)
