@@ -243,7 +243,7 @@ class ExplainBridgeTests(unittest.TestCase):
 
     def test_tool_list_appends_new_tools_without_authority(self):
         names = [tool["name"] for tool in TOOLS]
-        self.assertEqual(names[17:], NEW_TOOLS)
+        self.assertEqual(names[17:17 + len(NEW_TOOLS)], NEW_TOOLS)
         for tool in TOOLS[17:]:
             self.assertFalse(any(word in tool["name"] for word in ("answer", "say", "accept")))
             self.assertTrue("no agreement" in tool["description"] or "Authority: none" in tool["description"], tool["name"])

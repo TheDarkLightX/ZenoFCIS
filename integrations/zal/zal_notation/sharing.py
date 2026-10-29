@@ -343,6 +343,7 @@ def compare_discussions(left, right):
 
 
 def toolkit():
+    from .ontology_tools import tool_definitions as ontology_tools
     from .story import toolkit as story_toolkit
 
     def spec(name, description, required, properties):
@@ -371,6 +372,7 @@ def toolkit():
             "authority": "none"}
     story_tools = story_toolkit()
     result["tools"].extend(story_tools["tools"])
+    result["tools"].extend(ontology_tools())
     try:
         from category_profile.tools import toolkit as category_toolkit
     except ImportError:
@@ -396,6 +398,9 @@ def dispatch_tool(name, arguments, *, category_host=None):
     core.need(type(name) is str and name in definitions, "unknown ZAL discussion tool")
     schema = definitions[name]
     core.keys(arguments, set(schema["required"]), set(schema["properties"]) - set(schema["required"]), "tool arguments")
+    if name.startswith("zal_ontology_"):
+        from .ontology_tools import dispatch
+        return dispatch(name, arguments)
     if name.startswith("zal_lens_"):
         from .lenses import dispatch
         return dispatch({"action": name.removeprefix("zal_lens_"), **arguments})

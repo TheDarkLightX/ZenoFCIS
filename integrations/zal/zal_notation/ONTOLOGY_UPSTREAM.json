@@ -1,0 +1,115 @@
+{
+  "components": {
+    "ontology.py": {
+      "adaptation": "Byte-identical upstream source.",
+      "local_sha256": "124d8c4d5ae435faf12d8cd53dc2d8e703937a733d17ac581ee7b04e13a237b4",
+      "upstream_git_blob": "8d1a91e9a8ff3e9bd96dd88c49aa5cde6171d0c9",
+      "upstream_path": "experiments/zal-notation-library/zal_notation/ontology.py",
+      "upstream_sha256": "124d8c4d5ae435faf12d8cd53dc2d8e703937a733d17ac581ee7b04e13a237b4"
+    },
+    "ontology_browser.py": {
+      "adaptation": "Byte-identical upstream source.",
+      "local_sha256": "88f3be8225dfc552a2ff591081893b692aa546601a6566c7a66c813d86d9e7da",
+      "upstream_git_blob": "8e18a3f024be922fd4d04fe085954a776df9eb8b",
+      "upstream_path": "experiments/zal-notation-library/zal_notation/ontology_browser.py",
+      "upstream_sha256": "88f3be8225dfc552a2ff591081893b692aa546601a6566c7a66c813d86d9e7da"
+    },
+    "ontology_cnl.py": {
+      "adaptation": "Byte-identical upstream source.",
+      "local_sha256": "a86e5325d866dffbe4252e4c28a37cdd943d39b559727e046a2c2c580c8f658d",
+      "upstream_git_blob": "58aaf1e6220d879b53617aeae96ead2a30e0fc40",
+      "upstream_path": "experiments/zal-notation-library/zal_notation/ontology_cnl.py",
+      "upstream_sha256": "a86e5325d866dffbe4252e4c28a37cdd943d39b559727e046a2c2c580c8f658d"
+    },
+    "ontology_demo.py": {
+      "adaptation": "Artifact IO imports use existing local library_lens_browser helpers.",
+      "local_sha256": "d0c74905a780f6a094fc0569f295430118f02a532820f6a78509f1d7bdc02328",
+      "upstream_git_blob": "50d9712cc3059b26e55650f2febbfa9aab309f3d",
+      "upstream_path": "experiments/zal-notation-library/zal_notation/ontology_demo.py",
+      "upstream_sha256": "3907898aae055591bcf56bf0e82c08b3a9e95c1b59ff2ea405ac18a38776cecf"
+    },
+    "ontology_rdf.py": {
+      "adaptation": "Byte-identical upstream source.",
+      "local_sha256": "2182e9097adcd7807bd2e72ce387b88390d573b2bcedda58bcb0ed74276b107b",
+      "upstream_git_blob": "20163dcd99c2f34da2c58d997e246ac56d5bcba0",
+      "upstream_path": "experiments/zal-notation-library/zal_notation/ontology_rdf.py",
+      "upstream_sha256": "2182e9097adcd7807bd2e72ce387b88390d573b2bcedda58bcb0ed74276b107b"
+    },
+    "ontology_records.py": {
+      "adaptation": "Byte-identical upstream source.",
+      "local_sha256": "8952a4a9be3dbc2b86376116864ff38060bbe6d1f87dafa2a934ba1933551011",
+      "upstream_git_blob": "8adb4010f36f9af19ba8f484094cc70cb5fb11d3",
+      "upstream_path": "experiments/zal-notation-library/zal_notation/ontology_records.py",
+      "upstream_sha256": "8952a4a9be3dbc2b86376116864ff38060bbe6d1f87dafa2a934ba1933551011"
+    },
+    "ontology_tools.py": {
+      "adaptation": "Byte-identical upstream source.",
+      "local_sha256": "305c41d9aedb7135113e817635a5a8fc702ccaa128492216833d863a9cdabd46",
+      "upstream_git_blob": "9a36252ba355a026386fde4976da609e4a9e9f57",
+      "upstream_path": "experiments/zal-notation-library/zal_notation/ontology_tools.py",
+      "upstream_sha256": "305c41d9aedb7135113e817635a5a8fc702ccaa128492216833d863a9cdabd46"
+    },
+    "tests/ontology_guard_fixture.py": {
+      "adaptation": "Exact TARGET value and guard_fixture function extracted; no native runner or receipt adopted.",
+      "local_sha256": "0e6ec31fc45517748933d9c0f73cc86d7cf0ca8cd62a38ebb5b892a4b273e6fb",
+      "upstream_git_blob": "10bbbeeac6eebe60b733b38deb7f8e265f21a58d",
+      "upstream_path": "experiments/zal-notation-library/run_ontology_loop_validation.py"
+    },
+    "tests/test_ontology.py": {
+      "adaptation": "Byte-identical upstream tests.",
+      "local_sha256": "0f116d205f203908526233def217a89438c6d6c6ee73215bbc2d046628eaad2d",
+      "upstream_git_blob": "6403d3b68da91360ff528cd4d5d3b05630f53959",
+      "upstream_path": "experiments/zal-notation-library/tests/test_ontology.py",
+      "upstream_sha256": "0f116d205f203908526233def217a89438c6d6c6ee73215bbc2d046628eaad2d"
+    },
+    "tests/test_ontology_adversarial.py": {
+      "adaptation": "Use extracted pure local guard fixture instead of native experiment runner.",
+      "local_sha256": "90d2dec2f0ac93a4e92f1e102fd674d3a72c734736f26219538d80f458c07c42",
+      "upstream_git_blob": "a032eba40eec985e71e59ca5ba46546d52f74f7d",
+      "upstream_path": "experiments/zal-notation-library/tests/test_ontology_adversarial.py",
+      "upstream_sha256": "4ec8bfff826224bd3144d5c3ef31931ecb4a10e63020c6c70559f5238e3ce6d3"
+    },
+    "tests/test_ontology_cnl.py": {
+      "adaptation": "Byte-identical upstream tests.",
+      "local_sha256": "f899fab1c59542a5ccaa6bbf8bc9c385511aebeb353b00a2f661030d982e1c70",
+      "upstream_git_blob": "0037c51b832a6bb308a53e33ebac8c573b8b9983",
+      "upstream_path": "experiments/zal-notation-library/tests/test_ontology_cnl.py",
+      "upstream_sha256": "f899fab1c59542a5ccaa6bbf8bc9c385511aebeb353b00a2f661030d982e1c70"
+    },
+    "tests/test_ontology_interop.py": {
+      "adaptation": "Byte-identical upstream tests.",
+      "local_sha256": "c331cf9dbfc56b097f02e316519412ceb8696a7d1628d4039bef950bb975244e",
+      "upstream_git_blob": "a572566faa7b04a58935dc3fcf312182ddeebefc",
+      "upstream_path": "experiments/zal-notation-library/tests/test_ontology_interop.py",
+      "upstream_sha256": "c331cf9dbfc56b097f02e316519412ceb8696a7d1628d4039bef950bb975244e"
+    },
+    "tests/test_ontology_tools.py": {
+      "adaptation": "CLI working directory adapted to included package.",
+      "local_sha256": "12f7600b4dfe95ca5c5bbfe04ad85cb05a83918f8113982aa68c01bd187b15c8",
+      "upstream_git_blob": "36caf3608937f6b2c9fed8ed0b098164ad662c90",
+      "upstream_path": "experiments/zal-notation-library/tests/test_ontology_tools.py",
+      "upstream_sha256": "a65f964958bb746080a98e31299bfe196f6c99c0f4d14aa31c7e1fe8ad5a9b07"
+    }
+  },
+  "license": "Included package LICENSE retained.",
+  "local_interfaces": {
+    "integrations/zal/mcp.py": "f2faa6dfefc09c7ab78b4e112c3a3e8ebfc0082618df0ac994b622d5f2badd9d",
+    "integrations/zal/test_ontology_mcp.py": "0e1881aee457c77bfacd8d2dd7b805086e3024e336cf7a4eb6de1770f36115c7",
+    "integrations/zal/zal_notation/__main__.py": "0398a2529b3203a33048206f06551f9ef5df8d72ce8c60d95afd16c9da772889",
+    "integrations/zal/zal_notation/sharing.py": "2a753847be7e356c9ed762b317d9d38d3516893c7d08acd6430bcdcb78f5c9cb"
+  },
+  "reused_artifact_boundary": {
+    "change": "Unchanged existing local implementation.",
+    "functions": [
+      "fresh_directory",
+      "read_artifact"
+    ],
+    "path": "library_lens_browser.py",
+    "sha256": "ae7d43c5af05f0bea2625dd85967f99e17a29d7f9e7a3edea4c1a921231e5ede"
+  },
+  "schema": "zal/ontology-components/1",
+  "scope": "Source provenance only; local validation and reported upstream evidence remain distinct. No mathematical proof, receipt authenticity, human agreement, deployment or release authority inferred.",
+  "upstream_commit": "b799b1f69a8ebe6942e66b8a850ff41017e66c46",
+  "upstream_pr": 44,
+  "upstream_repository": "TheDarkLightX/Zeno-Crucible"
+}

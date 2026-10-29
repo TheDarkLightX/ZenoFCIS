@@ -4,6 +4,13 @@ This package retains and relates informal descriptions, candidate meanings, type
 
 [Lenses](LENSES.md) enumerate registered viewpoints on the same exact library entry. The finite Mealy adapter provides source-retaining applications and replayed finite checks; general syntax/graph structure, pending custom definitions and informal analogies remain distinct. This integration exposes local Python/JSON functions, not an installed Lens CLI or MCP service.
 
+[Explained ontology classification](ONTOLOGY.md) adds controlled-English rules,
+shared-class queries, premise explanations, explicit-record validation and fresh
+replay. Its six read-only operations are connected to the ZAL MCP bridge and the
+ontology CLI. They do not accept application meaning or turn a shared class into
+a checked behavioral relation. General notation and Lens APIs retain the
+separate interface boundary described above.
+
 From `integrations/zal`, the Python APIs are available through `zal_notation`:
 
 ```python
@@ -32,7 +39,7 @@ The menu stores the source text and complete supplied alternatives; it does not 
 
 `sharing.make_context` binds a grammar, model, semantic profile, assumptions, and observation into an exact context identity. Unknown custom profiles remain representable and shareable; a request without a registered matching evaluator reports unsupported. Exact context identity is not a claim that different contexts are mathematically inequivalent. `normalizer.canonical_json` and `normalizer.alpha_normalize` retain their source and report their limited preservation scopes; alpha normalization applies only to the registered closed-lambda profile.
 
-`sharing.toolkit()` lists the discussion and story proposal functions supported by `sharing.dispatch_tool`. Human-facing `story.vote` is deliberately not a proposal tool. The package has no provider or transport service and does not modify a shared workspace. Existing CLI and browser wiring, authenticated collaboration, general interpretation generation, runtime lowering, and application qualification are separate work.
+`sharing.toolkit()` lists the discussion, story proposal and ontology functions supported by `sharing.dispatch_tool`. Human-facing `story.vote` is deliberately not a proposal tool. These functions do not modify the behavioral review workspace. The ontology family has the CLI and read-only MCP routes described above; general discussion/story transport, authenticated collaboration, interpretation generation, runtime lowering and application qualification remain separate work.
 
 ## Source and checks
 
