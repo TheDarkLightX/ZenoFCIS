@@ -390,6 +390,7 @@ impl Parser {
                     name.clone(),
                     crate::syntax_resources::DerivedHeight {
                         height,
+                        circuit: true,
                         bits: table.bits.is_some(),
                         size: table.size as usize,
                     },
@@ -400,6 +401,7 @@ impl Parser {
                     name.clone(),
                     crate::syntax_resources::DerivedHeight {
                         height: 2,
+                        circuit: false,
                         bits: false,
                         size: table.values.len(),
                     },

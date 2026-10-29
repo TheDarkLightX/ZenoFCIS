@@ -7,6 +7,21 @@ use zeno_fcis_spec::{
 
 const HEADER: &str = "zeno 1; project 1 checks;";
 
+#[test]
+fn source_constructed_height_accepts_the_limit_and_refuses_the_next_layer() {
+    // A 256-operand chain has 255 Add layers; negative one contributes
+    // two scalar layers and the comparison contributes the final layer.
+    let tail = " + 0".repeat(255);
+    let at_limit = format!("{HEADER} law 2 edge = -1{tail} == 0;");
+    assert!(parse_project(&at_limit, SourceLimits::default()).is_ok());
+    assert_eq!(zeno_fcis_spec::MAX_PARSED_EXPRESSION_HEIGHT, 258);
+    let over_limit = format!("{HEADER} law 2 edge = --1{tail} == 0;");
+    let errors = parse_project(&over_limit, SourceLimits::default())
+        .err()
+        .unwrap_or_else(|| panic!("height 259 must refuse"));
+    assert!(errors.to_string().contains("constructed expression height"));
+}
+
 fn limits(bytes: usize, tokens: usize, diagnostics: usize) -> SourceLimits {
     SourceLimits::try_new(bytes, tokens, diagnostics)
         .unwrap_or_else(|| panic!("test limits must be valid"))
@@ -231,5 +246,32 @@ fn source_derived_reads_compose_definition_and_consumer_heights() {
                 .iter()
                 .any(|diagnostic| diagnostic.code() == DiagnosticCode::ResourceLimit)
         );
+    }
+}
+
+#[test]
+fn source_flattened_boolean_strata_keep_recursive_scalar_leaf_heights() {
+    let arithmetic = format!("pre.100.120{}", " + 0".repeat(180));
+    let project = format!(
+        "{HEADER} type 100 state S; type 101 int I in 0..=1; field 120 100 value 101;
+         table 200 100 items 101 size 1;
+         derived table 700 a[i] in table 200 rounds 1 {{
+         default {arithmetic} == 0 || a[i]; }};
+         derived table 701 b[i] in table 200 rounds 1 {{ default a[i] || b[i]; }};"
+    );
+    assert!(parse_project(&project, SourceLimits::default()).is_ok());
+    let expression = format!("choose(b[0], 1, 0){} == 0", " + 0".repeat(100));
+    for outcome in [
+        parse_project(
+            &format!("{project} law 900 deep = {expression};"),
+            SourceLimits::default(),
+        )
+        .map(|_| ()),
+        parse_table_expression(&project, &expression, SourceLimits::default()).map(|_| ()),
+    ] {
+        let errors = outcome
+            .err()
+            .unwrap_or_else(|| panic!("retained scalar leaves must remain bounded"));
+        assert!(errors.to_string().contains("constructed expression height"));
     }
 }

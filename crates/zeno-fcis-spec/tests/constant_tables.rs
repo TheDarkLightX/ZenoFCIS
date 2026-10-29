@@ -3,6 +3,37 @@ use zeno_fcis_spec::{
     CompareOp, ProjectLimits, RelExpr, SourceLimits, ValueExpr, elaborate_project, expand_tables,
     parse_project,
 };
+
+#[test]
+fn constant_table_size_accepts_64_and_refuses_65_with_its_size_diagnostic() {
+    for size in [64, 65] {
+        let source = format!(
+            "zeno 1; project 1 sizes; type 105 int V in 0..=0;
+             const table 110 values 105 size {size} [{}];
+             law 500 last = values[{}] == 0;",
+            vec!["0"; size].join(","),
+            size - 1
+        );
+        if size == 64 {
+            let expanded = expand_tables(&source, SourceLimits::default())
+                .unwrap_or_else(|errors| panic!("64 entries must expand: {errors}"));
+            assert_eq!(
+                project(&source)
+                    .canonical_bytes()
+                    .unwrap_or_else(|errors| panic!("{errors:?}")),
+                project(&expanded.text)
+                    .canonical_bytes()
+                    .unwrap_or_else(|errors| panic!("{errors:?}"))
+            );
+        } else {
+            let errors = parse_project(&source, SourceLimits::default())
+                .err()
+                .unwrap_or_else(|| panic!("65 entries must refuse"));
+            assert!(errors.to_string().contains("size1..64"), "{errors}");
+            assert!(!errors.to_string().contains("constructed expression height"));
+        }
+    }
+}
 fn project(s: &str) -> zeno_fcis_spec::ProjectSpec {
     elaborate_project(
         parse_project(s, SourceLimits::default())
