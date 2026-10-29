@@ -56,8 +56,6 @@ class CertificateBoundaryTests(unittest.TestCase):
             path = root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text('original qualification input')
-        native = checks.REFERENCE.with_name('native-report.json').read_bytes()
-        (root / 'tools/test_data/core_components/native-report.json').write_bytes(native)
         cli = directory / 'cli'
         cli.write_bytes(b'original executable identity')
         return root, cli
@@ -102,7 +100,7 @@ class CertificateBoundaryTests(unittest.TestCase):
             root, cli = self.qualification_inputs(directory)
             # A transition-only refresh must work without a historical native
             # report, and must still bind the current runtime before replay.
-            (root / 'tools/test_data/core_components/native-report.json').unlink()
+            self.assertFalse((root / 'tools/test_data/core_components/native-report.json').exists())
             work = directory / 'qualification'
 
             def refresh_then_stop(command, stage, *args, **kwargs):
