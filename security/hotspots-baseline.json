@@ -3733,7 +3733,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 804,
-      "rank": 30,
+      "rank": 32,
       "score": 89,
       "signals": [
         {
@@ -5939,17 +5939,17 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 19806461,
-    "admitted_files": 1278,
-    "inventory_sha256": "05a44a1d671d189cec440dc00c98a5fbd2a9819b0523774d5a364b23cd0358e5",
-    "ranked_above_minimum": 1093,
+    "admitted_bytes": 20294562,
+    "admitted_files": 1320,
+    "inventory_sha256": "5a8ba0382064cc096af613f075386f26b99ff6f31c3b03dbfe83aeec0af76cf6",
+    "ranked_above_minimum": 1135,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 76,
-      "priority-2": 358,
-      "priority-3": 403,
-      "priority-4": 156,
+      "priority-2": 366,
+      "priority-3": 429,
+      "priority-4": 164,
       "priority-5": 285
     }
   }
