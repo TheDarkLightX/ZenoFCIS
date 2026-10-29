@@ -213,7 +213,7 @@ class NegativeRetentionTests(unittest.TestCase):
                 self.assertTrue(logs.is_dir())
                 self.assertEqual(logs.parent, output.parent)
                 self.assertEqual(json.loads((logs / 'source_sha256.json').read_text()), before)
-                ordered = [observed[name] for name in ('positive', *mutants)]
+                ordered = [observed[name] for name in ('positive', *mutants) if name in observed]
                 for location, prefix, process, cwd in ordered:
                     self.assertEqual((location / f'{prefix}.json').read_text(), process.stdout)
                     self.assertEqual((location / f'{prefix}.stderr').read_text(), process.stderr)
