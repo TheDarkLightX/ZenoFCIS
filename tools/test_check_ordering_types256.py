@@ -25,7 +25,9 @@ class SourceAdmission(unittest.TestCase):
     def test_exact_current_source_and_all_configurations(self):
         admitted = gate.configuration(self.root, self.profile)
         self.assertEqual(len(admitted), 8)
-        self.assertEqual(sum(map(len, admitted.values())), 10)
+        for path, entries in admitted.items():
+            self.assertCountEqual([{k: v for k, v in entry.items() if k != "line"} for entry in entries],
+                                  self.profile["native_configuration_exceptions"].get(path, []))
 
     def test_drift_refuses_before_tools(self):
         with (self.root / gate.SUBJECT).open("a") as stream:
@@ -113,7 +115,7 @@ class ProofAdmission(unittest.TestCase):
         aliases = {m["vir"]: m["display"] for m in
                    (*self.profile["methods"], *self.profile["view_aliases"])}
         self.report = {"verus": {**self.pin, "toolchain": self.pin["rust_toolchain"]},
-                       "verification-results": {"success": True, "verified": 21, "errors": 0,
+                       "verification-results": {"success": True, "verified": 22, "errors": 0,
                             "encountered-error": False, "encountered-vir-error": False,
                             "is-verifying-entire-crate": True},
                        "func-details": {aliases.get(n, n): {} for n in self.profile["functions"]}}
@@ -129,7 +131,7 @@ class ProofAdmission(unittest.TestCase):
             if mode == "filtered":
                 report["verification-results"]["is-verifying-entire-crate"] = False
             elif mode == "partial":
-                report["verification-results"]["verified"] = 20
+                report["verification-results"]["verified"] = 21
             elif mode == "pin":
                 report["verus"]["commit"] = "other"
             elif mode == "extra":
@@ -196,7 +198,7 @@ class ProofAdmission(unittest.TestCase):
             valid = "".join(map(render, self.profile["smt_sections"]))
             path = root / "all.smt2"
             path.write_text(valid)
-            self.assertEqual(gate.smt_coverage(root, root, self.profile)["conditions"], 21)
+            self.assertEqual(gate.smt_coverage(root, root, self.profile)["conditions"], 22)
             variants = [valid.replace(" (check-sat)\n", "", 1), valid + render(self.profile["smt_sections"][0]),
                         valid.replace(self.profile["smt_sections"][0]["source"], "copied.rs", 1),
                         valid.replace(";; Function-Def ", ";; Function-Def wrong::", 1)]

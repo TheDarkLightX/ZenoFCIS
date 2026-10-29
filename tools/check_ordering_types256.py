@@ -74,7 +74,7 @@ def configuration(root, profile, expected=None):
         require(not words.intersection({"assume", "assume_specification", "admit", "axiom",
                 "external_body", "external_fn_specification", "unsafe"}),
                 f"untrusted type-order proof escape: {path}")
-    require(profile["expected_verified"] == 21, "type-order condition count changed")
+    require(profile["expected_verified"] == 22, "type-order condition count changed")
     return admitted
 
 
@@ -139,7 +139,7 @@ def check_inventory(vir, profile):
     require(actual == profile["functions"], "translated contracts, bodies or inventory changed")
     executable = {n for n, r in actual.items() if r["mode"] in ("Exec", "Proof")}
     require(executable == set(profile["body_covered_functions"])
-            and len(executable) == 18 and len(actual) == 36
+            and len(executable) == 19 and len(actual) == 37
             and all("body_sha256" in r for r in actual.values()), "incomplete type-order body coverage")
     nodes = {n[1][2]: dict(zip(n[2::2], n[3::2])) for n in parse_vir(vir)
              if n and n[0] == "Function" and n[1][2] in actual}
@@ -170,7 +170,7 @@ def positive_accepted(proc, report, pin, profile):
     aliases = {m["vir"]: m["display"] for m in (*profile["methods"], *profile["view_aliases"])}
     expected = {aliases.get(n, n) for n in profile["functions"]}
     actual = {n for n in report["func-details"] if n.startswith(NAMESPACE)}
-    return report["verification-results"]["verified"] == 21 and actual == expected
+    return report["verification-results"]["verified"] == 22 and actual == expected
 
 
 def smt_coverage(directory, root, profile):
@@ -185,7 +185,7 @@ def smt_coverage(directory, root, profile):
             require(path.resolve().is_relative_to(root.resolve()), "body outside qualified source")
             actual.append((name, path.resolve().relative_to(root.resolve()).as_posix(), int(line)))
     expected = [(x["function"], x["source"], x["line"]) for x in profile["smt_sections"]]
-    require(queries == 21 and len(expected) == 21 and Counter(actual) == Counter(expected),
+    require(queries == 22 and len(expected) == 22 and Counter(actual) == Counter(expected),
             "missing, duplicate or foreign type-order verification condition")
     return {"conditions": queries, "sections": profile["smt_sections"]}
 

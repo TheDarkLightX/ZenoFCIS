@@ -103,9 +103,10 @@ The complete isolated harness passed 21 verification conditions. Its closure
 includes the seven actual methods, two derived clone bodies, shared comparator,
 and eight checked helper bodies. The gate checks all 36 local function bodies
 and contracts, nine typed method/derive bindings, and all 21 solver sections.
-The raw-bit endpoint lemmas establish inhabited unsigned and signed extrema;
-they do not certify the separate public associated constants or narrow
-constructor conversions.
+At that checkpoint, raw-bit endpoint lemmas established inhabited unsigned and
+signed extrema. They did not certify the separate public associated constants
+or narrow constructor conversions. The constants refinement below covers the
+public constants separately.
 
 Each of seven deliberate actual-method defects produced an intended semantic
 failure in a whole-harness run: swapped constructor limbs, a dropped high limb,
@@ -136,6 +137,158 @@ qualification costs, not benchmark speedups. Later documentation and provenance
 additions preserve all 26 proof and 61 package/configuration input bytes and
 reuse those exact results without relabeling them as fresh runs on a later
 commit.
+
+### Actual associated constants
+
+The abstract specification uses the same integer interpretations as the
+type/order proof: two unsigned limbs mean `low + 2^128 * high`, and signed
+values subtract `2^256` at the `2^255` boundary. The wider unsigned values use
+the corresponding four- or six-limb radix expansion. Constants have no inputs
+or state changes and produce owned fixed-width values.
+
+| Actual associated constant | Exact integer value |
+| --- | --- |
+| `U256::ZERO` | `0` |
+| `U256::ONE` | `1` |
+| `U256::MAX` | `2^256 - 1` |
+| `I256::ZERO` | `0` |
+| `I256::MIN` | `-2^255` |
+| `I256::MAX` | `2^255 - 1` |
+| `U512::ZERO` | `0` |
+| `U768::ZERO` | `0` |
+
+These equations are proved for the actual bodies under the stated assumptions.
+The [numeric harness](../verification/verus/numeric256_harness.rs) imports the
+production arithmetic module directly. Each actual executable constant has its
+own integer postcondition. Checked representation and raw-bit lemmas support
+those refinements; the raw-bit lemmas alone do not certify a public constant.
+The executable initializer expressions are preserved, with erased proof blocks
+and separate implementation blocks for the selected proof scope.
+
+The [reviewed profile](../verification/verus/numeric256_profile.json) lists all
+eight constant obligations, complete translated bodies/contracts, solver sections,
+source bindings and semantic defects. At the constants checkpoint its complete positive closure contained
+53 verification conditions, including imported type/order and legacy wide
+dependencies. Its four semantic controls change unsigned `MAX` by one, move
+the signed `MIN` sign bit, and give each wider `ZERO` a nonzero high limb.
+Every control must reach its intended semantic failure. A parse, build,
+timeout or incomplete result cannot catch a control.
+
+```sh
+python3 tools/check_numeric256.py --out /tmp/numeric256-proof
+```
+
+Use a fresh output directory and the same pinned verifier/process containment
+as the ordering gates. The profile producer is a development tool: its positive
+run does not qualify a profile without review and the complete controls gate.
+The updated type/order closure also checks a representation lemma while
+preserving all earlier type/order contracts and bodies.
+
+Assumptions remain explicit: soundness of the pinned Verus frontend, its vstd
+specifications and SMT solver; Rust integer and array semantics represented by
+that environment; and correspondence of native compilation with the proof
+frontend, including erasure of ghost code and constant annotations. The
+configuration guard and source review do not prove compiler/erasure
+correspondence. Unproved arithmetic blocks are explicitly excluded from this
+harness and supply no callable specifications to the checked closure. Native
+integration tests remain separate evidence.
+
+### Actual conversions
+
+The conversion contracts use the integer meanings above for every legal input,
+without an added precondition. Write `U`, `S` and `W` for the unsigned, signed
+and wider unsigned integer meanings. Every refusal in this table is exactly
+`Failure::Overflow`; an in-range input must succeed with the exact value.
+
+| Actual method | Exact result and acceptance condition |
+| --- | --- |
+| `U256::from_u128(x)` | `U(result) = x` |
+| `U256::try_u128(x)` | Returns `U(x)` exactly when `U(x) < 2^128` |
+| `I256::from_i128(x)` | `S(result) = x`, including both signed 128-bit endpoints |
+| `I256::magnitude(x)` | `U(result) = abs(S(x))`, including `abs(-2^255)` |
+| `I256::from_magnitude(x, negative)` | Returns `-U(x)` or `U(x)` exactly when that signed value fits `[-2^255, 2^255)`; either sign accepts zero |
+| `I256::try_unsigned(x)` | Returns the exact `S(x)` exactly when `S(x) >= 0` |
+| `I256::difference_unsigned(a, b)` | Returns `U(a) - U(b)` exactly when the difference fits the signed range; neither operand is narrowed beforehand |
+| `U512::from_u256(x)` | `W(result) = U(x)` |
+| `U512::narrow(x)` | Returns the exact `W(x)` exactly when `W(x) < 2^256` |
+| `U768::from_u256(x)` | `W(result) = U(x)` |
+| `U768::narrow(x)` | Returns the exact `W(x)` exactly when `W(x) < 2^256` |
+
+These statements are proved for the actual bodies under the stated assumptions.
+The same source-bound numeric harness checks the complete verification closure,
+including the earlier constants and imported dependencies. The profile checks every translated
+local body and contract, the exact input and result types, and every solver
+section. Supporting refinements establish the actual two-complement helper,
+two-limb carry/borrow loops and `U256::checked_sub` used before signed narrowing.
+The loop result claims here concern two limbs; they do not certify every wider
+helper instantiation.
+
+Eight additional semantic controls remove sign extension, retain negative bits
+as a magnitude, admit a nonzero high word, reject the signed minimum magnitude,
+return the wrong failure, reverse a difference's sign, or ignore either wider
+type's top word. Together with the four constant controls, all twelve must
+reach their intended semantic failures in complete harness runs. A missing
+input, parse failure, verifier failure or timeout is inconclusive.
+
+The executable source uses wrapping results with explicit carry/borrow tests,
+primitive Boolean casts, enum patterns and four ordered zero comparisons for
+the 768-bit narrowing guard. These preserve the preceding operations' values,
+flags and refusals while avoiding unspecified library calls in the proof
+frontend. They do not preserve executable source bytes. Native comparisons
+against the preceding overflowing loops cover boundary values, carry/borrow
+chains and deterministic generated inputs across all used widths. A separate
+comparison covers all sixteen zero/nonzero patterns of the four high words.
+These tests supplement the actual-body proofs; they are not exhaustive native
+word enumeration or a compiler-equivalence proof.
+
+Inputs and results remain owned fixed-width values. The helpers mutate only
+their exclusive local arrays and flags; refusals retain no scratch or aliases.
+No decision, metering, publication or effect authority is added. The existing
+Verus/vstd/SMT, integer/array semantics and compiler/ghost-erasure assumptions
+remain explicit. No custom trusted primitive specification is added, and no
+physical runtime-cost bound is established by these refinements.
+
+### Checked addition, subtraction and negation
+
+The same integer meanings give exact contracts for all five existing checked
+256-bit addition, subtraction and negation methods. Every fitting result must
+succeed with its exact value; every other result must be exactly
+`Failure::Overflow`. The contracts impose no added input precondition.
+
+| Actual method | Mathematical result and accepted range |
+| --- | --- |
+| `U256::checked_add(a, b)` | `U(a) + U(b)` in `[0, 2^256)` |
+| `U256::checked_sub(a, b)` | `U(a) - U(b)` in `[0, 2^256)` |
+| `I256::checked_add(a, b)` | `S(a) + S(b)` in `[-2^255, 2^255)` |
+| `I256::checked_sub(a, b)` | `S(a) - S(b)` in `[-2^255, 2^255)` |
+| `I256::checked_neg(a)` | `-S(a)`; the sole refusal is `S(a) = -2^255` |
+
+These statements are proved for the actual bodies under the stated assumptions.
+Unsigned subtraction retains its already checked conversion-dependency
+contract. The actual carry/borrow helpers and sign tests establish the exact
+overflow partitions; no separate executable arithmetic model replaces them.
+A checked endpoint lemma establishes the unique minimum bit pattern needed
+by the actual negation guard.
+
+That guard compares the same two representation words reached by the preceding
+derived wrapper equality. The comparison keeps the minimum-value refusal and
+introduces no state or interface. A native regression compares the preceding
+guard on 64 boundary word pairs, checks exact zero, minimum and maximum
+outcomes, and checks admitted double negation. This supports the source review;
+it does not prove compiler or ghost-erasure correspondence.
+
+Five additional semantic controls miss unsigned carry/borrow boundary cases,
+use the wrong signed addition/subtraction sign partition, or refuse zero
+instead of the minimum. The complete numeric gate retains all seventeen
+constant, conversion and checked-arithmetic controls. Each must reach its
+intended semantic failure in a whole-harness run, with exact typed/body and
+solver-section coverage and source/tool postchecks.
+
+`U256` has no public `checked_neg` method; none is added. The multiply/divide,
+root and rounding families, `I256::try_i128`, wider arithmetic and wider raw
+constructors/views remain outside this proof scope. So do carry/borrow result
+claims for helper widths other than two limbs, compiler/ghost erasure, physical
+resource costs, and the Schema2 and factory obligations below.
 
 ### Earlier schema checkpoint
 
