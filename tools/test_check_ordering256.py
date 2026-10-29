@@ -29,7 +29,7 @@ class OrderingAdmission(unittest.TestCase):
 
     def test_current_shared_sources_are_admitted(self):
         admitted = gate.configuration(self.root, self.profile)
-        self.assertEqual(sum(map(len, admitted.values())), 5)
+        self.assertEqual(sum(map(len, admitted.values())), 26)
 
     def test_source_hash_drift_refuses(self):
         self.change(gate.SUBJECT, (self.root / gate.SUBJECT).read_text() + "\n")

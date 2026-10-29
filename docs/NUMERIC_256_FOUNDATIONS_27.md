@@ -103,9 +103,10 @@ The complete isolated harness passed 21 verification conditions. Its closure
 includes the seven actual methods, two derived clone bodies, shared comparator,
 and eight checked helper bodies. The gate checks all 36 local function bodies
 and contracts, nine typed method/derive bindings, and all 21 solver sections.
-The raw-bit endpoint lemmas establish inhabited unsigned and signed extrema;
-they do not certify the separate public associated constants or narrow
-constructor conversions.
+At that checkpoint, raw-bit endpoint lemmas established inhabited unsigned and
+signed extrema. They did not certify the separate public associated constants
+or narrow constructor conversions. The constants refinement below covers the
+public constants separately.
 
 Each of seven deliberate actual-method defects produced an intended semantic
 failure in a whole-harness run: swapped constructor limbs, a dropped high limb,
@@ -136,6 +137,65 @@ qualification costs, not benchmark speedups. Later documentation and provenance
 additions preserve all 26 proof and 61 package/configuration input bytes and
 reuse those exact results without relabeling them as fresh runs on a later
 commit.
+
+### Actual associated constants
+
+The abstract specification uses the same integer interpretations as the
+type/order proof: two unsigned limbs mean `low + 2^128 * high`, and signed
+values subtract `2^256` at the `2^255` boundary. The wider unsigned values use
+the corresponding four- or six-limb radix expansion. Constants have no inputs
+or state changes and produce owned fixed-width values.
+
+| Actual associated constant | Exact integer value |
+| --- | --- |
+| `U256::ZERO` | `0` |
+| `U256::ONE` | `1` |
+| `U256::MAX` | `2^256 - 1` |
+| `I256::ZERO` | `0` |
+| `I256::MIN` | `-2^255` |
+| `I256::MAX` | `2^255 - 1` |
+| `U512::ZERO` | `0` |
+| `U768::ZERO` | `0` |
+
+These equations are proved for the actual bodies under the stated assumptions.
+The [numeric harness](../verification/verus/numeric256_harness.rs) imports the
+production arithmetic module directly. Each actual executable constant has its
+own integer postcondition. Checked representation and raw-bit lemmas support
+those refinements; the raw-bit lemmas alone do not certify a public constant.
+The executable initializer expressions are preserved, with erased proof blocks
+and separate implementation blocks for the selected proof scope.
+
+The [reviewed profile](../verification/verus/numeric256_profile.json) lists all
+eight obligations, complete translated bodies/contracts, solver sections,
+source bindings and semantic defects. The complete positive closure contains
+53 verification conditions, including imported type/order and legacy wide
+dependencies. Its four semantic controls change unsigned `MAX` by one, move
+the signed `MIN` sign bit, and give each wider `ZERO` a nonzero high limb.
+Every control must reach its intended semantic failure. A parse, build,
+timeout or incomplete result cannot catch a control.
+
+```sh
+python3 tools/check_numeric256.py --out /tmp/numeric256-proof
+```
+
+Use a fresh output directory and the same pinned verifier/process containment
+as the ordering gates. The profile producer is a development tool: its positive
+run does not qualify a profile without review and the complete controls gate.
+The updated type/order closure also checks a representation lemma while
+preserving all earlier type/order contracts and bodies.
+
+Assumptions remain explicit: soundness of the pinned Verus frontend, its vstd
+specifications and SMT solver; Rust integer and array semantics represented by
+that environment; and correspondence of native compilation with the proof
+frontend, including erasure of ghost code and constant annotations. The
+configuration guard and source review do not prove compiler/erasure
+correspondence. Unproved arithmetic blocks are explicitly excluded from this
+harness and supply no callable specifications to the checked closure. Native
+integration tests remain separate evidence.
+
+Conversions, checked add/subtract/negation and the multiply/divide family remain
+open here, along with the Schema2 and factory obligations below. `U256` has no
+public `checked_neg` method in this checkpoint.
 
 ### Earlier schema checkpoint
 

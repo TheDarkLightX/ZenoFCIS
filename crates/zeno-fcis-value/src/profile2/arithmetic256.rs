@@ -1,6 +1,11 @@
 //! PRIVATE arithmetic candidate. No codec, authority, usage or publication API.
 //! Fixed limbs own their values; all mutable arrays are invocation-local scratch.
 use core::cmp::Ordering;
+#[cfg(verus_keep_ghost)]
+use vstd::prelude::*;
+#[cfg(verus_keep_ghost)]
+#[path = "numeric256_model.rs"]
+pub(crate) mod numeric_model;
 
 #[allow(dead_code)]
 #[path = "reference/legacy_wide.rs"]
@@ -11,6 +16,7 @@ mod wide;
 mod legacy_scalar;
 
 /// A checked fixed-width arithmetic refusal.
+#[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Failure {
     /// The result does not fit the requested integer width or signed range.
@@ -25,6 +31,7 @@ pub enum Failure {
     Invariant,
 }
 /// The rounding policy for a checked arithmetic operation.
+#[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Rounding {
     /// Round toward negative infinity.
@@ -39,15 +46,18 @@ pub enum Rounding {
 mod number256;
 pub use number256::{I256, U256};
 /// An owned unsigned 512-bit integer with private least significant word order.
+#[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct U512([u128; 4]);
 /// An owned unsigned 768-bit integer with private least significant word order.
+#[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct U768([u128; 6]);
 
 #[path = "ordering256.rs"]
 mod ordering256;
 use ordering256::compare;
+#[cfg_attr(verus_keep_ghost, verifier::external)]
 fn add<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
     let mut out = [0; N];
     let mut carry = false;
@@ -58,6 +68,7 @@ fn add<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
     }
     (out, carry)
 }
+#[cfg_attr(verus_keep_ghost, verifier::external)]
 fn subtract<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
     let mut out = [0; N];
     let mut borrow = false;
@@ -68,6 +79,7 @@ fn subtract<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
     }
     (out, borrow)
 }
+#[cfg_attr(verus_keep_ghost, verifier::external)]
 fn add_word<const N: usize>(out: &mut [u128; N], at: usize, value: u128) -> Result<(), Failure> {
     if at >= N { return if value == 0 { Ok(()) } else { Err(Failure::Invariant) }; }
     let mut carry = value;
@@ -78,6 +90,7 @@ fn add_word<const N: usize>(out: &mut [u128; N], at: usize, value: u128) -> Resu
     }
     Err(Failure::Invariant)
 }
+#[cfg_attr(verus_keep_ghost, verifier::external)]
 fn multiply<const A: usize, const B: usize, const O: usize>(
     a: [u128; A], b: [u128; B],
 ) -> Result<[u128; O], Failure> {
@@ -94,6 +107,7 @@ fn multiply<const A: usize, const B: usize, const O: usize>(
 }
 /// Adapted from the audited owned zUSD wide divider. The extra shifted bit is
 /// preserved as carry; subtraction's borrow must match it. No quotient narrowing.
+#[cfg_attr(verus_keep_ghost, verifier::external)]
 fn divide<const N: usize>(n: [u128; N], d: [u128; N]) -> Result<([u128; N], [u128; N]), Failure> {
     if d.iter().all(|x| *x == 0) { return Err(Failure::ZeroDivisor); }
     let bits = N.checked_mul(128).ok_or(Failure::Domain)?;
@@ -116,13 +130,40 @@ fn divide<const N: usize>(n: [u128; N], d: [u128; N]) -> Result<([u128; N], [u12
     Ok((q, r))
 }
 
+#[cfg_attr(verus_keep_ghost, cfg_eval)]
+#[cfg_attr(verus_keep_ghost, verus_verify)]
 impl U256 {
     /// The unsigned zero value.
-    pub const ZERO: Self = Self([0, 0]);
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        ensures numeric_model::unsigned(Self::ZERO) == 0,
+    ))]
+    pub const ZERO: Self = {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::constant_bits(); }
+        Self([0, 0])
+    };
     /// The unsigned unit value.
-    pub const ONE: Self = Self([1, 0]);
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        ensures numeric_model::unsigned(Self::ONE) == 1,
+    ))]
+    pub const ONE: Self = {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::constant_bits(); }
+        Self([1, 0])
+    };
     /// The largest unsigned 256-bit value.
-    pub const MAX: Self = Self([u128::MAX, u128::MAX]);
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        ensures numeric_model::unsigned(Self::MAX) == numeric_model::modulus() - 1,
+    ))]
+    pub const MAX: Self = {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::constant_bits(); }
+        Self([u128::MAX, u128::MAX])
+    };
+}
+
+#[cfg_attr(verus_keep_ghost, verifier::external)]
+impl U256 {
     /// Zero-extends an unsigned 128-bit value.
     pub const fn from_u128(x: u128) -> Self { Self([x, 0]) }
     /// Adds two unsigned values, refusing overflow.
@@ -198,9 +239,22 @@ impl U256 {
     }
 }
 
+#[cfg_attr(verus_keep_ghost, cfg_eval)]
+#[cfg_attr(verus_keep_ghost, verus_verify)]
 impl U512 {
     /// The unsigned 512-bit zero value.
-    pub const ZERO: Self = Self([0; 4]);
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        ensures numeric_model::unsigned512(Self::ZERO) == 0,
+    ))]
+    pub const ZERO: Self = {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::wide_representation(); }
+        Self([0; 4])
+    };
+}
+
+#[cfg_attr(verus_keep_ghost, verifier::external)]
+impl U512 {
     /// Constructs a value from four words, least significant word first.
     pub const fn from_words_le(words: [u128; 4]) -> Self { Self(words) }
     /// Returns four words in least significant word order.
@@ -246,9 +300,22 @@ impl U512 {
     }
 }
 
+#[cfg_attr(verus_keep_ghost, cfg_eval)]
+#[cfg_attr(verus_keep_ghost, verus_verify)]
 impl U768 {
     /// The unsigned 768-bit zero value.
-    pub const ZERO: Self = Self([0; 6]);
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        ensures numeric_model::unsigned768(Self::ZERO) == 0,
+    ))]
+    pub const ZERO: Self = {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::wide_representation(); }
+        Self([0; 6])
+    };
+}
+
+#[cfg_attr(verus_keep_ghost, verifier::external)]
+impl U768 {
     /// Zero-extends an unsigned 256-bit value.
     pub const fn from_u256(x: U256) -> Self { Self([x.0[0], x.0[1], 0, 0, 0, 0]) }
     /// Returns the 768-bit quotient and remainder, refusing a zero divisor.
@@ -262,13 +329,42 @@ impl U768 {
     }
 }
 
+#[cfg_attr(verus_keep_ghost, cfg_eval)]
+#[cfg_attr(verus_keep_ghost, verus_verify)]
 impl I256 {
     /// The signed zero value.
-    pub const ZERO: Self = Self(U256::ZERO);
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        ensures numeric_model::signed(Self::ZERO) == 0,
+    ))]
+    pub const ZERO: Self = {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::constant_bits(); }
+        Self(U256::ZERO)
+    };
     /// The smallest signed 256-bit value.
-    pub const MIN: Self = Self(U256([0, 1u128 << 127]));
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        ensures numeric_model::signed(Self::MIN) == -numeric_model::half(),
+    ))]
+    pub const MIN: Self = {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::constant_bits();
+            assert(1u128 << 127 == 170141183460469231731687303715884105728u128) by(bit_vector); }
+        Self(U256([0, 1u128 << 127]))
+    };
     /// The largest signed 256-bit value.
-    pub const MAX: Self = Self(U256([u128::MAX, (1u128 << 127) - 1]));
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        ensures numeric_model::signed(Self::MAX) == numeric_model::half() - 1,
+    ))]
+    pub const MAX: Self = {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::constant_bits();
+            assert(1u128 << 127 == 170141183460469231731687303715884105728u128) by(bit_vector); }
+        Self(U256([u128::MAX, (1u128 << 127) - 1]))
+    };
+}
+
+#[cfg_attr(verus_keep_ghost, verifier::external)]
+impl I256 {
     /// Sign-extends a signed 128-bit value.
     pub const fn from_i128(x: i128) -> Self { Self(U256([x as u128, if x < 0 { u128::MAX } else { 0 }])) }
     fn negative_bits(x: U256) -> U256 {

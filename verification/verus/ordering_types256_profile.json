@@ -3,11 +3,11 @@
   "namespace": "ordering256_types_harness::",
   "scope": "Actual unsigned/signed two-word constructors, getters, sign predicate and numeric comparisons; shared actual C1 and mathematical definitions. No other arithmetic, conversions, associated constants, Schema2 or compiler/erasure proof.",
   "source_hashes": {
-    "crates/zeno-fcis-value/src/profile2/number256.rs": "05c468b78caa0ec206420e53a48ed035b1d3bd056fcc4642164b178d3090f00d",
-    "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs": "b46ad54934a0fce69c42202132d44b513bfed2a61d5360e75ab14d97aa1ec04e",
+    "crates/zeno-fcis-value/src/profile2/number256.rs": "b2c8d2d6019e7b0d5eb46954a60c796df493e37cc171d1c22f1612ace900bdc5",
+    "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs": "a4760c2561e903ee726c2a7489cdfdc2c46483f28861e955e27c32b58d8536a9",
     "crates/zeno-fcis-value/src/profile2/ordering256.rs": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825",
     "crates/zeno-fcis-value/src/profile2/ordering_model.rs": "d02708ccbae41434efc8acb8e8bcd7bd30f2abc04b7256bd32d15421c3f1544a",
-    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "8b9c0b00bc97014739b3aa43157864076cdb8a7dffd704b9793cd1adaa4505ff",
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "10d479b50d52f20c4b369e18a0215a1898be24321bdce5c7451f9be05f355bea",
     "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs": "4db8c554f26546e2fa1995f393508ab56c22fad3401a88407b241409f229f1b8",
     "crates/zeno-fcis-value/src/profile2/reference/legacy_wide_model.rs": "98eac195ee436806f7b3d201543400287635e0a3613dafe0ec128a5e3b2409e9",
     "verification/verus/ordering256_types_harness.rs": "3f249c152d982104cb2712b462cf4038fa87da68f0aa1a69d8cc695af09ffecc"
@@ -63,16 +63,121 @@
       {
         "text": "#[cfg(test)]",
         "following": "#[allow(dead_code)] #[path = \"reference/legacy_scalar.rs\"] mod legacy_scalar;",
-        "reason": "Retained legacy test reference is absent from production and from this proof harness."
+        "reason": "Legacy test reference is excluded from both production and proof builds."
       },
       {
         "text": "#[cfg(test)]",
         "following": "#[path = \"tests.rs\"] mod tests;",
-        "reason": "Retained arithmetic tests are independently run natively; the proof loads only the actual comparator."
+        "reason": "Arithmetic tests are checked separately in native suites."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub enum Failure",
+        "reason": "Verifies the actual closed arithmetic result or rounding datatype and derives."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub enum Rounding",
+        "reason": "Verifies the actual closed arithmetic result or rounding datatype and derives."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub struct U512",
+        "reason": "Verifies the actual owned fixed-width datatype and its derived clone."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub struct U768",
+        "reason": "Verifies the actual owned fixed-width datatype and its derived clone."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl U256 {",
+        "reason": "Expands only erased annotations before the pinned impl frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl U256 {",
+        "reason": "Verifies only the selected actual numeric constants and methods in this impl block."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl I256 {",
+        "reason": "Expands only erased annotations before the pinned impl frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl I256 {",
+        "reason": "Verifies only the selected actual numeric constants and methods in this impl block."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl U512 {",
+        "reason": "Expands only erased annotations before the pinned impl frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl U512 {",
+        "reason": "Verifies only the selected actual numeric constants and methods in this impl block."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl U768 {",
+        "reason": "Expands only erased annotations before the pinned impl frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl U768 {",
+        "reason": "Verifies only the selected actual numeric constants and methods in this impl block."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn add<const N: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn subtract<const N: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn add_word<const N: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn multiply<const A: usize, const B: usize, const O: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn divide<const N: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "impl U256 {",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "impl I256 {",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "impl U512 {",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "impl U768 {",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
       }
     ]
   },
-  "expected_verified": 21,
+  "expected_verified": 22,
   "body_covered_functions": [
     "ordering256_types_harness::number256::impl&%14::cmp",
     "ordering256_types_harness::number256::impl&%14::from_words_le",
@@ -83,6 +188,7 @@
     "ordering256_types_harness::number256::impl&%15::is_negative",
     "ordering256_types_harness::number256::impl&%1::clone",
     "ordering256_types_harness::number256::impl&%8::clone",
+    "ordering256_types_harness::number256::numeric_representation",
     "ordering256_types_harness::number256::ordering_model::boundary_witnesses",
     "ordering256_types_harness::number256::ordering_model::high_half",
     "ordering256_types_harness::number256::ordering_model::lex_two",
@@ -192,6 +298,15 @@
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "e7105d3039861425d831508cdbec7733b4436927a26bb4e1f8322c56fb30e82a",
       "body_sha256": "ce928891cbe8c969edf5d3f184bac5355e1e331284504e3f1bc5abbd0d55611c"
+    },
+    "ordering256_types_harness::number256::numeric_representation": {
+      "mode": "Proof",
+      "signature_sha256": "c506630c5c47ba8db01cf1fa2df8d29049dfc58a4a1e7f271c3c53e460250058",
+      "requires": 0,
+      "ensures": 4,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "e2b1e350f299b4b0aa12750e0fca3c836e705c4d9a79ed94baddc0208ffcf3df",
+      "body_sha256": "3562ddbe0c2fca42f1c7dd2b8711d94db15a760539f5f9296a414fafa9169798"
     },
     "ordering256_types_harness::number256::ordering_model::boundary_witnesses": {
       "mode": "Proof",
@@ -334,8 +449,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "af7943304ee9d5b24287809d04e1529746bcbcd18dc238f5226bd8c0431df2b3",
-      "body_sha256": "d122f47a2bd0370b648cf5e6091a326e8f873ec67b1b417f14c83178f99e01c7"
+      "ensures_sha256": "e64b1ba0520f0ca22d15c040c31dfafae3854006618d0bb446db096ad43aee1d",
+      "body_sha256": "d3e376daab648e790aa4a427086241d4991234e9da2adfb4f030bd46ef12454e"
     },
     "ordering256_types_harness::ordering256::ordering_model::lex_gt": {
       "mode": "Spec",
@@ -344,7 +459,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "b9f47fd4077fad9036fd9a21c72bd5ba6bd60f97b56ade4a9f4682491a190485"
+      "body_sha256": "05461af763628841f571d53cd52a9747381c0855c8ea6be5efb9e86c8cdc9f62"
     },
     "ordering256_types_harness::ordering256::ordering_model::lex_lt": {
       "mode": "Spec",
@@ -353,7 +468,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "374e8e43b54e43bc8a21a1b9889a2212487edb2d74b91db4dcc57f2c11c4162b"
+      "body_sha256": "ec78753d771c4af83f9d3b4dce2cf86acde434a044013f05fc919f27a3e58136"
     },
     "ordering256_types_harness::ordering256::ordering_model::lex_result": {
       "mode": "Spec",
@@ -362,7 +477,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "f89010bca1d7ffd8fd818f3739f3a6f3522351696c251d847a81a8073bda1ac3"
+      "body_sha256": "f280e1047e4a1b6423a0537804c4fcae0ebab058be452bfa32dda7ffc9d5118b"
     },
     "ordering256_types_harness::ordering256::ordering_model::suffix_equal": {
       "mode": "Spec",
@@ -371,7 +486,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "e48cb8aea55229efa3fc2f7b0379385e0b62cd1611c7547f98c7f1ccf72a0052"
+      "body_sha256": "11fffb658b0c4087f4b3321e0e490a447a2c82e047e4d2e48e65ff70971e6521"
     },
     "ordering256_types_harness::wide::ceiling_value": {
       "mode": "Spec",
@@ -380,7 +495,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "79e5c9962cd11ddeb97d0a1eab555e6f3a191a7f435928e2f5c35e962de87246"
+      "body_sha256": "f2e9d63997f4134cd5c86b7aa9e3fff7e1a835296343f3bb9064abfe9e30db79"
     },
     "ordering256_types_harness::wide::floor_value": {
       "mode": "Spec",
@@ -389,7 +504,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "c46c6fc93b68811f84ef4016d6f34cb598b0b5d33b32a9c1b108cbee1c6b4a28"
+      "body_sha256": "38d635d40193c6edba6a150199ec4025061a9c24f37594579a61fa5fb09c14fb"
     },
     "ordering256_types_harness::wide::number2": {
       "mode": "Spec",
@@ -398,7 +513,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "6cb1341dfb32c120078080e8ba45a73a52d65f5d63a431f8644855860ef95cd6"
+      "body_sha256": "b4348360e0b8cf03ee5cbbc1bd6dd19f76a2bb517ea0c45c217008c66b618e15"
     },
     "ordering256_types_harness::wide::number3": {
       "mode": "Spec",
@@ -407,7 +522,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "2213ea5eba9e474a9331318bb4e3349f96ae1dd33502918cde9f4bc4343809d3"
+      "body_sha256": "51a50e5e47d055a7557baca0e3530888ea1682e8b9c1b3dd20cb589f12c503ef"
     },
     "ordering256_types_harness::wide::scale": {
       "mode": "Spec",
@@ -540,6 +655,11 @@
       "function": "ordering256_types_harness::number256::I256::cmp",
       "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
       "line": 111
+    },
+    {
+      "function": "ordering256_types_harness::number256::numeric_representation",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 135
     },
     {
       "function": "ordering256_types_harness::number256::ordering_model::limbs_bounds",

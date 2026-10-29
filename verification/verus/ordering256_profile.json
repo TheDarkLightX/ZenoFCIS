@@ -4,7 +4,7 @@
   "source_hashes": {
     "crates/zeno-fcis-value/src/profile2/ordering256.rs": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825",
     "crates/zeno-fcis-value/src/profile2/ordering_model.rs": "d02708ccbae41434efc8acb8e8bcd7bd30f2abc04b7256bd32d15421c3f1544a",
-    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "8b9c0b00bc97014739b3aa43157864076cdb8a7dffd704b9793cd1adaa4505ff",
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "10d479b50d52f20c4b369e18a0215a1898be24321bdce5c7451f9be05f355bea",
     "crates/zeno-fcis-value/src/profile2/mod.rs": "8e086860ac68d991eeb7b982e8b4ed58a83c77139a326f268dc27d5840d9a6ca",
     "verification/verus/ordering256_harness.rs": "83ed73a6504208f584b6a0f2a77b23525f3caa055b3da248c8d2098ee3faf17f"
   },
@@ -26,12 +26,117 @@
       {
         "text": "#[cfg(test)]",
         "following": "#[allow(dead_code)] #[path = \"reference/legacy_scalar.rs\"] mod legacy_scalar;",
-        "reason": "Retained legacy test reference is absent from production and from this proof harness."
+        "reason": "Legacy test reference is excluded from both production and proof builds."
       },
       {
         "text": "#[cfg(test)]",
         "following": "#[path = \"tests.rs\"] mod tests;",
-        "reason": "Retained arithmetic tests are independently run natively; the proof loads only the actual comparator."
+        "reason": "Arithmetic tests are checked separately in native suites."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub enum Failure",
+        "reason": "Verifies the actual closed arithmetic result or rounding datatype and derives."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub enum Rounding",
+        "reason": "Verifies the actual closed arithmetic result or rounding datatype and derives."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub struct U512",
+        "reason": "Verifies the actual owned fixed-width datatype and its derived clone."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub struct U768",
+        "reason": "Verifies the actual owned fixed-width datatype and its derived clone."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl U256 {",
+        "reason": "Expands only erased annotations before the pinned impl frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl U256 {",
+        "reason": "Verifies only the selected actual numeric constants and methods in this impl block."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl I256 {",
+        "reason": "Expands only erased annotations before the pinned impl frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl I256 {",
+        "reason": "Verifies only the selected actual numeric constants and methods in this impl block."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl U512 {",
+        "reason": "Expands only erased annotations before the pinned impl frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl U512 {",
+        "reason": "Verifies only the selected actual numeric constants and methods in this impl block."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl U768 {",
+        "reason": "Expands only erased annotations before the pinned impl frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl U768 {",
+        "reason": "Verifies only the selected actual numeric constants and methods in this impl block."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn add<const N: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn subtract<const N: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn add_word<const N: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn multiply<const A: usize, const B: usize, const O: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn divide<const N: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "impl U256 {",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "impl I256 {",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "impl U512 {",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "impl U768 {",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
       }
     ],
     "crates/zeno-fcis-value/src/profile2/mod.rs": [

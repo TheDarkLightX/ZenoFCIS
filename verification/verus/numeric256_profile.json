@@ -1,0 +1,1269 @@
+{
+  "schema": "zeno-fcis/numeric256-profile/1",
+  "namespace": "numeric256_harness::",
+  "scope": "The eight actual associated constants and their exact unsigned or two-complement integer values. The complete imported order and legacy-wide proof closure is checked; no conversion or other arithmetic refinement is claimed.",
+  "assumptions": [
+    "Soundness of the pinned Verus frontend, vstd specifications and SMT solver.",
+    "Correspondence between Rust compilation and the proof frontend, including ghost erasure and the reviewed constant annotations.",
+    "Standard Rust fixed-width integer and array semantics as specified by the pinned verifier; native execution is separately tested."
+  ],
+  "obligations": [
+    {
+      "stage": "constants",
+      "member": "U256::ZERO",
+      "meaning": "0",
+      "refinement_display": "numeric256_harness::arithmetic256::U256::ZERO",
+      "parameters": [],
+      "result": "U256",
+      "refinement": "numeric256_harness::arithmetic256::impl&%28::ZERO"
+    },
+    {
+      "stage": "constants",
+      "member": "U256::ONE",
+      "meaning": "1",
+      "refinement_display": "numeric256_harness::arithmetic256::U256::ONE",
+      "parameters": [],
+      "result": "U256",
+      "refinement": "numeric256_harness::arithmetic256::impl&%28::ONE"
+    },
+    {
+      "stage": "constants",
+      "member": "U256::MAX",
+      "meaning": "2^256 - 1",
+      "refinement_display": "numeric256_harness::arithmetic256::U256::MAX",
+      "parameters": [],
+      "result": "U256",
+      "refinement": "numeric256_harness::arithmetic256::impl&%28::MAX"
+    },
+    {
+      "stage": "constants",
+      "member": "I256::ZERO",
+      "meaning": "0",
+      "refinement_display": "numeric256_harness::arithmetic256::I256::ZERO",
+      "parameters": [],
+      "result": "I256",
+      "refinement": "numeric256_harness::arithmetic256::impl&%34::ZERO"
+    },
+    {
+      "stage": "constants",
+      "member": "I256::MIN",
+      "meaning": "-2^255",
+      "refinement_display": "numeric256_harness::arithmetic256::I256::MIN",
+      "parameters": [],
+      "result": "I256",
+      "refinement": "numeric256_harness::arithmetic256::impl&%34::MIN"
+    },
+    {
+      "stage": "constants",
+      "member": "I256::MAX",
+      "meaning": "2^255 - 1",
+      "refinement_display": "numeric256_harness::arithmetic256::I256::MAX",
+      "parameters": [],
+      "result": "I256",
+      "refinement": "numeric256_harness::arithmetic256::impl&%34::MAX"
+    },
+    {
+      "stage": "constants",
+      "member": "U512::ZERO",
+      "meaning": "0",
+      "refinement_display": "numeric256_harness::arithmetic256::U512::ZERO",
+      "parameters": [],
+      "result": "U512",
+      "refinement": "numeric256_harness::arithmetic256::impl&%30::ZERO"
+    },
+    {
+      "stage": "constants",
+      "member": "U768::ZERO",
+      "meaning": "0",
+      "refinement_display": "numeric256_harness::arithmetic256::U768::ZERO",
+      "parameters": [],
+      "result": "U768",
+      "refinement": "numeric256_harness::arithmetic256::impl&%32::ZERO"
+    }
+  ],
+  "controls": [
+    {
+      "stage": "constants",
+      "name": "unsigned_max_off_by_one",
+      "member": "U256::MAX",
+      "old": "Self([u128::MAX, u128::MAX])",
+      "new": "Self([u128::MAX - 1, u128::MAX])",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::impl&%28::MAX",
+      "error_region": [
+        155,
+        162
+      ]
+    },
+    {
+      "stage": "constants",
+      "name": "signed_min_wrong_sign_word",
+      "member": "I256::MIN",
+      "old": "Self(U256([0, 1u128 << 127]))",
+      "new": "Self(U256([0, 1u128 << 126]))",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::impl&%34::MIN",
+      "error_region": [
+        345,
+        353
+      ]
+    },
+    {
+      "stage": "constants",
+      "name": "wide512_zero_nonzero_high",
+      "member": "U512::ZERO",
+      "old": "Self([0; 4])",
+      "new": "Self([0, 0, 0, 1])",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::impl&%30::ZERO",
+      "error_region": [
+        246,
+        253
+      ]
+    },
+    {
+      "stage": "constants",
+      "name": "wide768_zero_nonzero_high",
+      "member": "U768::ZERO",
+      "old": "Self([0; 6])",
+      "new": "Self([0, 0, 0, 0, 0, 1])",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::impl&%32::ZERO",
+      "error_region": [
+        307,
+        314
+      ]
+    }
+  ],
+  "native_configuration_exceptions": {
+    "crates/zeno-fcis-value/src/profile2/number256.rs": [
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub struct U256",
+        "reason": "Marks the actual closed unsigned datatype for the pinned verifier frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub struct I256",
+        "reason": "Marks the actual closed signed datatype for the pinned verifier frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl U256 {",
+        "reason": "Marks only the three actual unsigned constructor/view/order methods; no unrelated arithmetic imported."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl I256 {",
+        "reason": "Marks only the four actual signed constructor/view/sign/order methods; no unrelated arithmetic imported."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl U256 {",
+        "reason": "Eager conditional method annotation expansion prevents duplicate specs in the pinned impl rewriter; proof frontend only."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl I256 {",
+        "reason": "Eager conditional method annotation expansion prevents duplicate specs in the pinned impl rewriter; proof frontend only."
+      }
+    ],
+    "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs": [
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_spec)]",
+        "following": "const RADIX: u128",
+        "reason": "Existing proof-only frontend annotation on the unchanged native constant; no executable branch."
+      }
+    ],
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": [
+      {
+        "text": "#[cfg(test)]",
+        "following": "#[allow(dead_code)] #[path = \"reference/legacy_scalar.rs\"] mod legacy_scalar;",
+        "reason": "Legacy test reference is excluded from both production and proof builds."
+      },
+      {
+        "text": "#[cfg(test)]",
+        "following": "#[path = \"tests.rs\"] mod tests;",
+        "reason": "Arithmetic tests are checked separately in native suites."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub enum Failure",
+        "reason": "Verifies the actual closed arithmetic result or rounding datatype and derives."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub enum Rounding",
+        "reason": "Verifies the actual closed arithmetic result or rounding datatype and derives."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub struct U512",
+        "reason": "Verifies the actual owned fixed-width datatype and its derived clone."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "#[derive(Clone, Copy, Debug, Eq, PartialEq)] pub struct U768",
+        "reason": "Verifies the actual owned fixed-width datatype and its derived clone."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl U256 {",
+        "reason": "Expands only erased annotations before the pinned impl frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl U256 {",
+        "reason": "Verifies only the selected actual numeric constants and methods in this impl block."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl I256 {",
+        "reason": "Expands only erased annotations before the pinned impl frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl I256 {",
+        "reason": "Verifies only the selected actual numeric constants and methods in this impl block."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl U512 {",
+        "reason": "Expands only erased annotations before the pinned impl frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl U512 {",
+        "reason": "Verifies only the selected actual numeric constants and methods in this impl block."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, cfg_eval)]",
+        "following": "#[cfg_attr(verus_keep_ghost, verus_verify)] impl U768 {",
+        "reason": "Expands only erased annotations before the pinned impl frontend."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verus_verify)]",
+        "following": "impl U768 {",
+        "reason": "Verifies only the selected actual numeric constants and methods in this impl block."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn add<const N: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn subtract<const N: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn add_word<const N: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn multiply<const A: usize, const B: usize, const O: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "fn divide<const N: usize>",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "impl U256 {",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "impl I256 {",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "impl U512 {",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      },
+      {
+        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
+        "following": "impl U768 {",
+        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
+      }
+    ],
+    "verification/verus/numeric256_harness.rs": [
+      {
+        "text": "#![cfg_attr(verus_keep_ghost, feature(proc_macro_hygiene, cfg_eval))]",
+        "following": "extern crate alloc;",
+        "reason": "Pinned annotation frontend features; no native branch."
+      }
+    ]
+  },
+  "source_hashes": {
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "10d479b50d52f20c4b369e18a0215a1898be24321bdce5c7451f9be05f355bea",
+    "crates/zeno-fcis-value/src/profile2/numeric256_model.rs": "f0d4caa33054d187ae36c9c5ffd3bcecfac386ffe8c474d89a2990020f2e85ac",
+    "crates/zeno-fcis-value/src/profile2/number256.rs": "b2c8d2d6019e7b0d5eb46954a60c796df493e37cc171d1c22f1612ace900bdc5",
+    "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs": "a4760c2561e903ee726c2a7489cdfdc2c46483f28861e955e27c32b58d8536a9",
+    "crates/zeno-fcis-value/src/profile2/ordering256.rs": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825",
+    "crates/zeno-fcis-value/src/profile2/ordering_model.rs": "d02708ccbae41434efc8acb8e8bcd7bd30f2abc04b7256bd32d15421c3f1544a",
+    "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs": "4db8c554f26546e2fa1995f393508ab56c22fad3401a88407b241409f229f1b8",
+    "crates/zeno-fcis-value/src/profile2/reference/legacy_wide_model.rs": "98eac195ee436806f7b3d201543400287635e0a3613dafe0ec128a5e3b2409e9",
+    "verification/verus/numeric256_harness.rs": "f500b3723743058c4f0c4b02393515953bfcdd98999ce41efd5d4c22277138a2"
+  },
+  "body_covered_functions": [
+    "numeric256_harness::arithmetic256::impl&%15::clone",
+    "numeric256_harness::arithmetic256::impl&%1::clone",
+    "numeric256_harness::arithmetic256::impl&%22::clone",
+    "numeric256_harness::arithmetic256::impl&%28::MAX",
+    "numeric256_harness::arithmetic256::impl&%28::ONE",
+    "numeric256_harness::arithmetic256::impl&%28::ZERO",
+    "numeric256_harness::arithmetic256::impl&%30::ZERO",
+    "numeric256_harness::arithmetic256::impl&%32::ZERO",
+    "numeric256_harness::arithmetic256::impl&%34::MAX",
+    "numeric256_harness::arithmetic256::impl&%34::MIN",
+    "numeric256_harness::arithmetic256::impl&%34::ZERO",
+    "numeric256_harness::arithmetic256::impl&%8::clone",
+    "numeric256_harness::arithmetic256::number256::impl&%14::cmp",
+    "numeric256_harness::arithmetic256::number256::impl&%14::from_words_le",
+    "numeric256_harness::arithmetic256::number256::impl&%14::words_le",
+    "numeric256_harness::arithmetic256::number256::impl&%15::bits",
+    "numeric256_harness::arithmetic256::number256::impl&%15::cmp",
+    "numeric256_harness::arithmetic256::number256::impl&%15::from_bits",
+    "numeric256_harness::arithmetic256::number256::impl&%15::is_negative",
+    "numeric256_harness::arithmetic256::number256::impl&%1::clone",
+    "numeric256_harness::arithmetic256::number256::impl&%8::clone",
+    "numeric256_harness::arithmetic256::number256::numeric_representation",
+    "numeric256_harness::arithmetic256::number256::ordering_model::boundary_witnesses",
+    "numeric256_harness::arithmetic256::number256::ordering_model::high_half",
+    "numeric256_harness::arithmetic256::number256::ordering_model::lex_two",
+    "numeric256_harness::arithmetic256::number256::ordering_model::limbs_bounds",
+    "numeric256_harness::arithmetic256::number256::ordering_model::sign_bit",
+    "numeric256_harness::arithmetic256::number256::ordering_model::signed_bounds",
+    "numeric256_harness::arithmetic256::number256::ordering_model::signed_order",
+    "numeric256_harness::arithmetic256::number256::ordering_model::unsigned_bounds",
+    "numeric256_harness::arithmetic256::numeric_model::constant_bits",
+    "numeric256_harness::arithmetic256::numeric_model::wide_representation",
+    "numeric256_harness::arithmetic256::ordering256::compare",
+    "numeric256_harness::arithmetic256::wide::less_equal",
+    "numeric256_harness::arithmetic256::wide::mul_div_ceil",
+    "numeric256_harness::arithmetic256::wide::mul_div_floor",
+    "numeric256_harness::arithmetic256::wide::multiply",
+    "numeric256_harness::arithmetic256::wide::multiply_three",
+    "numeric256_harness::arithmetic256::wide::products_ge",
+    "numeric256_harness::arithmetic256::wide::quotient_from_interval",
+    "numeric256_harness::arithmetic256::wide::split64"
+  ],
+  "functions": {
+    "numeric256_harness::arithmetic256::impl&%15::clone": {
+      "mode": "Exec",
+      "signature_sha256": "be79936b3aacab1b09ae50ad03624de496ff3ac3d26e3b0bafd81f7aaef92fc3",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "a5debd40bc90cd024a7909be0a6789809173cc2c67d34391718b1083a214f37c",
+      "body_sha256": "333625a385bd9ad69e97084c78be6bc65aae720ae6b96009d0b2321636166864"
+    },
+    "numeric256_harness::arithmetic256::impl&%1::clone": {
+      "mode": "Exec",
+      "signature_sha256": "bfa686e55d762e0635dcf0fde7cc64cfa3da6ae22cd564061befd12471c4ba15",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "9fb6a07d9fdefda98f749b2feb670e0d7390eeff26956f22c07196dd1d153581",
+      "body_sha256": "e4c0b9a7d88b1e74a56febe004c9c83a00c905030915f8f7ecccf1ba7345d9d7"
+    },
+    "numeric256_harness::arithmetic256::impl&%22::clone": {
+      "mode": "Exec",
+      "signature_sha256": "0965734351995b412a4430b50e7bd7735cea1a0b8ec3c58c98339377f08a9e73",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "65dbe98c45db5ae9831b40ea6981b243562c448af0a407d7285fd4c6435b6e8e",
+      "body_sha256": "7b71143557d2398a12dc22452407106b72388b0abc7342fcba20c6b4208078b5"
+    },
+    "numeric256_harness::arithmetic256::impl&%28::MAX": {
+      "mode": "Exec",
+      "signature_sha256": "d99b85a3d25fe5d05b7dc76400e391f1ebebc60289f2bf40dfa1842700bbd360",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "931ea491c3102f38bfa12d98d985ce5bcb853b3b586812450a270ee65ca46ac7",
+      "body_sha256": "f72a39fca7d2865b9af2010cc9c6e60bc9bf321e4c2b566bfb2428007d19c54b"
+    },
+    "numeric256_harness::arithmetic256::impl&%28::ONE": {
+      "mode": "Exec",
+      "signature_sha256": "d99b85a3d25fe5d05b7dc76400e391f1ebebc60289f2bf40dfa1842700bbd360",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "29a645e15b73b21be08653e50e0228c93c05bdbb8fefd05f25bf30b2071233d9",
+      "body_sha256": "aa92fc8456025aa21257744b671b142f64fe34f679e2169ed64f122edcc182fc"
+    },
+    "numeric256_harness::arithmetic256::impl&%28::ZERO": {
+      "mode": "Exec",
+      "signature_sha256": "d99b85a3d25fe5d05b7dc76400e391f1ebebc60289f2bf40dfa1842700bbd360",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "c71f1b465e931a86aa2573871909865269474ac711bc7931c4b434e34a0865c3",
+      "body_sha256": "2f396ef8f2fc3a27e978e4edaaed29c5b6af02bd9a2ae0d1a2fa13c86bbc9738"
+    },
+    "numeric256_harness::arithmetic256::impl&%30::ZERO": {
+      "mode": "Exec",
+      "signature_sha256": "a1a11738b967419d32d69354a2179ffea8580420186823e06097ff97f0350e7a",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "8ca9fb0991aeec0287f4255cbb51be44859578ddb609cf8be25a5e53cbb0dae6",
+      "body_sha256": "8f252c08826400b18ef2118c505e90a32cc173666e73724017c91586099db833"
+    },
+    "numeric256_harness::arithmetic256::impl&%32::ZERO": {
+      "mode": "Exec",
+      "signature_sha256": "20b7a49b4a6616e33a62a2ca0aa304bf7a48c35f31581e0bf57c04c5c061b7cb",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "1911a32f1928ee2e7135905498fe90747222275913dfab201ed431d106154450",
+      "body_sha256": "2b3823bf28767f1ce1713cd7f9f85b6307f64f1d62ebcc630b036c177d37e6e8"
+    },
+    "numeric256_harness::arithmetic256::impl&%34::MAX": {
+      "mode": "Exec",
+      "signature_sha256": "9ef83dc0408ed3f695c446ed89451d33d9cfee1cdba5b362c8acf1030b00df6b",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "1355026b45bf5d579e32cf413c9ad62cd4a858296abd8351d4e2882561007782",
+      "body_sha256": "c1c092d32c2b7b9cd8b28b73d0549ba4e2c73162bc81b6716a881c6fed3be297"
+    },
+    "numeric256_harness::arithmetic256::impl&%34::MIN": {
+      "mode": "Exec",
+      "signature_sha256": "9ef83dc0408ed3f695c446ed89451d33d9cfee1cdba5b362c8acf1030b00df6b",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "2075ed472dd577d494c53d1a2089d0dd46278e9413646f9a0c4adffa578423fa",
+      "body_sha256": "e7362028293ce8fa9fd1b1b48b798fc2eec97bdc2967783b93283c37ad0bcaa1"
+    },
+    "numeric256_harness::arithmetic256::impl&%34::ZERO": {
+      "mode": "Exec",
+      "signature_sha256": "9ef83dc0408ed3f695c446ed89451d33d9cfee1cdba5b362c8acf1030b00df6b",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "eff9d93e3577cffde3d18766efc89d0209f2c3c53f9218f60c8f2ed42470cb1a",
+      "body_sha256": "49b8c6fc9f992b16e36b0a5d1b74011777086e55080b3feda4356f42b4f92f8b"
+    },
+    "numeric256_harness::arithmetic256::impl&%8::clone": {
+      "mode": "Exec",
+      "signature_sha256": "804d3c55eb46b756e687831bdd335893f2ee9646f01294883d703f93208d6dc0",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "1346c4a38fdf26428aa2f2abb2580feb400d259ee38ddc1e1c6b56b60b6f1475",
+      "body_sha256": "ce8399f4f7adaa07c9e91ec0464a1b1c89c10cb0d293866affa0d7e3b0e5bcb3"
+    },
+    "numeric256_harness::arithmetic256::number256::impl&%14::cmp": {
+      "mode": "Exec",
+      "signature_sha256": "43b98b62c9aca375b6fd03e44c933b29420d698422c172d5a79bae39641a69f7",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "8758a5ffd20c8b4e0c7b1fa697a130f9aead22a96f1ae88a8addd9ac0cea07a8",
+      "body_sha256": "e9901cd5db7ccb6c2f9ca40a98e7ad09f73a5c8f4582049e278a01dc0924f6b9"
+    },
+    "numeric256_harness::arithmetic256::number256::impl&%14::from_words_le": {
+      "mode": "Exec",
+      "signature_sha256": "179abd5c0ef9e362cbc203ca61af23743689dbb93331f5b1fc3f881b98ea0046",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "ad653f2af519d751b0ec785556503ce89eb00ea385f739ecf4425fd02cb7c592",
+      "body_sha256": "bdb5e4dac9dc7cb25261b520b8accdb9962fef940bb484df8e201c646c2f493f"
+    },
+    "numeric256_harness::arithmetic256::number256::impl&%14::words_le": {
+      "mode": "Exec",
+      "signature_sha256": "9c6e038f3cba38f5ceb4025c6c7b17c4d3dee456d6473dd24f3083b8fceb9ab8",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "9da9a738e465cefe83fe7144d239663b6d9a886f42a9c6de8c083b48b7809191",
+      "body_sha256": "30b3c3a61f8f551d92dd43c845a817480553d045634f9950e8a826583adbb7fc"
+    },
+    "numeric256_harness::arithmetic256::number256::impl&%15::bits": {
+      "mode": "Exec",
+      "signature_sha256": "7937c94d0f5f796957fe7bda8fa3506addb58143ddabe085f784fa4ed2b20c59",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "94f127e76b76598fc187fe2142bdeb10db124b6440a4df578c6eb5f5ac4bee2d",
+      "body_sha256": "c1f4f265193ac4a1144aa0d6dc85a794dba01fc867117560294b805fc881bf45"
+    },
+    "numeric256_harness::arithmetic256::number256::impl&%15::cmp": {
+      "mode": "Exec",
+      "signature_sha256": "02ab7d261745abe124948ad993629079020df44ea9980d7392cfd59f3bfbb36c",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "bffd15b282052e02e2f29940ae23e3b23123903b292d7615ed7b3595fa858ae6",
+      "body_sha256": "11a394833adfffc19413e50c3abb26a82df875b7ea23b1638ed34f19e5797c2a"
+    },
+    "numeric256_harness::arithmetic256::number256::impl&%15::from_bits": {
+      "mode": "Exec",
+      "signature_sha256": "055891807d3dda704add949eec4fbd1873a802f34911e36bbf2bcc6fc8862154",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "0c6fc94ef21e8e987308950974cda565f5a6b1045f6c8e93fce79f3b155dd01d",
+      "body_sha256": "19fc27ac0083612e795ac968120c0aa06fb16df15a79d23305bbcd2b5b50137b"
+    },
+    "numeric256_harness::arithmetic256::number256::impl&%15::is_negative": {
+      "mode": "Exec",
+      "signature_sha256": "ffcf8d63cfda874e5ed28168d9d15752a0be36af12812a58c59d006d128597cf",
+      "requires": 0,
+      "ensures": 2,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "926b6c05be7e7b68c02c38e0fbba5b1826c37b1346b03fc874353545fca0d90e",
+      "body_sha256": "c24ef0291a8cc51abd30127dbfe5c2de247b9171cc12c9a1307130d8e81031eb"
+    },
+    "numeric256_harness::arithmetic256::number256::impl&%16::ordering_words": {
+      "mode": "Spec",
+      "signature_sha256": "a8983c6af29305bb2b1592d88699e266056cfc11034d37bfaf555f5aff4fd057",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "e67b225edc83a7cb1cfd52afcf329689447b9dc965260cfef0d0855228a2755f"
+    },
+    "numeric256_harness::arithmetic256::number256::impl&%17::ordering_bits": {
+      "mode": "Spec",
+      "signature_sha256": "68d85aee70b0477573eb5d4e9d9992d335fa2414f6fd9ee72fddc02de6af3dc1",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "7d6e5e7a2a97f15ce5f2d06c067b92606f5f6d69775372345eb60ada4bcde710"
+    },
+    "numeric256_harness::arithmetic256::number256::impl&%1::clone": {
+      "mode": "Exec",
+      "signature_sha256": "c3843c310edd208464ef3080043788dfe927ff0d71ccd39252a9fc56b4efc487",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "dbb6beb344fd7cb57f6f0bc18c0385f9b6f3d1931e11ce26bbf9df7c00aa55dc",
+      "body_sha256": "3617502d951ab98737d158c57ba4e3e0f80e4046f51dfd74c242252a16b759ee"
+    },
+    "numeric256_harness::arithmetic256::number256::impl&%8::clone": {
+      "mode": "Exec",
+      "signature_sha256": "00346995f48421cd1081edfa8d14f047fe439fbace55e236eb6f462dd93d7ee2",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "ab8abf8b67dc455d91f654d9be68800dc313745395de96b9e5fba4458491c4ab",
+      "body_sha256": "b4f480d3faed71e8b7fdbf95d3b9de5e9bde021caf4c5c91834c2467a222424e"
+    },
+    "numeric256_harness::arithmetic256::number256::numeric_representation": {
+      "mode": "Proof",
+      "signature_sha256": "c506630c5c47ba8db01cf1fa2df8d29049dfc58a4a1e7f271c3c53e460250058",
+      "requires": 0,
+      "ensures": 4,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "7096acdf9533aa88932549688d1ac2ad9dc1568e3476993e0c069c8c734b160f",
+      "body_sha256": "8251e6fdfd64ec72c4b4c3a4cf9c5a0231a224884c8ad4a7c6a9097fe17c7e1d"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::boundary_witnesses": {
+      "mode": "Proof",
+      "signature_sha256": "c506630c5c47ba8db01cf1fa2df8d29049dfc58a4a1e7f271c3c53e460250058",
+      "requires": 0,
+      "ensures": 4,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "a9faa0e8e5b5638ef12d12fe18cc0d9ed18cf8ca24255e0c26edfc64d81defd6",
+      "body_sha256": "88dcce101087f5a2b2b5854311a536e5cc7b9a2d53b3018ca297d2a97c4e01a8"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::half": {
+      "mode": "Spec",
+      "signature_sha256": "37d17814e2363ec9dd355b7b861569863ca17999f857c62ad579bb3c570c125b",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "1294bb3141cf5eb6249d5e6ee9c08789c3ec6766f1ce4fc081786d6e42045cee"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::high_half": {
+      "mode": "Proof",
+      "signature_sha256": "2e9d61314e384d875c605233efc421aee595c714a80a1f9047f5b4a2426350c3",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "17a461e1ca37bcfc1fb0f6d3497e0da412f847790fd6f77f75832e954d69ba57",
+      "body_sha256": "39394cc5051c7fbdde337d0434dbc69a6b750cb37e2094b5425fafe872b02cc0"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::integer_order": {
+      "mode": "Spec",
+      "signature_sha256": "ebf4ca9dce8f2fa68c5da15acffbf1e160a75eecdc6c59a7d4af7e131dc42f1e",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "626ca14eea62f0a035c33e3664a7d0c4ddf1cef602df178f1ddc4cb65cd19312"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::lex_two": {
+      "mode": "Proof",
+      "signature_sha256": "f51db28092506b4f22b9812f4b847cb0dfa4f06fd23f9bd0990928cee80fb834",
+      "requires": 1,
+      "ensures": 1,
+      "requires_sha256": "de2d159ac09a5b70940b64042f083ead4575b5adcc30063949e4bdb6c4f91c80",
+      "ensures_sha256": "66538ff62481d403ea312f688a8ee1435fd26f16529872f1e1e8664814e3be5b",
+      "body_sha256": "8a9c970d307fd9712922e06a65747542d3cfe29b41a272bab987afb5a41790cf"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::limbs_bounds": {
+      "mode": "Proof",
+      "signature_sha256": "2e9d61314e384d875c605233efc421aee595c714a80a1f9047f5b4a2426350c3",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "44791998d92909f856aacfb431a000eb517aeff42fa937d890c22d0fcf675deb",
+      "body_sha256": "660ec519e2e22c37c196fb8ef7faefbfcab52a22557dd1f1daac8d11b1a6dcfe"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::modulus": {
+      "mode": "Spec",
+      "signature_sha256": "37d17814e2363ec9dd355b7b861569863ca17999f857c62ad579bb3c570c125b",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "529832d4089c2677473a9cd8adf3f97ac68cf003076e94518d0239898b1f780f"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::radix": {
+      "mode": "Spec",
+      "signature_sha256": "37d17814e2363ec9dd355b7b861569863ca17999f857c62ad579bb3c570c125b",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "5085e18c06b0d82ebbb729f23737033914dcb7c4483fc6887ba14c82cde47259"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::sign_bit": {
+      "mode": "Proof",
+      "signature_sha256": "f4721d350bf56e811cf5b3d85b3d7631552801198fd0384312735a12e6dabf7c",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "e8e9fb36f64f7cb0e0c6e5337ccc1ac4d211184d86dc06efb51e2d7004ef04d5",
+      "body_sha256": "3ee6bb44268c4c8dc5f6ee5698cec2f033f4c77d979be6eb8804e931c354d377"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::signed": {
+      "mode": "Spec",
+      "signature_sha256": "37d4d2537052d7b1a3c428194c31b084dd4e585958174994f5657c97a299c8f3",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "e4a6254e70805d55c3fbeecd26c16bd3a8bcdf974a507f2f99a33787cb303e9e"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::signed_bits": {
+      "mode": "Spec",
+      "signature_sha256": "79b674d81fc9f555eff0a7b1d11da88c9d3da778a32669a33e2f6afaf04d76ee",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "e3a02489f3db207c55d211f7e398ddb53bab4e29814d51fd95adac632ae2cbb7"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::signed_bounds": {
+      "mode": "Proof",
+      "signature_sha256": "7ff1ab387b32621acebdfe913289ad78198ae7545abd2c41e48044e21c06d802",
+      "requires": 0,
+      "ensures": 2,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4d97f37f8842e59226dd572052d2a51727b3d3e2b0de060273a3fdfa933015b6",
+      "body_sha256": "47e4ff17a47fae510b13f7710ce1ee70e0dba2536c8b0afe63729cf38f2f3bec"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::signed_order": {
+      "mode": "Proof",
+      "signature_sha256": "598d822ed11f2383d9dc20a7cf7927b6c3af70a649d7afa4d24ef29bbf415ab1",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "fce037ad30222cea8cb9b11c43651277e4f353f77c4a2b1d3e6240ede2ff4cf2",
+      "body_sha256": "eb8c8b6307c178e878e453e676e489fae6fe179bc2c715ee5755b2975914b992"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::unsigned": {
+      "mode": "Spec",
+      "signature_sha256": "28f2e71de8a6525109a064cb97c177680c8e7916c04cb5cf3fb8a79fea56887d",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "589b67e347729feee018fd5c7497cea6464e35308678ebdd6d6aafe586abc306"
+    },
+    "numeric256_harness::arithmetic256::number256::ordering_model::unsigned_bounds": {
+      "mode": "Proof",
+      "signature_sha256": "7ff1ab387b32621acebdfe913289ad78198ae7545abd2c41e48044e21c06d802",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "e07b683eb7a370970811a1258c304d176034850ca52d02e536093656c4580e4d",
+      "body_sha256": "400fed088bbc493248684ac173cdfacb6d47e6858e64ca3ab254058f234ad7f2"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::constant_bits": {
+      "mode": "Proof",
+      "signature_sha256": "c506630c5c47ba8db01cf1fa2df8d29049dfc58a4a1e7f271c3c53e460250058",
+      "requires": 0,
+      "ensures": 7,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "a3501bec33847a11c4d9044a8385a66edca53167ce570c4e89574e62f06255b8",
+      "body_sha256": "d32a7a4ce3d7da50d8673c3e3e8262be72274384d14d5b0ff155695a58818e01"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::impl&%0::numeric_words": {
+      "mode": "Spec",
+      "signature_sha256": "cd9515172b4e3dad1426b745f7777d637276a6057bce7ce1970895bf26429d56",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "1251d5548e831f771b86f7fb96cbaf21375a94952a0bf8af03bd1bac2298c3a4"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::impl&%1::numeric_words": {
+      "mode": "Spec",
+      "signature_sha256": "0f924eb78b462a8a9bb5af0f8c2f26d8f8f06950d45494324803bcd3b1ae35a0",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "82c7ccf68dd7dee9600e56497d9ab47e0eb4d5ffbbc369d486ab2ebec02d4e2c"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::unsigned512": {
+      "mode": "Spec",
+      "signature_sha256": "0bc82b2ece323c8a80f0d08aae9273ebef92c4a5bb2f53a6491d06459028380e",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "ea6fbaaa0d3729979f544b5f78d499a00045153a089bc48afc022e4dcbb2cc37"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::unsigned768": {
+      "mode": "Spec",
+      "signature_sha256": "1e7f86a8c8b945eea45ff4b96bacc41af244b46d81f271381eb1656f6a9d8cc0",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "f2199fe536ab3a0a318b2fbeea6130c4aa714855526cb4662e564a0924249ae3"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::wide_representation": {
+      "mode": "Proof",
+      "signature_sha256": "c506630c5c47ba8db01cf1fa2df8d29049dfc58a4a1e7f271c3c53e460250058",
+      "requires": 0,
+      "ensures": 2,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "e725e0e8a2c8a9afb7dc49ae71bea2c02cd440239bb53bd767378dc71b469cc8",
+      "body_sha256": "da0d477b84302b508e1d4d4de704c9eb72b953ee557c98f6016d94bc2f622729"
+    },
+    "numeric256_harness::arithmetic256::ordering256::compare": {
+      "mode": "Exec",
+      "signature_sha256": "78a44f12be967f8621f044882c167d8536710b3d40a9f3832733ecf264800b43",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "6a0be75ad35c15262a367b34cc2d7e58738d735ffb8474ec60b591dee52d6335",
+      "body_sha256": "e48f4a3cbd2913f3272b107596e8f472bf24dc2837a5442f39a4de07aa58683a"
+    },
+    "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_gt": {
+      "mode": "Spec",
+      "signature_sha256": "b5cc9878fc68c7492897d5f053f23befec5b541b3dfc60eb3182e892e39bab6c",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "91440b25f1594f2e1f01f0a77426aef6c10ae0f10cf21c012018b5bcac25e4d0"
+    },
+    "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_lt": {
+      "mode": "Spec",
+      "signature_sha256": "b5cc9878fc68c7492897d5f053f23befec5b541b3dfc60eb3182e892e39bab6c",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "4aa223c51daa02d43798e3c771589493ce32bc5a0b3f6debda9f78c3d5743c71"
+    },
+    "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_result": {
+      "mode": "Spec",
+      "signature_sha256": "8e69496a27a69fa6fe0eaa2aabac4bb970e593289823f8a097e28b45c67a4831",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "7aa768e61c54352a4fa8c22cb26fe6bc0c2e75eb9ca556d407694e3bfe871833"
+    },
+    "numeric256_harness::arithmetic256::ordering256::ordering_model::suffix_equal": {
+      "mode": "Spec",
+      "signature_sha256": "fa6494b763cc15b6151ce514c83b6e0b69e4c95af79c01c84e2b41e61aae2ecc",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "1f1377f17022fbb17792d5b10420d375da4b3da3d2f69d69a148a7e1eb6bb198"
+    },
+    "numeric256_harness::arithmetic256::wide::RADIX": {
+      "mode": "Spec",
+      "signature_sha256": "0d33b0dca3ae8a616e3a6ed29d8f83bee7ac754d99ae0c471ef962abae4c8961",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "28f910c253b2911d1997c6225946fd5c5eab8847d07112ceac9f3ba1a57c80c5"
+    },
+    "numeric256_harness::arithmetic256::wide::less_equal": {
+      "mode": "Exec",
+      "signature_sha256": "cf86e8705f927b64f5259eafbdf0256cb702d35e927cfccc27409589466e3cb7",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "ddfd0fd66ded2806c36020829eef36259ba28f64788dc5b0a78cb5049d93f360",
+      "body_sha256": "a7529434a0ac0e20cfd13e1c47479fb318c87f3cf9346132bb3382b5120dc302"
+    },
+    "numeric256_harness::arithmetic256::wide::mul_div_ceil": {
+      "mode": "Exec",
+      "signature_sha256": "b2e6de8abca4d73ea0f0568cf6f59143bbbc93cdbb5148902d1931be34aa48fb",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "dc555842ee81b4b04bec39b546945ab4f94e2dcd972aa98e7d44e13c789d16c2",
+      "body_sha256": "92044d10046fdadbe360bbb71072fb69518e461684731be180a3a3a502c10020"
+    },
+    "numeric256_harness::arithmetic256::wide::mul_div_floor": {
+      "mode": "Exec",
+      "signature_sha256": "b2e6de8abca4d73ea0f0568cf6f59143bbbc93cdbb5148902d1931be34aa48fb",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "9883152100f568edc0951f279678689339e1c6a7a63fd145462fe8d545da858a",
+      "body_sha256": "d0a39285baa6ff32d4ab0843b77767fc203fdb740d9be4a27f8c57aa2e623bdf"
+    },
+    "numeric256_harness::arithmetic256::wide::multiply": {
+      "mode": "Exec",
+      "signature_sha256": "7805d063e1605dd786a69ed878f5b97c091414e7c9667cb348f2ae7b46fda362",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "7d729106fef225f0f822f62a239285cf38539371a9f0d776121e9d026464c1b3",
+      "body_sha256": "fc745eae3fab98ee8d9599360e6f0c367cd18999a801d96f296a48685fc5932f"
+    },
+    "numeric256_harness::arithmetic256::wide::multiply_three": {
+      "mode": "Exec",
+      "signature_sha256": "e349341abcea1c6e3025abadcf5ff880b10cba1990575b3fc4a14b021b0247e5",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "57232409aa7efde3bf8531daaf40012f1919625d95e2a7d175d254560583d386",
+      "body_sha256": "da527cd060de585842ad0645fe8f8c8be0db53b5f11faedfc2ca307f90d670df"
+    },
+    "numeric256_harness::arithmetic256::wide::products_ge": {
+      "mode": "Exec",
+      "signature_sha256": "8f1a0769d46b8706c194f270e887b993dc2159477f76b8bf912cba54e5d08024",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "51eaabca135566a62ec1bcb0a6a4f93a3b710eb647fdb17563c7cd2e41c7d9ea",
+      "body_sha256": "a6449292b813632293b34f3536f906f836f4028738f23146fc7713f6ec23dfef"
+    },
+    "numeric256_harness::arithmetic256::wide::quotient_from_interval": {
+      "mode": "Proof",
+      "signature_sha256": "19043915e9afa9f46e30b7d5e92e0c6e309a9d0829dd78002b018b65ad67514e",
+      "requires": 3,
+      "ensures": 1,
+      "requires_sha256": "83ba454b144d4be916d87ec75de99420620974de5880288960d94e3b63a452dc",
+      "ensures_sha256": "0bdf48da08ed8c56b5cba25630f54711f0a7f66175247b3e265331b5bfd8f5aa",
+      "body_sha256": "8a5cf87864d71d618f5c474c75168f7897f6795db1f0631c306d5cfeea876765"
+    },
+    "numeric256_harness::arithmetic256::wide::split64": {
+      "mode": "Proof",
+      "signature_sha256": "5e8c58517f40f2d46a784202d64e5e4850bfce5d62b98f1ffaeef7f4d90e3148",
+      "requires": 0,
+      "ensures": 3,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "2808dd7626ed617a1732774d8d8e0be92887d5edefc1f912f531005a4db03f8b",
+      "body_sha256": "24fd2547af3fdc27518da4c6e28dc9ee61d93a9d5cf37c3b3788e950c0cdcb34"
+    },
+    "numeric256_harness::arithmetic256::wide::wide_model::ceiling_value": {
+      "mode": "Spec",
+      "signature_sha256": "0451a586f77f9027e067479771ae6bb97ec1eec6ce1e24ed0659d144a92e4c8e",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "ff59310c167101a2e052eccec35115ec7ec1b62eba317f41d13ae307f2e06010"
+    },
+    "numeric256_harness::arithmetic256::wide::wide_model::floor_value": {
+      "mode": "Spec",
+      "signature_sha256": "0451a586f77f9027e067479771ae6bb97ec1eec6ce1e24ed0659d144a92e4c8e",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "f461eb4f96da84cee971fb25c6e311d2ab6bc20b2133e49198a83928723ead48"
+    },
+    "numeric256_harness::arithmetic256::wide::wide_model::number2": {
+      "mode": "Spec",
+      "signature_sha256": "52c36f78a7dd72121693ff7708afe0343107dd15f7d120a9a558f5ee0afae79c",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "58f84f30eb4649c7b5e43f595a7a423373a770c3f3da2d307817f36790d32b14"
+    },
+    "numeric256_harness::arithmetic256::wide::wide_model::number3": {
+      "mode": "Spec",
+      "signature_sha256": "72f55d661e82e824535969506d4f79f1d37d6686400fbc3c25c4fa0891afb042",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "0e0af383a4d28c6c347de4b4be93fa7dffc5202ccd12cc29e6003834abaaec30"
+    },
+    "numeric256_harness::arithmetic256::wide::wide_model::scale": {
+      "mode": "Spec",
+      "signature_sha256": "37d17814e2363ec9dd355b7b861569863ca17999f857c62ad579bb3c570c125b",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "d2079666138d02a7a1e88f3b85e0083c6abc1b33c4bfbb37698a81a4bc01f58a"
+    }
+  },
+  "report_functions": [
+    "numeric256_harness::arithmetic256::Failure::clone",
+    "numeric256_harness::arithmetic256::Rounding::clone",
+    "numeric256_harness::arithmetic256::U512::clone",
+    "numeric256_harness::arithmetic256::U512::numeric_words",
+    "numeric256_harness::arithmetic256::U768::clone",
+    "numeric256_harness::arithmetic256::U768::numeric_words",
+    "numeric256_harness::arithmetic256::impl&%28::MAX",
+    "numeric256_harness::arithmetic256::impl&%28::ONE",
+    "numeric256_harness::arithmetic256::impl&%28::ZERO",
+    "numeric256_harness::arithmetic256::impl&%30::ZERO",
+    "numeric256_harness::arithmetic256::impl&%32::ZERO",
+    "numeric256_harness::arithmetic256::impl&%34::MAX",
+    "numeric256_harness::arithmetic256::impl&%34::MIN",
+    "numeric256_harness::arithmetic256::impl&%34::ZERO",
+    "numeric256_harness::arithmetic256::number256::I256::bits",
+    "numeric256_harness::arithmetic256::number256::I256::clone",
+    "numeric256_harness::arithmetic256::number256::I256::cmp",
+    "numeric256_harness::arithmetic256::number256::I256::from_bits",
+    "numeric256_harness::arithmetic256::number256::I256::is_negative",
+    "numeric256_harness::arithmetic256::number256::I256::ordering_bits",
+    "numeric256_harness::arithmetic256::number256::U256::clone",
+    "numeric256_harness::arithmetic256::number256::U256::cmp",
+    "numeric256_harness::arithmetic256::number256::U256::from_words_le",
+    "numeric256_harness::arithmetic256::number256::U256::ordering_words",
+    "numeric256_harness::arithmetic256::number256::U256::words_le",
+    "numeric256_harness::arithmetic256::number256::numeric_representation",
+    "numeric256_harness::arithmetic256::number256::ordering_model::boundary_witnesses",
+    "numeric256_harness::arithmetic256::number256::ordering_model::half",
+    "numeric256_harness::arithmetic256::number256::ordering_model::high_half",
+    "numeric256_harness::arithmetic256::number256::ordering_model::integer_order",
+    "numeric256_harness::arithmetic256::number256::ordering_model::lex_two",
+    "numeric256_harness::arithmetic256::number256::ordering_model::limbs_bounds",
+    "numeric256_harness::arithmetic256::number256::ordering_model::modulus",
+    "numeric256_harness::arithmetic256::number256::ordering_model::radix",
+    "numeric256_harness::arithmetic256::number256::ordering_model::sign_bit",
+    "numeric256_harness::arithmetic256::number256::ordering_model::signed",
+    "numeric256_harness::arithmetic256::number256::ordering_model::signed_bits",
+    "numeric256_harness::arithmetic256::number256::ordering_model::signed_bounds",
+    "numeric256_harness::arithmetic256::number256::ordering_model::signed_order",
+    "numeric256_harness::arithmetic256::number256::ordering_model::unsigned",
+    "numeric256_harness::arithmetic256::number256::ordering_model::unsigned_bounds",
+    "numeric256_harness::arithmetic256::numeric_model::constant_bits",
+    "numeric256_harness::arithmetic256::numeric_model::unsigned512",
+    "numeric256_harness::arithmetic256::numeric_model::unsigned768",
+    "numeric256_harness::arithmetic256::numeric_model::wide_representation",
+    "numeric256_harness::arithmetic256::ordering256::compare",
+    "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_gt",
+    "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_lt",
+    "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_result",
+    "numeric256_harness::arithmetic256::ordering256::ordering_model::suffix_equal",
+    "numeric256_harness::arithmetic256::wide::RADIX",
+    "numeric256_harness::arithmetic256::wide::less_equal",
+    "numeric256_harness::arithmetic256::wide::mul_div_ceil",
+    "numeric256_harness::arithmetic256::wide::mul_div_floor",
+    "numeric256_harness::arithmetic256::wide::multiply",
+    "numeric256_harness::arithmetic256::wide::multiply_three",
+    "numeric256_harness::arithmetic256::wide::products_ge",
+    "numeric256_harness::arithmetic256::wide::quotient_from_interval",
+    "numeric256_harness::arithmetic256::wide::split64",
+    "numeric256_harness::arithmetic256::wide::wide_model::ceiling_value",
+    "numeric256_harness::arithmetic256::wide::wide_model::floor_value",
+    "numeric256_harness::arithmetic256::wide::wide_model::number2",
+    "numeric256_harness::arithmetic256::wide::wide_model::number3",
+    "numeric256_harness::arithmetic256::wide::wide_model::scale"
+  ],
+  "expected_verified": 53,
+  "smt_sections": [
+    {
+      "function": "numeric256_harness::arithmetic256::Failure::clone",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 20
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::Rounding::clone",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 35
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::U512::clone",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 50
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::U768::clone",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 54
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::impl&%28::ZERO",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 140
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::impl&%28::ONE",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 149
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::impl&%28::MAX",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 158
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::impl&%30::ZERO",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 249
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::impl&%32::ZERO",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 310
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::impl&%34::ZERO",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 339
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::impl&%34::MIN",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 348
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::impl&%34::MAX",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 358
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::U256::clone",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 12
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::I256::clone",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 16
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::numeric_representation",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 135
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::U256::from_words_le",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 26
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::U256::words_le",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 35
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::U256::cmp",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 49
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::I256::from_bits",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 70
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::I256::bits",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 79
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::I256::is_negative",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 90
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::I256::cmp",
+      "source": "crates/zeno-fcis-value/src/profile2/number256.rs",
+      "line": 111
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::ordering_model::limbs_bounds",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 33
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::ordering_model::lex_two",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 49
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::ordering_model::sign_bit",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 110
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::ordering_model::high_half",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 116
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::ordering_model::unsigned_bounds",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 129
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::ordering_model::signed_bounds",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 136
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::ordering_model::signed_order",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 145
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::ordering_model::boundary_witnesses",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 164
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::ordering_model::limbs_bounds",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 38
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::ordering_model::sign_bit",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs",
+      "line": 113
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::wide_representation",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 13
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::constant_bits",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 33
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::ordering256::compare",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering256.rs",
+      "line": 21
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::ordering256::compare",
+      "source": "crates/zeno-fcis-value/src/profile2/ordering256.rs",
+      "line": 13
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::RADIX",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 9
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::split64",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 19
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::quotient_from_interval",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 27
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::multiply",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 41
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::multiply_three",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 110
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::less_equal",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 153
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::products_ge",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 165
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::mul_div_floor",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 216
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::mul_div_floor",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 181
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::mul_div_ceil",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 244
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::multiply",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 75
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::multiply",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 85
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::multiply_three",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 123
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::multiply_three",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 135
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::wide::quotient_from_interval",
+      "source": "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs",
+      "line": 31
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::impl&%34::MAX",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 361
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::impl&%34::MIN",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 351
+    }
+  ]
+}

@@ -161,7 +161,7 @@ pub(crate) proof fn signed_order(a: U256, b: U256)
 }
 
 /// Concrete inhabited endpoints. This candidate is not a checked witness yet.
-pub(crate) proof fn boundary_witnesses()
+pub(super) proof fn boundary_witnesses()
     ensures
         unsigned(U256([0, 0])) == 0,
         unsigned(U256([u128::MAX, u128::MAX])) == modulus() - 1,

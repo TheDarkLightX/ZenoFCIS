@@ -130,4 +130,20 @@ impl U256 {
 impl I256 {
     pub closed spec fn ordering_bits(&self) -> U256 { self.0 }
 }
+
+/// Reveals the representation only in proof; no mutable reference escapes.
+pub(super) proof fn numeric_representation()
+    ensures
+        forall|value: U256| #[trigger] value.ordering_words() == value.0,
+        forall|value: I256| #[trigger] value.ordering_bits() == value.0,
+        forall|value: U256| #[trigger] ordering_model::unsigned(value)
+            == super::wide::number2(value.0),
+        forall|value: I256| #[trigger] ordering_model::signed(value)
+            == if super::wide::number2(value.0.0) >= ordering_model::half() {
+                super::wide::number2(value.0.0) - ordering_model::modulus()
+            } else { super::wide::number2(value.0.0) },
+{
+    reveal(U256::ordering_words);
+    reveal(I256::ordering_bits);
+}
 }
