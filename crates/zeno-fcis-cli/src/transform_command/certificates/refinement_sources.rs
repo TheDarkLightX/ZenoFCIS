@@ -214,7 +214,7 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/evaluator.rs",
-        "5db95f02924f3fd52975848678f24bd47c6a8bc5e84a89485a65527bf76fb2eb",
+        "26bbd177dd87d6643df85dd4b1e0d0877b48baf60be03591c4a3950c96635289",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/family_spec.rs",
@@ -636,11 +636,11 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "Cargo.lock",
-        "ebdae23dea679a4a817d4e668ac8b68c1dd7560b4f1b6b87d9bfdf51bf909c88",
+        "c7b2161a386610144e5f23ecd05ea304a71d6c910edc11bc3387021956518ba7",
     ),
     (
         "Cargo.toml",
-        "f888b3e61952f6e6245c34af2d2b200b995de12cb0c365b274ce9fcd0b5e9156",
+        "0e73f02a7aa80134a65b00d0f7942b98076c3bae76673f14ef8d501e52913d1e",
     ),
     (
         "crates/zeno-fcis-cli/src/symbolic.rs",
@@ -660,7 +660,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-codec/Cargo.toml",
-        "c81261ddf1027a53fbd07e91ba1bc374a8b30fa98698a9bee6cdc244119ec65f",
+        "8b468f921361bd679baeb4e7e466c04a6230f84296f9b67a3dfbc45e7a12442e",
     ),
     (
         "crates/zeno-fcis-codec/src/artifact.rs",
@@ -688,7 +688,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-codec/src/lib.rs",
-        "adad2a8d651a15f85fe8430e7a394ac852e0bf177b6f6c6140ede16840839643",
+        "3bfc4893d883de4400ee8b0fdc6293efbe241eda150f0f8281aeaab2cb998d3b",
     ),
     (
         "crates/zeno-fcis-codec/src/providers.rs",
@@ -696,7 +696,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-collections/Cargo.toml",
-        "bb690b17ef05ed14e967c5c0ce39f9ab83c85e15fe7a18525dcf3cf43ffa8fa5",
+        "1bdeb563121fc527a23784f0943177821cd56953c7dd2588abbc66d5b2c70419",
     ),
     (
         "crates/zeno-fcis-collections/src/bounded.rs",
@@ -740,7 +740,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-crypto/Cargo.toml",
-        "934fa2e125569112a0832c5131033002f8181ba38edf1fb73e5d6af71553eed0",
+        "c539001bde729b43e30ddada81b91c8596722d738c5e4a0aee611ff7693bb614",
     ),
     (
         "crates/zeno-fcis-crypto/src/lib.rs",
@@ -748,7 +748,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/Cargo.toml",
-        "9c371c1d99b95b0cdc902cc23c86096a0dfd458699651629a7fa52db048643b7",
+        "80b8ae9da3f3d8971184151f5dbb9d5dedeecd08baa9d02c5d3b28cf31e0f7ce",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/canonical_v2/envelope.rs",
@@ -1688,7 +1688,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-value/Cargo.toml",
-        "216653044e5c69a81f39692282ab40de52dd3baf4d6a6c66a44ec31e6e4d1701",
+        "627768a842ae6bc4486b1527686cfda6fa5bca02e356659de25991a9f42087e2",
     ),
     (
         "crates/zeno-fcis-value/src/decoder_bytes.rs",
@@ -1704,7 +1704,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-value/src/lib.rs",
-        "6ea5e1ff27abf83524c13c4ebab0fd45c540683920ce22842d050410a1e1af97",
+        "1a899279f23e5957a6f17345a5385337fa5b0fb29374a26e524bcd10c911d07e",
     ),
     (
         "release/historical-24-copy.json",

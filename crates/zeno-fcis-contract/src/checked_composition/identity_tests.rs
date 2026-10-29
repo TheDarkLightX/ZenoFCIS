@@ -15,6 +15,7 @@ const REVIEWED_FILES: &[&str] = &[
     "src/checked_composition/assembly_differential_tests.rs",
     "src/checked_composition/assembly_tests.rs",
     "src/checked_composition/compose_tests.rs",
+    "src/checked_composition/coupling_cuts_tests.rs",
     "src/checked_composition/domain_tests.rs",
     "src/checked_composition/hierarchy_tests.rs",
     "src/checked_composition/identity_tests.rs",

@@ -320,7 +320,7 @@ fn the_constructor_refuses_tables_over_the_ceiling_before_building() {
 /// Derive current program identities through the ordinary native producer while
 /// retaining the historical fixture's external source pins and all other data.
 fn current_guarded_fixture() -> (String, Vec<super::LeafSources>) {
-    let (historical, sources) = committed("guarded/composition.json");
+    let (historical, sources) = committed("guarded/historical-composition.json");
     let mut manifest: Value = serde_json::from_str(&historical).unwrap_or_else(fail);
     let components = manifest["components"]
         .as_array_mut()
@@ -341,7 +341,7 @@ fn current_guarded_fixture() -> (String, Vec<super::LeafSources>) {
 
 #[test]
 fn native_bridge_27_historical_program_bindings_refuse_before_current_derivation() {
-    let (historical, sources) = committed("guarded/composition.json");
+    let (historical, sources) = committed("guarded/historical-composition.json");
     let refusal = JointComposition::from_sources(&DomainSources {
         manifest: &historical,
         components: &sources,
