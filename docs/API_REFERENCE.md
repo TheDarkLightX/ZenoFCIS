@@ -1,8 +1,10 @@
 # API reference
 
-This guide documents the `2.6.0` source. Its retained V1
-protocol guidance is historical; see [the release notes](RELEASE_NOTES.md)
-for the current checked API and assurance boundaries.
+The workspace development version is `2.7.0-rc.1`; full qualification is
+incomplete. See the [continuation guide](DEVELOPMENT_27.md) and
+[open requirements](FACTORY_GAPS_27.md). This guide retains the `2.6.0` API
+baseline and historical V1 protocol guidance; [the earlier release notes](RELEASE_NOTES.md)
+state that baseline's assurance boundaries.
 
 The 2.6.0 source uses the checked program family by default. `zeno_fcis::Program` is the existing private Authority; `bind_catalog` and `bind_program` perform actual admission. Original envelopes enter `Program::publish`/`publish_genesis`; only successful library evaluation returns a private publication capability. See [migration](V2_PROGRAM_API_MIGRATION.md) for declaration modules, refusal/replay behavior and remaining lower-level obligations.
 

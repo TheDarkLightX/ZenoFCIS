@@ -115,7 +115,7 @@ pub(super) fn capture(
         if ((*name == FILES[0] || *name == BINDING || *name == MAP) && bytes.len() > TEXT_LIMIT)
             || std::str::from_utf8(bytes).is_err()
         {
-            return Err(invalid(*name, "app provenance text is not bounded UTF-8"));
+            return Err(invalid(name, "app provenance text is not bounded UTF-8"));
         }
     }
     let binding = json(&raw[1], BINDING)?;

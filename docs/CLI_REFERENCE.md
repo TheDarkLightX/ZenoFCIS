@@ -1,8 +1,10 @@
 # `zeno-fcis` CLI reference
 
-This guide documents the `2.6.0` source. Its retained V1
-protocol guidance is historical; see [the release notes](RELEASE_NOTES.md)
-for the current checked API and assurance boundaries.
+The workspace development version is `2.7.0-rc.1`; full qualification is
+incomplete. See the [continuation guide](DEVELOPMENT_27.md) and
+[open requirements](FACTORY_GAPS_27.md). This guide retains the `2.6.0` command
+baseline and historical V1 guidance; [the earlier release notes](RELEASE_NOTES.md)
+state that baseline's assurance boundaries.
 
 The `zeno-fcis-cli` package in `2.6.0` publishes the `zeno-fcis` binary.
 It pins `clap = 4.6.1` without environment parsing or color output.
