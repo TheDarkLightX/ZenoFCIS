@@ -49,6 +49,20 @@ def flip_digest(original: str) -> str:
     return changed
 
 
+def native_arguments(artifacts: dict[str, str]) -> list[str]:
+    expected = {'zeno_fcis_codec', 'zeno_fcis_value', 'zeno_fcis_collections', 'zeno_fcis_crypto'}
+    if set(artifacts) != expected:
+        raise ValueError('replay requires the codec, value, collections and crypto native artifacts')
+    paths = {name: Path(path).resolve() for name, path in artifacts.items()}
+    directories = {path.parent for path in paths.values()}
+    if len(directories) != 1:
+        raise ValueError('replay artifacts must share one prepared dependency directory')
+    arguments = ['-L', 'dependency=' + str(next(iter(directories)))]
+    for name, path in sorted(paths.items()):
+        arguments += ['--extern', name + '=' + str(path)]
+    return arguments
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out',required=True,type=Path)
@@ -62,12 +76,8 @@ def main():
         shutil.copyfile(gate.ROOT/relative,target)
     public=specimen/gate.PUBLIC_TEST;public.write_text(public.read_text()+PROBE)
     artifacts=json.loads(args.artifacts.read_text())
-    assert set(artifacts)=={'zeno_fcis_codec','zeno_fcis_value'}
-    deps=Path(artifacts['zeno_fcis_codec']).parent
-    if deps.name != 'deps':deps=deps/'deps'
     rust=['rustc','+1.97.1','--edition=2024','--check-cfg','cfg(verus_keep_ghost)',
-          '--check-cfg','cfg(test)','-C','debuginfo=0','-L','dependency='+str(deps)]
-    for name,path in sorted(artifacts.items()):rust+=['--extern',name+'='+path]
+          '--check-cfg','cfg(test)','-C','debuginfo=0',*native_arguments(artifacts)]
     env={**os.environ,'CARGO_MANIFEST_DIR':str(specimen/'crates/zeno-fcis-synthesis'),
          'ZENO_EVALUATOR_FIXTURES':str(out)}
     records=[]
