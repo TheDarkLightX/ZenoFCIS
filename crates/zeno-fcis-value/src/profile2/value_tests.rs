@@ -6,23 +6,31 @@ fn wide_extrema_are_fixed_numeric_bytes_with_nominal_tags() {
     let mut unsigned_max = vec![0x0d];
     unsigned_max.extend([0xff; 32]);
     assert_eq!(
-        Value::unsigned256(U256::MAX).zcve_bytes().unwrap(),
+        Value::unsigned256(U256::MAX)
+            .zcve_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         unsigned_max
     );
     let mut signed_min = vec![0x0e, 0x80];
     signed_min.extend([0; 31]);
     assert_eq!(
-        Value::signed256(I256::MIN).zcve_bytes().unwrap(),
+        Value::signed256(I256::MIN)
+            .zcve_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         signed_min
     );
     let mut minus_one = vec![0x0e];
     minus_one.extend([0xff; 32]);
     assert_eq!(
-        Value::signed256(I256::from_i128(-1)).zcve_bytes().unwrap(),
+        Value::signed256(I256::from_i128(-1))
+            .zcve_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         minus_one
     );
     let value = Value::unsigned256(U256::from_words_le([1, 2]));
-    let bytes = value.zcve_bytes().unwrap();
+    let bytes = value
+        .zcve_bytes()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(bytes.len(), 33);
     assert_eq!(bytes[16], 2);
     assert_eq!(bytes[32], 1);
@@ -34,33 +42,58 @@ fn wide_extrema_are_fixed_numeric_bytes_with_nominal_tags() {
 fn complete_legacy_tree_lifts_byte_identically_and_narrows_explicitly() {
     use crate::{Field as F, MapEntry as E, Value as L};
     let map = L::normalize_map(vec![
-        E::try_new(L::signed(-1), L::unit()).unwrap(),
-        E::try_new(L::unsigned(0), L::boolean(true)).unwrap(),
+        E::try_new(L::signed(-1), L::unit())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        E::try_new(L::unsigned(0), L::boolean(true))
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ])
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     let legacy = L::tuple(vec![
         L::unit(),
         L::boolean(false),
         L::boolean(true),
         L::unsigned(u128::MAX),
         L::signed(i128::MIN),
-        L::bytes(vec![0, 255]).unwrap(),
-        L::text_ascii(String::from("ASCII")).unwrap(),
+        L::bytes(vec![0, 255]).unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        L::text_ascii(String::from("ASCII"))
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         L::enumeration(0, 0),
-        L::record_canonical(vec![F::new(0, L::unit()), F::new(u16::MAX, L::signed(-1))]).unwrap(),
+        L::record_canonical(vec![F::new(0, L::unit()), F::new(u16::MAX, L::signed(-1))])
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         L::sum(u32::MAX, u16::MAX, None),
-        L::sum(0, 0, Some(L::vector(vec![L::unit()]).unwrap())),
+        L::sum(
+            0,
+            0,
+            Some(
+                L::vector(vec![L::unit()])
+                    .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+            ),
+        ),
         map,
     ])
-    .unwrap();
-    let lifted = Value::lift_legacy(&legacy, ValueLimits::default()).unwrap();
-    assert_eq!(lifted.zcve_bytes().unwrap(), legacy.zcve_bytes().unwrap());
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    let lifted = Value::lift_legacy(&legacy, ValueLimits::default())
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(
-        lifted.validate_limits(ValueLimits::default()).unwrap(),
-        legacy.validate_limits(ValueLimits::default()).unwrap()
+        lifted
+            .zcve_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        legacy
+            .zcve_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
     );
     assert_eq!(
-        lifted.try_into_legacy(ValueLimits::default()).unwrap(),
+        lifted
+            .validate_limits(ValueLimits::default())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        legacy
+            .validate_limits(ValueLimits::default())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+    );
+    assert_eq!(
+        lifted
+            .try_into_legacy(ValueLimits::default())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         legacy
     );
 }
@@ -71,15 +104,23 @@ fn nested_wide_zero_cannot_silently_narrow() {
     let values = vec![
         wide.clone(),
         Value::signed256(I256::ZERO),
-        Value::tuple(vec![wide.clone()]).unwrap(),
-        Value::vector(vec![wide.clone()]).unwrap(),
+        Value::tuple(vec![wide.clone()])
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        Value::vector(vec![wide.clone()])
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         Value::sum(1, 0, Some(wide.clone())),
-        Value::record_canonical(vec![Field::new(1, wide.clone())]).unwrap(),
+        Value::record_canonical(vec![Field::new(1, wide.clone())])
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         Value::map_canonical(vec![
-            MapEntry::try_new(wide.clone(), Value::unit()).unwrap(),
+            MapEntry::try_new(wide.clone(), Value::unit())
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         ])
-        .unwrap(),
-        Value::map_canonical(vec![MapEntry::try_new(Value::unit(), wide).unwrap()]).unwrap(),
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        Value::map_canonical(vec![
+            MapEntry::try_new(Value::unit(), wide)
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        ])
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ];
     for value in values {
         assert_eq!(
@@ -105,9 +146,9 @@ fn complete_limit_admission_precedes_any_narrowing_or_copy() {
     );
     let mixed = Value::tuple(vec![
         Value::signed256(I256::ZERO),
-        Value::bytes(vec![9]).unwrap(),
+        Value::bytes(vec![9]).unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ])
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     let limits = ValueLimits {
         max_payload_bytes: 0,
         ..ValueLimits::default()
@@ -125,20 +166,29 @@ fn complete_limit_admission_precedes_any_narrowing_or_copy() {
 fn encoded_key_order_is_not_signed_numeric_order() {
     let negative = I256::from_i128(-1);
     assert_eq!(negative.cmp(I256::ZERO), core::cmp::Ordering::Less);
-    let a = MapEntry::try_new(Value::signed256(negative), Value::boolean(false)).unwrap();
-    let b = MapEntry::try_new(Value::signed256(I256::ZERO), Value::boolean(true)).unwrap();
+    let a = MapEntry::try_new(Value::signed256(negative), Value::boolean(false))
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    let b = MapEntry::try_new(Value::signed256(I256::ZERO), Value::boolean(true))
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert!(a.encoded_key() > b.encoded_key());
     assert_eq!(
         Value::map_canonical(vec![a.clone(), b.clone()]),
         Err(ValueError::MapKeyOrder)
     );
-    let map = Value::normalize_map(vec![a, b]).unwrap();
+    let map = Value::normalize_map(vec![a, b])
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     let ValueRef::Map(entries) = map.view() else {
         panic!("map")
     };
     assert_eq!(entries[0].key(), &Value::signed256(I256::ZERO));
     for entry in entries {
-        assert_eq!(entry.encoded_key(), entry.key().zcve_bytes().unwrap());
+        assert_eq!(
+            entry.encoded_key(),
+            entry
+                .key()
+                .zcve_bytes()
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+        );
     }
 }
 
@@ -151,7 +201,8 @@ fn duplicate_fields_and_encoded_keys_refuse_without_combining() {
         ]),
         Err(ValueError::RecordFieldOrder { .. })
     ));
-    let e = MapEntry::try_new(Value::unsigned256(U256::ZERO), Value::unit()).unwrap();
+    let e = MapEntry::try_new(Value::unsigned256(U256::ZERO), Value::unit())
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(
         Value::normalize_map(vec![e.clone(), e]),
         Err(ValueError::MapKeyOrder)
@@ -160,17 +211,29 @@ fn duplicate_fields_and_encoded_keys_refuse_without_combining() {
 
 fn nested_map() -> Value {
     let inner = Value::map_canonical(vec![
-        MapEntry::try_new(Value::unit(), Value::unit()).unwrap(),
+        MapEntry::try_new(Value::unit(), Value::unit())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ])
-    .unwrap();
-    Value::map_canonical(vec![MapEntry::try_new(Value::unit(), inner).unwrap()]).unwrap()
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    Value::map_canonical(vec![
+        MapEntry::try_new(Value::unit(), inner)
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+    ])
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
 }
 #[test]
 fn nested_map_blobs_share_payload_and_node_counters() {
     let value = nested_map();
-    assert_eq!(value.encoded_length().unwrap(), 29);
     assert_eq!(
-        value.validate_limits(ValueLimits::default()).unwrap(),
+        value
+            .encoded_length()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        29
+    );
+    assert_eq!(
+        value
+            .validate_limits(ValueLimits::default())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         ValueMetrics {
             nodes: 5,
             payload_bytes: 18,
@@ -226,7 +289,8 @@ fn admitted_custom_depth_is_not_silently_replaced_by_default() {
         max_depth: 65,
         ..ValueLimits::default()
     };
-    let admitted = AdmittedValue::try_new_with_limits(value, limits).unwrap();
+    let admitted = AdmittedValue::try_new_with_limits(value, limits)
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(admitted.limits(), limits);
     assert_eq!(
         admitted.metrics(),
@@ -237,7 +301,9 @@ fn admitted_custom_depth_is_not_silently_replaced_by_default() {
         }
     );
     let mut wire = Vec::new();
-    admitted.encode_zcve_to(&mut wire).unwrap();
+    admitted
+        .encode_zcve_to(&mut wire)
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(wire.len(), 65 * 8 + 33);
 }
 
@@ -282,11 +348,13 @@ fn hard_depth_cannot_be_disabled_and_refusal_preserves_prefix() {
 #[test]
 fn owned_construction_and_views_cannot_retain_mutable_inputs() {
     let mut bytes = vec![1, 2];
-    let value = Value::bytes(bytes.clone()).unwrap();
+    let value = Value::bytes(bytes.clone())
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     bytes[0] = 9;
     assert_eq!(value.view(), ValueRef::Bytes(&[1, 2]));
     let mut fields = vec![Field::new(1, value.clone())];
-    let record = Value::record_canonical(fields.clone()).unwrap();
+    let record = Value::record_canonical(fields.clone())
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     fields[0] = Field::new(2, Value::unit());
     let ValueRef::Record(fs) = record.view() else {
         panic!("record")

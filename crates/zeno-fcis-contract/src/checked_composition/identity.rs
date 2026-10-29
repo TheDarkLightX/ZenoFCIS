@@ -48,6 +48,7 @@ pub(crate) const CHECKER_SOURCES: &[(&str, &[u8])] = checker_sources![
     "src/checked_composition/aggregate.rs",
     "src/checked_composition/assembly.rs",
     "src/checked_composition/compose.rs",
+    "src/checked_composition/coupling_cuts.rs",
     "src/checked_composition/domain.rs",
     "src/checked_composition/formula.rs",
     "src/checked_composition/hierarchy.rs",

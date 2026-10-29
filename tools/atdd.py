@@ -1074,6 +1074,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "tools/test_check_arithmetic_proof.py"),
          ("python3", "tools/test_check_arithmetic_typed_proof.py"),
          ("python3", "tools/test_arithmetic_emitted_ast.py"),
+         ("python3", "tools/test_check_ordering256.py"),
+         ("python3", "tools/test_check_ordering_types256.py"),
          ("python3", "tools/test_check_collections_runtime.py"),
          ("python3", "tools/test_check_effect_reservation.py")),
     ),

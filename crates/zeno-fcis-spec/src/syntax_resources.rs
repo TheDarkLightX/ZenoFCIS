@@ -19,6 +19,8 @@ pub(crate) const MAX_SEMANTIC_RECURSION: usize = 32;
 #[derive(Clone, Copy, Default)]
 struct Shape {
     height: usize,
+    /// Recursive formula leaves retained after Boolean circuit flattening.
+    leaf_height: usize,
     recursion: usize,
     source_nesting: usize,
 }
@@ -33,6 +35,7 @@ pub(crate) struct ResourceUse {
 #[derive(Clone, Copy)]
 pub(crate) struct DerivedHeight {
     pub(crate) height: usize,
+    pub(crate) circuit: bool,
     pub(crate) bits: bool,
     pub(crate) size: usize,
 }
@@ -109,8 +112,16 @@ pub(crate) fn check(
                 _ => None,
             })
             .and_then(|id| tables.get(&id).copied())
-            .filter(|size| (1..=MAX_TABLE_ENTRIES).contains(size))
-            .map_or(MAX_TABLE_ENTRIES as usize, |size| size as usize)
+            // table_header refuses an invalid extent and parses its body once.
+            // Budget that fallback, so a later expansion does not mask the
+            // declaration's existing size refusal.
+            .map_or(MAX_TABLE_ENTRIES as usize, |size| {
+                if (1..=MAX_TABLE_ENTRIES).contains(&size) {
+                    size as usize
+                } else {
+                    1
+                }
+            })
     };
     let mut shapes: Vec<Shape> = Vec::with_capacity(tree.nodes.len());
     let mut children = Vec::new();
@@ -120,6 +131,7 @@ pub(crate) fn check(
         for &child in &tree.children[node.children_start..node.children_start + node.children_len] {
             let child = shapes[child];
             shape.height = shape.height.max(child.height);
+            shape.leaf_height = shape.leaf_height.max(child.leaf_height);
             shape.recursion = shape.recursion.max(child.recursion);
             shape.source_nesting = shape.source_nesting.max(child.source_nesting);
         }
@@ -169,6 +181,20 @@ pub(crate) fn check(
                 if indexes > 0 && !own && imported.is_some_and(|value| value.bits) {
                     shape.height = shape.height.saturating_add(8);
                 }
+                shape.leaf_height = if own {
+                    // Active self reads become node references, not formulas.
+                    0
+                } else if let Some(value) = imported.filter(|value| value.circuit && !value.bits) {
+                    // CircuitBuilder imports the graph and flattens Boolean
+                    // selection. Only its formula leaves and index comparisons
+                    // remain recursive in the new circuit.
+                    shape
+                        .leaf_height
+                        .saturating_add(1)
+                        .max(value.height.saturating_sub(1))
+                } else {
+                    shape.height
+                };
             }
             "ExprAtom" => {
                 if first.is_some_and(|token| token.kind == TokenKind::LParen) {
@@ -210,6 +236,9 @@ pub(crate) fn check(
                         shape.height = 1;
                     } else {
                         shape.height = shape.height.max(1) + 1;
+                        if word == "-" {
+                            shape.leaf_height = shape.height;
+                        }
                         // Relational !/not and scalar minus prefixes are
                         // consumed iteratively, but still spend source nesting.
                         shape.source_nesting += 1;
@@ -233,6 +262,7 @@ pub(crate) fn check(
                     .any(|&child| name(tree, child) == "CompareOp")
                 {
                     shape.height += 1;
+                    shape.leaf_height = shape.height;
                 }
             }
             "ExprOr" | "ExprAnd" | "ExprAdd" | "ExprTerm" | "TemporalUntil" | "TemporalOr"
@@ -278,6 +308,9 @@ pub(crate) fn check(
                     ));
                 }
                 shape.height = height.unwrap_or(shape.height);
+                if count > 1 && matches!(rule, "ExprAdd" | "ExprTerm") {
+                    shape.leaf_height = shape.height;
+                }
             }
             "ExprCall" => {
                 shape.height += match word {
@@ -300,6 +333,7 @@ pub(crate) fn check(
                         .saturating_add(6),
                     _ => 1,
                 };
+                shape.leaf_height = shape.height;
                 shape.recursion += 1;
             }
             "QuantifiedDomain" | "SumDomain" => {
@@ -319,6 +353,9 @@ pub(crate) fn check(
                 } else {
                     1
                 };
+                if !matches!(word, "table" | "entries") || rule == "SumDomain" {
+                    shape.leaf_height = shape.height;
+                }
                 shape.recursion += 1;
             }
             "TableCount" => {
@@ -330,6 +367,7 @@ pub(crate) fn check(
             }
             "BitFold" => {
                 shape.height = shape.height.max(1) + table_size(node.start + 4) + 13;
+                shape.leaf_height = shape.height;
                 shape.recursion += 1;
             }
             "ProjectionSuffix" if first.is_some_and(|token| token.kind == TokenKind::LBracket) => {
@@ -366,6 +404,7 @@ pub(crate) fn check(
             }
             "Circuit" => {
                 shape.height = shape.height.max(1).saturating_add(1);
+                shape.leaf_height = shape.height;
             }
             "DerivedTable" => {
                 if let Some(label) = tokens.get(node.start + 3) {
@@ -382,12 +421,15 @@ pub(crate) fn check(
                         .get(header)
                         .is_some_and(|token| token.spelling == "bits");
                     // Definitions are visited in certified source order. The
-                    // semantic pass refuses forward/mutual reads; a later read
-                    // composes its full imported formula height here.
+                    // semantic pass refuses forward/mutual reads. Boolean
+                    // operators, rounds and prior circuits become flat node
+                    // references; later reads retain only the formula leaves
+                    // plus one Circuit wrapper, not the logical graph depth.
                     derived
                         .entry(String::from(label.spelling))
                         .or_insert(DerivedHeight {
-                            height: shape.height.max(1).saturating_add(1),
+                            height: shape.leaf_height.max(1).saturating_add(1),
+                            circuit: true,
                             bits,
                             size: table_size(header - 1),
                         });
@@ -399,6 +441,7 @@ pub(crate) fn check(
                         .entry(String::from(label.spelling))
                         .or_insert(DerivedHeight {
                             height: 2,
+                            circuit: false,
                             bits: false,
                             size: table_size(node.start + 2),
                         });

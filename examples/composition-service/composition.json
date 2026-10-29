@@ -21,7 +21,7 @@
       "participates": "op <= 3",
       "path": "keydir",
       "policy_sha256": "4c5575f98f6c2ece871df3eb31b7a84ca046a4122300f5712822a688b1cf0580",
-      "program_sha256": "fa71ce71f78331ee0c1c6f09f96134d5b249cdcaf846615dcb86e593117d7e3e",
+      "program_sha256": "152e4578781c1b8d8012dcd579a2fb734373fdf822df78429b310e9631ee7a2d",
       "project_sha256": "9df48e1d4cac4040acf3781d9fbf5e66f9f24d2b5f90aab30ccf9a98da31048a"
     },
     {
@@ -44,7 +44,7 @@
       "participates": "op >= 4",
       "path": "mailbox-keyed",
       "policy_sha256": "c7cfba5c44cda395da2bfafc330e4fbf9914890a4f35e5d1ae37c7629e88e4ec",
-      "program_sha256": "ee4ea7c8eb2e7edf6b7848b9072c512c4ba588602e85bd5a9df33bbd9ca24294",
+      "program_sha256": "ac3052ead444fa58ab9920d2886aa3c8e819132495887d67237a522c8f4a6a44",
       "project_sha256": "42a6bc193ee260b5f908d79f630ce599a071257d0e3506a48e59bfc1720b4e61"
     }
   ],

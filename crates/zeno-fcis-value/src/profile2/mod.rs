@@ -23,16 +23,20 @@ pub use value::{
 
 /// Proposed leaf tags; they are never admitted by the ZCVE/1 decoder.
 pub const TAG_U256: u8 = 0x0d;
+/// The experimental signed 256-bit atom tag; refused by ZCVE/1.
 pub const TAG_I256: u8 = 0x0e;
 
 /// Explicit profile selection; there is no default/global width switch.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ValueProfile {
+    /// The legacy ZCVE/1 value profile.
     Zcve1,
+    /// The experimental ZCVE/2 value profile.
     Zcve2,
 }
 
 impl ValueProfile {
+    /// Parses an exact versioned profile name, refusing unsupported names.
     pub fn parse(value: &str) -> Result<Self, BoundaryError> {
         match value {
             "ZCVE/1" => Ok(Self::Zcve1),
@@ -45,17 +49,31 @@ impl ValueProfile {
 /// Owned fixed-width leaves; signedness is not inferred from payload bytes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Integer256 {
+    /// An explicitly unsigned 256-bit leaf.
     Unsigned(U256),
+    /// An explicitly signed 256-bit leaf.
     Signed(I256),
 }
 
+/// A refusal at the experimental integer atom or decimal boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BoundaryError {
+    /// The selected profile is unsupported by this operation.
     UnsupportedProfile,
-    Length { expected: usize, actual: usize },
+    /// The encoded atom length is not the required fixed size.
+    Length {
+        /// The required number of bytes.
+        expected: usize,
+        /// The supplied number of bytes.
+        actual: usize,
+    },
+    /// The leaf tag does not name a supported 256-bit atom.
     UnknownTag(u8),
+    /// The text is not a canonical, length-bounded decimal integer.
     DecimalSyntax,
+    /// The decimal magnitude exceeds the selected integer range.
     OutOfRange,
+    /// A checked arithmetic operation refused during conversion.
     Arithmetic(Failure),
 }
 
@@ -76,6 +94,7 @@ pub fn unsigned_payload(value: U256) -> [u8; 32] {
     output
 }
 
+/// Decodes all 32 big-endian payload bytes into an unsigned value.
 #[must_use]
 pub fn unsigned_from_payload(bytes: [u8; 32]) -> U256 {
     let mut high = [0; 16];
@@ -143,6 +162,7 @@ pub fn parse_unsigned_decimal(text: &str) -> Result<U256, BoundaryError> {
     Ok(value)
 }
 
+/// Parses canonical signed decimal text with checked 256-bit range admission.
 pub fn parse_signed_decimal(text: &str) -> Result<I256, BoundaryError> {
     if text.len() > 78 {
         return Err(BoundaryError::DecimalSyntax);
@@ -158,6 +178,7 @@ pub fn parse_signed_decimal(text: &str) -> Result<I256, BoundaryError> {
     I256::from_magnitude(magnitude, negative).map_err(range_failure)
 }
 
+/// Formats an unsigned value as canonical decimal without leading zeroes.
 pub fn unsigned_decimal(mut value: U256) -> Result<String, BoundaryError> {
     if value == U256::ZERO {
         return Ok(String::from("0"));
@@ -187,6 +208,7 @@ pub fn unsigned_decimal(mut value: U256) -> Result<String, BoundaryError> {
     Ok(output)
 }
 
+/// Formats a signed value as canonical decimal with a minus sign only when negative.
 pub fn signed_decimal(value: I256) -> Result<String, BoundaryError> {
     let magnitude = unsigned_decimal(value.magnitude())?;
     if !value.is_negative() {
