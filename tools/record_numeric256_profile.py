@@ -152,10 +152,13 @@ def record(root, out, cache, refresh_ordering, previous_source=None, conversions
                       and gate.parameter_types(n) == types]
         gate.require(len(candidates) == 1, f"ambiguous actual refinement: {obligation['member']}")
         obligation["refinement"] = candidates[0]
+        obligation["report_function"] = gate.report_function(obligation)
+        gate.require(obligation["report_function"] in profile["report_functions"],
+                     "actual refinement is absent from the complete verifier report")
     for control in profile["controls"]:
         # Exact unique mutation expression and enclosing actual declaration contract.
         obligation = next(o for o in profile["obligations"] if o["member"] == control["member"])
-        control["error_function"] = obligation["refinement"]
+        control["error_function"] = obligation["report_function"]
         source = gate.read(root, Path(control["error_source"]))
         if control["stage"] == "conversions":
             control["error_region"] = list(method_region(source, *control["member"].split("::")))

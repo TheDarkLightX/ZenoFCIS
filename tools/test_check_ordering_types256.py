@@ -25,7 +25,9 @@ class SourceAdmission(unittest.TestCase):
     def test_exact_current_source_and_all_configurations(self):
         admitted = gate.configuration(self.root, self.profile)
         self.assertEqual(len(admitted), 8)
-        self.assertEqual(sum(map(len, admitted.values())), 31)
+        for path, entries in admitted.items():
+            self.assertCountEqual([{k: v for k, v in entry.items() if k != "line"} for entry in entries],
+                                  self.profile["native_configuration_exceptions"].get(path, []))
 
     def test_drift_refuses_before_tools(self):
         with (self.root / gate.SUBJECT).open("a") as stream:

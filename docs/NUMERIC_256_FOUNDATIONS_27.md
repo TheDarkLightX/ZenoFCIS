@@ -215,9 +215,8 @@ and wider unsigned integer meanings. Every refusal in this table is exactly
 | `U768::narrow(x)` | Returns the exact `W(x)` exactly when `W(x) < 2^256` |
 
 These statements are proved for the actual bodies under the stated assumptions.
-The same source-bound numeric harness now checks 77 verification conditions,
-including the earlier constants and imported dependencies. This is a closure
-count, not 77 separate conversion theorems. The profile checks every translated
+The same source-bound numeric harness checks the complete verification closure,
+including the earlier constants and imported dependencies. The profile checks every translated
 local body and contract, the exact input and result types, and every solver
 section. Supporting refinements establish the actual two-complement helper,
 two-limb carry/borrow loops and `U256::checked_sub` used before signed narrowing.

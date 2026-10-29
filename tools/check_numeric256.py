@@ -66,6 +66,13 @@ def parameter_types(node):
     return [typ(p) for p in fields[":params"]], typ(fields[":ret"])
 
 
+def report_function(obligation):
+    if obligation["member"] in CONSTANTS:
+        return obligation["refinement"]
+    kind, method = obligation["member"].split("::")
+    return NAMESPACE + "arithmetic256::" + ("number256::" if kind in ("U256", "I256") else "") + kind + "::" + method
+
+
 def snapshot(root):
     result = {}
     for path in SOURCES:
@@ -119,7 +126,7 @@ def control_sources(root, profile):
         require(control["member"] in obligations
                 and control["stage"] == obligations[control["member"]]["stage"],
                 "control has no corresponding obligation")
-        require(control["error_function"] == obligations[control["member"]]["refinement"],
+        require(control["error_function"] == obligations[control["member"]]["report_function"],
                 "control targets a different refinement")
         first, last = (method_region(source, *control["member"].split("::"))
                        if control["stage"] == "conversions" else (1, len(source.splitlines())))
@@ -145,6 +152,10 @@ def check_inventory(vir, profile):
         name = obligation["refinement"]
         require(name in concrete and actual[name]["requires"] == 0
                 and actual[name]["ensures"] > 0, "conditional or missing numeric refinement")
+        require(name.endswith("::" + obligation["member"].split("::")[-1])
+                and obligation["report_function"] == report_function(obligation)
+                and obligation["report_function"] in profile["report_functions"],
+                "numeric refinement and diagnostic identity do not agree")
         require(parameter_types(nodes[name]) ==
                 ([expected_type(t) for t in obligation["parameters"]], expected_type(obligation["result"])),
                 "refinement does not bind the declared actual full-width types")

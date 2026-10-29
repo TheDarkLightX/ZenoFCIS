@@ -208,6 +208,14 @@ class ProofAdmission(unittest.TestCase):
                     self.assertRaisesRegex(ValueError, "full-width types"):
                 gate.check_inventory("fixture", self.profile)
 
+    def test_diagnostic_identity_cannot_be_substituted_for_another_method(self):
+        profile = copy.deepcopy(self.profile)
+        profile["obligations"][0]["report_function"] = profile["obligations"][1]["report_function"]
+        with mock.patch.object(gate, "inventory", return_value=profile["functions"]), \
+                mock.patch.object(gate, "parse_vir", return_value=self.typed_nodes()), \
+                self.assertRaisesRegex(ValueError, "diagnostic identity"):
+            gate.check_inventory("fixture", profile)
+
     def test_exact_solver_sections_and_query_count(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

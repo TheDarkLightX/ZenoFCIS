@@ -65,6 +65,16 @@ pub(super) proof fn complement(word: u128)
     assert(!word == u128::MAX - word) by(bit_vector);
 }
 
+pub(super) proof fn unsigned_word(word: u128)
+    ensures unsigned(U256([word, 0])) == word as int,
+{
+    conversion_representation();
+    let value = U256([word, 0]);
+    assert(value.0@[0] == word);
+    assert(value.0@[1] == 0);
+    assert(unsigned(value) == value.0@[0] as int + radix() * value.0@[1] as int);
+}
+
 pub(super) proof fn signed_word_cast(word: i128)
     ensures
         (word as u128) as int == if word < 0 { word as int + radix() } else { word as int },

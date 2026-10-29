@@ -235,7 +235,7 @@ impl U256 {
     ))]
     pub const fn from_u128(x: u128) -> Self {
         #[cfg(verus_keep_ghost)]
-        proof! { numeric_model::conversion_representation(); }
+        proof! { numeric_model::unsigned_word(x); }
         Self([x, 0])
     }
     /// Returns the value if its high 128-bit word is zero.
