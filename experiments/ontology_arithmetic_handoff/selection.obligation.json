@@ -1,0 +1,154 @@
+{
+  "artifact_revision": "375fe4ef595f3c6c6694abbf30829371646ca084",
+  "assumptions": [
+    "Exact Python bool and str inputs from the admitted classifier projection.",
+    "The independently enumerated decision table expresses the intended versioned policy.",
+    "Python runtime and recorded source identities are trusted."
+  ],
+  "base_revision": "3a7da94f7318f7b821cb682ce7d5c7d3cebfe9a4",
+  "boundary": "arithmetic_handoff.select only; the ontology reasoner, IO shell, native arithmetic and Schema2 refinement are separate obligations.",
+  "claim": "The actual finite selection function agrees with the independent requirement-selection table throughout its declared input domain.",
+  "claim_class": "model",
+  "completed_evidence": [
+    {
+      "artifacts": [
+        {
+          "path": "experiments/ontology_arithmetic_handoff/selector.log",
+          "role": "successful exact-selector replay output",
+          "sha256": "d10ffbd9f0faa72cd6837063279524e199b59fbc3d035051302a1e8dbc4b36ad"
+        },
+        {
+          "path": "integrations/zal/test_ontology_arithmetic_handoff.py",
+          "role": "replayed oracle/test source",
+          "sha256": "5e6a5f216fc83cc72a572365b9757762b9d313db20bcef8a5846ddd0a576df01"
+        },
+        {
+          "path": "integrations/zal/arithmetic_handoff.py",
+          "role": "replayed implementation source",
+          "sha256": "5c9066cc477573e8a107f94a2b8a86f34db5f5064e71930d48b164ec26fa3799"
+        }
+      ],
+      "id": "finite-selection-test",
+      "kind": "test",
+      "lane_id": "finite-selection",
+      "limitations": [
+        "Finite selector only, not the ontology reasoner or Python interpreter correctness.",
+        "Native and Verus results are separately retained in qualification.json; they are not inferred from this table check.",
+        "Schema2 C0/S1/S2/S3 remain open."
+      ],
+      "replay": {
+        "argv": [
+          "python3",
+          "-m",
+          "unittest",
+          "test_ontology_arithmetic_handoff.ArithmeticHandoffTests.test_entire_finite_selector_against_independent_decision_table"
+        ],
+        "cwd": "integrations/zal",
+        "exit_code": 0
+      },
+      "status": "passed",
+      "tool_revision": "CPython 3.12.14"
+    }
+  ],
+  "conclusion": "For every declared case, select(case) equals the independent table; bound requires complete consistent classification, a present individual, width, exactly one signedness, no unsupported requirement, and the matching target.",
+  "counterexample": null,
+  "execution_policy": "replay_argv_is_untrusted_data_never_execute_from_validation",
+  "falsifiers": [
+    "Any declared case with different production and oracle results",
+    "Any bound result with missing, incomplete, inconsistent or unsupported inputs",
+    "Any bound result selecting I256 for unsigned requirements or U256 for signed requirements"
+  ],
+  "id": "zal-arithmetic-handoff-finite-selection-v1",
+  "lanes": [
+    {
+      "acceptance_tests": [
+        "All 2304 cases compare equal and every bound case satisfies the explicit invariant."
+      ],
+      "deliverables": [
+        "The bound source pair and retained successful test output."
+      ],
+      "evidence_ids": [
+        "finite-selection-test"
+      ],
+      "goal": "Exhaustively compare the actual finite selector to the independent table.",
+      "id": "finite-selection",
+      "replay": {
+        "argv": [
+          "python3",
+          "-m",
+          "unittest",
+          "test_ontology_arithmetic_handoff.ArithmeticHandoffTests.test_entire_finite_selector_against_independent_decision_table"
+        ],
+        "cwd": "integrations/zal"
+      },
+      "status": "passed",
+      "tool": "reference-model"
+    }
+  ],
+  "nonclaims": [
+    "Full proof of Python ontology inference or source-binding IO",
+    "Arithmetic correctness from ontology inference",
+    "Universal Schema2 implementation refinement",
+    "Execution or publication authorization",
+    "Complete DeFi application correctness"
+  ],
+  "oracle": {
+    "artifacts": [
+      {
+        "path": "integrations/zal/test_ontology_arithmetic_handoff.py",
+        "role": "independent finite table and exhaustive acceptance test",
+        "sha256": "5e6a5f216fc83cc72a572365b9757762b9d313db20bcef8a5846ddd0a576df01"
+      },
+      {
+        "path": "integrations/zal/arithmetic_handoff.py",
+        "role": "actual finite selection implementation",
+        "sha256": "5c9066cc477573e8a107f94a2b8a86f34db5f5064e71930d48b164ec26fa3799"
+      }
+    ],
+    "claim_mapping": [
+      {
+        "artifact_path": "integrations/zal/test_ontology_arithmetic_handoff.py",
+        "claim_clause": "Independent table plus exhaustive 2304-case enumeration and explicit bound invariants."
+      },
+      {
+        "artifact_path": "integrations/zal/arithmetic_handoff.py",
+        "claim_clause": "Actual implementation evaluated for each enumerated case."
+      }
+    ],
+    "kind": "reference-model",
+    "replay": {
+      "argv": [
+        "python3",
+        "-m",
+        "unittest",
+        "test_ontology_arithmetic_handoff.ArithmeticHandoffTests.test_entire_finite_selector_against_independent_decision_table"
+      ],
+      "cwd": "integrations/zal"
+    }
+  },
+  "profile_ids": [
+    "zeno-fcis/ontology-arithmetic-handoff/1"
+  ],
+  "quantifiers": [
+    "All 2304 combinations: four closure statuses, two completeness flags, three consistency states, five independent boolean projections, and U256/I256/one representative unsupported target.",
+    "The five projections are individual presence, width, unsigned requirement, signed requirement, and unsupported requirement.",
+    "Unsupported target names form one equivalence class because production and oracle branch only on membership in the two supported names."
+  ],
+  "refinement": {
+    "relation": "Pointwise equality to the independent table on the declared finite domain; signedness preservation is a necessary condition of bound.",
+    "source_semantics": "Admitted closure flags and explicitly projected requirement predicates.",
+    "target_semantics": "A conditional bound target or a non-authoritative diagnostic state."
+  },
+  "required_tools": [
+    "reference-model"
+  ],
+  "schema": "zrm/proof-obligation/v3",
+  "status": "passed_bounded",
+  "upstream_revisions": [
+    {
+      "name": "ontology and full-width stack",
+      "revision": "3a7da94f7318f7b821cb682ce7d5c7d3cebfe9a4",
+      "uri": "https://github.com/TheDarkLightX/ZenoFCIS"
+    }
+  ]
+}

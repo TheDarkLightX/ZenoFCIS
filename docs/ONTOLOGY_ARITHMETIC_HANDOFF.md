@@ -152,6 +152,10 @@ The actual finite selector is checked against an independent table on all 2,304
 admitted combinations of closure state, completeness, consistency, presence,
 width, signedness, unsupported requirements and selected type. This exhausts
 that function's finite domain; it does not prove the entire Python reasoner.
+The revision-bound [selection obligation](../experiments/ontology_arithmetic_handoff/selection.obligation.json)
+uses `zrm/proof-obligation/v3`, with the exact finite domain, independent oracle,
+Git-blob-bound source/evidence and replay argv. Its `passed_bounded` status
+applies only to this finite selector.
 
 The integer oracle uses Python integers and signed byte decoding independently
 of production Rust arithmetic. Forty fixed patterns include 128-bit and 256-bit
