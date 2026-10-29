@@ -12,7 +12,7 @@
     {
       "family": "versioned-register",
       "instance": "components/register/core-instance.json",
-      "instance_sha256": "0e6876c94c05a55d9910835c7efc9b6466d0f0bc7842d5c20ae912c187232e74",
+      "instance_sha256": "0842a19cb6d92767f419ba5f70a24adfd040f1b76676fd1b4858ab59fd97d41e",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "register",
       "owns_fields": [
@@ -40,7 +40,7 @@
     {
       "family": "approval-queue",
       "instance": "components/review/core-instance.json",
-      "instance_sha256": "910daf81a8787cb02b136e3d1e64528a2817b897ccc6a3658e18f83c021e890d",
+      "instance_sha256": "ee14024eefe9b74adcf28724351ec2cae79cebf23d8a6c9519226747f519f17c",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "review",
       "owns_fields": [

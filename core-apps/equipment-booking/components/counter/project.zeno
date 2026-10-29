@@ -35,5 +35,5 @@ law 541 acceptance_eligibility on accept = (((true) && !(context.102.130 == 0)) 
 law 542 no_committed_failure on failure = false;
 // Core seed bounded-counter/1; parameters {"C": 2}.
 // Instance source-set SHA256 89b0b6bce248b1aede09d92fe786aefdde2307d66a01a4a134216afab89eb39a.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/bounded-counter.json SHA256 45685358c810f9ed9eada36ae8d115ad6db04e520b9a0cd06506b739ae897f33; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/bounded-counter.json SHA256 5429a8afa8802eb3e047602ab5722913fa1a0909f4b26fbafbafed624cc27d15; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

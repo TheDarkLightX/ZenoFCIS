@@ -35,5 +35,5 @@ law 541 acceptance_eligibility on accept = (((true) && !(context.102.130 == 0)) 
 law 542 no_committed_failure on failure = false;
 // Core seed retry-budget/1; parameters {"C": 3}.
 // Instance source-set SHA256 2177a9bca22d53a84b17f40e57a12f615cc03dddae6ec3815a7c06d4422c1184.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/retry-budget.json SHA256 acf17fd73c68081e991c744c298f0146ab84bcc2a57044295235f1eea54dc6af; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/retry-budget.json SHA256 c090e4c67b9a71a40cd637cf951dae48ceab7a9444f579a16322e283f23a8987; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.
