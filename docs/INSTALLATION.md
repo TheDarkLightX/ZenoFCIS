@@ -1,5 +1,9 @@
 # Installation
 
+This checkout declares development version `2.7.0-rc.1`. Full qualification
+is incomplete; it is not a qualified release candidate. See the
+[continuation guide](DEVELOPMENT_27.md) and [open requirements](FACTORY_GAPS_27.md).
+
 ZenoFCIS `2.6.0` is released with CLI downloads for **Linux x86_64 GNU**,
 **Windows x64** and **macOS on Apple silicon**, plus offline Rustdoc. The
 Mac platform update has a separate source pin. The release page provides a
