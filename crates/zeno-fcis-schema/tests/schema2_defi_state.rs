@@ -14,7 +14,8 @@ use zeno_fcis_value::profile2::{
 };
 
 fn definition(id: u32, name: &str, kind: TypeKind) -> TypeDef {
-    TypeDef::try_new(TypeId::new(id), name, kind, SchemaLimits::default()).unwrap()
+    TypeDef::try_new(TypeId::new(id), name, kind, SchemaLimits::default())
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
 }
 
 fn schema(revision: u16) -> Schema {
@@ -67,9 +68,12 @@ fn schema(revision: u16) -> Schema {
             "State",
             TypeKind::Record {
                 fields: vec![
-                    FieldDef::try_new(FieldId::new(1), "balances", TypeId::new(4)).unwrap(),
-                    FieldDef::try_new(FieldId::new(2), "positions", TypeId::new(5)).unwrap(),
-                    FieldDef::try_new(FieldId::new(3), "sequence", TypeId::new(7)).unwrap(),
+                    FieldDef::try_new(FieldId::new(1), "balances", TypeId::new(4))
+                        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+                    FieldDef::try_new(FieldId::new(2), "positions", TypeId::new(5))
+                        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+                    FieldDef::try_new(FieldId::new(3), "sequence", TypeId::new(7))
+                        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
                 ]
                 .into_boxed_slice(),
             },
@@ -91,30 +95,31 @@ fn schema(revision: u16) -> Schema {
         definitions,
         SchemaLimits::default(),
     )
-    .unwrap()
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
 }
 
 fn state_with_first_amount(amount: Value) -> Value {
     let balances = Value::map_canonical(vec![
-        MapEntry::try_new(Value::unsigned256(U256::ZERO), amount).unwrap(),
+        MapEntry::try_new(Value::unsigned256(U256::ZERO), amount)
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         MapEntry::try_new(
             Value::unsigned256(U256::from_words_le([0, 1])),
             Value::unsigned256(U256::ONE),
         )
-        .unwrap(),
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ])
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     let positions = Value::vector(vec![
         Value::signed256(I256::MIN),
         Value::signed256(I256::MAX),
     ])
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     Value::record_canonical(vec![
         Field::new(1, balances),
         Field::new(2, positions),
         Field::new(3, Value::unsigned(u128::MAX)),
     ])
-    .unwrap()
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
 }
 
 fn state() -> Value {
@@ -123,7 +128,7 @@ fn state() -> Value {
 
 fn admitted() -> SchemaAdmittedEnvelope {
     SchemaAdmittedEnvelope::try_new::<Hash>(&schema(1), state(), ValidationLimits::default())
-        .unwrap()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
 }
 
 #[test]
@@ -132,7 +137,7 @@ fn full_width_state_public_wire_roundtrip_and_owned_metrics() {
     let retained = original.clone();
     let witness =
         SchemaAdmittedEnvelope::try_new::<Hash>(&schema(1), original, ValidationLimits::default())
-            .unwrap();
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(witness.value().value(), &retained);
     assert_eq!(
         witness.validation_report(),
@@ -142,19 +147,30 @@ fn full_width_state_public_wire_roundtrip_and_owned_metrics() {
         }
     );
     assert_eq!(
-        witness.value().value().zcve_bytes().unwrap(),
+        witness
+            .value()
+            .value()
+            .zcve_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         golden_state_bytes()
     );
-    let bytes = witness.canonical_bytes().unwrap();
+    let bytes = witness
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     let replay = SchemaAdmittedEnvelope::decode_expected::<Hash>(
         &schema(1),
         &bytes,
         DecodeLimits::default(),
         ValidationLimits::default(),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(replay, witness);
-    assert_eq!(replay.canonical_bytes().unwrap(), bytes);
+    assert_eq!(
+        replay
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        bytes
+    );
     assert_eq!(retained, state());
 }
 
@@ -163,7 +179,9 @@ fn matching_schema_hash_does_not_certify_narrow_amount() {
     let selected = schema(1);
     let raw = Envelope::new(
         6,
-        selected.schema_hash::<Hash>().unwrap(),
+        selected
+            .schema_hash::<Hash>()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         state_with_first_amount(Value::unsigned(0)),
     );
     assert_eq!(
@@ -206,7 +224,7 @@ fn signed_full_width_subrange_is_numeric_not_bit_or_narrow_order() {
         )],
         SchemaLimits::default(),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     for value in [I256::MIN, I256::from_i128(-1)] {
         assert!(
             selected
@@ -243,7 +261,12 @@ fn expected_type_refuses_before_hash_or_validation_budget() {
 fn application_revision_is_part_of_expected_schema_identity() {
     let current = schema(2);
     let old = schema(1);
-    let raw = Envelope::new(6, old.schema_hash::<Hash>().unwrap(), state());
+    let raw = Envelope::new(
+        6,
+        old.schema_hash::<Hash>()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        state(),
+    );
     assert_eq!(
         SchemaAdmittedEnvelope::try_from_envelope::<Hash>(
             &current,
@@ -251,8 +274,12 @@ fn application_revision_is_part_of_expected_schema_identity() {
             ValidationLimits::default()
         ),
         Err(SchemaEnvelopeError::SchemaIdentity {
-            expected: current.schema_hash::<Hash>().unwrap(),
-            actual: old.schema_hash::<Hash>().unwrap(),
+            expected: current
+                .schema_hash::<Hash>()
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+            actual: old
+                .schema_hash::<Hash>()
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         })
     );
 }
@@ -289,7 +316,9 @@ fn logical_resource_boundaries_and_decoder_precedence_are_explicit() {
             Err(ValueValidationError::BudgetExceeded)
         );
     }
-    let bytes = admitted().canonical_bytes().unwrap();
+    let bytes = admitted()
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert!(matches!(
         SchemaAdmittedEnvelope::decode_expected::<Hash>(
             &selected,
@@ -306,7 +335,9 @@ fn logical_resource_boundaries_and_decoder_precedence_are_explicit() {
 
 #[test]
 fn trailing_bytes_and_legacy_magic_do_not_admit_as_profile2() {
-    let bytes = admitted().canonical_bytes().unwrap();
+    let bytes = admitted()
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     let mut trailing = bytes.clone();
     trailing.push(0);
     assert!(matches!(
@@ -335,13 +366,13 @@ fn trailing_bytes_and_legacy_magic_do_not_admit_as_profile2() {
 
 #[test]
 fn noncanonical_map_is_rejected_at_structural_boundary() {
-    let greater =
-        MapEntry::try_new(Value::unsigned256(U256::ONE), Value::unsigned256(U256::ONE)).unwrap();
+    let greater = MapEntry::try_new(Value::unsigned256(U256::ONE), Value::unsigned256(U256::ONE))
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     let smaller = MapEntry::try_new(
         Value::unsigned256(U256::ZERO),
         Value::unsigned256(U256::ONE),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(
         Value::map_canonical(vec![greater, smaller]),
         Err(ValueError::MapKeyOrder)
@@ -351,8 +382,16 @@ fn noncanonical_map_is_rejected_at_structural_boundary() {
 #[test]
 fn legacy_bare_bytes_stay_identical_but_nested_wide_leaves_never_narrow() {
     let legacy = zeno_fcis_value::Value::unsigned(u128::MAX);
-    let lifted = Value::lift_legacy(&legacy, ValueLimits::default()).unwrap();
-    assert_eq!(legacy.zcve_bytes().unwrap(), lifted.zcve_bytes().unwrap());
+    let lifted = Value::lift_legacy(&legacy, ValueLimits::default())
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    assert_eq!(
+        legacy
+            .zcve_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        lifted
+            .zcve_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+    );
     assert_eq!(
         state().try_into_legacy(ValueLimits::default()),
         Err(ConversionError::WideInteger)

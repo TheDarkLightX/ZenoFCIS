@@ -9,10 +9,15 @@ fn limits() -> DecodeLimits {
 }
 fn nested_map() -> Value {
     let inner = Value::map_canonical(vec![
-        MapEntry::try_new(Value::unit(), Value::unit()).unwrap(),
+        MapEntry::try_new(Value::unit(), Value::unit())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ])
-    .unwrap();
-    Value::map_canonical(vec![MapEntry::try_new(Value::unit(), inner).unwrap()]).unwrap()
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    Value::map_canonical(vec![
+        MapEntry::try_new(Value::unit(), inner)
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+    ])
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
 }
 fn values() -> Vec<Value> {
     vec![
@@ -25,31 +30,44 @@ fn values() -> Vec<Value> {
         Value::unsigned256(U256::MAX),
         Value::signed256(I256::MIN),
         Value::signed256(I256::MAX),
-        Value::bytes(vec![0, 255]).unwrap(),
-        Value::text_ascii(String::from("ASCII")).unwrap(),
+        Value::bytes(vec![0, 255])
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        Value::text_ascii(String::from("ASCII"))
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         Value::enumeration(0, 0),
-        Value::tuple(vec![Value::unsigned256(U256::MAX), Value::boolean(true)]).unwrap(),
-        Value::vector(vec![Value::signed256(I256::MIN)]).unwrap(),
+        Value::tuple(vec![Value::unsigned256(U256::MAX), Value::boolean(true)])
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        Value::vector(vec![Value::signed256(I256::MIN)])
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         Value::record_canonical(vec![
             Field::new(0, Value::unsigned256(U256::MAX)),
             Field::new(u16::MAX, Value::unit()),
         ])
-        .unwrap(),
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         Value::sum(u32::MAX, u16::MAX, None),
         Value::sum(0, 0, Some(Value::signed256(I256::MIN))),
         Value::normalize_map(vec![
-            MapEntry::try_new(Value::signed256(I256::from_i128(-1)), Value::unit()).unwrap(),
-            MapEntry::try_new(Value::signed256(I256::ZERO), Value::unsigned256(U256::MAX)).unwrap(),
+            MapEntry::try_new(Value::signed256(I256::from_i128(-1)), Value::unit())
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+            MapEntry::try_new(Value::signed256(I256::ZERO), Value::unsigned256(U256::MAX))
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         ])
-        .unwrap(),
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         nested_map(),
     ]
 }
 fn hex(text: &str) -> Vec<u8> {
-    assert!(text.is_ascii() && text.len() % 2 == 0);
+    assert!(text.is_ascii() && text.len().is_multiple_of(2));
     text.as_bytes()
         .chunks_exact(2)
-        .map(|p| u8::from_str_radix(core::str::from_utf8(p).unwrap(), 16).unwrap())
+        .map(|p| {
+            u8::from_str_radix(
+                core::str::from_utf8(p)
+                    .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+                16,
+            )
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+        })
         .collect()
 }
 
@@ -60,13 +78,25 @@ fn independent_atom_vectors_decode_full_width_and_preserve_nominal_kind() {
         assert_eq!(parts.len(), 3);
         assert_eq!(parts[2].len(), 66);
         let expected = match parts[0] {
-            "u256" => Value::unsigned256(parse_unsigned_decimal(parts[1]).unwrap()),
-            "i256" => Value::signed256(parse_signed_decimal(parts[1]).unwrap()),
+            "u256" => Value::unsigned256(
+                parse_unsigned_decimal(parts[1])
+                    .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+            ),
+            "i256" => Value::signed256(
+                parse_signed_decimal(parts[1])
+                    .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+            ),
             _ => panic!("vector kind"),
         };
         let wire = hex(parts[2]);
-        assert_eq!(expected.canonical_bytes().unwrap(), wire);
-        let (actual, metrics) = decode_value_with_metrics(&wire, limits()).unwrap();
+        assert_eq!(
+            expected
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+            wire
+        );
+        let (actual, metrics) = decode_value_with_metrics(&wire, limits())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
         assert_eq!(actual, expected);
         assert_eq!(
             metrics,
@@ -90,12 +120,30 @@ fn independent_atom_vectors_decode_full_width_and_preserve_nominal_kind() {
 #[test]
 fn complete_grammar_roundtrips_with_exact_structural_metrics() {
     for original in values() {
-        let bytes = original.canonical_bytes().unwrap();
-        assert_eq!(original.encoded_length().unwrap(), bytes.len());
-        let (decoded, metrics) = decode_value_with_metrics(&bytes, limits()).unwrap();
+        let bytes = original
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+        assert_eq!(
+            original
+                .encoded_length()
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+            bytes.len()
+        );
+        let (decoded, metrics) = decode_value_with_metrics(&bytes, limits())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
         assert_eq!(decoded, original);
-        assert_eq!(decoded.canonical_bytes().unwrap(), bytes);
-        assert_eq!(metrics, original.validate_limits(limits().value).unwrap());
+        assert_eq!(
+            decoded
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+            bytes
+        );
+        assert_eq!(
+            metrics,
+            original
+                .validate_limits(limits().value)
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+        );
     }
 }
 
@@ -107,34 +155,68 @@ fn legacy_bare_value_bytes_are_unchanged_but_new_envelope_is_explicit() {
         L::boolean(true),
         L::unsigned(u128::MAX),
         L::signed(i128::MIN),
-        L::bytes(vec![0, 255]).unwrap(),
-        L::text_ascii(String::from("A")).unwrap(),
+        L::bytes(vec![0, 255]).unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        L::text_ascii(String::from("A"))
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         L::enumeration(1, 2),
-        L::record_canonical(vec![F::new(1, L::unit())]).unwrap(),
-        L::sum(0, 0, Some(L::vector(vec![L::signed(-1)]).unwrap())),
-        L::map_canonical(vec![E::try_new(L::unit(), L::boolean(false)).unwrap()]).unwrap(),
+        L::record_canonical(vec![F::new(1, L::unit())])
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        L::sum(
+            0,
+            0,
+            Some(
+                L::vector(vec![L::signed(-1)])
+                    .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+            ),
+        ),
+        L::map_canonical(vec![
+            E::try_new(L::unit(), L::boolean(false))
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        ])
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ])
-    .unwrap();
-    let old = legacy.canonical_bytes().unwrap();
-    let lifted = Value::lift_legacy(&legacy, limits().value).unwrap();
-    assert_eq!(lifted.canonical_bytes().unwrap(), old);
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    let old = legacy
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    let lifted = Value::lift_legacy(&legacy, limits().value)
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    assert_eq!(
+        lifted
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        old
+    );
     assert_eq!(
         decode_value(&old, limits())
-            .unwrap()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
             .try_into_legacy(limits().value)
-            .unwrap(),
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         legacy
     );
     let wide = Value::unsigned256(U256::ZERO);
-    let raw = wide.canonical_bytes().unwrap();
-    assert_ne!(raw, Value::unsigned(0).canonical_bytes().unwrap());
-    assert_eq!(decode_value(&raw, limits()).unwrap(), wide);
+    let raw = wide
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    assert_ne!(
+        raw,
+        Value::unsigned(0)
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+    );
+    assert_eq!(
+        decode_value(&raw, limits())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        wide
+    );
 }
 
 #[test]
 fn every_truncation_and_trailing_suffix_refuses_for_values_and_envelopes() {
     for original in values() {
-        let wire = original.canonical_bytes().unwrap();
+        let wire = original
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
         for n in 0..wire.len() {
             assert!(decode_value(&wire[..n], limits()).is_err(), "prefix {n}");
         }
@@ -145,7 +227,9 @@ fn every_truncation_and_trailing_suffix_refuses_for_values_and_envelopes() {
             Err(DecodeError::TrailingBytes { offset: wire.len() })
         );
         let env = Envelope::new(9, Hash32::new([7; 32]), original);
-        let frame = env.canonical_bytes().unwrap();
+        let frame = env
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
         for n in 0..frame.len() {
             assert!(
                 decode_envelope(&frame[..n], limits()).is_err(),
@@ -172,17 +256,23 @@ fn envelope_golden_magic_length_pins_and_wrong_profile_refusal() {
     expected.extend(33_u32.to_be_bytes());
     expected.push(0x0d);
     expected.extend([255; 32]);
-    let actual = env.canonical_bytes().unwrap();
+    let actual = env
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(actual, expected);
     assert_eq!(actual.len(), 81);
-    assert_eq!(decode_envelope(&actual, limits()).unwrap(), env);
+    assert_eq!(
+        decode_envelope(&actual, limits())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        env
+    );
     assert_eq!(
         crate::decode_envelope(&actual, limits()),
         Err(DecodeError::EnvelopeMagic)
     );
     let legacy = crate::Envelope::new(42, Hash32::new([3; 32]), zeno_fcis_value::Value::unit())
         .canonical_bytes()
-        .unwrap();
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(
         decode_envelope(&legacy, limits()),
         Err(DecodeError::EnvelopeMagic)
@@ -192,17 +282,22 @@ fn envelope_golden_magic_length_pins_and_wrong_profile_refusal() {
     let mut changed = actual.clone();
     changed[11] ^= 1;
     changed[12] ^= 1;
-    let decoded = decode_envelope(&changed, limits()).unwrap();
+    let decoded = decode_envelope(&changed, limits())
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_ne!(decoded.type_id(), 42);
     assert_ne!(decoded.schema_hash(), Hash32::new([3; 32]));
 }
 
 #[test]
 fn nested_map_blob_depth_node_payload_counters_never_restart() {
-    let wire = nested_map().canonical_bytes().unwrap();
+    let wire = nested_map()
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(wire.len(), 29);
     assert_eq!(
-        decode_value_with_metrics(&wire, limits()).unwrap().1,
+        decode_value_with_metrics(&wire, limits())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+            .1,
         ValueMetrics {
             nodes: 5,
             payload_bytes: 18,
@@ -267,19 +362,32 @@ fn wide_atom_is_not_payload_but_its_framed_map_blob_is() {
         ..limits()
     };
     assert_eq!(
-        decode_value_with_metrics(&atom.canonical_bytes().unwrap(), zero_payload)
-            .unwrap()
-            .1,
+        decode_value_with_metrics(
+            &atom
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+            zero_payload
+        )
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+        .1,
         ValueMetrics {
             nodes: 1,
             payload_bytes: 0,
             depth: 0
         }
     );
-    let map = Value::map_canonical(vec![MapEntry::try_new(atom, Value::unit()).unwrap()]).unwrap();
-    let wire = map.canonical_bytes().unwrap();
+    let map = Value::map_canonical(vec![
+        MapEntry::try_new(atom, Value::unit())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+    ])
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    let wire = map
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(
-        decode_value_with_metrics(&wire, limits()).unwrap().1,
+        decode_value_with_metrics(&wire, limits())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+            .1,
         ValueMetrics {
             nodes: 3,
             payload_bytes: 34,
@@ -403,7 +511,9 @@ fn all_encoding_refusals_preserve_existing_prefix() {
         })
     );
     assert_eq!(out, before);
-    let bytes = env.canonical_bytes().unwrap();
+    let bytes = env
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(
         decode_envelope(&bytes, tiny),
         Err(DecodeError::InputLimit {
@@ -416,7 +526,8 @@ fn all_encoding_refusals_preserve_existing_prefix() {
 #[test]
 fn admitted_envelope_retains_custom_limits_and_readmits_changed_witness() {
     let value = nested_map();
-    let admitted = AdmittedValue::try_new(value.clone()).unwrap();
+    let admitted = AdmittedValue::try_new(value.clone())
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     let exact = DecodeLimits {
         max_input_bytes: 77,
         value: ValueLimits {
@@ -426,8 +537,8 @@ fn admitted_envelope_retains_custom_limits_and_readmits_changed_witness() {
             max_collection_len: 1,
         },
     };
-    let env =
-        AdmittedEnvelope::try_new_with_limits(1, Hash32::ZERO, admitted.clone(), exact).unwrap();
+    let env = AdmittedEnvelope::try_new_with_limits(1, Hash32::ZERO, admitted.clone(), exact)
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(env.limits(), exact);
     assert_eq!(env.payload_length(), 29);
     assert_eq!(env.encoded_length(), 77);
@@ -439,8 +550,15 @@ fn admitted_envelope_retains_custom_limits_and_readmits_changed_witness() {
             depth: 2
         }
     );
-    let wire = env.canonical_bytes().unwrap();
-    assert_eq!(decode_envelope(&wire, exact).unwrap().into_value(), value);
+    let wire = env
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    assert_eq!(
+        decode_envelope(&wire, exact)
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+            .into_value(),
+        value
+    );
     let tighter = DecodeLimits {
         value: ValueLimits {
             max_payload_bytes: 17,
@@ -467,11 +585,19 @@ fn admitted_envelope_encodes_under_retained_depth_instead_of_default_depth() {
         },
         ..limits()
     };
-    let admitted = AdmittedValue::try_new_with_limits(value.clone(), custom.value).unwrap();
-    let envelope =
-        AdmittedEnvelope::try_new_with_limits(1, Hash32::ZERO, admitted, custom).unwrap();
-    let wire = envelope.canonical_bytes().unwrap();
-    assert_eq!(decode_envelope(&wire, custom).unwrap().into_value(), value);
+    let admitted = AdmittedValue::try_new_with_limits(value.clone(), custom.value)
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    let envelope = AdmittedEnvelope::try_new_with_limits(1, Hash32::ZERO, admitted, custom)
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    let wire = envelope
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    assert_eq!(
+        decode_envelope(&wire, custom)
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+            .into_value(),
+        value
+    );
     assert_eq!(
         decode_envelope(&wire, limits()),
         Err(DecodeError::DepthLimit {
@@ -483,7 +609,7 @@ fn admitted_envelope_encodes_under_retained_depth_instead_of_default_depth() {
         envelope
             .into_envelope()
             .canonical_bytes_with_limits(custom)
-            .unwrap(),
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         wire
     );
 }
@@ -503,11 +629,13 @@ fn hard_depth1024_is_supported_but_cannot_be_disabled() {
             wire.push(0);
             let mut custom = limits();
             custom.value.max_depth = u32::MAX;
-            let (value, metrics) = decode_value_with_metrics(&wire, custom).unwrap();
+            let (value, metrics) = decode_value_with_metrics(&wire, custom)
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
             assert_eq!(metrics.depth, 1024);
             assert_eq!(metrics.nodes, 1025);
             assert_eq!(
-                canonical_value_bytes_with_limits(&value, custom.value).unwrap(),
+                canonical_value_bytes_with_limits(&value, custom.value)
+                    .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
                 wire
             );
             let mut deeper = prefix;

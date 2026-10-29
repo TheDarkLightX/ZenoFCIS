@@ -12,7 +12,8 @@ fn parse<const N: usize>(s: &str) -> [u128; N] {
     let mut words = [0; N];
     for (i, word) in words.iter_mut().enumerate() {
         let end = s.len() - i * 32;
-        *word = u128::from_str_radix(&s[end - 32..end], 16).unwrap();
+        *word = u128::from_str_radix(&s[end - 32..end], 16)
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     }
     words
 }
@@ -184,7 +185,9 @@ fn high_products_roots_and_differences_are_not_narrowed_early() {
         n.sqrt_ratio(U512::from_u256(U256::ONE), Rounding::Exact),
         Ok(root)
     );
-    let lower = U256::MAX.checked_sub(U256::ONE).unwrap();
+    let lower = U256::MAX
+        .checked_sub(U256::ONE)
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(
         I256::difference_unsigned(U256::MAX, lower),
         Ok(I256::from_i128(1))

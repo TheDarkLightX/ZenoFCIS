@@ -25,21 +25,37 @@ fn independent_atom_and_decimal_vectors() {
         assert_eq!(fields.len(), 3);
         let value = match fields[0] {
             "u256" => {
-                let value = parse_unsigned_decimal(fields[1]).unwrap();
-                assert_eq!(unsigned_decimal(value).unwrap(), fields[1]);
+                let value = parse_unsigned_decimal(fields[1])
+                    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+                assert_eq!(
+                    unsigned_decimal(value)
+                        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+                    fields[1]
+                );
                 Integer256::Unsigned(value)
             }
             "i256" => {
-                let value = parse_signed_decimal(fields[1]).unwrap();
-                assert_eq!(signed_decimal(value).unwrap(), fields[1]);
+                let value = parse_signed_decimal(fields[1])
+                    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+                assert_eq!(
+                    signed_decimal(value)
+                        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+                    fields[1]
+                );
                 Integer256::Signed(value)
             }
             _ => panic!("invalid committed control kind"),
         };
-        let expected = atom_vector_hex(fields[2]).unwrap();
-        let actual = encode_atom(ValueProfile::Zcve2, value).unwrap();
+        let expected = atom_vector_hex(fields[2])
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+        let actual = encode_atom(ValueProfile::Zcve2, value)
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
         assert_eq!(&actual[..], &expected[..]);
-        assert_eq!(decode_atom(ValueProfile::Zcve2, &actual).unwrap(), value);
+        assert_eq!(
+            decode_atom(ValueProfile::Zcve2, &actual)
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+            value
+        );
         assert_eq!(
             encode_atom(ValueProfile::Zcve1, value),
             Err(BoundaryError::UnsupportedProfile)
@@ -109,8 +125,13 @@ fn signed_delta_is_not_a_full_unsigned_transfer() {
         Err(Failure::Overflow)
     );
     let value = Integer256::Unsigned(U256::MAX);
-    let encoded = encode_atom(ValueProfile::Zcve2, value).unwrap();
-    assert_eq!(decode_atom(ValueProfile::Zcve2, &encoded).unwrap(), value);
+    let encoded = encode_atom(ValueProfile::Zcve2, value)
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    assert_eq!(
+        decode_atom(ValueProfile::Zcve2, &encoded)
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        value
+    );
     assert_eq!(I256::MIN.checked_neg(), Err(Failure::Overflow));
     assert_eq!(U256::MAX.try_u128(), Err(Failure::Overflow));
 }
@@ -118,7 +139,10 @@ fn signed_delta_is_not_a_full_unsigned_transfer() {
 #[test]
 fn atom_vector_reader_refuses_malformed_hex_without_discarding_input() {
     let valid = "00".repeat(33);
-    assert_eq!(atom_vector_hex(&valid).unwrap(), alloc::vec![0; 33]);
+    assert_eq!(
+        atom_vector_hex(&valid).unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        alloc::vec![0; 33]
+    );
     for malformed in [
         alloc::string::String::new(),
         "0".into(),

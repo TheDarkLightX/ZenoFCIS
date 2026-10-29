@@ -11,6 +11,7 @@ pub(crate) mod ordering_model;
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct U256(pub(super) [u128; 2]);
+/// An owned signed 256-bit integer represented by its two's-complement bits.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct I256(pub(super) U256);
@@ -18,6 +19,7 @@ pub struct I256(pub(super) U256);
 #[cfg_attr(verus_keep_ghost, cfg_eval)]
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 impl U256 {
+    /// Constructs an unsigned value from two words, least significant word first.
     #[cfg_attr(verus_keep_ghost, verus_spec(result =>
         ensures result.ordering_words() == words,
     ))]
@@ -26,6 +28,7 @@ impl U256 {
         proof! { reveal(U256::ordering_words); }
         Self(words)
     }
+    /// Returns the two unsigned words in least significant word order.
     #[cfg_attr(verus_keep_ghost, verus_spec(result =>
         ensures result == self.ordering_words(),
     ))]
@@ -34,6 +37,11 @@ impl U256 {
         proof! { reveal(U256::ordering_words); }
         self.0
     }
+    /// Compares the complete unsigned 256-bit values.
+    #[allow(
+        clippy::should_implement_trait,
+        reason = "Retain the proof-bound by-value comparison API"
+    )]
     #[cfg_attr(verus_keep_ghost, verus_spec(result =>
         ensures result == ordering_model::integer_order(
             ordering_model::unsigned(self), ordering_model::unsigned(other)),
@@ -55,6 +63,7 @@ impl U256 {
 #[cfg_attr(verus_keep_ghost, cfg_eval)]
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 impl I256 {
+    /// Constructs a signed value from its complete two's-complement bit pattern.
     #[cfg_attr(verus_keep_ghost, verus_spec(result =>
         ensures result.ordering_bits() == bits,
     ))]
@@ -63,6 +72,7 @@ impl I256 {
         proof! { reveal(I256::ordering_bits); }
         Self(bits)
     }
+    /// Returns the complete two's-complement bit pattern.
     #[cfg_attr(verus_keep_ghost, verus_spec(result =>
         ensures result == self.ordering_bits(),
     ))]
@@ -71,6 +81,7 @@ impl I256 {
         proof! { reveal(I256::ordering_bits); }
         self.0
     }
+    /// Reports whether the signed value is negative.
     #[cfg_attr(verus_keep_ghost, verus_spec(result =>
         ensures
             result == (ordering_model::unsigned(self.ordering_bits()) >= ordering_model::half()),
@@ -88,6 +99,11 @@ impl I256 {
         }
         self.0.0[1] >> 127 != 0
     }
+    /// Compares the complete signed 256-bit values.
+    #[allow(
+        clippy::should_implement_trait,
+        reason = "Retain the proof-bound by-value comparison API"
+    )]
     #[cfg_attr(verus_keep_ghost, verus_spec(result =>
         ensures result == ordering_model::integer_order(
             ordering_model::signed(self), ordering_model::signed(other)),

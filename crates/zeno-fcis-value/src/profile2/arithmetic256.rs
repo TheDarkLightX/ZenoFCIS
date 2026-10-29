@@ -10,16 +10,38 @@ mod wide;
 #[path = "reference/legacy_scalar.rs"]
 mod legacy_scalar;
 
+/// A checked fixed-width arithmetic refusal.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Failure { Overflow, ZeroDivisor, Inexact, Domain, Invariant }
+pub enum Failure {
+    /// The result does not fit the requested integer width or signed range.
+    Overflow,
+    /// The divisor is zero.
+    ZeroDivisor,
+    /// Exact rounding was requested for a nonintegral result.
+    Inexact,
+    /// An operand is outside the operation's permitted domain.
+    Domain,
+    /// An internal arithmetic consistency check failed.
+    Invariant,
+}
+/// The rounding policy for a checked arithmetic operation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Rounding { Floor, Ceil, Exact }
+pub enum Rounding {
+    /// Round toward negative infinity.
+    Floor,
+    /// Round toward positive infinity.
+    Ceil,
+    /// Refuse a result that requires rounding.
+    Exact,
+}
 
 #[path = "number256.rs"]
 mod number256;
 pub use number256::{I256, U256};
+/// An owned unsigned 512-bit integer with private least significant word order.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct U512([u128; 4]);
+/// An owned unsigned 768-bit integer with private least significant word order.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct U768([u128; 6]);
 
@@ -95,24 +117,33 @@ fn divide<const N: usize>(n: [u128; N], d: [u128; N]) -> Result<([u128; N], [u12
 }
 
 impl U256 {
+    /// The unsigned zero value.
     pub const ZERO: Self = Self([0, 0]);
+    /// The unsigned unit value.
     pub const ONE: Self = Self([1, 0]);
+    /// The largest unsigned 256-bit value.
     pub const MAX: Self = Self([u128::MAX, u128::MAX]);
+    /// Zero-extends an unsigned 128-bit value.
     pub const fn from_u128(x: u128) -> Self { Self([x, 0]) }
+    /// Adds two unsigned values, refusing overflow.
     pub fn checked_add(self, other: Self) -> Result<Self, Failure> {
         let (value, carry) = add(self.0, other.0);
         if carry { Err(Failure::Overflow) } else { Ok(Self(value)) }
     }
+    /// Subtracts two unsigned values, refusing underflow.
     pub fn checked_sub(self, other: Self) -> Result<Self, Failure> {
         let (value, borrow) = subtract(self.0, other.0);
         if borrow { Err(Failure::Overflow) } else { Ok(Self(value)) }
     }
+    /// Returns the complete 512-bit product of two unsigned values.
     pub fn full_product(self, other: Self) -> Result<U512, Failure> {
         Ok(U512(multiply(self.0, other.0)?))
     }
+    /// Multiplies two unsigned values, refusing a result wider than 256 bits.
     pub fn checked_mul(self, other: Self) -> Result<Self, Failure> {
         self.full_product(other)?.narrow()
     }
+    /// Returns the unsigned quotient and remainder, refusing a zero divisor.
     pub fn div_rem(self, den: Self) -> Result<(Self, Self), Failure> {
         let (q, r) = divide(self.0, den.0)?; Ok((Self(q), Self(r)))
     }
@@ -123,15 +154,18 @@ impl U256 {
             _ => Ok(q),
         }
     }
+    /// Divides using the selected rounding mode and refuses a zero divisor.
     pub fn checked_div(self, den: Self, mode: Rounding) -> Result<Self, Failure> {
         let (q, r) = self.div_rem(den)?; Self::rounded(q, r != Self::ZERO, mode)
     }
+    /// Divides the full product plus offset, refusing a quotient wider than 256 bits.
     pub fn mul_add_div_rem(self, b: Self, offset: Self, den: Self) -> Result<(Self, Self), Failure> {
         if den == Self::ZERO { return Err(Failure::ZeroDivisor); }
         let numerator = self.full_product(b)?.checked_add(U512::from_u256(offset))?;
         let (q, r) = numerator.div_rem(U512::from_u256(den))?;
         Ok((q.narrow()?, r.narrow()?))
     }
+    /// Divides the full product with one final rounding and checked narrowing.
     pub fn mul_div(self, b: Self, den: Self, mode: Rounding) -> Result<Self, Failure> {
         let (q, r) = self.mul_add_div_rem(b, Self::ZERO, den)?;
         Self::rounded(q, r != Self::ZERO, mode)
@@ -141,6 +175,7 @@ impl U256 {
         let half = Self([den.0[0] >> 1 | (den.0[1] << 127), den.0[1] >> 1]);
         self.mul_add_div_rem(b, half, den).map(|(q, _)| q)
     }
+    /// Returns the rounded square root of the complete product.
     pub fn geometric_mean(self, b: Self, mode: Rounding) -> Result<Self, Failure> {
         self.full_product(b)?.sqrt(mode)
     }
@@ -151,35 +186,46 @@ impl U256 {
         let (q, r) = numerator.div_rem(U768::from_u256(den))?;
         Self::rounded(q.narrow()?, r != U768::ZERO, mode)
     }
+    /// Compares two complete products of three unsigned factors.
     pub fn products_ge(a: [Self; 3], b: [Self; 3]) -> Result<bool, Failure> {
         let left = a[0].full_product(a[1])?.multiply_u256(a[2])?;
         let right = b[0].full_product(b[1])?.multiply_u256(b[2])?;
         Ok(compare(&left.0, &right.0) != Ordering::Less)
     }
+    /// Returns the value if its high 128-bit word is zero.
     pub fn try_u128(self) -> Result<u128, Failure> {
         if self.0[1] == 0 { Ok(self.0[0]) } else { Err(Failure::Overflow) }
     }
 }
 
 impl U512 {
+    /// The unsigned 512-bit zero value.
     pub const ZERO: Self = Self([0; 4]);
+    /// Constructs a value from four words, least significant word first.
     pub const fn from_words_le(words: [u128; 4]) -> Self { Self(words) }
+    /// Returns four words in least significant word order.
     pub const fn words_le(self) -> [u128; 4] { self.0 }
+    /// Zero-extends an unsigned 256-bit value.
     pub const fn from_u256(x: U256) -> Self { Self([x.0[0], x.0[1], 0, 0]) }
+    /// Returns the value if it fits in 256 bits.
     pub fn narrow(self) -> Result<U256, Failure> {
         if self.0[2] == 0 && self.0[3] == 0 { Ok(U256([self.0[0], self.0[1]])) }
         else { Err(Failure::Overflow) }
     }
+    /// Adds two 512-bit values, refusing overflow.
     pub fn checked_add(self, other: Self) -> Result<Self, Failure> {
         let (value, carry) = add(self.0, other.0);
         if carry { Err(Failure::Overflow) } else { Ok(Self(value)) }
     }
+    /// Returns the complete 768-bit product with an unsigned 256-bit value.
     pub fn multiply_u256(self, other: U256) -> Result<U768, Failure> {
         Ok(U768(multiply(self.0, other.0)?))
     }
+    /// Returns the 512-bit quotient and remainder, refusing a zero divisor.
     pub fn div_rem(self, den: Self) -> Result<(Self, Self), Failure> {
         let (q, r) = divide(self.0, den.0)?; Ok((Self(q), Self(r)))
     }
+    /// Returns the rounded square root with checked 256-bit narrowing.
     pub fn sqrt(self, mode: Rounding) -> Result<U256, Failure> {
         let mut root = U256::ZERO;
         for bit in (0..256).rev() {
@@ -201,11 +247,15 @@ impl U512 {
 }
 
 impl U768 {
+    /// The unsigned 768-bit zero value.
     pub const ZERO: Self = Self([0; 6]);
+    /// Zero-extends an unsigned 256-bit value.
     pub const fn from_u256(x: U256) -> Self { Self([x.0[0], x.0[1], 0, 0, 0, 0]) }
+    /// Returns the 768-bit quotient and remainder, refusing a zero divisor.
     pub fn div_rem(self, den: Self) -> Result<(Self, Self), Failure> {
         let (q, r) = divide(self.0, den.0)?; Ok((Self(q), Self(r)))
     }
+    /// Returns the value if it fits in 256 bits.
     pub fn narrow(self) -> Result<U256, Failure> {
         if self.0[2..].iter().all(|x| *x == 0) { Ok(U256([self.0[0], self.0[1]])) }
         else { Err(Failure::Overflow) }
@@ -213,21 +263,28 @@ impl U768 {
 }
 
 impl I256 {
+    /// The signed zero value.
     pub const ZERO: Self = Self(U256::ZERO);
+    /// The smallest signed 256-bit value.
     pub const MIN: Self = Self(U256([0, 1u128 << 127]));
+    /// The largest signed 256-bit value.
     pub const MAX: Self = Self(U256([u128::MAX, (1u128 << 127) - 1]));
+    /// Sign-extends a signed 128-bit value.
     pub const fn from_i128(x: i128) -> Self { Self(U256([x as u128, if x < 0 { u128::MAX } else { 0 }])) }
     fn negative_bits(x: U256) -> U256 {
         let (words, _) = add([!x.0[0], !x.0[1]], [1, 0]); U256(words)
     }
+    /// Returns the unsigned absolute magnitude, including that of the minimum value.
     pub fn magnitude(self) -> U256 {
         if self.is_negative() { Self::negative_bits(self.0) } else { self.0 }
     }
+    /// Applies the sign to a magnitude, refusing values outside the signed range.
     pub fn from_magnitude(x: U256, negative: bool) -> Result<Self, Failure> {
         let bound = if negative { Self::MIN.0 } else { Self::MAX.0 };
         if x.cmp(bound) == Ordering::Greater { return Err(Failure::Overflow); }
         Ok(Self(if negative { Self::negative_bits(x) } else { x }))
     }
+    /// Returns the unsigned value if this signed value is nonnegative.
     pub fn try_unsigned(self) -> Result<U256, Failure> {
         if self.is_negative() { Err(Failure::Overflow) } else { Ok(self.0) }
     }
@@ -237,21 +294,25 @@ impl I256 {
         if a.cmp(b) == Ordering::Less { Self::from_magnitude(b.checked_sub(a)?, true) }
         else { Self::from_magnitude(a.checked_sub(b)?, false) }
     }
+    /// Negates the value, refusing the minimum signed value.
     pub fn checked_neg(self) -> Result<Self, Failure> {
         if self == Self::MIN { Err(Failure::Overflow) } else { Ok(Self(Self::negative_bits(self.0))) }
     }
+    /// Adds two signed values, refusing signed overflow.
     pub fn checked_add(self, other: Self) -> Result<Self, Failure> {
         let (bits, _) = add(self.0.0, other.0.0); let result = Self(U256(bits));
         if self.is_negative() == other.is_negative() && result.is_negative() != self.is_negative() {
             Err(Failure::Overflow)
         } else { Ok(result) }
     }
+    /// Subtracts two signed values, refusing signed overflow.
     pub fn checked_sub(self, other: Self) -> Result<Self, Failure> {
         let (bits, _) = subtract(self.0.0, other.0.0); let result = Self(U256(bits));
         if self.is_negative() != other.is_negative() && result.is_negative() != self.is_negative() {
             Err(Failure::Overflow)
         } else { Ok(result) }
     }
+    /// Multiplies two signed values, refusing signed overflow.
     pub fn checked_mul(self, other: Self) -> Result<Self, Failure> {
         Self::from_magnitude(self.magnitude().checked_mul(other.magnitude())?, self.is_negative() != other.is_negative())
     }
@@ -261,17 +322,20 @@ impl I256 {
             (Rounding::Exact, _) => Rounding::Exact, _ => Rounding::Floor,
         }
     }
+    /// Divides with signed rounding, refusing zero, inexactness or signed overflow.
     pub fn checked_div(self, den: Self, mode: Rounding) -> Result<Self, Failure> {
         let negative = self.is_negative() != den.is_negative();
         let q = self.magnitude().checked_div(den.magnitude(), Self::magnitude_round(mode, negative))?;
         Self::from_magnitude(q, negative)
     }
+    /// Divides the full signed product by a positive denominator with checked rounding.
     pub fn mul_div_positive(self, b: Self, den: Self, mode: Rounding) -> Result<Self, Failure> {
         if den.is_negative() || den == Self::ZERO { return Err(Failure::Domain); }
         let negative = self.is_negative() != b.is_negative();
         let q = self.magnitude().mul_div(b.magnitude(), den.magnitude(), Self::magnitude_round(mode, negative))?;
         Self::from_magnitude(q, negative)
     }
+    /// Requires nonnegative factors and a positive denominator before rounded division.
     pub fn nonnegative_mul_div(self, b: Self, den: Self, mode: Rounding) -> Result<Self, Failure> {
         if self.is_negative() || b.is_negative() { return Err(Failure::Domain); }
         self.mul_div_positive(b, den, mode)
@@ -283,10 +347,12 @@ impl I256 {
         let q = self.magnitude().mul3_div(b, c.magnitude(), den, Self::magnitude_round(mode, negative))?;
         Self::from_magnitude(q, negative)
     }
+    /// Compares two triple products after refusing any negative factor.
     pub fn nonnegative_products_ge(a: [Self; 3], b: [Self; 3]) -> Result<bool, Failure> {
         for x in a.iter().chain(b.iter()) { if x.is_negative() { return Err(Failure::Domain); } }
         U256::products_ge(a.map(|x| x.0), b.map(|x| x.0))
     }
+    /// Returns the value if its upper word is a valid 128-bit sign extension.
     pub fn try_i128(self) -> Result<i128, Failure> {
         let low = self.0.0[0] as i128;
         if self.0.0[1] == if low < 0 { u128::MAX } else { 0 } { Ok(low) }

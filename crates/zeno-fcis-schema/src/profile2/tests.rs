@@ -10,7 +10,8 @@ use zeno_fcis_value::profile2::{
 };
 
 fn type_def(id: u32, name: &str, kind: TypeKind) -> TypeDef {
-    TypeDef::try_new(TypeId::new(id), name, kind, SchemaLimits::default()).expect("type fixture")
+    TypeDef::try_new(TypeId::new(id), name, kind, SchemaLimits::default())
+        .unwrap_or_else(|error| panic!("type fixture: {error:?}"))
 }
 
 fn schema(root: u32, types: Vec<TypeDef>) -> Schema {
@@ -22,7 +23,7 @@ fn schema(root: u32, types: Vec<TypeDef>) -> Schema {
         types,
         SchemaLimits::default(),
     )
-    .expect("schema fixture")
+    .unwrap_or_else(|error| panic!("schema fixture: {error:?}"))
 }
 
 fn unsigned_schema(min: U256, max: U256) -> Schema {
@@ -89,10 +90,14 @@ fn profile_selection_is_closed_and_not_application_revision() {
         vec![def],
         SchemaLimits::default(),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(app.version(), 1);
     assert_eq!(app.root_type(), TypeId::new(0));
-    assert!(app.canonical_bytes().unwrap().starts_with(SCHEMA_MAGIC));
+    assert!(
+        app.canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+            .starts_with(SCHEMA_MAGIC)
+    );
 }
 
 #[test]
@@ -143,8 +148,10 @@ fn exact_unsigned_nontrivial_interval_and_neighbors() {
         assert!(validation(&schema, &Value::unsigned256(n)).is_ok());
     }
     for n in [
-        min.checked_sub(U256::ONE).unwrap(),
-        max.checked_add(U256::ONE).unwrap(),
+        min.checked_sub(U256::ONE)
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        max.checked_add(U256::ONE)
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ] {
         assert_eq!(
             validation(&schema, &Value::unsigned256(n)),
@@ -165,8 +172,10 @@ fn exact_signed_interval_crosses_zero_at_full_width() {
         assert!(validation(&schema, &Value::signed256(n)).is_ok());
     }
     for n in [
-        min.checked_sub(I256::from_i128(1)).unwrap(),
-        max.checked_add(I256::from_i128(1)).unwrap(),
+        min.checked_sub(I256::from_i128(1))
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        max.checked_add(I256::from_i128(1))
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ] {
         assert_eq!(
             validation(&schema, &Value::signed256(n)),
@@ -254,7 +263,7 @@ fn schema_bytes_match_independent_distinct_limb_and_signed_goldens() {
         )],
         SchemaLimits::default(),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     let i = Schema::try_new(
         SchemaProfile::VALUE2,
         "Wide",
@@ -273,9 +282,17 @@ fn schema_bytes_match_independent_distinct_limb_and_signed_goldens() {
         )],
         SchemaLimits::default(),
     )
-    .unwrap();
-    assert_eq!(u.canonical_bytes().unwrap(), hex(GOLDEN_UNSIGNED));
-    assert_eq!(i.canonical_bytes().unwrap(), hex(GOLDEN_SIGNED));
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    assert_eq!(
+        u.canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        hex(GOLDEN_UNSIGNED)
+    );
+    assert_eq!(
+        i.canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        hex(GOLDEN_SIGNED)
+    );
 }
 
 #[test]
@@ -291,11 +308,11 @@ fn schema1_golden_and_domain_remain_legacy_while_schema2_is_disjoint() {
                 crate::TypeKind::U128 { min: 1, max: 100 },
                 SchemaLimits::default(),
             )
-            .unwrap(),
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         ],
         SchemaLimits::default(),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     let new = Schema::try_new(
         SchemaProfile::VALUE2,
         "Compat",
@@ -304,16 +321,28 @@ fn schema1_golden_and_domain_remain_legacy_while_schema2_is_disjoint() {
         vec![type_def(7, "Small", TypeKind::U128 { min: 1, max: 100 })],
         SchemaLimits::default(),
     )
-    .unwrap();
-    assert_eq!(old.canonical_bytes().unwrap(), hex(GOLDEN_LEGACY));
-    assert_eq!(new.canonical_bytes().unwrap(), hex(GOLDEN_COMPAT2));
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(
-        &old.canonical_bytes().unwrap()[13..],
-        &new.canonical_bytes().unwrap()[13..]
+        old.canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        hex(GOLDEN_LEGACY)
+    );
+    assert_eq!(
+        new.canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        hex(GOLDEN_COMPAT2)
+    );
+    assert_eq!(
+        &old.canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))[13..],
+        &new.canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))[13..]
     );
     assert_ne!(
-        old.schema_hash::<Hash>().unwrap(),
-        new.schema_hash::<Hash>().unwrap()
+        old.schema_hash::<Hash>()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        new.schema_hash::<Hash>()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
     );
 }
 
@@ -339,8 +368,10 @@ fn record_map_schema() -> Schema {
         "Entry",
         TypeKind::Record {
             fields: vec![
-                FieldDef::try_new(FieldId::new(2), "delta", TypeId::new(2)).unwrap(),
-                FieldDef::try_new(FieldId::new(1), "amount", TypeId::new(1)).unwrap(),
+                FieldDef::try_new(FieldId::new(2), "delta", TypeId::new(2))
+                    .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+                FieldDef::try_new(FieldId::new(1), "amount", TypeId::new(1))
+                    .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
             ]
             .into_boxed_slice(),
         },
@@ -363,7 +394,7 @@ fn record(amount: Value, delta: I256) -> Value {
         Field::new(1, amount),
         Field::new(2, Value::signed256(delta)),
     ])
-    .unwrap()
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
 }
 
 fn record_map() -> Value {
@@ -372,14 +403,14 @@ fn record_map() -> Value {
             Value::signed256(I256::from_i128(-1)),
             record(Value::unsigned256(U256::MAX), I256::MIN),
         )
-        .unwrap(),
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         MapEntry::try_new(
             Value::signed256(I256::ZERO),
             record(Value::unsigned256(U256::ONE), I256::MAX),
         )
-        .unwrap(),
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ])
-    .unwrap()
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
 }
 
 #[test]
@@ -428,9 +459,9 @@ fn nested_range_and_record_shape_refuse() {
             Value::signed256(I256::ZERO),
             record(Value::unsigned256(U256::ZERO), I256::ZERO),
         )
-        .unwrap(),
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ])
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(
         validation(&schema, &invalid),
         Err(ValueValidationError::IntegerRange)
@@ -439,7 +470,7 @@ fn nested_range_and_record_shape_refuse() {
         Field::new(1, Value::unsigned256(U256::ONE)),
         Field::new(3, Value::signed256(I256::ZERO)),
     ])
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(
         schema.validate_value(TypeId::new(3), &wrong_fields, ValidationLimits::default()),
         Err(ValueValidationError::RecordShape)
@@ -448,7 +479,7 @@ fn nested_range_and_record_shape_refuse() {
         Field::new(1, Value::unsigned(1)),
         Field::new(3, Value::signed256(I256::ZERO)),
     ])
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(
         schema.validate_value(TypeId::new(3), &both_bad, ValidationLimits::default()),
         Err(ValueValidationError::TypeMismatch)
@@ -468,7 +499,7 @@ fn schema_and_field_declaration_order_are_normalized() {
         types,
         SchemaLimits::default(),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(left.canonical_bytes(), right.canonical_bytes());
     assert_eq!(left.schema_hash::<Hash>(), right.schema_hash::<Hash>());
 }
@@ -514,8 +545,11 @@ fn complete_structural_vocabulary_remains_available_in_schema2() {
             7,
             "Enum",
             TypeKind::Enum {
-                variants: vec![EnumVariantDef::try_new(VariantId::new(0), "Zero").unwrap()]
-                    .into_boxed_slice(),
+                variants: vec![
+                    EnumVariantDef::try_new(VariantId::new(0), "Zero")
+                        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+                ]
+                .into_boxed_slice(),
             },
         ),
         type_def(
@@ -529,8 +563,11 @@ fn complete_structural_vocabulary_remains_available_in_schema2() {
             9,
             "Record",
             TypeKind::Record {
-                fields: vec![FieldDef::try_new(FieldId::new(0), "flag", TypeId::new(2)).unwrap()]
-                    .into_boxed_slice(),
+                fields: vec![
+                    FieldDef::try_new(FieldId::new(0), "flag", TypeId::new(2))
+                        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+                ]
+                .into_boxed_slice(),
             },
         ),
         type_def(
@@ -539,7 +576,7 @@ fn complete_structural_vocabulary_remains_available_in_schema2() {
             TypeKind::Sum {
                 variants: vec![
                     SumVariantDef::try_new(VariantId::new(0), "Item", Some(TypeId::new(3)))
-                        .unwrap(),
+                        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
                 ]
                 .into_boxed_slice(),
             },
@@ -596,21 +633,33 @@ fn complete_structural_vocabulary_remains_available_in_schema2() {
         Value::boolean(true),
         Value::unsigned(u128::MAX),
         Value::signed(i128::MIN),
-        Value::bytes(vec![1]).unwrap(),
-        Value::text_ascii("x".into()).unwrap(),
+        Value::bytes(vec![1]).unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        Value::text_ascii("x".into())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         Value::enumeration(7, 0),
-        Value::tuple(vec![Value::unit()]).unwrap(),
-        Value::record_canonical(vec![Field::new(0, Value::boolean(true))]).unwrap(),
+        Value::tuple(vec![Value::unit()])
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        Value::record_canonical(vec![Field::new(0, Value::boolean(true))])
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         Value::sum(10, 0, Some(Value::unsigned(3))),
-        Value::vector(vec![Value::unit()]).unwrap(),
+        Value::vector(vec![Value::unit()])
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         Value::map_canonical(vec![
-            MapEntry::try_new(Value::unsigned(1), Value::signed(-1)).unwrap(),
+            MapEntry::try_new(Value::unsigned(1), Value::signed(-1))
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         ])
-        .unwrap(),
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         Value::unsigned256(U256::MAX),
         Value::signed256(I256::MIN),
     ];
-    assert!(validation(&schema, &Value::tuple(values).unwrap()).is_ok());
+    assert!(
+        validation(
+            &schema,
+            &Value::tuple(values)
+                .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -631,9 +680,10 @@ fn enum_sum_type_identity_payload_and_variant_are_checked() {
                 "Choice",
                 TypeKind::Sum {
                     variants: vec![
-                        SumVariantDef::try_new(VariantId::new(0), "None", None).unwrap(),
+                        SumVariantDef::try_new(VariantId::new(0), "None", None)
+                            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
                         SumVariantDef::try_new(VariantId::new(1), "Some", Some(TypeId::new(1)))
-                            .unwrap(),
+                            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
                     ]
                     .into_boxed_slice(),
                 },
@@ -642,8 +692,11 @@ fn enum_sum_type_identity_payload_and_variant_are_checked() {
                 3,
                 "Flag",
                 TypeKind::Enum {
-                    variants: vec![EnumVariantDef::try_new(VariantId::new(0), "No").unwrap()]
-                        .into_boxed_slice(),
+                    variants: vec![
+                        EnumVariantDef::try_new(VariantId::new(0), "No")
+                            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+                    ]
+                    .into_boxed_slice(),
                 },
             ),
         ],
@@ -758,8 +811,11 @@ fn closure_duplicates_cycles_and_local_schema_caps_refuse() {
             TypeId::new(1),
             "Fields",
             TypeKind::Record {
-                fields: vec![FieldDef::try_new(FieldId::new(1), "a", TypeId::new(2)).unwrap()]
-                    .into_boxed_slice()
+                fields: vec![
+                    FieldDef::try_new(FieldId::new(1), "a", TypeId::new(2))
+                        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+                ]
+                .into_boxed_slice()
             },
             SchemaLimits {
                 max_fields: 0,
@@ -791,7 +847,7 @@ fn root_and_selected_type_witness_bind_exact_owned_value_and_metrics() {
         Value::unsigned256(U256::MAX),
         ValidationLimits::default(),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(root.root_type(), TypeId::new(1));
     assert_eq!(
         root.validation_report(),
@@ -807,7 +863,7 @@ fn root_and_selected_type_witness_bind_exact_owned_value_and_metrics() {
         Value::boolean(true),
         ValidationLimits::default(),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(selected.type_id(), TypeId::new(2));
     assert_eq!(selected.schema_hash(), root.schema_hash());
     assert_eq!(selected.value().value(), &Value::boolean(true));
@@ -836,7 +892,9 @@ fn expected_type_precedes_hash_value_and_validation_budget() {
 #[test]
 fn expected_hash_precedes_shape_and_matching_pin_is_not_certification() {
     let schema = unsigned_schema(U256::ONE, U256::MAX);
-    let expected = schema.schema_hash::<Hash>().unwrap();
+    let expected = schema
+        .schema_hash::<Hash>()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     let wrong = Envelope::new(1, Hash32::ZERO, Value::boolean(false));
     assert_eq!(
         SchemaAdmittedEnvelope::try_from_envelope::<Hash>(
@@ -870,8 +928,10 @@ fn codec2_roundtrip_rechecks_expected_schema_and_exact_bytes() {
     let schema = record_map_schema();
     let root =
         SchemaAdmittedEnvelope::try_new::<Hash>(&schema, record_map(), ValidationLimits::default())
-            .unwrap();
-    let bytes = root.canonical_bytes().unwrap();
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    let bytes = root
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(&bytes[..8], b"ZFCISV2\0");
     let replay = SchemaAdmittedEnvelope::decode_expected::<Hash>(
         &schema,
@@ -879,10 +939,19 @@ fn codec2_roundtrip_rechecks_expected_schema_and_exact_bytes() {
         DecodeLimits::default(),
         ValidationLimits::default(),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(replay, root);
-    assert_eq!(replay.canonical_bytes().unwrap(), bytes);
-    assert_eq!(replay.encoded_length(), u64::try_from(bytes.len()).unwrap());
+    assert_eq!(
+        replay
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        bytes
+    );
+    assert_eq!(
+        replay.encoded_length(),
+        u64::try_from(bytes.len())
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+    );
     let mut extra = bytes.clone();
     extra.push(0);
     assert!(matches!(
@@ -918,11 +987,14 @@ fn legacy_envelope_magic_refuses_even_for_old_tag_payload() {
     );
     let old = zeno_fcis_codec::Envelope::new(
         1,
-        schema.schema_hash::<Hash>().unwrap(),
+        schema
+            .schema_hash::<Hash>()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         zeno_fcis_value::Value::unsigned(42),
     );
     let mut bytes = Vec::new();
-    old.encode_to(&mut bytes).unwrap();
+    old.encode_to(&mut bytes)
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_eq!(
         SchemaAdmittedEnvelope::decode_expected::<Hash>(
             &schema,
@@ -959,17 +1031,21 @@ fn codec2_magic_does_not_turn_a_schema1_hash_into_schema2_admission() {
                 crate::TypeKind::U128 { min: 0, max: 100 },
                 SchemaLimits::default(),
             )
-            .unwrap(),
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         ],
         SchemaLimits::default(),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     let new = schema(
         1,
         vec![type_def(1, "Narrow", TypeKind::U128 { min: 0, max: 100 })],
     );
-    let old_hash = old.schema_hash::<Hash>().unwrap();
-    let expected = new.schema_hash::<Hash>().unwrap();
+    let old_hash = old
+        .schema_hash::<Hash>()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+    let expected = new
+        .schema_hash::<Hash>()
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_ne!(expected, old_hash);
     let raw = Envelope::new(1, old_hash, Value::unsigned(42));
     assert_eq!(
@@ -992,11 +1068,13 @@ fn application_revision_changes_bound_hash_without_changing_profile() {
         first.types().to_vec(),
         SchemaLimits::default(),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     assert_ne!(first.schema_hash::<Hash>(), second.schema_hash::<Hash>());
     let raw = Envelope::new(
         1,
-        first.schema_hash::<Hash>().unwrap(),
+        first
+            .schema_hash::<Hash>()
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
         Value::unsigned256(U256::ONE),
     );
     assert!(matches!(
@@ -1028,7 +1106,8 @@ fn default_structural_admission_is_not_replaced_by_schema_budget() {
                 items: Box::new([TypeId::new(id + 1)]),
             },
         ));
-        value = Value::tuple(vec![value]).unwrap();
+        value = Value::tuple(vec![value])
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     }
     let schema = schema(0, types);
     assert_eq!(
@@ -1061,16 +1140,22 @@ fn schema_limits_revalidate_types_created_under_looser_local_caps() {
         },
     );
     let variants = vec![
-        EnumVariantDef::try_new(VariantId::new(0), "A").unwrap(),
-        EnumVariantDef::try_new(VariantId::new(1), "B").unwrap(),
+        EnumVariantDef::try_new(VariantId::new(0), "A")
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        EnumVariantDef::try_new(VariantId::new(1), "B")
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ];
     let sums = vec![
-        SumVariantDef::try_new(VariantId::new(0), "A", None).unwrap(),
-        SumVariantDef::try_new(VariantId::new(1), "B", Some(TypeId::new(1))).unwrap(),
+        SumVariantDef::try_new(VariantId::new(0), "A", None)
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        SumVariantDef::try_new(VariantId::new(1), "B", Some(TypeId::new(1)))
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ];
     let fields = vec![
-        FieldDef::try_new(FieldId::new(1), "a", TypeId::new(1)).unwrap(),
-        FieldDef::try_new(FieldId::new(2), "b", TypeId::new(1)).unwrap(),
+        FieldDef::try_new(FieldId::new(1), "a", TypeId::new(1))
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+        FieldDef::try_new(FieldId::new(2), "b", TypeId::new(1))
+            .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
     ];
     let cases = vec![
         (
@@ -1134,8 +1219,13 @@ fn schema_limits_revalidate_types_created_under_looser_local_caps() {
             types,
             limits,
         )
-        .unwrap();
-        assert_eq!(accepted.type_by_id(TypeId::new(2)).unwrap(), &before);
+        .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
+        assert_eq!(
+            accepted
+                .type_by_id(TypeId::new(2))
+                .unwrap_or_else(|| panic!("fixture type 2 must exist")),
+            &before
+        );
     }
 }
 
@@ -1149,8 +1239,11 @@ fn transitive_schema_caps_have_explicit_refusal_order() {
         1,
         "Root",
         TypeKind::Record {
-            fields: vec![FieldDef::try_new(FieldId::new(1), "missing", TypeId::new(9)).unwrap()]
-                .into_boxed_slice(),
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "missing", TypeId::new(9))
+                    .unwrap_or_else(|error| panic!("test operation failed: {error:?}")),
+            ]
+            .into_boxed_slice(),
         },
     );
     assert_eq!(
