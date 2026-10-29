@@ -65,6 +65,22 @@ jobs:
         run: |
           python3 -B -m unittest test_shared test_reviewed_export test_ladder_tools zal_notation.tests.test_sharing zal_notation.tests.test_story zal_notation.tests.test_lenses zal_notation.tests.test_lens_integration
 
+  zal-lens-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Catalog ownership, admission, independent finite oracles and packet replay
+        working-directory: integrations/zal
+        run: |
+          python3 -B -m unittest zal_notation.tests.test_lens_library zal_notation.tests.test_lens_integration zal_notation.tests.test_library_lens_browser
+          PYTHONOPTIMIZE=1 python3 -O -B -m unittest zal_notation.tests.test_lens_library zal_notation.tests.test_lens_integration zal_notation.tests.test_library_lens_browser
+
   rust:
     runs-on: ubuntu-24.04
     timeout-minutes: 120

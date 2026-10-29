@@ -1,0 +1,140 @@
+{
+  "backends": {
+    "baseline": {
+      "catalog_bytes": 9523,
+      "catalog_median_ns": 92452878,
+      "catalog_runs": 75,
+      "definition_validation_calls": 255,
+      "full_registry_validation_calls": 30,
+      "peak_rss_kib_observed": 31928,
+      "total_worker_cpu_seconds": 181.564863931
+    },
+    "candidate": {
+      "catalog_bytes": 9523,
+      "catalog_median_ns": 6913816,
+      "catalog_runs": 75,
+      "definition_validation_calls": 30,
+      "full_registry_validation_calls": 1,
+      "peak_rss_kib_observed": 31828,
+      "total_worker_cpu_seconds": 61.892035921
+    }
+  },
+  "cleanup": {
+    "identities": 6,
+    "signals": 0,
+    "survivors": []
+  },
+  "matched_workers": 6,
+  "schema": "zal/registry-performance-summary/1",
+  "scope": "Warm builtin construction and full fixed workload export/replay on pinned host/Python,1CPU,3runs/backend. Not whole-factory/prover speed or universal crossover.",
+  "workloads": {
+    "heldout-latch": {
+      "baseline": {
+        "artifact_bytes": [
+          1489238,
+          1489238,
+          1489238
+        ],
+        "combined_seconds": [
+          14.652556593995541,
+          15.054668779019266,
+          17.36889567412436
+        ],
+        "export_seconds": [
+          8.347844457020983,
+          6.290219309972599,
+          8.76013589114882
+        ],
+        "files": 32,
+        "median_combined_seconds": 15.054668779019266,
+        "replay_seconds": [
+          6.304712136974558,
+          8.764449469046667,
+          8.60875978297554
+        ],
+        "semantic_projection_sha256": "3746b62f1ebe0d8c9a4b467d184f51bb021eee3b9b35f35e6a4152b81ad27f6d"
+      },
+      "candidate": {
+        "artifact_bytes": [
+          1489238,
+          1489238,
+          1489238
+        ],
+        "combined_seconds": [
+          4.071242219069973,
+          5.526365790981799,
+          4.531029497040436
+        ],
+        "export_seconds": [
+          2.033996670972556,
+          2.8088704880792648,
+          2.0092890448868275
+        ],
+        "files": 32,
+        "median_combined_seconds": 4.531029497040436,
+        "replay_seconds": [
+          2.0372455480974168,
+          2.7174953029025346,
+          2.521740452153608
+        ],
+        "semantic_projection_sha256": "3746b62f1ebe0d8c9a4b467d184f51bb021eee3b9b35f35e6a4152b81ad27f6d"
+      },
+      "median_ratio_baseline_over_candidate": 3.3225713469428153,
+      "semantic_results_match": true
+    },
+    "representative-five": {
+      "baseline": {
+        "artifact_bytes": [
+          2660741,
+          2660741,
+          2660741
+        ],
+        "combined_seconds": [
+          36.69062095996924,
+          38.323214892996475,
+          41.23106625606306
+        ],
+        "export_seconds": [
+          17.61704715504311,
+          21.120204069884494,
+          18.885465848026797
+        ],
+        "files": 69,
+        "median_combined_seconds": 38.323214892996475,
+        "replay_seconds": [
+          19.073573804926127,
+          17.20301082311198,
+          22.345600408036262
+        ],
+        "semantic_projection_sha256": "bad419f280e039bebcd8ea575e4e483e6a34554ed93a6579ee84bb5900312624"
+      },
+      "candidate": {
+        "artifact_bytes": [
+          2660741,
+          2660741,
+          2660741
+        ],
+        "combined_seconds": [
+          12.96888516494073,
+          16.648018918931484,
+          15.362162149045616
+        ],
+        "export_seconds": [
+          6.487854867009446,
+          8.04364639800042,
+          7.038203642936423
+        ],
+        "files": 69,
+        "median_combined_seconds": 15.362162149045616,
+        "replay_seconds": [
+          6.481030297931284,
+          8.604372520931065,
+          8.323958506109193
+        ],
+        "semantic_projection_sha256": "bad419f280e039bebcd8ea575e4e483e6a34554ed93a6579ee84bb5900312624"
+      },
+      "median_ratio_baseline_over_candidate": 2.494649810435527,
+      "semantic_results_match": true
+    }
+  }
+}

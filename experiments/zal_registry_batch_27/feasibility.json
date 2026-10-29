@@ -1,0 +1,261 @@
+{
+  "baseline": {
+    "artifact": {
+      "kind": "artifact",
+      "path": "experiments/zal_registry_batch_27/baseline_lens_library.source.txt",
+      "sha256": "5c4a4eac6233dff0a8ddf9902d0a4ba7c8147c93c3d84e05a69ee1d2c21bf7a5"
+    },
+    "artifact_sha256": "5c4a4eac6233dff0a8ddf9902d0a4ba7c8147c93c3d84e05a69ee1d2c21bf7a5",
+    "inventory_as_of": "2026-10-29",
+    "name": "Published private-prefix registration producer",
+    "qualification_evidence": [
+      {
+        "kind": "qualification",
+        "path": "experiments/zal_registry_batch_27/qualification.json",
+        "sha256": "ae75a29d4e629be425b520c30e1d93a454002e6788d2742b6db8c1f7cf3eef42"
+      },
+      {
+        "kind": "replay",
+        "path": "experiments/zal_registry_batch_27/qualification.json",
+        "sha256": "ae75a29d4e629be425b520c30e1d93a454002e6788d2742b6db8c1f7cf3eef42"
+      }
+    ],
+    "qualification_scope": "Current registered builtin catalog producer: exact catalog/fallback/refusal comparison and fresh source-specific finite/structural export replay, within declared source/budget profiles. No full Python kernel theorem.",
+    "revision": "8de5a6543f93353d2f4563b17badfde285ce46a2",
+    "selection_evidence": [
+      {
+        "kind": "review",
+        "path": "experiments/zal_registry_batch_27/README.md",
+        "sha256": "edf884a4792cb3e09b35b14eeb7d628c2675e1d5fcea4cbcd05c880c96066da7"
+      },
+      {
+        "kind": "qualification",
+        "path": "experiments/zal_registry_batch_27/qualification.json",
+        "sha256": "ae75a29d4e629be425b520c30e1d93a454002e6788d2742b6db8c1f7cf3eef42"
+      }
+    ],
+    "selection_rationale": "The source inventory found one runtime default_registry implementation in integrations/tools. The published implementation is the only registered currently applicable qualified producer found; this does not rank unrelated verification backends.",
+    "toolchain": {
+      "description": "Descriptor for actual measured Python3.12.3/GCC13.3.0; binary SHA verified before/after, descriptor hashing does not attest the installed interpreter.",
+      "path": "experiments/zal_registry_batch_27/runtime.json",
+      "sha256": "33c23ab35066791f1f9bebc1b59887402d784b77f6f087c4463de9dc4b7c1ee4"
+    }
+  },
+  "candidate": {
+    "artifact": {
+      "kind": "artifact",
+      "path": "integrations/zal/zal_notation/lens_library.py",
+      "sha256": "2c5c8700834cec172583cf92012fc3b7000659e5233203b05cf8f30b93efc7f8"
+    },
+    "artifact_sha256": "2c5c8700834cec172583cf92012fc3b7000659e5233203b05cf8f30b93efc7f8",
+    "name": "Batch private builtin catalog (source-file revision)",
+    "revision": "2c5c8700834cec172583cf92012fc3b7000659e5233203b05cf8f30b93efc7f8",
+    "toolchain": {
+      "description": "Descriptor for actual measured Python3.12.3/GCC13.3.0; binary SHA verified before/after, descriptor hashing does not attest the installed interpreter.",
+      "path": "experiments/zal_registry_batch_27/runtime.json",
+      "sha256": "33c23ab35066791f1f9bebc1b59887402d784b77f6f087c4463de9dc4b7c1ee4"
+    }
+  },
+  "claim": "For the pinned built-in Lens catalog producer and unchanged fixed definition/adapter sources, batch private construction preserves canonical returned catalogs, public admission/refusal results and tested source-retaining view semantics while reducing measured warm construction/export/replay cost on two frozen libraries. No whole-factory speed or universal asymptotic/crossover claim.",
+  "components": {
+    "assurance_preservation": {
+      "analysis": "No new state/cache/interface/dependency. Every completed catalog still crosses validate_registry; public register, validators and exact canonical adapter matching are unchanged. Definition constructors deep-copy mutable fields and new ownership tests exercise this. The same finite/structural checker bodies reconstruct and check fresh applications. Shared source implementation hashes deliberately change, invalidating old receipts; current receipts are regenerated/replayed, not transferred. Existing trust in Python, filesystem source identity and selected checker is retained; no kernel proof, bytecode attestation, effect authority, deployment or full2.7 claim.",
+      "evidence": [
+        {
+          "kind": "replay",
+          "path": "experiments/zal_registry_batch_27/qualification.json",
+          "sha256": "ae75a29d4e629be425b520c30e1d93a454002e6788d2742b6db8c1f7cf3eef42"
+        },
+        {
+          "kind": "review",
+          "path": "experiments/zal_registry_batch_27/README.md",
+          "sha256": "edf884a4792cb3e09b35b14eeb7d628c2675e1d5fcea4cbcd05c880c96066da7"
+        },
+        {
+          "kind": "qualification",
+          "path": "experiments/zal_registry_batch_27/qualification.json",
+          "sha256": "ae75a29d4e629be425b520c30e1d93a454002e6788d2742b6db8c1f7cf3eef42"
+        }
+      ],
+      "open_questions": [
+        "Native checker/runtime-isolation/end-to-end refinement obligations remain separate."
+      ],
+      "status": "supported"
+    },
+    "asymptotic_complexity": {
+      "analysis": "For N individually constructed definitions, source counting gives N constructor validations plus sum(2i,i=1..N) prefix validations in the baseline, versus N constructor and N final-row validations in the candidate. At actualN15 this is255to30, with30to1full registry validations, confirmed by call tracing. This count is not a complete time/bit-complexity theorem for variable encodings or the unchanged whole export/check pipeline. No asymptotic software speedup is claimed.",
+      "evidence": [
+        {
+          "kind": "analysis",
+          "path": "experiments/zal_registry_batch_27/README.md",
+          "sha256": "edf884a4792cb3e09b35b14eeb7d628c2675e1d5fcea4cbcd05c880c96066da7"
+        },
+        {
+          "kind": "measurement",
+          "path": "experiments/zal_registry_batch_27/performance.json",
+          "sha256": "98ba41644d81cc1bb9730843b213f56eb115822840c0b18f784143f8ca5fe995"
+        }
+      ],
+      "open_questions": [
+        "Establish and independently review a complete time/space model over a declared growing definition/encoding family, including canonicalization and allocation."
+      ],
+      "status": "unknown"
+    },
+    "concrete_resource_model": {
+      "analysis": "PinnedPython3.12.3, oneCPU,1GiB90CPU120wall per worker. Six workers completed without signals/survivors. Exact validation counts,75warm timing samples/backend, three full export/replay repetitions/workload/backend, workerCPU, observed peakRSS and identical encoded sizes are retained. PeakRSS about31MiB both; no memory reduction claim. Full allocation counts and isolated cold startup/CPU instruction costs were not measured; supervisor/worker total cost contains auxiliary qualification work and is distinct from timed API costs.",
+      "evidence": [
+        {
+          "kind": "measurement",
+          "path": "experiments/zal_registry_batch_27/performance.json",
+          "sha256": "98ba41644d81cc1bb9730843b213f56eb115822840c0b18f784143f8ca5fe995"
+        },
+        {
+          "kind": "qualification",
+          "path": "experiments/zal_registry_batch_27/qualification.json",
+          "sha256": "ae75a29d4e629be425b520c30e1d93a454002e6788d2742b6db8c1f7cf3eef42"
+        }
+      ],
+      "open_questions": [
+        "Measure allocation/encoding work and isolated cold startup if a broader resource claim is needed."
+      ],
+      "status": "unknown"
+    },
+    "correctness": {
+      "analysis": "Within fixed pinned host definitions and optional finite-adapter presence/ImportError/ValueError cases, actual canonical catalogs match exactly. Fresh owned rows, eight malformed/multiple-fault refusal cases and exact/altered adapter results match.16other production functions are AST-identical.46affected cases passed per mode; each source-specific full export independently replayed. The semantic projection removes only declared source-identity fields in explicit receipt paths; authored source, contexts, targets, mappings, statuses and evidence match. This is bounded implementation/replay evidence and source review, not a general Python theorem.",
+      "evidence": [
+        {
+          "kind": "replay",
+          "path": "experiments/zal_registry_batch_27/qualification.json",
+          "sha256": "ae75a29d4e629be425b520c30e1d93a454002e6788d2742b6db8c1f7cf3eef42"
+        },
+        {
+          "kind": "qualification",
+          "path": "experiments/zal_registry_batch_27/qualification.json",
+          "sha256": "ae75a29d4e629be425b520c30e1d93a454002e6788d2742b6db8c1f7cf3eef42"
+        },
+        {
+          "kind": "review",
+          "path": "experiments/zal_registry_batch_27/README.md",
+          "sha256": "edf884a4792cb3e09b35b14eeb7d628c2675e1d5fcea4cbcd05c880c96066da7"
+        }
+      ],
+      "open_questions": [
+        "A general machine-checked refinement theorem for this Python producer is not supplied."
+      ],
+      "status": "supported"
+    },
+    "empirical_crossover": {
+      "analysis": "On the declared measured regimes, representative5object export+replay median38.3232sto15.3622s(2.4946x), heldout2object latch/draft15.0547sto4.5310s(3.3226x). SequentialABB AAB order,3runs/backend, same runtime/source dependencies and caps. Catalog medians92.45msto6.91ms over75samples/backend. Both encoded sizes match. These are observed warm/API gains on these workloads, not a statistically established universal crossover or a prediction at other sizes/platforms.",
+      "evidence": [
+        {
+          "kind": "measurement",
+          "path": "experiments/zal_registry_batch_27/performance.json",
+          "sha256": "98ba41644d81cc1bb9730843b213f56eb115822840c0b18f784143f8ca5fe995"
+        },
+        {
+          "kind": "qualification",
+          "path": "experiments/zal_registry_batch_27/qualification.json",
+          "sha256": "ae75a29d4e629be425b520c30e1d93a454002e6788d2742b6db8c1f7cf3eef42"
+        }
+      ],
+      "open_questions": [
+        "Find regimes where fixed catalog/encoding/startup costs change the outcome; broader crossover remains unknown."
+      ],
+      "status": "supported"
+    }
+  },
+  "disposition": "request-independent-review",
+  "negative_results": [
+    {
+      "cause_status": "supported",
+      "classification": "implementation-specific",
+      "evidence": [
+        {
+          "kind": "qualification",
+          "path": "experiments/zal_registry_batch_27/qualification.json",
+          "sha256": "ae75a29d4e629be425b520c30e1d93a454002e6788d2742b6db8c1f7cf3eef42"
+        },
+        {
+          "kind": "measurement",
+          "path": "experiments/zal_registry_batch_27/performance.json",
+          "sha256": "98ba41644d81cc1bb9730843b213f56eb115822840c0b18f784143f8ca5fe995"
+        },
+        {
+          "kind": "analysis",
+          "path": "experiments/zal_registry_batch_27/README.md",
+          "sha256": "edf884a4792cb3e09b35b14eeb7d628c2675e1d5fcea4cbcd05c880c96066da7"
+        }
+      ],
+      "explanation": "Repeated default_registry/private-prefix validation dominated overlapping cumulative profile time. Source review and exact255to30call counts support this diagnosis; no fundamental limit is inferred.",
+      "next_test": "Broaden representative sizes only if another latency question remains; retain these negatives.",
+      "observation": "Earlier full five-object sixteen-lens profile hit its60second limit before font embedding; preceding general browser selection hit90seconds.",
+      "scope": "Pre-simplification instrumented/export/test workflows; profile costs differ from ordinary timings."
+    },
+    {
+      "cause_status": "supported",
+      "classification": "workload-specific",
+      "evidence": [
+        {
+          "kind": "qualification",
+          "path": "experiments/zal_registry_batch_27/qualification.json",
+          "sha256": "ae75a29d4e629be425b520c30e1d93a454002e6788d2742b6db8c1f7cf3eef42"
+        },
+        {
+          "kind": "qualification",
+          "path": "experiments/zal_registry_batch_27/logs/normal.log.gz",
+          "sha256": "4d39bf83bc8b7f10d0d02dcb62940a56ea28241103ea82882b3285451fdffe86"
+        }
+      ],
+      "explanation": "Aggregate repeated full packet reconstruction exceeded the combined window; no test assertion failed before deadline. Completed results were retained instead of restarting the entire suite.",
+      "next_test": "Use affected module groups and preserve completed evidence; do not relabel deadline as pass.",
+      "observation": "Combined candidate46case normal suite hit90seconds after43individual successes.",
+      "scope": "Same frozen source and original cap; remaining3normal cases and optimized modules subsequently passed in separate bounded groups."
+    },
+    {
+      "cause_status": "supported",
+      "classification": "implementation-specific",
+      "evidence": [
+        {
+          "kind": "qualification",
+          "path": "experiments/zal_registry_batch_27/qualification.json",
+          "sha256": "ae75a29d4e629be425b520c30e1d93a454002e6788d2742b6db8c1f7cf3eef42"
+        }
+      ],
+      "explanation": "The unchanged machine_table guard requires initial unseen. The frozen supported held-out workload explicitly declares unseen. General ZAL authoring remains broader; no hidden relabeling or admission widening occurred.",
+      "next_test": "A separate arbitrary-initial-label extension needs source/bridge/replay qualification.",
+      "observation": "Authoring a finite Mealy source with initial label latched was refused.",
+      "scope": "Legacy finite Mealy Lens adapter only; before benchmark or algorithm repair."
+    }
+  ],
+  "schema": "zeno-fcis/computational-feasibility/2",
+  "workloads": {
+    "frozen_plan_evidence": [
+      {
+        "kind": "analysis",
+        "path": "experiments/zal_registry_batch_27/FROZEN_PLAN_02.json",
+        "sha256": "8e5a6c04d4375184251a01612b2be3401406a6d37de886463e185eb20d2ab046"
+      }
+    ],
+    "held_out": [
+      {
+        "id": "heldout-latch",
+        "path": "experiments/zal_registry_batch_27/workloads/heldout-latch.json",
+        "sha256": "59045fb9caa940edac8c37e4093358fa8a06dc685a484f7d97699a23282ad9a7"
+      }
+    ],
+    "representative": [
+      {
+        "id": "representative-five",
+        "path": "experiments/zal_registry_batch_27/workloads/representative-five.json",
+        "sha256": "7236b226d81fd3611a2d18adad30a5c54a5d1ab96d90db47f03ad687db0780d7"
+      }
+    ],
+    "used_for_selection": [
+      {
+        "id": "representative-five",
+        "path": "experiments/zal_registry_batch_27/workloads/representative-five.json",
+        "sha256": "7236b226d81fd3611a2d18adad30a5c54a5d1ab96d90db47f03ad687db0780d7"
+      }
+    ]
+  }
+}

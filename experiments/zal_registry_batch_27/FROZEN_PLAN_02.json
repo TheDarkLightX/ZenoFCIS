@@ -1,0 +1,20 @@
+{
+  "baseline_commit": "8de5a6543f93353d2f4563b17badfde285ce46a2",
+  "baseline_producer_sha256": "5c4a4eac6233dff0a8ddf9902d0a4ba7c8147c93c3d84e05a69ee1d2c21bf7a5",
+  "candidate_producer_sha256": "2c5c8700834cec172583cf92012fc3b7000659e5233203b05cf8f30b93efc7f8",
+  "comparison": "Same host/tools,1CPU,90CPU120wall per worker. Sequential A B B A A B backend order, one full export/replay per workload per worker gives three repetitions per backend.25warm catalog calls each worker; validation counts instrumented separately. Published baseline is the sole registered current producer.",
+  "correctness": "Exact canonical builtin catalogs and public refusals must match. Every complete export must independently replay under its current source. Compare authored objects and all exposed semantic view data, retaining declared source/implementation/lens/receipt identity differences. Do not strip arbitrary hashes or claim old receipts validate changed source.",
+  "cost_model": "Validation call counts separate from execution timings. Record process startup,25warm catalog calls, complete export/replay, encoded sizes and peakRSS.",
+  "heldout": "heldout-latch.json created after candidate producer bytes were fixed; no candidate benchmark/outcome used for editing. Initial authoring with latched label was refused by unchanged legacy adapter before catalog evaluation; retained separately. Retire this workload if its outcome informs a repair.",
+  "nonclaims": "No universal crossover, whole Python theorem or full2.7 completion. Retain earlier90second suite/60second profile negatives.",
+  "reason": "The actual default catalog producer changed. Prior checks cannot cover it. Compare actual canonical catalogs, optional adapter absence, fresh ownership, public refusals, receipts and full exports; run affected Lens library/integration/browser suites normal/O. Ontology, Rust, Verus, parser and font rendering code unchanged.",
+  "representative": "representative-five.json identified the bottleneck and was used for selection.",
+  "reviewed_boundary": "Only default_registry production body differs;16other functions AST-identical, register/adapter exact matching/validators unchanged. No new state/cache/dependency.",
+  "schema": "zal/registry-batch-evaluation-plan/2",
+  "snapshot_sha256": "ea3f147b8dd4df5ba4ee379b551d18a06b8a251ad21c56eae49f328fb6bd38ba",
+  "supersedes": "Plan01 retained. Preflight found that lenses.py binds its implementation to all sibling Python modules, so changed producer source also changes shared implementation/lens/receipt identities.",
+  "workloads": {
+    "heldout-latch.json": "59045fb9caa940edac8c37e4093358fa8a06dc685a484f7d97699a23282ad9a7",
+    "representative-five.json": "7236b226d81fd3611a2d18adad30a5c54a5d1ab96d90db47f03ad687db0780d7"
+  }
+}

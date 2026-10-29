@@ -1,0 +1,7 @@
+{
+  "measured_binary_sha256": "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f",
+  "measured_context": "Linux actual host,one CPU,1GiB90CPU120wall per worker",
+  "schema": "zal/registry-runtime-descriptor/1",
+  "scope": "Descriptor metadata; the feasibility checker hashes this record, not an installed interpreter. The measurement preflight and postcheck verified the actual runtime binary.",
+  "version": "Python3.12.3 GCC13.3.0"
+}

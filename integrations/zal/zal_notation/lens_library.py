@@ -82,9 +82,10 @@ def _structural_definitions():
 def default_registry():
     # Import is a fixed host dependency, never a module name taken from data.
     registry = new_registry()
-    for row in _structural_definitions():
-        registry = register(registry, row)
-    registry = register(registry, definition("typed-category", "Typed category lens",
+    # Each definition owns its fields. Build this private fixed catalog first;
+    # the complete result crosses the same registry validator before return.
+    registry["definitions"].extend(_structural_definitions())
+    registry["definitions"].append(definition("typed-category", "Typed category lens",
         summary="Author a categorical interpretation; optional Haskell tools check supplied finite tables or compose authored symbolic relationships.",
         assumptions=["Supply an explicit interpretation and request; discovery is not applicability."],
         preserves=["Only completed scoped laws established by the explicit category host."],
@@ -95,13 +96,13 @@ def default_registry():
     except (ImportError, ValueError):
         # General authoring/structure remains available without the optional
         # fixed finite adapter; no missing construction is called refuted.
-        return registry
+        return validate_registry(registry)
     for identifier in lenses.SPECS:
         spec = lenses._spec(identifier)
-        registry = register(registry, definition(identifier, spec["name"], summary=spec["summary"],
+        registry["definitions"].append(definition(identifier, spec["name"], summary=spec["summary"],
             assumptions=lenses.ASSUMPTIONS, preserves=spec["preserves"], forgets=spec["forgets"],
             adds=spec["adds"], profile_hints=[lenses.PROFILE]))
-    return registry
+    return validate_registry(registry)
 
 
 def _adapter(proposed):
