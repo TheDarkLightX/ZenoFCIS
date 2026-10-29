@@ -50,7 +50,9 @@ try {
     'zal_loop_read', 'zal_loop_packet', 'zal_loop_submit', 'zal_loop_translate', 'zal_loop_legend',
     'zal_capture_read', 'zal_capture_packet', 'zal_capture_submit', 'zal_capture_translate', 'zal_capture_legend',
     'zal_why_not', 'zal_what_if', 'zal_narrate', 'zal_guide', 'zal_ladder_read', 'zal_ladder_render',
-    'zal_ladder_parse', 'zal_ladder_same', 'zal_ladder_lower', 'zal_ladder_explain'];
+    'zal_ladder_parse', 'zal_ladder_same', 'zal_ladder_lower', 'zal_ladder_explain',
+    'zal_ontology_parse', 'zal_ontology_validate_record', 'zal_ontology_classify', 'zal_ontology_query',
+    'zal_ontology_explain', 'zal_ontology_replay'];
   assert.deepEqual((await client.listTools()).tools.map(t => t.name).sort(), expected.sort());
   const read = await call('zal_read', {});
   const revision = read.model.revision;
