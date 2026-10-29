@@ -31,15 +31,23 @@ an inert data boundary; it grants no publication or effect authority.
 
 The original foundation arithmetic source had SHA-256
 `db196c5d746d27bf21579e9a3a3ce32d556ec74ea62ba929e4c8a462a6130131`.
-The current source explicitly factors its comparison into
+The comparison checkpoint factored its comparator into
 [`ordering256.rs`](../crates/zeno-fcis-value/src/profile2/ordering256.rs), shared
-by production callers and the proof harness. The remaining original arithmetic
-bytes are unchanged. The [retained patch](../experiments/256_foundations_27/ordering256-runtime-factor.patch)
-and [comparison qualification record](../experiments/256_foundations_27/ordering256-qualification.json)
-bind the original and current identities. Formatter exclusion preserves the
-remaining capsule formatting; it does not imply current byte identity with the
-original source. Related proofs and vectors do not establish refinement of
-every Rust arithmetic method or its callers.
+by production callers and the proof harness. The subsequent type/order checkpoint
+factors the actual `U256`/`I256` declarations and seven methods into
+[`number256.rs`](../crates/zeno-fcis-value/src/profile2/number256.rs), and shares
+the existing finite-wide mathematical definitions with its harness. Public
+reexport paths remain available; the defining Rust module path changes.
+
+The historical [comparison patch](../experiments/256_foundations_27/ordering256-runtime-factor.patch)
+and [qualification](../experiments/256_foundations_27/ordering256-qualification.json)
+retain their original subject. The later [type/order patch](../experiments/256_foundations_27/ordering-types256-runtime-factor.patch)
+and [qualification](../experiments/256_foundations_27/ordering-types256-qualification.json)
+bind the factor from that checkpoint. All seven ordinary method bodies retain
+their original tokens after removing only the new ghost proof blocks. This
+source review does not prove compiler or ghost-erasure correspondence. The
+remaining arithmetic algorithms are unchanged by this factor; their complete
+implementation refinement still needs proof.
 
 ### Shared comparison proof
 
@@ -79,9 +87,55 @@ The qualification record preserves the exact compiled inputs and original
 results. Later proof-tool and documentation additions reuse that native
 evidence after checking these inputs remain unchanged.
 
-This comparison result is C1. Lifting it to the numeric order of the actual
-unsigned and signed wrappers (C2/C3), and proving the other arithmetic methods,
-remains open. It does not complete 256-bit arithmetic or Schema2 refinement.
+This comparison result is C1. The following checkpoint establishes the numeric
+order lifting for the actual types; other arithmetic and Schema2 refinement
+remain separate obligations.
+
+### Actual type and numeric-order proof
+
+The actual unsigned constructors and views preserve both 128-bit limbs. Their
+mathematical value is `low + 2^128 * high`. The signed interpretation subtracts
+`2^256` when that unsigned value is at least `2^255`. The actual sign test and
+both comparisons agree with those interpretations for every representable
+input, with no added input precondition.
+
+The complete isolated harness passed 21 verification conditions. Its closure
+includes the seven actual methods, two derived clone bodies, shared comparator,
+and eight checked helper bodies. The gate checks all 36 local function bodies
+and contracts, nine typed method/derive bindings, and all 21 solver sections.
+The raw-bit endpoint lemmas establish inhabited unsigned and signed extrema;
+they do not certify the separate public associated constants or narrow
+constructor conversions.
+
+Each of seven deliberate actual-method defects produced an intended semantic
+failure in a whole-harness run: swapped constructor limbs, a dropped high limb,
+reversed unsigned order, zeroed signed constructor/view bits, the wrong sign bit,
+and the wrong opposite-sign comparison. The unchanged generic comparator also
+passed fresh checking and its three separate defects. Thirty focused gate tests
+cover source, configuration, typed coverage and output admission; those tests
+are separate from the mathematical verification conditions.
+
+```sh
+python3 tools/check_ordering_types256.py --out /tmp/ordering-types256-proof
+```
+
+Use a fresh output directory and the same pinned-tool/process containment as
+the comparison gate. A success receipt requires the complete proof, exact
+coverage, all seven semantic refusals and source/tool postchecks. This remains
+a reviewed source-dialect route with the stated Verus/vstd/SMT/compiler
+assumptions.
+
+Fresh native checks at frozen source manifest
+`4d8bba31eb96c3720affeffde7af6d9ebca483edc187d844bbad1cbf3ae36699`
+passed 39 value, 39 codec, 40 Schema2 and 10 public-consumer test executions,
+plus the allocation-only/no-std schema build. The window used 79.019007 CPU
+seconds and 108.400953 elapsed seconds, including its source/tool/cache checks.
+All 4,943 source files and 62 tool/control pins stayed unchanged; all 19 recorded
+native process identities exited without cleanup signals. These are
+qualification costs, not benchmark speedups. Later documentation and provenance
+additions preserve all 26 proof and 61 package/configuration input bytes and
+reuse those exact results without relabeling them as fresh runs on a later
+commit.
 
 ### Earlier schema checkpoint
 

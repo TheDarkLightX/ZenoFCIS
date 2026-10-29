@@ -2,7 +2,7 @@
   "schema": "zeno-fcis/ordering256-profile/1",
   "scope": "Generic all-N high-limb-first lexical comparison in the actual shared production module; no input premises. Not public numeric-wrapper order or all arithmetic.",
   "source_hashes": {
-    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "55addbb825ae43af20b69704732d5b2c867c233444e362ca27754806f0ef357e",
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "e3597f7a812840edf2bccf8f8ff3fb3b51e0578b91839825acbb06926bada1c0",
     "crates/zeno-fcis-value/src/profile2/ordering256.rs": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825",
     "crates/zeno-fcis-value/src/profile2/ordering_model.rs": "d02708ccbae41434efc8acb8e8bcd7bd30f2abc04b7256bd32d15421c3f1544a",
     "crates/zeno-fcis-value/src/profile2/mod.rs": "de8a75172ecbd92695978f32951b4ca7f0278bf33231e9da3af66d3a9f08a062",

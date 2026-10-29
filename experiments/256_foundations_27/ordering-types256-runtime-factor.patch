@@ -1,0 +1,407 @@
+diff --git a/crates/zeno-fcis-value/src/profile2/arithmetic256.rs b/crates/zeno-fcis-value/src/profile2/arithmetic256.rs
+index 914aec7b..868c2439 100644
+--- a/crates/zeno-fcis-value/src/profile2/arithmetic256.rs
++++ b/crates/zeno-fcis-value/src/profile2/arithmetic256.rs
+@@ -18,5 +18,3 @@ pub enum Rounding { Floor, Ceil, Exact }
+-/// Least-significant word first; this is an arithmetic representation, not wire.
+-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+-pub struct U256([u128; 2]);
+-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+-pub struct I256(U256);
++#[path = "number256.rs"]
++mod number256;
++pub use number256::{I256, U256};
+@@ -104,3 +101,0 @@ impl U256 {
+-    pub const fn from_words_le(words: [u128; 2]) -> Self { Self(words) }
+-    pub const fn words_le(self) -> [u128; 2] { self.0 }
+-    pub fn cmp(self, other: Self) -> Ordering { compare(&self.0, &other.0) }
+@@ -224,2 +218,0 @@ impl I256 {
+-    pub const fn from_bits(bits: U256) -> Self { Self(bits) }
+-    pub const fn bits(self) -> U256 { self.0 }
+@@ -227 +219,0 @@ impl I256 {
+-    pub fn is_negative(self) -> bool { self.0.0[1] >> 127 != 0 }
+@@ -248,6 +239,0 @@ impl I256 {
+-    pub fn cmp(self, other: Self) -> Ordering {
+-        match (self.is_negative(), other.is_negative()) {
+-            (true, false) => Ordering::Less, (false, true) => Ordering::Greater,
+-            _ => self.0.cmp(other.0),
+-        }
+-    }
+diff --git a/crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs b/crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs
+index 90d414a2..3af878f3 100644
+--- a/crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs
++++ b/crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs
+@@ -10,0 +11,6 @@ const RADIX: u128 = 18_446_744_073_709_551_616;
++#[cfg(verus_keep_ghost)]
++#[path = "legacy_wide_model.rs"]
++mod wide_model;
++#[cfg(verus_keep_ghost)]
++pub(crate) use wide_model::{ceiling_value, floor_value, number2, number3, scale};
++
+@@ -13,22 +18,0 @@ verus! {
+-pub(crate) open spec fn scale() -> int { u128::MAX as int + 1 }
+-pub(crate) open spec fn number2(v: [u128; 2]) -> int {
+-    v[1] as int * scale() + v[0] as int
+-}
+-pub(crate) open spec fn number3(v: [u128; 3]) -> int {
+-    v[2] as int * scale() * scale() + v[1] as int * scale() + v[0] as int
+-}
+-pub(crate) open spec fn floor_value(a: u128, b: u128, den: u128) -> Option<u128> {
+-    if den == 0 { None }
+-    else {
+-        let q = (a as int * b as int) / den as int;
+-        if q > u128::MAX { None } else { Some(q as u128) }
+-    }
+-}
+-pub(crate) open spec fn ceiling_value(a: u128, b: u128, den: u128) -> Option<u128> {
+-    if den == 0 { None }
+-    else {
+-        let p = a as int * b as int;
+-        let q = p / den as int + if p % den as int == 0 { 0int } else { 1int };
+-        if q > u128::MAX { None } else { Some(q as u128) }
+-    }
+-}
+diff --git a/crates/zeno-fcis-value/src/profile2/number256.rs b/crates/zeno-fcis-value/src/profile2/number256.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..8fa28af2d96d117a8a138ef97e208ac9e1f1eb7b
+--- /dev/null
++++ b/crates/zeno-fcis-value/src/profile2/number256.rs
+@@ -0,0 +1,117 @@
++//! Actual closed numeric atoms and order methods shared with the proof harness.
++use super::ordering256::compare;
++use core::cmp::Ordering;
++#[cfg(verus_keep_ghost)]
++use vstd::prelude::*;
++#[cfg(verus_keep_ghost)]
++#[path = "ordering_types_model.rs"]
++pub(crate) mod ordering_model;
++
++/// Least-significant word first; this is an arithmetic representation, not wire.
++#[cfg_attr(verus_keep_ghost, verus_verify)]
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub struct U256(pub(super) [u128; 2]);
++#[cfg_attr(verus_keep_ghost, verus_verify)]
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub struct I256(pub(super) U256);
++
++#[cfg_attr(verus_keep_ghost, cfg_eval)]
++#[cfg_attr(verus_keep_ghost, verus_verify)]
++impl U256 {
++    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
++        ensures result.ordering_words() == words,
++    ))]
++    pub const fn from_words_le(words: [u128; 2]) -> Self {
++        #[cfg(verus_keep_ghost)]
++        proof! { reveal(U256::ordering_words); }
++        Self(words)
++    }
++    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
++        ensures result == self.ordering_words(),
++    ))]
++    pub const fn words_le(self) -> [u128; 2] {
++        #[cfg(verus_keep_ghost)]
++        proof! { reveal(U256::ordering_words); }
++        self.0
++    }
++    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
++        ensures result == ordering_model::integer_order(
++            ordering_model::unsigned(self), ordering_model::unsigned(other)),
++    ))]
++    pub fn cmp(self, other: Self) -> Ordering {
++        #[cfg(verus_keep_ghost)]
++        proof! {
++            reveal(U256::ordering_words);
++            assert forall|r: Ordering| ordering_model::lex_result(self.0@, other.0@, r)
++                implies r == ordering_model::integer_order(
++                    ordering_model::unsigned(self), ordering_model::unsigned(other)) by {
++                ordering_model::lex_two(self.0, other.0, r);
++            }
++        }
++        compare(&self.0, &other.0)
++    }
++}
++
++#[cfg_attr(verus_keep_ghost, cfg_eval)]
++#[cfg_attr(verus_keep_ghost, verus_verify)]
++impl I256 {
++    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
++        ensures result.ordering_bits() == bits,
++    ))]
++    pub const fn from_bits(bits: U256) -> Self {
++        #[cfg(verus_keep_ghost)]
++        proof! { reveal(I256::ordering_bits); }
++        Self(bits)
++    }
++    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
++        ensures result == self.ordering_bits(),
++    ))]
++    pub const fn bits(self) -> U256 {
++        #[cfg(verus_keep_ghost)]
++        proof! { reveal(I256::ordering_bits); }
++        self.0
++    }
++    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
++        ensures
++            result == (ordering_model::unsigned(self.ordering_bits()) >= ordering_model::half()),
++            result == (ordering_model::signed(self) < 0),
++    ))]
++    pub fn is_negative(self) -> bool {
++        #[cfg(verus_keep_ghost)]
++        proof! {
++            reveal(U256::ordering_words);
++            reveal(I256::ordering_bits);
++            let words = self.0.0;
++            ordering_model::sign_bit(words@[1]);
++            ordering_model::high_half(words);
++            ordering_model::signed_bounds(self.0);
++        }
++        self.0.0[1] >> 127 != 0
++    }
++    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
++        ensures result == ordering_model::integer_order(
++            ordering_model::signed(self), ordering_model::signed(other)),
++    ))]
++    pub fn cmp(self, other: Self) -> Ordering {
++        #[cfg(verus_keep_ghost)]
++        proof! {
++            reveal(I256::ordering_bits);
++            ordering_model::signed_order(self.0, other.0);
++        }
++        match (self.is_negative(), other.is_negative()) {
++            (true, false) => Ordering::Less,
++            (false, true) => Ordering::Greater,
++            _ => self.0.cmp(other.0),
++        }
++    }
++}
++
++#[cfg(verus_keep_ghost)]
++verus! {
++impl U256 {
++    pub closed spec fn ordering_words(&self) -> [u128; 2] { self.0 }
++}
++impl I256 {
++    pub closed spec fn ordering_bits(&self) -> U256 { self.0 }
++}
++}
+diff --git a/crates/zeno-fcis-value/src/profile2/ordering_types_model.rs b/crates/zeno-fcis-value/src/profile2/ordering_types_model.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..e13eea9376a6b388ad001459cc647be0fc52d701
+--- /dev/null
++++ b/crates/zeno-fcis-value/src/profile2/ordering_types_model.rs
+@@ -0,0 +1,183 @@
++//! Exact unsigned and two-complement meanings of actual closed numeric atoms.
++//! Candidate proof bodies require actual Verus qualification.
++pub(crate) use super::super::ordering256::ordering_model::{
++    lex_gt, lex_lt, lex_result, suffix_equal,
++};
++use super::super::wide;
++use super::{I256, U256};
++use core::cmp::Ordering;
++use vstd::prelude::*;
++
++verus! {
++// These definitions reuse the existing finite-wide mathematical interpretation.
++// They do not invoke or replace wide's executable less_equal implementation.
++pub open spec fn radix() -> int { wide::scale() }
++pub open spec fn modulus() -> int { radix() * radix() }
++pub open spec fn half() -> int { modulus() / 2 }
++pub open spec fn unsigned(value: U256) -> int {
++    wide::number2(value.ordering_words())
++}
++pub open spec fn signed_bits(bits: U256) -> int {
++    if unsigned(bits) >= half() { unsigned(bits) - modulus() }
++    else { unsigned(bits) }
++}
++pub open spec fn signed(value: I256) -> int {
++    signed_bits(value.ordering_bits())
++}
++pub open spec fn integer_order(a: int, b: int) -> Ordering {
++    if a < b { Ordering::Less }
++    else if a > b { Ordering::Greater }
++    else { Ordering::Equal }
++}
++
++pub(crate) proof fn limbs_bounds(words: [u128; 2])
++    ensures 0 <= wide::number2(words) < modulus(),
++{
++    assert(0 <= (words@[0] as int) < radix());
++    assert(0 <= (words@[1] as int) < radix());
++    assert(0 <= wide::number2(words) < modulus()) by(nonlinear_arith)
++        requires
++            0 <= (words@[0] as int) < radix(),
++            0 <= (words@[1] as int) < radix(),
++            radix() == u128::MAX as int + 1,
++            wide::number2(words) == words@[1] as int * radix() + words@[0] as int,
++            modulus() == radix() * radix();
++}
++
++/// The premise is produced by the actual compare body, not a caller assumption
++/// on U256::cmp. This lemma itself must be checked before using its contract.
++pub(crate) proof fn lex_two(a: [u128; 2], b: [u128; 2], result: Ordering)
++    requires lex_result(a@, b@, result),
++    ensures result == integer_order(wide::number2(a), wide::number2(b)),
++{
++    // Every ghost array lookup explicitly uses a Seq view and an int index.
++    assert(a@.len() == 2 && b@.len() == 2);
++    assert(suffix_equal(a@, b@, 2));
++    assert(suffix_equal(a@, b@, 1) == (a@[1] == b@[1]));
++
++    if a@[1] < b@[1] {
++        assert(lex_lt(a@, b@)) by {
++            assert(0 <= 1 < a@.len() && a@[1] < b@[1] && suffix_equal(a@, b@, 2));
++        }
++        assert(!lex_gt(a@, b@)) by {
++            assert forall|j: int| 0 <= j < 2
++                implies !(a@[j] > b@[j] && suffix_equal(a@, b@, j + 1)) by {
++                if j == 0 { assert(!suffix_equal(a@, b@, 1)); }
++            }
++        }
++        assert(a@ != b@);
++        assert(wide::number2(a) < wide::number2(b));
++    } else if a@[1] > b@[1] {
++        assert(lex_gt(a@, b@)) by {
++            assert(0 <= 1 < a@.len() && a@[1] > b@[1] && suffix_equal(a@, b@, 2));
++        }
++        assert(!lex_lt(a@, b@)) by {
++            assert forall|j: int| 0 <= j < 2
++                implies !(a@[j] < b@[j] && suffix_equal(a@, b@, j + 1)) by {
++                if j == 0 { assert(!suffix_equal(a@, b@, 1)); }
++            }
++        }
++        assert(a@ != b@);
++        assert(wide::number2(a) > wide::number2(b));
++    } else if a@[0] < b@[0] {
++        assert(lex_lt(a@, b@)) by {
++            assert(0 <= 0 < a@.len() && a@[0] < b@[0] && suffix_equal(a@, b@, 1));
++        }
++        assert(!lex_gt(a@, b@)) by {
++            assert forall|j: int| 0 <= j < 2
++                implies !(a@[j] > b@[j] && suffix_equal(a@, b@, j + 1)) by {}
++        }
++        assert(a@ != b@);
++        assert(wide::number2(a) < wide::number2(b));
++    } else if a@[0] > b@[0] {
++        assert(lex_gt(a@, b@)) by {
++            assert(0 <= 0 < a@.len() && a@[0] > b@[0] && suffix_equal(a@, b@, 1));
++        }
++        assert(!lex_lt(a@, b@)) by {
++            assert forall|j: int| 0 <= j < 2
++                implies !(a@[j] < b@[j] && suffix_equal(a@, b@, j + 1)) by {}
++        }
++        assert(a@ != b@);
++        assert(wide::number2(a) > wide::number2(b));
++    } else {
++        assert(a@ =~= b@);
++        assert(!lex_lt(a@, b@));
++        assert(!lex_gt(a@, b@));
++        assert(wide::number2(a) == wide::number2(b));
++    }
++}
++
++pub(crate) proof fn sign_bit(word: u128)
++    ensures (word >> 127 != 0) == (word >= 170141183460469231731687303715884105728u128),
++{
++    assert((word >> 127 != 0) == (word >= 170141183460469231731687303715884105728u128)) by(bit_vector);
++}
++
++pub(crate) proof fn high_half(words: [u128; 2])
++    ensures (words@[1] >= 170141183460469231731687303715884105728u128)
++        == (wide::number2(words) >= half()),
++{
++    assert(radix() == 2 * (170141183460469231731687303715884105728u128 as int));
++    assert(half() == radix() * (170141183460469231731687303715884105728u128 as int));
++    if words@[1] >= 170141183460469231731687303715884105728u128 {
++        assert(wide::number2(words) >= half());
++    } else {
++        assert(wide::number2(words) < half());
++    }
++}
++
++pub(crate) proof fn unsigned_bounds(bits: U256)
++    ensures 0 <= unsigned(bits) < modulus(),
++{
++    reveal(U256::ordering_words);
++    limbs_bounds(bits.ordering_words());
++}
++
++pub(crate) proof fn signed_bounds(bits: U256)
++    ensures
++        -half() <= signed_bits(bits) < half(),
++        (signed_bits(bits) < 0) == (unsigned(bits) >= half()),
++{
++    unsigned_bounds(bits);
++    assert(modulus() == 2 * half());
++}
++
++pub(crate) proof fn signed_order(a: U256, b: U256)
++    ensures
++        integer_order(signed_bits(a), signed_bits(b)) ==
++        if unsigned(a) >= half() && unsigned(b) < half() { Ordering::Less }
++        else if unsigned(a) < half() && unsigned(b) >= half() { Ordering::Greater }
++        else { integer_order(unsigned(a), unsigned(b)) },
++{
++    signed_bounds(a);
++    signed_bounds(b);
++    if unsigned(a) >= half() {
++        if unsigned(b) < half() {
++            assert(signed_bits(a) < 0 <= signed_bits(b));
++        }
++    } else if unsigned(b) >= half() {
++        assert(signed_bits(b) < 0 <= signed_bits(a));
++    }
++}
++
++/// Concrete inhabited endpoints. This candidate is not a checked witness yet.
++pub(crate) proof fn boundary_witnesses()
++    ensures
++        unsigned(U256([0, 0])) == 0,
++        unsigned(U256([u128::MAX, u128::MAX])) == modulus() - 1,
++        signed(I256(U256([0, 170141183460469231731687303715884105728u128]))) == -half(),
++        signed(I256(U256([u128::MAX, 170141183460469231731687303715884105727u128]))) == half() - 1,
++{
++    reveal(U256::ordering_words);
++    reveal(I256::ordering_bits);
++    assert(radix() == 340282366920938463463374607431768211456int);
++    assert(modulus() == 115792089237316195423570985008687907853269984665640564039457584007913129639936int);
++    assert(half() == 57896044618658097711785492504343953926634992332820282019728792003956564819968int);
++    assert(unsigned(U256([0, 0])) == 0);
++    assert(unsigned(U256([u128::MAX, u128::MAX])) == 115792089237316195423570985008687907853269984665640564039457584007913129639935int);
++    assert(unsigned(U256([0, 170141183460469231731687303715884105728u128])) == 57896044618658097711785492504343953926634992332820282019728792003956564819968int);
++    assert(unsigned(U256([u128::MAX, 170141183460469231731687303715884105727u128])) == 57896044618658097711785492504343953926634992332820282019728792003956564819967int);
++    assert(signed(I256(U256([0, 170141183460469231731687303715884105728u128]))) == -57896044618658097711785492504343953926634992332820282019728792003956564819968int);
++    assert(signed(I256(U256([u128::MAX, 170141183460469231731687303715884105727u128]))) == 57896044618658097711785492504343953926634992332820282019728792003956564819967int);
++}
++}
+diff --git a/crates/zeno-fcis-value/src/profile2/reference/legacy_wide_model.rs b/crates/zeno-fcis-value/src/profile2/reference/legacy_wide_model.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..ee74de064e9792a9ef47e2de91574a171fb3d37f
+--- /dev/null
++++ b/crates/zeno-fcis-value/src/profile2/reference/legacy_wide_model.rs
+@@ -0,0 +1,26 @@
++//! Existing finite-wide mathematical definitions, shared without executable helpers.
++use vstd::prelude::*;
++verus! {
++pub open spec fn scale() -> int { u128::MAX as int + 1 }
++pub open spec fn number2(v: [u128; 2]) -> int {
++    v[1] as int * scale() + v[0] as int
++}
++pub(crate) open spec fn number3(v: [u128; 3]) -> int {
++    v[2] as int * scale() * scale() + v[1] as int * scale() + v[0] as int
++}
++pub(crate) open spec fn floor_value(a: u128, b: u128, den: u128) -> Option<u128> {
++    if den == 0 { None }
++    else {
++        let q = (a as int * b as int) / den as int;
++        if q > u128::MAX { None } else { Some(q as u128) }
++    }
++}
++pub(crate) open spec fn ceiling_value(a: u128, b: u128, den: u128) -> Option<u128> {
++    if den == 0 { None }
++    else {
++        let p = a as int * b as int;
++        let q = p / den as int + if p % den as int == 0 { 0int } else { 1int };
++        if q > u128::MAX { None } else { Some(q as u128) }
++    }
++}
++}
