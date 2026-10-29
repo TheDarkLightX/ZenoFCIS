@@ -1,0 +1,4 @@
+{
+  "stdout_sha256": "93f8a74ac122342fc8366714e3bc9c0f765ddb3b66a2c01a1c86af48a19606b7",
+  "stdout": "\nrunning 3 tests\ntest independent_vectors ... ok\ntest requirements_select_actual_schema_types ... FAILED\ntest schema_ranges_and_nominal_refusals ... ok\n\nfailures:\n\n---- requirements_select_actual_schema_types stdout ----\n\nthread 'requirements_select_actual_schema_types' (806) panicked at crates/zeno-fcis-schema/tests/ontology_arithmetic_handoff.rs:155:9:\nassertion `left == right` failed: signed and unsigned requirements interchanged\n  left: \"U256\"\n right: \"I256\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    requirements_select_actual_schema_types\n\ntest result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s\n\n"
+}

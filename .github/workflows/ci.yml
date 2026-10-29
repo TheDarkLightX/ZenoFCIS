@@ -60,6 +60,9 @@ jobs:
         run: |
           python3 -B -m unittest discover -s integrations/zal -p 'test_ontology*.py'
           PYTHONOPTIMIZE=1 python3 -O -B -m unittest discover -s integrations/zal -p 'test_ontology*.py'
+          python3 -B tools/ontology_arithmetic_oracle.py --check
+          python3 -B -m unittest discover -s tools -p 'test_check_arithmetic_handoff.py'
+          PYTHONOPTIMIZE=1 python3 -O -B -m unittest discover -s tools -p 'test_check_arithmetic_handoff.py'
       - name: Existing review, sharing, story and Lens behavior
         working-directory: integrations/zal
         run: |
@@ -90,6 +93,9 @@ jobs:
           python3 tools/check_authority_v2.py --check-sources
           python3 -m unittest discover -s tools -p test_evaluator_identity.py
           cargo +1.97.1 test --locked -p zeno-fcis-synthesis --test v2_evaluator_identity
+
+      - name: Ontology arithmetic handoff and semantic negative controls
+        run: python3 -B tools/check_arithmetic_handoff.py --native --out "$RUNNER_TEMP/ontology-arithmetic-handoff"
 
       - name: Repository tool tests
         # Pure-Python tests of repository tools that no ATDD scenario runs.
