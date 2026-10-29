@@ -12,14 +12,40 @@ fn source_constructed_height_accepts_the_limit_and_refuses_the_next_layer() {
     // A 256-operand chain has 255 Add layers; negative one contributes
     // two scalar layers and the comparison contributes the final layer.
     let tail = " + 0".repeat(255);
-    let at_limit = format!("{HEADER} law 2 edge = -1{tail} == 0;");
-    assert!(parse_project(&at_limit, SourceLimits::default()).is_ok());
+    let at_limit = format!("-1{tail} == 0");
+    assert!(
+        parse_project(
+            &format!("{HEADER} law 2 edge = {at_limit};"),
+            SourceLimits::default(),
+        )
+        .is_ok()
+    );
+    assert!(
+        expand_tables(
+            &format!("{HEADER} law 2 edge = {at_limit};"),
+            SourceLimits::default(),
+        )
+        .is_ok()
+    );
     assert_eq!(zeno_fcis_spec::MAX_PARSED_EXPRESSION_HEIGHT, 258);
-    let over_limit = format!("{HEADER} law 2 edge = --1{tail} == 0;");
-    let errors = parse_project(&over_limit, SourceLimits::default())
-        .err()
-        .unwrap_or_else(|| panic!("height 259 must refuse"));
-    assert!(errors.to_string().contains("constructed expression height"));
+    let over_limit = format!("--1{tail} == 0");
+    for outcome in [
+        parse_project(
+            &format!("{HEADER} law 2 edge = {over_limit};"),
+            SourceLimits::default(),
+        )
+        .map(|_| ()),
+        expand_tables(
+            &format!("{HEADER} law 2 edge = {over_limit};"),
+            SourceLimits::default(),
+        )
+        .map(|_| ()),
+    ] {
+        let errors = outcome
+            .err()
+            .unwrap_or_else(|| panic!("height 259 must refuse"));
+        assert!(errors.to_string().contains("constructed expression height"));
+    }
 }
 
 fn limits(bytes: usize, tokens: usize, diagnostics: usize) -> SourceLimits {
