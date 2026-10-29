@@ -17,31 +17,20 @@ native callback API.
 
 ## Host platforms
 
-The 2.6.0 release publishes Linux; the macOS binary follows native platform
-validation. The workflow supports these host builds:
+The 2.6.0 release has CLI downloads for Linux x86_64 GNU, Windows x64 and
+Apple-silicon macOS. The Mac platform update has a separate source pin and
+checksum file. The evidence below applies to the named host runs, not every
+version of each operating system.
 
-- Linux x86_64 GNU, on Ubuntu 24.04;
-- macOS on Apple silicon (`aarch64-apple-darwin`, minimum-version field
-  macOS 11.0), on GitHub's macOS 15 arm64 image.
+| Evidence or capability | Linux x86_64 | macOS arm64 | Windows x64 |
+|---|---|---|---|
+| Published CLI and native app journey | yes | yes, macOS 15 runner | yes, Windows Server 2025 runner |
+| `synth verify` execution | yes | yes | unavailable |
+| Contained checker runtime | see installation guide | unavailable (exit 2) | not qualified |
+| Full ATDD, Verus, Miri and packaged-workspace gates | Linux release evidence | not claimed | not claimed |
 
-Its release-set job requires the Linux build and installed-binary record.
-The optional macOS build and full native test suite run on manual request;
-when that host is requested, its build and installed-binary record must pass too.
-The table lists the available checks, not a claim that every check has passed. Only a completed run
-bound to the release source and artifact qualifies a host executable.
-
-| Workflow check | Linux x86_64 | macOS arm64 |
-|---|---|---|
-| Build, archive and custody check | yes | yes |
-| Installed-binary journey | yes | yes |
-| Clippy and tests | yes | portable tests; validation pending |
-| Contained checker runtime | yes | unavailable (exit 2) |
-| `synth verify` execution | yes | blocked (exit 2) |
-| ATDD, packaged-workspace verification, Verus, Miri, formal tools, Tau kit, OCaml profile | yes | no |
-
-Linux evidence is not claimed for macOS. Intel Macs, Windows and other hosts
-have no executable and are not qualified. See
-[supported hosts](INSTALLATION.md#supported-hosts).
+The Mac executable is ad-hoc signed and not notarized. Intel Macs and mobile
+apps have no published executable. See [supported hosts](INSTALLATION.md#supported-hosts).
 
 ## Environment labels
 

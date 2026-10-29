@@ -222,13 +222,17 @@ mod tests {
     fn law_statuses_follow_the_manifest_scopes() {
         let mut demo = Demo::<AccountLockout>::new().unwrap();
         let failure = demo.step(&request("LoginFailed", 1000, false)).unwrap();
-        assert_eq!(law_ids(&failure), [500, 503, 991]);
+        assert_eq!(law_ids(&failure), [500, 503, 505, 510, 511, 991]);
         let accept = demo.step(&request("LoginSucceeded", 1010, false)).unwrap();
-        assert_eq!(law_ids(&accept), [500, 501, 502, 991]);
+        assert_eq!(law_ids(&accept), [500, 501, 502, 510, 511, 991]);
         let reject = demo.step(&request("AdminUnlock", 1020, false)).unwrap();
-        assert_eq!(law_ids(&reject), [509, 991]);
+        assert_eq!(law_ids(&reject), [504, 909, 991]);
         assert_eq!(accept["laws"][1]["name"], "login_clears_failures");
-        assert_eq!(reject["laws"][0]["name"], "reject_publishes_nothing");
+        assert_eq!(
+            reject["laws"][0]["name"],
+            "reject_only_for_first_failed_guard"
+        );
+        assert_eq!(reject["laws"][1]["name"], "reject_publishes_nothing");
     }
 
     #[test]

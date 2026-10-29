@@ -17,6 +17,7 @@ from unittest import mock
 
 import atdd
 import miri_exclusions
+from miri_shards import logical_rows
 
 
 REPAIRED = (
@@ -128,6 +129,15 @@ for suffix, module, index, count in TEMPLATE_RETAINED:
     else:
         TEMPLATE_RETAINED_CALLS["retained_complete_examples_genesis_and_replay_" + suffix] = f"retained_examples_and_genesis!({module}, {index}, {count});"
 TEMPLATE_RETAINED_TESTS = list(TEMPLATE_RETAINED_CALLS)
+# Explicit focused-Miri exclusions; every original replay remains native.
+TEMPLATE_NATIVE_REPLAYS = [
+    *(f"retained_examples_and_replay_agent_treasury_guard_{start:02}_{start + 4:02}"
+      for start in range(0, 30, 5)),
+    *(f"retained_examples_and_replay_withdrawal_queue_{start:02}_{start + 4:02}"
+      for start in range(0, 25, 5)),
+    "retained_genesis_and_replay_withdrawal_queue",
+]
+TEMPLATE_FOCUSED_REPLAY = "miri_bounded_retained_treasury_examples"
 
 
 def template_profile_problems(source):
@@ -320,7 +330,7 @@ class RepairedRegistryTests(unittest.TestCase):
 
     def test_miri_covers_all_current_synthesis_targets_without_template_filters(self):
         source = (atdd.ROOT / ".github/workflows/miri.yml").read_text()
-        rows = json.loads(source.split("        include: ", 1)[1].split("    env:", 1)[0])
+        rows = logical_rows(miri_rows(source))
         rows = [row for row in rows if row["packages"] == "-p zeno-fcis-synthesis"]
         actual = [(row.get("command", "test"), *shlex.split(row["target"]))
                   for row in rows if "test" not in row]
@@ -331,18 +341,33 @@ class RepairedRegistryTests(unittest.TestCase):
         ] + [("run", "--example", path.stem) for path in (synthesis / "examples").glob("*.rs")]
         self.assertEqual(collections.Counter(actual), collections.Counter(expected))
         template = [row for row in rows if row["target"] == "--test v2_template_contracts"]
-        self.assertEqual(len(template), 32)
+        self.assertEqual(len(template), 21)
         self.assertEqual(sum("test" not in row for row in template), 1)
         self.assertTrue(all("--skip" not in row["target"] for row in template))
 
+    def test_miri_values_and_specification_keep_documentation_out_of_libtest_partitions(self):
+        rows = logical_rows(miri_rows((atdd.ROOT / ".github/workflows/miri.yml").read_text()))
+        for name in ["values", "specification"]:
+            remainder = [r for r in rows if r["group"] == name]
+            docs = [r for r in rows if r["group"] == name + "-docs"]
+            self.assertEqual(len(remainder), 1)
+            self.assertEqual(len(docs), 1)
+            self.assertEqual(shlex.split(remainder[0]["target"]), ["--lib", "--tests"])
+            self.assertEqual(docs[0]["packages"], remainder[0]["packages"])
+            self.assertEqual(docs[0]["target"], "--doc")
+            self.assertNotIn("miri_skip", docs[0])
+            self.assertNotIn("test", docs[0])
+
     def test_miri_split_targets_run_each_listed_test_exactly_once(self):
         source = (atdd.ROOT / ".github/workflows/miri.yml").read_text()
-        rows = miri_rows(source)
+        raw_rows = miri_rows(source)
+        rows = logical_rows(raw_rows)
         library = [row for row in rows if row.get("target") == "--lib"]
         remainder = [row for row in library if "test" not in row]
         isolated = [row["test"] for row in library if "test" in row]
         self.assertEqual([row["group"] for row in remainder], ["synthesis-library"])
-        self.assertEqual(len(isolated), 9)
+        selected_remainder = next(row for row in raw_rows if row["group"] == "synthesis-library")
+        self.assertEqual(len(isolated), 27)
         # Each isolated name is one real library unit test, so CI cannot be
         # first to discover a misspelt selector.
         listed = subprocess.run(
@@ -356,26 +381,33 @@ class RepairedRegistryTests(unittest.TestCase):
             self.assertEqual(inventory[name], 1, name)
             self.assertEqual(inventory[name.replace("finite::", "missing::", 1)], 0, name)
         graphs = [row["test"] for row in rows if row.get("target") == "--test completion" and "test" in row]
-        inventories = {"--lib": sorted(isolated + ["finite::common::first", "finite::common::second"]),
+        excluded_library = remainder[0]["miri_skip"]
+        exclusion_args = miri_exclusions.miri_test_arguments(remainder[0])
+        inventories = {"--lib": sorted(isolated + excluded_library +
+                                      ["finite::common::first", "finite::common::second"]),
                        "--test completion": sorted(graphs + ["common_completion"])}
-        expected = "-- " + shlex.join(["--exact"] + [a for name in isolated for a in ("--skip", name)])
-        self.assertEqual(run_miri_coverage_check(source, remainder[0], inventories), expected)
+        expected = exclusion_args + " " + shlex.join([a for name in isolated for a in ("--skip", name)])
+        self.assertEqual(run_miri_coverage_check(source, selected_remainder, inventories,
+                                                 test_args=exclusion_args), expected)
         for row in library[1:]:
             self.assertEqual(run_miri_coverage_check(source, row, inventories),
                              "-- " + shlex.join(["--exact", row["test"]]))
+
         completion = next(row for row in rows if row["group"] == "synthesis-completion")
         self.assertEqual(run_miri_coverage_check(source, completion, inventories),
                          "-- " + shlex.join(["--exact"] + [a for name in graphs for a in ("--skip", name)]))
-        self.assertEqual(run_miri_coverage_check(source, next(row for row in rows if row["group"] == "synthesis-finite"),
+        self.assertEqual(run_miri_coverage_check(source, next(row for row in raw_rows if row["group"] == "synthesis-finite"),
                                                  inventories), "")
 
         # Planted controls: each must be refused by the workflow's own check.
         with self.assertRaisesRegex(AssertionError, "split selector coverage differs"):
-            run_miri_coverage_check(source, remainder[0], inventories, honour_skip=False)
+            run_miri_coverage_check(source, selected_remainder, inventories, honour_skip=False,
+                                    test_args=exclusion_args)
         renamed = dict(inventories, **{"--lib": [n for n in inventories["--lib"] if n != isolated[0]]})
-        for row in (remainder[0], library[1]):
+        for row in (selected_remainder, library[1]):
             with self.assertRaisesRegex(AssertionError, "empty test inventory"):
-                run_miri_coverage_check(source, row, renamed)
+                run_miri_coverage_check(source, row, renamed,
+                                        test_args=miri_exclusions.miri_test_arguments(row))
 
         def planted(row):
             anchor = json.dumps(library[1]) + ",\n"
@@ -383,13 +415,13 @@ class RepairedRegistryTests(unittest.TestCase):
             self.assertNotEqual(changed, source)
             return changed
         with self.assertRaisesRegex(AssertionError, "duplicate exact test row"):
-            run_miri_coverage_check(planted(dict(library[1], group="synthesis-library-again")), remainder[0], inventories)
+            run_miri_coverage_check(planted(dict(library[1], group="synthesis-library-again")), selected_remainder, inventories, test_args=exclusion_args)
         with self.assertRaisesRegex(AssertionError, "split target needs one remainder row"):
             run_miri_coverage_check(planted(dict(library[1], group="stray", target="--test completon")),
-                                    remainder[0], inventories)
+                                    selected_remainder, inventories, test_args=exclusion_args)
         with self.assertRaisesRegex(AssertionError, "exact tests need miri test"):
             run_miri_coverage_check(planted(dict(library[1], group="run", test="other", command="run")),
-                                    remainder[0], inventories)
+                                    selected_remainder, inventories, test_args=exclusion_args)
 
         # A remainder with pinned exclusions composes them with its exact-test
         # skips: the exclusion step's arguments stay first and unchanged, and each
@@ -411,6 +443,18 @@ class RepairedRegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "split target tests must run exactly once"):
             run_miri_coverage_check(source.replace(json.dumps(completion), json.dumps(invented), 1), invented,
                                     inventories, test_args=miri_exclusions.miri_test_arguments(invented))
+
+    def test_miri_preflight_refuses_missing_and_changed_parts(self):
+        source = (atdd.ROOT / ".github/workflows/miri.yml").read_text()
+        encoded = source.split("        include: ", 1)[1].split("    env:", 1)[0]
+        rows = miri_rows(source)
+        selected = next(row for row in rows if row["group"] == "synthesis-library")
+        changed = [dict(row) for row in rows]
+        next(row for row in changed if row["group"] == "synthesis-library" and row["part"] == 2)["miri_skip"] = []
+        missing = [row for row in rows if not (row["group"] == "synthesis-library" and row["part"] == 2)]
+        for mutant in (missing, changed):
+            with self.subTest(mutant=mutant), self.assertRaises(ValueError):
+                run_miri_coverage_check(source.replace(encoded, json.dumps(mutant) + '\n'), selected, {})
 
     def test_miri_original_compound_runs_each_test_in_its_own_group(self):
         # Interpreted alone, two of the three tests each take about an hour,
@@ -448,21 +492,23 @@ class RepairedRegistryTests(unittest.TestCase):
         template = [row for row in rows if row.get("target") == target]
         remainder = next(row for row in template if "test" not in row)
         exact = [row for row in template if "test" in row]
-        native_only = list(TEMPLATE_NATIVE_ONLY)
+        native_only = list(TEMPLATE_NATIVE_ONLY) + TEMPLATE_NATIVE_REPLAYS
         self.assertEqual(remainder["miri_skip"], native_only)
         self.assertTrue(all("miri_skip" not in row for row in exact))
         isolated = [row["test"] for row in exact]
-        self.assertEqual(isolated, TEMPLATE_RETAINED_TESTS + TEMPLATE_PROFILE_TESTS)
+        self.assertCountEqual(isolated,
+                              [name for name in TEMPLATE_RETAINED_TESTS if name not in TEMPLATE_NATIVE_REPLAYS]
+                              + TEMPLATE_PROFILE_TESTS + [TEMPLATE_FOCUSED_REPLAY])
         entries = miri_exclusions.load_exclusions()
         self.assertEqual([e["test"] for e in entries if e["group"] == remainder["group"]], native_only)
-        self.assertEqual(len(entries), 5)
+        self.assertEqual(len(entries), 39)
         rust = (atdd.ROOT / TEMPLATE_TESTS).read_text()
         self.assertEqual(template_profile_problems(rust), [])
         sum_native = sum(size for _, size, _, _ in TEMPLATE_CORPORA)
         self.assertEqual(sum_native, 2_175_778)
 
         inventory = sorted(re.findall(r"#\[test\]\s*(?:#\[ignore[^\n]*\n\s*)?fn (\w+)\(", rust))
-        self.assertEqual(len(inventory), 38)
+        self.assertEqual(len(inventory), 39)
         inventories = {target: inventory}
         ignored = {target: []}
         arguments = miri_exclusions.miri_test_arguments(remainder)
@@ -471,8 +517,8 @@ class RepairedRegistryTests(unittest.TestCase):
             if args is None:
                 args = miri_exclusions.miri_test_arguments(row)
             return run_miri_coverage_check(workflow, row, names, honour_skip=skip, ignored=ignore, test_args=args)
-        # The remainder keeps the four native-only skips first, then skips the
-        # thirty-one exact-test groups; each exact-test group runs its one test.
+        # The remainder keeps all sixteen native-only skips first, then skips
+        # the twenty exact-test groups; each exact group runs its one test.
         self.assertEqual(coverage(), arguments + " " + shlex.join([a for name in isolated for a in ("--skip", name)]))
         for row in exact:
             self.assertEqual(coverage(row), "-- " + shlex.join(["--exact", row["test"]]))

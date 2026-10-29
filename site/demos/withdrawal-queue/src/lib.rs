@@ -233,7 +233,7 @@ mod tests {
         let accept = demo.step(&deposit_of(1, "Operator")).unwrap();
         assert_eq!(
             law_ids(&accept),
-            [500, 501, 502, 503, 504, 505, 506, 510, 511, 512, 991]
+            [500, 501, 502, 503, 504, 505, 506, 510, 511, 512, 514, 991]
         );
         assert_eq!(accept["laws"][3]["name"], "tick_follows_the_controller");
         demo.step(&deposit_of(2, "Operator")).unwrap();

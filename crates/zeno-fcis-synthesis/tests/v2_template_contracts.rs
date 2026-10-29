@@ -1841,6 +1841,17 @@ fn retained_examples_and_replay_agent_treasury_guard_20_24() {
 fn retained_examples_and_replay_agent_treasury_guard_25_29() {
     retained_examples_batch!(treasury, 5, 30, 25, 30);
 }
+// The complete thirty-example replay stays in the native tests above.
+// This interpreted profile uses the same checker on two fixed corpus endpoints.
+#[test]
+fn miri_bounded_retained_treasury_examples() {
+    assert_eq!(example_count(5), 30);
+    let count = with_app!(treasury, |a, f| {
+        examples_range(5, a, f, 0, 1) + examples_range(5, a, f, 29, 30)
+    });
+    assert_eq!(count, 2);
+}
+
 #[test]
 fn retained_genesis_and_replay_agent_treasury_guard() {
     retained_genesis!(treasury, 5);

@@ -37,6 +37,7 @@ fn resumed_search_matches_uninterrupted_closure() {
                     &policies,
                 )
                 .unwrap_or_else(|error| panic!("{error:?}"));
+                let mut first_resume = true;
                 while matches!(resumed.exploration, Exploration::Incomplete(_)) {
                     let checkpoint = resumed
                         .checkpoint
@@ -44,7 +45,16 @@ fn resumed_search_matches_uninterrupted_closure() {
                         .unwrap_or_else(|| panic!("missing resumable checkpoint"));
                     // Advisory report edits cannot alter the opaque retained progress.
                     resumed.stats.runs = u64::MAX;
-                    resumed = explore::resume(checkpoint, 127)
+                    // Keep the first partial resume and every final closure.
+                    // Larger later Miri chunks avoid repeatedly cloning the
+                    // growing checkpoint. Native tests retain every 127-step cut.
+                    let chunk = if cfg!(miri) && !first_resume {
+                        4096
+                    } else {
+                        127
+                    };
+                    first_resume = false;
+                    resumed = explore::resume(checkpoint, chunk)
                         .unwrap_or_else(|error| panic!("{error:?}"));
                 }
                 assert_eq!(resumed, whole, "resumed closure differs");

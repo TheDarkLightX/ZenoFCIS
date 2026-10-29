@@ -25,10 +25,17 @@ impl Rng {
 }
 
 fn iterations() -> u64 {
-    std::env::var("ZENO_FCIS_ROBUSTNESS_ITERATIONS")
+    let requested: u64 = std::env::var("ZENO_FCIS_ROBUSTNESS_ITERATIONS")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(1_000)
+        .unwrap_or(1_000);
+    // Native runs retain the full requested seeded corpus. Miri interprets a
+    // bounded prefix; every deterministic nesting/refusal case below still runs.
+    if cfg!(miri) {
+        requested.min(32)
+    } else {
+        requested
+    }
 }
 
 fn collect(dir: &Path, out: &mut Vec<String>) {

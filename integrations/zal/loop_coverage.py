@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 
@@ -402,11 +403,19 @@ def markdown(report):
     return "\n".join(lines) + "\n"
 
 
+def binary_path():
+    """Use the configured executable or discover the installed CLI on PATH."""
+    configured = os.environ.get("ZENO_FCIS_BIN")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    executable = shutil.which("zeno-fcis")
+    if executable is None:
+        raise FileNotFoundError("zeno-fcis not found on PATH; set ZENO_FCIS_BIN to its path")
+    return Path(executable).resolve()
+
+
 def run(options):
-    binary_path = os.environ.get("ZENO_FCIS_BIN")
-    if not binary_path:
-        raise ValueError("ZENO_FCIS_BIN must explicitly select the trusted native checker executable")
-    binary = Path(binary_path).resolve()
+    binary = binary_path()
     out, contract = options.out.resolve(), options.directory.resolve()
     if out == contract or contract in out.parents:
         raise ValueError("--out must be outside the contract directory")

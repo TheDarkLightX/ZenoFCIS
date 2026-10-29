@@ -172,10 +172,10 @@ mod tests {
     fn law_statuses_follow_the_manifest_scopes() {
         let mut demo = Demo::<InventoryReservation>::new().unwrap();
         let accept = demo.step(&request("Restock", 1, true)).unwrap();
-        assert_eq!(law_ids(&accept), [500, 501, 502, 991]);
+        assert_eq!(law_ids(&accept), [500, 501, 502, 510, 511, 991]);
         assert_eq!(accept["laws"][1]["name"], "units_conserved");
         let reject = demo.step(&request("Restock", 1, false)).unwrap();
-        assert_eq!(law_ids(&reject), [509, 991]);
+        assert_eq!(law_ids(&reject), [503, 909, 991]);
     }
 
     #[test]

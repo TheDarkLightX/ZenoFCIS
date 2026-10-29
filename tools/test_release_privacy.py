@@ -18,6 +18,25 @@ from check_release_privacy import PATTERNS, Scan, load_allowlist, match_fingerpr
 
 
 class PrivacyTests(unittest.TestCase):
+    def test_private_media_paths_are_redacted_without_a_marker_file(self):
+        for prefix in (b"/" + b"media/", b"/run/" + b"media/"):
+            private = prefix + b"alice/drive/private.txt"
+            scan = Scan()
+            scan.inspect("report.txt", private)
+            report = scan.report()
+            self.assertEqual(report["status"], "failed")
+            self.assertEqual(report["findings"][0]["code"], "personal-media-path")
+            self.assertNotIn(private.decode(), json.dumps(report))
+            scan = Scan()
+            scan.inspect(private.decode(), b"")
+            report = scan.report()
+            self.assertEqual(report["status"], "failed")
+            self.assertNotIn(private.decode(), json.dumps(report))
+
+        scan = Scan()
+        scan.inspect("report.txt", b"/" + b"media/user/drive/public.txt")
+        self.assertEqual(scan.report()["status"], "passed")
+
     def exception(self, location, data):
         match = PATTERNS["model-api-token"].search(data)
         self.assertIsNotNone(match)
@@ -57,6 +76,24 @@ class PrivacyTests(unittest.TestCase):
             scan = Scan(allowlist=frozenset({changed_entry}))
             scan.inspect(entry[0], data)
             self.assertEqual(scan.report()["status"], "failed")
+
+    def test_refused_token_reports_only_hashes_and_offsets_for_review(self):
+        token = b"sk-" + b"A" * 50
+        data = b"prefix\n" + token + b"\nsuffix"
+        scan = Scan()
+        scan.inspect("binaries/program", data)
+        report = scan.report()
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(report["allowlisted_matches"], 0)
+        self.assertEqual(len(scan.findings), 1)
+        finding = scan.findings[0]
+        self.assertEqual(finding["file_sha256"], hashlib.sha256(data).hexdigest())
+        self.assertEqual(finding["match_sha256"], hashlib.sha256(token).hexdigest())
+        match = PATTERNS["model-api-token"].search(data)
+        self.assertEqual(finding["fingerprint_sha256"], match_fingerprint(data, match))
+        self.assertEqual((finding["offset"], finding["length"], finding["line"]), (7, 53, 2))
+        self.assertNotIn(token.decode(), json.dumps(report))
+        self.assertNotIn("prefix", json.dumps(report))
 
     def test_allowlisting_one_match_does_not_hide_another_secret_in_the_same_file(self):
         literal = b"sk-" + b"public_literal_" * 5

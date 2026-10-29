@@ -90,6 +90,39 @@ fn source(width: u8) -> String {
     }
     s
 }
+fn check_boolean_lift(
+    p: &zeno_fcis_spec::ProjectSpec,
+    width: u8,
+    parent: [usize; 3],
+    grant: [usize; 3],
+) {
+    let fields = [
+        parent[0] as u128,
+        parent[1] as u128,
+        parent[2] as u128,
+        grant[0] as u128,
+        grant[1] as u128,
+        grant[2] as u128,
+    ];
+    for k in 0..width {
+        let mut bits = [false; 3];
+        loop {
+            let next = std::array::from_fn(|i| grant[i] & (1 << k) != 0 || bits[parent[i]]);
+            if next == bits {
+                break;
+            }
+            bits = next;
+        }
+        for (i, expected) in bits.into_iter().enumerate() {
+            assert_eq!(
+                holds(p.laws()[i * width as usize + k as usize].formula(), &fields),
+                expected,
+                "width={width}, parents={parent:?}, grants={grant:?}, entry={i}, atom={k}"
+            );
+        }
+    }
+}
+
 #[test]
 fn small_algebras_match_independent_boolean_lifts_exhaustively() {
     for width in [2, 3] {
@@ -99,36 +132,35 @@ fn small_algebras_match_independent_boolean_lifts_exhaustively() {
             let parent = [parents % 3, parents / 3 % 3, parents / 9];
             for grants in 0..base.pow(3) {
                 let grant = [grants % base, grants / base % base, grants / (base * base)];
-                let fields = [
-                    parent[0] as u128,
-                    parent[1] as u128,
-                    parent[2] as u128,
-                    grant[0] as u128,
-                    grant[1] as u128,
-                    grant[2] as u128,
-                ];
-                for k in 0..width {
-                    let mut bits = [false; 3];
-                    loop {
-                        let next =
-                            std::array::from_fn(|i| grant[i] & (1 << k) != 0 || bits[parent[i]]);
-                        if next == bits {
-                            break;
-                        }
-                        bits = next;
-                    }
-                    for (i, expected) in bits.into_iter().enumerate() {
-                        assert_eq!(
-                            holds(p.laws()[i * width as usize + k as usize].formula(), &fields),
-                            expected,
-                            "width={width}, parents={parent:?}, grants={grant:?}, entry={i}, atom={k}"
-                        );
-                    }
-                }
+                check_boolean_lift(&p, width, parent, grant);
             }
         }
     }
 }
+#[test]
+fn bounded_boolean_lift_profile_covers_cycles_and_seed_boundaries() {
+    let mut cases = 0;
+    for width in [2, 3] {
+        let p = project(&source(width));
+        let all = (1usize << width) - 1;
+        // Independent points: self-loops, a chain, a two-cycle and a three-cycle;
+        // no seeds, each endpoint, all bits, and split bits.
+        for parent in [[0, 1, 2], [1, 2, 2], [1, 0, 2], [1, 2, 0]] {
+            for grant in [
+                [0, 0, 0],
+                [1, 0, 0],
+                [0, 0, all],
+                [all, all, all],
+                [1, 2, 0],
+            ] {
+                check_boolean_lift(&p, width, parent, grant);
+                cases += 1;
+            }
+        }
+    }
+    assert_eq!(cases, 40);
+}
+
 #[test]
 fn full_width_constants_complement_and_round_bound_are_exact() {
     let all = u128::MAX;

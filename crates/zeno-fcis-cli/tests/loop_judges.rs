@@ -467,10 +467,12 @@ law 501 toggle on accept = post.100.110 == 1 - pre.100.110;
         "--answers",
         &answer,
     ]);
-    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(exit, Some(1), "{report}");
     assert_eq!(report["detail"]["answers"][0]["status"], "disagreement");
     assert_eq!(report["detail"]["stats"]["inconsistent"], 0);
-    assert_eq!(report["detail"]["stats"]["determined"], 2);
+    assert_eq!(report["detail"]["stats"]["disagreements"], 2);
+    // A unique lawful outcome that disagrees with the Authority is not determined.
+    assert_eq!(report["detail"]["stats"]["determined"], 0);
 
     // Keep unanswerable but admissible classes visible with an explicit limit.
     policy["cases"][0]["class"] = json!("CommittedFailure");

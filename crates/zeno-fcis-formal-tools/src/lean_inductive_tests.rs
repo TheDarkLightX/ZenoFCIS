@@ -540,7 +540,17 @@ macro_rules! control {
             // runtime and axiom-admission baseline using the positive control.
             let (name, source, checked) = CONTROLS[$index];
             if !checked {
-                POSITIVE_BASELINE.call_once(|| run_fixture("positive_baseline", PILOTS[0].1, true));
+                // The all-laws mutation also affects this preliminary export.
+                // Use the positive single-law domain fixture for that control:
+                // every declared law is supported and already assumed, so the
+                // mutation reaches the law-scope result instead of refusing a
+                // pilot's unrelated notification or decision-reason syntax.
+                let baseline = if $index == 5 {
+                    CONTROLS[2].1
+                } else {
+                    PILOTS[0].1
+                };
+                POSITIVE_BASELINE.call_once(|| run_fixture("positive_baseline", baseline, true));
             }
             run_fixture(name, source, checked);
         }
