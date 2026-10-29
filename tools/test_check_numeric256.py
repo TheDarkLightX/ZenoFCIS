@@ -17,7 +17,7 @@ class SourceAdmission(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name) / "source"
-        for path in gate.SOURCES:
+        for path in (*gate.SOURCES, Path("verification/verus/ordering_types256_profile.json")):
             target = self.root / path
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(gate.ROOT / path, target)
