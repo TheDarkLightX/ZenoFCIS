@@ -78,6 +78,49 @@ def include_conversions(profile):
         "and exact Overflow partitions, without public input preconditions. The actual negative_bits and "
         "U256::checked_sub dependencies and two-limb carry/borrow helper instantiations are refined. "
         "Other helper widths, other arithmetic and compiler/ghost-erasure correspondence are not proved.")
+    if any(o["stage"] == "checked" for o in profile["obligations"]):
+        include_checked(profile)
+
+
+def include_checked(profile):
+    statements = [
+        ("U256::checked_add", ["U256", "U256"], "Result<U256,Failure>",
+         "Exact unsigned sum iff it is below 2^256; otherwise exactly Overflow."),
+        ("U256::checked_sub", ["U256", "U256"], "Result<U256,Failure>",
+         "Exact unsigned difference iff nonnegative; otherwise exactly Overflow. Same statement as the conversion dependency."),
+        ("I256::checked_add", ["I256", "I256"], "Result<I256,Failure>",
+         "Exact signed sum iff in [-2^255,2^255); otherwise exactly Overflow."),
+        ("I256::checked_sub", ["I256", "I256"], "Result<I256,Failure>",
+         "Exact signed difference iff in [-2^255,2^255); otherwise exactly Overflow."),
+        ("I256::checked_neg", ["I256"], "Result<I256,Failure>",
+         "Exact signed negation except at -2^255, which returns exactly Overflow; zero maps to zero."),
+    ]
+    profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != "checked"] + [
+        {"stage": "checked", "member": member, "parameters": parameters, "result": result,
+         "meaning": meaning, "refinement_display": gate.NAMESPACE + "arithmetic256::" + member}
+        for member, parameters, result, meaning in statements]
+    profile["supporting_obligations"] = [o for o in profile.get("supporting_obligations", [])
+                                        if o["member"] != "U256::checked_sub"]
+    defects = [
+        ("unsigned_add_misses_zero_wrap", "U256::checked_add", "if carry {", "if carry && value[0] != 0 {"),
+        ("unsigned_sub_misses_max_wrap", "U256::checked_sub", "if borrow {",
+         "if borrow && value[0] != u128::MAX {"),
+        ("signed_add_wrong_sign_partition", "I256::checked_add",
+         "self.is_negative() == other.is_negative()", "self.is_negative() != other.is_negative()"),
+        ("signed_sub_wrong_sign_partition", "I256::checked_sub",
+         "self.is_negative() != other.is_negative()", "self.is_negative() == other.is_negative()"),
+        ("signed_negation_refuses_zero", "I256::checked_neg",
+         "self.0.0 == Self::MIN.0.0", "self.0.0 == Self::ZERO.0.0"),
+    ]
+    profile["controls"] = [c for c in profile["controls"] if c["stage"] != "checked"] + [
+        {"stage": "checked", "name": name, "member": member, "old": old, "new": new,
+         "error_source": str(gate.SUBJECT)} for name, member, old, new in defects]
+    profile["scope"] = (
+        "The eight actual associated constants, eleven public conversions and five checked 256-bit "
+        "add/subtract/negation methods with exact integer values and exact Overflow partitions, without "
+        "public input preconditions. The actual negative_bits dependency and two-limb carry/borrow helper "
+        "instantiations are refined. U256 has no checked_neg method. Other helper widths, the multiply/divide "
+        "family, other arithmetic and compiler/ghost-erasure correspondence are not proved.")
 
 
 def arithmetic_exceptions(root):
@@ -113,10 +156,12 @@ def arithmetic_exceptions(root):
     return entries
 
 
-def record(root, out, cache, refresh_ordering, previous_source=None, conversions=False):
+def record(root, out, cache, refresh_ordering, previous_source=None, conversions=False, checked=False):
     profile = json.loads(gate.read(root, gate.PROFILE))
-    if conversions:
+    if conversions or checked:
         include_conversions(profile)
+    if checked:
+        include_checked(profile)
     previous = json.loads(gate.read(root, Path("verification/verus/ordering_types256_profile.json")))
     exceptions = {key: entries for key, entries in previous["native_configuration_exceptions"].items()
                   if key != str(gate.SUBJECT) and key != str(Path("verification/verus/ordering256_types_harness.rs"))}
@@ -160,7 +205,7 @@ def record(root, out, cache, refresh_ordering, previous_source=None, conversions
         obligation = next(o for o in profile["obligations"] if o["member"] == control["member"])
         control["error_function"] = obligation["report_function"]
         source = gate.read(root, Path(control["error_source"]))
-        if control["stage"] == "conversions":
+        if control["stage"] != "constants":
             control["error_region"] = list(method_region(source, *control["member"].split("::")))
         else:
             at = source.index(control["old"])
@@ -248,11 +293,13 @@ def main():
     parser.add_argument("--refresh-ordering-bindings", action="store_true")
     parser.add_argument("--include-conversions", action="store_true",
                         help="Add the reviewed complete conversion stage and its semantic controls")
+    parser.add_argument("--include-checked", action="store_true",
+                        help="Include conversions and the five checked add/subtract/negation methods")
     parser.add_argument("--previous-source", type=Path,
                         help="Exact previous profile sources, required only for a compiler-ID migration review")
     args = parser.parse_args()
     record(gate.ROOT, args.out.absolute(), args.cache, args.refresh_ordering_bindings,
-           args.previous_source, args.include_conversions)
+           args.previous_source, args.include_conversions, args.include_checked)
 
 
 if __name__ == "__main__":

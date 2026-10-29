@@ -315,3 +315,38 @@ fn wide_narrowing_preserves_every_previous_zero_pattern() {
         }
     }
 }
+
+#[test]
+fn checked_negation_preserves_the_minimum_refusal_and_exact_endpoints() {
+    let minimum_plus_one = I256::from_bits(U256::from_words_le([1, 1u128 << 127]));
+    assert_eq!(I256::MIN.checked_neg(), Err(Failure::Overflow));
+    assert_eq!(I256::ZERO.checked_neg(), Ok(I256::ZERO));
+    assert_eq!(I256::MAX.checked_neg(), Ok(minimum_plus_one));
+    assert_eq!(minimum_plus_one.checked_neg(), Ok(I256::MAX));
+    assert_eq!(I256::from_i128(-1).checked_neg(), Ok(I256::from_i128(1)));
+    assert_eq!(I256::from_i128(1).checked_neg(), Ok(I256::from_i128(-1)));
+    let words = [
+        0,
+        1,
+        2,
+        u64::MAX as u128,
+        (1u128 << 127) - 1,
+        1u128 << 127,
+        (1u128 << 127) + 1,
+        u128::MAX,
+    ];
+    for low in words {
+        for high in words {
+            let value = I256::from_bits(U256::from_words_le([low, high]));
+            let previous = if value == I256::MIN {
+                Err(Failure::Overflow)
+            } else {
+                Ok(I256(I256::negative_bits(value.0)))
+            };
+            assert_eq!(value.checked_neg(), previous);
+            if let Ok(negative) = value.checked_neg() {
+                assert_eq!(negative.checked_neg(), Ok(value));
+            }
+        }
+    }
+}

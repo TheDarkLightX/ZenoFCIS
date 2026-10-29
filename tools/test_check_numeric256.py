@@ -74,11 +74,29 @@ class SourceAdmission(unittest.TestCase):
         for mode in ("conversion", "dependency", "duplicate"):
             profile = copy.deepcopy(complete)
             if mode == "conversion":
-                profile["obligations"].pop()
+                profile["obligations"].pop(next(i for i, o in enumerate(profile["obligations"])
+                                                if o["stage"] == "conversions"))
             elif mode == "dependency":
                 profile["supporting_obligations"].pop()
             else:
                 profile["supporting_obligations"].append(profile["supporting_obligations"][0])
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                gate.configuration(self.root, profile)
+
+    def test_checked_stage_is_complete_and_retains_conversion_dependencies(self):
+        complete = copy.deepcopy(self.profile)
+        producer.include_conversions(complete)
+        producer.include_checked(complete)
+        gate.configuration(self.root, complete)
+        for mode in ("method", "conversions", "duplicate_dependency"):
+            profile = copy.deepcopy(complete)
+            if mode == "method":
+                profile["obligations"].pop()
+            elif mode == "conversions":
+                profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != "conversions"]
+            else:
+                profile["supporting_obligations"].append(next(
+                    o for o in profile["obligations"] if o["member"] == "U256::checked_sub"))
             with self.subTest(mode=mode), self.assertRaises(ValueError):
                 gate.configuration(self.root, profile)
 

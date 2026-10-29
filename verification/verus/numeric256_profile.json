@@ -1,7 +1,7 @@
 {
   "schema": "zeno-fcis/numeric256-profile/1",
   "namespace": "numeric256_harness::",
-  "scope": "The eight actual associated constants and eleven public conversions with exact integer values and exact Overflow partitions, without public input preconditions. The actual negative_bits and U256::checked_sub dependencies and two-limb carry/borrow helper instantiations are refined. Other helper widths, other arithmetic and compiler/ghost-erasure correspondence are not proved.",
+  "scope": "The eight actual associated constants, eleven public conversions and five checked 256-bit add/subtract/negation methods with exact integer values and exact Overflow partitions, without public input preconditions. The actual negative_bits dependency and two-limb carry/borrow helper instantiations are refined. U256 has no checked_neg method. Other helper widths, the multiply/divide family, other arithmetic and compiler/ghost-erasure correspondence are not proved.",
   "assumptions": [
     "Soundness of the pinned Verus frontend, vstd specifications and SMT solver.",
     "Correspondence between Rust compilation and the proof frontend, including ghost erasure and the reviewed constant annotations.",
@@ -221,6 +221,70 @@
       "refinement_display": "numeric256_harness::arithmetic256::U768::narrow",
       "refinement": "numeric256_harness::arithmetic256::impl&%32::narrow",
       "report_function": "numeric256_harness::arithmetic256::U768::narrow"
+    },
+    {
+      "stage": "checked",
+      "member": "U256::checked_add",
+      "parameters": [
+        "U256",
+        "U256"
+      ],
+      "result": "Result<U256,Failure>",
+      "meaning": "Exact unsigned sum iff it is below 2^256; otherwise exactly Overflow.",
+      "refinement_display": "numeric256_harness::arithmetic256::U256::checked_add",
+      "refinement": "numeric256_harness::arithmetic256::impl&%28::checked_add",
+      "report_function": "numeric256_harness::arithmetic256::number256::U256::checked_add"
+    },
+    {
+      "stage": "checked",
+      "member": "U256::checked_sub",
+      "parameters": [
+        "U256",
+        "U256"
+      ],
+      "result": "Result<U256,Failure>",
+      "meaning": "Exact unsigned difference iff nonnegative; otherwise exactly Overflow. Same statement as the conversion dependency.",
+      "refinement_display": "numeric256_harness::arithmetic256::U256::checked_sub",
+      "refinement": "numeric256_harness::arithmetic256::impl&%28::checked_sub",
+      "report_function": "numeric256_harness::arithmetic256::number256::U256::checked_sub"
+    },
+    {
+      "stage": "checked",
+      "member": "I256::checked_add",
+      "parameters": [
+        "I256",
+        "I256"
+      ],
+      "result": "Result<I256,Failure>",
+      "meaning": "Exact signed sum iff in [-2^255,2^255); otherwise exactly Overflow.",
+      "refinement_display": "numeric256_harness::arithmetic256::I256::checked_add",
+      "refinement": "numeric256_harness::arithmetic256::impl&%34::checked_add",
+      "report_function": "numeric256_harness::arithmetic256::number256::I256::checked_add"
+    },
+    {
+      "stage": "checked",
+      "member": "I256::checked_sub",
+      "parameters": [
+        "I256",
+        "I256"
+      ],
+      "result": "Result<I256,Failure>",
+      "meaning": "Exact signed difference iff in [-2^255,2^255); otherwise exactly Overflow.",
+      "refinement_display": "numeric256_harness::arithmetic256::I256::checked_sub",
+      "refinement": "numeric256_harness::arithmetic256::impl&%34::checked_sub",
+      "report_function": "numeric256_harness::arithmetic256::number256::I256::checked_sub"
+    },
+    {
+      "stage": "checked",
+      "member": "I256::checked_neg",
+      "parameters": [
+        "I256"
+      ],
+      "result": "Result<I256,Failure>",
+      "meaning": "Exact signed negation except at -2^255, which returns exactly Overflow; zero maps to zero.",
+      "refinement_display": "numeric256_harness::arithmetic256::I256::checked_neg",
+      "refinement": "numeric256_harness::arithmetic256::impl&%34::checked_neg",
+      "report_function": "numeric256_harness::arithmetic256::number256::I256::checked_neg"
     }
   ],
   "controls": [
@@ -246,8 +310,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::impl&%34::MIN",
       "error_region": [
-        501,
-        509
+        511,
+        519
       ]
     },
     {
@@ -259,8 +323,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::impl&%30::ZERO",
       "error_region": [
-        360,
-        367
+        370,
+        377
       ]
     },
     {
@@ -272,8 +336,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::impl&%32::ZERO",
       "error_region": [
-        447,
-        454
+        457,
+        464
       ]
     },
     {
@@ -298,8 +362,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::from_i128",
       "error_region": [
-        521,
-        531
+        531,
+        541
       ]
     },
     {
@@ -311,8 +375,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::magnitude",
       "error_region": [
-        549,
-        563
+        559,
+        573
       ]
     },
     {
@@ -324,8 +388,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::from_magnitude",
       "error_region": [
-        564,
-        586
+        574,
+        596
       ]
     },
     {
@@ -337,8 +401,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::try_unsigned",
       "error_region": [
-        587,
-        603
+        597,
+        613
       ]
     },
     {
@@ -350,8 +414,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::difference_unsigned",
       "error_region": [
-        604,
-        626
+        614,
+        637
       ]
     },
     {
@@ -363,8 +427,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::U512::narrow",
       "error_region": [
-        378,
-        389
+        388,
+        399
       ]
     },
     {
@@ -376,8 +440,73 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::U768::narrow",
       "error_region": [
-        465,
-        476
+        475,
+        486
+      ]
+    },
+    {
+      "stage": "checked",
+      "name": "unsigned_add_misses_zero_wrap",
+      "member": "U256::checked_add",
+      "old": "if carry {",
+      "new": "if carry && value[0] != 0 {",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::number256::U256::checked_add",
+      "error_region": [
+        274,
+        291
+      ]
+    },
+    {
+      "stage": "checked",
+      "name": "unsigned_sub_misses_max_wrap",
+      "member": "U256::checked_sub",
+      "old": "if borrow {",
+      "new": "if borrow && value[0] != u128::MAX {",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::number256::U256::checked_sub",
+      "error_region": [
+        255,
+        273
+      ]
+    },
+    {
+      "stage": "checked",
+      "name": "signed_add_wrong_sign_partition",
+      "member": "I256::checked_add",
+      "old": "self.is_negative() == other.is_negative()",
+      "new": "self.is_negative() != other.is_negative()",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::number256::I256::checked_add",
+      "error_region": [
+        660,
+        681
+      ]
+    },
+    {
+      "stage": "checked",
+      "name": "signed_sub_wrong_sign_partition",
+      "member": "I256::checked_sub",
+      "old": "self.is_negative() != other.is_negative()",
+      "new": "self.is_negative() == other.is_negative()",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::number256::I256::checked_sub",
+      "error_region": [
+        682,
+        702
+      ]
+    },
+    {
+      "stage": "checked",
+      "name": "signed_negation_refuses_zero",
+      "member": "I256::checked_neg",
+      "old": "self.0.0 == Self::MIN.0.0",
+      "new": "self.0.0 == Self::ZERO.0.0",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::number256::I256::checked_neg",
+      "error_region": [
+        638,
+        659
       ]
     }
   ],
@@ -537,8 +666,8 @@
     ]
   },
   "source_hashes": {
-    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "182b000c85a099264f361f8094c758a5a4b5cdd0c5866ffaa58e0526c52ec674",
-    "crates/zeno-fcis-value/src/profile2/numeric256_model.rs": "b368520e2d523b6823157dcc261b6db3d0489b3c5ea92307dfaca0ffb97a2888",
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "e99090c7179062248c9b4a09bcb4a1a81ebd01402dd0256dc8fc4fef4454c409",
+    "crates/zeno-fcis-value/src/profile2/numeric256_model.rs": "1ee5da3301e545ba378f31e6f15cc10025ecd83353d2d81ca37effdae39f85f4",
     "crates/zeno-fcis-value/src/profile2/number256.rs": "b2c8d2d6019e7b0d5eb46954a60c796df493e37cc171d1c22f1612ace900bdc5",
     "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs": "a4760c2561e903ee726c2a7489cdfdc2c46483f28861e955e27c32b58d8536a9",
     "crates/zeno-fcis-value/src/profile2/ordering256.rs": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825",
@@ -555,6 +684,7 @@
     "numeric256_harness::arithmetic256::impl&%28::MAX",
     "numeric256_harness::arithmetic256::impl&%28::ONE",
     "numeric256_harness::arithmetic256::impl&%28::ZERO",
+    "numeric256_harness::arithmetic256::impl&%28::checked_add",
     "numeric256_harness::arithmetic256::impl&%28::checked_sub",
     "numeric256_harness::arithmetic256::impl&%28::from_u128",
     "numeric256_harness::arithmetic256::impl&%28::try_u128",
@@ -567,6 +697,9 @@
     "numeric256_harness::arithmetic256::impl&%34::MAX",
     "numeric256_harness::arithmetic256::impl&%34::MIN",
     "numeric256_harness::arithmetic256::impl&%34::ZERO",
+    "numeric256_harness::arithmetic256::impl&%34::checked_add",
+    "numeric256_harness::arithmetic256::impl&%34::checked_neg",
+    "numeric256_harness::arithmetic256::impl&%34::checked_sub",
     "numeric256_harness::arithmetic256::impl&%34::difference_unsigned",
     "numeric256_harness::arithmetic256::impl&%34::from_i128",
     "numeric256_harness::arithmetic256::impl&%34::from_magnitude",
@@ -595,6 +728,7 @@
     "numeric256_harness::arithmetic256::numeric_model::complement",
     "numeric256_harness::arithmetic256::numeric_model::constant_bits",
     "numeric256_harness::arithmetic256::numeric_model::conversion_representation",
+    "numeric256_harness::arithmetic256::numeric_model::minimum_bits",
     "numeric256_harness::arithmetic256::numeric_model::signed_bounds",
     "numeric256_harness::arithmetic256::numeric_model::signed_word_cast",
     "numeric256_harness::arithmetic256::numeric_model::unsigned_bounds",
@@ -618,8 +752,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "b17ff7d95da09c48c1680e9caec8a27069c3a46c2a72debc3d6522d03dffe8e1",
-      "body_sha256": "81db2253de254b31aff8ebe7eb5253b7f3783cd6dc1c2e617dac8278e59116b1"
+      "ensures_sha256": "f072975182756c5612ad8c6ed24d260cb5914436da2ac221f258a5bb515cf103",
+      "body_sha256": "391e3c94b8a8ff51c9f11dc4edcf1319603d81930921d025310ba2cdee996dca"
     },
     "numeric256_harness::arithmetic256::impl&%15::clone": {
       "mode": "Exec",
@@ -627,8 +761,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "9b847843cfb4726cb664c129ad13bc516442fa737217e50515ef2e20e6ea3e95",
-      "body_sha256": "55942ab605444de411534dd1144a9446e7b08da4be7ef6ce357b2f667c47ebba"
+      "ensures_sha256": "92d54ca5b6fcb6230709bfd66d44e21e3f1332d89730a0364678cc70c5412f36",
+      "body_sha256": "82433ee17649f0b7d47be1266597a1f0ad92ec6448b00f184a2ce70626911196"
     },
     "numeric256_harness::arithmetic256::impl&%1::clone": {
       "mode": "Exec",
@@ -636,8 +770,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "119384163dfc43b2a668591ba133159ad07d5624e1d57aeeb3a29f4d9f9d4494",
-      "body_sha256": "6a192efebfbe56915765cf9dc11ea5eebba0807754109b2f3c174af3ad885535"
+      "ensures_sha256": "154c068110da2e2da3b36c15064c15b446bb8e2605e8a88f010b93461088bc61",
+      "body_sha256": "a66915b8c0a1549e9e2a1a73bcdd3f0b47c874d6b8cbebeb0b2da97bc66b8b48"
     },
     "numeric256_harness::arithmetic256::impl&%22::clone": {
       "mode": "Exec",
@@ -645,8 +779,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "6a376266bbff49818c4df794d6dee039937bd1d623640b071284fbe6609b2b42",
-      "body_sha256": "8dd787f5c0b2b10bf892ecc1d148728c5a949513010ff749b2926d4ac8a4d240"
+      "ensures_sha256": "61d7b021d5c45a40d0cad5b8d7c854a6ac9341baf1ba73fc7dabe312e11c639a",
+      "body_sha256": "93544a3e7e54c5e252de57378d4a2d6e8376097edbeefa00e2dfbcd345bdfb43"
     },
     "numeric256_harness::arithmetic256::impl&%28::MAX": {
       "mode": "Exec",
@@ -675,14 +809,23 @@
       "ensures_sha256": "c71f1b465e931a86aa2573871909865269474ac711bc7931c4b434e34a0865c3",
       "body_sha256": "2f396ef8f2fc3a27e978e4edaaed29c5b6af02bd9a2ae0d1a2fa13c86bbc9738"
     },
+    "numeric256_harness::arithmetic256::impl&%28::checked_add": {
+      "mode": "Exec",
+      "signature_sha256": "36b41533ac6ace6d4b0a6cd3093a729b3c2cd7b0a237efe13973a4f13569f9c1",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "83aeeadf505a4840d6b06dc0160af7e6c71d3ce2692e2920e88221bf871da18d",
+      "body_sha256": "246ac3ca1b0404d70fa75b18c9f3cfc7ae676511da13163d3e4aad8a3d2e81ed"
+    },
     "numeric256_harness::arithmetic256::impl&%28::checked_sub": {
       "mode": "Exec",
       "signature_sha256": "36b41533ac6ace6d4b0a6cd3093a729b3c2cd7b0a237efe13973a4f13569f9c1",
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "cff6e5eaaba4e9e9c5158ae44675599c98aa4e5946cf4d0b5592960ec8f43543",
-      "body_sha256": "c5c87203c64abd7bb6f07f34b39c9c2566c4662ec1613d1e9aa8cff0303dec6b"
+      "ensures_sha256": "5512cbf6d5d157c8f00144b3601be58c5c1e0ff3515a4f8e6ee4f36e5a0fcee7",
+      "body_sha256": "05a673d79e7a8c2cca9ed1980271d425687c22ec523140f494b1f8e70758345c"
     },
     "numeric256_harness::arithmetic256::impl&%28::from_u128": {
       "mode": "Exec",
@@ -690,8 +833,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "e4226c53c772a2851134def50f8b64161a0cf34e854f654eb4edfce9cbd2c296",
-      "body_sha256": "82ecf3c50496e86a0be508e0482bacc9082ddabfc49a2c6b253e0225bca8051d"
+      "ensures_sha256": "3f67de3eb4b34601c8722723b13b9f50e5e5c43412c3bc3d921feb8a928ba104",
+      "body_sha256": "efc9efcd5a41e2eae414bf3bc82f6d1d5d02aeeaf1f8f3f870665519380ec9fb"
     },
     "numeric256_harness::arithmetic256::impl&%28::try_u128": {
       "mode": "Exec",
@@ -699,8 +842,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "bdccd24349cd712619d4b6f0870e79e645236922927fc0d94678e409086dfcc6",
-      "body_sha256": "1139d3f45c77074027056a343a4011e13b35288ed7594484e3067ec644e0c4a5"
+      "ensures_sha256": "b6bf9505f85232e3dcf6f34412d5295a0b3809a100a4a8b69bf1134f72cc0d63",
+      "body_sha256": "6660c164744db9b5b3d6164ddc81323ca3f49dde592aeb47cb74e4e300cf9222"
     },
     "numeric256_harness::arithmetic256::impl&%30::ZERO": {
       "mode": "Exec",
@@ -717,8 +860,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "ca5c7751ba236dde2b8f90a1fb96281260183347723b2dd0677c62868a89ef22",
-      "body_sha256": "6c5695433c03e9c7d414f3dd3c9e6d15e0c37270b97b45e759f01b5fc80c3875"
+      "ensures_sha256": "771f38bbcf64888f9063f52df17ae058c3dd39b94c697e4126106d2936487058",
+      "body_sha256": "b6460c2b9214d6c3305cf0ebf07decd1f6969ae61f38be07fd86d316651cd2d2"
     },
     "numeric256_harness::arithmetic256::impl&%30::narrow": {
       "mode": "Exec",
@@ -726,8 +869,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "123f70b1f7dd021b12870c489d6f883858315c1440ff755953db6f6ff1c56915",
-      "body_sha256": "d65440b26f3e77215923e758dc8dbd80898bf3da4507e85c61f7346a8c6ae419"
+      "ensures_sha256": "c44ab9923dae78870a04557620ba474d94fd8a7d228f31c2672caba76eb3ddc3",
+      "body_sha256": "c75e5b51590cac8e8784586f9fa7198553cdb9dcac6bd5eb3afd1f13b4b7aeeb"
     },
     "numeric256_harness::arithmetic256::impl&%32::ZERO": {
       "mode": "Exec",
@@ -744,8 +887,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "e436f862adc46f9da6bee9d4a28a02bc48773b025d7f4b4046c1f169f0e5aa3a",
-      "body_sha256": "f168eeccd1e210cf1bb0e6e85401054ba162a8bdf6933e6ed88e778be0963b2c"
+      "ensures_sha256": "49e085bf4a629d7854e17202a3c8ad3043c21b406ad937189f230f413c7fc82d",
+      "body_sha256": "a1e114889e2a7dc0f533ade9f71893f28d73f9e170c702f334ff335801c21e94"
     },
     "numeric256_harness::arithmetic256::impl&%32::narrow": {
       "mode": "Exec",
@@ -753,8 +896,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "9ab3276d531135abcb3477f5a43ef67329a728e6eab9c15a655a0bb6a119e539",
-      "body_sha256": "6f0b93eab1e042199fd34802b2c68e932b34c9fae68d17bbf4c3311e8efacbcd"
+      "ensures_sha256": "e6006484ab74ebcdf0826bbbc2c58a3d442556461e5d851353e93380e79925c3",
+      "body_sha256": "63d7a79858a34aa51b52c2a3fb891f8720b27ced2e2d374d5460e01ae021a7f6"
     },
     "numeric256_harness::arithmetic256::impl&%34::MAX": {
       "mode": "Exec",
@@ -783,14 +926,41 @@
       "ensures_sha256": "eff9d93e3577cffde3d18766efc89d0209f2c3c53f9218f60c8f2ed42470cb1a",
       "body_sha256": "49b8c6fc9f992b16e36b0a5d1b74011777086e55080b3feda4356f42b4f92f8b"
     },
+    "numeric256_harness::arithmetic256::impl&%34::checked_add": {
+      "mode": "Exec",
+      "signature_sha256": "4bc1562bd4ab84040c9fad0ea36c8110bcb4e14f594a7c06a48077b64822d691",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "ef05805c59f2ce2e951917f9f085cc026c0e4459fc68e964946f466a4374d148",
+      "body_sha256": "8d9930551899f4b08893cf22c99a7765237f23eccce3bba7282ca25e7f89443e"
+    },
+    "numeric256_harness::arithmetic256::impl&%34::checked_neg": {
+      "mode": "Exec",
+      "signature_sha256": "581d574ef46ae72fa08fdf10cd777ea8ee2c127b7739b804e8ea00815a315c63",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "9242c4608d9923dc20eaa90cd33516baba4a37a44791dcca2681af6d47530533",
+      "body_sha256": "8c2ec65cf1106f1f4c2832e0ecadb8e89de1e7e1282b4dca4b8da023dd17e9bd"
+    },
+    "numeric256_harness::arithmetic256::impl&%34::checked_sub": {
+      "mode": "Exec",
+      "signature_sha256": "4bc1562bd4ab84040c9fad0ea36c8110bcb4e14f594a7c06a48077b64822d691",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "76fa0e237ca4a48d993dd06aaf674dc5a9a9e562b697ac4808cc8e2509d5f7ac",
+      "body_sha256": "c96517b055a3cf49670dd0f20d3912f2a8a825f858661afc53c8ab1b4f040d9a"
+    },
     "numeric256_harness::arithmetic256::impl&%34::difference_unsigned": {
       "mode": "Exec",
       "signature_sha256": "dbe7cacc7b4373ab7fa4bd2013cf4ac1f7b5fcb18d1fdf944c3dbb083fa3e475",
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "4093c57726485d2fd738b2595837b5a71e09b85c83ffcf74c17a3d59a851ec50",
-      "body_sha256": "f69ae0e41c8fe69df73138ecc14deb332910b048f36fe6541e7e5bc5e34680af"
+      "ensures_sha256": "eefaeeb3ba10c828c27c7d3c3a7f9003a7f93480f6f6630e9999f7a020b517ca",
+      "body_sha256": "55582abca8f7ef6425f769f0b1ef10e2de3df0db8ade886fac1abd55b8c4ea0a"
     },
     "numeric256_harness::arithmetic256::impl&%34::from_i128": {
       "mode": "Exec",
@@ -798,8 +968,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "b57265d3e8c67a1747c34fb5f3c7a6f6c94f60f50847d2750a91a78d8c102a62",
-      "body_sha256": "182630279fbb81d5582dd1afc89e0b5f2d8b97288c21c7e8ebedcc77cd144756"
+      "ensures_sha256": "f0cc8bdc0b4fb42c855d21e4587b3889ca398cba267fa93ae72eb65737e10a3b",
+      "body_sha256": "8c5a6dedce4e69a402b88ba3b773f54db8f4fed9b4e81ef8a7402d9c930099e7"
     },
     "numeric256_harness::arithmetic256::impl&%34::from_magnitude": {
       "mode": "Exec",
@@ -807,8 +977,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "90233ddb760d102379552edd4640a73f70b3e58c9213fe0ae45eb6c879f55f2b",
-      "body_sha256": "94d87df6b716bfbf302cb8f85103b3274082e7afdc76be8c115e00a4f9b17164"
+      "ensures_sha256": "6b31de8965fb4e90221ded1f9611e0e5219abedd256364d18a9df808136db63d",
+      "body_sha256": "c7bc43a19589c28b68ac82497ec9e47772927dd8ce9f6e893b35c5da7d7e9c04"
     },
     "numeric256_harness::arithmetic256::impl&%34::magnitude": {
       "mode": "Exec",
@@ -816,8 +986,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "e8ebbccac73815d9b6d7aff3aa5479554d87be4490ea8751eb5c29bfa9410471",
-      "body_sha256": "8916724d3952c94e93085320eeb52e17f6d41251ab8c2ab434bcec0455de9979"
+      "ensures_sha256": "26a74423d40af4b051d812dd4d9b4d6d5ac6380a51d08065a8f1c7105d1c576c",
+      "body_sha256": "53353d53f6c695d0ff74ecc89b42a2dd42c7b0f09bd826d466430a7aba562b95"
     },
     "numeric256_harness::arithmetic256::impl&%34::negative_bits": {
       "mode": "Exec",
@@ -825,8 +995,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "2f416d1679abcbcb5683c045edcb0e4f6294ca11a8cc1f9ba2f721b7da637ca9",
-      "body_sha256": "50863238f8eb939f0aa511d3865126168d1633da86d977be935ec0ad519aa870"
+      "ensures_sha256": "f2acb0274d82a3a23a74970679a446a5210a9b626d22429bd326c531a82d7134",
+      "body_sha256": "7c29c6c73c8ea47c1b162e7ff639f5e24da3b7c4b7b256bfd305a4d196c8b0fd"
     },
     "numeric256_harness::arithmetic256::impl&%34::try_unsigned": {
       "mode": "Exec",
@@ -834,8 +1004,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "b60a63e59e049ebc58a2cf41d92ca2967e674f28157f44a8d66c7f7a31900211",
-      "body_sha256": "e5fa8d8da029f2f510ee776c8e0739f8405d0a9fd3b0642882a98e83ab3e3edf"
+      "ensures_sha256": "9f5e61b58790d3b9188cadccdb2d7c10dc507c4dc6c0cb9398c3b893605864fa",
+      "body_sha256": "a1b05bd841bca4e4c864600b06c16f0b032d74c924524423fbdb35f9ddb8bf54"
     },
     "numeric256_harness::arithmetic256::impl&%8::clone": {
       "mode": "Exec",
@@ -843,8 +1013,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "2f1549e5f3c4799ca9851968c5c297624a91fdd6b35a48fd3d5148acc2e1a52a",
-      "body_sha256": "ff41b0cd05cb620dcae956ed714a5eac8d9baa2dfb1bf9cbc5e7e7f21808ab38"
+      "ensures_sha256": "0a9b324565987c6e4ae548a51135ba08d97f5c6cde5ff68cd12792f82c7af373",
+      "body_sha256": "cc0802df068f333549a271afa877931c373d03ba24b1534f7fced24373695234"
     },
     "numeric256_harness::arithmetic256::number256::impl&%14::cmp": {
       "mode": "Exec",
@@ -852,8 +1022,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "962b5988d3106f7069e8015061510c8fd042f2cdb7577221cc4e4b96702aa9b9",
-      "body_sha256": "5c9a01eef0f1d75ce794519b0bf13b92472654701c8902fcfd8cd8854221d6b9"
+      "ensures_sha256": "87495ee3d3b3d011ae66358ae8c46ae0f8d13475b7bc1a191744accfbed6b5b0",
+      "body_sha256": "ad5d85b0da07b4a827287e5858d38ca3b885d8e7dc130c2a5ac5193d1fccf6a6"
     },
     "numeric256_harness::arithmetic256::number256::impl&%14::from_words_le": {
       "mode": "Exec",
@@ -861,8 +1031,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "e7c2a7907939fa8efbd0d810e2e5fd7dd53f3180b2a7e825631c3906a2af03f3",
-      "body_sha256": "3913c8d95f3b5a4f99c0584852688b84c8bd3654511abf322e3f38301b195b47"
+      "ensures_sha256": "e90822e960e70efdd368bafe22e5739f8c7eb7274c224132aceca3f1d77cc28d",
+      "body_sha256": "18e8f7f4fbcdba69f37556a195d46b2eae4964911bb48fe182a976eecc719c95"
     },
     "numeric256_harness::arithmetic256::number256::impl&%14::words_le": {
       "mode": "Exec",
@@ -870,8 +1040,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "5ce2a7d77b5933822706addd78ec69e35ec55c315ef6e738fc014588b5ce12f2",
-      "body_sha256": "1e65305e193594e205ae4cbd2c9c1533f7aef214ec5d748d34fe2e39053a8b64"
+      "ensures_sha256": "bf81fdda1064e80000454a7727c92c12bb64fb4ed01c12c8740cc3276d85e9b0",
+      "body_sha256": "e4b4239355ee744195b22d6321912d999f9d7839dd29aa84c2b10a722caf73c3"
     },
     "numeric256_harness::arithmetic256::number256::impl&%15::bits": {
       "mode": "Exec",
@@ -879,8 +1049,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "b6fd229517dd062032e0652b585a407d013f247fc6eb2f4575733757b8148492",
-      "body_sha256": "2a80e45701975f65616b70fde01e6518918d6f5f0233a029e8da16460aea74a8"
+      "ensures_sha256": "4f820286bbb085b68a58012c0284b525e34c3dadfff20cdd3dbb553d874a1958",
+      "body_sha256": "3b759e07dc9e5b7bf02b754fb07800fa6ea4a0ca67ffce7310b6a8f99ae267be"
     },
     "numeric256_harness::arithmetic256::number256::impl&%15::cmp": {
       "mode": "Exec",
@@ -888,8 +1058,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "dabf7e7234577191385f155af68bdacc3df984bb1878a004c8173b8a30210c3d",
-      "body_sha256": "66a42fa9fee4ba2182f1ce1811a83c74f097e8441232cd79f70ee53d784863d0"
+      "ensures_sha256": "c72ae9df1d191d6b419e11fb8e459d6d03a074a863b75a726f032d2a1289082e",
+      "body_sha256": "d697df0aa71f778d8398adcf12567873db460dde207b6fbb7ba3be381c33f81d"
     },
     "numeric256_harness::arithmetic256::number256::impl&%15::from_bits": {
       "mode": "Exec",
@@ -897,8 +1067,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "96e1632d66de44b4cb9764bac3cdb9d2b00fbaf6226f468789c9afd34ecbaaa4",
-      "body_sha256": "d293f7f64fdbb6d73bd5b89aa143c8b44191797df7e35779a0a3dce732d70da5"
+      "ensures_sha256": "8b55393b4d92d79f76a3ce88aa6d6563e2ad63f890c5749688a5cef73178a999",
+      "body_sha256": "d68b89579eecb6eacf3ab8ab35c018c4e653c758e73c50c219fcdb6bb700df7f"
     },
     "numeric256_harness::arithmetic256::number256::impl&%15::is_negative": {
       "mode": "Exec",
@@ -906,8 +1076,8 @@
       "requires": 0,
       "ensures": 2,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "9ca2f7cd755548f02c6cb527e7af9509e8acc3a3ba9f8dc3d0a865328b358da8",
-      "body_sha256": "6ee8c662e5f46d1b518e79f66f6f638b897aea10a76d544cfa948eef11b25ac8"
+      "ensures_sha256": "9d3fe692f4086cf4f7675240284c8ffb8603b0a3b3cc194980bf7bdb6306c3d6",
+      "body_sha256": "cbdaaa1f801d105067a9d286f035a16aa460f81204db0502022558d28d8a54a8"
     },
     "numeric256_harness::arithmetic256::number256::impl&%16::ordering_words": {
       "mode": "Spec",
@@ -916,7 +1086,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "886a4edd199d89dfb430cabbf35193b7d37a10b3f69bb2e9ae93933488411c0a"
+      "body_sha256": "8fec50050fc0947495cc49cbe543f1e1fb21df9baae2a2710188e9117529f243"
     },
     "numeric256_harness::arithmetic256::number256::impl&%17::ordering_bits": {
       "mode": "Spec",
@@ -925,7 +1095,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "1d13406db3fa1130e0990a46abc14b09709bb0e797bd15c04f0111a21e637233"
+      "body_sha256": "1c25bf45610408f4c17c993781a1cfe0c6f87cfb692c8899abac3e76f20e0994"
     },
     "numeric256_harness::arithmetic256::number256::impl&%1::clone": {
       "mode": "Exec",
@@ -933,8 +1103,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "0d1e18e6eebb627c79fe3fb13ebc03128553cb741e0ff9e40c3b6b97ab2b9aaa",
-      "body_sha256": "75c19b12c52fd11fb4bbf6275b6bded00db2c5015cfcfc6784a091e7e3813ad1"
+      "ensures_sha256": "67715b0c7a34144ca4b96019545970fd85c8a1cf0e0320b1a27761b95d21558a",
+      "body_sha256": "19de5deee9ab8b2ad2a1f9e1772dc00db900ed4bd0ff93168cda198c58c8eabc"
     },
     "numeric256_harness::arithmetic256::number256::impl&%8::clone": {
       "mode": "Exec",
@@ -942,8 +1112,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "fb95b97e0489c8d57e85d026492a745a7c53c8a5f8f1c096dbfe894faa47a4f0",
-      "body_sha256": "c15faf8d9b02099903f2322c75ed0b564b0537c9b85feb8e73b23d6c04f89816"
+      "ensures_sha256": "b17118f48db5c093a89254377978bb5225a82ff5492246f5cd968a8bf2a8395c",
+      "body_sha256": "9780976947d2398bdfe104bd89a43c8999c30af7308feb299944859b9fd9163d"
     },
     "numeric256_harness::arithmetic256::number256::numeric_representation": {
       "mode": "Proof",
@@ -951,7 +1121,7 @@
       "requires": 0,
       "ensures": 4,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "9daf6c0dd16671e3b3266507540d0e8bea4e30db7c900f89c63612f6ec320b62",
+      "ensures_sha256": "cb21b4514bac286a7d7347f039c0f57150cd0606dc11d2d44077d28af11107b9",
       "body_sha256": "8251e6fdfd64ec72c4b4c3a4cf9c5a0231a224884c8ad4a7c6a9097fe17c7e1d"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::boundary_witnesses": {
@@ -978,8 +1148,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "e55391ae62687b0c304fbaf00465ba18cb8418d8db9d5efce574d3377a60086b",
-      "body_sha256": "139eebce11a57ef40f20f616784b11264a8c819a9d0fa6f0288057aa5b201a30"
+      "ensures_sha256": "b8ff39c5a93f59134e5b22cf45a22827dbed0cee5f0e6ea5ec7c1caca897928c",
+      "body_sha256": "b8745384afa14883aa08cb7d1b7d56430144f035531e3e6790b22c906718acdf"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::integer_order": {
       "mode": "Spec",
@@ -988,16 +1158,16 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "37987c347ef2d3bca3a0544a1b7a1e22c7f97f721362a41f88bc698cdae37d79"
+      "body_sha256": "aaad353d6c312084af38f5fef4594df46882c491a86b76a240c4befcefd0b809"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::lex_two": {
       "mode": "Proof",
       "signature_sha256": "f51db28092506b4f22b9812f4b847cb0dfa4f06fd23f9bd0990928cee80fb834",
       "requires": 1,
       "ensures": 1,
-      "requires_sha256": "f6ee5d8a6947426345d10c1ac7d07f438d4845809ded7f7b594a12047ff85cae",
-      "ensures_sha256": "6fc0d03a6b586c09e9a513668f36a1bca606a5a681f74247381d61cf2d940ff0",
-      "body_sha256": "e8b84ee4c355c9fd551ded747ee0e84af3156f1100ba2595fd668ff488f52e96"
+      "requires_sha256": "e6387d1a6e552c64d7c810e717ec235915c093229351e71d59fba384b6c3345c",
+      "ensures_sha256": "74420e1e9dd5fa8910792bf3e7c21db4f72a463024704e3bb6143f643b42c9c3",
+      "body_sha256": "49b4611680c6f593e731035b981f07cf8a93883a1883a26920ae6010d142ed83"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::limbs_bounds": {
       "mode": "Proof",
@@ -1005,8 +1175,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "0fa6bff874e858590dbc7dfe5a270328d2db728dcd0e59569a6cafd8b4b635d6",
-      "body_sha256": "98c234de85466a449c298d48e57b7aa996e62e1a8e0526f33a71585682034170"
+      "ensures_sha256": "04426dd0958dcc246a17a0b5eab4829b86808504731610846d9639eee578e008",
+      "body_sha256": "8e7eaca21ec10e16c1caf7d55011f5af4aff96b3b12fdeb418a9adde20c4ea00"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::modulus": {
       "mode": "Spec",
@@ -1032,8 +1202,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "8b0211cc1b77016a1ce5a84f7f6effbf4c529c9880468480e3dc205148a96566",
-      "body_sha256": "61352743d4d4f7d507d4a1438057229a8c69e7d7c033e54aaed4775314450ce4"
+      "ensures_sha256": "fd35eed90811d1e9881c884622e8f31545c33fd870a516c6dda1354246bf81a9",
+      "body_sha256": "ced5b7a8dd71bb6c063a2d45070631996462af3339cf662e985038e41bab28d8"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::signed": {
       "mode": "Spec",
@@ -1042,7 +1212,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "9981555a6f2e8c4d73db0c7394a3ec117bed2b6870aca793d3a2cb1b23403d62"
+      "body_sha256": "414ce4d5bc93c967d20af59666b6063770f96822406d6795e83bc30dc27411a8"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::signed_bits": {
       "mode": "Spec",
@@ -1051,7 +1221,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "544c464535d4c506d4a2999866d4a03d0f0e86003c8e944ea02ae1eb064bf68a"
+      "body_sha256": "5af37c8b29c66a46fb1cc7f71219df97d15de4d91dc85a6a8ef9001930c23501"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::signed_bounds": {
       "mode": "Proof",
@@ -1059,8 +1229,8 @@
       "requires": 0,
       "ensures": 2,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "5a82c41417630fe4912a6b429aec6828fd9122f28f93930daa651901a8b8c024",
-      "body_sha256": "cc4aa25c9e8b77d747573fa9c98aa2bafb82f7b64d44c7b07d87b3456654364d"
+      "ensures_sha256": "bc7092a93716ad47c7bcae2e67317d4715a8bd5a66ffaa9223dba129f96a6d14",
+      "body_sha256": "c66ac660683ab29f019d21f8650780134a709b7e4c825367868c7c7cc0743e58"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::signed_order": {
       "mode": "Proof",
@@ -1068,8 +1238,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "c4543cfce16b51897ac1f8770ee6a70c81e320e7f71b47b99882aa7a1e4a632c",
-      "body_sha256": "6cde3b51cd92111ff239aa2452fdf1ce1dcd588bfbdceeddf0f7a6c7f9d4d795"
+      "ensures_sha256": "12e20b624204681c0e661f32ea67a4fa17d56772a0de044c5b8d133f001b3cf1",
+      "body_sha256": "f6fb124d71161e2afde82a14c74ed6f6a50375783c136ad859074272c5e5db86"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::unsigned": {
       "mode": "Spec",
@@ -1078,7 +1248,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "d9362108a5494c609508dd3686302f206e1eb77d28f65be17aaa171bdd913a74"
+      "body_sha256": "d009405f446b18d6ba36ef070322348870cc353570a25752497d2c40d1bf9733"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::unsigned_bounds": {
       "mode": "Proof",
@@ -1086,8 +1256,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "d8a907e1efcd878c54036e3c8ffd13b4a7b5a06f4e9491bcdeb278dae3f67d9d",
-      "body_sha256": "9cf3319941d69169a7e425b90dcd2a4410210b39c1884dbddefbae641bbf27f5"
+      "ensures_sha256": "e744814f7c3ea115ab4d7755ff4d83df860dee39bf315c1387bdfe1ea4ba7909",
+      "body_sha256": "21a1a0ab6473e0dbcd4525076480ff8a1c0b5c1963e39829f9f9c0382dd48786"
     },
     "numeric256_harness::arithmetic256::numeric_model::complement": {
       "mode": "Proof",
@@ -1104,7 +1274,7 @@
       "requires": 0,
       "ensures": 7,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "2c5c97c681b7e2842b24f10fdbe6b01ac43230319848cf43a918da78d21371f0",
+      "ensures_sha256": "24537391db2b3faa0d5e9028c47aa2d41338c79d64879352409a693f9601ec42",
       "body_sha256": "d32a7a4ce3d7da50d8673c3e3e8262be72274384d14d5b0ff155695a58818e01"
     },
     "numeric256_harness::arithmetic256::numeric_model::conversion_representation": {
@@ -1133,6 +1303,15 @@
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "body_sha256": "82c7ccf68dd7dee9600e56497d9ab47e0eb4d5ffbbc369d486ab2ebec02d4e2c"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::minimum_bits": {
+      "mode": "Proof",
+      "signature_sha256": "c506630c5c47ba8db01cf1fa2df8d29049dfc58a4a1e7f271c3c53e460250058",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "eaac8cbd824089a15091607edf6c5feb7c373579fb11fbad151d677c838f0f32",
+      "body_sha256": "15fbfaaf8d160eef774221decfb607ec2c6b3fcf3d7622848f0de82c4a2c9a63"
     },
     "numeric256_harness::arithmetic256::numeric_model::place2": {
       "mode": "Spec",
@@ -1248,8 +1427,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "3d736cefb38398bc0d00b7be9b19ed09ce41a18fe2d5791fd5127a32609ef7a3",
-      "body_sha256": "1bf1e1020427ff66ae1cc1aee3f17c8d8ae9685203d9b064117ea0ad6a361271"
+      "ensures_sha256": "df43df1b5607a124ec8ca75b66c1b165aafaaadb91ba863462f3c789d33d3dc0",
+      "body_sha256": "59eca922ea952d574a92f4452a1d1cd4a2c723dd0ee761c7353f3a4e49200941"
     },
     "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_gt": {
       "mode": "Spec",
@@ -1258,7 +1437,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "0202c9c7db6b511ef7f70cf2356ea0187ca54557fd531ffb0836b930b533316b"
+      "body_sha256": "b13fde47f9a297706f646b90197850bc70ab237cb82a8f87db4c009442785f23"
     },
     "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_lt": {
       "mode": "Spec",
@@ -1267,7 +1446,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "d3a0716d9d74396c95cfa001908c7c0c27b3c6186a67164694ce359f6fde7ed8"
+      "body_sha256": "752915e17acd4542050f64b370c71c8e3dcb2227ac25a7a2571c9eed33a312ae"
     },
     "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_result": {
       "mode": "Spec",
@@ -1276,7 +1455,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "493130d0e541175a99c8f94c4b1e3337a560b3d5605c92ef1fe79ae47298f12e"
+      "body_sha256": "1bca49991152fdb8746b89e93b3536958f002e3810d8ddd783d8db3bc4a2edcf"
     },
     "numeric256_harness::arithmetic256::ordering256::ordering_model::suffix_equal": {
       "mode": "Spec",
@@ -1285,7 +1464,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "8f5ac80bdd0e4244f5e9eefeb1f529f84472e8d76fda144081cbce90119cf0ba"
+      "body_sha256": "5052adc310b8fe7072736083e3ea7b912da0d4feca8d1e0c26358c8df44b6b60"
     },
     "numeric256_harness::arithmetic256::subtract": {
       "mode": "Exec",
@@ -1293,8 +1472,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "77a79730fd256eb63348fff62ad376717155865eb672dc663bd6c41e026c052e",
-      "body_sha256": "ee2f0d39c928a68306f42e7e0d66484e63cde046505ed7f7d9f1248dcdfb014b"
+      "ensures_sha256": "80789eeed4ca68ac57d418aecdc48664779753019f9d0283f7fecf1d1d344347",
+      "body_sha256": "9526d031493a1e9ffdc3189c2f1ee6a8d1a81a0ca02fe4ebb0ae297e6a460150"
     },
     "numeric256_harness::arithmetic256::wide::RADIX": {
       "mode": "Spec",
@@ -1311,8 +1490,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "b8c80b2b0fbc4dfb7e109e8b5d5a63db91af53eaeb2e261e3e1c2ce036bc780d",
-      "body_sha256": "5e3594ff589a02f0d49b401cdfa1ebfa4ad855da47c2e0b01496137e8e0517a8"
+      "ensures_sha256": "5ba3ba49042748b3bf389652247be68f90d1e849a908b1be14b10e819f14c6ef",
+      "body_sha256": "52dae9ed45ec687e254f9aacfa9436fc9e713128cc6fcc7f1f121284d1f0ffeb"
     },
     "numeric256_harness::arithmetic256::wide::mul_div_ceil": {
       "mode": "Exec",
@@ -1320,8 +1499,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "d0bf70bcc3bf6e139ee2627c38686d34de3ee5176930d254615e026adfd05653",
-      "body_sha256": "cea5c51426efa2fdc5f83c4fac866e3112398549e2e77cfc548f33d358c37ea2"
+      "ensures_sha256": "5f06f0c83fe7f43038759d5f333638da5873d82ef251126572df05e77d77f2c2",
+      "body_sha256": "fa63d3d098fc3d21bf9c8a8b90474631cef571a095cc47acc959be52d97466de"
     },
     "numeric256_harness::arithmetic256::wide::mul_div_floor": {
       "mode": "Exec",
@@ -1329,8 +1508,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "6cc1b514b96f554f4ef428783691f3b6227a71e6433d2fd7fd454167ea5a67c0",
-      "body_sha256": "b1b36e94ae3b70197a3c8bc14a08f481fc01688961952734f68518c85a5b4a56"
+      "ensures_sha256": "0a99323793d72333d4588a29ae2f0c857fed7d1fdd926152c1c1732d861022e4",
+      "body_sha256": "fe221278569eb2e66d0dc2e61071f2837fe5e9b4eb774158728f605e88a79f2b"
     },
     "numeric256_harness::arithmetic256::wide::multiply": {
       "mode": "Exec",
@@ -1338,8 +1517,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "01f263c683a65a59193e7c61f25e10ab536b9885eedf9c24c576d06cfd050aed",
-      "body_sha256": "a7551e51c3d185ff0b120d5f99391d35f34b442ffb999ec25857c4d8850d6499"
+      "ensures_sha256": "aa8e019e040dc61da41395db633b0a8a209447377019ca4488cca9967a5616ab",
+      "body_sha256": "d319cda8f16df192a94f167c8d321e42d6682819b52fb2f2ff29e05bae771aad"
     },
     "numeric256_harness::arithmetic256::wide::multiply_three": {
       "mode": "Exec",
@@ -1347,8 +1526,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "ba8f7c6121c97e2cbcac439ac53e9aef1f208c172511c4045de099ddca0d1e98",
-      "body_sha256": "e8fa57efd21f8c9168085cb0117dfbaa193653ea80eb5e0c1ea7a38afed53719"
+      "ensures_sha256": "b00aa6f0bba70ed3f742d48aa346448dc68369596596f761649d9e243608617d",
+      "body_sha256": "2bdb845d9761145a81b043613c5435c268860707a97c31ea0668a7a2606b742e"
     },
     "numeric256_harness::arithmetic256::wide::products_ge": {
       "mode": "Exec",
@@ -1356,17 +1535,17 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "c464cfa461d5605d00d83bb624bd28799dff18212caa35e9db8a43fb006739c2",
-      "body_sha256": "c4c5ad92e1c5b27ccfc49e3adbce7beb7f7d16042cba38286b693fe230cbd0af"
+      "ensures_sha256": "c470c4096438b02a7c8144237138b4c97f52bf08ccb1d8a16d34fc26cc3a85b1",
+      "body_sha256": "b52994759f069af4e602dd558c8cc837468ca625bacd00ad7ec3901ec537c258"
     },
     "numeric256_harness::arithmetic256::wide::quotient_from_interval": {
       "mode": "Proof",
       "signature_sha256": "19043915e9afa9f46e30b7d5e92e0c6e309a9d0829dd78002b018b65ad67514e",
       "requires": 3,
       "ensures": 1,
-      "requires_sha256": "84e4317f33e7b6a8bbceeb948b2e331653a137a3cd42cdc810bb5773f3c6658c",
-      "ensures_sha256": "2675a28128622c79e99f0a8aca6cb82c08f8a0201fff2cd2ed773555ebf9d7c0",
-      "body_sha256": "b39132ec5724b4cf7fa19833c318b4509be88a3d6094677f8c0dd96fc868bfc8"
+      "requires_sha256": "72aaf87633c886b7b4bfdf8647d4d551ffa3af9877101cce3bf004210e2f0eab",
+      "ensures_sha256": "fa47742ba280c93acb452d414bb22aa36676ac5b263742b7e992a1a2e32efbfa",
+      "body_sha256": "9b0c3f166ec1dc37af1b4d4d3b8f7c1f5e170371e6f9d8f2d8989642b7ea4464"
     },
     "numeric256_harness::arithmetic256::wide::split64": {
       "mode": "Proof",
@@ -1374,8 +1553,8 @@
       "requires": 0,
       "ensures": 3,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "9882da5eb17df07463cad5d8d66206cd3ebc2a4ace1015b95c46717b632d562e",
-      "body_sha256": "3acd38fcb89ca04a21e20391ce2ca03f18d3e0eb1115e2aa9d5181496b0c905d"
+      "ensures_sha256": "426b599fe6c24093bb577b19aa8bda6c7ed8188759f22653cee5667ab76935df",
+      "body_sha256": "3ac226bd248c62940260c6aee8ed3e7cb1782cc69203ae3c1c9aab3b8137efe4"
     },
     "numeric256_harness::arithmetic256::wide::wide_model::ceiling_value": {
       "mode": "Spec",
@@ -1384,7 +1563,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "47fbf1a46100d5e5b7972b4f3af0a69d9d8d1cd248b2c1e62afcf5b3a69bc716"
+      "body_sha256": "6277c971c957d0df5da3e65db84dd518b1f96445ab3dbf56a6fbbcf3af5b5326"
     },
     "numeric256_harness::arithmetic256::wide::wide_model::floor_value": {
       "mode": "Spec",
@@ -1393,7 +1572,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "d9d029504044c51939df1305c4cc342cbd53dc32fd07d08f730382d085a272cc"
+      "body_sha256": "598a946a310ed48b691920138e07e1bfc6b2e111cd361dce4796df91b63c4aa8"
     },
     "numeric256_harness::arithmetic256::wide::wide_model::number2": {
       "mode": "Spec",
@@ -1402,7 +1581,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "8fc342e25bdb94826e994ef047d7c0929514f26cd2c8b4677b00c83505e5f8ae"
+      "body_sha256": "41a43df948287c28d76bbdac91325ebf14b5be929737fe98e7a0e9bfbc7d213f"
     },
     "numeric256_harness::arithmetic256::wide::wide_model::number3": {
       "mode": "Spec",
@@ -1411,7 +1590,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "b1ee980e8f2a642f4a9f0253a7596160215ccd336de5795b6e1c17444121bc35"
+      "body_sha256": "f89443ee3a79d6e5f38a71ddcb4a0fb547480448cc2202993dfb4573bd514f9d"
     },
     "numeric256_harness::arithmetic256::wide::wide_model::scale": {
       "mode": "Spec",
@@ -1444,6 +1623,9 @@
     "numeric256_harness::arithmetic256::impl&%34::MIN",
     "numeric256_harness::arithmetic256::impl&%34::ZERO",
     "numeric256_harness::arithmetic256::number256::I256::bits",
+    "numeric256_harness::arithmetic256::number256::I256::checked_add",
+    "numeric256_harness::arithmetic256::number256::I256::checked_neg",
+    "numeric256_harness::arithmetic256::number256::I256::checked_sub",
     "numeric256_harness::arithmetic256::number256::I256::clone",
     "numeric256_harness::arithmetic256::number256::I256::cmp",
     "numeric256_harness::arithmetic256::number256::I256::difference_unsigned",
@@ -1455,6 +1637,7 @@
     "numeric256_harness::arithmetic256::number256::I256::negative_bits",
     "numeric256_harness::arithmetic256::number256::I256::ordering_bits",
     "numeric256_harness::arithmetic256::number256::I256::try_unsigned",
+    "numeric256_harness::arithmetic256::number256::U256::checked_add",
     "numeric256_harness::arithmetic256::number256::U256::checked_sub",
     "numeric256_harness::arithmetic256::number256::U256::clone",
     "numeric256_harness::arithmetic256::number256::U256::cmp",
@@ -1482,6 +1665,7 @@
     "numeric256_harness::arithmetic256::numeric_model::complement",
     "numeric256_harness::arithmetic256::numeric_model::constant_bits",
     "numeric256_harness::arithmetic256::numeric_model::conversion_representation",
+    "numeric256_harness::arithmetic256::numeric_model::minimum_bits",
     "numeric256_harness::arithmetic256::numeric_model::place2",
     "numeric256_harness::arithmetic256::numeric_model::prefix2",
     "numeric256_harness::arithmetic256::numeric_model::signed_bounds",
@@ -1515,7 +1699,7 @@
     "numeric256_harness::arithmetic256::wide::wide_model::number3",
     "numeric256_harness::arithmetic256::wide::wide_model::scale"
   ],
-  "expected_verified": 78,
+  "expected_verified": 83,
   "smt_sections": [
     {
       "function": "numeric256_harness::arithmetic256::Failure::clone",
@@ -1588,79 +1772,99 @@
       "line": 259
     },
     {
+      "function": "numeric256_harness::arithmetic256::number256::U256::checked_add",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 278
+    },
+    {
       "function": "numeric256_harness::arithmetic256::impl&%30::ZERO",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 363
+      "line": 373
     },
     {
       "function": "numeric256_harness::arithmetic256::U512::from_u256",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 372
+      "line": 382
     },
     {
       "function": "numeric256_harness::arithmetic256::U512::narrow",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 381
+      "line": 391
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%32::ZERO",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 450
+      "line": 460
     },
     {
       "function": "numeric256_harness::arithmetic256::U768::from_u256",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 459
+      "line": 469
     },
     {
       "function": "numeric256_harness::arithmetic256::U768::narrow",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 468
+      "line": 478
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%34::ZERO",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 495
+      "line": 505
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%34::MIN",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 504
+      "line": 514
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%34::MAX",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 514
+      "line": 524
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::from_i128",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 524
+      "line": 534
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::negative_bits",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 537
+      "line": 547
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::magnitude",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 554
+      "line": 564
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::from_magnitude",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 568
+      "line": 578
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::try_unsigned",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 590
+      "line": 600
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::difference_unsigned",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 608
+      "line": 618
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::I256::checked_neg",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 641
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::I256::checked_add",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 664
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::I256::checked_sub",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 686
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::clone",
@@ -1798,9 +2002,14 @@
       "line": 120
     },
     {
-      "function": "numeric256_harness::arithmetic256::numeric_model::constant_bits",
+      "function": "numeric256_harness::arithmetic256::numeric_model::minimum_bits",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
       "line": 127
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::constant_bits",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 142
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::complement",
@@ -1900,26 +2109,15 @@
     {
       "function": "numeric256_harness::arithmetic256::impl&%34::MAX",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 517
+      "line": 527
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%34::MIN",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 507
+      "line": 517
     }
   ],
   "supporting_obligations": [
-    {
-      "member": "U256::checked_sub",
-      "parameters": [
-        "U256",
-        "U256"
-      ],
-      "result": "Result<U256,Failure>",
-      "meaning": "Exact unsigned difference iff nonnegative; otherwise exactly Overflow. Used before signed narrowing.",
-      "refinement": "numeric256_harness::arithmetic256::impl&%28::checked_sub",
-      "report_function": "numeric256_harness::arithmetic256::number256::U256::checked_sub"
-    },
     {
       "member": "I256::negative_bits",
       "parameters": [

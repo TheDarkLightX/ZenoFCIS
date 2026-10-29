@@ -270,12 +270,18 @@ impl U256 {
             Ok(Self(value))
         }
     }
-}
-
-#[cfg_attr(verus_keep_ghost, verifier::external)]
-impl U256 {
     /// Adds two unsigned values, refusing overflow.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::unsigned_result(result,
+            numeric_model::unsigned(self) + numeric_model::unsigned(other)),
+    ))]
     pub fn checked_add(self, other: Self) -> Result<Self, Failure> {
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::conversion_representation();
+            numeric_model::unsigned_bounds(self);
+            numeric_model::unsigned_bounds(other);
+        }
         let (value, carry) = add(self.0, other.0);
         if carry {
             Err(Failure::Overflow)
@@ -283,6 +289,10 @@ impl U256 {
             Ok(Self(value))
         }
     }
+}
+
+#[cfg_attr(verus_keep_ghost, verifier::external)]
+impl U256 {
     /// Returns the complete 512-bit product of two unsigned values.
     pub fn full_product(self, other: Self) -> Result<U512, Failure> {
         Ok(U512(multiply(self.0, other.0)?))
@@ -624,20 +634,42 @@ impl I256 {
             Self::from_magnitude(a.checked_sub(b)?, false)
         }
     }
-}
-
-#[cfg_attr(verus_keep_ghost, verifier::external)]
-impl I256 {
     /// Negates the value, refusing the minimum signed value.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::signed_result(result, -numeric_model::signed(self)),
+    ))]
     pub fn checked_neg(self) -> Result<Self, Failure> {
-        if self == Self::MIN {
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::conversion_representation();
+            numeric_model::signed_bounds(self);
+            numeric_model::unsigned_bounds(self.0);
+            numeric_model::minimum_bits();
+        }
+        if self.0.0 == Self::MIN.0.0 {
+            #[cfg(verus_keep_ghost)]
+            proof! { assert(numeric_model::signed(self) == -numeric_model::half()); }
             Err(Failure::Overflow)
         } else {
+            #[cfg(verus_keep_ghost)]
+            proof! { assert(numeric_model::signed(self) != -numeric_model::half()); }
             Ok(Self(Self::negative_bits(self.0)))
         }
     }
     /// Adds two signed values, refusing signed overflow.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::signed_result(result,
+            numeric_model::signed(self) + numeric_model::signed(other)),
+    ))]
     pub fn checked_add(self, other: Self) -> Result<Self, Failure> {
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::conversion_representation();
+            numeric_model::signed_bounds(self);
+            numeric_model::signed_bounds(other);
+            numeric_model::unsigned_bounds(self.0);
+            numeric_model::unsigned_bounds(other.0);
+        }
         let (bits, _) = add(self.0.0, other.0.0);
         let result = Self(U256(bits));
         if self.is_negative() == other.is_negative() && result.is_negative() != self.is_negative() {
@@ -647,7 +679,19 @@ impl I256 {
         }
     }
     /// Subtracts two signed values, refusing signed overflow.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::signed_result(result,
+            numeric_model::signed(self) - numeric_model::signed(other)),
+    ))]
     pub fn checked_sub(self, other: Self) -> Result<Self, Failure> {
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::conversion_representation();
+            numeric_model::signed_bounds(self);
+            numeric_model::signed_bounds(other);
+            numeric_model::unsigned_bounds(self.0);
+            numeric_model::unsigned_bounds(other.0);
+        }
         let (bits, _) = subtract(self.0.0, other.0.0);
         let result = Self(U256(bits));
         if self.is_negative() != other.is_negative() && result.is_negative() != self.is_negative() {
@@ -656,6 +700,10 @@ impl I256 {
             Ok(result)
         }
     }
+}
+
+#[cfg_attr(verus_keep_ghost, verifier::external)]
+impl I256 {
     /// Multiplies two signed values, refusing signed overflow.
     pub fn checked_mul(self, other: Self) -> Result<Self, Failure> {
         Self::from_magnitude(

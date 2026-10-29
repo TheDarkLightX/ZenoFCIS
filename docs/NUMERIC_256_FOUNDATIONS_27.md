@@ -248,9 +248,47 @@ Verus/vstd/SMT, integer/array semantics and compiler/ghost-erasure assumptions
 remain explicit. No custom trusted primitive specification is added, and no
 physical runtime-cost bound is established by these refinements.
 
-Other checked add/subtract/negation and the multiply/divide family remain open,
-along with the Schema2 and factory obligations below. `U256` has no public
-`checked_neg` method in this checkpoint.
+### Checked addition, subtraction and negation
+
+The same integer meanings give exact contracts for all five existing checked
+256-bit addition, subtraction and negation methods. Every fitting result must
+succeed with its exact value; every other result must be exactly
+`Failure::Overflow`. The contracts impose no added input precondition.
+
+| Actual method | Mathematical result and accepted range |
+| --- | --- |
+| `U256::checked_add(a, b)` | `U(a) + U(b)` in `[0, 2^256)` |
+| `U256::checked_sub(a, b)` | `U(a) - U(b)` in `[0, 2^256)` |
+| `I256::checked_add(a, b)` | `S(a) + S(b)` in `[-2^255, 2^255)` |
+| `I256::checked_sub(a, b)` | `S(a) - S(b)` in `[-2^255, 2^255)` |
+| `I256::checked_neg(a)` | `-S(a)`; the sole refusal is `S(a) = -2^255` |
+
+These statements are proved for the actual bodies under the stated assumptions.
+Unsigned subtraction retains its already checked conversion-dependency
+contract. The actual carry/borrow helpers and sign tests establish the exact
+overflow partitions; no separate executable arithmetic model replaces them.
+A checked endpoint lemma establishes the unique minimum bit pattern needed
+by the actual negation guard.
+
+That guard compares the same two representation words reached by the preceding
+derived wrapper equality. The comparison keeps the minimum-value refusal and
+introduces no state or interface. A native regression compares the preceding
+guard on 64 boundary word pairs, checks exact zero, minimum and maximum
+outcomes, and checks admitted double negation. This supports the source review;
+it does not prove compiler or ghost-erasure correspondence.
+
+Five additional semantic controls miss unsigned carry/borrow boundary cases,
+use the wrong signed addition/subtraction sign partition, or refuse zero
+instead of the minimum. The complete numeric gate retains all seventeen
+constant, conversion and checked-arithmetic controls. Each must reach its
+intended semantic failure in a whole-harness run, with exact typed/body and
+solver-section coverage and source/tool postchecks.
+
+`U256` has no public `checked_neg` method; none is added. The multiply/divide,
+root and rounding families, `I256::try_i128`, wider arithmetic and wider raw
+constructors/views remain outside this proof scope. So do carry/borrow result
+claims for helper widths other than two limbs, compiler/ghost erasure, physical
+resource costs, and the Schema2 and factory obligations below.
 
 ### Earlier schema checkpoint
 

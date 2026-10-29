@@ -38,6 +38,7 @@ CONSTANTS = {"U256::ZERO", "U256::ONE", "U256::MAX", "I256::ZERO", "I256::MIN",
 CONVERSIONS = {"U256::from_u128", "U256::try_u128", "I256::from_i128", "I256::magnitude",
                "I256::from_magnitude", "I256::try_unsigned", "I256::difference_unsigned",
                "U512::from_u256", "U512::narrow", "U768::from_u256", "U768::narrow"}
+CHECKED = {"U256::checked_add", "U256::checked_sub", "I256::checked_add", "I256::checked_sub", "I256::checked_neg"}
 
 
 def expected_type(name):
@@ -101,13 +102,18 @@ def configuration(root, profile, expected=None):
                 f"untrusted numeric proof escape: {path}")
     require({o["member"] for o in profile["obligations"] if o["stage"] == "constants"}
             == CONSTANTS, "constant obligations incomplete")
-    require({o["stage"] for o in profile["obligations"]}.issubset({"constants", "conversions"}),
-            "unreviewed numeric stage")
-    if any(o["stage"] == "conversions" for o in profile["obligations"]):
+    stages = {o["stage"] for o in profile["obligations"]}
+    require(stages.issubset({"constants", "conversions", "checked"}), "unreviewed numeric stage")
+    if "checked" in stages:
+        require("conversions" in stages and
+                {o["member"] for o in profile["obligations"] if o["stage"] == "checked"} == CHECKED,
+                "checked arithmetic obligations incomplete")
+    if "conversions" in stages:
         require({o["member"] for o in profile["obligations"] if o["stage"] == "conversions"}
                 == CONVERSIONS, "conversion obligations incomplete")
-        require({o["member"] for o in profile.get("supporting_obligations", [])}
-                == {"U256::checked_sub", "I256::negative_bits"}, "conversion dependencies incomplete")
+        expected_support = {"I256::negative_bits"} | (set() if "checked" in stages else {"U256::checked_sub"})
+        require({o["member"] for o in profile.get("supporting_obligations", [])} == expected_support,
+                "conversion dependencies incomplete")
     obligations = profile["obligations"] + profile.get("supporting_obligations", [])
     require(len({o["member"] for o in obligations}) == len(obligations),
             "duplicate numeric obligation")
@@ -129,7 +135,7 @@ def control_sources(root, profile):
         require(control["error_function"] == obligations[control["member"]]["report_function"],
                 "control targets a different refinement")
         first, last = (method_region(source, *control["member"].split("::"))
-                       if control["stage"] == "conversions" else (1, len(source.splitlines())))
+                       if control["stage"] != "constants" else (1, len(source.splitlines())))
         lines = source.splitlines(keepends=True)
         selected = "".join(lines[first - 1:last])
         require(control["old"] and selected.count(control["old"]) == 1

@@ -124,6 +124,21 @@ pub(super) proof fn signed_bounds(value: I256)
     super::number256::ordering_model::signed_bounds(value.0);
 }
 
+pub(super) proof fn minimum_bits()
+    ensures forall|value: I256| #[trigger] signed(value) == -half()
+        ==> value == I256(U256([0, 170141183460469231731687303715884105728u128])),
+{
+    conversion_representation();
+    assert forall|value: I256| #[trigger] signed(value) == -half()
+        implies value == I256(U256([0, 170141183460469231731687303715884105728u128])) by {
+        unsigned_bounds(value.0);
+        assert(unsigned(value.0) == half());
+        assert(value.0.0@[1] == 170141183460469231731687303715884105728u128);
+        assert(value.0.0@[0] == 0);
+        assert(value.0.0 =~= [0u128, 170141183460469231731687303715884105728u128]);
+    }
+}
+
 pub(super) proof fn constant_bits()
     ensures
         unsigned(U256([0, 0])) == 0,
