@@ -113,6 +113,14 @@ TOOLS += [
 ]
 
 
+# Ontology requests are inert documents with their own strict bounded validator.
+# Keep its opaque JSON and integer vocabulary separate from the FSM schemas.
+from zal_notation.ontology_tools import tool_definitions as ontology_definitions
+
+TOOLS += [{"name": tool["name"], "description": tool["description"] + " Authority: none; no behavioral acceptance.",
+           "inputSchema": tool["input_schema"]} for tool in ontology_definitions()]
+
+
 def validate(value, specification, path="arguments"):
     """Enforce the small published tool-schema vocabulary before any action."""
     kind = specification["type"]
@@ -173,6 +181,9 @@ class Bridge:
         tool = next((tool for tool in TOOLS if tool["name"] == name), None)
         if not tool:
             raise Refusal("Unknown tool")
+        if name.startswith("zal_ontology_"):
+            from zal_notation.ontology_tools import dispatch
+            return dispatch(name, arguments)
         validate(arguments, tool["inputSchema"])
         if name.startswith("zal_capture_"):
             from capture_workspace import mcp_call as capture_call

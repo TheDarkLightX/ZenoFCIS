@@ -1,6 +1,6 @@
 ---
 name: zal-authoring
-description: Discuss, inspect, or change precise application behavior through the ZAL MCP tools in a coding harness. Use for a configured ZAL workspace and supported finite control-state models.
+description: Discuss reviewed finite application behavior or explained ontology classifications through ZAL MCP tools in a configured coding harness.
 ---
 
 Use the project's `zal` MCP server for behavior specification. Read
@@ -9,7 +9,11 @@ If setup is absent, use the library's `integrations/zal/setup.py` with the targe
 project; inspect its plan before applying it. Preserve existing configurations,
 skills, workspaces and pending proposals.
 
-Call `zal_read` before proposing or interpreting a revision. Its `model.revision`
+For ontology/library questions, use the separate route below when its tools are
+advertised. An installed server may expose fewer profiles than the development
+source; inspect its capabilities instead of assuming an upgrade is already live.
+
+Call `zal_read` before proposing or interpreting a behavioral revision. Its `model.revision`
 and `object_ids` bind subsequent calls. After a stale refusal or human acceptance,
 read again. Each context supplies every declared observation as a JSON Boolean;
 a fact named `authorized` is an assumption, not authenticated authorization.
@@ -40,7 +44,7 @@ then pass the statement ID and exact revision to `zal_ladder_render`,
 "different normal forms" answer does not show different meanings, and a
 lowered claim is an inert obligation, not evidence.
 
-For a requested change, compare the complete candidate with `zal_compare` and
+For a requested behavior change, compare the complete candidate with `zal_compare` and
 show a concrete distinguishing input. Stage it with `zal_propose` using the exact
 base revision and declared IDs. State the changed behavior and remaining
 requirements plainly. Never silently repair ambiguity or weaken a requirement
@@ -66,7 +70,7 @@ Reviewed meaning/export can retain a displayed example conflict or out-of-domain
 case. State it plainly: corpus binding is not an owner-example pass or a
 machine-proved requirements route.
 
-The current profile is `zal/finite-fsm/1`: flat control labels, enumerated events,
+The behavioral review route above uses `zal/finite-fsm/1`: flat control labels, enumerated events,
 fresh Boolean observations, fixed targets, explicit rejection and state invariants.
 Arithmetic, effects, concurrency, fairness and liveness need explicit unresolved
 obligations or a separately supported contract route. Never approximate these
@@ -77,3 +81,23 @@ factory correspondence and verified execution. A zero-invariant consistency pass
 does not prove an unstated safety or authorization policy. Local shared-file
 review is cooperative; it does not authenticate approval against a same-user
 agent. No ZAL operation authorizes adoption, deployment or publication.
+
+## Ontology and shared structure
+
+Use `zal_ontology_parse` for the admitted controlled-English rules, then
+`zal_ontology_query` or `zal_ontology_classify` on the returned document. Explain
+a classification with `zal_ontology_explain` and its exact fact ID. Report the
+ground premises, rule, ontology digest and run completeness; supplied assertions
+remain assumptions. These self-contained documents do not use the behavioral
+workspace revision and do not record its human acceptance.
+
+Use `zal_ontology_replay` to recompute a retained run after context changes.
+Matching an incomplete or inconsistent run preserves that status. Missing facts
+remain unknown. `zal_ontology_validate_record` checks explicit field syntax;
+conforming receipt text does not establish valid evidence. A shared class can
+suggest a Lens or checker to try, while behavioral equivalence requires its own
+scoped check.
+
+Read `integrations/zal/zal_notation/ONTOLOGY.md` under the source root recorded in
+the install record for the admitted profile and local CLI. General ZAL is not
+restricted to this positive ontology fragment or the finite review profile.

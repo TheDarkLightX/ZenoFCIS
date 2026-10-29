@@ -1,0 +1,26 @@
+Ontology "zal/examples/defi-arithmetic" version 1.
+Description "Shared full-width requirements with distinct signed and unsigned arithmetic needs.".
+Origin {"kind":"illustrative-library-query","scope":"These are supplied requirements and classifications, not arithmetic proofs or an executable DeFi application."}.
+Class "Amount".
+Class "FullWidth".
+Class "Unsigned256".
+Class "Signed256".
+Class "NeedsWideArithmetic".
+Class "NeedsUnsignedArithmetic".
+Class "NeedsSignedArithmetic".
+Property "usesRepresentation".
+Individual "swapBalance".
+Individual "signedPnl".
+Individual "u256".
+Individual "i256".
+Axiom "unsigned-width": every "Unsigned256" is "FullWidth".
+Axiom "signed-width": every "Signed256" is "FullWidth".
+Axiom "wide-requirement": if an individual is "Amount" and has "usesRepresentation" some "FullWidth", then it is "NeedsWideArithmetic".
+Axiom "unsigned-requirement": if an individual is "Amount" and has "usesRepresentation" some "Unsigned256", then it is "NeedsUnsignedArithmetic".
+Axiom "signed-requirement": if an individual is "Amount" and has "usesRepresentation" some "Signed256", then it is "NeedsSignedArithmetic".
+Fact "balance-kind": "swapBalance" is "Amount".
+Fact "pnl-kind": "signedPnl" is "Amount".
+Fact "unsigned-kind": "u256" is "Unsigned256".
+Fact "signed-kind": "i256" is "Signed256".
+Fact "balance-representation": "swapBalance" relates by "usesRepresentation" to "u256".
+Fact "pnl-representation": "signedPnl" relates by "usesRepresentation" to "i256".
