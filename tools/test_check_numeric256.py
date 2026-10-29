@@ -67,10 +67,31 @@ class SourceAdmission(unittest.TestCase):
             with self.subTest(mode=mode), self.assertRaises(ValueError):
                 gate.configuration(self.root, profile)
 
+    def test_conversion_stage_and_its_dependencies_must_be_complete(self):
+        complete = copy.deepcopy(self.profile)
+        producer.include_conversions(complete)
+        gate.configuration(self.root, complete)
+        for mode in ("conversion", "dependency", "duplicate"):
+            profile = copy.deepcopy(complete)
+            if mode == "conversion":
+                profile["obligations"].pop()
+            elif mode == "dependency":
+                profile["supporting_obligations"].pop()
+            else:
+                profile["supporting_obligations"].append(profile["supporting_obligations"][0])
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                gate.configuration(self.root, profile)
+
     def test_controls_change_only_the_declared_production_expression(self):
         original = (self.root / gate.SUBJECT).read_text()
         for control, changed in gate.control_sources(self.root, self.profile):
-            self.assertEqual(changed.replace(control["new"], control["old"], 1), original)
+            first, last = control["error_region"]
+            lines = original.splitlines(keepends=True)
+            selected = "".join(lines[first - 1:last])
+            self.assertEqual(selected.count(control["old"]), 1)
+            self.assertEqual(changed, "".join(lines[:first - 1])
+                             + selected.replace(control["old"], control["new"], 1)
+                             + "".join(lines[last:]))
             profile = copy.deepcopy(self.profile)
             for entry in profile["native_configuration_exceptions"][str(gate.SUBJECT)]:
                 entry["following"] = entry["following"].replace(control["old"], control["new"])
@@ -80,7 +101,7 @@ class SourceAdmission(unittest.TestCase):
         (self.root / gate.SUBJECT).write_text(original)
 
     def test_incomplete_duplicate_noop_and_unbound_controls_refuse(self):
-        for mode in ("incomplete", "duplicate", "noop", "unbound", "ambiguous"):
+        for mode in ("incomplete", "duplicate", "noop", "unbound", "ambiguous", "target"):
             profile = copy.deepcopy(self.profile)
             if mode == "incomplete":
                 profile["controls"] = profile["controls"][:2]
@@ -90,8 +111,10 @@ class SourceAdmission(unittest.TestCase):
                 profile["controls"][0]["new"] = profile["controls"][0]["old"]
             elif mode == "unbound":
                 profile["controls"][0]["member"] = "Unknown::method"
-            else:
+            elif mode == "ambiguous":
                 profile["controls"][0]["old"] = "Self"
+            else:
+                profile["controls"][0]["error_function"] = "wrong::refinement"
             with self.subTest(mode=mode), self.assertRaises(ValueError):
                 gate.control_sources(self.root, profile)
 
@@ -122,7 +145,7 @@ class ProofAdmission(unittest.TestCase):
         return [["Function", ["Fun", ":path", o["refinement"]],
                  ":params", [parameter(gate.expected_type(t)) for t in o["parameters"]],
                  ":ret", parameter(gate.expected_type(o["result"]))]
-                for o in self.profile["obligations"]]
+                for o in self.profile["obligations"] + self.profile.get("supporting_obligations", [])]
 
     def test_complete_report(self):
         self.assertTrue(gate.positive_accepted(self.proc, self.report, self.pin, self.profile))
@@ -173,6 +196,17 @@ class ProofAdmission(unittest.TestCase):
                 mock.patch.object(gate, "parse_vir", return_value=nodes), \
                 self.assertRaisesRegex(ValueError, "full-width types"):
             gate.check_inventory("fixture", self.profile)
+
+    def test_narrow_result_payload_and_wrong_failure_type_refuse(self):
+        for mode in ("payload", "failure"):
+            nodes = self.typed_nodes()
+            node = next(n for n in nodes if n[-1][2] == gate.expected_type("Result<U256,Failure>"))
+            node[-1][2][3][0 if mode == "payload" else 1] = gate.expected_type("u128")
+            with self.subTest(mode=mode), \
+                    mock.patch.object(gate, "inventory", return_value=self.profile["functions"]), \
+                    mock.patch.object(gate, "parse_vir", return_value=nodes), \
+                    self.assertRaisesRegex(ValueError, "full-width types"):
+                gate.check_inventory("fixture", self.profile)
 
     def test_exact_solver_sections_and_query_count(self):
         with tempfile.TemporaryDirectory() as temporary:

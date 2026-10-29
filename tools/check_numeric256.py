@@ -16,7 +16,7 @@ import re
 import shutil
 
 import check_verus as verifier
-from check_ordering_types256 import read, require
+from check_ordering_types256 import method_region, read, require
 from verus_coverage import inventory, parse_vir
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,9 +35,16 @@ SOURCES = (*UNIT, PROFILE, verifier.PIN, Path("tools/check_numeric256.py"),
            Path("tools/verus_coverage.py"), *verifier.QUALIFICATION_SOURCES)
 CONSTANTS = {"U256::ZERO", "U256::ONE", "U256::MAX", "I256::ZERO", "I256::MIN",
              "I256::MAX", "U512::ZERO", "U768::ZERO"}
+CONVERSIONS = {"U256::from_u128", "U256::try_u128", "I256::from_i128", "I256::magnitude",
+               "I256::from_magnitude", "I256::try_unsigned", "I256::difference_unsigned",
+               "U512::from_u256", "U512::narrow", "U768::from_u256", "U768::narrow"}
 
 
 def expected_type(name):
+    if name.startswith("Result<") and name.endswith(",Failure>"):
+        value = name[len("Result<"):-len(",Failure>")]
+        return ["Typ", "Datatype", ["Dt", "Path", "core::result::Result"],
+                [expected_type(value), expected_type("Failure")], []]
     if name in ("U256", "I256", "U512", "U768", "Failure"):
         path = NAMESPACE + "arithmetic256::" + ("number256::" if name in ("U256", "I256") else "") + name
         return ["Typ", "Datatype", ["Dt", "Path", path], [], []]
@@ -87,7 +94,15 @@ def configuration(root, profile, expected=None):
                 f"untrusted numeric proof escape: {path}")
     require({o["member"] for o in profile["obligations"] if o["stage"] == "constants"}
             == CONSTANTS, "constant obligations incomplete")
-    require(len({o["member"] for o in profile["obligations"]}) == len(profile["obligations"]),
+    require({o["stage"] for o in profile["obligations"]}.issubset({"constants", "conversions"}),
+            "unreviewed numeric stage")
+    if any(o["stage"] == "conversions" for o in profile["obligations"]):
+        require({o["member"] for o in profile["obligations"] if o["stage"] == "conversions"}
+                == CONVERSIONS, "conversion obligations incomplete")
+        require({o["member"] for o in profile.get("supporting_obligations", [])}
+                == {"U256::checked_sub", "I256::negative_bits"}, "conversion dependencies incomplete")
+    obligations = profile["obligations"] + profile.get("supporting_obligations", [])
+    require(len({o["member"] for o in obligations}) == len(obligations),
             "duplicate numeric obligation")
     return admitted
 
@@ -104,9 +119,17 @@ def control_sources(root, profile):
         require(control["member"] in obligations
                 and control["stage"] == obligations[control["member"]]["stage"],
                 "control has no corresponding obligation")
-        require(control["old"] and source.count(control["old"]) == 1
-                and control["old"] != control["new"], "ambiguous numeric mutation")
-        result.append((control, source.replace(control["old"], control["new"])))
+        require(control["error_function"] == obligations[control["member"]]["refinement"],
+                "control targets a different refinement")
+        first, last = (method_region(source, *control["member"].split("::"))
+                       if control["stage"] == "conversions" else (1, len(source.splitlines())))
+        lines = source.splitlines(keepends=True)
+        selected = "".join(lines[first - 1:last])
+        require(control["old"] and selected.count(control["old"]) == 1
+                and control["old"] != control["new"], f"ambiguous numeric mutation: {control['name']}")
+        result.append((control, "".join(lines[:first - 1])
+                       + selected.replace(control["old"], control["new"])
+                       + "".join(lines[last:])))
     return result
 
 
@@ -118,7 +141,7 @@ def check_inventory(vir, profile):
             and all("body_sha256" in r for r in actual.values()), "incomplete numeric body coverage")
     nodes = {n[1][2]: n for n in parse_vir(vir)
              if n and n[0] == "Function" and n[1][2] in actual}
-    for obligation in profile["obligations"]:
+    for obligation in profile["obligations"] + profile.get("supporting_obligations", []):
         name = obligation["refinement"]
         require(name in concrete and actual[name]["requires"] == 0
                 and actual[name]["ensures"] > 0, "conditional or missing numeric refinement")

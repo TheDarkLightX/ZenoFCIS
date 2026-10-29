@@ -1,6 +1,6 @@
 //! Integer specifications and refinements of the actual numeric declarations.
-use super::{I256, U256, U512, U768};
 pub(crate) use super::number256::ordering_model::{half, modulus, radix, signed, unsigned};
+use super::{Failure, I256, U256, U512, U768};
 use vstd::prelude::*;
 
 verus! {
@@ -28,6 +28,90 @@ pub open spec fn unsigned768(value: U768) -> int {
     w@[0] as int + radix() * (w@[1] as int + radix() *
         (w@[2] as int + radix() * (w@[3] as int + radix() *
         (w@[4] as int + radix() * w@[5] as int))))
+}
+
+/// The result must succeed on every fitting input and otherwise be Overflow.
+pub open spec fn unsigned_result(result: Result<U256, Failure>, value: int) -> bool {
+    match result {
+        Ok(actual) => 0 <= value < modulus() && unsigned(actual) == value,
+        Err(error) => error == Failure::Overflow && !(0 <= value < modulus()),
+    }
+}
+pub open spec fn signed_result(result: Result<I256, Failure>, value: int) -> bool {
+    match result {
+        Ok(actual) => -half() <= value < half() && signed(actual) == value,
+        Err(error) => error == Failure::Overflow && !(-half() <= value < half()),
+    }
+}
+pub open spec fn word_result(result: Result<u128, Failure>, value: int) -> bool {
+    match result {
+        Ok(actual) => 0 <= value < radix() && actual as int == value,
+        Err(error) => error == Failure::Overflow && !(0 <= value < radix()),
+    }
+}
+
+/// Prefix interpretation for the selected two-limb helper instantiations.
+pub open spec fn prefix2(words: Seq<u128>, count: int) -> int {
+    if count == 0 { 0 } else if count == 1 { words[0] as int }
+    else { words[0] as int + radix() * words[1] as int }
+}
+pub open spec fn place2(count: int) -> int {
+    if count == 0 { 1 } else if count == 1 { radix() } else { modulus() }
+}
+
+pub(super) proof fn complement(word: u128)
+    ensures (!word) as int == u128::MAX as int - word as int,
+{
+    assert(!word == u128::MAX - word) by(bit_vector);
+}
+
+pub(super) proof fn signed_word_cast(word: i128)
+    ensures
+        (word as u128) as int == if word < 0 { word as int + radix() } else { word as int },
+        signed(I256(U256([word as u128, if word < 0 { u128::MAX } else { 0 }]))) == word as int,
+{
+    super::number256::numeric_representation();
+    assert((word as u128) as int ==
+        if word < 0 { word as int + 340282366920938463463374607431768211456int }
+        else { word as int }) by(bit_vector);
+    let bits = U256([word as u128, if word < 0 { u128::MAX } else { 0 }]);
+    if word < 0 {
+        assert(unsigned(bits) == word as int + modulus());
+        assert(unsigned(bits) >= half());
+    } else {
+        assert(unsigned(bits) == word as int);
+        assert(unsigned(bits) < half());
+    }
+}
+
+pub(super) proof fn conversion_representation()
+    ensures
+        forall|value: U256| #[trigger] value.ordering_words() == value.0,
+        forall|value: I256| #[trigger] value.ordering_bits() == value.0,
+        forall|value: U256| #[trigger] unsigned(value)
+            == value.0@[0] as int + radix() * value.0@[1] as int,
+        forall|value: I256| #[trigger] signed(value)
+            == if unsigned(value.0) >= half() {
+                unsigned(value.0) - modulus()
+            } else { unsigned(value.0) },
+        forall|value: U512| #[trigger] value.numeric_words() == value.0,
+        forall|value: U768| #[trigger] value.numeric_words() == value.0,
+{
+    super::number256::numeric_representation();
+    wide_representation();
+}
+
+pub(super) proof fn unsigned_bounds(value: U256)
+    ensures 0 <= unsigned(value) < modulus(),
+{
+    super::number256::ordering_model::unsigned_bounds(value);
+}
+
+pub(super) proof fn signed_bounds(value: I256)
+    ensures -half() <= signed(value) < half(),
+{
+    conversion_representation();
+    super::number256::ordering_model::signed_bounds(value.0);
 }
 
 pub(super) proof fn constant_bits()

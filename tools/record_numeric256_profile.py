@@ -17,6 +17,67 @@ import shutil
 import check_numeric256 as gate
 from verus_coverage import fingerprint, inventory, parse_vir
 import verus_ids
+from check_ordering_types256 import method_region
+
+
+def include_conversions(profile):
+    """Reviewed statements and defects; fingerprints still require a full proof."""
+    statements = [
+        ("U256::from_u128", ["u128"], "U256", "Exact zero extension: unsigned(result) = input."),
+        ("U256::try_u128", ["U256"], "Result<u128,Failure>",
+         "Exact value iff input < 2^128; otherwise exactly Overflow."),
+        ("I256::from_i128", ["i128"], "I256", "Exact sign extension: signed(result) = input."),
+        ("I256::magnitude", ["I256"], "U256", "Exact absolute signed value, including -2^255."),
+        ("I256::from_magnitude", ["U256", "bool"], "Result<I256,Failure>",
+         "Apply the requested sign, accepting zero with either sign; exact value iff in [-2^255,2^255), else Overflow."),
+        ("I256::try_unsigned", ["I256"], "Result<U256,Failure>",
+         "Exact unsigned value iff signed input is nonnegative; otherwise exactly Overflow."),
+        ("I256::difference_unsigned", ["U256", "U256"], "Result<I256,Failure>",
+         "Exact unsigned(a)-unsigned(b) iff the difference fits [-2^255,2^255), else Overflow; no early narrowing."),
+        ("U512::from_u256", ["U256"], "U512", "Exact zero extension into 512 bits."),
+        ("U512::narrow", ["U512"], "Result<U256,Failure>",
+         "Exact value iff every high limb is zero, equivalently input < 2^256; otherwise exactly Overflow."),
+        ("U768::from_u256", ["U256"], "U768", "Exact zero extension into 768 bits."),
+        ("U768::narrow", ["U768"], "Result<U256,Failure>",
+         "Exact value iff every high limb is zero, equivalently input < 2^256; otherwise exactly Overflow."),
+    ]
+    profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != "conversions"] + [
+        {"stage": "conversions", "member": member, "parameters": parameters, "result": result,
+         "meaning": meaning, "refinement_display": gate.NAMESPACE + "arithmetic256::" + member}
+        for member, parameters, result, meaning in statements]
+    profile["supporting_obligations"] = [
+        {"member": "U256::checked_sub", "parameters": ["U256", "U256"], "result": "Result<U256,Failure>",
+         "meaning": "Exact unsigned difference iff nonnegative; otherwise exactly Overflow. Used before signed narrowing."},
+        {"member": "I256::negative_bits", "parameters": ["U256"], "result": "U256",
+         "meaning": "Two-complement bits: zero maps to zero; every nonzero U maps to 2^256-U."},
+    ]
+    defects = [
+        ("unsigned_narrow_accepts_high_one", "U256::try_u128",
+         "self.0[1] == 0", "self.0[1] <= 1"),
+        ("signed_constructor_without_extension", "I256::from_i128",
+         "u128::MAX", "0"),
+        ("signed_magnitude_keeps_negative_bits", "I256::magnitude",
+         "Self::negative_bits(self.0)", "self.0"),
+        ("signed_negative_bound_excludes_minimum", "I256::from_magnitude",
+         "Self::MIN.0", "Self::MAX.0"),
+        ("signed_to_unsigned_wrong_failure", "I256::try_unsigned",
+         "Failure::Overflow", "Failure::Domain"),
+        ("unsigned_difference_wrong_negative_sign", "I256::difference_unsigned",
+         "Self::from_magnitude(b.checked_sub(a)?, true)", "Self::from_magnitude(b.checked_sub(a)?, false)"),
+        ("wide512_narrow_ignores_top_word", "U512::narrow",
+         "self.0[2] == 0 && self.0[3] == 0", "self.0[2] == 0"),
+        ("wide768_narrow_ignores_top_word", "U768::narrow",
+         "self.0[2] == 0 && self.0[3] == 0 && self.0[4] == 0 && self.0[5] == 0",
+         "self.0[2] == 0 && self.0[3] == 0 && self.0[4] == 0"),
+    ]
+    profile["controls"] = [c for c in profile["controls"] if c["stage"] != "conversions"] + [
+        {"stage": "conversions", "name": name, "member": member, "old": old, "new": new,
+         "error_source": str(gate.SUBJECT)} for name, member, old, new in defects]
+    profile["scope"] = (
+        "The eight actual associated constants and eleven public conversions with exact integer values "
+        "and exact Overflow partitions, without public input preconditions. The actual negative_bits and "
+        "U256::checked_sub dependencies and two-limb carry/borrow helper instantiations are refined. "
+        "Other helper widths, other arithmetic and compiler/ghost-erasure correspondence are not proved.")
 
 
 def arithmetic_exceptions(root):
@@ -43,8 +104,7 @@ def arithmetic_exceptions(root):
             {"text": "#[cfg_attr(verus_keep_ghost, verus_verify)]", "following": f"impl {kind} {{",
              "reason": "Verifies only the selected actual numeric constants and methods in this impl block."},
         ])
-    for item in ("fn add<const N: usize>", "fn subtract<const N: usize>",
-                 "fn add_word<const N: usize>", "fn multiply<const A: usize, const B: usize, const O: usize>",
+    for item in ("fn add_word<const N: usize>", "fn multiply<const A: usize, const B: usize, const O: usize>",
                  "fn divide<const N: usize>", "impl U256 {", "impl I256 {", "impl U512 {", "impl U768 {"):
         entries.append({"text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
                         "following": item,
@@ -53,8 +113,10 @@ def arithmetic_exceptions(root):
     return entries
 
 
-def record(root, out, cache, refresh_ordering, previous_source=None):
+def record(root, out, cache, refresh_ordering, previous_source=None, conversions=False):
     profile = json.loads(gate.read(root, gate.PROFILE))
+    if conversions:
+        include_conversions(profile)
     previous = json.loads(gate.read(root, Path("verification/verus/ordering_types256_profile.json")))
     exceptions = {key: entries for key, entries in previous["native_configuration_exceptions"].items()
                   if key != str(gate.SUBJECT) and key != str(Path("verification/verus/ordering256_types_harness.rs"))}
@@ -81,7 +143,7 @@ def record(root, out, cache, refresh_ordering, previous_source=None):
     profile["expected_verified"] = report["verification-results"]["verified"]
     profile["smt_sections"], queries = gate.solver_sections(out / "logs", root)
     gate.require(queries == profile["expected_verified"], "incomplete producer solver logs")
-    for obligation in profile["obligations"]:
+    for obligation in profile["obligations"] + profile.get("supporting_obligations", []):
         member = obligation["member"].rsplit("::", 1)[-1]
         types = ([gate.expected_type(t) for t in obligation["parameters"]],
                  gate.expected_type(obligation["result"]))
@@ -91,14 +153,17 @@ def record(root, out, cache, refresh_ordering, previous_source=None):
         gate.require(len(candidates) == 1, f"ambiguous actual refinement: {obligation['member']}")
         obligation["refinement"] = candidates[0]
     for control in profile["controls"]:
-        # Exact unique mutation expression and enclosing constant contract.
+        # Exact unique mutation expression and enclosing actual declaration contract.
         obligation = next(o for o in profile["obligations"] if o["member"] == control["member"])
         control["error_function"] = obligation["refinement"]
         source = gate.read(root, Path(control["error_source"]))
-        at = source.index(control["old"])
-        before = source.rfind("#[cfg_attr(verus_keep_ghost, verus_spec(", 0, at)
-        gate.require(before >= 0, "control lacks actual constant contract")
-        control["error_region"] = [source.count("\n", 0, before) + 1, source.count("\n", 0, at) + 2]
+        if control["stage"] == "conversions":
+            control["error_region"] = list(method_region(source, *control["member"].split("::")))
+        else:
+            at = source.index(control["old"])
+            before = source.rfind("#[cfg_attr(verus_keep_ghost, verus_spec(", 0, at)
+            gate.require(before >= 0, "control lacks actual declaration contract")
+            control["error_region"] = [source.count("\n", 0, before) + 1, source.count("\n", 0, at) + 2]
     gate.check_inventory(vir, profile)
     gate.smt_coverage(out / "logs", root, profile)
     gate.control_sources(root, profile)
@@ -178,10 +243,13 @@ def main():
     parser.add_argument("--cache", type=Path, default=gate.verifier.cache_directory())
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--refresh-ordering-bindings", action="store_true")
+    parser.add_argument("--include-conversions", action="store_true",
+                        help="Add the reviewed complete conversion stage and its semantic controls")
     parser.add_argument("--previous-source", type=Path,
                         help="Exact previous profile sources, required only for a compiler-ID migration review")
     args = parser.parse_args()
-    record(gate.ROOT, args.out.absolute(), args.cache, args.refresh_ordering_bindings, args.previous_source)
+    record(gate.ROOT, args.out.absolute(), args.cache, args.refresh_ordering_bindings,
+           args.previous_source, args.include_conversions)
 
 
 if __name__ == "__main__":

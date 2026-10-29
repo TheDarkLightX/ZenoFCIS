@@ -226,3 +226,92 @@ fn all_mutation_is_local_and_arguments_remain_owned_values() {
     assert_eq!((a, b), saved);
     assert_eq!(I256::from_magnitude(U256::ZERO, true), Ok(I256::ZERO));
 }
+
+#[test]
+fn limb_helpers_preserve_the_previous_overflowing_operations() {
+    fn previous_add<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
+        let mut out = [0; N];
+        let mut carry = false;
+        for i in 0..N {
+            let (x, p) = a[i].overflowing_add(b[i]);
+            let (x, q) = x.overflowing_add(u128::from(carry));
+            out[i] = x;
+            carry = p || q;
+        }
+        (out, carry)
+    }
+    fn previous_subtract<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
+        let mut out = [0; N];
+        let mut borrow = false;
+        for i in 0..N {
+            let (x, p) = a[i].overflowing_sub(b[i]);
+            let (x, q) = x.overflowing_sub(u128::from(borrow));
+            out[i] = x;
+            borrow = p || q;
+        }
+        (out, borrow)
+    }
+    fn compare<const N: usize>() {
+        let check = |a, b| {
+            assert_eq!(add(a, b), previous_add(a, b));
+            assert_eq!(subtract(a, b), previous_subtract(a, b));
+        };
+        let boundaries = [
+            0,
+            1,
+            2,
+            u64::MAX as u128,
+            1u128 << 127,
+            u128::MAX - 1,
+            u128::MAX,
+        ];
+        for a in boundaries {
+            for b in boundaries {
+                check([a; N], [b; N]);
+            }
+        }
+        if N > 0 {
+            let mut one = [0; N];
+            one[0] = 1;
+            check([u128::MAX; N], one);
+            check([0; N], one);
+        }
+        let mut state = 0x4ed0_dfb2_7a54_6719_d24a_9c15_3351_740bu128;
+        let mut next = || {
+            state ^= state << 7;
+            state ^= state >> 9;
+            state ^= state << 8;
+            state
+        };
+        for _ in 0..512 {
+            check(
+                core::array::from_fn(|_| next()),
+                core::array::from_fn(|_| next()),
+            );
+        }
+    }
+    compare::<0>();
+    compare::<1>();
+    compare::<2>();
+    compare::<3>();
+    compare::<4>();
+    compare::<6>();
+}
+
+#[test]
+fn wide_narrowing_preserves_every_previous_zero_pattern() {
+    for nonzero in [1, 2, 1u128 << 127, u128::MAX] {
+        for mask in 0..16 {
+            let mut words = [u128::MAX, 7, 0, 0, 0, 0];
+            for i in 0..4 {
+                words[i + 2] = if mask & (1 << i) != 0 { nonzero } else { 0 };
+            }
+            let previous = if words[2..].iter().all(|x| *x == 0) {
+                Ok(U256([words[0], words[1]]))
+            } else {
+                Err(Failure::Overflow)
+            };
+            assert_eq!(U768(words).narrow(), previous);
+        }
+    }
+}
