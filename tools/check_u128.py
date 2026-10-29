@@ -23,7 +23,16 @@ def specimens():
     mutant=original[:cut]+once(original[cut:],'ArithmeticOp::Add => a.checked_add(b),','ArithmeticOp::Add => Some(a.wrapping_add(b)),')
     yield 'wrapping-add',path,original,mutant,'u128_checked_arithmetic_oracle'
     path=ROOT/'crates/zeno-fcis-synthesis/src/finite/evaluation/typed.rs';original=path.read_text()
-    mutant=once(original,'u128::try_from(v)','Result::<u128,core::num::TryFromIntError>::Ok(v as u128)')
+    checked_conversion='''                (false, Atom::I128(v)) => {
+                    if v >= 0 {
+                        Ok(Atom::U128(v as u128))
+                    } else {
+                        Err(Failure::Arithmetic)
+                    }
+                }
+'''
+    mutant=once(original,checked_conversion,
+        '                (false, Atom::I128(v)) => Ok(Atom::U128(v as u128)),\n')
     yield 'sign-extension',path,original,mutant,'u128_conversion_boundaries'
     path=ROOT/'crates/zeno-fcis-synthesis/src/finite/value/wide.rs';original=path.read_text()
     mutant=once(original,'    [low, high]\n','    [low, 0]\n')
@@ -31,7 +40,8 @@ def specimens():
 def native(test,path,disable=False):
     disk=subprocess.check_output(['df','-B1G','/'],text=True)
     if shutil.disk_usage('/').free < 6*1024**3: raise RuntimeError('STOP: root below 6 GiB')
-    env=dict(os.environ,CARGO_TARGET_DIR='/tmp/sol-u128/target',CARGO_PROFILE_DEV_DEBUG='0',CARGO_PROFILE_TEST_DEBUG='0',CARGO_BUILD_JOBS='2',CARGO_TERM_COLOR='never')
+    env=dict(os.environ,CARGO_PROFILE_DEV_DEBUG='0',CARGO_PROFILE_TEST_DEBUG='0',CARGO_BUILD_JOBS='2',CARGO_TERM_COLOR='never')
+    env.setdefault('CARGO_TARGET_DIR',str(ROOT/'target'))
     env.pop('U128_DISABLE_COMPARISON',None)
     if disable: env['U128_DISABLE_COMPARISON']='1'
     command=['cargo','+1.97.1','test','--locked','--offline','-j','2','-p','zeno-fcis-contract','--test','u128_contract',test,'--','--exact','--nocapture','--test-threads=1']
