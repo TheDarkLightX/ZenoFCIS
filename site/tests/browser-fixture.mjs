@@ -25,7 +25,7 @@ export class Element extends EventTarget {
   getAttribute(key){return this.attributes[key]??null;}
   matches(selector){
     const compound=selector.replace(/\[[^\]]*\]/g,'');
-    const tag=compound.match(/^[a-z]+/i)?.[0];if(tag&&this.tagName!==tag.toUpperCase())return false;
+    const tag=compound.match(/^[a-z][\w-]*/i)?.[0];if(tag&&this.tagName!==tag.toUpperCase())return false;
     const id=compound.match(/#([\w-]+)/)?.[1];if(id&&this.id!==id)return false;
     for(const [,name] of compound.matchAll(/\.([\w-]+)/g))if(!this.className.split(/\s+/).includes(name))return false;
     for(const [,key,value] of selector.matchAll(/\[([\w-]+)(?:="([^"]*)")?\]/g)){
