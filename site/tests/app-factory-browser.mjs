@@ -49,7 +49,7 @@ try{
  };
  await command('Page.navigate',{url:url+'/'});
  await waitFor(evaluate,`!!document.querySelector('#credential')`,'credential form');
- assert.ok(await evaluate(`document.body.textContent.includes('Sign in required')&&!document.querySelector('[data-region=commands]')`),'signed-out browser offers no commands');
+ assert.ok(await evaluate(`document.querySelector('[data-region=signin] h1')?.textContent==='Sign in'&&document.querySelector('label[for=credential]')?.textContent==='Application credential'&&document.querySelector('#credential')?.type==='password'&&!document.querySelector('[data-region=commands]')`),'signed-out browser offers a labelled credential form without commands');
  assert.equal(await evaluate(`fetch('/state',{cache:'no-store'}).then(r=>r.status)`),401,'no credential is refused by ingress');
  await evaluate(`document.querySelector('#credential').focus()`);await pressKey(command,session,'Enter');
  await waitFor(evaluate,`document.querySelector('[data-region=signin-status]').textContent.includes('Sign-in refused')`,'empty sign-in refusal');

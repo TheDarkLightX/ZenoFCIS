@@ -40,7 +40,15 @@ const settle=async predicate=>{const deadline=Date.now()+5000;while(!predicate()
   await loader.evaluate('https://zenoui.test/ZenoFCIS/zenoui/durable-bootstrap.js');return doc.getElementById('app');
  };
  const root=await open(),submit=value=>{root.querySelector('#credential').value=value;root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true}));};
- assert.match(root.textContent,/Sign in required/);assert.equal(root.querySelector('[data-region="commands"]'),null);assert.equal(requests.length,0);
+ const assertSignIn=element=>{
+  const form=element.querySelector('[data-region="signin"]');assert.ok(form,'sign-in form is present');
+  assert.equal(form.querySelector('h1').textContent,'Sign in');
+  assert.equal(form.querySelector('label').textContent,'Application credential');
+  assert.equal(form.querySelector('label').htmlFor,'credential');
+  assert.equal(form.querySelector('#credential').type,'password');
+  assert.match(form.querySelector('[role="status"]').textContent,/Sign in to review the requests allowed by your access/);
+ };
+ assertSignIn(root);assert.equal(root.querySelector('[data-region="commands"]'),null);assert.equal(requests.length,0);
  submit('');await settle(()=>root.textContent.includes('Sign-in refused'));
  assert.equal(root.querySelector('[data-region="commands"]'),null);assert.equal(requests.length,0,'empty credential never sends');
  submit('00'.repeat(32));await settle(()=>root.textContent.includes('Check your application credential'));
@@ -55,7 +63,7 @@ const settle=async predicate=>{const deadline=Date.now()+5000;while(!predicate()
  const binding={contract:session.contract,principal:session.principal,revision:session.revision,input:observation.before};
  const saved=JSON.stringify({contract:session.contract,principal:session.principal,binding,body:hex(envelope(session.contract,observation.key,session.revision,unhex(observation.command)))});
  storage.setItem(pendingKey,saved);assert.ok(!saved.includes(credential));
- const reopened=await open();assert.match(reopened.textContent,/Sign in required/);assert.equal(reopened.querySelector('[data-region="commands"]'),null);
+ const reopened=await open();assertSignIn(reopened);assert.equal(reopened.querySelector('[data-region="commands"]'),null);
  reopened.querySelector('#credential').value=credential;reopened.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true}));
  await settle(()=>reopened.textContent.includes('A request is unresolved'));assert.equal(reopened.querySelector('[data-region="commands"]'),null);
  reopened.querySelector('button').click();await settle(()=>reopened.textContent.includes('Original request committed at revision'));
