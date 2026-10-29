@@ -476,6 +476,7 @@ integrations/zal/relational_profile/vendor/README.md
 integrations/zal/relational_profile/vendor/SPECIFICATION.md
 integrations/zal/zal_notation/LENSES.md
 integrations/zal/zal_notation/ONTOLOGY.md
+integrations/zal/zal_notation/READING_TYPOGRAPHY.md
 integrations/zal/zal_notation/README.md
 docs/DEVELOPMENT_27.md
 docs/MACHINE_CODE_SYNTHESIS_27.md

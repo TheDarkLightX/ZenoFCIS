@@ -1,0 +1,15 @@
+{
+  "asset_filename": "LinuxLibertine-Regular.otf",
+  "bytes": 505280,
+  "distribution": "https://packages.debian.org/stable/fonts/fonts-linuxlibertine",
+  "family": "Linux Libertine O",
+  "license": "OFL-1.1",
+  "modification": "None. Original OpenType font bytes; the CSS embeds those bytes as a data URL.",
+  "motivation_paper": "https://doi.org/10.1145/3776682",
+  "original_filename": "LinLibertine_R.otf",
+  "paper_pdf_sha256": "7f94fea2183f84a0e537c91270451be0b589d43a0998a05860b76edb400ac77d",
+  "scope": "Prose reading font only; this is not a substitute for the paper\u2019s complete math/typesetting system.",
+  "sha256": "057bbfa1ac76133c8ae596eff0baf1fd662b2b60e830e6d45cfec5d21489eda3",
+  "upstream": "https://linuxlibertine.org/",
+  "version": "5.3.0"
+}

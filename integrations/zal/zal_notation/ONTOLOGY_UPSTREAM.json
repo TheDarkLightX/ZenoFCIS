@@ -8,8 +8,8 @@
       "upstream_sha256": "124d8c4d5ae435faf12d8cd53dc2d8e703937a733d17ac581ee7b04e13a237b4"
     },
     "ontology_browser.py": {
-      "adaptation": "Byte-identical upstream source.",
-      "local_sha256": "88f3be8225dfc552a2ff591081893b692aa546601a6566c7a66c813d86d9e7da",
+      "adaptation": "Original ontology behavior retained; offline Libertine reading style and data-font CSP added after PR168.",
+      "local_sha256": "fa3ee27633f4ede2d8687438555016bc08a03a2b4a6a8f06886a10ac65778a9e",
       "upstream_git_blob": "8e18a3f024be922fd4d04fe085954a776df9eb8b",
       "upstream_path": "experiments/zal-notation-library/zal_notation/ontology_browser.py",
       "upstream_sha256": "88f3be8225dfc552a2ff591081893b692aa546601a6566c7a66c813d86d9e7da"
@@ -98,14 +98,15 @@
     "integrations/zal/zal_notation/__main__.py": "0398a2529b3203a33048206f06551f9ef5df8d72ce8c60d95afd16c9da772889",
     "integrations/zal/zal_notation/sharing.py": "2a753847be7e356c9ed762b317d9d38d3516893c7d08acd6430bcdcb78f5c9cb"
   },
+  "prior_integration_commit": "3a7da94f7318f7b821cb682ce7d5c7d3cebfe9a4",
   "reused_artifact_boundary": {
-    "change": "Unchanged existing local implementation.",
+    "change": "fresh_directory and read_artifact are unchanged from PR168. The enclosing module now embeds a licensed reading font in its stylesheet and binds the added assets in producer identity.",
     "functions": [
       "fresh_directory",
       "read_artifact"
     ],
     "path": "library_lens_browser.py",
-    "sha256": "ae7d43c5af05f0bea2625dd85967f99e17a29d7f9e7a3edea4c1a921231e5ede"
+    "sha256": "1e7cb170233f99119a4f34b457290b19d4fdfb3db82937d841aa15cc26157811"
   },
   "schema": "zal/ontology-components/1",
   "scope": "Source provenance only; local validation and reported upstream evidence remain distinct. No mathematical proof, receipt authenticity, human agreement, deployment or release authority inferred.",
