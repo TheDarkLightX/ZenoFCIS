@@ -31,6 +31,8 @@ class SetupTests(unittest.TestCase):
         claude = json.loads((self.project / ".mcp.json").read_text())
         self.assertEqual(codex["mcp_servers"]["zal"]["args"], claude["mcpServers"]["zal"]["args"])
         self.assertEqual(codex["mcp_servers"]["zal"]["enabled_tools"], result["tools"])
+        self.assertIn("zal_arithmetic_handoff", result["tools"])
+        self.assertIn("zal_arithmetic_replay", result["tools"])
         workspace = Path(result["workspace"])
         self.assertEqual(workspace.stat().st_mode & 0o777, 0o600)
         self.assertEqual(workspace.parent.stat().st_mode & 0o777, 0o700)

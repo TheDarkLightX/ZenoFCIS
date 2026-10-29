@@ -495,3 +495,4 @@ docs/zal/diagrams/observations/relational_leak.english.txt
 docs/zal/diagrams/observations/relational_leak.json
 docs/zal/diagrams/observations/relational_leak.paired.svg
 docs/NUMERIC_256_FOUNDATIONS_27.md
+docs/ONTOLOGY_ARITHMETIC_HANDOFF.md

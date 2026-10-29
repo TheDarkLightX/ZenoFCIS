@@ -1,0 +1,4 @@
+{
+  "stdout_sha256": "80d77b077e8e32e99bba4af532989a257114be3820383aaaac1d1852b33db522",
+  "stdout": "\nrunning 3 tests\ntest independent_vectors ... ok\ntest requirements_select_actual_schema_types ... ok\ntest schema_ranges_and_nominal_refusals ... FAILED\n\nfailures:\n\n---- schema_ranges_and_nominal_refusals stdout ----\n\nthread 'schema_ranges_and_nominal_refusals' (348) panicked at crates/zeno-fcis-schema/tests/ontology_arithmetic_handoff.rs:120:13:\nassertion `left == right` failed\n  left: Ok(ValidationReport { nodes: 1, maximum_depth: 0 })\n right: Err(TypeMismatch)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    schema_ranges_and_nominal_refusals\n\ntest result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n\n"
+}

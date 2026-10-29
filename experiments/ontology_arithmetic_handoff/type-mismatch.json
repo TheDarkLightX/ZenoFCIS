@@ -1,0 +1,773 @@
+{
+  "assumptions": [
+    "The supplied ontology expresses the intended requirements.",
+    "The Needs-prefixed requirement vocabulary is interpreted only by this versioned mapping policy.",
+    "A complete consistent closure establishes conditional entailment in the admitted profile, not completeness of human requirements."
+  ],
+  "authority": "none",
+  "classification": {
+    "absence": "not-derived is unknown, never a negative class or property assertion",
+    "authority": "none",
+    "checker": "zal.ontology-closure/1",
+    "complete": true,
+    "consistency": "consistent",
+    "facts": [
+      {
+        "id": "f-0e47ab4ca9b52e9f87e0f254cf14c5a3aa16443dab4a5abaeb7e02452770dbb4",
+        "kind": "property",
+        "object": "i256",
+        "property": "usesRepresentation",
+        "subject": "signedPnl"
+      },
+      {
+        "id": "f-fba6872ffb6bd59569fa83d487430d24b6af1dff8191ff0cb5b71f5b2ee85db3",
+        "kind": "property",
+        "object": "u256",
+        "property": "usesRepresentation",
+        "subject": "swapBalance"
+      },
+      {
+        "class": "FullWidth",
+        "id": "f-0ee302b4c057ca20a855432b5900f52c0a1eab20d7c389a41cc4ef9c72292853",
+        "individual": "i256",
+        "kind": "type"
+      },
+      {
+        "class": "Signed256",
+        "id": "f-cd37fcf5f6ab22b1594e407879bd027210f2ecb1b908f09afea9b58968b9d890",
+        "individual": "i256",
+        "kind": "type"
+      },
+      {
+        "class": "Amount",
+        "id": "f-947d1f9226a3511b0a20fd493f4d18b7a352e2adf909e5b63f3bbd6ba2404569",
+        "individual": "signedPnl",
+        "kind": "type"
+      },
+      {
+        "class": "NeedsSignedArithmetic",
+        "id": "f-1e74b297823e6e7eba8aa007df942824d33a5e22231457cc365594cf086860d4",
+        "individual": "signedPnl",
+        "kind": "type"
+      },
+      {
+        "class": "NeedsWideArithmetic",
+        "id": "f-e1dc3cf576bd6b6679604ee0835e5368df0a312e10dc90af9e5a7a4730b89fb7",
+        "individual": "signedPnl",
+        "kind": "type"
+      },
+      {
+        "class": "Amount",
+        "id": "f-0ccfab157ce3ff65d5f17b8f27323a50b965110a8732238871faf770f3405b20",
+        "individual": "swapBalance",
+        "kind": "type"
+      },
+      {
+        "class": "NeedsUnsignedArithmetic",
+        "id": "f-106b218731ff6d31def10c6ab5639fbaa53e9e491a6190fb0d68fb078e983448",
+        "individual": "swapBalance",
+        "kind": "type"
+      },
+      {
+        "class": "NeedsWideArithmetic",
+        "id": "f-f1d7d6913df01cf46c0b274703cd2a1ada6c6a77c166e1666f190f8ad96a7e67",
+        "individual": "swapBalance",
+        "kind": "type"
+      },
+      {
+        "class": "FullWidth",
+        "id": "f-189f87cb7f149012c7b381c6ef2b044e1d97ca0350c7572a9876b3e41df49c68",
+        "individual": "u256",
+        "kind": "type"
+      },
+      {
+        "class": "Unsigned256",
+        "id": "f-370b72b37d27a2b0ed75c00560bb9db974178f8d5520521f153f56f20ab7c619",
+        "individual": "u256",
+        "kind": "type"
+      }
+    ],
+    "limits": {
+      "max_facts": 1024,
+      "max_work": 1000000
+    },
+    "ontology_digest": "281aa39b172fc5e5a50cfb20551301e88b8b8dd5d421b225e2ed813cf97b9089",
+    "profile": "zal.ontology/positive-rl/1",
+    "proofs": [
+      {
+        "assertion": "pnl-representation",
+        "axiom": null,
+        "fact": "f-0e47ab4ca9b52e9f87e0f254cf14c5a3aa16443dab4a5abaeb7e02452770dbb4",
+        "premises": [],
+        "rule": "asserted"
+      },
+      {
+        "assertion": "balance-representation",
+        "axiom": null,
+        "fact": "f-fba6872ffb6bd59569fa83d487430d24b6af1dff8191ff0cb5b71f5b2ee85db3",
+        "premises": [],
+        "rule": "asserted"
+      },
+      {
+        "assertion": null,
+        "axiom": "signed-width",
+        "fact": "f-0ee302b4c057ca20a855432b5900f52c0a1eab20d7c389a41cc4ef9c72292853",
+        "premises": [
+          "f-cd37fcf5f6ab22b1594e407879bd027210f2ecb1b908f09afea9b58968b9d890"
+        ],
+        "rule": "subclass"
+      },
+      {
+        "assertion": "signed-kind",
+        "axiom": null,
+        "fact": "f-cd37fcf5f6ab22b1594e407879bd027210f2ecb1b908f09afea9b58968b9d890",
+        "premises": [],
+        "rule": "asserted"
+      },
+      {
+        "assertion": "pnl-kind",
+        "axiom": null,
+        "fact": "f-947d1f9226a3511b0a20fd493f4d18b7a352e2adf909e5b63f3bbd6ba2404569",
+        "premises": [],
+        "rule": "asserted"
+      },
+      {
+        "assertion": null,
+        "axiom": "signed-requirement",
+        "fact": "f-1e74b297823e6e7eba8aa007df942824d33a5e22231457cc365594cf086860d4",
+        "premises": [
+          "f-0e47ab4ca9b52e9f87e0f254cf14c5a3aa16443dab4a5abaeb7e02452770dbb4",
+          "f-947d1f9226a3511b0a20fd493f4d18b7a352e2adf909e5b63f3bbd6ba2404569",
+          "f-cd37fcf5f6ab22b1594e407879bd027210f2ecb1b908f09afea9b58968b9d890"
+        ],
+        "rule": "classify"
+      },
+      {
+        "assertion": null,
+        "axiom": "wide-requirement",
+        "fact": "f-e1dc3cf576bd6b6679604ee0835e5368df0a312e10dc90af9e5a7a4730b89fb7",
+        "premises": [
+          "f-0e47ab4ca9b52e9f87e0f254cf14c5a3aa16443dab4a5abaeb7e02452770dbb4",
+          "f-0ee302b4c057ca20a855432b5900f52c0a1eab20d7c389a41cc4ef9c72292853",
+          "f-947d1f9226a3511b0a20fd493f4d18b7a352e2adf909e5b63f3bbd6ba2404569"
+        ],
+        "rule": "classify"
+      },
+      {
+        "assertion": "balance-kind",
+        "axiom": null,
+        "fact": "f-0ccfab157ce3ff65d5f17b8f27323a50b965110a8732238871faf770f3405b20",
+        "premises": [],
+        "rule": "asserted"
+      },
+      {
+        "assertion": null,
+        "axiom": "unsigned-requirement",
+        "fact": "f-106b218731ff6d31def10c6ab5639fbaa53e9e491a6190fb0d68fb078e983448",
+        "premises": [
+          "f-0ccfab157ce3ff65d5f17b8f27323a50b965110a8732238871faf770f3405b20",
+          "f-370b72b37d27a2b0ed75c00560bb9db974178f8d5520521f153f56f20ab7c619",
+          "f-fba6872ffb6bd59569fa83d487430d24b6af1dff8191ff0cb5b71f5b2ee85db3"
+        ],
+        "rule": "classify"
+      },
+      {
+        "assertion": null,
+        "axiom": "wide-requirement",
+        "fact": "f-f1d7d6913df01cf46c0b274703cd2a1ada6c6a77c166e1666f190f8ad96a7e67",
+        "premises": [
+          "f-0ccfab157ce3ff65d5f17b8f27323a50b965110a8732238871faf770f3405b20",
+          "f-189f87cb7f149012c7b381c6ef2b044e1d97ca0350c7572a9876b3e41df49c68",
+          "f-fba6872ffb6bd59569fa83d487430d24b6af1dff8191ff0cb5b71f5b2ee85db3"
+        ],
+        "rule": "classify"
+      },
+      {
+        "assertion": null,
+        "axiom": "unsigned-width",
+        "fact": "f-189f87cb7f149012c7b381c6ef2b044e1d97ca0350c7572a9876b3e41df49c68",
+        "premises": [
+          "f-370b72b37d27a2b0ed75c00560bb9db974178f8d5520521f153f56f20ab7c619"
+        ],
+        "rule": "subclass"
+      },
+      {
+        "assertion": "unsigned-kind",
+        "axiom": null,
+        "fact": "f-370b72b37d27a2b0ed75c00560bb9db974178f8d5520521f153f56f20ab7c619",
+        "premises": [],
+        "rule": "asserted"
+      }
+    ],
+    "schema": "zal.ontology-classification/1",
+    "scope": "Named ground type/property closure of the admitted positive RL fragment; disjointness contradictions only; no full OWL entailment, code equivalence, receipt validation or authority.",
+    "source_identity": {
+      "checker": "zal.ontology-closure/1",
+      "ontology_digest": "281aa39b172fc5e5a50cfb20551301e88b8b8dd5d421b225e2ed813cf97b9089",
+      "profile": "zal.ontology/positive-rl/1"
+    },
+    "status": "classified",
+    "types": {
+      "i256": [
+        "FullWidth",
+        "Signed256"
+      ],
+      "signedPnl": [
+        "Amount",
+        "NeedsSignedArithmetic",
+        "NeedsWideArithmetic"
+      ],
+      "swapBalance": [
+        "Amount",
+        "NeedsUnsignedArithmetic",
+        "NeedsWideArithmetic"
+      ],
+      "u256": [
+        "FullWidth",
+        "Unsigned256"
+      ]
+    },
+    "usage": {
+      "facts": 12,
+      "processed_facts": 12,
+      "work": 152
+    }
+  },
+  "execution_policy": "replay_argv_is_untrusted_data_never_execute_from_validation",
+  "nonclaims": [
+    "Arithmetic correctness from inference",
+    "Execution or publication authorization",
+    "Schema2 implementation refinement",
+    "Complete DeFi application correctness"
+  ],
+  "ontology_digest": "281aa39b172fc5e5a50cfb20551301e88b8b8dd5d421b225e2ed813cf97b9089",
+  "requirements": [
+    {
+      "authority": "none",
+      "binding": {
+        "individual": "signedPnl",
+        "target": "U256",
+        "type_id": 2
+      },
+      "obligations": [
+        {
+          "authority": "none",
+          "conclusion": "The supplied target equals the discovered nominal type.",
+          "evidence": [],
+          "id": "r-5703694d665cd2c8f14cf1bb75149ba5e91f30e4ad0d2167697672f8fff5de48/nominal-binding",
+          "interfaces": [],
+          "kind": "nominal-binding",
+          "quantifiers": "This supplied binding only.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "refuted",
+          "witness": {
+            "required": "I256",
+            "supplied": "U256"
+          }
+        },
+        {
+          "authority": "none",
+          "conclusion": "Constructors and views preserve all 256 bits; is_negative agrees with the two's-complement integer sign.",
+          "evidence": [],
+          "id": "r-5703694d665cd2c8f14cf1bb75149ba5e91f30e4ad0d2167697672f8fff5de48/representation",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-value/src/profile2/number256.rs",
+              "symbols": [
+                "U256::from_words_le",
+                "I256::from_bits",
+                "I256::bits",
+                "I256::is_negative"
+              ]
+            }
+          ],
+          "kind": "representation",
+          "quantifiers": "For every lo, hi in [0, 2^128), without preconditions.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "cmp(a,b) equals comparison of the mathematical interpretations.",
+          "evidence": [],
+          "id": "r-5703694d665cd2c8f14cf1bb75149ba5e91f30e4ad0d2167697672f8fff5de48/numeric-order",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-value/src/profile2/number256.rs",
+              "symbols": [
+                "I256::cmp"
+              ]
+            }
+          ],
+          "kind": "numeric-order",
+          "quantifiers": "For all representable a and b of the selected nominal type.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "Successful Schema::try_new implies normalized, closed, acyclic definitions under the supplied caps.",
+          "evidence": [],
+          "id": "r-5703694d665cd2c8f14cf1bb75149ba5e91f30e4ad0d2167697672f8fff5de48/schema-C0",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-schema/src/profile2/model.rs",
+              "symbols": [
+                "Schema::try_new",
+                "TypeKind::I256"
+              ]
+            }
+          ],
+          "kind": "schema-C0",
+          "quantifiers": "All supplied Schema2 definitions and limits; implementation refinement remains open.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "Successful admission implies the exact nominal kind and inclusive numeric range; the owned witness retains the exact value and report.",
+          "evidence": [],
+          "id": "r-5703694d665cd2c8f14cf1bb75149ba5e91f30e4ad0d2167697672f8fff5de48/schema-S1",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-schema/src/profile2/validate.rs",
+              "symbols": [
+                "Schema::validate_value",
+                "Schema::validate_root"
+              ]
+            },
+            {
+              "path": "crates/zeno-fcis-schema/src/profile2/envelope.rs",
+              "symbols": [
+                "SchemaAdmittedEnvelope::try_new"
+              ]
+            }
+          ],
+          "kind": "schema-S1",
+          "quantifiers": "All recursive Value2 inputs and explicit validation limits; finite scalar tests are insufficient.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "Expected-envelope admission consumes complete canonical codec2 bytes and preserves selected type, schema identity, admission and refusal precedence.",
+          "evidence": [],
+          "id": "r-5703694d665cd2c8f14cf1bb75149ba5e91f30e4ad0d2167697672f8fff5de48/schema-S2",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-schema/src/profile2/envelope.rs",
+              "symbols": [
+                "SchemaAdmittedEnvelope::decode_expected",
+                "SchemaAdmittedEnvelope::try_from_envelope"
+              ]
+            }
+          ],
+          "kind": "schema-S2",
+          "quantifiers": "All byte strings, expected schemas and decoding/validation limits.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "The explicit profile2 route is disjoint from legacy/default admission and retains resource boundaries.",
+          "evidence": [],
+          "id": "r-5703694d665cd2c8f14cf1bb75149ba5e91f30e4ad0d2167697672f8fff5de48/schema-S3",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-schema/src/profile2/mod.rs",
+              "symbols": [
+                "SchemaProfile::VALUE2"
+              ]
+            },
+            {
+              "path": "crates/zeno-fcis-value/src/profile2/value.rs",
+              "symbols": [
+                "Value::try_into_legacy"
+              ]
+            }
+          ],
+          "kind": "schema-S3",
+          "quantifiers": "All legacy and profile2 inputs; no implicit narrowing or signedness coercion.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "Actual constructors, comparison, nominal Schema2 admission and envelope identity agree with the independent retained integer vectors.",
+          "evidence": [],
+          "id": "r-5703694d665cd2c8f14cf1bb75149ba5e91f30e4ad0d2167697672f8fff5de48/native-corpus",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-schema/tests/ontology_arithmetic_handoff.rs",
+              "symbols": [
+                "independent_vectors",
+                "requirements_select_actual_schema_types"
+              ]
+            }
+          ],
+          "kind": "native-corpus",
+          "quantifiers": "Only the deterministic corpus and explicit negative controls, not the full 256-bit domain.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "Select each required arithmetic operation and specify overflow, refusal, rounding and resource contracts before proving its implementation.",
+          "evidence": [],
+          "id": "r-5703694d665cd2c8f14cf1bb75149ba5e91f30e4ad0d2167697672f8fff5de48/operation-contracts",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+              "symbols": []
+            }
+          ],
+          "kind": "operation-contracts",
+          "quantifiers": "Unspecified: these ontology examples do not select addition, multiplication, division or a financial transition.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        }
+      ],
+      "requirement_id": "r-5703694d665cd2c8f14cf1bb75149ba5e91f30e4ad0d2167697672f8fff5de48",
+      "status": "type-mismatch",
+      "type_requirement": {
+        "bits": 256,
+        "classes": [
+          "NeedsSignedArithmetic",
+          "NeedsWideArithmetic"
+        ],
+        "fact_ids": [
+          "f-1e74b297823e6e7eba8aa007df942824d33a5e22231457cc365594cf086860d4",
+          "f-e1dc3cf576bd6b6679604ee0835e5368df0a312e10dc90af9e5a7a4730b89fb7"
+        ],
+        "features": [
+          "value-profile-2",
+          "schema-profile-2"
+        ],
+        "interpretation": "u = lo + 2^128 * hi; value = u if u < 2^255 else u - 2^256",
+        "maximum": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+        "minimum": "-57896044618658097711785492504343953926634992332820282019728792003956564819968",
+        "nominal_type": "I256",
+        "rust_type": "zeno_fcis_value::profile2::I256",
+        "schema_kind": "TypeKind::I256",
+        "schema_profile": "SchemaProfile::VALUE2",
+        "schema_type_id": 2,
+        "signed": true,
+        "value_constructor": "Value::signed256"
+      },
+      "unsupported_requirements": []
+    },
+    {
+      "authority": "none",
+      "binding": {
+        "individual": "swapBalance",
+        "target": "I256",
+        "type_id": 1
+      },
+      "obligations": [
+        {
+          "authority": "none",
+          "conclusion": "The supplied target equals the discovered nominal type.",
+          "evidence": [],
+          "id": "r-b3037bc82b9d1109556a9282a978bc45cf378a18b85ab795bbbc36463573331c/nominal-binding",
+          "interfaces": [],
+          "kind": "nominal-binding",
+          "quantifiers": "This supplied binding only.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "refuted",
+          "witness": {
+            "required": "U256",
+            "supplied": "I256"
+          }
+        },
+        {
+          "authority": "none",
+          "conclusion": "Constructors and views preserve all 256 bits.",
+          "evidence": [],
+          "id": "r-b3037bc82b9d1109556a9282a978bc45cf378a18b85ab795bbbc36463573331c/representation",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-value/src/profile2/number256.rs",
+              "symbols": [
+                "U256::from_words_le",
+                "U256::words_le"
+              ]
+            }
+          ],
+          "kind": "representation",
+          "quantifiers": "For every lo, hi in [0, 2^128), without preconditions.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "cmp(a,b) equals comparison of the mathematical interpretations.",
+          "evidence": [],
+          "id": "r-b3037bc82b9d1109556a9282a978bc45cf378a18b85ab795bbbc36463573331c/numeric-order",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-value/src/profile2/number256.rs",
+              "symbols": [
+                "U256::cmp"
+              ]
+            }
+          ],
+          "kind": "numeric-order",
+          "quantifiers": "For all representable a and b of the selected nominal type.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "Successful Schema::try_new implies normalized, closed, acyclic definitions under the supplied caps.",
+          "evidence": [],
+          "id": "r-b3037bc82b9d1109556a9282a978bc45cf378a18b85ab795bbbc36463573331c/schema-C0",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-schema/src/profile2/model.rs",
+              "symbols": [
+                "Schema::try_new",
+                "TypeKind::U256"
+              ]
+            }
+          ],
+          "kind": "schema-C0",
+          "quantifiers": "All supplied Schema2 definitions and limits; implementation refinement remains open.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "Successful admission implies the exact nominal kind and inclusive numeric range; the owned witness retains the exact value and report.",
+          "evidence": [],
+          "id": "r-b3037bc82b9d1109556a9282a978bc45cf378a18b85ab795bbbc36463573331c/schema-S1",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-schema/src/profile2/validate.rs",
+              "symbols": [
+                "Schema::validate_value",
+                "Schema::validate_root"
+              ]
+            },
+            {
+              "path": "crates/zeno-fcis-schema/src/profile2/envelope.rs",
+              "symbols": [
+                "SchemaAdmittedEnvelope::try_new"
+              ]
+            }
+          ],
+          "kind": "schema-S1",
+          "quantifiers": "All recursive Value2 inputs and explicit validation limits; finite scalar tests are insufficient.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "Expected-envelope admission consumes complete canonical codec2 bytes and preserves selected type, schema identity, admission and refusal precedence.",
+          "evidence": [],
+          "id": "r-b3037bc82b9d1109556a9282a978bc45cf378a18b85ab795bbbc36463573331c/schema-S2",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-schema/src/profile2/envelope.rs",
+              "symbols": [
+                "SchemaAdmittedEnvelope::decode_expected",
+                "SchemaAdmittedEnvelope::try_from_envelope"
+              ]
+            }
+          ],
+          "kind": "schema-S2",
+          "quantifiers": "All byte strings, expected schemas and decoding/validation limits.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "The explicit profile2 route is disjoint from legacy/default admission and retains resource boundaries.",
+          "evidence": [],
+          "id": "r-b3037bc82b9d1109556a9282a978bc45cf378a18b85ab795bbbc36463573331c/schema-S3",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-schema/src/profile2/mod.rs",
+              "symbols": [
+                "SchemaProfile::VALUE2"
+              ]
+            },
+            {
+              "path": "crates/zeno-fcis-value/src/profile2/value.rs",
+              "symbols": [
+                "Value::try_into_legacy"
+              ]
+            }
+          ],
+          "kind": "schema-S3",
+          "quantifiers": "All legacy and profile2 inputs; no implicit narrowing or signedness coercion.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "Actual constructors, comparison, nominal Schema2 admission and envelope identity agree with the independent retained integer vectors.",
+          "evidence": [],
+          "id": "r-b3037bc82b9d1109556a9282a978bc45cf378a18b85ab795bbbc36463573331c/native-corpus",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-schema/tests/ontology_arithmetic_handoff.rs",
+              "symbols": [
+                "independent_vectors",
+                "requirements_select_actual_schema_types"
+              ]
+            }
+          ],
+          "kind": "native-corpus",
+          "quantifiers": "Only the deterministic corpus and explicit negative controls, not the full 256-bit domain.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        },
+        {
+          "authority": "none",
+          "conclusion": "Select each required arithmetic operation and specify overflow, refusal, rounding and resource contracts before proving its implementation.",
+          "evidence": [],
+          "id": "r-b3037bc82b9d1109556a9282a978bc45cf378a18b85ab795bbbc36463573331c/operation-contracts",
+          "interfaces": [
+            {
+              "path": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+              "symbols": []
+            }
+          ],
+          "kind": "operation-contracts",
+          "quantifiers": "Unspecified: these ontology examples do not select addition, multiplication, division or a financial transition.",
+          "source_binding_digest": "f5c80688660a608443f3096461e50a65aa04cbe3c44118dc41a0a30992e809e0",
+          "status": "open",
+          "witness": null
+        }
+      ],
+      "requirement_id": "r-b3037bc82b9d1109556a9282a978bc45cf378a18b85ab795bbbc36463573331c",
+      "status": "type-mismatch",
+      "type_requirement": {
+        "bits": 256,
+        "classes": [
+          "NeedsUnsignedArithmetic",
+          "NeedsWideArithmetic"
+        ],
+        "fact_ids": [
+          "f-106b218731ff6d31def10c6ab5639fbaa53e9e491a6190fb0d68fb078e983448",
+          "f-f1d7d6913df01cf46c0b274703cd2a1ada6c6a77c166e1666f190f8ad96a7e67"
+        ],
+        "features": [
+          "value-profile-2",
+          "schema-profile-2"
+        ],
+        "interpretation": "lo + 2^128 * hi",
+        "maximum": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "minimum": "0",
+        "nominal_type": "U256",
+        "rust_type": "zeno_fcis_value::profile2::U256",
+        "schema_kind": "TypeKind::U256",
+        "schema_profile": "SchemaProfile::VALUE2",
+        "schema_type_id": 1,
+        "signed": false,
+        "value_constructor": "Value::unsigned256"
+      },
+      "unsupported_requirements": []
+    }
+  ],
+  "schema": "zeno-fcis/ontology-arithmetic-handoff/1",
+  "source_binding": {
+    "bridge": {
+      "arithmetic_handoff.py": "5c9066cc477573e8a107f94a2b8a86f34db5f5064e71930d48b164ec26fa3799",
+      "arithmetic_handoff_sources.json": "72b1d01f088becd865cee659a76429d5abdb6a3db01a329539e61f62a4d69e06",
+      "arithmetic_handoff_tools.py": "a706453db1f8d042a18b3cca9e8a17375b7c4269eba9eecc4cece8f41fc68cce",
+      "mcp.py": "cc08683eba02481aeedebf94e28b9d5e6717ff5083effd05190eb051eb830f82",
+      "zal_notation/__main__.py": "f8f613db728896a3720374c5a2d8a005fd427379070d621791eb2dbf8db82dbf"
+    },
+    "contracts": {
+      "base_revision": "3a7da94f7318f7b821cb682ce7d5c7d3cebfe9a4",
+      "files": {
+        ".cargo/config.toml": "617c13aecf5b5eb08def4c002a76c19312b4b5bb1d5651cedd27f8db624e75cc",
+        "Cargo.lock": "c7b2161a386610144e5f23ecd05ea304a71d6c910edc11bc3387021956518ba7",
+        "Cargo.toml": "0e73f02a7aa80134a65b00d0f7942b98076c3bae76673f14ef8d501e52913d1e",
+        "crates/zeno-fcis-codec/Cargo.toml": "8b468f921361bd679baeb4e7e466c04a6230f84296f9b67a3dfbc45e7a12442e",
+        "crates/zeno-fcis-codec/src/artifact.rs": "3bd613e822e8fa6ef54a15c6d53fa528824b20bfc2ddd681327955e8511cdf41",
+        "crates/zeno-fcis-codec/src/collection_limits.rs": "2b40147aed78a65ecee5514d5bb2b321f8e1a0769b3c83aa3493b4a1e2b8c408",
+        "crates/zeno-fcis-codec/src/decoder_bytes.rs": "9f7290924bc307d06aa98fd66c30c77c7d0ecfa4f591d1a2c48c7c8b418a1035",
+        "crates/zeno-fcis-codec/src/decoder_induction.rs": "7c283513190f3a93f9875e2a9a22669606c1776bff711dafd7e60efeffaf723f",
+        "crates/zeno-fcis-codec/src/decoder_refinement.rs": "360b68704c058847684c89fb74b599e92dbd47021728256f5656da1f4602759e",
+        "crates/zeno-fcis-codec/src/decoder_spec.rs": "cfa5e94028fc022feb379a8c583628a572ec19d130775dff06a5ed8ca6c41a0d",
+        "crates/zeno-fcis-codec/src/domains.rs": "f4e006cc6ec0294e9af982f909a7a001f73448b70891d3ea423524b2476f71f5",
+        "crates/zeno-fcis-codec/src/lib.rs": "3bfc4893d883de4400ee8b0fdc6293efbe241eda150f0f8281aeaab2cb998d3b",
+        "crates/zeno-fcis-codec/src/profile2.rs": "cae0ac71647cd16a2833fe19a06eb5357fc050216f2dca2926a3c26db14e7a6e",
+        "crates/zeno-fcis-codec/src/profile2/tests.rs": "98e62f38094c69ce698468fe604a448a8d17d3c5e44c7b25b2d8a36f873a299a",
+        "crates/zeno-fcis-codec/src/providers.rs": "412e23fc2847f9b186e02547a1d466ab474db219e78810eeaf49e3eb12f0f926",
+        "crates/zeno-fcis-schema/Cargo.toml": "e5fb9fe57c7add650b12a5c15826889cd106cafe6fb5baf96831fd65fca59158",
+        "crates/zeno-fcis-schema/src/encoding.rs": "b945d5d8c8c10efe049dffd24bdf07be7d64c2d6242a7514143da2b42977d29e",
+        "crates/zeno-fcis-schema/src/envelope.rs": "4e652a12d7901601bcf8396c02a0d886960e240e4f2e281785d25994c8b96324",
+        "crates/zeno-fcis-schema/src/error.rs": "425642bebb82365d4830c11a0017757803940e78026ab93148cfd12395b24a61",
+        "crates/zeno-fcis-schema/src/ids.rs": "dedf004c04ce5dbf0409e2f73f645a2193dde776d68cd642f4454571d0495fc9",
+        "crates/zeno-fcis-schema/src/lib.rs": "3e25698ba66b9a76e15fbe6c8983aed447482c26408ce25ae69b30e4071d963d",
+        "crates/zeno-fcis-schema/src/model.rs": "57c12dd409cd806557489da0709922aa0b97c1c3953ed5ef80711daab3b61c18",
+        "crates/zeno-fcis-schema/src/profile2/encoding.rs": "48f7a8e231fa0689d640e408722bc6413baf7d8d39008edb145c271fc41dba78",
+        "crates/zeno-fcis-schema/src/profile2/envelope.rs": "d12bd02d3088a7bbb5a06a4ffd7e29971684edfbc6a3ef6d03a662021f60c627",
+        "crates/zeno-fcis-schema/src/profile2/mod.rs": "18d5e54d1dbd0c8f635d7782ba1d7166ef540477ee31e56dfdc0c9eeca3c77d7",
+        "crates/zeno-fcis-schema/src/profile2/model.rs": "dade22fb058abf78ab8699e8affe6b4f2d310b25206d8a03613353960e732c2e",
+        "crates/zeno-fcis-schema/src/profile2/tests.rs": "60f02bfc11ff0fb918b05349f6d22cd7f993f47fdf7a3234f11e5e0d88713536",
+        "crates/zeno-fcis-schema/src/profile2/validate.rs": "fb0e1c58e7d0c8c66a1d137c9fa3c4e6167e8ebef66f7078e07d68333f1f6d82",
+        "crates/zeno-fcis-schema/src/validate.rs": "c40c9ee715624c7ce92b4335e7de1f0d02d6814b05ae4e8218e86e7c5f7ae2f3",
+        "crates/zeno-fcis-value/Cargo.toml": "627768a842ae6bc4486b1527686cfda6fa5bca02e356659de25991a9f42087e2",
+        "crates/zeno-fcis-value/src/decoder_bytes.rs": "328b8f2014a7ee937a64d99c8591a74c00d9f51b9b29f8eeb842e0f23c540eaa",
+        "crates/zeno-fcis-value/src/decoder_model.rs": "6a31bf3fe2d9a0e9afd6574f3948581b5ee31f5a7c404daa70bff8a00d98dc5c",
+        "crates/zeno-fcis-value/src/decoder_refinement.rs": "9b0568f10f4e3bf06b124b972db8845aab1441b9dc9ecc758548a9208ec50422",
+        "crates/zeno-fcis-value/src/lib.rs": "1a899279f23e5957a6f17345a5385337fa5b0fb29374a26e524bcd10c911d07e",
+        "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "e3597f7a812840edf2bccf8f8ff3fb3b51e0578b91839825acbb06926bada1c0",
+        "crates/zeno-fcis-value/src/profile2/boundary_tests.rs": "3b4eb487dc19b4f2f34427ff9fc6c42232413f5d6b6e98d27e7a3088a3f3b42a",
+        "crates/zeno-fcis-value/src/profile2/mod.rs": "de8a75172ecbd92695978f32951b4ca7f0278bf33231e9da3af66d3a9f08a062",
+        "crates/zeno-fcis-value/src/profile2/number256.rs": "b6c714e3af2ac924718d2ba086dc719159805a013544e83e9b44414fe4d9ce9f",
+        "crates/zeno-fcis-value/src/profile2/ordering256.rs": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825",
+        "crates/zeno-fcis-value/src/profile2/ordering_model.rs": "d02708ccbae41434efc8acb8e8bcd7bd30f2abc04b7256bd32d15421c3f1544a",
+        "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs": "b46ad54934a0fce69c42202132d44b513bfed2a61d5360e75ab14d97aa1ec04e",
+        "crates/zeno-fcis-value/src/profile2/reference/legacy_scalar.rs": "b0bd6938daeaff9da36f9559d52ea0ad759d9297490958ae0f3d1b3edb650127",
+        "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs": "4db8c554f26546e2fa1995f393508ab56c22fad3401a88407b241409f229f1b8",
+        "crates/zeno-fcis-value/src/profile2/reference/legacy_wide_model.rs": "98eac195ee436806f7b3d201543400287635e0a3613dafe0ec128a5e3b2409e9",
+        "crates/zeno-fcis-value/src/profile2/tests.rs": "a9f3dadefc43e30cab1b8734c1815c9d32c146506f82ba28caa5f739e31ac532",
+        "crates/zeno-fcis-value/src/profile2/value.rs": "ede5c72667848e1d344fc22ca159a0e54437842e4a37f443e764cff112abfab0",
+        "crates/zeno-fcis-value/src/profile2/value_tests.rs": "cd9cc4ddfb80afc3851173868dfc099bc2978992d85c6dbd20d93f20ecaa6d8a",
+        "integrations/zal/examples/ontology/defi_arithmetic.english.txt": "c360e34c45b4f1d7759ec09fa9fcd23e83f811fb6f5e05d7c8fb658f4f8b5c7a",
+        "rust-toolchain.toml": "8e390d6a0838315f972690f46ef8bae8b7ecc9ee6c1ed70140ef852869c2482e",
+        "tools/check_ordering_types256.py": "d3962b3b3727dda01cb8d39dc7e7046e24b4045b06d408c888e791befbc2fc0a",
+        "tools/check_verus.py": "b27d67bc264b571e31b0d821e07328026834ef7b5deb05f064a941ea7efd363a",
+        "tools/verus_coverage.py": "372a0f19520e739f77ae698fab7af88f2f39dbd8cdd4412906a6026e7fe8c4c3",
+        "verification/verus/ordering256_types_harness.rs": "3f249c152d982104cb2712b462cf4038fa87da68f0aa1a69d8cc695af09ffecc",
+        "verification/verus/ordering_types256_profile.json": "b1c27bfe7b6cef4083d5ed2ac3f1a5789116d3b7416f67154af126fcae1d5b5b",
+        "verification/verus/toolchain.json": "a8a66e9481c2701be0134c049a022558d6ee0f89e74618e3e47c13eb3c3bb862"
+      },
+      "repository": "https://github.com/TheDarkLightX/ZenoFCIS",
+      "schema": "zeno-fcis/arithmetic-handoff-sources/1"
+    },
+    "ontology_implementation": {
+      "digest": "fa9c190bc88a0f335414a976d2d0e71e904cd2822932c602608351b961dba41e",
+      "files": {
+        "core.py": "18ec5d16e564d233dd0a0a942bbef7fd8e04fe207e41f781d2b0882bb5409738",
+        "ontology.py": "124d8c4d5ae435faf12d8cd53dc2d8e703937a733d17ac581ee7b04e13a237b4",
+        "ontology_cnl.py": "a86e5325d866dffbe4252e4c28a37cdd943d39b559727e046a2c2c580c8f658d",
+        "ontology_rdf.py": "2182e9097adcd7807bd2e72ce387b88390d573b2bcedda58bcb0ed74276b107b",
+        "ontology_records.py": "8952a4a9be3dbc2b86376116864ff38060bbe6d1f87dafa2a934ba1933551011",
+        "ontology_tools.py": "305c41d9aedb7135113e817635a5a8fc702ccaa128492216833d863a9cdabd46"
+      },
+      "schema": "zal.ontology-implementation/1"
+    }
+  },
+  "status": "blocked"
+}
