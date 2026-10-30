@@ -133,6 +133,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "-O", "-B", "tools/test_machine_code_profile2_loop.py"),
          ("python3", "-B", "tools/test_machine_code_library.py"),
          ("python3", "-O", "-B", "tools/test_machine_code_library.py"),
+         ("python3", "-B", "tools/test_machine_qualification_performance.py"),
+         ("python3", "-O", "-B", "tools/test_machine_qualification_performance.py"),
          ("python3", "-B", "tools/test_machine_code_native.py"),
          ("python3", "-B", "tools/test_machine_code_library_native.py"),
          ("python3", "-O", "-B", "tools/test_machine_code_library_native.py"),
