@@ -1,6 +1,6 @@
 # ZenoFCIS 2.7 factory gap register
 
-All twenty-nine rows remain open. This is the development backlog for full 2.7.
+All thirty rows remain open. This is the development backlog for full 2.7.
 Implementation, focused tests, native qualification, proof and release readiness
 have separate requirements. See the [continuation guide](DEVELOPMENT_27.md) for
 source locations and reproduction commands; bind results to the actual commit.
@@ -74,6 +74,7 @@ controls. Additional test counts do not discharge an open refinement theorem.
 | F27-27 | P1 | Payload-carrying variants in contracts | The `.zeno` parser accepts variants with payloads, but the contract compiler refuses them as having no contract form. Commands with per-variant data must use a tag plus defaulted fields, so their validity is expressed as laws instead of types. Admit payload variants with exact domains and canonical encoding, or a checked lowering to the tag form, through review, synthesis and generated applications. |
 | F27-28 | P1 | Operating generated and assembled applications | Generated applications tell users to restore a missing journal from a backup, but provide no consistent backup or verified restore command. The [runtime assembly](RUNTIME_ASSEMBLY.md#data-queries-and-operations) lists export/restore, explicit binding migration, readiness/backlog health, retention, overload and disk-full recovery as incomplete. Qualify snapshot and verified restore that preserve pending delivery IDs and never duplicate effect identity, plus health and resource-exhaustion behavior. |
 | F27-29 | P2 | Command cards for agents | `guide` lists 29 cards, as in 2.6.0. No card covers `assemble`, `contract postconditions`, `two-run`, `runs`, `refine-check`, `check-composition`, `check-symbolic`, `evolve`, `diff`, `refresh-receipts`, `draft` or `purity`. Add cards that state exact commands, limits, verdicts and exit codes, and check that every leaf command has a card or a stated exclusion. |
+| F27-30 | P1 | Purity check on generated applications | Every template README tells the user to run `zeno-fcis purity src/program.rs src/laws.rs ...` in the generated application, and it always refuses: `new` writes a `[patch.crates-io]` path entry for each ZenoFCIS package, and the purity manifest reader refuses every `[patch]` because a patch can replace a trusted dependency's code under the same name. ATDD runs purity only on the in-tree template, which has no `Cargo.toml`, so the journey is untested. Admit a patch section only when it is exactly the binding this CLI writes for its own build tree (each entry's package name, path and library name checked), keep every other patch refused, cover the resolved-purity entry point, and add the generated-application journey to acceptance. |
 
 See the [runtime checklist](RUNTIME_ISOLATION_27_PROGRESS.md),
 [assembly](RUNTIME_ASSEMBLY.md), [refinement](RUNTIME_REFINEMENT.md),
