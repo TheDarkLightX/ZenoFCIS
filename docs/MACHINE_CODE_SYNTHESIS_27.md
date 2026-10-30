@@ -14,6 +14,10 @@ own ABI, rejection, effects and metering obligations.
 
 ## Registered profiles
 
+Profile 1 is listed here. [Profile 2](#profile-2-flags-carries-and-comparisons)
+is registered separately and adds flags, comparisons, selects, up to six inputs
+and two results; profile-1 problems, sessions, receipts and checks are unchanged.
+
 | Target | Calling contract | Admitted computation |
 | --- | --- | --- |
 | `x86_64-sysv-register/1` | `rdi=x`, `rsi=y`, return `rax`; other admitted caller-saved registers initially arbitrary | 64-bit MOV, ADD, SUB, AND, OR, XOR, low IMUL, immediate MOV/shifts, displacement-free LEA, NOP, final RET |
@@ -31,7 +35,7 @@ overflow, U256/I256 values and multi-result error ABIs require their own explici
 profile; narrowing those tasks to this profile would change their requirements.
 
 The decoder and its concrete/SMT semantics do not import the proposal encoder or
-search implementation. Z3, the handwritten instruction model, Python and the
+search implementation. Z3, the authored instruction model, Python and the
 host remain trusted premises. An SMT result here is not a kernel proof of the
 complete ISA or physical processor.
 
@@ -54,9 +58,10 @@ are JSON arrays with these constructors:
 | Binary word operation | `[operator, left, right]`, where operator is `add`, `sub`, `mul`, `and`, `or` or `xor` |
 | Shift | `["shl", expression, count]` or `["lshr", expression, count]`; integer count in 0 through 63 |
 
-Expressions have at most 64 nodes and depth 16. The profile has no comparison
+Expressions have at most 64 nodes and depth 16. Profile 1 has no comparison
 or conditional constructor. A different mathematical requirement needs either
-an equivalent expression in this vocabulary or an explicitly extended profile.
+an equivalent expression in this vocabulary or an explicitly extended profile,
+such as profile 2.
 
 ```sh
 python3 -B -m tools.machine_code.run --help
@@ -184,6 +189,200 @@ profile. Retain equal or worse results, including missed compact instructions.
 Apply the [five-part feasibility standard](RESEARCH_FEASIBILITY.md) before
 promoting a route. These experiments do not complete native-checker refinement,
 installed isolation, full-width DeFi, arbitrary embedded apps or release gates.
+
+## Profile 2: flags, carries and comparisons
+
+Profile 2 is a second, separately registered pair of targets for multi-word
+arithmetic and decision kernels: 128-bit add and subtract with carry, carry-out,
+unsigned and signed minimum and maximum, saturating add, absolute value and
+compare-and-select guards. Profile 1 keeps its own validator, checker
+(`tools/machine_code/verify.py`) and tests, and they are unchanged.
+
+| Target | Calling contract | Admitted computation |
+| --- | --- | --- |
+| `x86_64-sysv-register/2` | Inputs in `rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9`, in declared order; results in `rax`, then `rdx`. Every other admitted register and CF, ZF, SF and OF initially arbitrary | Every profile-1 x86 form; 64-bit register ADC, SBB, CMP and TEST; NEG; SAR by an immediate; SETcc on the low byte of an admitted register; MOVZX of a low byte into a 64-bit register; 64-bit register CMOVcc |
+| `rv64i-register/2` | Inputs in `a0` to `a5`, in declared order; results in `a0`, then `a1`. `t0` to `t2` and every `a` register without an input initially arbitrary; `zero=0` | Every profile-1 RV64I form, plus SLT, SRA, SLTI, SLTIU, XORI, ORI, ANDI and SRAI, over `zero`, `t0` to `t2` and `a0` to `a7` |
+
+The admitted x86 registers are the nine of profile 1: `rax`, `rcx`, `rdx`, `rsi`,
+`rdi` and `r8` to `r11`. SETcc and CMOVcc take the conditions `o`, `no`, `b`,
+`ae`, `e`, `ne`, `be`, `a`, `s`, `ns`, `l`, `ge`, `le` and `g`, as in `setb` and
+`cmovl`. The parity conditions refuse. A two-result kernel returns like the C
+declaration `struct { uint64_t lo, hi; } f(...)` or `unsigned __int128 f(...)`:
+in `rax:rdx` on x86 and `a0:a1` on RV64I. The bounds of profile 1 still apply:
+at most 16 body instructions and 256 bytes, one final return, no other control
+flow, memory, system or privileged operations.
+
+### Flags
+
+CF, ZF, SF and OF are modelled exactly. The table gives each instruction's
+effect on them.
+
+| Instructions | CF, ZF, SF, OF after the instruction |
+| --- | --- |
+| ADD, ADC, SUB, SBB, CMP, NEG | All four set from the operation |
+| AND, OR, XOR, TEST | CF and OF cleared; ZF and SF set from the result |
+| IMUL | CF and OF set on signed overflow; ZF and SF undefined |
+| SHL, SHR, SAR by 0 | Unchanged |
+| SHL, SHR, SAR by 1 | All four set |
+| SHL, SHR, SAR by 2 to 63 | CF, ZF and SF set; OF undefined |
+| MOV, MOVABS, LEA, MOVZX, SETcc, CMOVcc, NOP | Unchanged |
+
+PF, AF and the other flags are not modelled. No admitted instruction reads
+them. A candidate that reads a flag an earlier instruction left undefined is
+refused with `ReadsUndefinedFlag` before any solver call. Entry flags are
+arbitrary but defined, so reading one is admitted and quantified.
+
+SETcc writes only the low byte of its register; the other 56 bits are kept. To
+produce a 0 or 1 word, clear the register before the flag-setting instruction,
+or apply MOVZX afterwards. The checker models the partial write, so a missing
+zero-extension is a counterexample. MOVZX always reads the low byte of a 64-bit
+register name, so `["movzx", "rdx", "rdi"]` assembles as `movzx rdx, dil`.
+
+### Problem format
+
+The schema is `zeno-fcis/machine-problem/2`. It has exactly the fields
+`schema`, `target`, `inputs`, `outputs`, `grammar`, `max_instructions` and
+`objective`.
+
+- `inputs`: one to six distinct names, each matching `[a-z][a-z0-9_]{0,15}`.
+  They are assigned to the input registers in order.
+- `outputs`: one or two expressions, assigned to the result registers in order.
+  Each has at most 64 nodes and depth 16.
+- `grammar`, `max_instructions` and `objective`: as in profile 1. Forms use
+  64-bit register names; for example, `["setb", "rdx"]` writes `dl`.
+
+Expressions use the profile-1 constructors, with `["input", NAME]` naming a
+declared input, plus these constructors.
+
+| Meaning | Expression |
+| --- | --- |
+| Arithmetic shift right | `["ashr", expression, count]`; integer count 0 to 63 |
+| Unsigned less than, less or equal | `["ult", left, right]`, `["ule", left, right]`; 1 when true, else 0 |
+| Signed less than, less or equal | `["slt", left, right]`, `["sle", left, right]`; two's complement; 1 or 0 |
+| Equality | `["eq", left, right]`; 1 or 0 |
+| Select | `["ite", condition, then, else]`; `then` when `condition` is not 0, else `else` |
+
+Greater-than comparisons swap the operands. Examples are
+[`add128-x86.json`](../test-data/machine-code/add128-x86.json),
+[`umin-x86.json`](../test-data/machine-code/umin-x86.json) and
+[`add128-rv64i.json`](../test-data/machine-code/add128-rv64i.json).
+
+### Checking and the loop
+
+`tools/machine_code/verify2.py` decodes the bytes, checks the palette, bound and
+flag reads, and asks Z3 for an assignment where any result differs. The query
+quantifies all 2^(64n) values of the n inputs, every other admitted register
+and, on x86, the four entry flags. A counterexample names each input, each
+initial register, the initial flags on x86, and the lists of expected and
+actual results. It is replayed on the concrete model before it is reported.
+
+The commands are those of profile 1: `open`, `packet`, `candidate`, `search`,
+`resume`, `emit` and `replay`. `open` selects the checker from the schema. Search
+filters candidates on eight fixed concrete states before any solver call. One
+of them has every free register at 2^64-1 and every entry flag set. A candidate
+that reads an undefined flag counts as a concrete refutation.
+
+```sh
+machine_work=$(mktemp -d)
+python3 -B -m tools.machine_code.run open \
+  --problem test-data/machine-code/umin-x86.json --session "$machine_work/session"
+python3 -B -m tools.machine_code.run search --session "$machine_work/session" --deadline-ms 20000
+python3 -B -m tools.machine_code.run emit --session "$machine_work/session" --out "$machine_work/artifact"
+python3 -B -m tools.machine_code.run replay --artifact "$machine_work/artifact"
+```
+
+This search proposes 259 candidates. It selects `cmp rdi, rsi; mov rax, rsi;
+cmovb rax, rdi`, which is 11 bytes. The artifact files and replay checks are those
+of profile 1.
+
+### Trusted base
+
+The checker trusts:
+
+- `verify2.py` for the decoder, the concrete and SMT instruction models, and the
+  flag rules;
+- `profile2.py` for problem validation;
+- the instruction record shared with `verify.py`;
+- Z3, Python and the host.
+
+The encoder in `targets.py`, the search and every proposer, including an LLM,
+supply data only. They are not trusted.
+
+### Evidence
+
+```sh
+python3 -B tools/test_machine_code_profile2_verifier.py
+python3 -O -B tools/test_machine_code_profile2_verifier.py
+python3 -B tools/test_machine_code_profile2_loop.py
+python3 -O -B tools/test_machine_code_profile2_loop.py
+python3 -B tools/test_machine_code_profile2_native.py
+python3 -B tools/test_machine_code_profile2_conformance.py
+python3 -B tools/test_machine_code_rv64i_conformance.py
+```
+
+- **Literal-byte controls:** the verifier test uses GNU-assembled x86 bytes and
+  field-packed RV64I words, not the encoder. Its controls include a lost carry,
+  swapped conditions, the partial SETcc write, quantified entry flags, refused
+  undefined-flag reads, refused parity, byte-register and width variants, and
+  solver-unknown and replay-mismatch mocks.
+- **x86 conformance:** the conformance test enumerates every admitted x86 form,
+  6,949 forms in all. Each encoding is compared with GNU `as` and round-trips
+  through the decoder. Each form then runs on the CPU from full register states
+  with CF, ZF, SF, OF, PF and AF loaded by POPFQ. All nine registers and the
+  four modelled flags, read back by PUSHFQ, must equal the concrete model on every
+  state and the SMT model on two states. Flags the model leaves undefined are
+  not compared. Five planted model defects must be detected: SBB carry without
+  borrow, ADD overflow equal to carry, SETcc writing the whole register, CMOVLE
+  ignoring ZF and an SHL carry taken from the wrong bit.
+- **Decoder language:** a scan of 2,883,840 short byte bodies checks that every
+  accepted body is an enumerated form in its unique canonical encoding.
+- **Measured run:** a 64-state run on an AMD Ryzen Threadripper 1950X compared
+  444,736 executions with the concrete model and 13,898 with the SMT model,
+  with no disagreement.
+- **Native execution:** eight kernels go through `open`, a proposal or search,
+  `emit` and `replay`. Each emitted `kernel.o` is linked with a C runner whose
+  expected values use 128-bit arithmetic or GCC overflow builtins. The runner
+  checks every combination of eight edge values per input, then 4,096
+  pseudorandom input vectors.
+
+| Kernel | Route | Kernel bytes | GCC -O2 bytes, no CET |
+| --- | --- | --- | --- |
+| 128-bit add, two results | proposal | 13 | 18 |
+| 128-bit subtract, two results | proposal | 13 | 18 |
+| Add with carry-out, two results | proposal | 13 | 12 |
+| Unsigned minimum | search | 11 | 11 |
+| Signed maximum | proposal | 11 | 11 |
+| Saturating unsigned add | proposal | 13 | 14 |
+| Saturating signed add | proposal | 31 | 37 |
+| Absolute value | proposal | 11 | 11 |
+
+The byte counts include the return and record size only. GCC's carry-out
+version is smaller than the proposal. No timing was measured.
+
+- **RV64I execution:** `tools/test_machine_code_rv64i_conformance.py` runs in the
+  `rv64i-execution` job of the machine-code workflow, which installs `qemu-user`
+  and the `riscv64-linux-gnu` toolchain. It enumerates 21,166 RV64I forms of
+  profile 2. Encodings are compared with GNU `as -march=rv64i`. Each form runs
+  under QEMU user mode against the profile-2 concrete model on every state and
+  its SMT model on one. Forms inside profile 1 are also compared with the
+  profile-1 concrete model. Four planted defects must be detected. The job sets
+  `ZENO_MACHINE_REQUIRE_RV64I=1`, so missing tools fail it. Elsewhere the test is
+  skipped with the reason. The development host has neither QEMU nor the
+  cross toolchain, so **no RV64I execution evidence exists until that job
+  passes**. QEMU agreement is evidence about the emulator, not RISC-V hardware.
+  The conformance test's local agreement of the RV64I concrete and SMT models
+  is not execution evidence.
+
+### Non-claims
+
+- Only CF, ZF, SF and OF are modelled. Profile 2 makes no claim about PF, AF,
+  DF, the other RFLAGS bits, or the flags a kernel leaves on return.
+- There is no CET or ENDBR64 entry, memory operation, branch, fault or timing
+  model.
+- Agreement on sampled states is not a proof of the ISA or of other processors.
+- A selected kernel is not claimed globally optimal, and no speedup is claimed
+  without paired timing on the target.
+- The ZAL `zal/word-kernel/1` route lowers to profile 1 only.
 
 ## ZAL human-to-machine word-kernel connection
 
