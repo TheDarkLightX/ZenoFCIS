@@ -11,7 +11,10 @@ This checkout then meets those artifacts. Its identity differs from 2.6.0
 only in the trailing evaluator digest, so its builds refuse a 2.6.0 store
 by name and write nothing, and its CLI refuses the 2.6.0 receipt until
 `contract refresh-receipts`, which must yield this checkout's own fixture.
-`--write-test-data` exports the released inputs the native tests replay.
+`--write-test-data` exports the released inputs the native tests replay,
+with their provenance: the tag commit, the source lock, the toolchain, the
+exact CLI build command when this tool builds it (`--released-target`), the
+CLI's SHA-256 and every generation command.
 """
 from __future__ import annotations
 
@@ -43,6 +46,9 @@ FIXTURE_FILES = (
 )
 # The named refusal of a store created by a 2.6.0 build.
 REFUSAL = "OtherRelease"
+# The exact build of the released CLI, in the released checkout.
+BUILD = ["cargo", "+1.97.1", "build", "-p", "zeno-fcis-cli", "--locked", "--offline"]
+BUILD_ENVIRONMENT = {"CARGO_PROFILE_DEV_DEBUG": "0"}
 
 
 def digest(data: bytes) -> str:
@@ -99,20 +105,52 @@ def prepare(app: Path, source: Path) -> dict:
     return {**binding, "lock_sha256": digest((app / "Cargo.lock").read_bytes())}
 
 
-def check_released_source(cli: Path, source: Path, directory: Path) -> str:
-    if ok([cli, "--version"], directory).strip() != f"zeno-fcis {RELEASE}":
-        raise RuntimeError(f"the supplied executable is not zeno-fcis {RELEASE}")
+def check_released_source(source: Path) -> None:
     if tomllib.loads((source / "Cargo.toml").read_text())["workspace"]["package"]["version"] != RELEASE:
         raise RuntimeError(f"the released source is not version {RELEASE}")
     if (ok(["git", "rev-parse", "HEAD"], source).strip() != SUBJECT
             or ok(["git", "status", "--porcelain", "--untracked-files=no"], source).strip()):
         raise RuntimeError(f"the released source is not an unmodified checkout of {SUBJECT}")
-    return digest(cli.read_bytes())
 
 
-def released(directory: Path, cli: Path, source: Path) -> dict:
+def build_released_cli(source: Path, target: Path) -> tuple[Path, dict]:
+    """Build the released CLI from the released checkout with the recorded command."""
+    check_released_source(source)
+    environment = {**os.environ, **BUILD_ENVIRONMENT, "CARGO_TARGET_DIR": str(target)}
+    subprocess.run(BUILD, cwd=source, check=True, env=environment)
+    return target / "debug/zeno-fcis", {"command": BUILD, "environment": BUILD_ENVIRONMENT,
+                                        "directory": "the released checkout"}
+
+
+def provenance(cli: Path, source: Path, directory: Path, build: dict | None) -> dict:
+    check_released_source(source)
+    if ok([cli, "--version"], directory).strip() != f"zeno-fcis {RELEASE}":
+        raise RuntimeError(f"the supplied executable is not zeno-fcis {RELEASE}")
+    return {"tag": f"v{RELEASE}", "subject": SUBJECT,
+            "source_lock_sha256": digest((source / "Cargo.lock").read_bytes()),
+            "rustc": ok(["rustc", "+1.97.1", "--version"], directory).strip(),
+            "cargo": ok(["cargo", "+1.97.1", "--version"], directory).strip(),
+            "build": build, "released_cli_sha256": digest(cli.read_bytes())}
+
+
+def released(directory: Path, cli: Path, source: Path, build: dict | None = None) -> dict:
     """Make every 2.6.0 artifact with the released CLI and its own source tree."""
-    cli_sha256 = check_released_source(cli, source, directory)
+    origin = provenance(cli, source, directory, build)
+    commands: list[list[str]] = []
+
+    def relative(item: str | Path) -> str:
+        text = str(item)
+        for path, name in ((cli, "zeno-fcis"), (source, "V260"), (directory, ".")):
+            text = text.replace(str(path), name)
+        return text
+
+    def step(command: list[str | Path]) -> str:
+        commands.append([relative(item) for item in command])
+        return ok(command, directory)
+
+    def app(binary: Path, arguments: list[str], label: str) -> dict:
+        commands.append([binary.name, *(relative(item) for item in arguments)])
+        return upgrade.report(upgrade.run_app(binary, arguments), label)
     raw = directory / "original-contract"
     for name in INPUTS:
         (raw / name).parent.mkdir(parents=True, exist_ok=True)
@@ -120,17 +158,17 @@ def released(directory: Path, cli: Path, source: Path) -> dict:
     (raw / "tests").mkdir()
     (raw / EXAMPLES).write_text(upgrade.SESSION)
     first = directory / "released-version-1"
-    ok([cli, "new", first, "--contract", raw], directory)
+    step([cli, "new", first, "--contract", raw])
     first_graph = prepare(first, source)
+    commands.append(["cargo", "+1.97.1", "build", "--locked", "--offline", "# in ./released-version-1"])
     first = upgrade.build_app(first)
     genesis = directory / "genesis.sqlite"
     pending = directory / "pending.sqlite"
-    initialized = upgrade.report(upgrade.run_app(first, ["init", str(genesis), "--format", "json"]),
-                                 "released genesis")
-    audited = upgrade.report(upgrade.run_app(first, ["--audit", str(genesis)]), "released audit")
+    initialized = app(first, ["init", str(genesis), "--format", "json"], "released genesis")
+    audited = app(first, ["--audit", str(genesis)], "released audit")
     upgrade.expect(audited, {"contract_version": 1, "commits": 0, "pending": 0, "upgrades": 0},
                    "released audit")
-    decided = upgrade.report(upgrade.run_app(first, ["--decide", str(pending)]), "released decide")
+    decided = app(first, ["--decide", str(pending)], "released decide")
     upgrade.expect(decided, {"decisions": ["Accept"] * 3, "bundles": 3, "pending": 1,
                              "deliveries": 0}, "released decide")
     pending_ids = upgrade.pending_ids(pending)
@@ -144,13 +182,13 @@ def released(directory: Path, cli: Path, source: Path) -> dict:
     original = directory / "original.zcve"
     receipt = directory / "receipt.json"
     candidate = source / PROGRAMS / "current-decision-scalars-candidate.zcve"
-    ok([cli, "contract", "export-program", adopted, "--out", original], directory)
+    step([cli, "contract", "export-program", adopted, "--out", original])
     if original.read_bytes() != (source / PROGRAMS / "current-decision-scalars-original.zcve").read_bytes():
         raise RuntimeError("the released export differs from the released original program")
-    ok([cli, "transform", "check", "--original", original, "--candidate", candidate,
-        "--receipt", receipt], directory)
-    ok([cli, "contract", "adopt", adopted, "--candidate", candidate, "--receipt", receipt,
-        "--usage", "new-version"], directory)
+    step([cli, "transform", "check", "--original", original, "--candidate", candidate,
+          "--receipt", receipt])
+    step([cli, "contract", "adopt", adopted, "--candidate", candidate, "--receipt", receipt,
+          "--usage", "new-version"])
     (adopted / "tests").mkdir()
     shutil.copyfile(source / TEMPLATE / EXAMPLES, adopted / EXAMPLES)
     adopted_files = files(adopted)
@@ -159,21 +197,22 @@ def released(directory: Path, cli: Path, source: Path) -> dict:
 
     # Control: the released version 2 build upgrades both released stores.
     second = directory / "released-adopted"
-    ok([cli, "new", second, "--contract", adopted], directory)
+    step([cli, "new", second, "--contract", adopted])
     second_graph = prepare(second, source)
+    commands.append(["cargo", "+1.97.1", "build", "--locked", "--offline", "# in ./released-adopted"])
     second = upgrade.build_app(second)
     controls = []
     for store, commits, count in ((genesis, 0, 0), (pending, 3, 1)):
         trial = copy_store(store, directory / ("control-" + store.name))
-        upgraded = upgrade.report(upgrade.run_app(second, ["--upgrade", str(trial)]),
-                                  "released upgrade")
+        upgraded = app(second, ["--upgrade", str(trial)], "released upgrade")
         upgrade.expect(upgraded, {"status": "upgraded", "kind": "program-successor",
                                   "contract_version": 2, "commits": commits, "pending": count,
                                   "upgrades": 1}, "released upgrade")
         controls.append(upgraded)
     if upgrade.pending_ids(directory / "control-pending.sqlite") != pending_ids:
         raise RuntimeError("the released upgrade changed the pending delivery ID")
-    record = {"release": RELEASE, "subject": SUBJECT, "released_cli_sha256": cli_sha256,
+    record = {"release": RELEASE, "subject": SUBJECT, "provenance": origin,
+              "released_cli_sha256": origin["released_cli_sha256"], "commands": commands,
               "version_1_lock_sha256": first_graph["lock_sha256"],
               "version_2_lock_sha256": second_graph["lock_sha256"],
               "initialized": initialized, "genesis_audit": audited, "decided": decided,
@@ -203,6 +242,8 @@ def export_test_data(directory: Path, root: Path) -> dict:
         stores[f"{name}.sql"] = digest(sql.encode())
     shell_manifest = {"schema": "zeno-fcis/released-26-test-inputs/1", "release": RELEASE,
                       "subject": SUBJECT, "released_cli_sha256": record["released_cli_sha256"],
+                      "provenance": record["provenance"], "commands": record["commands"],
+                      "version_1_lock_sha256": record["version_1_lock_sha256"],
                       "files": stores, "pending_ids": record["pending_ids"], "authority": "none"}
     (shell / "manifest.json").write_text(json.dumps(shell_manifest, indent=2, sort_keys=True) + "\n")
     # Only the adopted files that differ from this checkout's fixture are kept;
@@ -218,6 +259,7 @@ def export_test_data(directory: Path, root: Path) -> dict:
         shutil.copyfile(adopted / name, cli / name)
     cli_manifest = {"schema": "zeno-fcis/released-26-adoption/1", "release": RELEASE,
                     "subject": SUBJECT, "released_cli_sha256": record["released_cli_sha256"],
+                    "provenance": record["provenance"], "commands": record["commands"],
                     "base": str(FIXTURE), "kept": kept, "files": record["adopted_files"],
                     "authority": "none"}
     (cli / "released.json").write_text(json.dumps(cli_manifest, indent=2, sort_keys=True) + "\n")
@@ -278,8 +320,8 @@ def current(directory: Path, cli: Path, record: dict) -> dict:
 
 
 def check(directory: Path, released_cli: Path, released_source: Path, current_cli: Path,
-          write_test_data: bool) -> dict:
-    record = released(directory, released_cli, released_source)
+          write_test_data: bool, build: dict | None = None) -> dict:
+    record = released(directory, released_cli, released_source, build)
     exported = export_test_data(directory, applications.ROOT) if write_test_data else None
     observed = current(directory, current_cli, record)
     return {"schema": "zeno-fcis/contract-upgrade-26-check/1", "status": "passed",
@@ -289,7 +331,10 @@ def check(directory: Path, released_cli: Path, released_source: Path, current_cl
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--released-cli", type=Path, required=True)
+    released_cli = parser.add_mutually_exclusive_group(required=True)
+    released_cli.add_argument("--released-cli", type=Path, help="a zeno-fcis 2.6.0 executable")
+    released_cli.add_argument("--released-target", type=Path,
+                              help="build the released CLI here with the recorded command")
     parser.add_argument("--released-source", type=Path, required=True,
                         help=f"an unmodified checkout of {SUBJECT}, the v{RELEASE} tag")
     parser.add_argument("--current-cli", type=Path, default=Path(upgrade.cli()))
@@ -298,8 +343,13 @@ def main() -> int:
                         help="export the released inputs the native tests replay")
     args = parser.parse_args()
     os.environ.setdefault("CARGO_BUILD_JOBS", "2")
-    arguments = (args.released_cli.resolve(), args.released_source.resolve(),
-                 args.current_cli.resolve(), args.write_test_data)
+    source = args.released_source.resolve()
+    build = None
+    if args.released_target:
+        cli, build = build_released_cli(source, args.released_target.resolve())
+    else:
+        cli = args.released_cli.resolve()
+    arguments = (cli, source, args.current_cli.resolve(), args.write_test_data, build)
     if args.keep:
         args.keep.mkdir()
         result = check(args.keep.resolve(), *arguments)
