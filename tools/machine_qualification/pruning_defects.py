@@ -4,18 +4,19 @@ Each defect is one named edit to `tools/machine_code/footprint.py`, applied to a
 checker package and of this qualification package. The exactness control (`pruning_exactness run`) then runs inside
 the specimen, under `python3 -B` and `python3 -O -B`, against the specimen's own footprint module. Outcomes:
 
-- `detected`: the control completed and reported at least one removed sequence without a proved witness;
+- `detected`: the control completed and reported at least one removal without a proved twin or checker refutation;
 - `survived`: the control completed and every case was exact;
 - `inconclusive`: the control crashed or timed out;
-- `invalid-specimen`: the edit does not apply exactly once, the copy does not compile, or the control imported
-  another checker package.
+- `invalid-specimen`: the edit does not apply exactly once, the copy does not compile, the control imported
+  another checker package, or the edit is a registered equivalent mutant: it survived, and its removals are
+  identical to the unmodified pruning's on every case, as its written argument predicts.
 
 Crashes and timeouts never count as detections; no checker identity or receipt is involved.
 
     python3 -B -m tools.machine_qualification.pruning_defects run [--defect NAME]... [--out REPORT.json]
 
-Exit 0 when every defect is detected in both modes and the unmodified specimen is exact, 1 when a defect survives or
-the unmodified specimen is not exact, 2 otherwise.
+Exit 0 when every defect is detected in both modes (a registered equivalent mutant is confirmed equivalent instead)
+and the unmodified specimen is exact, 1 when a defect survives or the unmodified specimen is not exact, 2 otherwise.
 """
 
 from __future__ import annotations
@@ -44,18 +45,26 @@ class Defect:
     anchor: str
     replacement: str
     why: str
+    equivalent: str = ""  # why the edit cannot change a removal, for a registered equivalent mutant
 
 
 DEFECTS = (
     Defect("flag-writes-omitted",
-           'return _effects(z, {**entry, **flags}, {**final, **final_flags}, declared)',
-           'return _effects(z, {**entry, **flags}, {**final, **flags}, declared)',
+           '_effects(z, {**entry, **flags}, {**final, **final_flags}, declared)',
+           '_effects(z, {**entry, **flags}, {**final, **flags}, declared)',
            "Every x86 flag keeps its entry value in the footprint, so no instruction writes a flag."),
     Defect("conditional-write-as-overwrite",
-           'used = {variable[4:] for variable in _variables(z, value)}',
-           'used = {variable[4:] for variable in _variables(z, value)} - ({name} if z.is_app_of(value, z.Z3_OP_ITE)'
-           ' else set())',
+           'used = frozenset(variable[4:] for variable in _variables(z, value))',
+           'used = frozenset(variable[4:] for variable in _variables(z, value)) - ({name} if z.is_app_of(value,'
+           ' z.Z3_OP_ITE) else set())',
            "A conditional move neither reads its destination nor keeps it: it is treated as a full overwrite."),
+    Defect("conditional-write-overwrite-only",
+           'if name not in used:',
+           'if name not in used or z.is_app_of(value, z.Z3_OP_ITE):',
+           "A conditional move is marked as overwriting its destination but still reads it.",
+           equivalent="dead() consults a later instruction's reads before its overwrites, and a conditional write "
+                      "reads its destination, so the extra overwrite is never consulted; no other rule reads "
+                      "overwrites."),
     Defect("write-write-conflict-ignored",
            'independent = (not first.writes & (second.reads | second.writes)',
            'independent = (not first.writes & second.reads',
@@ -72,6 +81,19 @@ DEFECTS = (
            'return frozenset({"rax" if problem["target"] == verify.X86 else "a0"})',
            'return frozenset()',
            "On profile 1 the result register is treated as unobserved at the end."),
+    Defect("duplicate-without-proof",
+           '    return solver.check() == z.unsat',
+           '    return True',
+           "Entries with the same declared flag reads are duplicates without a Z3 proof of equal final states."),
+    Defect("input-required-without-query",
+           'if solver.check() == z.sat:',
+           'if True:',
+           "Every input is taken as required by the specification, so overwriting an unused input loses it."),
+    Defect("copied-input-forgotten",
+           'parent.get(source, {source})',
+           'parent.get(source, frozenset())',
+           "A location not yet written is taken to hold nothing, so an input copied to another register is lost "
+           "once its argument register is overwritten."),
 )
 
 
@@ -94,8 +116,8 @@ def build(directory: Path, defect: Defect | None) -> dict:
     return {}
 
 
-def judge(directory: Path, mode: tuple, timeout: int = TIMEOUT) -> tuple[str, str, float]:
-    """Run the exactness control inside one specimen and classify the outcome."""
+def judge(directory: Path, mode: tuple, timeout: int = TIMEOUT) -> tuple[str, str, float, dict | None]:
+    """Run the exactness control inside one specimen; (outcome, evidence, seconds, removal digests per case)."""
     environment = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTHONSAFEPATH", "PYTHONOPTIMIZE")}
     probe = ("import json, runpy, sys; import machine_code; "
              "print('ZENO_PACKAGE ' + machine_code.__file__, flush=True); "
@@ -106,19 +128,20 @@ def judge(directory: Path, mode: tuple, timeout: int = TIMEOUT) -> tuple[str, st
         completed = subprocess.run([sys.executable, *mode, "-c", probe], cwd=directory / "tools", env=environment,
                                    capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
-        return "inconclusive", f"timeout after {timeout} s", round(time.monotonic() - started, 1)
+        return "inconclusive", f"timeout after {timeout} s", round(time.monotonic() - started, 1), None
     seconds = round(time.monotonic() - started, 1)
     lines = completed.stdout.splitlines()
     package = next((line.split(" ", 1)[1] for line in lines if line.startswith("ZENO_PACKAGE ")), "")
     if Path(package).resolve().parent != (directory / "tools/machine_code").resolve():
-        return "invalid-specimen", "the control imported another checker package: " + package, seconds
+        return "invalid-specimen", "the control imported another checker package: " + package, seconds, None
     result = next((json.loads(line[len(MARKER):]) for line in lines if line.startswith(MARKER)), None)
     if result is None:
-        return "inconclusive", "crash: " + completed.stderr.strip()[-300:], seconds
+        return "inconclusive", "crash: " + completed.stderr.strip()[-300:], seconds, None
     failures = {case: count for case, count in result["failures"].items() if count}
     if result["exact"]:
-        return "survived", "every case exact", seconds
-    return "detected", "unwitnessed removals: " + ", ".join(f"{c} {n}" for c, n in failures.items()), seconds
+        return "survived", "every case exact", seconds, result["removals"]
+    return ("detected", "unwitnessed removals: " + ", ".join(f"{c} {n}" for c, n in failures.items()), seconds,
+            result["removals"])
 
 
 def campaign(defects=DEFECTS, modes=MODES, timeout: int = TIMEOUT) -> dict:
@@ -126,26 +149,36 @@ def campaign(defects=DEFECTS, modes=MODES, timeout: int = TIMEOUT) -> dict:
     with tempfile.TemporaryDirectory(prefix="zeno-pruning-defects-") as temporary:
         base = Path(temporary) / "base"
         build(base, None)
+        baseline = {}
         for mode in modes:
-            outcome, evidence, seconds = judge(base, mode, timeout)
+            outcome, evidence, seconds, baseline[mode] = judge(base, mode, timeout)
             report["positive"][" ".join(mode)] = {"exact": outcome == "survived", "evidence": evidence,
                                                   "seconds": seconds}
         for index, defect in enumerate(defects):
             specimen = Path(temporary) / f"defect-{index}"
             binding = build(specimen, defect)
-            row = {"defect": defect.name, "why": defect.why, "outcomes": {}}
+            row = {"defect": defect.name, "why": defect.why, "equivalent": defect.equivalent, "outcomes": {}}
             for mode in modes:
+                changed = None
                 if "invalid" in binding:
                     outcome, evidence, seconds = "invalid-specimen", binding["invalid"], 0.0
                 else:
-                    outcome, evidence, seconds = judge(specimen, mode, timeout)
-                row["outcomes"][" ".join(mode)] = {"outcome": outcome, "evidence": evidence, "seconds": seconds}
+                    outcome, evidence, seconds, removals = judge(specimen, mode, timeout)
+                    if removals is not None and baseline[mode] is not None:
+                        changed = removals != baseline[mode]
+                    if outcome == "survived" and defect.equivalent and changed is False:
+                        outcome, evidence = "invalid-specimen", "equivalent mutant: identical removals on every case"
+                row["outcomes"][" ".join(mode)] = {"outcome": outcome, "evidence": evidence, "seconds": seconds,
+                                                   "removals_changed": changed}
             report["defects"].append(row)
             shutil.rmtree(specimen)
     outcomes = [o["outcome"] for row in report["defects"] for o in row["outcomes"].values()]
+    confirmed = all(o["outcome"] == "detected" or (row["equivalent"] and o["outcome"] == "invalid-specimen"
+                                                   and o["removals_changed"] is False)
+                    for row in report["defects"] for o in row["outcomes"].values())
     if not all(p["exact"] for p in report["positive"].values()) or "survived" in outcomes:
         report["status"] = "failed"
-    elif any(o != "detected" for o in outcomes):
+    elif not confirmed:
         report["status"] = "inconclusive"
     else:
         report["status"] = "all-detected"

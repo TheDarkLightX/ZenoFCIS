@@ -36,7 +36,7 @@ class Outcomes(unittest.TestCase):
         binding = planted.build(specimen, defect)
         if "invalid" in binding:
             return "invalid-specimen", binding["invalid"]
-        outcome, evidence, _ = planted.judge(specimen, MODE)
+        outcome, evidence, *_ = planted.judge(specimen, MODE)
         return outcome, evidence
 
     def test_unmodified_exact_planted_detected_missing_invalid_and_crash_inconclusive(self):
@@ -45,8 +45,8 @@ class Outcomes(unittest.TestCase):
             (None, "survived"),
             (second, "detected"),
             (planted.Defect("missing", "this text is not in footprint.py", "x", "test"), "invalid-specimen"),
-            (planted.Defect("crash", 'SCHEME = "exact-footprint/1"', 'raise RuntimeError("planted crash")', "test"),
-             "inconclusive"),
+            (planted.Defect("crash", 'SCHEME = "exact-footprint/', 'raise RuntimeError("planted crash")\n'
+                            'SCHEME = "exact-footprint/', "test"), "inconclusive"),
         ]
         for index, (defect, expected) in enumerate(cases):
             with self.subTest(defect=defect.name if defect else "unmodified"):
