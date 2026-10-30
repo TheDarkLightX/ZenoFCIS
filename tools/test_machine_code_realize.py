@@ -62,27 +62,102 @@ def exhaustive(problem, work: Path):
     return None if result["cost"] is None else primary(problem, result["cost"])
 
 
+_LEAST = {}
+
+
+def least_cost(name, problem):
+    """Cached per problem: both modes compare with the same exhaustive enumeration."""
+    if name not in _LEAST:
+        with tempfile.TemporaryDirectory() as directory:
+            _LEAST[name] = exhaustive(problem, Path(directory))
+    return _LEAST[name]
+
+
+def covers(entry, palette):
+    """The test's own exact-cover check: every candidate of the length lies in exactly one recorded subspace,
+    counted per slot range rather than by the realize code's own check."""
+    boxes = [[tuple(r) for r in sub["ranges"]] for sub in entry["subspaces"]]
+    if any(len(b) != entry["length"] or any(low < 0 or high > palette or low >= high for low, high in b)
+           for b in boxes):
+        return False
+    total = 0
+    for b in boxes:
+        size = 1
+        for low, high in b:
+            size *= high - low
+        total += size
+    for i, first in enumerate(boxes):
+        for second in boxes[i + 1:]:
+            if all(max(x[0], y[0]) < min(x[1], y[1]) for x, y in zip(first, second)):
+                return False
+    return total == palette ** entry["length"]
+
+
 class RealizeCrossCheck(unittest.TestCase):
-    def test_every_small_problem_agrees_with_exhaustive_enumeration(self):
+    def cross_check(self, **mode):
         cases = problems()
         self.assertGreaterEqual(len(cases), 15)
         for name, problem in cases:
-            with self.subTest(problem=name), tempfile.TemporaryDirectory() as directory:
-                least = exhaustive(problem, Path(directory))
+            with self.subTest(problem=name, **mode):
+                least = least_cost(name, problem)
                 if least is None:
-                    record = realize.realize(problem, None, 2000)
+                    record = realize.realize(problem, None, 2000, **mode)
                     self.assertEqual(record["status"], "unrealizable", record)
                     self.assertEqual([e["length"] for e in record["lengths"]],
                                      list(range(problem["max_instructions"] + 1)))
+                    self.partition_scope(problem, record, **mode)
                     continue
-                below = realize.realize(problem, least, 2000)
+                below = realize.realize(problem, least, 2000, **mode)
                 self.assertEqual(below["status"], "unrealizable", below)
                 self.assertTrue(all(e["status"] == "unrealizable" for e in below["lengths"]), below)
-                at = realize.realize(problem, least + 1, 2000)
+                self.partition_scope(problem, below, **mode)
+                at = realize.realize(problem, least + 1, 2000, **mode)
                 self.assertEqual(at["status"], "realizable", at)
                 found = at["lengths"][-1]
                 self.assertEqual(found["verification"]["status"], "equivalent")
                 self.assertEqual(primary(problem, found["verification"]["cost"]), least)
+
+    def partition_scope(self, problem, record, groups=1, workers=1):
+        if groups == 1:
+            self.assertNotIn("partition", record)
+            return
+        palette = len(problem["grammar"])
+        self.assertEqual(record["partition"]["groups_per_slot"], min(groups, palette))
+        for entry in record["lengths"]:
+            self.assertEqual(entry["subspace_count"], min(groups, palette) ** entry["length"])
+            self.assertTrue(covers(entry, palette), entry)
+            for subspace in entry["subspaces"]:
+                self.assertEqual(subspace["status"], "unrealizable")
+                self.assertRegex(subspace["query_sha256"], "^[0-9a-f]{64}$")
+
+    def test_every_small_problem_agrees_with_exhaustive_enumeration(self):
+        self.cross_check()
+
+    def test_every_small_problem_agrees_in_partitioned_mode(self):
+        self.cross_check(groups=2, workers=4)
+
+    def test_adaptive_splitting_agrees_and_covers_the_space(self):
+        # A 1 ms probe makes nearly every query split, down to single forms where needed.
+        for name in ("add64-x86", "umin-x86", "triple64-x86"):
+            problem = read_json(DATA / f"{name}.json")
+            with self.subTest(problem=name):
+                least = least_cost(name, problem)
+                below = realize.realize(problem, least, 2000, workers=2, split_ms=1)
+                self.assertEqual(below["status"], "unrealizable", below)
+                self.assertGreater(sum(e["splits"] for e in below["lengths"]), 0)
+                for entry in below["lengths"]:
+                    self.assertTrue(covers(entry, len(problem["grammar"])), entry)
+                self.assertEqual(realize.replay(problem, below)["status"], "replayed")
+                at = realize.realize(problem, least + 1, 2000, workers=2, split_ms=1)
+                self.assertEqual(at["status"], "realizable", at)
+                self.assertEqual(primary(problem, at["lengths"][-1]["verification"]["cost"]), least)
+
+    def test_an_undecided_subspace_makes_the_length_inconclusive(self):
+        # One weak example state and one round: every subspace's first solution agrees on it and is then refuted,
+        # so no subspace is decided.
+        record = realize.realize(NO_PROGRAM, None, 2000, max_rounds=1, seeds=[((0, 0), {}, None)], groups=2)
+        self.assertEqual(record["status"], "inconclusive", record)
+        self.assertTrue(all(e["status"] == "inconclusive" for e in record["lengths"]), record)
 
     def test_a_missing_palette_form_is_caught_by_the_cross_check(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -133,6 +208,25 @@ class RealizeReplay(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()) as printed:
                 code = run.main(argv)
             self.assertEqual(code, 65, printed.getvalue())
+
+    def test_partitioned_record_replays_and_a_missing_subspace_fails(self):
+        problem = read_json(DATA / "umin-x86.json")
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory) / "record.json"
+            argv = ["realize", "--problem", str(DATA / "umin-x86.json"), "--below", "11", "--groups", "2",
+                    "--workers", "2", "--out", str(out)]
+            with contextlib.redirect_stdout(io.StringIO()) as printed:
+                code = run.main(argv)
+            self.assertEqual(code, 0, printed.getvalue())
+            record = read_json(out)
+        self.assertEqual(record["status"], "unrealizable")
+        self.assertEqual([e["subspace_count"] for e in record["lengths"]], [1, 2, 4, 8])
+        self.assertEqual(realize.replay(problem, record)["status"], "replayed")
+        missing = json.loads(json.dumps(record))
+        missing["lengths"][-1]["subspaces"].pop()
+        result = realize.replay(problem, missing)
+        self.assertEqual(result["status"], "failed")
+        self.assertFalse(result["replayed"][-1]["coverage"])
 
     def test_cli_session_mode_asks_below_the_rechecked_incumbent(self):
         with tempfile.TemporaryDirectory() as directory:

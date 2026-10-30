@@ -55,6 +55,7 @@ V1 = "test_machine_code_verifier.VerifierTests."
 V2 = "test_machine_code_profile2_verifier.Profile2VerifierTests."
 V3 = "test_machine_code_profile3_verifier.Profile3VerifierTests."
 REALIZE = "test_machine_code_realize.RealizeCrossCheck."
+REALIZE_REPLAY = "test_machine_code_realize.RealizeReplay."
 CONFORMANCE1 = "test_machine_code_conformance.X86ModelConformance."
 CONFORMANCE2 = "test_machine_code_profile2_conformance."
 POSITIVE = (
@@ -319,6 +320,18 @@ DEFECTS = (
            "        pass\n",
            REALIZE + "test_every_small_problem_agrees_with_exhaustive_enumeration",
            "Programs at the bound are admitted, so a length below the least cost is reported realizable."),
+    Defect("realize-partition-omits-one-group", "realize.py", "partition coverage",
+           "    return [(bounds[g], bounds[g + 1]) for g in range(count)]",
+           "    return [(bounds[g], bounds[g + 1]) for g in range(count - 1)]",
+           REALIZE + "test_every_small_problem_agrees_in_partitioned_mode",
+           "The last palette group is never a subspace, so lengths whose programs need its forms are reported "
+           "unrealizable.",
+           REALIZE_REPLAY + "test_partitioned_record_replays_and_a_missing_subspace_fails"),
+    Defect("realize-partition-undecided-read-as-unsat", "realize.py", "partition verdict",
+           "    elif not undecided:",
+           "    elif True:",
+           REALIZE + "test_an_undecided_subspace_makes_the_length_inconclusive",
+           "A subspace that ran out of budget is counted as unsat, so an undecided length is reported unrealizable."),
 )
 
 # Runs one control inside a specimen and prints one JSON line. A failure counts only when its AssertionError was
