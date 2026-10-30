@@ -1,0 +1,110 @@
+{
+  "schema": "zeno-fcis/research-authority-boundary/1",
+  "status": "unmounted_advisory_only",
+  "authority": "none",
+  "source_base_sha": "57a19ecc6aabfcd6e5107ce0e6135fe2c1a01beb",
+  "study": {
+    "crucible_repository": "TheDarkLightX/Zeno-Crucible",
+    "draft_pr": 47,
+    "prerequisite": "docs/AUTHORITY_DELEGATION_PREREG.md",
+    "experimental_model": "crucible/authority_delegation_lab.py",
+    "evidence_level": "finite_toy_not_implementation"
+  },
+  "scope": {
+    "adversaries": [
+      "compromised_upstream_service",
+      "bypassed_raw_signer",
+      "valid_out_of_policy_signature",
+      "stale_nonce",
+      "chain_id_zero_wildcard",
+      "delegate_code_identity_drift",
+      "external_callback_reentry",
+      "reverted_outer_execution"
+    ],
+    "excluded": [
+      "cryptographic_signature_break",
+      "full_ethereum_consensus",
+      "full_compromise_of_original_EOA_key",
+      "deployed_signer_implementation",
+      "production_publication_authority"
+    ]
+  },
+  "obligations": [
+    {
+      "id": "FAE-01",
+      "claim": "Every minted signing effect has one exact authorized origin",
+      "negative": "caller invokes raw signer without nominal authorization",
+      "status": "open"
+    },
+    {
+      "id": "FAE-02",
+      "claim": "Actual signer enforces policy independent of upstream request source",
+      "negative": "compromised upstream sends prohibited but well-formed EIP-7702 authorization",
+      "status": "open"
+    },
+    {
+      "id": "FAE-03",
+      "claim": "Operation identity and delegated behavior are reviewed without assuming EIP binds app metadata",
+      "negative": "chain0, stale nonce, changed delegate or proxy implementation",
+      "status": "open"
+    },
+    {
+      "id": "FAE-04",
+      "claim": "Unknown or failed authorization cannot emit new signatures",
+      "negative": "timeout or forged success response",
+      "status": "open"
+    },
+    {
+      "id": "FAE-05",
+      "claim": "One-shot signatures are payload-exact and replay-safe",
+      "negative": "same effect identity with substituted message",
+      "status": "open"
+    },
+    {
+      "id": "FAE-06",
+      "claim": "Shell accounts before allowing untrusted callback in applicable withdrawal profile",
+      "negative": "send-first DAO toy transfers more than committed debit",
+      "status": "open"
+    },
+    {
+      "id": "FAE-07",
+      "claim": "Delegation is separately privileged and cannot be routed as routine send",
+      "negative": "routine transaction obtains code delegation capability",
+      "status": "open"
+    },
+    {
+      "id": "FAE-08",
+      "claim": "Reverted outer transaction does not imply delegations reverted",
+      "negative": "recovery ignores persistent EIP-7702 marker",
+      "status": "open"
+    },
+    {
+      "id": "FAE-09",
+      "claim": "Implementation and policy drift make stale approval unusable where enforceable",
+      "negative": "delegate proxy upgraded post-approval",
+      "status": "open"
+    },
+    {
+      "id": "FAE-10",
+      "claim": "Research evidence never grants production signing authority",
+      "negative": "forged research receipt drives production handler",
+      "status": "open"
+    }
+  ],
+  "promotion_requires": [
+    "owner_meaning_review",
+    "source_bound_independent_oracles",
+    "formal_or_finite_scope_receipts",
+    "exact_native_signer_refinement",
+    "end_to_end_policy_enforcement",
+    "compromised_signer_residual_risk_review",
+    "independent_security_review",
+    "no_bypass_path_in_deployed_capability_graph"
+  ],
+  "nonclaims": [
+    "no_production_code_change",
+    "no_detected_vulnerability",
+    "no_protocol_conformance_proof",
+    "no_hsm_mpc_key_protection_claim"
+  ]
+}
