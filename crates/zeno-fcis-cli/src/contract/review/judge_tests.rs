@@ -634,6 +634,82 @@ fn a_lemma_must_be_one_state_formula() {
     }
 }
 
+/// A formula the contract cannot compile is refused under its own name, not
+/// under the synthetic law ID that the judge gives it.
+#[test]
+fn a_refused_formula_is_named_as_supplied() {
+    let counter = Core::new("bounded-counter", &[("C", 2)]);
+    let lemma = |formula: &str| {
+        lemma::judge(
+            &counter.project,
+            &counter.rules,
+            &["post.100.110 >= 0".to_owned(), formula.to_owned()],
+            DEFAULT_MAX_TUPLES,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("{formula:?} was judged"))
+    };
+    let probe = |question: Question| {
+        probe::probe(
+            &counter.project,
+            &counter.rules,
+            &question,
+            DEFAULT_MAX_TUPLES,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("{question:?} was answered"))
+    };
+    for (error, place, reason) in [
+        (
+            lemma("pre.100.110 == 0"),
+            "lemma 2",
+            "applies at genesis, where `pre.100.110` has no value",
+        ),
+        (
+            lemma("post.100 == post.100"),
+            "lemma 2",
+            "`post.100` is a record; name one of its fields",
+        ),
+        (
+            probe(Question::Reachable {
+                state: "pre.100.110 == 0".to_owned(),
+            }),
+            "--state",
+            "applies at genesis, where `pre.100.110` has no value",
+        ),
+        (
+            probe(Question::Implies {
+                premise: "true".to_owned(),
+                conclusion: "pre.100 == pre.100".to_owned(),
+            }),
+            "--then",
+            "`pre.100` is a record; name one of its fields",
+        ),
+    ] {
+        assert_eq!((error.place(), error.reason()), (place, reason), "{error}");
+    }
+}
+
+/// A project that holds `u32::MAX`, as a `0..=4294967295` bound does, leaves
+/// no ID above every number it holds; the judged formula takes the largest
+/// free one.
+#[test]
+fn a_project_holding_the_largest_id_still_judges_formulas() {
+    let mut counter = Core::new("bounded-counter", &[("C", 2)]);
+    counter
+        .project
+        .push_str("\n// The external meter wraps at 4294967295.\n");
+    assert_eq!(
+        counter.lemmas(&["post.100.110 <= 2"])[0]["verdict"],
+        "inductive"
+    );
+    let implies = counter.probe(&Question::Implies {
+        premise: "true".to_owned(),
+        conclusion: "true".to_owned(),
+    });
+    assert_eq!(implies["answer"], "yes");
+}
+
 const COUNTER_SCENARIOS: &str = "# Bounded counter runs.\n\
 # scenario count-up-and-down\n\
 0 | 150 | 1 | accept - 1 | -\n\

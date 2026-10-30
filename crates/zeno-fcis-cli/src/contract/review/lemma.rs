@@ -387,12 +387,13 @@ pub(super) fn state_holds(
         formula,
         LawKind::StateInvariant,
     )?;
-    extended.bind(&extended.rules, |authority, framer| {
+    let holds = extended.bind(&extended.rules, |authority, framer| {
         let laws = LawSet::new(authority.descriptor(), &[id]);
         Ok(machine::valid_states(&machine.space, |tuple| {
             laws.on_state(framer, tuple)
         }))
-    })
+    });
+    holds.map_err(|error| machine::judged_formula_error(error, id, what))
 }
 
 /// The verdict of one lemma.

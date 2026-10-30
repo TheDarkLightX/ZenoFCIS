@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -201,7 +202,7 @@ class AssemblyTests(Fixture):
     def test_ambient_connector_refuses(self):
         with patch.dict(os.environ, {"ZENO_APP_CONNECTOR": "/tmp/injected"}, clear=True), \
              patch.object(assembler, "run_checked") as child:
-            self.refuse("AssemblyAmbientAppConfiguration", assembler.build, self.description,
+            self.refuse("AssemblyAmbientAppConfiguration:ZENO_APP_CONNECTOR$", assembler.build, self.description,
                         self.cli, self.root / "package", self.root / "scratch")
             child.assert_not_called()
 
@@ -209,7 +210,7 @@ class AssemblyTests(Fixture):
         for name in ["RUSTFLAGS", "RUSTC_WRAPPER", "CARGO_BUILD_RUSTFLAGS", "CC", "LD_PRELOAD", "PYTHONOPTIMIZE", "PYTHONPATH", "PYTHONHOME"]:
             with self.subTest(name=name), patch.dict(os.environ, {name: "injected"}, clear=True), \
                  patch.object(assembler, "run_checked") as child:
-                self.refuse("AssemblyBuildEnvironment", assembler.build, self.description,
+                self.refuse(f"AssemblyBuildEnvironment:{name}$", assembler.build, self.description,
                             self.cli, self.root / "package", self.root / "scratch")
                 child.assert_not_called()
 
@@ -218,7 +219,8 @@ class AssemblyTests(Fixture):
         default_config.parent.mkdir(parents=True)
         default_config.write_text("[build]\n")
         with patch.dict(os.environ, {}, clear=True), patch.object(assembler, "run_checked") as child:
-            self.refuse("AssemblyAmbientCargoConfiguration", assembler.build, self.description,
+            self.refuse("AssemblyAmbientCargoConfiguration:" + re.escape(str(default_config)) + "$",
+                        assembler.build, self.description,
                         self.cli, self.root / "package", self.root / "scratch")
             child.assert_not_called()
         default_config.unlink()
@@ -228,7 +230,8 @@ class AssemblyTests(Fixture):
         config.write_text('[build]\nrustflags = ["--cfg", "injected"]\n')
         with patch.dict(os.environ, {"CARGO_HOME": str(cargo_home)}, clear=True), \
              patch.object(assembler, "run_checked") as child:
-            self.refuse("AssemblyAmbientCargoConfiguration", assembler.build, self.description,
+            self.refuse("AssemblyAmbientCargoConfiguration:" + re.escape(str(config)) + "$",
+                        assembler.build, self.description,
                         self.cli, self.root / "package", self.root / "scratch")
             child.assert_not_called()
         config.unlink()
@@ -237,7 +240,8 @@ class AssemblyTests(Fixture):
         parent_config.write_text("[build]\n")
         with patch.dict(os.environ, {"CARGO_HOME": str(cargo_home)}, clear=True), \
              patch.object(assembler, "run_checked") as child:
-            self.refuse("AssemblyAmbientCargoConfiguration", assembler.build, self.description,
+            self.refuse("AssemblyAmbientCargoConfiguration:" + re.escape(str(parent_config)) + "$",
+                        assembler.build, self.description,
                         self.cli, self.root / "package", self.root / "scratch")
             child.assert_not_called()
 

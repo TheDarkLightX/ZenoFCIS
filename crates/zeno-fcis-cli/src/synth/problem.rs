@@ -143,9 +143,7 @@ pub(super) fn parse(bytes: Vec<u8>) -> Result<Problem, String> {
     }
     let source: Source =
         serde_json::from_slice(&bytes).map_err(|e| format!("problem-json: {e}"))?;
-    if source.schema != SCHEMA || source.profile != PROFILE {
-        return Err("unsupported-profile-or-schema".into());
-    }
+    header(&source.schema, SCHEMA, &source.profile)?;
     let inputs = fields(&source.inputs)?;
     let outputs = fields(&source.outputs)?;
     let nodes = source
@@ -189,6 +187,20 @@ pub(super) fn parse(bytes: Vec<u8>) -> Result<Problem, String> {
 }
 fn error(error: Error) -> String {
     error.to_string()
+}
+/// Admit a problem's `schema` and `profile`, naming the field that differs
+/// and the value this CLI accepts.
+pub(super) fn header(schema: &str, expected: &str, profile: &str) -> Result<(), String> {
+    let (name, actual, accepted) = if schema != expected {
+        ("schema", schema, expected)
+    } else if profile != PROFILE {
+        ("profile", profile, PROFILE)
+    } else {
+        return Ok(());
+    };
+    Err(format!(
+        "unsupported-profile-or-schema: {name} `{actual}` is not `{accepted}`"
+    ))
 }
 pub(super) fn fields(fields: &[Field]) -> Result<Vec<Domain>, String> {
     if fields.len() > 16 {

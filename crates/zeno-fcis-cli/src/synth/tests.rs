@@ -55,6 +55,26 @@ fn source_admission_rejects_duplicates_unknown_fields_and_noninteger_atoms() {
     assert!(problem::parse(serde_json::to_vec(&source).unwrap()).is_err());
 }
 #[test]
+fn an_unsupported_header_names_its_field_and_the_accepted_value() {
+    let refusal = |field: &str, value: &str| {
+        let mut source: Value = serde_json::from_slice(COUNTER).unwrap();
+        source[field] = json!(value);
+        problem::parse(serde_json::to_vec(&source).unwrap()).err()
+    };
+    assert_eq!(
+        refusal("profile", "zeno-fcis/finite-i64/1").as_deref(),
+        Some(
+            "unsupported-profile-or-schema: profile `zeno-fcis/finite-i64/1` is not `zeno-fcis/finite-i128/1`"
+        )
+    );
+    assert_eq!(
+        refusal("schema", "zeno-fcis/synthesis-problem/0").as_deref(),
+        Some(
+            "unsupported-profile-or-schema: schema `zeno-fcis/synthesis-problem/0` is not `zeno-fcis/synthesis-problem/1`"
+        )
+    );
+}
+#[test]
 fn runner_verdicts_require_exact_outputs_and_complete_coverage() {
     let (problem, cases) = selected();
     let wire = cases
@@ -135,6 +155,31 @@ fn discovery_has_distinct_language_adapters_and_missing_tools_stay_unknown() {
         };
         assert_eq!(failure.code, "tool-missing");
     }
+}
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
+#[test]
+fn a_different_artifact_file_set_names_the_missing_and_unexpected_files() {
+    let temp = runner::Temp::new().unwrap_or_else(|error| panic!("{}", error.message));
+    // Python artifacts checked as Rust ones: only the source file differs.
+    for name in ["manifest.json", "transition.py"] {
+        fs::write(temp.path().join(name), b"").unwrap();
+    }
+    let expected: BTreeMap<String, Vec<u8>> = ["manifest.json", "transition.rs"]
+        .into_iter()
+        .map(|name| (name.to_owned(), Vec::new()))
+        .collect();
+    let Err(failure) = check_files(temp.path(), &expected) else {
+        panic!("a different file set was accepted")
+    };
+    assert_eq!(failure.exit, crate::INVALID);
+    assert_eq!(failure.report["status"], "artifact-drift");
+    assert_eq!(
+        failure.report["detail"],
+        json!({"message":"artifact file set differs","missing":["transition.rs"],"unexpected":["transition.py"]})
+    );
 }
 #[cfg(any(
     target_os = "macos",

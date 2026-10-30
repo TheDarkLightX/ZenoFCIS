@@ -323,15 +323,18 @@ pub(crate) fn check(
             // Path existence is not scalar typing. Compile/bind the proposed
             // law without evaluating any decision under it. A record-valued
             // or otherwise unsupported candidate cannot abort valid peers.
-            let (extended, _) = super::machine::with_law(
+            let what = "postcondition candidate";
+            let (extended, id) = super::machine::with_law(
                 project,
                 &rules,
-                "postcondition candidate",
+                what,
                 "any",
                 &candidate.formula,
                 crate::contract::rules::LawKind::AuthoritySubjectRecipient,
             )?;
-            extended.bind(&extended.rules, |_, _| Ok(()))?;
+            extended
+                .bind(&extended.rules, |_, _| Ok(()))
+                .map_err(|error| super::machine::judged_formula_error(error, id, what))?;
             let substance = relation_substance(&formula).code();
             canonical.push(formula);
             Ok(substance)

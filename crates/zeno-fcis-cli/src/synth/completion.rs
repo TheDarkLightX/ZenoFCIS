@@ -205,9 +205,7 @@ fn read_file(path: &Path, limit: u64) -> Result<Vec<u8>> {
 fn load(path: &Path) -> Result<Loaded> {
     let source: Source = serde_json::from_slice(&read_file(path, problem::MAX_BYTES)?)
         .map_err(|error| invalid(format!("problem-json: {error}")))?;
-    if source.schema != SCHEMA || source.profile != PROFILE {
-        return Err(invalid("unsupported-profile-or-schema".into()));
-    }
+    problem::header(&source.schema, SCHEMA, &source.profile).map_err(invalid)?;
     let state = problem::fields(&source.state).map_err(invalid)?;
     let commands = problem::fields(&source.commands).map_err(invalid)?;
     let step = source

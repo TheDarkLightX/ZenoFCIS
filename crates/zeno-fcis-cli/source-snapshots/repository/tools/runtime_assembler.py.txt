@@ -221,18 +221,20 @@ def build(description, cli, output, scratch):
     scratch.mkdir(parents=True, exist_ok=True)
     environment = dict(os.environ)
     allowed = {"CARGO_HOME", "CARGO_TARGET_DIR", "RUSTUP_HOME"}
-    for key in environment:
+    # Each refusal names the variable or file to remove, never a value.
+    for key in sorted(environment):
         if ((key.startswith(("CARGO_", "RUST", "CC_", "CXX_", "LD_", "PKG_CONFIG")) and key not in allowed)
                 or key in {"CC", "CXX", "AR", "LD", "CFLAGS", "CXXFLAGS", "LDFLAGS", "PYTHONOPTIMIZE", "PYTHONPATH", "PYTHONHOME"}):
-            refuse("AssemblyBuildEnvironment")
-    for parent in {ROOT, *ROOT.parents, output.parent, *output.parents, scratch, *scratch.parents}:
-        if parent != ROOT and any((parent / ".cargo" / name).exists() for name in ["config", "config.toml"]):
-            refuse("AssemblyAmbientCargoConfiguration")
+            refuse("AssemblyBuildEnvironment:" + key)
     cargo_home = Path(environment.get("CARGO_HOME", Path.home() / ".cargo"))
-    if any((cargo_home / name).exists() for name in ["config", "config.toml"]):
-        refuse("AssemblyAmbientCargoConfiguration")
-    if any(key.startswith("ZENO_APP_") for key in environment):
-        refuse("AssemblyAmbientAppConfiguration")
+    parents = {ROOT, *ROOT.parents, output.parent, *output.parents, scratch, *scratch.parents} - {ROOT}
+    for config in [*(parent / ".cargo" / name for parent in sorted(parents) for name in ["config", "config.toml"]),
+                   *(cargo_home / name for name in ["config", "config.toml"])]:
+        if config.exists():
+            refuse("AssemblyAmbientCargoConfiguration:" + str(config))
+    for key in sorted(environment):
+        if key.startswith("ZENO_APP_"):
+            refuse("AssemblyAmbientAppConfiguration:" + key)
     environment["INGRESS_TEST_MEMORY"] = "1"
     environment.pop("APP_JOURNEY_TCP", None)
     with tempfile.TemporaryDirectory(prefix=".assembly-", dir=output.parent) as temporary:

@@ -127,7 +127,9 @@ impl Record {
             return Err("operator-record-bound".into());
         }
         let retention = Retention::environment()?;
-        prune(&root, retention, SystemTime::now()).map_err(|e| e.to_string())?;
+        // One pass after publishing leaves the same records as a pass before
+        // and after: both remove the oldest eligible records until the caps
+        // hold. Each pass lists and stats every record in the directory.
         publish_record(&root, &name, |file| {
             file.write_all(&bytes)?;
             file.flush()
@@ -161,13 +163,12 @@ fn prune(root: &Path, retention: Retention, now: SystemTime) -> std::io::Result<
     prune_with(root, retention, now, &mut exempt)
 }
 
-/// A live writer or parent may still have a reader: its record is exempt.
+/// A live writer or parent may still have a reader: its record is exempt. A
+/// record that states its writer's start time names that process, not a later
+/// one that reuses its PID.
 fn exempt(path: &Path, pid: u32) -> bool {
-    if process_start_ticks(pid).is_some() {
-        return true;
-    }
     // Open without following links and bound reads even for legacy or
-    // malformed files. Malformed matching records of a live writer above
+    // malformed files. Malformed matching records of a live writer below
     // remain visible to its reader, which must still reject corruption.
     let mut text = Vec::new();
     if let Ok(file) = fs::OpenOptions::new()
@@ -177,7 +178,16 @@ fn exempt(path: &Path, pid: u32) -> bool {
     {
         let _ = file.take(32769).read_to_end(&mut text);
     }
-    if let Ok(record) = serde_json::from_slice::<serde_json::Value>(&text)
+    let record = serde_json::from_slice::<serde_json::Value>(&text).ok();
+    if let Some(ticks) = process_start_ticks(pid)
+        && record
+            .as_ref()
+            .and_then(|record| record.get("process_start_ticks")?.as_u64())
+            .is_none_or(|recorded| recorded == ticks)
+    {
+        return true;
+    }
+    if let Some(record) = record
         && let Some(parent) = record["parent_pid"]
             .as_u64()
             .and_then(|p| u32::try_from(p).ok())
@@ -374,6 +384,46 @@ mod tests {
         assert!(
             live.exists() && parent.exists(),
             "age cap removed live diagnostics"
+        );
+        fs::remove_dir_all(root).unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    #[test]
+    fn a_reused_writer_pid_does_not_keep_a_dead_writers_record() {
+        let root = std::env::temp_dir().join(format!(
+            "zeno-retention-reuse-{}-{}",
+            std::process::id(),
+            crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        fs::create_dir(&root).unwrap_or_else(|e| panic!("{e}"));
+        let pid = std::process::id();
+        let ticks = process_start_ticks(pid).unwrap_or_else(|| panic!("own start time"));
+        let record = |name: &str, writer_ticks: serde_json::Value| {
+            let path = root.join(format!("{pid}-{name}.json"));
+            let value = serde_json::json!({"pid": pid, "process_start_ticks": writer_ticks, "parent_pid": 0});
+            fs::write(
+                &path,
+                serde_json::to_vec(&value).unwrap_or_else(|e| panic!("{e}")),
+            )
+            .unwrap_or_else(|e| panic!("{e}"));
+            path
+        };
+        // An earlier process with this PID wrote `reused`; this process wrote `own`.
+        let reused = record("reused", serde_json::json!(ticks + 1));
+        let own = record("own", serde_json::json!(ticks));
+        let unknown = record("unknown", serde_json::Value::Null);
+        let malformed = root.join(format!("{pid}-malformed.json"));
+        fs::write(&malformed, b"{malformed").unwrap_or_else(|e| panic!("{e}"));
+        // A one-byte cap makes every record a removal candidate.
+        let policy = Retention {
+            bytes: 1,
+            age: Duration::ZERO,
+        };
+        prune(&root, policy, SystemTime::now()).unwrap_or_else(|e| panic!("{e}"));
+        assert!(!reused.exists(), "a dead writer's record was kept");
+        assert!(
+            own.exists() && unknown.exists() && malformed.exists(),
+            "a live writer's record was removed"
         );
         fs::remove_dir_all(root).unwrap_or_else(|e| panic!("{e}"));
     }

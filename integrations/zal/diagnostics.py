@@ -21,6 +21,7 @@ def describe(error, source, path):
         ("formula-scope", "not allowed in (?:guards|invariants)", "Keep guards on pre-state and inputs, invariants on state, and put event, accepted or post-state conditions in a requirement."),
         ("invalid-range", "inclusive range|starts outside", "Use an inclusive range of 1 to 64 values within -32767 to 32767 and put the initial value inside it."),
         ("invalid-outcome", "explicit outcome|updates one variable more than once|updates need an Accept", "Use accept TARGET with at most one update per variable, or reject REASON unchanged with no updates."),
+        ("syntax-mismatch", "is the (?:English|symbolic) syntax", "Pass --syntax english for a source whose header reads ZAL ... version N., and omit it for zal N;."),
     ]
     code, fix = "controlled-grammar", "Use one complete controlled-grammar declaration per line; see docs/zal/GRAMMAR.md."
     for candidate, pattern, suggestion in cases:
