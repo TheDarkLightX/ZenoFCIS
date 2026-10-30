@@ -2,9 +2,9 @@
 
 This development integration converts the existing ZAL DeFi classifications
 into explicit, source-bound U256/I256 requirements and verification tasks.
-It is stacked on ontology PR #168, whose ancestry includes the Schema2 and
-actual-type ordering work. It changes no production Rust arithmetic or schema
-implementation.
+It builds on the ontology tools of PR #168 and on the Schema2 and actual-type
+ordering work of the 2.7 line. It changes no production Rust arithmetic or
+schema implementation.
 
 The supplied [ontology](../integrations/zal/examples/ontology/defi_arithmetic.english.txt)
 and [bindings](../integrations/zal/examples/ontology/defi_arithmetic.bindings.json)
@@ -79,6 +79,13 @@ change. Canonical ontology content, implementation identity, explicit bindings
 and discovered type contribute to the requirement ID. Obligation IDs extend
 that ID. Fact IDs resolve through the retained grounded explanation graph.
 Git revision labels alone are not evidence; exact file hashes are checked.
+`tools/record_arithmetic_handoff_sources.py --revision REV` regenerates the
+digests with the adapter's own digest function. It keeps the reviewed file
+list and refuses any file whose bytes differ at `REV`, so the recorded base
+revision names bytes that exist there; `--check` lists stale files. The pin
+and the adapter bytes enter every requirement ID, so a regenerated pin also
+needs a regenerated requirements projection
+(`tools/ontology_arithmetic_oracle.py`) and a fresh qualification.
 
 Each obligation states its quantified domain, conclusion, actual source file
 and API symbols. The kinds deliberately separate different evidence strengths:
@@ -95,6 +102,13 @@ and API symbols. The kinds deliberately separate different evidence strengths:
 | `schema-S3` | Future profile-separation refinement | OPEN: disjoint legacy/profile2 and resource behavior |
 | `operation-contracts` | Explicit operation selection followed by implementation proofs | OPEN: operations, overflow, rounding and financial behavior are unspecified |
 
+The 2.7 line also proves the actual 256-bit associated constants, conversions
+and checked addition, subtraction and negation for the stated bodies under the
+stated assumptions; see the [numeric foundations](NUMERIC_256_FOUNDATIONS_27.md).
+They do not close `operation-contracts` here: the example ontology selects no
+operation, and an operation obligation first needs that selection and its
+overflow, refusal and rounding contract.
+
 The MCP handoff leaves all arithmetic evidence open. A separate local
 qualification command can run fixed, reviewed proof/test commands and write
 obligation assessments. The original handoff remains byte-replayable inside
@@ -110,6 +124,7 @@ From the repository root:
 PYTHONPATH=integrations/zal python3 -B -m zal_notation arithmetic-handoff \
   --source integrations/zal/examples/ontology/defi_arithmetic.english.txt \
   --bindings integrations/zal/examples/ontology/defi_arithmetic.bindings.json
+python3 -B tools/record_arithmetic_handoff_sources.py --check
 python3 -B tools/ontology_arithmetic_oracle.py --check
 python3 -B -m unittest discover -s integrations/zal -p 'test_ontology*.py'
 PYTHONOPTIMIZE=1 python3 -O -B -m unittest discover -s integrations/zal -p 'test_ontology*.py'
@@ -138,14 +153,15 @@ overwrite an existing output file.
 ## Independent checks and negative controls
 
 The retained [qualification](../experiments/ontology_arithmetic_handoff/qualification.json)
-records 21 verified conditions and seven intended Verus method refusals, passing
+records 22 verified conditions and seven intended Verus method refusals, passing
 native conformance, and four native semantic refusals. Its 18 obligation
 assessments have eight scoped satisfactions and ten open obligations. The
 [type-mismatch packet](../experiments/ontology_arithmetic_handoff/type-mismatch.json)
 separately refutes both swapped nominal bindings. The
 [validation record](../experiments/ontology_arithmetic_handoff/validation.json)
-binds 223 focused Python tests in each of normal and optimized execution,
-including existing review/Lens behavior and setup checks. This is component
+binds 226 focused Python tests in each of normal and optimized execution,
+including existing review/Lens behavior, setup checks and the source-pin
+producer. This is component
 qualification, not a 2.7 release candidate.
 
 The actual finite selector is checked against an independent table on all 2,304
