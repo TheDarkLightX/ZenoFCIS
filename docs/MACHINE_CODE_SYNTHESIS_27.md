@@ -1380,6 +1380,60 @@ On an AMD Ryzen Threadripper 1950X, the three x86 memory entries agreed on
 wrong sum, both accepted by a stubbed model check, fail natively. A store to a
 read-only region is never run.
 
+**U256 kernels.** [`test-data/machine-code/u256-kernels`](../test-data/machine-code/u256-kernels)
+holds 256-bit add, subtract, unsigned less-than and signed less-than over
+read-only regions `a[4]` (base `rdi`) and `b[4]` (base `rsi`), four
+little-endian 64-bit limbs each. Add and subtract write the read-write region
+`out[4]` (base `rdx`) modulo 2^256. The compares return 1 or 0 in `rax`.
+
+| Kernel | Body | Bytes |
+| --- | --- | --- |
+| `u256-add-x86` | 8 loads, `add` then 3 `adc`, 4 stores | 58 |
+| `u256-sub-x86` | 8 loads, `sub` then 3 `sbb`, 4 stores | 58 |
+| `u256-ult-x86` | 8 loads, `cmp` then 3 `sbb`; `sbb rax,rax; neg rax` | 49 |
+| `u256-slt-x86` | 8 loads, `cmp` then 3 `sbb`; `setl cl; movzx rax,cl` | 50 |
+
+The kernels were proposed, not searched; their palettes are the forms they
+use. For each kernel:
+
+- The profile-3 checker returns `equivalent` over all region contents, base
+  pointers, scratch registers and flags.
+- The pinned cvc5 1.3.3 answers `unsat` to the same query.
+- The problem's limb expressions are proved equal to 256-bit arithmetic on the
+  concatenated limbs, with Z3 over the checker's own expression semantics.
+- `library check --native` agrees on 5,126 states.
+- The calling-convention gate qualifies it, and the native trampoline reports
+  no fault.
+
+`realize` showed that no program of at most 11 instructions in the add
+palette, or at most 5 in the unsigned-compare palette, meets the problem.
+Longer lengths were inconclusive at a 30-second solver limit, so minimality
+is not claimed. A planted dropped carry and a planted unsigned flag in the
+signed compare are both refuted.
+
+A benchmark outside the tree linked these kernels next to the Rust `U256` of
+`zeno-fcis-value`: `checked_add`, `checked_sub`, `U256::cmp` and `I256::cmp`.
+Their contracts are proved with Verus. On 4,096 inputs both gave the same
+results.
+
+| Operation | Kernel bytes | Rust function bytes | Kernel/Rust time, median |
+| --- | --- | --- | --- |
+| add | 58 | 129 | 0.75 to 0.77 |
+| sub | 58 | 107 | 0.77 |
+| unsigned less-than | 49 | 96 | 0.59 to 0.60 |
+| signed less-than | 50 | 111 | 0.67 |
+
+The comparison is not like for like:
+
+- Add and subtract here wrap, while `checked_add` and `checked_sub` also detect
+  overflow and return a `Result`; the inputs avoided overflow.
+- The compares return one bit, while `cmp` returns a three-way `Ordering`.
+- The time ratio is the median of 31 repeats of 819,200 calls each.
+- It was measured once, on an AMD Ryzen Threadripper 1950X at load average
+  about 15, pinned to one core, with Rust 1.97.1 at `opt-level=3`.
+
+It is not a portable speedup claim.
+
 **Counterexample diagnosis.** For profile 3 the packet's advisory `diagnosis`
 adds a memory view. It lists every region word at entry and after each
 instruction, the words each instruction wrote, and the expected and actual
