@@ -88,6 +88,46 @@ this boundary and are trusted-local invocation; their profile metadata says
 `trusted-local-import` and its file hash is not a claim about previously loaded
 code bytes. Neither route is a hostile-host sandbox.
 
+## Current-file qualification
+
+`qualify.py` is this integration's equivalent of the upstream validation,
+replay and mutation harness that the capsule omits. It needs GHC 9.4.7 and
+the five package versions that `vendor/build.py` checks:
+
+```sh
+python3 -B integrations/zal/relational_profile/qualify.py --out /tmp/my-new-qualification
+```
+
+It prepares a new runtime from the manifest-checked current files, builds the
+worker, and runs the following, failing on the first refusal:
+- the retained upstream suites `test_backend.py`, `test_operations.py` and
+  `test_shell.py` in that runtime. They check exact counts and
+  supplied-model evaluations against the independent original-formula
+  oracle, comparisons against independent enumeration, malformed, resource
+  and forged-response controls of the upstream shell, and source-freshness
+  and interruption controls;
+- six compiled semantic mutants of the Haskell sources. Each must compile,
+  the unmutated worker must give the oracle's count for the mutant's query,
+  and the mutant must give a different exact count;
+- forged worker responses against this wrapper's validation, each derived
+  from an actual response;
+- replay of a completed count and a refuted comparison through the wrapper,
+  with changed-request, changed-count, changed-agreement and changed-witness
+  controls;
+- `test_live_provider.py` against the built runtime, and `test_profile.py`.
+
+The run fails if any current profile file or the ladder files the bridge
+reads change while it runs, and it writes `qualification.json` to `--out`.
+`test_qualify.py` holds planted controls for the driver's own gates. The
+upstream ladder-adapter suite, the FCIS bridge vectors and the Lean
+arithmetic check are not run.
+
+At run time the wrapper checks an exact count's schema, scope and limits,
+not its value. Exact values are checked against the oracle only in the
+qualification corpus. A refutation's witness is evaluated again
+independently; a positive comparison (`EquivalentAt`, `ImpliesAt`) is checked
+for coverage and partition consistency, not model by model.
+
 ## Outcomes and bounds
 
 The result schema is `zal/relational-profile-result/1`. `ExactCount` is a
