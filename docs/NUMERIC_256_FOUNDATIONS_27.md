@@ -284,11 +284,220 @@ constant, conversion and checked-arithmetic controls. Each must reach its
 intended semantic failure in a whole-harness run, with exact typed/body and
 solver-section coverage and source/tool postchecks.
 
-`U256` has no public `checked_neg` method; none is added. The multiply/divide,
-root and rounding families, `I256::try_i128`, wider arithmetic and wider raw
-constructors/views remain outside this proof scope. So do carry/borrow result
-claims for helper widths other than two limbs, compiler/ghost erasure, physical
-resource costs, and the Schema2 and factory obligations below.
+`U256` has no public `checked_neg` method; none is added. At this checkpoint the
+multiply/divide, root and rounding families, `I256::try_i128`, wider arithmetic
+and wider raw constructors/views remained outside this proof scope. So did
+carry/borrow result claims for helper widths other than two limbs, compiler/ghost
+erasure, physical resource costs, and the Schema2 and factory obligations below.
+The next sections narrow that list.
+
+### Exact unsigned division
+
+Write `N` and `D` for the unsigned meanings of the numerator and denominator.
+Both contracts hold for every input, with no added precondition.
+
+| Actual method | Exact result and refusal |
+| --- | --- |
+| `U256::div_rem(n, d)` | For `D > 0`, returns `(Q, R)` with `N = Q*D + R`, `Q >= 0` and `0 <= R < D`, the unique canonical pair; for `D = 0`, exactly `ZeroDivisor` |
+| `U256::checked_div(n, d, mode)` | `ZeroDivisor` exactly when `D = 0`; otherwise `Inexact` exactly when `mode` is `Exact` and `N mod D > 0`; otherwise `floor(N/D)`, or `ceil(N/D)` for `Ceil`, with the exact `Overflow` partition of that value |
+
+These statements are proved for the actual bodies under the stated assumptions.
+The refusal order matches the code: the zero divisor is refused before rounding
+is considered. For `checked_div`, `ceil(N/D) <= N`, so its `Overflow` branch is
+never reached; the contract states the partition rather than relying on that.
+
+The proof reaches the private restoring divider used by every width. Its
+contract holds at every limb count `N`: the result is the canonical witness of
+the limb meanings, `ZeroDivisor` exactly for a zero divisor, or `Domain` only
+when `128*N` exceeds `usize::MAX`. Both internal `Invariant` refusals, the
+borrow/carry mismatch and the final remainder check, are proved unreachable.
+The loop invariant states that after the bits above position `k` are consumed,
+the remainder and quotient are exactly `floor(N / 2^k) mod D` and
+`floor(floor(N / 2^k) / D) * 2^k`. Each step uses the extracted limb bit, the
+doubled remainder with its shifted-out carry, and the subtraction's borrow.
+The two-limb carry and borrow helpers now also have contracts at every width.
+The 512-bit and 768-bit division wrappers call the same proved divider, but
+those wrappers remain outside the proved closure.
+
+To state those invariants, the helpers use indexed `while` loops instead of
+the earlier iterator loops; the pinned verifier has no contract connecting
+`for limb in &mut array` with the array. Two expressions changed form:
+`compare(..) != Ordering::Less` became `!matches!(compare(..), Ordering::Less)`,
+and `r != Self::ZERO` in `checked_div` became `r.0 != Self::ZERO.0`. The pinned
+library specifies neither `Ordering` inequality nor the derived wrapper
+equality; the derived equality compares that same single field. A native test
+compares the indexed helpers with verbatim copies of the iterator helpers on
+boundary words, single-limb and top-limb shapes and deterministic generated
+inputs: division at widths 0, 1, 2, 3, 4 and 6, multiplication at seven shapes
+including outputs too small for the product, and word insertion at every
+position, including the scratch state a refusal leaves. These tests support
+the source review; they are not exhaustive and do not prove compiler or
+ghost-erasure correspondence.
+
+The numeric gate now also accounts for the termination conditions of the three
+recursive limb-meaning definitions, and it admits semantic controls inside a
+named private helper. Such a control must fail inside that helper's own proved
+body. Six new controls are refused semantically: three in the divider (dropping
+the incoming bit, setting the wrong quotient bit, ignoring the shifted-out bit),
+`div_rem` returning its results swapped, and `checked_div` inverting the
+remainder test or always rounding up. With the seventeen earlier controls, all
+twenty-three must reach their intended semantic failure in whole-harness runs.
+The complete closure has 153 verification conditions. Comparing the translated
+records before and after this step, all retained functions except the two carry
+and borrow helpers are identical apart from compiler-assigned identifiers.
+
+Restoring binary division is a standard multiple-precision technique; see
+Knuth, *The Art of Computer Programming*, Vol. 2, section 4.3.1, for the
+classical algorithms. The final step uses the pinned library's Euclidean
+division lemma. The contribution here is the proof of these actual bodies, not
+a new division method.
+
+### Exact unsigned products
+
+Write `U` for the unsigned 256-bit meaning and `W` for the 512-bit meaning.
+
+| Actual method | Exact result and refusal |
+| --- | --- |
+| `U256::full_product(a, b)` | Always succeeds, with `W(result) = U(a) * U(b)` |
+| `U256::checked_mul(a, b)` | Returns `U(a) * U(b)` exactly when it is below `2^256`; otherwise exactly `Overflow` |
+
+These statements are proved for the actual bodies under the stated assumptions,
+with no added public precondition. The proof reaches the private schoolbook
+multiplier and its word insertion helper. The multiplier is proved at every
+shape whose output has at least as many limbs as both inputs together; both
+callers, 2x2 into 4 limbs and 4x2 into 6 limbs, meet that private condition.
+There it returns the exact product, and its `Invariant` refusals are
+unreachable. Word insertion is proved at every width: it adds the word at its
+limb weight exactly, and refuses with `Invariant` exactly when the sum would
+not fit. Each partial product comes from the already proved two-word kernel.
+The 768-bit `U512::multiply_u256` wrapper calls the same proved multiplier but
+remains outside the proved closure.
+
+Five further controls are refused semantically: word insertion dropping a
+carry, the multiplier adding the high product word at the low position or at
+the wrong limb position, and the two public methods multiplying the wrong
+operands. All twenty-eight controls must reach their intended semantic failure
+in whole-harness runs, and the complete closure has 174 verification
+conditions. Apart from compiler-assigned identifiers, every retained translated
+function is unchanged except the representation lemma, which gained the
+512-bit and 768-bit meanings.
+
+### Exact 512-bit and 768-bit wrappers
+
+Write `W` and `W768` for the 512-bit and 768-bit unsigned meanings.
+
+| Actual method | Exact result and refusal |
+| --- | --- |
+| `U512::checked_add(a, b)` | Returns `W(a) + W(b)` exactly when it is below `2^512`; otherwise exactly `Overflow` |
+| `U512::multiply_u256(a, b)` | Always succeeds, with `W768(result) = W(a) * U(b)` |
+| `U512::div_rem(n, d)` | For `W(d) > 0`, the canonical 512-bit witness; for `W(d) = 0`, exactly `ZeroDivisor` |
+| `U768::div_rem(n, d)` | For `W768(d) > 0`, the canonical 768-bit witness; for `W768(d) = 0`, exactly `ZeroDivisor` |
+
+These statements are proved for the actual bodies under the stated assumptions,
+with no added public precondition. Each wrapper calls the carry helper, the
+multiplier or the divider already proved at every width, so the new proof
+obligations are the limb-meaning bridges for four and six limbs. Four controls
+are refused semantically: a sum that misses the top-limb carry, a product that
+swaps the factor's words, and quotient/remainder results or operands swapped.
+All thirty-two controls must reach their intended semantic failure, and the
+complete closure has 179 verification conditions. Removing the now empty
+excluded 768-bit block renumbers the following signed block in the translated
+records; apart from that reviewed renumbering and compiler-assigned
+identifiers, every retained translated function is unchanged.
+
+### Complete-product division, rounding and comparison
+
+Write `P` for the complete integer numerator and `D = U(den)`. Each refusal
+below is checked in the listed order, and each contract holds for every input
+with no added precondition.
+
+| Actual method | Exact result and refusal order |
+| --- | --- |
+| `U256::mul_add_div_rem(a, b, offset, den)` | `P = U(a)*U(b) + U(offset)`. `ZeroDivisor` exactly when `D = 0`; then `Overflow` exactly when `floor(P/D) >= 2^256`; otherwise the canonical witness `P = Q*D + R`, `0 <= R < D` |
+| `U256::mul_div(a, b, den, mode)` | `P = U(a)*U(b)`. `ZeroDivisor`; then `Overflow` when `floor(P/D) >= 2^256`; then `Inexact` for `Exact` with `P mod D > 0`; otherwise `floor(P/D)`, or `ceil(P/D)` for `Ceil` with the exact `Overflow` partition of that value |
+| `U256::mul_div_half_up(a, b, den)` | `P = U(a)*U(b)`. `ZeroDivisor`; otherwise `floor((P + floor(D/2)) / D)` exactly when it is below `2^256`, else `Overflow` |
+| `U256::mul3_div(a, b, c, den, mode)` | As `mul_div`, with the complete product `P = U(a)*U(b)*U(c)` of up to 768 bits |
+| `U256::products_ge(a, b)` | Always succeeds with `U(a0)*U(a1)*U(a2) >= U(b0)*U(b1)*U(b2)` |
+
+These statements are proved for the actual bodies under the stated assumptions.
+The numerator is never narrowed early: the product plus offset always fits 512
+bits, so the internal sum never overflows. Quotient narrowing precedes rounding,
+so with `a = b = 2^256 - 1` and `D = 2^256 - 2` the quotient `2^256` is refused as
+`Overflow` before any `Inexact` decision. A `Ceil` result can still overflow when
+the floor quotient is `2^256 - 1`. The half-up offset is the two-limb right shift
+of the denominator, proved to equal `floor(D/2)`.
+
+These bodies changed form in four places, with unchanged values: the zero tests
+`den == Self::ZERO` and `r != Self::ZERO` / `r != U768::ZERO` compare the same
+single field, the product comparison uses `!matches!(.., Ordering::Less)`, and
+`map(|(q, _)| q)` became `let (q, _) = ..?; Ok(q)`. A native test compares all
+five methods with verbatim copies of the previous bodies on boundary and
+generated inputs in every rounding mode, and checks the 768-bit zero test on
+all 64 zero/nonzero limb patterns. These tests support the source review; they
+are not exhaustive and do not prove compiler or ghost-erasure correspondence.
+
+Adding these proofs made three earlier proofs, word insertion and both
+narrowing methods, unstable under the pinned solver. They now use explicit
+bound lemmas; their contracts are unchanged apart from compiler-assigned
+identifiers. Five further controls are refused semantically: a zero test that
+ignores the low limb, a `mul_div` that adds one to the product, a half-up offset
+that drops the carried bit, an inverted 768-bit remainder test and a strict
+product comparison. Two of these fail at the proof step that states the changed
+fact, the others at the method contract. All thirty-seven controls must reach
+their intended semantic failure, and the complete closure has 196 verification
+conditions.
+
+### Signed multiplication, division and narrowing
+
+Write `S` for the signed meaning. Signed division rounds toward the signed
+infinities: `Floor` is `floor(N/D)` and `Ceil` is `ceil(N/D)` for the exact
+rational `N/D`, whatever the signs. The contract defines `floor(N/D)` with
+integer division by the positive divisor `|D|` after moving the sign into the
+numerator, so negative quotients round down rather than toward zero.
+
+| Actual method | Exact result and refusal order |
+| --- | --- |
+| `I256::checked_mul(a, b)` | `S(a)*S(b)` exactly when it is in `[-2^255, 2^255)`; otherwise exactly `Overflow` |
+| `I256::checked_div(n, d, mode)` | `ZeroDivisor` exactly when `S(d) = 0`; then `Inexact` for `Exact` when `S(d)` does not divide `S(n)`; otherwise the signed floor or ceiling, with the exact signed `Overflow` partition (for example `-2^255 / -1`) |
+| `I256::mul_div_positive(a, b, den, mode)` | `Domain` exactly when `S(den) <= 0`; then `Overflow` when `floor(|S(a)*S(b)| / S(den)) >= 2^256`; then `Inexact`; otherwise the signed floor or ceiling of `S(a)*S(b)/S(den)` with the exact signed `Overflow` partition |
+| `I256::nonnegative_mul_div(a, b, den, mode)` | `Domain` when `S(a) < 0` or `S(b) < 0`; otherwise exactly `mul_div_positive` |
+| `I256::mul_unsigned_signed_div(a, b, c, den, mode)` | With `P = S(a)*U(b)*S(c)` and `D = U(den)`: `ZeroDivisor` when `D = 0`; then `Overflow` when `floor(|P|/D) >= 2^256`; then `Inexact`; otherwise the signed floor or ceiling of `P/D` with the exact signed `Overflow` partition |
+| `I256::nonnegative_products_ge(a, b)` | `Domain` when any of the six factors is negative; otherwise whether the first signed triple product is at least the second |
+| `I256::try_i128(x)` | `S(x)` exactly when it is in `[-2^127, 2^127)`; otherwise exactly `Overflow` |
+
+These statements are proved for the actual bodies under the stated assumptions,
+with no added public precondition. Each method computes magnitudes with the
+proved unsigned methods and applies the sign with the proved `from_magnitude`.
+A checked lemma shows that the private magnitude rounding selection realizes
+signed rounding in every sign case, including a zero numerator with either
+sign, and that a remainder test on magnitudes is exactly signed divisibility.
+The magnitude quotient check precedes the inexact check, so an oversized exact
+quotient with a remainder is refused as `Overflow`, as the code does.
+
+Two bodies changed form with unchanged values: the zero test
+`den == Self::ZERO` in `mul_div_positive` compares the same two words, and
+`nonnegative_products_ge` checks the six factors in the same order with an
+indexed loop and builds the bit arrays directly instead of through
+`iter().chain(..)` and `map(..)`. A native test compares both with verbatim
+copies of the previous bodies on boundary and generated inputs in every
+rounding mode, and checks each position of a single negative factor.
+
+The closure growth again unsettled two earlier proofs, the lexicographic order
+lemma and the two-limb subtraction clause, so they now state their steps
+explicitly; their contracts are unchanged apart from compiler-assigned
+identifiers. Seven controls are refused semantically: a product with the wrong
+sign, reversed magnitude rounding, a positive-denominator check that admits
+zero, a nonnegativity check that skips the second factor, a mixed ratio that
+uses raw bits instead of a magnitude, a factor scan that stops one short and
+a narrowing test that ignores sign extension. All forty-four controls must
+reach their intended semantic failure, and the complete closure has 229
+verification conditions. As a development check, the positive closure also
+verified with twelve different solver seeds.
+
+The square-root methods (`U512::sqrt`, `U512::sqrt_ratio` and
+`U256::geometric_mean`) and the raw 512-bit word views remain outside this
+proof scope. So do compiler/ghost erasure, physical resource costs, and the
+Schema2 and factory obligations below.
 
 ### Earlier schema checkpoint
 

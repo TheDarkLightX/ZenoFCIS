@@ -100,6 +100,121 @@ class SourceAdmission(unittest.TestCase):
             with self.subTest(mode=mode), self.assertRaises(ValueError):
                 gate.configuration(self.root, profile)
 
+    def test_division_stage_is_complete_and_retains_checked_dependencies(self):
+        complete = copy.deepcopy(self.profile)
+        producer.include_division(complete)
+        gate.configuration(self.root, complete)
+        for mode in ("method", "checked"):
+            profile = copy.deepcopy(complete)
+            if mode == "method":
+                profile["obligations"].pop(next(i for i, o in enumerate(profile["obligations"])
+                                                if o["member"] == "U256::checked_div"))
+            else:
+                profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != "checked"]
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                gate.configuration(self.root, profile)
+
+    def test_multiplication_stage_is_complete_and_retains_conversion_dependencies(self):
+        complete = copy.deepcopy(self.profile)
+        producer.include_multiplication(complete)
+        gate.configuration(self.root, complete)
+        for mode in ("method", "conversions"):
+            profile = copy.deepcopy(complete)
+            if mode == "method":
+                profile["obligations"].pop(next(i for i, o in enumerate(profile["obligations"])
+                                                if o["member"] == "U256::checked_mul"))
+            else:
+                profile["obligations"] = [o for o in profile["obligations"]
+                                          if o["stage"] not in ("conversions", "checked", "division")]
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                gate.configuration(self.root, profile)
+
+    def test_wide_stage_is_complete_and_retains_its_helper_stages(self):
+        complete = copy.deepcopy(self.profile)
+        producer.include_wide(complete)
+        gate.configuration(self.root, complete)
+        for mode in ("method", "division", "multiplication"):
+            profile = copy.deepcopy(complete)
+            if mode == "method":
+                profile["obligations"].pop(next(i for i, o in enumerate(profile["obligations"])
+                                                if o["member"] == "U768::div_rem"))
+            else:
+                profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != mode]
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                gate.configuration(self.root, profile)
+
+    def test_muldiv_stage_is_complete_and_retains_the_wide_stage(self):
+        complete = copy.deepcopy(self.profile)
+        producer.include_muldiv(complete)
+        gate.configuration(self.root, complete)
+        for mode in ("method", "wide"):
+            profile = copy.deepcopy(complete)
+            if mode == "method":
+                profile["obligations"].pop(next(i for i, o in enumerate(profile["obligations"])
+                                                if o["member"] == "U256::products_ge"))
+            else:
+                profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != "wide"]
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                gate.configuration(self.root, profile)
+
+    def test_signed_stage_is_complete_and_retains_the_muldiv_stage(self):
+        complete = copy.deepcopy(self.profile)
+        producer.include_signed(complete)
+        gate.configuration(self.root, complete)
+        for mode in ("method", "muldiv"):
+            profile = copy.deepcopy(complete)
+            if mode == "method":
+                profile["obligations"].pop(next(i for i, o in enumerate(profile["obligations"])
+                                                if o["member"] == "I256::try_i128"))
+            else:
+                profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != "muldiv"]
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                gate.configuration(self.root, profile)
+
+    def test_fixed_array_parameters_bind_their_element_type_and_length(self):
+        self.assertEqual(gate.expected_type("[U256;3]"),
+                         ["Typ", "Primitive", ["Primitive", "Array"],
+                          [gate.expected_type("U256"), ["Typ", "ConstInt", "3"]]])
+        self.assertNotEqual(gate.expected_type("[U256;3]"), gate.expected_type("[U256;2]"))
+        self.assertNotEqual(gate.expected_type("[U256;3]"), gate.expected_type("[I256;3]"))
+
+    def test_every_proved_helper_has_a_semantic_control(self):
+        helpers = {c["helper"] for c in self.profile["controls"] if "helper" in c}
+        self.assertEqual(helpers, gate.HELPERS)
+        for helper in helpers:
+            self.assertIn(gate.NAMESPACE + "arithmetic256::" + helper, self.profile["body_covered_functions"])
+
+    def test_helper_controls_must_fail_inside_the_actual_proved_helper(self):
+        helper = next(i for i, c in enumerate(self.profile["controls"]) if "helper" in c)
+        gate.control_sources(self.root, self.profile)
+        for mode in ("unknown", "target", "unproved", "method"):
+            profile = copy.deepcopy(self.profile)
+            control = profile["controls"][helper]
+            if mode == "unknown":
+                control["helper"] = "subtract"
+            elif mode == "target":
+                control["error_function"] = profile["obligations"][0]["report_function"]
+            elif mode == "unproved":
+                profile["body_covered_functions"].remove(control["error_function"])
+            else:
+                # The public method region does not contain the helper expression.
+                control.pop("helper")
+                control["error_function"] = next(o["report_function"] for o in profile["obligations"]
+                                                 if o["member"] == control["member"])
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                gate.control_sources(self.root, profile)
+
+    def test_helper_region_is_the_complete_annotated_helper(self):
+        source = (self.root / gate.SUBJECT).read_text()
+        first, last = gate.helper_region(source, "divide")
+        lines = source.splitlines()
+        self.assertTrue(lines[first - 1].startswith("#[cfg_attr(verus_keep_ghost, verus_spec("))
+        self.assertTrue(lines[first].lstrip().startswith("ensures numeric_model::divide_result"))
+        self.assertEqual(lines[last - 1], "}")
+        self.assertIn("fn divide<const N: usize>", "\n".join(lines[first - 1:last]))
+        with self.assertRaisesRegex(ValueError, "helper"):
+            gate.helper_region(source, "absent_helper")
+
     def test_controls_change_only_the_declared_production_expression(self):
         original = (self.root / gate.SUBJECT).read_text()
         for control, changed in gate.control_sources(self.root, self.profile):
@@ -238,13 +353,16 @@ class ProofAdmission(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             def render(s):
-                return f";; Function-Def {s['function']}\n;; {root / s['source']}:{s['line']}:1: end\n(check-sat)\n"
+                header = "Spec-Termination" if s.get("kind") == "termination" else "Function-Def"
+                return f";; {header} {s['function']}\n;; {root / s['source']}:{s['line']}:1: end\n(check-sat)\n"
             text = "".join(render(s) for s in self.profile["smt_sections"])
             path = root / "all.smt2"
             path.write_text(text)
             gate.smt_coverage(root, root, self.profile)
             for bad in (text.replace("(check-sat)\n", "", 1), text + render(self.profile["smt_sections"][0]),
                         text.replace(";; Function-Def ", ";; Function-Def wrong::", 1),
+                        text.replace(";; Spec-Termination ", ";; Function-Def ", 1),
+                        text.replace(";; Function-Def ", ";; Spec-Termination ", 1),
                         text.replace(self.profile["smt_sections"][0]["source"], "copied.rs", 1)):
                 with self.subTest(bad=bad[:80]):
                     path.write_text(bad)
