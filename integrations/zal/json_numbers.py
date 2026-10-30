@@ -7,6 +7,9 @@ The supported meanings are:
   `0.30000000000000001`, `1e-400` and `1e400` are refused.
 - `NaN` and `Infinity` spellings are refused.
 
+Integer-only readers, such as those of contract policy JSON, use `integer_only`, which also refuses every fraction or
+exponent (`json-number-not-integer`) and, when bounds are given, integers outside them (`json-number-out-of-range`).
+
 For every accepted number, the source, the in-memory model and the canonical JSON output denote the same decimal
 value. Spelling can differ: `1.50` is written back as `1.5`. A reader that needs the original spelling keeps raw
 tokens instead; `zal_notation.normalizer` does. Each refusal names one of the reason codes below.
@@ -20,7 +23,10 @@ NONFINITE = "json-number-nonfinite"
 NEGATIVE_ZERO = "json-number-negative-zero-integer"
 TOO_LONG = "json-number-too-long"
 INEXACT = "json-number-inexact-decimal"
-REASONS = (NONFINITE, NEGATIVE_ZERO, TOO_LONG, INEXACT)
+NOT_INTEGER = "json-number-not-integer"
+OUT_OF_RANGE = "json-number-out-of-range"
+REASONS = (NONFINITE, NEGATIVE_ZERO, TOO_LONG, INEXACT, NOT_INTEGER, OUT_OF_RANGE)
+I128 = (-(1 << 127), (1 << 127) - 1)
 MAX_DIGITS = 4300  # Python's default integer-string conversion limit, now a named refusal.
 
 
@@ -52,6 +58,25 @@ def hooks(refuse, max_digits: int = MAX_DIGITS) -> dict:
 
     return {"parse_int": integer_hook(refuse, max_digits), "parse_float": parse_float,
             "parse_constant": parse_constant}
+
+
+def integer_only(refuse, bounds=None, max_digits: int = MAX_DIGITS) -> dict:
+    """json.loads keyword arguments for a reader that admits integers only, optionally within (low, high)."""
+    integer = integer_hook(refuse, max_digits)
+
+    def parse_int(lexeme: str) -> int:
+        value = integer(lexeme)
+        if bounds is not None and not bounds[0] <= value <= bounds[1]:
+            refuse(OUT_OF_RANGE, lexeme)
+        return value
+
+    def parse_float(lexeme: str):
+        refuse(NOT_INTEGER, lexeme)
+
+    def parse_constant(lexeme: str):
+        refuse(NONFINITE, lexeme)
+
+    return {"parse_int": parse_int, "parse_float": parse_float, "parse_constant": parse_constant}
 
 
 def raising(error_type, prefix: str = ""):

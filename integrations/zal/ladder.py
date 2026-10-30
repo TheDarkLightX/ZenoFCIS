@@ -13,7 +13,9 @@ from functools import lru_cache
 from itertools import product
 from collections import defaultdict, deque
 from collections.abc import Mapping
+from decimal import Decimal
 import json
+import math
 from pathlib import Path
 import re
 from string import Formatter
@@ -222,8 +224,40 @@ class Context:
         return self.data['domains'][name]
 
 
+def _number_hooks():
+    """Keep each number's exact decimal value or refuse it by name.
+
+    This is the policy and the reason codes of json_numbers.py, written inline because the standalone relational
+    route copies this file without its sibling modules. The cross-reader test checks that the copies agree.
+    """
+    def refuse(reason, lexeme):
+        raise Refusal(f"{reason}: {lexeme if len(lexeme) <= 40 else lexeme[:40] + '...'}")
+
+    def parse_int(lexeme):
+        if lexeme == "-0":
+            refuse("json-number-negative-zero-integer", lexeme)
+        if len(lexeme) > 4300:
+            refuse("json-number-too-long", lexeme)
+        return int(lexeme)
+
+    def parse_float(lexeme):
+        if len(lexeme) > 4300:
+            refuse("json-number-too-long", lexeme)
+        value = float(lexeme)
+        if not math.isfinite(value):
+            refuse("json-number-nonfinite", lexeme)
+        if Decimal(repr(value)) != Decimal(lexeme):
+            refuse("json-number-inexact-decimal", lexeme)
+        return value
+
+    def parse_constant(lexeme):
+        refuse("json-number-nonfinite", lexeme)
+
+    return {"parse_int": parse_int, "parse_float": parse_float, "parse_constant": parse_constant}
+
+
 def load(path):
-    return Context.from_data(json.loads(Path(path).read_text()))
+    return Context.from_data(json.loads(Path(path).read_text(), **_number_hooks()))
 
 
 def expand(n, ctx, stack=(), derived=True):
@@ -1244,7 +1278,7 @@ def fixture_text(n,ctx,fixture):
 
 
 def file_theory(path):
-    name=json.loads(Path(path).read_text()).get('theory')
+    name=json.loads(Path(path).read_text(),**_number_hooks()).get('theory')
     if not isinstance(name,str) or not name:
         raise Refusal('unsupported-theory: '+str(name))
     return name

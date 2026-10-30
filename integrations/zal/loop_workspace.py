@@ -40,6 +40,7 @@ import sys
 import tempfile
 
 from behavior import Refusal
+import json_numbers
 import report_numbers as N
 import loop_doors as doors
 
@@ -84,7 +85,8 @@ def fields_of(contract: Path) -> dict:
     (a root without fields is one input named after the root)."""
     zeno = (contract / "project.zeno").read_text(encoding="ascii")
     policy_text = (contract / "v2" / "policy.json").read_text(encoding="ascii")
-    policy = json.loads(policy_text)
+    # Contract policy JSON: integers within i128 only, as the Rust contract reader admits.
+    policy = json.loads(policy_text, **json_numbers.integer_only(json_numbers.raising(Refusal, "v2/policy.json: "), json_numbers.I128))
     types, fields, variants, reasons, laws = {}, [], {}, {}, []
     for line in _zeno_lines(zeno):
         parts = line.split()

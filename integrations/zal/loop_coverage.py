@@ -432,7 +432,8 @@ def run(options):
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(original.read_bytes())
     project = read_text(subject / "project.zeno")
-    policy = json.loads(read_text(subject / "v2/policy.json"))
+    policy = json.loads(read_text(subject / "v2/policy.json"),
+                        **json_numbers.integer_only(json_numbers.raising(ValueError, "v2/policy.json: "), json_numbers.I128))
     used = {int(x) for x in re.findall(r"\b(?:law|claim)\s+(\d+)", project)}
     next_id = 9000
     def allocate():
