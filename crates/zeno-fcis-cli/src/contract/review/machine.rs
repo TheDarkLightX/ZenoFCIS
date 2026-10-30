@@ -658,7 +658,8 @@ pub(super) fn valid_states(space: &Space, test: impl Fn(&[i128]) -> bool + Sync)
 
 /// The contract with one more law, `law ID NAME on SCOPE = FORMULA;`,
 /// appended to `project.zeno` and given `kind`, and the law's ID: an ID
-/// above every number `project.zeno` holds and every framework law's.
+/// above every number `project.zeno` holds and every framework law's, or,
+/// when `u32::MAX` is among them, the largest ID that none of them is.
 ///
 /// # Errors
 /// A formula with trailing text, undeclared paths or no contract form, named as
@@ -675,14 +676,16 @@ pub(super) fn with_law(
     if formula.trim().is_empty() {
         return Err(invalid("is empty".to_owned()));
     }
-    let highest = project
+    let taken: std::collections::BTreeSet<u32> = project
         .split(|character: char| !character.is_ascii_digit())
         .filter_map(|digits| digits.parse::<u32>().ok())
         .chain([990, 991, 909, rules.failure_law, rules.reject_law])
-        .max()
-        .unwrap_or(0);
+        .collect();
+    let highest = taken.last().copied().unwrap_or(0);
+    // A u32 bound such as `0..=4294967295` leaves no ID above it.
     let id = highest
         .checked_add(1)
+        .or_else(|| (1..u32::MAX).rev().find(|id| !taken.contains(id)))
         .ok_or_else(|| invalid("has no free law ID".to_owned()))?;
     let (scope, genesis) = match scope {
         "commit, genesis" => (zeno_fcis_spec::LawScope::Committing, true),

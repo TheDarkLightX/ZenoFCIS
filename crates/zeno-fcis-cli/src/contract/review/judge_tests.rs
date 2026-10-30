@@ -690,6 +690,26 @@ fn a_refused_formula_is_named_as_supplied() {
     }
 }
 
+/// A project that holds `u32::MAX`, as a `0..=4294967295` bound does, leaves
+/// no ID above every number it holds; the judged formula takes the largest
+/// free one.
+#[test]
+fn a_project_holding_the_largest_id_still_judges_formulas() {
+    let mut counter = Core::new("bounded-counter", &[("C", 2)]);
+    counter
+        .project
+        .push_str("\n// The external meter wraps at 4294967295.\n");
+    assert_eq!(
+        counter.lemmas(&["post.100.110 <= 2"])[0]["verdict"],
+        "inductive"
+    );
+    let implies = counter.probe(&Question::Implies {
+        premise: "true".to_owned(),
+        conclusion: "true".to_owned(),
+    });
+    assert_eq!(implies["answer"], "yes");
+}
+
 const COUNTER_SCENARIOS: &str = "# Bounded counter runs.\n\
 # scenario count-up-and-down\n\
 0 | 150 | 1 | accept - 1 | -\n\
