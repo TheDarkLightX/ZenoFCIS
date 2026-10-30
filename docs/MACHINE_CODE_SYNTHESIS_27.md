@@ -1397,5 +1397,28 @@ and the ratified [RV32I](https://docs.riscv.org/reference/isa/v20260120/unpriv/r
 provides a research precedent for instruction search; the present tool does not
 reuse its implementation or claim its optimization results.
 
+### Research lineage
+
+The 2.7 search and checking techniques adapt published work. None of that work's
+implementation is reused, and none of its measured results is claimed here.
+
+| Technique here | Source |
+| --- | --- |
+| Footprint pruning, split search, lost-input pruning | McSynth and McSynth++ ([Srinivasan 2017](https://research.cs.wisc.edu/wpis/papers/tr1844.pdf); [Srinivasan, Sharma and Reps, OOPSLA 2016](https://research.cs.wisc.edu/wpis/abstracts/oopsla16-synthesis.abs.html)), restricted to exact skips |
+| Reordering and duplicate pruning | partial-order reduction (Godefroid, LNCS 1032, 1996); equivalence reduction (Smith and Albarghouthi, VMCAI 2019) |
+| Specialization | WiPEr ([Srinivasan and Reps, OOPSLA 2015](https://research.cs.wisc.edu/wpis/abstracts/oopsla15.abs.html)) |
+| Per-result slices | McSlice (Srinivasan and Reps, OOPSLA 2016) |
+| Solver unrealizability (`realize`) | loop-free synthesis by exists-forall queries (Gulwani et al., PLDI 2011); complete space partitions ([Lu and Bodik, OOPSLA 2025](https://lsrcz.github.io/files/OOPSLA25.pdf)) |
+| Admission rules as part of correctness (profile 3) | capability-aware superoptimization ([CapOpt, OOPSLA 2026](https://2026.splashcon.org/details/oopsla-2026/107/CapOpt-Capability-aware-Superoptimization-for-Secure-and-Provably-Faster-Code), abstract); K2 (SIGCOMM 2021) |
+| Memory as word variables with stated assumptions | effect variables in [Arrival (OOPSLA 2025)](https://www.contrib.andrew.cmu.edu/~bparno/papers/arrival.pdf); STOKE's stated stack assumption |
+| Assembler cross-check of every admitted encoding | Arrival's encoding-template validation |
+| Verifier in the loop for proposals | LPO ([Xu et al., ASPLOS 2026](https://arxiv.org/abs/2508.16125)) |
+
+**The instruction models.** The models used here were generated, then checked
+against GNU `as` and against this CPU (x86) on sampled states. They were not
+derived from vendor specifications. Arrival and Islaris check against
+authoritative machine-readable semantics instead, such as Arm's ASL and the Sail
+RISC-V model; for ZenoFCIS that check is future work.
+
 The reusable [machine-code skill](../skills/zenofcis-machine-code/SKILL.md)
 records route selection, feedback, replay and evidence boundaries.
