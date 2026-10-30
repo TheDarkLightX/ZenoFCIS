@@ -1,0 +1,18 @@
+{
+  "schema": "zeno-fcis/guide-card-coverage/1",
+  "rule": "Every leaf command of `zeno-fcis describe` has a card whose `commands` list names the leaf or one of its ancestors, or an entry below naming the leaf or one of its ancestors with the documentation that stands in for a card. tools/test_guide_cli.py checks this against the compiled command tree.",
+  "excluded": {
+    "commons": "Shared coordination store; `zeno-fcis commons help` prints the Commons tool's own command reference. The Coordinate section of every card states how a loop uses it.",
+    "construct": "Checked priority-collection construction from an approved frozen requirements bundle; docs/CONSTRUCTION.md gives inputs, exits and finite scope.",
+    "describe": "Self-describing: prints the command tree, arguments, defaults and effects as JSON (docs/CLI_REFERENCE.md, line 13 and Exit codes). It needs no card because it is how the cards are checked.",
+    "guide": "The card index itself: list, show and find (docs/CLI_REFERENCE.md, Offline task guide).",
+    "graph": "Derived view of a checked project as DOT, Mermaid or JSON (docs/CLI_REFERENCE.md, line 19); exit 0 says only that the view was produced.",
+    "explain": "Diagnostics of a project, all or one stable code (docs/CLI_REFERENCE.md, line 20); companion of the check card.",
+    "backend list": "Lists the closed formal backend configurations; docs/CLI_REFERENCE.md Tools manifest and docs/FORMAL_TOOLS_RC3.md. The prove card covers backend inspect and verify.",
+    "backend inventory-lean": "Inventory of a pinned Lean runtime root (docs/CLI_REFERENCE.md, line 295); release-qualification tooling, not a loop step.",
+    "contract adopt": "Adoption of a checked candidate with its transform receipt; the program-search and transform cards state the workflow and docs/CLI_REFERENCE.md Contract adoption and store upgrades gives the exact contract, limits and exits.",
+    "contract export-program": "Writes the contract's canonical decision program; first step of the program-search card's workflow (docs/CLI_REFERENCE.md Contract program export).",
+    "contract export": "Tau export of per-rule tables (`--tau`); docs/TAU_KIT.md. Experimental integration, not a loop step.",
+    "contract import": "Tau import of a pointwise decision ladder (`--tau`); docs/TAU_KIT.md. Experimental integration, not a loop step."
+  }
+}
