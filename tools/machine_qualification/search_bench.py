@@ -16,9 +16,11 @@ identical. Times are for this machine and load only. Nothing here claims optimal
         [--no-prune]
     python3 -B -m tools.machine_qualification.search_bench compare BEFORE.json AFTER.json
 
-`compare` marks each found cost identical, improved (none found before, or a lower rank now) or worse, and exits 1
-when any is worse, a found cost is lost, or a problem of the first report is missing from the second. A problem only
-in the second report is listed as new.
+`compare` marks each found cost identical, improved (none found before, or a lower rank now) or worse, ranking by
+the problem's recorded objective first and the other cost second, as the search does. It exits 1 when any is worse,
+a found cost is lost, a problem of the first report is missing from the second, its objective changed, or two
+different costs cannot be ranked because neither report recorded the objective. A problem only in the second report
+is listed as new.
 """
 
 from __future__ import annotations
@@ -133,7 +135,8 @@ def run(selected: list[str] | None, budgets: dict, repeats: int, prune: bool | N
         if selected and name not in selected:
             continue
         problem = item["problem"]
-        row = {"schema": problem["schema"], "target": problem["target"], "grammar": len(problem["grammar"]),
+        row = {"schema": problem["schema"], "target": problem["target"], "objective": problem["objective"],
+               "grammar": len(problem["grammar"]),
                "max_instructions": problem["max_instructions"], "space": space(problem),
                "recorded_cost": item["recorded_cost"], **measure(problem, budgets, repeats, prune)}
         report["problems"][name] = row
@@ -146,15 +149,20 @@ def run(selected: list[str] | None, budgets: dict, repeats: int, prune: bool | N
 COLUMNS = ("solver_checks", "proposed", "concrete_refutations", "objective_pruned")
 
 
-def verdict(old, new) -> str:
-    """Compare two found costs by bytes, then instructions: the order of the default bytes objective."""
+def verdict(old, new, objective: str | None) -> str:
+    """Compare two found costs by the problem's objective first, then the other cost, as the search ranks them.
+
+    Without a recorded objective, two different costs cannot be ranked: the verdict is "unranked"."""
     if old == new:
         return "identical"
     if new is None:
         return "lost"
     if old is None:
         return "improved"
-    rank = lambda cost: (cost["bytes"], cost["instructions"])
+    if objective not in ("bytes", "instructions"):
+        return "unranked"
+    other = "instructions" if objective == "bytes" else "bytes"
+    rank = lambda cost: (cost[objective], cost[other])
     return "improved" if rank(new) < rank(old) else "worse"
 
 
@@ -175,7 +183,12 @@ def compare(before: dict, after: dict) -> tuple[str, int]:
             lines.append(f"{name} | missing from after")
             code = 1
             continue
-        found = verdict(old["cost"], new["cost"])
+        objectives = {row["objective"] for row in (old, new) if row.get("objective") is not None}
+        if len(objectives) > 1:
+            lines.append(f"{name} | objective changed {old['objective']} -> {new['objective']}")
+            code = 1
+            continue
+        found = verdict(old["cost"], new["cost"], next(iter(objectives), None))
         code = code if found in ("identical", "improved") else 1
         cells = [name, *(f"{old['counters'].get(c)}/{new['counters'].get(c)}" for c in COLUMNS),
                  f"{old['wall_median_seconds']}/{new['wall_median_seconds']}",
