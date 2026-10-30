@@ -130,6 +130,24 @@ class NativeMachineTests(unittest.TestCase):
                 self.results.append(row)
                 print("MACHINE_NATIVE_RESULT " + json.dumps(row, sort_keys=True), flush=True)
 
+    def test_paired_timing_of_a_replayed_kernel_against_gcc(self):
+        from machine_code import session
+        from machine_code.bench import bench
+        work = self.root / "bench"; work.mkdir()
+        repository = Path(__file__).resolve().parents[1]
+        session.open_session(repository / "test-data/machine-code/add64-x86.json", work / "session")
+        self.assertEqual(session.search(work / "session", max_candidates=5000, deadline_ms=8000)["status"], "checked-candidate")
+        self.assertEqual(session.emit(work / "session", work / "artifact")["status"], "emitted")
+        report = bench(work / "artifact", work / "timing", iterations=20_000, repeats=5)
+        self.assertEqual(report["status"], "measured", report)
+        self.assertEqual(report["baseline_c"], "(x + y)")
+        self.assertTrue(all(value > 0 for value in report["ticks_per_call"].values()))
+        self.assertIn("Not a portable speedup claim", report["scope"])
+        (work / "artifact" / "kernel.bin").write_bytes(bytes.fromhex("4831f8c3"))
+        with self.assertRaisesRegex(ValueError, "artifact bytes changed"):
+            bench(work / "artifact", work / "timing-tampered", iterations=20_000, repeats=5)
+        self.assertFalse((work / "timing-tampered").exists(), "a kernel that no longer replays is never timed")
+
     def test_rv64i_object_has_independent_elf_identification(self):
         out = self.root / "rv64i"; out.mkdir()
         code = encode_program(TARGETS[1], [["add", "a0", "a0", "a1"]])

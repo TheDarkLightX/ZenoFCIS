@@ -188,6 +188,24 @@ return from the instruction count. ELF overhead, synthesis/checking/setup cost,
 memory, compilation and measured execution cost are separate quantities.
 No global optimality or runtime speedup follows from a smaller candidate.
 
+Measure time with the paired benchmark, never infer it from size:
+
+```sh
+python3 -B -m tools.machine_code.run bench --artifact ARTIFACT --out NEW_DIR [--iterations N] [--repeats R]
+```
+
+- **Replay first:** a kernel is timed only after its artifact replays. A changed artifact is refused before
+  any timing.
+- **Baseline:** generated from the problem's expression as C and compiled with `gcc -O2`.
+- **Harness:** both functions go through the same function-pointer harness, in a latency mode (dependent calls)
+  and a throughput mode (independent inputs). Repeats alternate kernel and baseline, with RDTSC between LFENCEs.
+- **Report:** median ticks per call and the kernel/baseline ratios, with the CPU, load and compiler.
+
+Example: the searched 64-bit sum (`lea rax,[rdi+rsi]; ret`, 5 bytes) against GCC's `endbr64; lea; ret`
+(9 bytes), on an AMD Ryzen Threadripper 1950X under load, measured latency ratio 0.999 and throughput ratio
+0.97. At this size the call dominates, and the 4 saved bytes buy no measurable time. Results hold for that
+machine, load and call ABI only. They are not a portable speedup claim.
+
 Keep the default GCC baseline and the explicitly matching register-kernel
 baseline. Some distributions add ENDBR64 by default; its four bytes are a
 control-flow-hardening difference, not a synthesis improvement. Profile 1 does
