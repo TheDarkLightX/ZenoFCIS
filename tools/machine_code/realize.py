@@ -294,17 +294,21 @@ def query(z, problem, length, bound, examples, ranges=None):
 
 
 def _lengths(problem, bound):
-    """Lengths whose least possible cost is below the bound, and lengths excluded by arithmetic alone."""
+    """(asked, excluded by cost, empty): the lengths a query must decide, the lengths whose least possible cost is
+    not below the bound, and the positive lengths of an empty palette, which have no candidate at all. The last two
+    are discharged by arithmetic, without a query."""
     sizes = [len(encode_instruction(problem["target"], form)) for form in problem["grammar"]]
     terminal = len(encode_program(problem["target"], []))
-    asked, excluded = [], []
+    asked, excluded, empty = [], [], []
     for length in range(problem["max_instructions"] + 1):
         least = length if problem["objective"] == "instructions" else terminal + length * min(sizes, default=0)
-        if bound is None or least < bound:
-            asked.append(length)
-        else:
+        if bound is not None and least >= bound:
             excluded.append(length)
-    return asked, excluded
+        elif length > 0 and not sizes:
+            empty.append(length)
+        else:
+            asked.append(length)
+    return asked, excluded, empty
 
 
 def _query_hash(solver):
@@ -448,7 +452,7 @@ def realize(problem, bound=None, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadlin
     if problem["schema"] not in (profile2.SCHEMA, profile3.SCHEMA, "zeno-fcis/machine-problem/1"):
         raise ValueError("realize supports profiles 1, 2 and 3 only")
     if bound is not None:
-        integer(bound, 1, 1 << 16, "cost bound")
+        integer(bound, 0, 1 << 16, "cost bound")
     integer(timeout_ms, 1, 60_000, "solver timeout")
     integer(max_rounds, 1, 1024, "round budget")
     integer(deadline_ms, 1, 3_600_000, "deadline")
@@ -458,8 +462,9 @@ def realize(problem, bound=None, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadlin
         integer(split_ms, 1, 60_000, "split probe")
     partitioned = groups > 1 or split_ms is not None
     began, deadline = time.monotonic(), time.time() + deadline_ms / 1000
-    asked, excluded = _lengths(problem, bound)
-    palette_groups = _groups(len(problem["grammar"]), min(groups, len(problem["grammar"])))
+    asked, excluded, empty = _lengths(problem, bound)
+    palette = len(problem["grammar"])
+    palette_groups = _groups(palette, min(groups, palette)) if palette else []
     pool = None
     if partitioned and workers > 1:
         import multiprocessing
@@ -492,7 +497,7 @@ def realize(problem, bound=None, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadlin
             pool.shutdown(wait=True, cancel_futures=True)
     record = {"schema": SCHEMA, "status": status, "problem_sha256": digest(canonical(problem)),
               "objective": problem["objective"], "bound": bound, "lengths": lengths,
-              "excluded_by_cost": excluded, "z3_version": z.get_version_string(),
+              "excluded_by_cost": excluded, "excluded_by_empty_palette": empty, "z3_version": z.get_version_string(),
               "elapsed_seconds": time.monotonic() - began, "global_optimality": False, "authority": "none"}
     if partitioned:
         record["partition"] = {"groups_per_slot": len(palette_groups), "palette_groups": [list(g) for g in palette_groups],
@@ -513,17 +518,72 @@ def _covers(entry, palette):
                    for i in range(len(boxes)) for j in range(i + 1, len(boxes)))
 
 
+def _derived_status(statuses):
+    if statuses and statuses[-1] == "realizable":
+        return "realizable"
+    return "inconclusive" if "inconclusive" in statuses else "unrealizable"
+
+
 def replay(problem, record, timeout_ms=10_000):
-    """Rebuild each recorded unrealizable query from its examples; its hash must match and it must stay unsat.
-    A partitioned length must also show subspaces that exactly cover the palette product."""
+    """Re-establish a record's whole claim, not only its queries.
+
+    The eligible and excluded lengths are recomputed from the problem, objective and bound. Every eligible length
+    must appear once, in order, with the record's status following from its entries; a realizable record may end at
+    its realizable length. Each unrealizable entry must carry the exact statement and either one query or subspaces
+    that exactly cover the palette space; each query is rebuilt from its examples, must have the recorded hash and
+    must stay unsat. A realizable entry's bytes must recheck equivalent, at that length and below the bound."""
     import z3 as z
-    from .session import _validated
+    from .session import _checker, _validated
     problem = _validated(problem)
     if record.get("schema") != SCHEMA or record.get("problem_sha256") != digest(canonical(problem)):
         raise ValueError("realize record does not bind this problem")
-    replayed = []
-    for entry in record["lengths"]:
-        if entry["status"] != "unrealizable":
+    bound = record.get("bound")
+    if bound is not None:
+        integer(bound, 0, 1 << 16, "record cost bound")
+    failures, replayed = [], []
+    if record.get("objective") != problem["objective"]:
+        failures.append("objective differs from the problem's")
+    asked, excluded, empty = _lengths(problem, bound)
+    if record.get("excluded_by_cost") != excluded:
+        failures.append("cost-excluded lengths differ from the bound's")
+    if record.get("excluded_by_empty_palette", []) != empty:
+        failures.append("empty-palette lengths differ from the problem's")
+    entries = record.get("lengths")
+    if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+        raise ValueError("record lengths must be a list of entries")
+    labels = [e.get("length") for e in entries]
+    statuses = [e.get("status") for e in entries]
+    if labels != asked[:len(labels)]:
+        failures.append("lengths are missing, repeated, relabelled or out of order")
+    if any(status not in ("unrealizable", "realizable", "inconclusive") for status in statuses):
+        failures.append("unknown entry status")
+    if "realizable" in statuses[:-1]:
+        failures.append("an entry follows a realizable length")
+    if _derived_status(statuses) != "realizable" and len(entries) != len(asked):
+        failures.append("not every eligible length is present")
+    if record.get("status") != _derived_status(statuses):
+        failures.append("record status does not follow from its entries")
+    partitioned = "partition" in record
+    for entry in entries:
+        length = entry.get("length")
+        if type(length) is not int or length not in asked:
+            continue
+        if entry.get("status") == "realizable":
+            code = bytes.fromhex(entry.get("code_hex", ""))
+            verification = _checker(problem).check(problem, code, timeout_ms=timeout_ms)
+            cost = verification.get("cost", {})
+            primary = cost.get("bytes") if problem["objective"] == "bytes" else cost.get("instructions")
+            if (verification["status"] != "equivalent" or cost.get("instructions") != length
+                    or (bound is not None and not primary < bound)):
+                failures.append(f"length {length}: recorded bytes do not recheck below the bound")
+            continue
+        if entry.get("status") != "unrealizable":
+            continue
+        if entry.get("statement") != STATEMENT.format(length=length, objective=problem["objective"],
+                                                      bound="infinity" if bound is None else bound):
+            failures.append(f"length {length}: statement does not match the bound")
+        if partitioned != ("subspaces" in entry) or ("subspaces" in entry) == ("query_sha256" in entry):
+            failures.append(f"length {length}: entry shape does not match the record's mode")
             continue
         if "subspaces" not in entry:
             parts = [(None, entry["examples"], entry["query_sha256"])]
@@ -532,16 +592,16 @@ def replay(problem, record, timeout_ms=10_000):
             parts = [(s["ranges"], s["examples"], s["query_sha256"]) for s in entry["subspaces"]]
             covered = _covers(entry, len(problem["grammar"]))
         for ranges, examples, recorded in parts:
-            solver, _, _ = query(z, problem, entry["length"], record["bound"], [_example(e) for e in examples],
+            solver, _, _ = query(z, problem, length, bound, [_example(e) for e in examples],
                                  None if ranges is None else [tuple(r) for r in ranges])
             same = _query_hash(solver) == recorded
             solver.set(timeout=timeout_ms)
             answer = solver.check()
-            replayed.append({"length": entry["length"], "ranges": ranges, "coverage": covered,
+            replayed.append({"length": length, "ranges": ranges, "coverage": covered,
                              "query_hash_matches": same, "answer": str(answer)})
-    ok = all(r["coverage"] and r["query_hash_matches"] and r["answer"] == "unsat" for r in replayed)
-    return {"schema": SCHEMA, "status": "replayed" if ok else "failed", "replayed": replayed,
-            "z3_version": z.get_version_string(), "authority": "none"}
+    ok = not failures and all(r["coverage"] and r["query_hash_matches"] and r["answer"] == "unsat" for r in replayed)
+    return {"schema": SCHEMA, "status": "replayed" if ok else "failed", "claim": record.get("status"),
+            "failures": failures, "replayed": replayed, "z3_version": z.get_version_string(), "authority": "none"}
 
 
 def realize_session(directory, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadline_ms=60_000, groups=1, workers=1,

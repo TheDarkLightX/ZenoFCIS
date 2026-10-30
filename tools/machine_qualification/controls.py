@@ -342,6 +342,11 @@ DEFECTS = (
            "                    pass\n",
            REALIZE + "test_admission_encoding_equals_the_checkers_admission",
            "The query admits a read of a flag an earlier form left undefined, which the checker refuses."),
+    Defect("realize-replay-skips-length-coverage", "realize.py", "record replay",
+           '    if _derived_status(statuses) != "realizable" and len(entries) != len(asked):',
+           "    if False:",
+           REALIZE_REPLAY + "test_replay_refuses_a_changed_bound",
+           "Replay accepts a negative record that omits an eligible length, as after its bound is raised."),
 )
 
 # Runs one control inside a specimen and prints one JSON line. A failure counts only when its AssertionError was
