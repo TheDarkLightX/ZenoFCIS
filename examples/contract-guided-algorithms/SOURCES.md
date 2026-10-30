@@ -46,3 +46,19 @@ Before importing a new strategy, record: (1) exact public bibliographic chapter/
 After the initial directory/metadata review, a **separate technical reading** reviewed the major sections of all 18 chapters of the second edition through an available full-text HTML rendering, compared to the publisher's contents and sample PDF. The original GitHub **PDF binary remains inaccessible**, and some HTML mathematics is degraded: this is **not** a claim that every page, exact constant, diagram, or exercise has been verified. No copyrighted textbook implementation is included in the code.
 
 The resulting [chapter-by-chapter research map](HACKERS_DELIGHT_READING.md) identifies contract and search obligations, and **Chapter 2's right-to-left dependency constraint is implemented** as a finite structural palette preflight with replayable witnesses and three negative controls. The other seven PDFs retain their initial reading limitations.
+
+## Directly reviewed uploaded PDFs (October 30, 2026)
+
+The user supplied actual PDF copies. Earlier limitations saying those two files were available only through GitHub metadata or an HTML rendition are **superseded** by this direct reading; those limitations still apply to the other six PDFs not supplied.
+
+| Work | Exact uploaded PDF SHA-256 | PDF pages | Directly examined sections | Reading limits |
+| --- | --- | ---: | --- | --- |
+| Henry S. Warren Jr., *Hacker's Delight*, 2nd ed. | `f89446c3655975af750b964c70bb8fbeb0567a970a62032f9f9139d00f0523c0` | 470 | §2-1, §2-5, §2-13, chs. 3–4, chs. 8–10; overview of all 18 chapters | No claim of auditing each exercise or handwritten code path. |
+| Steven S. Skiena, *The Algorithm Design Manual*, 2nd ed. | `fe1a100b3f30b910cb33bcc64d90f4d62892e99bd775f28cc2933d1c359640d4` | 739 | §§1.3–1.4, 7.2, 8.1, ch. 10 and relevant chapter/catalog headings | No claim of independently proving each algorithm or reading every line of the catalog. |
+
+These PDFs are **not committed**, redistributed, packaged or automatically ingested as code. The SHA-256 hashes are source identity claims for the **uploaded copies** only and do not authenticate legal ownership or correctness. Reading notes:
+
+- [*Hacker's Delight* feasibility and arithmetic intake](HACKERS_DELIGHT_READING.md)
+- [Skiena modeling, pruning and experiment design](ALGORITHM_DESIGN_MANUAL_READING.md)
+
+The new bitwise-only rule is a sound, derived extension of the already implemented prefix-dependency check. It distinguishes the absence of a candidate within a bounded search from structural impossibility for a specified instruction vocabulary. Tests and catalog replay bind the actual registered u8 semantics; no performance claims follow automatically.
