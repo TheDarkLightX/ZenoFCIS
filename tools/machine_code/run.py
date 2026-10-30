@@ -71,6 +71,8 @@ def main(argv=None):
     realized.add_argument("--groups", type=int, default=1,
                           help="split each slot's palette into this many groups and decide every subspace alone")
     realized.add_argument("--workers", type=int, default=1, help="processes deciding subspaces (at most 4)")
+    realized.add_argument("--rules", action="store_true",
+                          help="restrict every query to the candidates the exact duplicate, order and dead rules keep")
     realized.add_argument("--split-ms", type=int,
                           help="halve any subspace whose query does not answer within this many milliseconds")
     contract = commands.add_parser("contract", help="lower an arithmetic contract to profile 2, or check bytes against it")
@@ -167,13 +169,13 @@ def main(argv=None):
                 if args.below is not None or args.replay is not None:
                     raise ValueError("--session takes its bound from the session; --below and --replay need --problem")
                 result = realize.realize_session(args.session, args.solver_ms, args.max_rounds, args.deadline_ms,
-                                                 args.groups, args.workers, args.split_ms)
+                                                 args.groups, args.workers, args.split_ms, args.rules)
             elif args.replay is not None:
                 result = realize.replay(read_json(args.problem), read_json(args.replay), args.solver_ms)
             else:
                 result = realize.realize(read_json(args.problem), args.below, args.solver_ms, args.max_rounds,
                                          args.deadline_ms, groups=args.groups, workers=args.workers,
-                                         split_ms=args.split_ms)
+                                         split_ms=args.split_ms, rules=args.rules)
             if args.out is not None:
                 session._json(args.out, result)
         elif args.command == "open":
