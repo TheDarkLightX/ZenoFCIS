@@ -160,7 +160,7 @@ def _x86_footprint(form):
     elif op in verify2.SETCC or op in ("neg", "shl", "shr", "sar"):
         reads = (args[0],)
     else:
-        reads = (args[0], args[1])
+        reads = tuple(a for a in (args[0], args[1]) if isinstance(a, str))  # an immediate is no read
     writes = () if op in ("cmp", "test") else (args[0],)
     return reads, writes, flag_reads, defined, undefined
 
@@ -237,7 +237,9 @@ def _identity(target, form, values):
     `values` maps each register operand to ("c", word) or a symbolic value. The constant flags are those the
     instruction then defines with a fixed value; its other defined flags must not be read afterwards.
     """
-    op, constant = form[0], lambda name: values[name][1] if values[name][0] == "c" else None
+    # An x86 immediate operand is a constant, sign-extended to 64 bits.
+    value_of = lambda name: ("c", name & MASK) if type(name) is int else values[name]
+    op, constant = form[0], lambda name: value_of(name)[1] if value_of(name)[0] == "c" else None
     if target == verify2.RV64:
         if op in ("slli", "srli", "srai", "addi", "ori", "xori") and form[3] == 0:
             return values[form[2]], {}
@@ -256,13 +258,13 @@ def _identity(target, form, values):
             return (values[form[3]] if left == MASK else values[form[2]]), {}
         return None
     if op in ("shl", "shr", "sar") and form[2] == 0:
-        return values[form[1]], {}
+        return value_of(form[1]), {}
     if op == "lea":
         base, index = constant(form[2]), constant(form[3])
         if index == 0:
-            return values[form[2]], {}
+            return value_of(form[2]), {}
         if base == 0 and form[4] == 1:
-            return values[form[3]], {}
+            return value_of(form[3]), {}
         return None
     if op not in ("add", "sub", "or", "xor", "and", "imul"):
         return None
@@ -272,10 +274,10 @@ def _identity(target, form, values):
         return ("c", 0), ({**clear, "zf": 1, "sf": 0} if op == "and" else clear)
     if (op in ("add", "sub", "or", "xor") and source == 0) or (op == "and" and source == MASK) \
             or (op == "imul" and source == 1):
-        return values[form[1]], clear
+        return value_of(form[1]), clear
     if (op in ("add", "or", "xor") and destination == 0) or (op == "and" and destination == MASK) \
             or (op == "imul" and destination == 1):
-        return values[form[2]], clear
+        return value_of(form[2]), clear
     return None
 
 
@@ -292,6 +294,29 @@ def _known_condition(form, flags):
     return form
 
 
+def _fits_immediate(item):
+    """The signed 32-bit immediate whose sign extension is this constant value, or None."""
+    if item[0] != "c":
+        return None
+    value = item[1] - (1 << 64) if item[1] >> 63 else item[1]
+    return value if verify2.IMMEDIATE_RANGE[0] <= value <= verify2.IMMEDIATE_RANGE[1] else None
+
+
+def _immediate(form, values):
+    """An x86 ALU form whose source register holds a 32-bit-representable constant, using the immediate instead.
+
+    A commutative form whose destination holds the constant swaps its operands first.
+    """
+    op = form[0]
+    if op not in verify2.IMMEDIATE_OPS or len(form) != 3 or not isinstance(form[2], str) or form[1] == form[2]:
+        return form
+    if op in ("add", "and", "or", "xor") and _fits_immediate(values[form[1]]) is not None \
+            and _fits_immediate(values[form[2]]) is None:
+        form = [op, form[2], form[1]]
+    constant = _fits_immediate(values[form[2]])
+    return form if constant is None else [op, form[1], constant]
+
+
 def _operands(target, form):
     """(source positions, destination position or None, whether the destination is also read)."""
     op = form[0]
@@ -302,7 +327,9 @@ def _operands(target, form):
     if op in ("xor", "sub", "sbb") and form[1] == form[2]:
         return (), 1, False  # the idiom's value does not depend on the register
     if op in ("cmp", "test"):
-        return (1, 2), None, False
+        return tuple(i for i in (1, 2) if isinstance(form[i], str)), None, False
+    if op in verify2.IMMEDIATE_OPS and type(form[2]) is int:
+        return (), 1, True
     if op == "lea":
         return (2, 3), 1, False
     if op in ("mov", "movzx"):
@@ -486,6 +513,11 @@ def specialize_kernel(problem: dict, code: bytes, fixed: dict, results: int) -> 
         if not step["kept"]:
             continue
         form = list(step["form"])
+        _, destination, _ = _operands(target, form)
+        written = form[destination] if destination is not None else None  # the key of the step's output
+        if target == verify2.X86:
+            form = _immediate(form, step["operands"])
+            step = {**step, "form": form}
         sources, destination, modifies = _operands(target, form)
         values = [step["operands"][form[p]] for p in sources if form[p] != "zero"]
         for name in set(step["reads"]):
@@ -494,10 +526,10 @@ def specialize_kernel(problem: dict, code: bytes, fixed: dict, results: int) -> 
         protect = {name for name in registers if hw[name] in values}
         choice = None
         if destination is not None:
-            original = written = form[destination]
+            original = form[destination]
             hint = hint_of.get(step["out"][written])
             if (target == verify2.X86 and modifies and form[0] in ("add", "and", "or", "xor", "imul")
-                    and hint is not None and len(form) == 3
+                    and hint is not None and len(form) == 3 and isinstance(form[2], str)
                     and hw[hint] == step["operands"][form[2]] and hw[hint] != step["operands"][original]):
                 # Commutative: compute in the result register that already holds the other operand.
                 form = [form[0], form[2], form[1]]

@@ -37,8 +37,26 @@ def _encode_x86_memory(insn: list) -> bytes:
     return encoded + (displacement.to_bytes(1, "little", signed=True) if mod else b"")
 
 
+IMMEDIATE_GROUP = {"add": 0, "or": 1, "and": 4, "sub": 5, "xor": 6, "cmp": 7}
+ACCUMULATOR = {"add": 0x05, "or": 0x0D, "and": 0x25, "sub": 0x2D, "xor": 0x35, "cmp": 0x3D}
+
+
+def _encode_x86_immediate(op: str, register: str, value: int) -> bytes:
+    """The canonical encoding: 83 /n ib when the value fits 8 signed bits, else the RAX short form or 81 /n id."""
+    dst = X86[register]
+    value = integer(value, -(1 << 31), (1 << 31) - 1, "sign-extended immediate")
+    rex, modrm = 0x48 | (dst >> 3), 0xC0 | (IMMEDIATE_GROUP[op] << 3) | (dst & 7)
+    if -128 <= value <= 127:
+        return bytes([rex, 0x83, modrm]) + struct.pack("<b", value)
+    if dst == 0:
+        return bytes([0x48, ACCUMULATOR[op]]) + struct.pack("<i", value)
+    return bytes([rex, 0x81, modrm]) + struct.pack("<i", value)
+
+
 def _encode_x86_profile2(insn: list) -> bytes:
     op, *args = insn
+    if op in IMMEDIATE_GROUP and len(args) == 2 and type(args[1]) is int:
+        return _encode_x86_immediate(op, args[0], args[1])
     rm_reg = {"adc": 0x11, "sbb": 0x19, "cmp": 0x39, "test": 0x85}
     if op in rm_reg and len(args) == 2:
         rm, reg = (X86[a] for a in args)

@@ -169,6 +169,13 @@ class Specialization(unittest.TestCase):
         self.assertEqual(result["status"], "specialized")
         self.assertNotIn("adc", [form[0] for form in forms])
         self.assertLess(len(forms), 4, forms)
+        # x86 immediates: y = 1 in a saturating add needs no register for the constant.
+        problem, code = kernel("saturating-add-x86")
+        result = specialize.specialize(problem, ["y=1"], None, code)
+        forms = [i.form() for i in verify2.decode(problem["target"], bytes.fromhex(result["code_hex"]))[:-1]]
+        self.assertEqual(result["status"], "specialized")
+        self.assertIn(["add", "rax", 1], forms)
+        self.assertNotIn("imm", [form[0] for form in forms])
         # RV64I: both high words zero leaves the low sum and its carry.
         problem, code = kernel("add128-rv64i")
         result = specialize.specialize(problem, ["a_hi=0", "b_hi=0"], None, code)
