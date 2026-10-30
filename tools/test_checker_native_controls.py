@@ -21,11 +21,12 @@ class CargoIsolation(unittest.TestCase):
             caller_binary.write_bytes(b"ordinary build")
             environment = {"CARGO_TARGET_DIR": str(cache), "TMPDIR": str(scratch)}
             before = dict(environment)
-            targets = []
+            targets, timeouts = [], []
 
-            def run_logged(command, cwd, env, out):
+            def run_logged(command, cwd, env, out, *, timeout=600):
                 target = Path(env["CARGO_TARGET_DIR"])
                 targets.append(target)
+                timeouts.append((out.name, timeout))
                 (target / "debug").mkdir(parents=True, exist_ok=True)
                 (target / "debug/zeno-fcis").write_bytes(b"mutation build")
                 if crash:
@@ -42,6 +43,8 @@ class CargoIsolation(unittest.TestCase):
                         C.run_controls(*args)
                 else:
                     self.assertTrue(C.run_controls(*args)[0]["killed"])
+                    # The cold baseline gets the cold-build deadline; the mutant keeps 600s.
+                    self.assertEqual(timeouts, [("P1_probe-positive", 3600), ("run", 600)])
             self.assertEqual(caller_binary.read_bytes(), b"ordinary build")
             self.assertEqual(environment, before)
             self.assertEqual((root / source).read_text(), "original")

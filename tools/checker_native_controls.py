@@ -88,7 +88,10 @@ def _run_controls(root, out, environment, controls, run_logged):
                    'zeno-fcis-cli', selector, target, test, '--', '--exact']
         key = (selector, target, test)
         if key not in baselines:
-            positive, _ = run_logged(command, specimen, environment, out / (name + '-positive'))
+            # A baseline may build a test target in the fresh private target;
+            # the first cold one-job CLI build took 667s. Mutants keep 600s.
+            positive, _ = run_logged(command, specimen, environment, out / (name + '-positive'),
+                                     timeout=3600)
             if not native_result(positive, test, failure=False):
                 raise ValueError(f'native control {name} baseline did not pass exactly one test')
             baselines.add(key)
