@@ -15,7 +15,8 @@ identical. Times are for this machine and load only. Nothing here claims optimal
         [--no-prune]
     python3 -B -m tools.machine_qualification.search_bench compare BEFORE.json AFTER.json
 
-`compare` exits 1 when a problem's found cost or status differs, or a problem is missing from either report.
+`compare` marks each found cost identical, improved (none found before, or a lower rank now) or worse, and exits 1
+when any is worse, a found cost is lost, or a problem is missing from either report.
 """
 
 from __future__ import annotations
@@ -143,8 +144,20 @@ def run(selected: list[str] | None, budgets: dict, repeats: int, prune: bool | N
 COLUMNS = ("solver_checks", "proposed", "concrete_refutations", "objective_pruned")
 
 
+def verdict(old, new) -> str:
+    """Compare two found costs by bytes, then instructions: the order of the default bytes objective."""
+    if old == new:
+        return "identical"
+    if new is None:
+        return "lost"
+    if old is None:
+        return "improved"
+    rank = lambda cost: (cost["bytes"], cost["instructions"])
+    return "improved" if rank(new) < rank(old) else "worse"
+
+
 def compare(before: dict, after: dict) -> tuple[str, int]:
-    """The before-and-after table; exit 1 when a found cost or status differs or a problem is missing."""
+    """The before-and-after table; exit 1 when a found cost is worse or lost, or a problem is missing."""
     names = sorted(set(before["problems"]) | set(after["problems"]))
     extra = sorted({key for row in after["problems"].values() for key in row["counters"]} - set(COLUMNS))
     header = ["problem", *(f"{c} before/after" for c in COLUMNS), "median s before/after", "cost", *extra]
@@ -156,11 +169,11 @@ def compare(before: dict, after: dict) -> tuple[str, int]:
             lines.append(f"{name} | missing from {'before' if old is None else 'after'}")
             code = 1
             continue
-        same = old["cost"] == new["cost"] and old["status"] == new["status"]
-        code = code if same else 1
+        found = verdict(old["cost"], new["cost"])
+        code = code if found in ("identical", "improved") else 1
         cells = [name, *(f"{old['counters'].get(c)}/{new['counters'].get(c)}" for c in COLUMNS),
                  f"{old['wall_median_seconds']}/{new['wall_median_seconds']}",
-                 "identical" if same else f"DIFFERS {old['cost']} -> {new['cost']}",
+                 found if found == "identical" else f"{found} {old['cost']} -> {new['cost']}",
                  *(str(new["counters"].get(key, "-")) for key in extra)]
         lines.append(" | ".join(cells))
     totals = [sum(report["problems"][n]["counters"].get("solver_checks", 0) for n in names if n in report["problems"])

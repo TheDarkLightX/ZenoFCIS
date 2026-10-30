@@ -56,13 +56,21 @@ class Comparison(unittest.TestCase):
         self.assertIn("dead_pruned", text.splitlines()[0])
         self.assertIn("identical", text)
 
-    def test_a_different_cost_status_or_missing_problem_fails(self):
+    def test_a_worse_or_lost_cost_or_missing_problem_fails(self):
         base = row({"bytes": 5, "instructions": 1})
         for after in (report(a=row({"bytes": 8, "instructions": 2})),
                       report(a=row(None, status="no-checked-candidate")), report()):
             with self.subTest(after=after):
                 text, code = bench.compare(report(a=base), after)
                 self.assertEqual(code, 1, text)
+
+    def test_a_cost_found_only_after_or_lower_after_is_an_improvement(self):
+        for old, new in ((None, {"bytes": 31, "instructions": 7}),
+                         ({"bytes": 8, "instructions": 2}, {"bytes": 5, "instructions": 1})):
+            with self.subTest(old=old):
+                text, code = bench.compare(report(a=row(old)), report(a=row(new)))
+                self.assertEqual(code, 0, text)
+                self.assertIn("improved", text)
 
 
 class SmallRun(unittest.TestCase):
