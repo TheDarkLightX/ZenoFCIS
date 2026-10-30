@@ -14,13 +14,18 @@ Profile-2 problems get the same report over every declared result, using the pro
 also shows CF, ZF, SF and OF on x86, with null for a flag the model leaves undefined, and each view lists the
 expected and actual value of every result. Subterms are matched against registers only. A comparison usually lives
 in a flag, so a comparison reported as never computed may still be held in a flag the trace shows.
+
+Profile-3 problems add a memory view from the profile-3 concrete model: every region word at entry and after each
+instruction, the words each instruction wrote, every read-write word's expected and actual final value, and
+`first_differing_region_word`, the first read-write word (in region and index order) whose final value differs,
+with the instruction that last wrote it. Subterms are matched against registers and region words.
 """
 
 from __future__ import annotations
 
 import random
 
-from . import profile2, verify2
+from . import profile2, profile3, verify2
 from .model import evaluate
 from .targets import encode_instruction
 from .verify import X86, decode, run_concrete
@@ -86,6 +91,8 @@ def diagnose(problem: dict, code: bytes, verification: dict) -> dict:
         return {"available": False, "reason": "only counterexamples are diagnosed"}
     if problem.get("schema") == profile2.SCHEMA:
         return _diagnose_profile2(problem, code, verification)
+    if problem.get("schema") == profile3.SCHEMA:
+        return _diagnose_profile3(problem, code, verification)
     inputs = {k: int(v) for k, v in verification["inputs"].items()}
     initial = {k: int(v) for k, v in verification["initial_registers"].items()}
     solver = _one(problem, code, inputs, initial)
@@ -169,3 +176,94 @@ def _one_profile2(problem: dict, code: bytes, arguments: list, initial: dict, fl
     return {"inputs": {n: str(v) for n, v in env.items()}, "initial_registers": {k: str(v) for k, v in initial.items()},
             **({"initial_flags": dict(states[0][1])} if x86 else {}), "entry": shown(states[0])["registers"],
             "trace": trace, "results": results, "spec_subterms": subterms, "first_missing_subterm": missing}
+
+
+def _diagnose_profile3(problem: dict, code: bytes, verification: dict) -> dict:
+    from . import verify3
+    target, regions = problem["target"], problem["regions"]
+    x86 = target == verify3.X86
+    inputs = {name: int(verification["inputs"][name]) for name in problem["inputs"]}
+    bases = {name: int(value) for name, value in verification["bases"].items()}
+    initial = {k: int(v) for k, v in verification["initial_registers"].items()}
+    memory = {name: [int(v) for v in words] for name, words in verification["initial_regions"].items()}
+    solver = _one_profile3(problem, code, inputs, bases, initial, verification.get("initial_flags"), memory)
+    rng = random.Random(0x5EED)
+    generic_report = None
+    for _ in range(64):
+        values = {name: rng.getrandbits(64) for name in problem["inputs"]}
+        pointers = {region["name"]: rng.getrandbits(64) for region in regions}
+        scratch = {name: rng.getrandbits(64) for name in initial}
+        entry = {name: rng.getrandbits(1) for name in verify3.FLAGS} if x86 else None
+        words = {region["name"]: [rng.getrandbits(64) for _ in range(region["words"])] for region in regions}
+        actual, final = verify3.run_concrete(problem, code, values, pointers, words, scratch, entry)
+        results, writable = profile3.expected(problem, values, words)
+        if actual != results or any(final[name] != expected for name, expected in writable.items()):
+            generic_report = _one_profile3(problem, code, values, pointers, scratch, entry, words)
+            break
+    preferred = generic_report or solver
+    return {"available": True, "authority": "none", "note": NOTE, "solver_counterexample": solver,
+            "generic_failure": generic_report, "first_missing_subterm": preferred["first_missing_subterm"],
+            "first_differing_region_word": preferred["first_differing_region_word"]}
+
+
+def _one_profile3(problem: dict, code: bytes, inputs: dict, bases: dict, initial: dict, flags, memory: dict) -> dict:
+    from . import verify3
+    target = problem["target"]
+    x86 = target == verify3.X86
+    input_registers, base_registers, scratch = verify3._layout(problem)
+    registers = {name: initial.get(name, 0) for name in scratch}
+    registers.update({input_registers[n]: v for n, v in inputs.items()})
+    registers.update({base_registers[n]: v for n, v in bases.items()})
+    entry_flags = {name: (flags or {}).get(name, 0) for name in verify3.FLAGS} if x86 else None
+    instructions = verify3.decode(target, code)
+    terminal = code[instructions[-1].offset:]
+    states = [(registers, entry_flags, {name: list(words) for name, words in memory.items()})]
+    for ins in instructions[:-1]:
+        states.append(verify3.execute(problem, code[:ins.offset + ins.size] + terminal, registers, entry_flags, memory))
+    text = lambda words: [str(v) for v in words]
+    shown = lambda state: {"registers": {r: str(state[0][r]) for r in verify3.REGISTERS[target]},
+                           **({"flags": dict(state[1])} if x86 else {}),
+                           "regions": {name: text(words) for name, words in state[2].items()}}
+    trace = []
+    for k in range(1, len(states)):
+        before, after = states[k - 1][2], states[k][2]
+        wrote = [{"region": name, "index": i, "before": str(before[name][i]), "after": str(after[name][i])}
+                 for name in after for i in range(len(after[name])) if before[name][i] != after[name][i]]
+        trace.append({"after": k, "instruction": instructions[k - 1].text(), **shown(states[k]),
+                      "region_writes": wrote})
+    final_registers, final_memory = states[-1][0], states[-1][2]
+    results, writable = profile3.expected(problem, inputs, memory)
+    result_rows = [{"register": register, "expected": str(value), "actual": str(final_registers[register])}
+                   for register, value in zip(verify3.RESULTS[target], results)]
+    words, differing = [], None
+    for region in problem["regions"]:
+        name = region["name"]
+        for i, value in enumerate(writable.get(name, [])):
+            row = {"region": name, "index": i, "initial": str(memory[name][i]), "expected": str(value),
+                   "actual": str(final_memory[name][i])}
+            words.append(row)
+            if differing is None and final_memory[name][i] != value:
+                written = [k for k in range(1, len(states)) if states[k][2][name][i] != states[k - 1][2][name][i]
+                           or (instructions[k - 1].op == "store" and verify3._access(instructions[k - 1].form())
+                               == (region["base"], 8 * i))]
+                differing = {**row, "last_written_after": written[-1] if written else None}
+    expressions = [(f"result {k + 1}", output) for k, output in enumerate(problem["outputs"])]
+    expressions += [(f"{name}[{i}]", e) for name, exprs in problem["memory"].items() for i, e in enumerate(exprs)]
+    lifted_inputs = {**inputs, **{profile3.slot(n, i): v for n, values in memory.items() for i, v in enumerate(values)}}
+    words_named = lambda state: {f"{n}[{i}]": v for n, values in state[2].items() for i, v in enumerate(values)}
+    subterms, missing = [], None
+    for label, expression in expressions:
+        for node in _subterms(profile3.lifted({**problem, "outputs": [expression], "memory": {}})[0][0], []):
+            value = profile2.evaluate(node, lifted_inputs)
+            seen = next(({"after": k, "registers": [r for r, v in state[0].items() if v == value],
+                          "region_words": [w for w, v in words_named(state).items() if v == value]}
+                         for k, state in enumerate(states)
+                         if value in state[0].values() or value in words_named(state).values()), None)
+            subterms.append({"of": label, "expression": _text(node), "value": str(value), "first_seen": seen})
+            if seen is None and missing is None and node[0] not in ("input", "const"):
+                missing = {"of": label, "expression": _text(node), "value": str(value)}
+    return {"inputs": {n: str(v) for n, v in inputs.items()}, "bases": {n: str(v) for n, v in bases.items()},
+            "initial_registers": {k: str(v) for k, v in initial.items()},
+            **({"initial_flags": dict(entry_flags)} if x86 else {}), "entry": shown(states[0]), "trace": trace,
+            "results": result_rows, "region_words": words, "first_differing_region_word": differing,
+            "spec_subterms": subterms, "first_missing_subterm": missing}

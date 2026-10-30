@@ -78,10 +78,36 @@ class Profile3LoopTests(unittest.TestCase):
             ["store", "rdi", 8, "rax"]]), witness))
         packet = session.packet(directory)
         self.assertEqual(packet["feedback"][0]["verification"]["status"], "counterexample")
+        diagnosis = packet["feedback"][0]["diagnosis"]
+        self.assertTrue(diagnosis["available"], diagnosis)
+        view = diagnosis["solver_counterexample"]
+        self.assertEqual([step["instruction"] for step in view["trace"]],
+                         ["load rcx, rdi, 8", "store rdi, 0, rcx", "load rax, rdi, 0", "store rdi, 8, rax"])
+        # Word 0 is overwritten before it is read, so word 1 receives the new word 0 and differs.
+        self.assertEqual(view["trace"][1]["region_writes"],
+                         [{"region": "p", "index": 0, "before": view["entry"]["regions"]["p"][0],
+                           "after": view["entry"]["regions"]["p"][1]}])
+        self.assertEqual(diagnosis["first_differing_region_word"]["region"], "p")
+        self.assertEqual(diagnosis["first_differing_region_word"]["index"], 1)
+        self.assertEqual(diagnosis["first_differing_region_word"]["last_written_after"], 4)
         accepted = session.submit(directory, self.proposal([["load", "rax", "rdi", 0], ["load", "rcx", "rdi", 8],
                                                             ["store", "rdi", 0, "rcx"], ["store", "rdi", 8, "rax"]]))
         self.assertEqual(accepted["status"], "equivalent")
         self.assertEqual(session.resume(directory)["status"], "replayed")
+
+    def test_the_memory_diagnosis_names_a_dropped_store_on_rv64i(self):
+        from machine_code import diagnose, verify3
+        value = entry("copy2-sum-rv64i")
+        dropped = targets.encode_program(profile3.TARGETS[1], [["load", "t0", "a0", 0], ["load", "t1", "a0", 8],
+                                                               ["store", "a1", 0, "t0"], ["add", "a0", "t0", "t1"]])
+        verification = verify3.check(value["problem"], dropped)
+        self.assertEqual(verification["status"], "counterexample")
+        report = diagnose.diagnose(value["problem"], dropped, verification)
+        differing = report["first_differing_region_word"]
+        self.assertEqual((differing["region"], differing["index"], differing["last_written_after"]), ("dst", 1, None))
+        self.assertEqual(differing["expected"], report["generic_failure"]["entry"]["regions"]["src"][1])
+        self.assertNotIn("flags", report["solver_counterexample"]["entry"])
+        self.assertEqual(len(report["solver_counterexample"]["trace"]), 4)
 
     def test_every_seed_separates_a_dropped_store_and_admits_the_right_kernel(self):
         value = entry("copy2-sum-x86")
