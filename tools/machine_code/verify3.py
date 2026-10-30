@@ -1,14 +1,15 @@
-"""Independent profile-3 checker: straight-line x86-64 word kernels over declared memory regions.
+"""Independent profile-3 checker: straight-line x86-64 and RV64I word kernels over declared memory regions.
 
-Profile 3 admits every profile-2 x86 form and two memory forms: the 64-bit loads and stores
-`mov r64, [base + disp]` and `mov [base + disp], r64`, with no displacement (ModRM mod 0) or a nonzero 8-bit
-displacement (mod 1). The base must be a declared region's base register that no earlier instruction wrote. The
-displacement must be a multiple of 8 inside the region, and a store must target a read-write region. Everything
-else refuses before any solver call, with an exact reason.
+Profile 3 admits every profile-2 form of its architecture and two memory forms, 64-bit loads and stores:
+on x86-64 `mov r64, [base + disp]` and `mov [base + disp], r64`, with no displacement (ModRM mod 0) or a nonzero
+8-bit displacement (mod 1); on RV64I `ld rd, disp(base)` and `sd rs2, disp(base)`. The base must be a declared
+region's base register that no earlier instruction wrote. The displacement must be a multiple of 8 inside the
+region, and a store must target a read-write region. Everything else refuses before any solver call, with an
+exact reason.
 
 Regions are modelled as separate word arrays: the static rules make every access an aligned word of exactly one
 declared region, and the problem assumes the regions are pairwise disjoint and disjoint from the stack. The base
-pointer values, every other admitted register, the four entry flags and every initial region word are quantified.
+pointer values, every other admitted register, the x86 entry flags and every initial region word are quantified.
 Non-memory instructions use the profile-2 models in `verify2.py` unchanged. This is not a proof of the hardware
 ISA, of the disjointness assumption, of native conformance or timing.
 """
@@ -18,9 +19,11 @@ from . import profile3, verify2
 from .verify import Instruction, _reg, _require
 
 MASK = (1 << 64) - 1
-X86 = profile3.TARGETS[0]
+X86, RV64 = profile3.TARGETS
 WORD = 8
-REGISTERS = {X86: verify2.REGISTERS[verify2.X86]}
+PROFILE2 = {X86: verify2.X86, RV64: verify2.RV64}
+REGISTERS = {target: verify2.REGISTERS[PROFILE2[target]] for target in PROFILE2}
+RETURN = {X86: b"\xc3", RV64: bytes.fromhex("67800000")}
 RESULTS = profile3.RESULTS
 FLAGS = verify2.FLAGS
 MEMORY = ("load", "store")
@@ -52,29 +55,51 @@ def _memory_form(code, at):
     return Instruction("store", (base, displacement, data), at, size)
 
 
-def _register_form(code, at):
+def _rv_memory_form(code, at):
+    """Decode one RV64I LD or SD word at `at`, or None when the word is neither opcode."""
+    word = int.from_bytes(code[at:at + 4], "little")
+    opcode, funct3, rs1 = word & 0x7F, (word >> 12) & 7, (word >> 15) & 31
+    if opcode not in (0x03, 0x23):
+        return None
+    _require(funct3 == 3, "UnsupportedMemoryWidth")
+    base = _reg(verify2._RREG, rs1)
+    if opcode == 0x03:
+        _require((word >> 7) & 31 != 0, "ZeroWriteHintRefused")
+        immediate = word >> 20
+    else:
+        immediate = ((word >> 25) << 5) | ((word >> 7) & 31)
+    displacement = immediate - 0x1000 if immediate & 0x800 else immediate
+    if opcode == 0x03:
+        return Instruction("load", (_reg(verify2._RREG, (word >> 7) & 31), base, displacement), at, 4)
+    return Instruction("store", (base, displacement, _reg(verify2._RREG, (word >> 20) & 31)), at, 4)
+
+
+def _register_form(target, code, at):
     """One profile-2 instruction at `at`: the shortest slice that verify2 decodes as exactly it and a return."""
-    for size in range(1, min(10, len(code) - at) + 1):
+    for size in range(1, min(10, len(code) - at) + 1) if target == X86 else (4,):
         try:
-            decoded = verify2.decode(verify2.X86, code[at:at + size] + b"\xc3")
+            decoded = verify2.decode(PROFILE2[target], code[at:at + size] + RETURN[target])
         except ValueError:
             continue
         if len(decoded) == 2 and decoded[0].size == size:
             return Instruction(decoded[0].op, decoded[0].operands, at, size)
-    verify2.decode(verify2.X86, code[at:])  # raises the profile-2 reason for this instruction
+    verify2.decode(PROFILE2[target], code[at:])  # raises the profile-2 reason for this instruction
     raise ValueError("UnsupportedOpcode")
 
 
-def decode(code):
+def decode(target, code):
     """Consume an entire admitted function, including its unique exact return."""
+    _require(type(target) is str and target in PROFILE2, "UnsupportedTarget")
     _require(type(code) is bytes and 0 < len(code) <= 256, "CodeMustBe1To256Bytes")
+    _require(target == X86 or len(code) % 4 == 0, "UnalignedOrCompressedCode")
     result, at = [], 0
     while at < len(code):
-        if code[at] == 0xC3:
-            _require(at + 1 == len(code), "ReturnMustBeTerminal")
-            result.append(Instruction("ret", (), at, 1))
+        if code[at:at + len(RETURN[target])] == RETURN[target]:
+            _require(at + len(RETURN[target]) == len(code), "ReturnMustBeTerminal")
+            result.append(Instruction("ret", (), at, len(RETURN[target])))
             return result
-        ins = _memory_form(code, at) or _register_form(code, at)
+        memory = _memory_form(code, at) if target == X86 else _rv_memory_form(code, at)
+        ins = memory or _register_form(target, code, at)
         result.append(ins)
         at += ins.size
         _require(len(result) <= 16, "TooManyBodyInstructions")
@@ -107,62 +132,72 @@ def admit(problem, instructions):
             _admit_access(problem, ins.op, base, displacement)
         if ins.op not in ("cmp", "test", "nop", "store"):
             written.add(ins.operands[0])
-    verify2.require_defined_flag_reads(verify2.X86, instructions)
+    verify2.require_defined_flag_reads(PROFILE2[problem["target"]], instructions)
 
 
 def _palette(problem):
     """Validate declared forms independently, including unused palette entries."""
-    registers = set(REGISTERS[X86])
+    registers = set(REGISTERS[problem["target"]])
     plain = []
     for form in problem["grammar"]:
         if form[0] == "load":
             _require(len(form) == 4 and all(type(x) is str and x in registers for x in form[1:3])
                      and type(form[3]) is int, "InvalidDeclaredInstruction")
         elif form[0] == "store":
+            sources = registers | ({"zero"} if problem["target"] == RV64 else set())
             _require(len(form) == 4 and type(form[1]) is str and form[1] in registers and type(form[2]) is int
-                     and type(form[3]) is str and form[3] in registers, "InvalidDeclaredInstruction")
+                     and type(form[3]) is str and form[3] in sources, "InvalidDeclaredInstruction")
         else:
             plain.append(form)
             continue
         _admit_access(problem, form[0], *_access(form))
-    verify2._palette(verify2.X86, plain)
+    verify2._palette(PROFILE2[problem["target"]], plain)
 
 
 def _layout(problem):
     inputs, bases = profile3.registers(problem)
     arguments = set(inputs.values()) | set(bases.values())
-    return inputs, bases, [name for name in REGISTERS[X86] if name not in arguments]
+    return inputs, bases, [name for name in REGISTERS[problem["target"]] if name not in arguments]
 
 
-def _step_concrete(ins, r, f, m, regions):
+def _step_concrete(target, ins, r, f, m, regions):
     if ins.op == "load":
         dst, base, displacement = ins.operands
         r[dst] = m[regions[base]][_index(displacement)]
     elif ins.op == "store":
         base, displacement, src = ins.operands
         m[regions[base]][_index(displacement)] = r[src]
-    else:
+    elif target == X86:
         verify2._x86_concrete(ins, r, f)
+    else:
+        verify2._rv_concrete(ins, r)
 
 
 def execute(problem, code, registers, flags, memory):
-    """Concrete whole-state run: every admitted register, the four flags and every region word."""
-    instructions = decode(code)
+    """Concrete whole-state run: every admitted register, the x86 flags and every region word."""
+    target = problem["target"]
+    instructions = decode(target, code)
     admit(problem, instructions)
-    _require(type(registers) is dict and set(registers) == set(REGISTERS[X86]), "ExactRegisterStateRequired")
-    _require(type(flags) is dict and set(flags) == set(FLAGS), "ExactFlagStateRequired")
+    _require(type(registers) is dict and set(registers) == set(REGISTERS[target]), "ExactRegisterStateRequired")
     _require(all(type(v) is int and 0 <= v <= MASK for v in registers.values()), "RegisterMustBeU64")
-    _require(all(type(v) is int and v in (0, 1) for v in flags.values()), "FlagMustBe0Or1")
+    if target == X86:
+        _require(type(flags) is dict and set(flags) == set(FLAGS), "ExactFlagStateRequired")
+        _require(all(type(v) is int and v in (0, 1) for v in flags.values()), "FlagMustBe0Or1")
+    else:
+        _require(flags is None, "RiscvHasNoFlags")
     sizes = {region["name"]: region["words"] for region in problem["regions"]}
     _require(type(memory) is dict and set(memory) == set(sizes), "ExactRegionStateRequired")
     for name, values in memory.items():
         _require(isinstance(values, (list, tuple)) and len(values) == sizes[name]
                  and all(type(v) is int and 0 <= v <= MASK for v in values), "RegionWordsMustBeU64")
-    r, f, m = dict(registers), dict(flags), {name: list(values) for name, values in memory.items()}
+    r, f, m = dict(registers), dict(flags or {}), {name: list(values) for name, values in memory.items()}
+    if target == RV64:
+        r["zero"] = 0
     regions = {region["base"]: region["name"] for region in problem["regions"]}
     for ins in instructions[:-1]:
-        _step_concrete(ins, r, f, m, regions)
-    return r, f, m
+        _step_concrete(target, ins, r, f, m, regions)
+    r.pop("zero", None)
+    return r, (f if target == X86 else None), m
 
 
 def run_concrete(problem, code, inputs, bases, memory, initial=None, flags=None):
@@ -175,20 +210,26 @@ def run_concrete(problem, code, inputs, bases, memory, initial=None, flags=None)
     registers = {name: initial.get(name, 0) for name in scratch}
     registers.update({input_registers[n]: v for n, v in inputs.items()})
     registers.update({base_registers[n]: v for n, v in bases.items()})
-    flags = {name: (flags or {}).get(name, 0) for name in FLAGS}
+    if problem["target"] == X86:
+        flags = {name: (flags or {}).get(name, 0) for name in FLAGS}
+    else:
+        _require(not flags, "RiscvHasNoFlags")
+        flags = None
     r, _, m = execute(problem, code, registers, flags, memory)
-    return [r[name] for name in RESULTS[X86][:len(problem["outputs"])]], m
+    return [r[name] for name in RESULTS[problem["target"]][:len(problem["outputs"])]], m
 
 
-def _step_smt(z, ins, r, f, m, regions, context):
+def _step_smt(z, target, ins, r, f, m, regions, context):
     if ins.op == "load":
         dst, base, displacement = ins.operands
         r[dst] = m[regions[base]][_index(displacement)]
     elif ins.op == "store":
         base, displacement, src = ins.operands
         m[regions[base]][_index(displacement)] = r[src]
-    else:
+    elif target == X86:
         verify2._x86_smt(z, ins, r, f, context)
+    else:
+        verify2._rv_smt(z, ins, r, context)
 
 
 def check(problem, code, timeout_ms=1000):
@@ -197,7 +238,7 @@ def check(problem, code, timeout_ms=1000):
         p = profile3.validate_problem(problem)
         _require(type(timeout_ms) is int and 1 <= timeout_ms <= 60000, "TimeoutMustBe1To60000Ms")
         _palette(p)
-        instructions = decode(code)
+        instructions = decode(p["target"], code)
         _require(len(instructions) - 1 <= p["max_instructions"], "ProblemInstructionBound")
         _require(all(i.form() in p["grammar"] for i in instructions[:-1]), "InstructionOutsideGrammar")
         admit(p, instructions)
@@ -206,17 +247,18 @@ def check(problem, code, timeout_ms=1000):
     input_registers, base_registers, scratch = _layout(p)
     regions = {r["base"]: r["name"] for r in p["regions"]}
     writable = [r["name"] for r in p["regions"] if r["access"] == "read-write"]
-    results = RESULTS[X86][:len(p["outputs"])]
+    target = p["target"]
+    results = RESULTS[target][:len(p["outputs"])]
     cost = {"bytes": len(code), "instructions": len(instructions) - 1}
     scope = {"word_bits": 64, "inputs": ",".join(f"{n}={r}" for n, r in input_registers.items()) or "none",
              "regions": ";".join(f"{r['name']}: base {r['base']}, {r['words']} words, {r['access']}"
                                  for r in p["regions"]),
              "results": ",".join(results) or "none",
              "quantified": "every input, base pointer value, initial region word, other admitted register "
-                           "(" + ",".join(scratch) + ") and CF,ZF,SF,OF",
+                           "(" + ",".join(scratch) + ")" + (" and CF,ZF,SF,OF" if target == X86 else ""),
              "assumptions": "regions are pairwise disjoint, disjoint from the stack and 8-byte aligned at their "
                             "bases; read-only regions are not written by anything else during the call",
-             "target": X86,
+             "target": target,
              "nonclaims": "Not full ISA, aliasing, faults, other flags, native conformance, timing or global optimality."}
     details = {"cost": cost, "decoded": [i.text() for i in instructions], "scope": scope}
     try:
@@ -230,13 +272,15 @@ def check(problem, code, timeout_ms=1000):
         inputs = {n: word("mc_input_" + n) for n in input_registers}
         bases = {n: word("mc_base_" + n) for n in base_registers}
         initial = {n: word("mc_initial_" + n) for n in scratch}
-        flags = {n: z.Bool("mc_flag_" + n, ctx=context) for n in FLAGS}
+        flags = {n: z.Bool("mc_flag_" + n, ctx=context) for n in FLAGS} if target == X86 else {}
         memory = {r["name"]: [word(f"mc_region_{r['name']}_{i}") for i in range(r["words"])] for r in p["regions"]}
         registers = {**initial, **{input_registers[n]: v for n, v in inputs.items()},
                      **{base_registers[n]: v for n, v in bases.items()}}
         r, f, m = dict(registers), dict(flags), {name: list(values) for name, values in memory.items()}
+        if target == RV64:
+            r["zero"] = z.BitVecVal(0, 64, ctx=context)
         for ins in instructions[:-1]:
-            _step_smt(z, ins, r, f, m, regions, context)
+            _step_smt(z, target, ins, r, f, m, regions, context)
         env = {**inputs, **{profile3.slot(n, i): v for n, values in memory.items() for i, v in enumerate(values)}}
         outputs, expected_memory = profile3.lifted(p)
         expected = [verify2._ast_smt(z, e, env, context) for e in outputs]
@@ -260,7 +304,8 @@ def check(problem, code, timeout_ms=1000):
         entry_memory = {n: [value(v) for v in values] for n, values in memory.items()}
         e = [value(term) for term in expected]
         a = [value(term) for term in actual]
-        replayed, final = run_concrete(p, code, witness_inputs, witness_bases, entry_memory, entry, entry_flags)
+        replayed, final = run_concrete(p, code, witness_inputs, witness_bases, entry_memory, entry,
+                                       entry_flags if target == X86 else None)
         want, want_memory = profile3.expected(p, witness_inputs, entry_memory)
         concrete_actual = replayed + [v for n in writable for v in final[n]]
         concrete_expected = want + [v for n in writable for v in want_memory[n]]
@@ -270,7 +315,8 @@ def check(problem, code, timeout_ms=1000):
         split = len(results)
         witness = {"inputs": {k: str(v) for k, v in witness_inputs.items()},
                    "bases": {k: str(v) for k, v in witness_bases.items()},
-                   "initial_registers": {k: str(v) for k, v in entry.items()}, "initial_flags": entry_flags,
+                   "initial_registers": {k: str(v) for k, v in entry.items()},
+                   "initial_flags": entry_flags if target == X86 else None,
                    "initial_regions": {k: [str(v) for v in values] for k, values in entry_memory.items()},
                    "expected": [str(v) for v in e[:split]], "actual": [str(v) for v in a[:split]],
                    "expected_regions": {n: [str(v) for v in want_memory[n]] for n in writable},

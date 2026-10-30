@@ -334,9 +334,11 @@ def _memory_seeds(problem):
     rows = [(lambda k: 0, lambda k: 0), (lambda k: 1, lambda k: k + 1), (lambda k: MASK, lambda k: MASK),
             (lambda k: (1 << 63) - k, lambda k: 1 << (63 - k)), (pattern, lambda k: pattern(k + 7))]
     seeds = [(tuple(value(i) for i in range(len(inputs))), pointers, {}, {}, words(fill)) for value, fill in rows]
-    from .verify3 import FLAGS, _layout
+    from .verify3 import FLAGS, X86, _layout
+    x86 = problem["target"] == X86
+    seeds = [(inputs, bases, scratch, flags if x86 else None, memory) for inputs, bases, scratch, flags, memory in seeds]
     scratch = dict.fromkeys(_layout(problem)[2], MASK)
-    return seeds + [(seeds[1][0], pointers, scratch, dict.fromkeys(FLAGS, 1), words(lambda k: k + 1))]
+    return seeds + [(seeds[1][0], pointers, scratch, dict.fromkeys(FLAGS, 1) if x86 else None, words(lambda k: k + 1))]
 
 
 def _seeds(problem):
