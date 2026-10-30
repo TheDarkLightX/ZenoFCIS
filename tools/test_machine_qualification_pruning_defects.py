@@ -31,34 +31,35 @@ class Outcomes(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
 
-    def judge(self, defect, name):
+    def judge(self, defect, name, cases):
         specimen = self.root / name
         binding = planted.build(specimen, defect)
         if "invalid" in binding:
             return "invalid-specimen", binding["invalid"]
-        outcome, evidence, *_ = planted.judge(specimen, MODE)
+        outcome, evidence, *_ = planted.judge(specimen, MODE, cases=cases)
         return outcome, evidence
 
     def test_unmodified_exact_planted_detected_missing_invalid_and_crash_inconclusive(self):
         second = next(d for d in planted.DEFECTS if d.name == "second-result-unobserved")
         syntactic = next(d for d in planted.DEFECTS if d.name == "input-required-syntactically")
+        # Small case subsets keep this test short; the campaign runs every case.
+        two, irrelevant, plain = "x86-profile2-two-results", "x86-profile1-irrelevant-input", "x86-profile1"
         cases = [
-            (None, "survived"),
-            (second, "detected"),
-            (syntactic, "detected"),
-            (planted.Defect("missing", "this text is not in footprint.py", "x", "test"), "invalid-specimen"),
+            (None, "survived", (two, irrelevant)),
+            (second, "detected", (two,)),
+            (syntactic, "detected", (irrelevant, plain)),
+            (planted.Defect("missing", "this text is not in footprint.py", "x", "test"), "invalid-specimen", ()),
             (planted.Defect("crash", 'SCHEME = "exact-footprint/', 'raise RuntimeError("planted crash")\n'
-                            'SCHEME = "exact-footprint/', "test"), "inconclusive"),
+                            'SCHEME = "exact-footprint/', "test"), "inconclusive", (plain,)),
         ]
-        for index, (defect, expected) in enumerate(cases):
+        for index, (defect, expected, subset) in enumerate(cases):
             with self.subTest(defect=defect.name if defect else "unmodified"):
-                outcome, evidence = self.judge(defect, f"case-{index}")
+                outcome, evidence = self.judge(defect, f"case-{index}", subset)
                 self.assertEqual(outcome, expected, evidence)
                 if defect is second:
                     self.assertIn("two-results", evidence)
                 if defect is syntactic:  # only where the specification mentions an input it ignores
-                    self.assertRegex(evidence, r"^unwitnessed removals: [a-z0-9-]*irrelevant-input \d+"
-                                               r"(, [a-z0-9-]*irrelevant-input \d+)*$")
+                    self.assertRegex(evidence, r"^unwitnessed removals: x86-profile1-irrelevant-input \d+$")
 
 
 if __name__ == "__main__":

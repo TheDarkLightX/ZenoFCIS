@@ -25,7 +25,7 @@ The pruning under test is a predicate `pruned(target, forms, results) -> str | N
 sequence, in enumeration order; it returns the pruning reason or None. `search_pruner` adapts the search's own
 `footprint.Pruner`, and checks that it removes exactly what `footprint.sequences` omits from the enumeration.
 
-    python3 -B -m tools.machine_qualification.pruning_exactness run [--out REPORT.json]
+    python3 -B -m tools.machine_qualification.pruning_exactness run [--case NAME]... [--out REPORT.json]
 
 Exit 0 when every case is exact, 1 when any removal has no witness.
 """
@@ -268,13 +268,15 @@ def neighbours(forms: tuple):
         yield forms[:index] + (forms[index + 1], forms[index]) + forms[index + 2:]
 
 
-def check(case: Grammar, pruned: Pruner, against_spec: bool = False) -> dict:
+def check(case: Grammar, pruned: Pruner, against_spec: bool = False, memo: dict | None = None) -> dict:
     """Enumerate the case with pruning off and on and witness every removed sequence.
 
     Without `against_spec` every removal except a lost input needs a kept twin. With it, the pruning may also
     remove a sequence whose only twins lose an input, so a removal without a kept twin passes when the checker
-    finds the sequence itself not equivalent to the specification.
+    finds the sequence itself not equivalent to the specification. Passes over the same case may share a `memo`
+    of admission, sample results, proofs and checker verdicts, which depend only on the sequences.
     """
+    memo = {} if memo is None else memo
     every = [tuple(case.forms[i] for i in choice) for length in range(case.length + 1)
              for choice in product(range(len(case.forms)), repeat=length)]
     reasons = {forms: pruned(case.target, forms, case.results) for forms in every}
@@ -284,35 +286,59 @@ def check(case: Grammar, pruned: Pruner, against_spec: bool = False) -> dict:
     states = samples(case.target, problem)
 
     def fingerprint(forms):
-        try:
-            return tuple(concrete(case.target, forms, state, flags, case.results, problem)
-                         for state, flags in states)
-        except ValueError:
-            return None
+        cache = memo.setdefault("prints", {})
+        if forms not in cache:
+            try:
+                cache[forms] = tuple(concrete(case.target, forms, state, flags, case.results, problem)
+                                     for state, flags in states)
+            except ValueError:
+                cache[forms] = None
+        return cache[forms]
+
+    def admitted(forms):
+        cache = memo.setdefault("refused", {})
+        if forms not in cache:
+            cache[forms] = refused(case.target, forms, problem)
+        return not cache[forms]
+
+    def verdict(forms):
+        cache = memo.setdefault("verdicts", {})
+        if forms not in cache:
+            cache[forms] = checker.check(problem, code(case.target, forms), timeout_ms=5000)["status"]
+        return cache[forms]
+
+    def equal(forms, candidate):
+        cache = memo.setdefault("proofs", {})
+        if (forms, candidate) not in cache:
+            cache[forms, candidate] = proved_equal(case.target, forms, candidate, case.results, problem=problem,
+                                                   context=context)
+        return cache[forms, candidate]
 
     # A twin must itself be admitted, or the search could never accept it in place of the removed sequence.
-    prints = {forms: None if refused(case.target, forms, problem) else fingerprint(forms) for forms in kept}
+    prints = {forms: fingerprint(forms) if admitted(forms) else None for forms in kept}
     kept_set = set(kept)
     report = {"case": case.name, "target": case.target, "forms": len(case.forms), "length": case.length,
               "results": case.results, "enumerated": len(every), "kept": len(kept), "removed": len(removed),
               "removed_refused": 0, "witnessed": 0, "lost_not_equivalent": 0, "not_equivalent": 0,
               "failures": [], "reasons": {}}
     checker = v3 if profile3(case.target) else v2 if profile2(case.target) else v1
-    import z3
-    context = z3.Context()
+    if "context" not in memo:
+        import z3
+        memo["context"] = z3.Context()
+    context = memo["context"]
     for forms in removed:
         report["reasons"][reasons[forms]] = report["reasons"].get(reasons[forms], 0) + 1
-        if refused(case.target, forms, problem):
+        if not admitted(forms):
             report["removed_refused"] += 1
             continue
         if reasons[forms] == "lost":
             # A lost input has no twin: the removed sequence itself must never be equivalent to the spec.
-            verdict = checker.check(problem, code(case.target, forms), timeout_ms=5000)
-            if verdict["status"] in ("counterexample", "refused"):
+            status = verdict(forms)
+            if status in ("counterexample", "refused"):
                 report["lost_not_equivalent"] += 1
             else:
                 report["failures"].append({"removed": [list(f) for f in forms], "reason": "lost",
-                                           "checker": verdict["status"]})
+                                           "checker": status})
             continue
         target_print = fingerprint(forms)
         bound = cost(case.target, forms)
@@ -325,18 +351,18 @@ def check(case: Grammar, pruned: Pruner, against_spec: bool = False) -> dict:
             if (size[0] > bound[0] or size[1] > bound[1] or prints[candidate] is None
                     or prints[candidate] != target_print):
                 continue
-            if proved_equal(case.target, forms, candidate, case.results, problem=problem, context=context):
+            if equal(forms, candidate):
                 witness = candidate
                 break
         if witness is not None:
             report["witnessed"] += 1
             continue
-        verdict = checker.check(problem, code(case.target, forms), timeout_ms=5000) if against_spec else None
-        if verdict and verdict["status"] in ("counterexample", "refused"):
+        status = verdict(forms) if against_spec else None
+        if status in ("counterexample", "refused"):
             report["not_equivalent"] += 1
         else:
             report["failures"].append({"removed": [list(f) for f in forms], "reason": reasons[forms],
-                                       **({"checker": verdict["status"]} if verdict else {})})
+                                       **({"checker": status} if status else {})})
     report["exact"] = not report["failures"]
     # Identifies the removal decisions, so a planted edit can be shown to change none of them.
     decisions = sorted([[list(f) for f in forms], reasons[forms]] for forms in removed)
@@ -378,8 +404,9 @@ def run(cases=CASES) -> dict:
     """Two passes per case: twins for every removal with the lost-input rule off, then the full pruning."""
     rows = []
     for case in cases:
-        passes = {"twins": check(case, search_pruner(case, lost=False)),
-                  "spec": check(case, search_pruner(case), against_spec=True)}
+        memo = {}
+        passes = {"twins": check(case, search_pruner(case, lost=False), memo=memo),
+                  "spec": check(case, search_pruner(case), against_spec=True, memo=memo)}
         for report in passes.values():
             report["failure_count"] = len(report["failures"])
             report["failures"] = report["failures"][:20]
@@ -397,8 +424,10 @@ def main(argv=None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     measured = commands.add_parser("run")
     measured.add_argument("--out", type=Path)
+    measured.add_argument("--case", action="append", choices=[case.name for case in CASES],
+                          help="run only this case (repeatable); every case by default")
     args = parser.parse_args(argv)
-    report = run()
+    report = run(tuple(case for case in CASES if not args.case or case.name in args.case))
     text = json.dumps(report, indent=2, sort_keys=True) + "\n"
     if args.out:
         args.out.write_text(text, encoding="utf-8")
