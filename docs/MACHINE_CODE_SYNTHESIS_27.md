@@ -12,6 +12,39 @@ profile below connects controlled human wording to this one modular-word
 problem format. Other ZAL profiles and full application lowering retain their
 own ABI, rejection, effects and metering obligations.
 
+## What a checked kernel guarantees
+
+> Under the stated machine model and environmental assumptions, these exact bytes satisfy these specified
+> properties for every admitted input and initial state.
+
+Every qualification in that sentence matters.
+
+**The compiler is out of the trusted path for the checked bytes, but these remain trusted:**
+
+- the byte decoder;
+- the instruction semantics, checked against the executing CPU on sampled states but not proved;
+- the SMT checker and Z3;
+- loading and linking;
+- the calling convention;
+- the hardware.
+
+**Outside the check:**
+
+- missing or wrong requirements: a modular sum that returns 0 for `MAX + 1` is correct under its contract, and
+  wrong for a contract that must refuse overflow;
+- integration mistakes;
+- timing and side channels;
+- unmodelled processor behaviour.
+
+**Proved separately or not at all:** correctness, code size and measured speed. Optimality would need a defined
+candidate space, a cost model, and evidence that no cheaper admissible candidate exists.
+
+**Counterexamples:** retained counterexamples reject a repeated failure automatically. They do not make a
+proposer learn, and they do not make search terminate.
+
+**Certification:** formal evidence can support assurance objectives, for example under DO-333 alongside
+DO-178C. It does not replace them.
+
 ## Registered profiles
 
 | Target | Calling contract | Admitted computation |
