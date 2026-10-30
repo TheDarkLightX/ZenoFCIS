@@ -45,6 +45,59 @@ class ContractGuidedResearchTests(unittest.TestCase):
         self.assertFalse(any(x["status"].startswith("inconclusive")
                              for x in artifact["experiments"]))
 
+    def test_right_to_left_impossibility_before_search(self):
+        """Chapter 2: a missing right-shift prevents higher-to-lower flow."""
+        experiments = research.run(self.corpus, 10000)["experiments"]
+        found = {(e["problem"], e["palette_name"]): e for e in experiments}
+        for problem, palette in (
+            ("divide-by-eight-u8", "control-no-shift"),
+            ("gray-code-u8", "control-no-shift"),
+            ("rotate-left-one-u8", "control-no-right-shift"),
+        ):
+            report = found[(problem, palette)]
+            self.assertEqual(report["status"], "infeasible-right-to-left-palette")
+            self.assertEqual(report["candidates_inspected"], 0)
+            witness = report["preflight"]
+            self.assertEqual(witness["rule"], "right-to-left-prefix-u8/1")
+            mask = (1 << witness["bits"]) - 1
+            self.assertEqual(witness["input_a"] & mask, witness["input_b"] & mask)
+            ref = next(p for p in self.corpus["problems"] if p["id"] == problem)["reference"]
+            self.assertNotEqual(research.reference.result(ref, witness["input_a"]) & mask,
+                                research.reference.result(ref, witness["input_b"]) & mask)
+        # A palette that includes a real right shift must not receive this refusal.
+        prob = next(p for p in self.corpus["problems"] if p["id"] == "gray-code-u8")
+        self.assertIsNone(research.structural_preflight(prob, prob["palettes"][0]))
+        # A shift by 0 is still prefix preserving, so it cannot defeat the refutation.
+        bogus = {"name":"shift0", "operators":["xor", "lshr"],
+                 "constants":[], "shifts":[0], "max_nodes":4}
+        self.assertIsNotNone(research.structural_preflight(prob, bogus))
+
+    def test_right_to_left_witness_tampering_is_detected(self):
+        artifact = research.run(self.corpus, 10000)
+        altered = copy.deepcopy(artifact)
+        target = next(e for e in altered["experiments"]
+                      if e["status"] == "infeasible-right-to-left-palette")
+        target["preflight"]["input_b"] ^= 1
+        with self.assertRaisesRegex(research.Refusal, "experiment replay mismatch"):
+            research.replay(self.corpus, altered)
+
+    def test_right_to_left_positive_closure_for_supported_atoms(self):
+        """Check a complete 4-bit atom cross-product; closure follows by induction."""
+        for bits in range(1, 4):
+            mask = (1 << bits) - 1
+            for a in range(16):
+                for b in range(16):
+                    a2, b2 = a ^ (1 << bits), b ^ (1 << bits)
+                    if a2 > 15 or b2 > 15:
+                        continue
+                    pairs = [(a & b, a2 & b2), (a | b, a2 | b2),
+                             (a ^ b, a2 ^ b2), ((a+b)&15, (a2+b2)&15),
+                             ((a-b)&15, (a2-b2)&15),
+                             ((~a)&15, (~a2)&15),
+                             ((a<<1)&15, (a2<<1)&15)]
+                    self.assertTrue(all((left & mask) == (right & mask)
+                                        for left, right in pairs))
+
     def test_tampered_candidate_is_not_promoted(self):
         artifact = research.run(self.corpus, 10000)
         altered = copy.deepcopy(artifact)
