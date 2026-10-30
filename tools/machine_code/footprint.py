@@ -109,6 +109,9 @@ def _profile2(z, context, target: str, form: list) -> Footprint:
 
 def footprints(problem: dict) -> list:
     """One Footprint per grammar entry, in grammar order; None where it cannot be derived."""
+    if problem["schema"] not in (profile2.SCHEMA, "zeno-fcis/machine-problem/1"):
+        # No footprint model yet (profile 3 memory); nothing is pruned against an underivable footprint.
+        return [None] * len(problem["grammar"])
     import z3 as z
     context = z.Context()
     derive = _profile2 if problem["schema"] == profile2.SCHEMA else _profile1

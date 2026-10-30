@@ -23,7 +23,7 @@ from pathlib import Path
 import re
 import tempfile
 
-from . import bench as timing, native as execution, session
+from . import bench as timing, native as execution, profile3, session
 from .model import canonical, digest, read_json
 from .targets import assembly_source, elf_object
 
@@ -34,6 +34,7 @@ ROUTES = ("proposal", "search")
 NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,62}")
 SUMMARY = re.compile(r"[ -~]{1,200}")
 MAX_ENTRIES = 256
+NOT_MEMORY = {"status": "not-run", "reason": "memory kernels are not executed natively"}
 
 
 def _validate(value: dict, name: str | None = None) -> tuple[dict, bytes]:
@@ -132,6 +133,8 @@ def check(library: Path, timeout_ms: int = 1000, native: bool = False) -> dict:
         for index, (row, problem, code) in enumerate(checked):
             if problem is None:
                 row["native"] = {"status": "not-run", "reason": "entry refused"}
+            elif problem["target"] in profile3.TARGETS:
+                row["native"] = dict(NOT_MEMORY)
             elif problem["target"] not in execution.X86_TARGETS:
                 row["native"] = dict(execution.NOT_RV64I)
             elif unsupported:
@@ -169,6 +172,8 @@ def bench(library: Path, output: Path, iterations: int = 1_000_000, repeats: int
                 "bytes": len(code) if code else None}
         if row["status"] != "equivalent":
             line.update(status="not-timed", reason="did not recheck: " + row["status"])
+        elif problem["target"] in profile3.TARGETS:
+            line.update(status="not-run", reason=NOT_MEMORY["reason"])
         elif problem["target"] not in timing.X86_TARGETS:
             line.update(status="not-run", reason=execution.NOT_RV64I["reason"])
         else:
