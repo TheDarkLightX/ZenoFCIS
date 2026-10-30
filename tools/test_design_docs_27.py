@@ -19,7 +19,7 @@ DESIGNS = {
         "mentions": ["zal/app-effects/1", "zal/effect-plan/1", "CHANNEL@ORDINAL:IDEMPOTENCY", "zal/typed-fsm/1"],
     },
 }
-FORBIDDEN = re.compile(r"correct by construction|/home/|/tmp/|Claude|Codex|GPT|Opus|Sonnet|Astra|Luna|Sol 6", re.I)
+FORBIDDEN = re.compile(r"correct by construction|/(?:home|tmp)/|Claude|Codex|GPT|Opus|Sonnet|Astra|Luna|Sol 6", re.I)
 
 
 class DesignDocuments(unittest.TestCase):
