@@ -1701,15 +1701,15 @@ fn a_refresh_rebinds_receipts_to_this_checker_and_nothing_else() {
             generate_contract(sources).map(|generated| (rules.to_owned(), Vec::new(), generated))
         }
     };
-    // The older identity no longer replays.
+    // The older identity no longer replays, and the refusal names the remedy.
     let refused = with(&old_rules, &older, false)
         .err()
         .unwrap_or_else(|| panic!("an older checker identity does not replay"));
     assert_eq!(refused.place(), "v2/policy.json adoptions[0]");
     assert!(
-        refused
-            .reason()
-            .ends_with("`checker` differ from the record"),
+        refused.reason().ends_with(
+            "`checker` differ from the record: another ZenoFCIS build, such as 2.6.0, wrote this receipt; run `zeno-fcis contract refresh-receipts DIR` on this contract directory to check every adoption again with this build"
+        ),
         "{}",
         refused.reason()
     );

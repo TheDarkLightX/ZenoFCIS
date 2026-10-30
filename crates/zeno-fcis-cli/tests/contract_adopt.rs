@@ -644,7 +644,7 @@ fn refresh_rebinds_a_receipt_from_an_older_checker_identity() {
     assert_eq!(refused.status.code(), Some(1));
     assert_eq!(
         json(&refused)["error"]["message"],
-        "v2/adoptions/1/receipt.json does not replay against version 1's program and the candidate: `checker` differ from the record"
+        "v2/adoptions/1/receipt.json does not replay against version 1's program and the candidate: `checker` differ from the record: another ZenoFCIS build, such as 2.6.0, wrote this receipt; run `zeno-fcis contract refresh-receipts DIR` on this contract directory to check every adoption again with this build"
     );
     assert_eq!(snapshot(&dir), before);
 
