@@ -1043,14 +1043,14 @@ integers keep their existing refusal for fractions and add the named integer che
 **Browser runtime.** The browser's `JSON.parse` gives the same decimal value for every accepted number except
 integers beyond plus or minus 2^53-1. The browser route already receives those as decimal strings.
 
-**Not covered yet.** The local agent transport still parses agent messages with plain binary floating point. It is
-planned for 2.7.1, because refusing a message changes a live agent session.
+**Not covered yet.** The local agent transport still parses agent messages with plain binary floating point. It needs
+its own reviewed change, because refusing a message changes a live agent session.
 
 A component list pins the finite-library and semantic-library sources. After editing them, run
 `python3 tools/record_finite_library_components.py --write`, then `python3 tools/record_category_capsule.py --write`,
 because the capsule pins that list.
 
-The Rust readers of ZAL JSON are planned for 2.7.1. `integrations/zal/test_json_numbers.py` lists every
+The Rust readers of ZAL JSON follow in 2.7 if done in time, otherwise in 2.8. `integrations/zal/test_json_numbers.py` lists every
 `json.load` and `json.loads` call under `integrations/zal`, and fails when a new one neither uses the policy nor
 is listed with a reason. The same test checks:
 

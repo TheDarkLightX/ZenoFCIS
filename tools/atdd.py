@@ -121,6 +121,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Check, search, emit, replay and execute machine-code kernels under both profiles",
         (("python3", "-B", "tools/test_machine_code_verifier.py"),
          ("python3", "-O", "-B", "tools/test_machine_code_verifier.py"),
+         ("python3", "-B", "tools/test_fuzz_machine_code_decoders.py"),
          ("python3", "-B", "tools/test_machine_code_loop.py"),
          ("python3", "-O", "-B", "tools/test_machine_code_loop.py"),
          ("python3", "-B", "tools/test_zal_word_kernel.py"),
@@ -944,6 +945,18 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "--features", "crash-injection"),
          ("python3", "tools/check_contract_upgrade.py")),
     ),
+    "released-26-compatibility": AcceptanceScenario(
+        "Meet stores and an adoption made by the published 2.6.0 CLI",
+        (("python3", "tools/test_check_contract_upgrade_26.py"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--test", "released_26", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_adopt", "--locked",
+          "released_26"),
+         ("python3", "tools/check_contract_upgrade_26.py")),
+        requires=(HostTool("the published 2.6.0 executable (ZENO_FCIS_RELEASED_26_CLI)",
+                           environment=("ZENO_FCIS_RELEASED_26_CLI",)),
+                  HostTool("an unmodified v2.6.0 checkout (ZENO_FCIS_RELEASED_26_SOURCE)",
+                           environment=("ZENO_FCIS_RELEASED_26_SOURCE",))),
+    ),
     "rule-change-upgrade": AcceptanceScenario(
         "Change the rules of a live store after the owner reviews the change",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_evolve", "--locked"),
@@ -1045,6 +1058,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
             ("python3", "tools/check_library_docs.py"),
             # Negative controls for the publication gate `rc_package.py check` runs.
             ("python3", "tools/test_public_docs.py"),
+            ("python3", "-B", "tools/test_design_docs_27.py"),
+            ("python3", "-B", "tools/test_fuzz_targets_registered.py"),
             ("cargo", "+1.97.1", "fmt", "--all", "--", "--check"),
             (
                 "cargo",

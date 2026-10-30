@@ -56,6 +56,7 @@ V2 = "test_machine_code_profile2_verifier.Profile2VerifierTests."
 V3 = "test_machine_code_profile3_verifier.Profile3VerifierTests."
 REALIZE = "test_machine_code_realize.RealizeCrossCheck."
 REALIZE_REPLAY = "test_machine_code_realize.RealizeReplay."
+REALIZE_BUDGET = "test_machine_code_realize.RealizeBudget."
 CONFORMANCE1 = "test_machine_code_conformance.X86ModelConformance."
 CONFORMANCE2 = "test_machine_code_profile2_conformance."
 POSITIVE = (
@@ -391,6 +392,21 @@ DEFECTS = (
            "    if False:",
            REALIZE_REPLAY + "test_replay_refuses_a_changed_bound",
            "Replay accepts a negative record that omits an eligible length, as after its bound is raised."),
+    Defect("realize-replay-ignores-failed-coverage", "realize.py", "record replay",
+           '            failures.append(f"length {length}: subspaces do not cover the palette space exactly once")\n',
+           "            pass\n",
+           REALIZE_REPLAY + "test_replay_refuses_a_length_with_no_subspaces",
+           "Replay accepts an unrealizable length whose subspace list is empty, since no query is replayed for it."),
+    Defect("realize-partition-decides-after-deadline", "realize.py", "partition deadline",
+           "        while not found and not expired():\n",
+           "        while not found:\n",
+           REALIZE_BUDGET + "test_partitioned_search_stops_at_its_deadline",
+           "Sequential partitioned synthesis keeps visiting every remaining subspace after its deadline."),
+    Defect("realize-partition-submits-every-job", "realize.py", "partition deadline",
+           "                while len(running) < 2 * workers and not expired():\n",
+           "                while True:\n",
+           REALIZE_BUDGET + "test_partitioned_search_stops_at_its_deadline",
+           "Partitioned synthesis with workers submits every subspace, unbounded and after its deadline."),
 )
 
 # Runs one control inside a specimen and prints one JSON line. A failure counts only when its AssertionError was

@@ -30,3 +30,9 @@ jobs:
           cargo +nightly-2026-07-21 fuzz build codec_roundtrip
           cargo +nightly-2026-07-21 fuzz build candidate_bundle
           cargo +nightly-2026-07-21 fuzz build zeno_parser
+
+      - name: Build codec2, schema2 and worker channel harnesses
+        run: |
+          cargo +nightly-2026-07-21 fuzz build codec2_envelope
+          cargo +nightly-2026-07-21 fuzz build schema2_envelope
+          cargo +nightly-2026-07-21 fuzz build worker_channel_frames

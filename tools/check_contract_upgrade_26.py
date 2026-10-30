@@ -15,6 +15,12 @@ by name and write nothing, and its CLI refuses the 2.6.0 receipt until
 with their provenance: the tag commit, the source lock, the toolchain, the
 exact CLI build command when this tool builds it (`--released-target`), the
 CLI's SHA-256 and every generation command.
+
+Without `--write-test-data`, the supplied executable must have the SHA-256
+the retained manifest records; any other file is refused by name before a
+store is made. The acceptance scenario supplies the executable and the
+released checkout through `ZENO_FCIS_RELEASED_26_CLI` and
+`ZENO_FCIS_RELEASED_26_SOURCE` when the options are absent.
 """
 from __future__ import annotations
 
@@ -46,6 +52,9 @@ FIXTURE_FILES = (
 )
 # The named refusal of a store created by a 2.6.0 build.
 REFUSAL = "OtherRelease"
+# The acceptance scenario supplies the released inputs through these variables.
+RELEASED_CLI_ENV = "ZENO_FCIS_RELEASED_26_CLI"
+RELEASED_SOURCE_ENV = "ZENO_FCIS_RELEASED_26_SOURCE"
 # The exact build of the released CLI, in the released checkout.
 BUILD = ["cargo", "+1.97.1", "build", "-p", "zeno-fcis-cli", "--locked", "--offline"]
 BUILD_ENVIRONMENT = {"CARGO_PROFILE_DEV_DEBUG": "0"}
@@ -226,6 +235,30 @@ SHELL_DATA = Path("crates/zeno-fcis-shell-sqlite/tests/test-data/released-26")
 CLI_DATA = Path("crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted-2.6.0")
 
 
+def pinned_cli_sha256(root: Path) -> str:
+    """The released CLI's SHA-256 as the retained manifest, written by
+    `--write-test-data`, records it."""
+    manifest = json.loads((root / SHELL_DATA / "manifest.json").read_text())
+    if manifest.get("release") != RELEASE or manifest.get("subject") != SUBJECT:
+        raise RuntimeError(f"the retained manifest is not for {RELEASE} at {SUBJECT}")
+    pinned = manifest.get("released_cli_sha256")
+    if not isinstance(pinned, str) or len(pinned) != 64:
+        raise RuntimeError("the retained manifest has no released CLI SHA-256")
+    return pinned
+
+
+def check_pinned_cli(cli: Path, root: Path) -> str:
+    """Refuse, by name, any executable other than the one the manifest pins.
+    The producer run (`--write-test-data`) is the only way to change the pin."""
+    pinned = pinned_cli_sha256(root)
+    actual = digest(cli.read_bytes())
+    if actual != pinned:
+        raise RuntimeError(f"the supplied executable {cli} has SHA-256 {actual}; the retained "
+                           f"manifest pins {pinned}. Re-run with --write-test-data to re-pin "
+                           f"it deliberately, or supply the pinned executable.")
+    return actual
+
+
 def export_test_data(directory: Path, root: Path) -> dict:
     """Export retained released inputs. They confer no upgrade or replay authority."""
     record = json.loads((directory / "RELEASED_INPUTS.json").read_text())
@@ -321,34 +354,57 @@ def current(directory: Path, cli: Path, record: dict) -> dict:
 
 def check(directory: Path, released_cli: Path, released_source: Path, current_cli: Path,
           write_test_data: bool, build: dict | None = None) -> dict:
+    pinned = None if write_test_data else check_pinned_cli(released_cli, applications.ROOT)
     record = released(directory, released_cli, released_source, build)
     exported = export_test_data(directory, applications.ROOT) if write_test_data else None
     observed = current(directory, current_cli, record)
     return {"schema": "zeno-fcis/contract-upgrade-26-check/1", "status": "passed",
-            "authority": "none", "released_inputs": record, "exported": exported,
-            "current": observed}
+            "authority": "none", "pinned_cli_sha256": pinned, "released_inputs": record,
+            "exported": exported, "current": observed}
+
+
+def resolve_inputs(args: argparse.Namespace, environment: dict[str, str]) -> tuple[Path | None, Path]:
+    """The released executable (None when `--released-target` builds it) and
+    the released checkout, from the options or the scenario's variables."""
+    cli = args.released_cli
+    if cli is None and args.released_target is None:
+        value = environment.get(RELEASED_CLI_ENV, "")
+        if not value:
+            raise SystemExit(f"error: one of --released-cli, --released-target or "
+                             f"{RELEASED_CLI_ENV} is required")
+        cli = Path(value)
+    source = args.released_source
+    if source is None:
+        value = environment.get(RELEASED_SOURCE_ENV, "")
+        if not value:
+            raise SystemExit(f"error: --released-source or {RELEASED_SOURCE_ENV} is required")
+        source = Path(value)
+    return cli, source
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    released_cli = parser.add_mutually_exclusive_group(required=True)
-    released_cli.add_argument("--released-cli", type=Path, help="a zeno-fcis 2.6.0 executable")
+    released_cli = parser.add_mutually_exclusive_group()
+    released_cli.add_argument("--released-cli", type=Path,
+                              help=f"a zeno-fcis 2.6.0 executable (default: {RELEASED_CLI_ENV})")
     released_cli.add_argument("--released-target", type=Path,
                               help="build the released CLI here with the recorded command")
-    parser.add_argument("--released-source", type=Path, required=True,
-                        help=f"an unmodified checkout of {SUBJECT}, the v{RELEASE} tag")
+    parser.add_argument("--released-source", type=Path,
+                        help=f"an unmodified checkout of {SUBJECT}, the v{RELEASE} tag "
+                             f"(default: {RELEASED_SOURCE_ENV})")
     parser.add_argument("--current-cli", type=Path, default=Path(upgrade.cli()))
     parser.add_argument("--keep", type=Path, help="a new directory that keeps every artifact")
     parser.add_argument("--write-test-data", action="store_true",
                         help="export the released inputs the native tests replay")
     args = parser.parse_args()
     os.environ.setdefault("CARGO_BUILD_JOBS", "2")
-    source = args.released_source.resolve()
+    cli, source = resolve_inputs(args, os.environ)
+    source = source.resolve()
     build = None
     if args.released_target:
         cli, build = build_released_cli(source, args.released_target.resolve())
     else:
-        cli = args.released_cli.resolve()
+        cli = cli.resolve()
     arguments = (cli, source, args.current_cli.resolve(), args.write_test_data, build)
     if args.keep:
         args.keep.mkdir()

@@ -79,6 +79,15 @@ Feature: Check a candidate program before the factory may use it
     And each history segment replays under its own contract and pending deliveries are delivered exactly once with their original identifiers
     And a different schema, a refused genesis, a missing old contract, an altered record, an unreplayable receipt, a false usage claim, an unchanged program and an edit to a superseded version each refuse with nothing written
 
+  @atdd-released-26-compatibility
+  Scenario: Meet stores and an adoption made by the published 2.6.0 CLI
+    Given the published 2.6.0 executable, identified by the SHA-256 the retained manifest pins, and an unmodified checkout of the v2.6.0 tag
+    When the released executable makes a version 1 store at genesis, a version 1 store with a pending payout and the withdrawal-queue adoption, and the released version 2 build upgrades both stores as a control
+    Then a build from this checkout refuses each released store for `state`, `--audit` and `--upgrade` with the named refusal OtherRelease and writes nothing, and every other identity mismatch is still refused as Identity
+    And the released adoption refuses to generate naming `zeno-fcis contract refresh-receipts DIR`, and the refresh yields exactly this checkout's adoption fixture, file for file
+    And an executable with any other SHA-256 is refused by name before a store is made, and only the producer run with `--write-test-data` can change the pin
+    And without the released executable or checkout the scenario is blocked naming the missing input, never passed
+
   @atdd-rule-change-upgrade
   Scenario: Change the rules of a live store after the owner reviews the change
     Given an escrow application whose store committed a funding and a shipment, and refused a dispute 14 days and one second after shipping

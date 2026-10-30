@@ -13,6 +13,24 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INVENTORY = ROOT / "crates/zeno-fcis-cli/guide-card-inventory.json"
 HELP_SNAPSHOTS = ROOT / "crates/zeno-fcis-cli/guide-help-snapshots.json"
+COVERAGE = ROOT / "docs/loops/coverage.json"
+
+
+def card_commands():
+    return {command for row in json.loads(INVENTORY.read_text())["cards"] for command in row["commands"]}
+
+
+def covers(paths, leaf):
+    """A card or exclusion for a command also covers every command below it."""
+    words = leaf.split()
+    return any(path.split() == words[:len(path.split())] for path in paths)
+
+
+def leaves(command):
+    if not command["subcommands"]:
+        yield " ".join(command["path"])
+    for child in command["subcommands"]:
+        yield from leaves(child)
 
 
 @unittest.skipUnless(os.environ.get("ZENO_FCIS_CLI"), "set ZENO_FCIS_CLI")
@@ -68,7 +86,7 @@ class GuideCli(unittest.TestCase):
             report = json.loads(result.stdout)
             self.assertEqual(report["schema"], "zeno-fcis/guide/1")
             self.assertEqual(report["authority"], "none")
-            self.assertEqual(len(report["cards"]), 29)
+            self.assertEqual(len(report["cards"]), 41)
             self.assertEqual({c["name"] for c in report["cards"]},
                              {c["name"] for c in json.loads(INVENTORY.read_text())["cards"]})
             self.assertIn("contract-risk", {c["name"] for c in report["cards"]})
@@ -133,10 +151,61 @@ class GuideCli(unittest.TestCase):
             self.assertFalse(report["containment"]["final"]["application_work_started"])
             self.assertFalse(session.exists())
 
+    def test_every_leaf_command_has_a_card_or_a_stated_exclusion(self):
+        result = self.call("describe")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        tree = json.loads(result.stdout)["command"]
+        excluded = json.loads(COVERAGE.read_text())["excluded"]
+        commands = card_commands()
+        uncovered = [leaf for leaf in leaves(tree)
+                     if not covers(commands, leaf) and not covers(excluded, leaf)]
+        self.assertEqual(uncovered, [], "add a card or a docs/loops/coverage.json entry")
+        all_leaves = list(leaves(tree))
+        stale = [path for path in excluded
+                 if not any(leaf == path or leaf.startswith(path + " ") for leaf in all_leaves)]
+        self.assertEqual(stale, [], "exclusion names a command that no longer exists")
+
     def test_unknown_card_has_actionable_refusal(self):
         result = self.call("guide", "show", "missing-card")
         self.assertEqual(result.returncode, 64)
         self.assertIn("guide list", json.loads(result.stdout)["next"])
+
+
+class GuideCoverageTable(unittest.TestCase):
+    """The coverage table is checked without the binary; the leaf walk above needs it."""
+
+    def test_coverage_table_is_well_formed(self):
+        table = json.loads(COVERAGE.read_text())
+        self.assertEqual(table["schema"], "zeno-fcis/guide-card-coverage/1")
+        self.assertIsInstance(table["rule"], str)
+        for path, reason in table["excluded"].items():
+            with self.subTest(path=path):
+                self.assertRegex(path, r"^[a-z][a-z-]*( [a-z][a-z-]*)*$")
+                self.assertGreater(len(reason.strip()), 20, "state which documentation stands in for the card")
+
+    def test_exclusions_do_not_duplicate_cards(self):
+        commands = card_commands()
+        for path in json.loads(COVERAGE.read_text())["excluded"]:
+            with self.subTest(path=path):
+                self.assertFalse(covers(commands, path), "a card already covers this command; drop the exclusion")
+
+    def test_gap_register_commands_have_cards(self):
+        commands = card_commands()
+        for path in ("assemble", "contract postconditions", "contract two-run", "contract runs", "contract refine-check",
+                     "contract check-composition", "contract check-symbolic", "contract evolve", "contract diff",
+                     "contract refresh-receipts", "contract draft", "purity"):
+            with self.subTest(path=path):
+                self.assertIn(path, commands)
+
+    def test_every_card_step_states_exit_and_a_check(self):
+        for row in json.loads(INVENTORY.read_text())["cards"]:
+            text = (ROOT / "docs/loops" / (row["name"] + ".md")).read_text()
+            card = json.loads(text.removeprefix("```json\n").split("\n```", 1)[0])
+            for step in card["steps"] + [card["example"]]:
+                with self.subTest(card=row["name"], command=step["command"]):
+                    self.assertIn(step["exit"], (0, 1, 2, 3, 64, 65))
+                    self.assertTrue(step.get("expected") or step.get("contains") or step["exit"] == 0,
+                                    "a non-zero step must state the expected status or an excerpt")
 
 
 if __name__ == "__main__":

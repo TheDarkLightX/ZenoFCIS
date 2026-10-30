@@ -43,5 +43,9 @@ jobs:
         run: |
           python3 -B integrations/zal/test_json_numbers.py -v
           python3 -O -B integrations/zal/test_json_numbers.py
+      - name: Relational profile qualification-driver controls
+        # Planted controls for qualify.py's own gates; the driver itself needs
+        # the pinned GHC and is run by hand (integrations/zal/relational_profile/README.md).
+        run: python3 -B integrations/zal/relational_profile/test_qualify.py
       - name: Research feasibility record controls
         run: python3 -B tools/test_research_feasibility.py

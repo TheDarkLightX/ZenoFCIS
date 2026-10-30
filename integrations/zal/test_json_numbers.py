@@ -113,7 +113,7 @@ REFUSING = {
 # Every other json.load(s) call under integrations/zal, by "path:function", with why it does not use the policy.
 UNCOVERED = {
     # Open: these ingest outside JSON and still use plain number parsing.
-    "codex_transport.py:AppServer._read": "open: local agent app-server transport; planned for 2.7.1",
+    "codex_transport.py:AppServer._read": "open: local agent app-server transport; a written plan exists",
     "category_profile/adapter.py:_capture": "own protocol: pinned category capsule",
     "category_profile/provider/build.py:main": "own protocol: pinned category capsule",
     "category_profile/provider/main.py:<module>": "own protocol: pinned category capsule",
