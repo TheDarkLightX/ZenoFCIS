@@ -121,6 +121,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Check, search, emit, replay and execute machine-code kernels under both profiles",
         (("python3", "-B", "tools/test_machine_code_verifier.py"),
          ("python3", "-O", "-B", "tools/test_machine_code_verifier.py"),
+         ("python3", "-B", "tools/test_fuzz_machine_code_decoders.py"),
          ("python3", "-B", "tools/test_machine_code_loop.py"),
          ("python3", "-O", "-B", "tools/test_machine_code_loop.py"),
          ("python3", "-B", "tools/test_zal_word_kernel.py"),
@@ -1045,6 +1046,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
             ("python3", "tools/check_library_docs.py"),
             # Negative controls for the publication gate `rc_package.py check` runs.
             ("python3", "tools/test_public_docs.py"),
+            ("python3", "-B", "tools/test_design_docs_27.py"),
+            ("python3", "-B", "tools/test_fuzz_targets_registered.py"),
             ("cargo", "+1.97.1", "fmt", "--all", "--", "--check"),
             (
                 "cargo",
