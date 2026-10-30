@@ -17,6 +17,7 @@ import pin_producer as pins
 import record_arithmetic_proof_sources as arithmetic
 import record_category_capsule as capsule
 import record_core_app_references as references
+import record_finite_library_components as finite
 import record_v1_baseline as baseline
 
 ROOT = pins.ROOT
@@ -236,6 +237,40 @@ class CategoryCapsule(ProducerContract, unittest.TestCase):
         fixture = self.fixture()
         fixture.edit_json(capsule.DEPENDENCIES, lambda d: d.update(scope=d["scope"] + " Planted."))
         self.refused(fixture, "change outside the declared closure")
+
+
+class FiniteLibraryComponents(ProducerContract, unittest.TestCase):
+    producer = finite
+    planted_name = "integrations/zal/semantic_library.py"
+
+    def paths(self):
+        components = json.loads((ROOT / finite.UPSTREAM).read_text())["components"]
+        return [finite.UPSTREAM, *(finite.bound(entry["path"]) for entry in components.values())]
+
+    def test_planted_component_change_rebinds_exactly_its_pin(self):
+        fixture, output = self.stale_then_rebound(lambda f: f.append(self.planted_name, b"\n# planted\n"),
+                                                  [finite.UPSTREAM])
+        self.assertIn("UPSTREAM.json: " + self.planted_name, output)
+        before, after = json.loads(fixture.before[finite.UPSTREAM]), json.loads(fixture.path(finite.UPSTREAM).read_bytes())
+        before["components"]["../semantic_library.py"]["sha256"] = sha(fixture.path(self.planted_name).read_bytes())
+        self.assertEqual(after, before)
+
+    def test_closure_or_field_change_is_refused(self):
+        fixture = self.fixture()
+        fixture.edit_json(finite.UPSTREAM, lambda u: u.update(scope=u["scope"] + " Planted."))
+        self.refused(fixture, "change outside the declared closure")
+        fixture = self.fixture()
+        fixture.edit_json(finite.UPSTREAM, lambda u: u["components"].pop("LICENSE"))
+        self.refused(fixture, "change outside the declared closure")
+        fixture = self.fixture()
+        fixture.edit_json(finite.UPSTREAM, lambda u: u["components"]["LICENSE"].update(path="../LICENSE"))
+        self.refused(fixture, "change outside the declared closure")
+
+    def test_component_paths_stay_inside_the_zal_integration(self):
+        self.assertEqual(finite.bound("../semantic_library.py"), "integrations/zal/semantic_library.py")
+        for path in ("../../README.md", "/etc/passwd", "../../../x"):
+            with self.subTest(path=path), self.assertRaises(pins.Refusal):
+                finite.bound(path)
 
 
 def certificate_layout(value):
