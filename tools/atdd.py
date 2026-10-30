@@ -1075,6 +1075,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
             ("python3", "tools/test_public_docs.py"),
             ("python3", "-B", "tools/test_design_docs_27.py"),
             ("python3", "-B", "tools/test_fuzz_targets_registered.py"),
+            ("python3", "-B", "tools/binding_register.py", "check"),
+            ("python3", "-B", "tools/test_binding_register.py"),
             ("cargo", "+1.97.1", "fmt", "--all", "--", "--check"),
             (
                 "cargo",
