@@ -36,6 +36,10 @@ instruction or MOVZX afterwards. Examples: `add128-x86.json`, `umin-x86.json`,
 `add128-rv64i.json`. Counterexamples give named inputs, entry registers, entry
 flags and expected/actual result lists. The same `open/packet/candidate/search/
 resume/emit/replay` commands apply; `open` selects the checker from the schema.
+The packet `diagnosis` covers profile 2 (flags in the trace, per-result
+expected/actual, `first_missing_subterm` with its result index; comparisons
+often live only in flags). `run bench` times profile-2 x86 artifacts against
+GCC's code for the same outputs and refuses RV64I artifacts.
 The ZAL word-kernel route lowers to profile 1 only.
 
 ## Connect human ZAL requirements

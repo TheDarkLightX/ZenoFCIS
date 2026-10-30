@@ -359,6 +359,16 @@ This search proposes 259 candidates. It selects `cmp rdi, rsi; mov rax, rsi;
 cmovb rax, rdi`, which is 11 bytes. The artifact files and replay checks are those
 of profile 1.
 
+The packet's advisory `diagnosis` covers profile 2 as well. It traces every
+admitted register, and on x86 CF, ZF, SF and OF, with null for a flag left
+undefined. It matches the subterms of every result. Each view lists the expected
+and actual value of every result register, and `first_missing_subterm` names
+its result index. Subterms are matched against registers only, but a comparison
+usually lives in a flag. A comparison reported as never computed may therefore
+be held in a flag the trace shows. For example, the 128-bit add that uses ADD
+instead of ADC reports `(ult (add a_lo b_lo) a_lo)` as missing from result 1,
+and the trace shows CF set after the low-word ADD.
+
 ### Trusted base
 
 The checker trusts:
@@ -369,8 +379,9 @@ The checker trusts:
 - the instruction record shared with `verify.py`;
 - Z3, Python and the host.
 
-The encoder in `targets.py`, the search and every proposer, including an LLM,
-supply data only. They are not trusted.
+The encoder in `targets.py`, the search, the advisory diagnosis, the timing
+harness and every proposer, including an LLM, are not trusted. The encoder,
+search and proposers supply data only; the diagnosis and harness only report.
 
 ### Evidence
 
@@ -421,7 +432,23 @@ python3 -B tools/test_machine_code_rv64i_conformance.py
 | Absolute value | proposal | 11 | 11 |
 
 The byte counts include the return and record size only. GCC's carry-out
-version is smaller than the proposal. No timing was measured.
+version is smaller than the proposal.
+
+`run bench` also times profile-2 x86 artifacts. The baseline is GCC's
+compilation of the problem's own output expressions. Each function takes one
+argument per input, and two results come back as the two-word structure. Two
+runs were made with the default 1,000,000 iterations and 21 repeats, on the
+same AMD Ryzen Threadripper 1950X under a load average of about 8, with GCC
+13.3. They gave these kernel/baseline tick ratios:
+
+- 128-bit add: latency 0.79 to 0.83, throughput 0.82 to 0.83;
+- 128-bit subtract: latency 0.77 to 0.83, throughput 0.77 to 0.86;
+- saturating signed add: latency 0.72 to 0.73, throughput 0.45 to 0.52;
+- the other five kernels: between 0.92 and 1.08, so no difference is claimed.
+
+These are paired measurements on that machine, load and call ABI only. They
+are not a portable speedup claim. RV64I artifacts are refused, because they
+cannot be executed on an x86 host.
 
 - **RV64I execution:** `tools/test_machine_code_rv64i_conformance.py` runs in the
   `rv64i-execution` job of the machine-code workflow, which installs `qemu-user`
