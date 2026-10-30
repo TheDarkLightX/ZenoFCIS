@@ -72,6 +72,41 @@ class ContractGuidedResearchTests(unittest.TestCase):
                  "constants":[], "shifts":[0], "max_nodes":4}
         self.assertIsNotNone(research.structural_preflight(prob, bogus))
 
+    def test_bitwise_only_palettes_are_structurally_infeasible(self):
+        """Skiena §7.2: prune before constructing an impossible search tree."""
+        artifact = research.run(self.corpus, 10000)
+        experiments = {(e["problem"], e["palette_name"]): e
+                       for e in artifact["experiments"]}
+        for problem in ("lowest-set-bit-u8", "clear-lowest-set-bit-u8"):
+            record = experiments[(problem, "control-bitwise-only")]
+            self.assertEqual(record["status"], "infeasible-bitwise-local-palette")
+            self.assertEqual(record["candidates_inspected"], 0)
+            witness = record["preflight"]
+            self.assertEqual(witness["rule"], "bitwise-locality-u8/1")
+            bit = witness["bit"]
+            self.assertEqual((witness["input_a"] >> bit) & 1,
+                             (witness["input_b"] >> bit) & 1)
+            ref = next(p for p in self.corpus["problems"] if p["id"] == problem)
+            self.assertNotEqual((research.reference.result(ref["reference"], witness["input_a"]) >> bit) & 1,
+                                (research.reference.result(ref["reference"], witness["input_b"]) >> bit) & 1)
+        # An unrelated bitwise-local target must not be rejected by this law.
+        local = next(p for p in self.corpus["problems"] if p["id"] == "modulo-eight-u8")
+        self.assertIsNone(research.structural_preflight(local, local["palettes"][1]))
+        # Arithmetic carry invalidates the *bitwise* locality law, even though
+        # it cannot invalidate the weaker right-to-left prefix rule.
+        arithmetic = next(p for p in self.corpus["problems"]
+                          if p["id"] == "lowest-set-bit-u8")
+        self.assertIsNone(research.structural_preflight(arithmetic, arithmetic["palettes"][0]))
+        self.assertEqual(research.replay(self.corpus, artifact), 6)
+
+    def test_bitwise_locality_witness_tampering_fails_semantically(self):
+        artifact = research.run(self.corpus, 10000)
+        target = next(e for e in artifact["experiments"]
+                      if e["status"] == "infeasible-bitwise-local-palette")
+        target["preflight"]["output_b_bit"] ^= 1
+        with self.assertRaisesRegex(research.Refusal, "experiment replay mismatch"):
+            research.replay(self.corpus, artifact)
+
     def test_right_to_left_witness_tampering_is_detected(self):
         artifact = research.run(self.corpus, 10000)
         altered = copy.deepcopy(artifact)
