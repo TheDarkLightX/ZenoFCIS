@@ -1,7 +1,7 @@
 """Closed profile-2 problem data and an integer reference for flag-based word kernels.
 
 Profile 2 keeps the modular-64 operations of profile 1 and adds up to six named
-unsigned 64-bit inputs, up to two results, comparisons returning 0 or 1, select
+unsigned 64-bit inputs (none for a constant problem), up to two results, comparisons returning 0 or 1, select
 and arithmetic right shift. Profile-1 problems keep their own validator.
 """
 
@@ -29,9 +29,10 @@ def validate_problem(problem: dict) -> dict:
     if problem["schema"] != SCHEMA or problem["target"] not in TARGETS:
         raise ValueError("unsupported machine problem schema or target")
     inputs = problem["inputs"]
-    if (not isinstance(inputs, list) or not 1 <= len(inputs) <= MAX_INPUTS or len(set(inputs)) != len(inputs)
+    # Zero inputs is a constant problem, for example one whose every input was fixed by specialization.
+    if (not isinstance(inputs, list) or not 0 <= len(inputs) <= MAX_INPUTS or len(set(inputs)) != len(inputs)
             or any(type(name) is not str or not re.fullmatch(r"[a-z][a-z0-9_]{0,15}", name) for name in inputs)):
-        raise ValueError("profile2 declares 1..6 distinct lowercase input names")
+        raise ValueError("profile2 declares 0..6 distinct lowercase input names")
     integer(problem["max_instructions"], 0, 16, "max_instructions")
     if problem["objective"] not in ("bytes", "instructions"):
         raise ValueError("objective must be bytes or instructions")

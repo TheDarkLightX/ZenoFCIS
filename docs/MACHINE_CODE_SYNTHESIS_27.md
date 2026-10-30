@@ -458,8 +458,11 @@ The schema is `zeno-fcis/machine-problem/2`. It has exactly the fields
 `schema`, `target`, `inputs`, `outputs`, `grammar`, `max_instructions` and
 `objective`.
 
-- `inputs`: one to six distinct names, each matching `[a-z][a-z0-9_]{0,15}`.
-  They are assigned to the input registers in order.
+- `inputs`: zero to six distinct names, each matching `[a-z][a-z0-9_]{0,15}`.
+  They are assigned to the input registers in order. A problem with no inputs
+  is a constant problem, for example one whose every input was fixed by
+  [specialization](#exact-specialization); then every argument register is
+  quantified scratch.
 - `outputs`: one or two expressions, assigned to the result registers in order.
   Each has at most 64 nodes and depth 16.
 - `grammar`, `max_instructions` and `objective`: as in profile 1. Forms use
@@ -694,6 +697,123 @@ inconclusive. Both exit 65 on malformed input or an existing output file.
 
 The layer covers 64-bit add, subtract and multiply only. Division, shifts,
 negation, wide and effectful contracts are refused or absent.
+
+### Exact specialization
+
+**Journey.** A developer has a checked 128-bit adder, but every caller passes
+zero for both high words. They fix those two inputs. The tool writes a smaller
+problem over the two low words, a Z3 proof that it agrees with the original
+problem at those values, and a rewritten kernel that the checker accepts
+against the smaller problem.
+
+```sh
+machine_work=$(mktemp -d)
+python3 -B -m tools.machine_code.run specialize \
+  --kernel test-data/machine-code/kernels/add128-x86.json \
+  --fix a_hi=0 --fix b_hi=0 --out "$machine_work/low-words"
+python3 -B -m tools.machine_code.run specialize-replay --dir "$machine_work/low-words"
+```
+
+`--problem P` specializes a profile-2 problem alone. `--problem P --code K.bin`
+or `--kernel ENTRY.json` also specializes a kernel; that kernel must first check
+equivalent to the original problem. Repeat `--fix NAME=VALUE` with a declared
+input and a canonical unsigned decimal word.
+
+**Specialized problem.** The remaining inputs keep their original order and are
+renumbered from the first argument register. Each output is the original output
+with the fixed inputs replaced by constants. It is then simplified by constant
+folding and by these identities: `x+0`, `x-0`, `x|0`, `x^0`, `x*1`,
+`x&(2^64-1)`, `x*0`, `x&0`, a select with a constant condition, and a shift by 0.
+Without a kernel, the grammar and bound stay as in the original problem. With a
+kernel, the rewritten kernel's forms are added to the grammar (refused above 32
+forms), and the bound becomes the larger of the original bound and the new
+length (refused above 16). Fixing every input gives a constant problem.
+
+**Proof.** Z3 checks a query asserting that some specialized output differs from
+the original output with the fixed values, over every assignment of the
+remaining 64-bit inputs. Nothing is written unless the answer is unsat. The
+query is stored as `proof.smt2`, and the record binds its SHA-256. Replay
+recomputes the specialization and reruns the stored query.
+
+**Kernel rewrite (advisory).** In the spirit of WiPEr (Srinivasan and Reps,
+"Partial Evaluation of Machine Code", OOPSLA 2015), the specializer works on the
+kernel's decoded instructions:
+
+1. It sets the fixed inputs as constants and propagates values, both registers
+   and CF/ZF/SF/OF, through the instructions in their original order.
+2. It folds every instruction whose reads are all known, and every instruction
+   that known operands turn into a copy or a constant (for example `x+0` or
+   `x&0`). An x86 instruction is folded this way only when its flags are not
+   read later.
+3. It keeps, to a fixpoint, the instruction that set each flag a kept
+   instruction reads.
+4. The kept instructions run in order. Each operand comes from whichever
+   register holds its value, so renumbered arguments need no prologue of moves.
+   A missing constant is set just before it is needed: by `MOV r64, imm64` on
+   x86, or by an `ADDI`/`SLLI` chain on RV64I.
+5. Backward register and flag liveness removes dead instructions. On x86, a
+   zero constant becomes a hoisted `XOR r, r` where no flag is live.
+
+The independent profile-2 checker must then find the bytes equivalent to the
+specialized problem. It quantifies every remaining input, scratch register and
+entry flag. Otherwise nothing is written. The rewrite has no authority of its
+own.
+
+`--out` must be a new directory; nothing is overwritten. It receives:
+
+- `original.json`, `problem.json` and `proof.smt2`;
+- `original.bin` and `kernel.bin`, when a kernel was given;
+- `specialization.json`, which records:
+  - the original and specialized problem hashes;
+  - the fixed values, the remaining inputs and the argument map;
+  - the proof answer, solver and query hash;
+  - for a kernel, both code hashes and costs.
+
+`specialize` and `specialize-replay` exit with these codes:
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | specialized or replayed |
+| 1 | counterexample: a failed proof or a rejected kernel; also a refused original kernel |
+| 2 | inconclusive |
+| 65 | malformed input, or the output directory already exists |
+
+`tools/test_machine_code_specialize.py` checks these behaviours:
+
+- a wrong simplification makes the proof fail, and nothing is written;
+- four library kernels on both targets specialize; the specialized kernel
+  rechecks against its specialized problem; the record names both problem and
+  both code hashes; replay passes; and concrete runs agree with the original
+  kernel at the fixed values;
+- fixing all four inputs of `add128-x86` gives a constant problem and a kernel
+  made only of constant loads;
+- a planted off-by-one constant fold is rejected by the checker with a concrete
+  counterexample, and nothing is written;
+- malformed fixes, profile-1 problems, an existing output directory, an
+  unchecked original kernel and a changed record are refused;
+- every profile-2 library kernel specializes over every nonempty subset of its
+  inputs, with one deterministic draw of boundary or random words each. Each
+  rewrite either checks equivalent or is refused for its size before checking;
+  none may produce a counterexample.
+
+At this checkpoint that last test covers 9 kernels and 61 cases:
+
+- the checker accepts 60 rewrites;
+- one RV64I case needs more than 16 instructions for its constants and is
+  refused before checking;
+- all 8 fully fixed cases have fewer instructions than the original kernel;
+- of the 52 partly fixed cases, 3 have fewer instructions, 11 the same number
+  and 38 more.
+
+Partly fixed rewrites are often longer because x86 profile 2 has no immediate
+arithmetic, so each needed constant costs a 10-byte load. Finding smaller
+kernels for a specialized problem is a search question; `search` can start
+from the specialized problem.
+
+**Scope.** Profile-2 problems and straight-line, register-only kernels under the
+registered ISA model. The proof covers output equality only. Kernel equivalence
+comes from the checker, not from the rewrite. Not claimed: native conformance,
+timing, a smaller or optimal rewritten kernel, or other targets.
 
 ## ZAL human-to-machine word-kernel connection
 

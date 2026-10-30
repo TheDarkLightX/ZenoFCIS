@@ -266,7 +266,7 @@ class Profile2VerifierTests(unittest.TestCase):
                                  code("4889f8c3"))["status"], "equivalent")
         for name, mutation in [
                 ("seven inputs", {"inputs": list("abcdefg")}), ("duplicate inputs", {"inputs": ["x", "x"]}),
-                ("no inputs", {"inputs": []}), ("upper-case name", {"inputs": ["X"]}),
+                ("no inputs but an input output", {"inputs": []}), ("upper-case name", {"inputs": ["X"]}),
                 ("three outputs", {"outputs": [i("x")] * 3}), ("no outputs", {"outputs": []}),
                 ("undeclared input", {"outputs": [i("y")]}), ("ite arity", {"outputs": [["ite", i("x"), i("x")]]}),
                 ("unknown op", {"outputs": [["udiv", i("x"), i("x")]]}), ("shift count", {"outputs": [["ashr", i("x"), 64]]}),
@@ -276,6 +276,13 @@ class Profile2VerifierTests(unittest.TestCase):
             with self.subTest(name=name):
                 result = v.check({**good, **mutation}, code("c3"))
                 self.assertEqual(result["status"], "refused", result)
+        # Zero inputs is a constant problem: every argument register is quantified scratch.
+        constant = problem(X, [], [c(7)], [["imm", "rax", "7"]], 1)
+        self.assertEqual(v.check(constant, code("48b80700000000000000c3"))["status"], "equivalent")
+        wrong = v.check(constant, code("4889f8c3"))
+        self.assertEqual(v.check({**constant, "grammar": [["mov", "rax", "rdi"]]}, code("4889f8c3"))["status"],
+                         "counterexample")
+        self.assertEqual(wrong["status"], "refused")
         p1 = {"schema": "zeno-fcis/machine-problem/1", "target": v1.X86, "inputs": ["x", "y"],
               "expression": i("x"), "grammar": [], "max_instructions": 0, "objective": "bytes"}
         self.assertEqual(v.check(p1, code("c3"))["status"], "refused")
@@ -294,11 +301,13 @@ class Profile2VerifierTests(unittest.TestCase):
 
     def test_concrete_rejects_implicit_identity_overrides_and_nonwords(self):
         for arguments, initial, flags in [([True], None, None), ([-1], None, None), ([MASK + 1], None, None),
-                                          ([], None, None), ([0] * 7, None, None), ([0], {"rdi": 1}, None),
+                                          ([0] * 7, None, None), ([0], {"rdi": 1}, None),
                                           ([0], {"rax": True}, None), ([0], None, {"pf": 1}), ([0], None, {"cf": 2}),
                                           ([0], None, {"cf": True})]:
             with self.subTest(arguments=arguments, initial=initial, flags=flags), self.assertRaises(ValueError):
                 v.run_concrete(X, code("c3"), arguments, initial, flags)
+        # A constant problem has no arguments; every argument register is then scratch.
+        self.assertEqual(v.run_concrete(X, code("c3"), [], {"rax": 5}), [5])
         with self.assertRaises(ValueError):
             v.run_concrete(R, code(RET_R), [0], None, {"cf": 0})
         with self.assertRaises(ValueError):
