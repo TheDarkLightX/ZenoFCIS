@@ -161,29 +161,37 @@ reused on its unchanged candidate. Budget exhaustion is not unrealizability.
 Search skips candidates that cannot be needed, using each grammar instruction's
 footprint. A footprint is what the instruction reads, may write and always
 overwrites. It is derived from the profile checker's own symbolic semantics, and
-read conservatively. Two classes are skipped:
+read conservatively. Four classes are skipped:
 
+- **Duplicates.** An instruction whose final state another palette entry matches
+  exactly (proved by Z3, with the same declared flag reads), when that entry has
+  a shorter or byte-smaller encoding. An example is RV64I `add` with swapped
+  sources.
+- **Reorderings.** Two neighbouring instructions that are independent, meaning
+  neither writes what the other reads or writes. Swapping them changes neither
+  the results nor the cost, so only the byte-least ordering is proposed.
+- **Lost inputs.** Once an input the specification depends on is held by no
+  register or flag, no continuation can be equivalent. Dependence is decided
+  semantically, by one Z3 query per input, so `(xor x x)` does not require `x`.
 - **Dead instructions.** An instruction whose every write is overwritten before
   being read, or is never read and is not a result. Deleting it gives a strictly
   cheaper sequence with the same results, which the length-ordered search has
   already proposed.
-- **Reorderings.** Two neighbouring instructions that are independent, meaning
-  neither writes what the other reads or writes. Swapping them changes neither
-  the results nor the cost, so only the byte-least ordering is proposed.
 
 Once no longer sequence can reach the incumbent's cost, the remaining lengths are
 skipped as well.
 
-The result: for every skipped candidate a kept one exists with no greater cost
-and the same results. A search that exhausts its grammar therefore reports the
-same optimum as before. Search results report `dead_pruned`, `order_pruned` and
-`bound_skipped`, and `--no-prune` restores the full enumeration. Measured on the
+The result: every skipped candidate is either never equivalent (a lost input) or
+has a kept candidate with no greater cost and the same results. A search that exhausts its grammar therefore reports the
+same optimum as before. Search results report `duplicate_pruned`, `order_pruned`,
+`lost_pruned`, `dead_pruned` and `bound_skipped`, and `--no-prune` restores the
+full enumeration. Measured on the
 test problems (checker decisions unchanged):
 
 | Problem | Proposed without pruning | Proposed with pruning |
 | --- | --- | --- |
 | `add64-x86` | 156 | 29 |
-| `add128-x86` | 1,555 | 292 |
+| `add128-x86` | 1,555 | 228 |
 | `minmax-x86` | 100,000 (budget exhausted) | 438 (grammar exhausted) |
 | library `signed-saturating-add-x86` | 100,000 (budget exhausted, no candidate) | 23,897 of 960,800 (grammar exhausted, 31-byte kernel) |
 
@@ -192,7 +200,8 @@ then joins two parts when their footprints show that the second part neither
 reads what the first may write nor overwrites the first part's result. A join
 that agrees on the filter states goes to the checker like any proposal.
 
-The joined kernel need not be optimal. For example, the two parts of `minmax`
+The joined kernel need not be optimal, and the result says so (`"split": true` and
+a `minimality` note). For example, the two parts of `minmax`
 each need their own comparison. Recorded as the incumbent, it bounds a later
 `search`:
 
@@ -203,17 +212,25 @@ python3 -B -m tools.machine_code.run search --session "$machine_work/session"
 
 The footprints and joins only steer the search. The checker still decides every
 candidate, and `global_optimality` stays false: an exhausted grammar says
-nothing about instructions outside it. The tests compare the cheapest kept
-candidate of every behaviour class with the cheapest candidate overall on seven
-problems, and planted footprint defects fail them.
+nothing about instructions outside it.
+
+The tests compare the cheapest kept candidate of every behaviour class with the
+cheapest candidate overall on eight problems. They also check that the checker
+refutes every candidate skipped for a lost input, through each problem's full
+length. Planted defects fail these tests: an unobserved result, omitted flag
+reads or writes, an ignored write-write conflict, unproved duplicates, a
+syntactic "required", and copies not counted as holding an input.
 
 These are the semantic pruning and decomposition ideas of McSynth and McSynth++
 ([Srinivasan 2017](https://research.cs.wisc.edu/wpis/papers/tr1844.pdf);
 [Srinivasan, Sharma and Reps 2016](https://research.cs.wisc.edu/wpis/abstracts/oopsla16-synthesis.abs.html)),
-restricted to the skips that lose no candidate. The reordering rule is the
-partial-order reduction of independent actions, keeping one representative per
-class (Godefroid, *Partial-Order Methods for the Verification of Concurrent
-Systems*, LNCS 1032, 1996).
+restricted to the skips that lose no candidate. The lost-input rule is the
+McSynth++ bits-lost pruner with a semantic notion of "required", which is what
+keeps it exact. The reordering rule is the partial-order reduction of
+independent actions, keeping one representative per class (Godefroid,
+*Partial-Order Methods for the Verification of Concurrent Systems*, LNCS 1032,
+1996). The duplicate rule is equivalence reduction over single instructions
+(Smith and Albarghouthi, VMCAI 2019).
 
 Exit 0 means a completed positive operation. Counterexamples/refused candidate
 verdicts exit 1; inconclusive/no-checked-candidate exits 2; malformed input,

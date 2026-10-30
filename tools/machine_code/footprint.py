@@ -9,17 +9,23 @@ which every register (and, on x86 profile 2, every modelled flag) is a distinct 
 - it *overwrites* a written location whose own entry variable does not occur in the new value, and every x86 flag
   it leaves undefined (under-approximate).
 
-Two candidate classes are then skipped during enumeration:
+Four candidate classes are then skipped during enumeration:
 
-- **dead**: one instruction's every write is overwritten before it is read, or reaches the end unread and
-  unobserved. Deleting that instruction gives a strictly cheaper sequence with the same results and the same
-  admission, which the length-ordered enumeration has already proposed.
+- **duplicate**: an instruction that another palette entry matches exactly (Z3-proved equal final state, the same
+  declared flag reads) with a shorter or byte-smaller encoding. Substituting that entry keeps results and
+  admission and lowers the rank.
 - **order**: two neighbouring instructions are independent (neither writes what the other reads or writes) and
-  their bytes are out of order. Swapping them preserves the results and the cost. The byte-least ordering of each
-  class of reorderings never has such a pair, so it is never skipped for this reason.
+  their bytes are out of order. Swapping them preserves the results and the cost and lowers the bytes.
+- **lost**: a required input (one the specification semantically depends on, by a Z3 query per input) is no longer
+  held by any register or flag. No extension can recover it, so no extension is equivalent. This is the bits-lost
+  pruner of McSynth++ made exact by computing "required" semantically, not syntactically.
+- **dead**: one instruction's every write is overwritten before it is read, or reaches the end unread and
+  unobserved. Deleting it gives a strictly cheaper sequence with the same results and the same admission, which the
+  length-ordered enumeration has already proposed.
 
-So every skipped candidate has a kept candidate of no greater cost with the same observed results, and a search that
-exhausts its grammar reports the same cost-then-bytes optimum with or without pruning. Footprints only steer the
+So every skipped candidate is either never equivalent (lost) or has a candidate of strictly lower rank (cost, then
+bytes) with the same observed results; following those steps ends at a kept candidate. A search that exhausts its
+grammar therefore reports the same cost-then-bytes optimum with or without pruning. Footprints only steer the
 search; the checker still decides every candidate. A footprint that cannot be derived is never pruned against.
 """
 
@@ -30,7 +36,7 @@ from dataclasses import dataclass
 from . import profile2
 from .targets import encode_instruction, encode_program
 
-SCHEME = "exact-footprint/1"
+SCHEME = "exact-footprint/2"
 
 
 @dataclass(frozen=True)
@@ -38,6 +44,8 @@ class Footprint:
     reads: frozenset
     writes: frozenset
     overwrites: frozenset
+    # (location, entry locations its new value may depend on) for every write with a defined value
+    sources: tuple = ()
 
 
 def _variables(z, term) -> set:
@@ -55,24 +63,26 @@ def _variables(z, term) -> set:
     return found
 
 
-def _effects(z, entry: dict, final: dict, declared_reads=()) -> Footprint:
-    """Footprint from entry variables `loc_<name>` and final values; a final value of None is left undefined."""
-    reads, writes, overwrites = set(declared_reads), set(), set()
+def _effects(z, entry: dict, final: dict, declared_reads=()):
+    """(Footprint, simplified final values) from entry variables `loc_<name>`; None marks an undefined flag."""
+    reads, writes, overwrites, sources, values = set(declared_reads), set(), set(), [], {}
     for name, start in entry.items():
         value = final[name]
         if value is None:
             writes.add(name)
             overwrites.add(name)
+            values[name] = None
             continue
-        value = z.simplify(value)
+        value = values[name] = z.simplify(value)
         if value.eq(start):
             continue
-        used = {variable[4:] for variable in _variables(z, value)}
+        used = frozenset(variable[4:] for variable in _variables(z, value))
         writes.add(name)
         reads |= used
+        sources.append((name, used))
         if name not in used:
             overwrites.add(name)
-    return Footprint(frozenset(reads), frozenset(writes), frozenset(overwrites))
+    return Footprint(frozenset(reads), frozenset(writes), frozenset(overwrites), tuple(sorted(sources))), values
 
 
 def _profile1(z, context, target: str, form: list) -> Footprint:
@@ -91,7 +101,7 @@ def _profile1(z, context, target: str, form: list) -> Footprint:
         probe = (verify.Instruction("mov", ("rax", name), 0, 0) if x86
                  else verify.Instruction("add", ("a0", name, "zero"), 0, 0))
         final[name] = verify._machine_smt(z, target, [decoded[0], probe, decoded[1]], inputs, scratch)
-    return _effects(z, entry, final)
+    return (*_effects(z, entry, final), ())
 
 
 def _profile2(z, context, target: str, form: list) -> Footprint:
@@ -104,24 +114,92 @@ def _profile2(z, context, target: str, form: list) -> Footprint:
         raise ValueError("grammar entry did not decode to one instruction")
     final, final_flags = verify2.machine_smt(z, target, decoded, entry, flags, context)
     declared = verify2.flag_effects(decoded[0])[0] if target == verify2.X86 else ()
-    return _effects(z, {**entry, **flags}, {**final, **final_flags}, declared)
+    return (*_effects(z, {**entry, **flags}, {**final, **final_flags}, declared), tuple(sorted(declared)))
+
+
+def _same(z, context, first: dict, second: dict) -> bool:
+    """Whether two single-instruction final states are equal for every entry state (Z3 unsat), with equal
+    undefined flags."""
+    differences = []
+    for name, value in first.items():
+        other = second[name]
+        if (value is None) != (other is None):
+            return False
+        if value is not None and not value.eq(other):
+            differences.append(value != other)
+    if not differences:
+        return True
+    solver = z.Solver(ctx=context)
+    solver.set(timeout=1000)
+    solver.add(z.Or(differences))
+    return solver.check() == z.unsat
+
+
+def _required(z, context, problem: dict) -> frozenset:
+    """Argument registers whose input the specification semantically depends on (one Z3 query per input).
+
+    An input is required when two input vectors that differ only in it give different results; an unknown answer
+    counts as not required, which only prunes less.
+    """
+    if problem["schema"] == profile2.SCHEMA:
+        from . import verify2
+        names = problem["inputs"]
+        registers = verify2.ARGUMENTS[problem["target"]][:len(names)]
+        smt = lambda node, inputs: verify2._ast_smt(z, node, inputs, context)
+        outputs = problem["outputs"]
+    else:
+        from . import verify
+        names = ("x", "y")
+        registers = ("rdi", "rsi") if problem["target"] == verify.X86 else ("a0", "a1")
+        smt = lambda node, inputs: verify._ast_smt(z, node, inputs)
+        outputs = [problem["expression"]]
+    inputs = {name: z.BitVec("spec_" + name, 64, ctx=context) for name in names}
+    required = set()
+    for name, register in zip(names, registers):
+        changed = dict(inputs, **{name: z.BitVec("spec_other_" + name, 64, ctx=context)})
+        solver = z.Solver(ctx=context)
+        solver.set(timeout=1000)
+        solver.add(z.Or([smt(output, inputs) != smt(output, changed) for output in outputs]))
+        if solver.check() == z.sat:
+            required.add(register)
+    return frozenset(required)
+
+
+def analyse(problem: dict):
+    """(footprints, dominated grammar indices, required input locations) for one problem.
+
+    An entry is dominated when another entry has the same final state for every entry state, the same declared
+    flag reads, and a shorter or byte-smaller encoding.
+    """
+    size = len(problem["grammar"])
+    if problem["schema"] not in (profile2.SCHEMA, "zeno-fcis/machine-problem/1"):
+        # No footprint model yet (profile 3 memory); nothing is pruned against an underivable footprint.
+        return [None] * size, frozenset(), frozenset()
+    import z3 as z
+    context = z.Context()
+    derive = _profile2 if problem["schema"] == profile2.SCHEMA else _profile1
+    prints, values, declared, encoded = [], [], [], []
+    for form in problem["grammar"]:
+        try:
+            footprint, final, reads = derive(z, context, problem["target"], form)
+            code = encode_instruction(problem["target"], form)
+        except (ValueError, KeyError, TypeError, IndexError):
+            footprint = final = reads = code = None
+        prints.append(footprint); values.append(final); declared.append(reads); encoded.append(code)
+    dominated = set()
+    for b in range(size):
+        for a in range(size):
+            if (a != b and prints[a] is not None and prints[b] is not None and declared[a] == declared[b]
+                    and (len(encoded[a]), encoded[a]) < (len(encoded[b]), encoded[b])
+                    and _same(z, context, values[a], values[b])):
+                dominated.add(b)
+                break
+    return prints, frozenset(dominated), _required(z, context, problem)
 
 
 def footprints(problem: dict) -> list:
     """One Footprint per grammar entry, in grammar order; None where it cannot be derived."""
-    if problem["schema"] not in (profile2.SCHEMA, "zeno-fcis/machine-problem/1"):
-        # No footprint model yet (profile 3 memory); nothing is pruned against an underivable footprint.
-        return [None] * len(problem["grammar"])
-    import z3 as z
-    context = z.Context()
-    derive = _profile2 if problem["schema"] == profile2.SCHEMA else _profile1
-    result = []
-    for form in problem["grammar"]:
-        try:
-            result.append(derive(z, context, problem["target"], form))
-        except (ValueError, KeyError, TypeError, IndexError):
-            result.append(None)
-    return result
+    return analyse(problem)[0]
 
 
 def observed(problem: dict) -> frozenset:
@@ -137,8 +215,11 @@ class Pruner:
     """Judges index prefixes for `sequences`; see the module docstring for why each refusal is exact."""
 
     def __init__(self, problem: dict, encoded: list):
-        self.prints = footprints(problem)
+        self.prints, self.dominated, self.required = analyse(problem)
+        if all(footprint is not None and not footprint.writes & self.required for footprint in self.prints):
+            self.required = frozenset()  # no entry can overwrite a required input, so none is ever lost
         self.observed = observed(problem)
+        self._states = {}
         size = len(encoded)
         self.order = [[False] * size for _ in range(size)]
         for a, first in enumerate(self.prints):
@@ -172,10 +253,49 @@ class Pruner:
                 return True
         return False
 
+    def _depends(self, prefix):
+        """Written location -> entry locations its value may depend on after `prefix`; None if underivable.
+
+        Enumeration extends prefixes one index at a time, so the parent's state is usually cached.
+        """
+        key = tuple(prefix)
+        if key in self._states:
+            return self._states[key]
+        parent = self._depends(key[:-1]) if key else {}
+        footprint = self.prints[key[-1]] if key else None
+        if parent is None or (key and footprint is None):
+            state = None
+        elif not key:
+            state = {}
+        else:
+            update = {location: frozenset().union(*(parent.get(source, {source}) for source in used))
+                      for location, used in footprint.sources}
+            for location in footprint.writes:
+                update.setdefault(location, frozenset())  # left undefined
+            state = {**parent, **update}
+        if len(self._states) > 200_000:
+            self._states.clear()
+        self._states[key] = state
+        return state
+
+    def lost(self, prefix) -> bool:
+        """Some required input is no longer held by any register or flag, so no extension can be equivalent."""
+        if not self.required:
+            return False
+        depends = self._depends(prefix)
+        if depends is None:
+            return False
+        held = frozenset().union(*depends.values()) if depends else frozenset()
+        return any(location in depends and location not in held for location in self.required)
+
     def judge(self, prefix, length: int):
         """None to keep the prefix, else the reason every extension of it is skipped."""
+        if prefix[-1] in self.dominated:
+            return "duplicate"
         if len(prefix) >= 2 and self.order[prefix[-2]][prefix[-1]]:
             return "order"
+        if self.lost(prefix):
+            return "lost"
         if self.dead(prefix, len(prefix) == length):
             return "dead"
         return None

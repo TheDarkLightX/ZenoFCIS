@@ -12,6 +12,7 @@ from machine_code import footprint, model, profile2, session, targets, verify2
 from machine_code.run import main
 
 ROOT = Path(__file__).resolve().parents[1]
+SKIPPED = ("dead_pruned", "order_pruned", "duplicate_pruned", "lost_pruned", "bound_skipped")
 DATA = ROOT / "test-data/machine-code"
 X86, RV64 = profile2.TARGETS
 
@@ -80,7 +81,7 @@ class Profile2LoopTests(unittest.TestCase):
         self.opened("add128-x86.json")
         result = session.search(self.directory, max_candidates=5000, max_checks=8, deadline_ms=20000)
         self.assertEqual((result["status"], result["stop_reason"]), ("checked-candidate", "grammar-exhausted"), result)
-        self.assertEqual(result["proposed"] + result["dead_pruned"] + result["order_pruned"], 1555)
+        self.assertEqual(result["proposed"] + sum(result[key] for key in SKIPPED), 1555)
         self.assertLess(result["proposed"], 1555 // 4)
         self.assertGreater(result["order_pruned"], 0)
         self.assertEqual(result["cost"], {"bytes": 13, "instructions": 4})

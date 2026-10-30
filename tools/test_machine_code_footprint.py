@@ -59,7 +59,8 @@ class FootprintTests(unittest.TestCase):
         self.assertIn("cf", adc.writes)
         self.assertNotIn("cf", adc.overwrites, "the new carry depends on the old one")
         self.assertEqual(prints[("mov", "rax", "rdi")], footprint.Footprint(frozenset({"rdi"}), frozenset({"rax"}),
-                                                                         frozenset({"rax"})))
+                                                                         frozenset({"rax"}),
+                                                                         (("rax", frozenset({"rdi"})),)))
         self.assertEqual(prints[("nop",)], footprint.Footprint(frozenset(), frozenset(), frozenset()))
         umin = dict(zip(map(tuple, load("umin-x86.json")["grammar"]), footprint.footprints(load("umin-x86.json"))))
         self.assertEqual(umin[("cmova", "rax", "rsi")].reads, {"cf", "zf", "rax", "rsi"})
@@ -82,15 +83,21 @@ class FootprintTests(unittest.TestCase):
                  "grammar": [["mov", "rax", "rdi"], ["add", "rax", "rsi"], ["cmp", "rdi", "rsi"], ["setb", "rdx"]]}
         # Both results observed, so neither order of the two flag writers is dead; only the order decides the carry.
         both = {**flags, "grammar": [["add", "rdx", "rsi"], ["add", "rax", "rdi"], ["setb", "rax"]]}
+        # Operand-swapped RV64I additions have equal final states, so one of each pair is a duplicate.
+        swapped = {**load("add128-rv64i.json"),
+                   "grammar": [["add", "a0", "a0", "a2"], ["add", "a0", "a2", "a0"], ["sltu", "t0", "a0", "a2"],
+                               ["add", "a1", "a1", "a3"], ["add", "a1", "a3", "a1"], ["add", "a1", "a1", "t0"]]}
         skipped_total = 0
         for name in ("add128-x86.json", "add128-rv64i.json", "umin-x86.json", "add64-x86.json", "add64-rv64i.json",
-                     flags, both):
+                     flags, both, swapped):
             problem = load(name) if isinstance(name, str) else name
-            name = name if isinstance(name, str) else "flag-order-" + name["grammar"][0][1]
+            name = name if isinstance(name, str) else "synthetic-" + "-".join(map(str, name["grammar"][1][:2]))
             problem["max_instructions"] = min(problem["max_instructions"], 3)
             grammar = _grammar(problem)
             terminal = encode_program(problem["target"], [])
             pruner = footprint.Pruner(problem, grammar)
+            # Lost-input pruning drops only non-equivalent candidates, whole classes of them; it has its own test.
+            pruner.required = frozenset()
             states = entry_states(problem)
             best_all, best_kept, skipped, total = {}, {}, {}, 0
             for length in range(problem["max_instructions"] + 1):
@@ -107,6 +114,49 @@ class FootprintTests(unittest.TestCase):
                 self.assertEqual(best_kept, best_all)
             skipped_total += sum(skipped.values())
         self.assertGreater(skipped_total, 500)
+
+
+    def test_operand_swapped_duplicates_are_found_by_proof(self):
+        problem = {**load("add128-rv64i.json"),
+                   "grammar": [["add", "a0", "a0", "a2"], ["add", "a0", "a2", "a0"], ["sub", "a1", "a1", "a3"],
+                               ["sub", "a1", "a3", "a1"]]}
+        _, dominated, _ = footprint.analyse(problem)
+        encoded = _grammar(problem)
+        self.assertEqual(len(dominated & {0, 1}), 1, "exactly one of the two additions is kept")
+        self.assertEqual(min({0, 1} - dominated, key=lambda i: encoded[i]), min((0, 1), key=lambda i: encoded[i]))
+        self.assertFalse(dominated & {2, 3}, "subtraction does not commute")
+
+    def test_required_inputs_are_semantic(self):
+        x, y = ["input", "x"], ["input", "y"]
+        problem = {"schema": profile2.SCHEMA, "target": verify2.X86, "inputs": ["x", "y"],
+                   "outputs": [["xor", ["xor", x, x], y]], "max_instructions": 2, "objective": "instructions",
+                   "grammar": [["mov", "rdi", "rsi"], ["mov", "rax", "rdi"]]}
+        self.assertEqual(footprint.analyse(problem)[2], {"rsi"}, "x occurs only syntactically")
+        # The only kernel overwrites x's register first; a syntactic notion of "required" would prune it.
+        grammar = _grammar(problem)
+        pruner = footprint.Pruner(problem, grammar)
+        self.assertIn((0, 1), set(footprint.sequences(len(grammar), 2, pruner.judge, {})))
+        pruner.required = frozenset({"rdi", "rsi"})
+        self.assertNotIn((0, 1), set(footprint.sequences(len(grammar), 2, pruner.judge, {})))
+
+    def test_every_lost_candidate_is_refuted_by_the_checker(self):
+        refuted = 0
+        for name in ("add128-x86.json", "add128-rv64i.json", "umin-x86.json"):
+            problem = load(name)
+            grammar = _grammar(problem)
+            terminal = encode_program(problem["target"], [])
+            pruner = footprint.Pruner(problem, grammar)
+            self.assertTrue(footprint.analyse(problem)[2], name)
+            checker = verify2 if problem["schema"] == profile2.SCHEMA else verify
+            # Through each problem's full length, so the carry chains' own kernels are covered.
+            for length in range(1, problem["max_instructions"] + 1):
+                for choices in product(range(len(grammar)), repeat=length):
+                    if not any(pruner.lost(list(choices[:k])) for k in range(1, length + 1)):
+                        continue
+                    verdict = checker.check(problem, b"".join(grammar[i] for i in choices) + terminal)
+                    self.assertIn(verdict["status"], ("counterexample", "refused"), (name, choices))
+                    refuted += 1
+        self.assertGreater(refuted, 50)
 
 
 if __name__ == "__main__":

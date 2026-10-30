@@ -14,6 +14,7 @@ from machine_code import model, session, targets
 from machine_code.run import main
 
 ROOT = Path(__file__).resolve().parents[1]
+SKIPPED = ("dead_pruned", "order_pruned", "duplicate_pruned", "lost_pruned", "bound_skipped")
 
 
 class MachineLoopTests(unittest.TestCase):
@@ -88,9 +89,9 @@ class MachineLoopTests(unittest.TestCase):
         self.opened()
         result = session.search(self.directory, max_candidates=156, deadline_ms=8000)
         self.assertEqual((result["status"], result["stop_reason"]), ("checked-candidate", "grammar-exhausted"), result)
-        self.assertEqual(result["pruning"], "exact-footprint/1")
+        self.assertEqual(result["pruning"], "exact-footprint/2")
         # Every one of the 156 sequences is proposed or skipped exactly once.
-        self.assertEqual(result["proposed"] + result["dead_pruned"] + result["order_pruned"], 156)
+        self.assertEqual(result["proposed"] + sum(result[key] for key in SKIPPED), 156)
         self.assertLess(result["proposed"], 156 // 4)
         self.assertGreater(result["dead_pruned"], 0)
         self.assertEqual(session.resume(self.directory)["code_hex"], session.resume(unpruned)["code_hex"])
