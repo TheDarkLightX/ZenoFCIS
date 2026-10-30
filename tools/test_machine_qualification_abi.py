@@ -11,6 +11,7 @@ from machine_code import verify2
 from machine_qualification import abi
 
 KERNELS = Path(__file__).resolve().parents[1] / "test-data/machine-code/kernels"
+MEMORY = Path(__file__).resolve().parents[1] / "test-data/machine-code/memory-kernels"
 LEA_SUM = bytes.fromhex("488d0437")  # lea rax, [rdi+rsi]
 
 
@@ -92,6 +93,86 @@ class NativeHarness(unittest.TestCase):
             result = abi.cet(problem, code, Path(folder) / "work")
         self.assertEqual((result["status"], result["active_modes"]["status"]), ("inactive-mode-only", "unsupported"))
         self.assertEqual(result["callable_bytes"], 4 + len(code))
+
+
+def memory_entry(name):
+    data = json.loads((MEMORY / (name + ".json")).read_text())
+    return data["problem"], bytes.fromhex(data["code_hex"])
+
+
+class MemoryObligations(unittest.TestCase):
+    def test_every_memory_kernel_meets_a01_to_a07_as_a_region_leaf(self):
+        for path in sorted(MEMORY.glob("*.json")):
+            problem, code = memory_entry(path.stem)
+            with self.subTest(kernel=path.stem):
+                result = abi.obligations(problem, code)
+                self.assertEqual(result["status"], "qualified", result["obligations"])
+                self.assertTrue(result["profile"].endswith("-u64-region-leaf/1"))
+                frame = result["obligations"]["A-03"]
+                self.assertEqual((frame["admission"], frame["outside_read_write_words"]), ("passed", []))
+                self.assertTrue(result["obligations"]["A-06"]["regions_disjoint_aligned_away_from_stack"])
+        problem, code = memory_entry("copy2-sum-x86")
+        self.assertEqual(abi.obligations(problem, code)["obligations"]["A-03"]["memory_written"], ["dst[0]", "dst[1]"])
+
+    def test_a_store_into_a_read_only_region_fails_a03_and_a05(self):
+        problem, code = memory_entry("copy2-sum-x86")
+        result = abi.obligations(problem, code[:-1] + bytes.fromhex("48890f") + b"\xc3")  # mov [rdi], rcx
+        frame = result["obligations"]["A-03"]
+        self.assertEqual((frame["status"], frame["admission"], frame["outside_read_write_words"]),
+                         ("failed", "StoreToReadOnlyRegion", ["src[0]"]))
+        self.assertEqual(result["obligations"]["A-05"]["status"], "failed")
+        self.assertEqual(result["status"], "not-qualified")
+
+    def test_overlapping_regions_fail_a06_and_a_region_on_the_return_slot_fails_a04(self):
+        problem, code = memory_entry("copy2-sum-x86")
+        with patch.object(abi, "REGION_STRIDE", 8):
+            result = abi.obligations(problem, code)
+        self.assertEqual(result["obligations"]["A-06"]["status"], "failed")
+        self.assertFalse(result["obligations"]["A-06"]["regions_disjoint_aligned_away_from_stack"])
+        problem, code = memory_entry("swap-words-x86")
+        with patch.object(abi, "REGION_BASE", abi.LAYOUT["x86"]["S"]):
+            result = abi.obligations(problem, code)
+        self.assertEqual((result["obligations"]["A-04"]["status"], result["obligations"]["A-06"]["status"]),
+                         ("failed", "failed"))
+
+
+@unittest.skipIf(abi._gcc() is None, "needs gcc")
+class MemoryNativeHarness(unittest.TestCase):
+    def run_entry(self, name, code=None, **options):
+        problem, stored = memory_entry(name)
+        with tempfile.TemporaryDirectory() as folder:
+            return abi.native(problem, stored if code is None else code, Path(folder) / "work", vectors=128, **options)
+
+    def test_the_three_x86_memory_kernels_conform(self):
+        for name in ("swap-words-x86", "load-add-store-x86", "copy2-sum-x86"):
+            with self.subTest(kernel=name):
+                result = self.run_entry(name)
+                self.assertEqual(result["status"], "conforms", result)
+                self.assertEqual(result["guard_words"], 8)
+        self.assertEqual(self.run_entry("swap-words-rv64i")["status"], "not-run")
+
+    def test_each_planted_memory_fault_is_reported_as_exactly_that_fault(self):
+        # Fixtures outside every palette; each returns normally to the trampoline.
+        _, swap = memory_entry("swap-words-x86")
+        _, copy = memory_entry("copy2-sum-x86")
+        fixtures = {
+            "out-of-region": ("swap-words-x86", bytes.fromhex("48894710") + swap),    # mov [rdi+16], rax: one past p
+            "read-only-region": ("copy2-sum-x86", copy[:-1] + bytes.fromhex("48890f") + b"\xc3"),  # mov [rdi], rcx
+            "callee-saved": ("swap-words-x86", bytes.fromhex("4889fb") + swap),       # mov rbx, rdi
+        }
+        for fault, (name, code) in fixtures.items():
+            with self.subTest(fault=fault):
+                result = self.run_entry(name, code)
+                self.assertEqual(result["status"], "violated", result)
+                self.assertGreater(result["faults"][fault], 0, result)
+                self.assertFalse(any(v for k, v in result["faults"].items() if k != fault), result)
+
+    def test_a_dropped_store_is_a_region_word_fault(self):
+        _, swap = memory_entry("swap-words-x86")
+        dropped = swap[:-5] + b"\xc3"  # the final mov [rdi+8], rax removed
+        result = self.run_entry("swap-words-x86", dropped)
+        self.assertGreater(result["faults"]["region-words"], 0, result)
+        self.assertFalse(any(v for k, v in result["faults"].items() if k != "region-words"), result)
 
 
 if __name__ == "__main__":
