@@ -40,7 +40,12 @@ The packet `diagnosis` covers profile 2 (flags in the trace, per-result
 expected/actual, `first_missing_subterm` with its result index; comparisons
 often live only in flags). `run bench` times profile-2 x86 artifacts against
 GCC's code for the same outputs and refuses RV64I artifacts.
-The ZAL word-kernel route lowers to profile 1 only.
+ZAL sources reach profile 2 with a `profile zal/word-kernel/2;` line (English
+`ZAL word kernel profile 2.`): `inputs a_lo:u64,...;`, `result 1 ... modulo 2^64;`
+and `result 2 ...` (English `Return first/second ...`). Comparisons are written
+`(a is below b (unsigned))`, `(a is at most b (signed))`, `(a equals b)` and
+`(if c then a else b)`. `what-if` takes `--input NAME=VALUE` per input. The
+examples are `test-data/zal-word-kernel/add128-x86*.zal` and `umin-x86*.zal`.
 
 ## Connect human ZAL requirements
 
@@ -65,7 +70,8 @@ Its artifacts nest the six original machine files without modifying them.
 Use named inputs and every entry scratch assignment in counterexample feedback
 to discuss the requirement; never infer acceptance or auto-edit meaning.
 MAX+1 evaluates to 0 for this profile. Checked overflow, wider integers,
-effects/memory, multiple outputs and distributed protocols are unsupported.
+effects/memory and distributed protocols are unsupported; more inputs, two
+results and comparisons need `zal/word-kernel/2` (above).
 ZAL remains a broad abstraction language; other profiles stay unchanged.
 
 Body data-memory operations refuse, but x86 RET reads the caller's stack and

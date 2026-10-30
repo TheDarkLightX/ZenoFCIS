@@ -506,7 +506,7 @@ cannot be executed on an x86 host.
 - Agreement on sampled states is not a proof of the ISA or of other processors.
 - A selected kernel is not claimed globally optimal, and no speedup is claimed
   without paired timing on the target.
-- The ZAL `zal/word-kernel/1` route lowers to profile 1 only.
+- The ZAL `zal/word-kernel/1` route lowers to profile 1, and `zal/word-kernel/2` lowers to profile 2.
 
 ## ZAL human-to-machine word-kernel connection
 
@@ -534,7 +534,9 @@ Expressions admit `x`, `y`, canonical decimal words, fully parenthesized `not`,
 `complement`, `plus/minus/times`, `bitwise and/or/xor`, and `shifted left by` /
 `shifted right logically by`. There are exactly nine declarations, at most 64
 expression nodes and depth 16. Checked overflow, U256/I256, memory operations,
-effects, extra inputs, multiple results and distributed protocols refuse.
+effects, extra inputs, multiple results and distributed protocols refuse; the
+[profile-2 subsection](#zal-word-kernel-profile-2) covers more inputs, two
+results, comparisons and selects.
 
 First read the source and copy its returned revision into later calls:
 
@@ -610,6 +612,110 @@ The first two gates are pure parser/binding/transport controls with explicitly
 supplied checker fixtures. The full third gate invokes the real installed
 Z3 checker and identities; missing solver support fails it. These gates are
 not native execution, application qualification or release claims.
+
+### ZAL word-kernel profile 2
+
+**Journey.** A developer asks for a 128-bit add as two 64-bit words. They write
+the requirement in ZAL as one sentence per result, read it back in plain English,
+try an example with `what-if`, and open a session. A proposer or the built-in
+search supplies bytes. The profile-2 checker accepts them or returns named input
+values, entry registers and flags on which a result differs. That counterexample
+is phrased as a question about the requirement.
+
+```text
+profile zal/word-kernel/2;
+kernel add128;
+target x86_64-sysv-register/2;
+inputs a_lo:u64,a_hi:u64,b_lo:u64,b_hi:u64;
+result 1 (add a_lo b_lo) modulo 2^64;
+result 2 (add (add a_hi b_hi) (ult (add a_lo b_lo) a_lo)) modulo 2^64;
+palette [["mov","rax","rdi"],["add","rax","rdx"],["mov","rdx","rsi"],["adc","rdx","rcx"]];
+max-body 4;
+objective bytes;
+limits candidates=2000 checks=16 deadline-ms=20000 solver-ms=1000;
+```
+
+The English form reads:
+
+```text
+Inputs a_lo, a_hi, b_lo and b_hi are unsigned 64-bit words.
+Return first (a_lo plus b_lo) with wraparound modulo 2^64.
+Return second ((a_hi plus b_hi) plus ((a_lo plus b_lo) is below a_lo (unsigned))) with wraparound modulo 2^64.
+```
+
+[`umin-x86.zal`](../test-data/zal-word-kernel/umin-x86.zal) states
+`(ite (ule x y) x y)`, in English
+`(if (x is at most y (unsigned)) then x else y)`. Its session `search` finds
+the same 11-byte kernel as the library entry. Each example also has an
+`.english.zal` form.
+
+**Formal meaning.** A `profile zal/word-kernel/2;` or `ZAL word kernel profile
+2.` line selects this profile. The declarations follow in a fixed order:
+
+- `kernel` and `target`, which must be a profile-2 target;
+- `inputs`, with 1 to 6 distinct names in argument order;
+- one or two results, written `result 1` and `result 2` when there are two;
+- `palette`, `max-body`, `objective` and `limits`, as in profile 1.
+
+Lowering produces a `zeno-fcis/machine-problem/2` problem. That problem is
+validated by `profile2.validate_problem`, `verify2._palette` and
+`session._grammar`. The two examples lower to exactly the library problems
+`add128-x86` and `umin-x86`. Expression meanings are those of the machine
+profile 2; the ZAL layer only parses and renders.
+
+| Symbolic | English |
+| --- | --- |
+| `(ashr e 3)` | `(e shifted right arithmetically by 3)` |
+| `(ult a b)`, `(ule a b)` | `(a is below b (unsigned))`, `(a is at most b (unsigned))` |
+| `(slt a b)`, `(sle a b)` | `(a is below b (signed))`, `(a is at most b (signed))` |
+| `(eq a b)` | `(a equals b)` |
+| `(ite c a b)` | `(if c then a else b)`, which gives `a` when `c` is not 0 |
+
+Comparisons give 1 or 0. Expression words cannot be input names. `render`
+converts between the syntaxes exactly; English and symbolic sources share one
+revision. Every expression node has a source span with an id such as
+`result/2/expression/2`. The binding also hashes `word_kernel2.py`.
+
+**Commands.** These differ from profile 1:
+
+- `what-if` takes one `--input NAME=VALUE` per declared input. The `--x`/`--y`
+  options stay for profile 1.
+- The controlled question lists every input, for example
+  `What if a_lo is 1, a_hi is 0, b_lo is 2 and b_hi is 0?`.
+- `What can be clobbered?` also names the result registers and the quantified
+  entry flags.
+
+Every other command is unchanged. Refusals name the declaration and the reason.
+They cover:
+
+- an unknown or duplicate input;
+- more than 6 inputs or 2 results;
+- an expression as a shift count, such as a comparison result;
+- a target that disagrees with the profile line.
+
+A `profile zal/word-kernel/1` line keeps the profile-1 parser and its refusals.
+
+**Scope.** Profile 2 is still a closed straight-line word profile:
+
+- no memory, effects, checked overflow, U256/I256, loops or branches;
+- only CF, ZF, SF and OF are modelled.
+
+The machine-profile non-claims above apply. The source binding does not
+authenticate intent.
+
+```sh
+python3 -B tools/test_zal_word_kernel2.py
+python3 -O -B tools/test_zal_word_kernel2.py
+```
+
+These checks cover:
+
+- the syntax round trips, with library-equal lowering for both examples;
+- every refusal above;
+- a real profile-2 search for `umin`, and a candidate for `add128`, each emitted
+  and replayed;
+- a planted wrong expression that yields a source-level counterexample;
+- a rehashed change of meaning, which replay refuses.
 
 ## Sources and agent skill
 
