@@ -320,6 +320,42 @@ Example: the searched 64-bit sum (`lea rax,[rdi+rsi]; ret`, 5 bytes) against GCC
 0.97. At this size the call dominates, and the 4 saved bytes buy no measurable time. Results hold for that
 machine, load and call ABI only. They are not a portable speedup claim.
 
+### Analysing supplied paired measurements
+
+`tools/machine_qualification/performance.py` implements the qualification design's frozen paired-ratio analysis
+over measurements that someone else supplies. It runs, times and measures nothing, and it makes no measurement
+claim of its own.
+
+```sh
+python3 -B -m tools.machine_qualification.performance --plan PLAN.json --observations ROWS.json
+```
+
+- **Plan:** a `zeno-fcis/machine-performance-plan/1` plan is frozen at 20 sessions of 6 candidate/baseline pairs,
+  3 AB and 3 BA each. It records the seed and the resulting order schedule, one call count for both arms, the
+  number m of preregistered comparisons, alpha 1/20 and the margin 1/50.
+- **Rows:** the `zeno-fcis/machine-performance-observations/1` rows bind the plan's hash. A changed plan
+  therefore needs new measurements.
+- **Refused input:** duplicate keys, unknown fields, non-integer numbers and non-canonical decimal strings are
+  refused (exit 65).
+- **Invalid measurements:** each reason is listed, and nothing is classified (exit 1). The reasons are a reused
+  observation or session identity, a missing or repeated pair, a zero duration, unequal call counts, an order that
+  differs from the schedule, wrong outputs and a changed artifact.
+- **Analysis:** uses `fractions.Fraction` only.
+  - Each pair's ratio is candidate over baseline elapsed nanoseconds.
+  - A session's summary is the mean of its 3rd and 4th sorted ratios.
+  - The point estimate, the *median paired elapsed-time ratio*, is the mean of the 10th and 11th sorted summaries.
+  - The interval runs from the k-th to the (21-k)-th summary. k is the largest rank whose two-sided binomial tail
+    is at most alpha/m: 6 for one comparison (coverage 1005176/1048576), and 4 for 7 or 14.
+- **Classification:** with delta = 1/50, the result is `improved` when the upper endpoint is below 49/50,
+  `practically_equivalent` when the interval lies in [49/50, 51/50], `regressed` when the lower endpoint is above
+  51/50, and `inconclusive` otherwise or when no rank is admissible.
+- **Presentation:** decimal strings round lower endpoints down and upper endpoints up. They never decide.
+
+The coverage statement needs independent identically distributed representative sessions, which an analysis
+cannot establish. The report is not mean execution time, application savings, instruction latency or a portable
+speedup claim. It also does not establish the measurement's truthful acquisition. The test
+`tools/test_machine_qualification_performance.py` uses fabricated rows only.
+
 Keep the default GCC baseline and the explicitly matching register-kernel
 baseline. Some distributions add ENDBR64 by default; its four bytes are a
 control-flow-hardening difference, not a synthesis improvement. Profile 1 does
