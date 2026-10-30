@@ -1,0 +1,340 @@
+{
+  "corpus_sha256": "e310f7da94e4ea1eb3512c5a463ce976f77f480e648a6617e794c318aa7907ee",
+  "cost_nonclaims": [
+    "Abstract tree nodes are NOT machine bytes, latency, gas or CLIF cost",
+    "Finite u8 verification is NOT a proof for another width or ABI",
+    "Search success is NOT global optimality outside the declared grammar"
+  ],
+  "entries": [
+    {
+      "contract_sha256": "26cf454938afc1f5482462fc626ef1e27e3b234ecf1776a836a8228987e86f2a",
+      "cost": {
+        "baseline": 5,
+        "candidate": 5,
+        "metric": "abstract-tree-nodes"
+      },
+      "experiment_palette": "rightmost-bit-arithmetic",
+      "expression": [
+        "and",
+        [
+          "input",
+          "x"
+        ],
+        [
+          "sub",
+          [
+            "const",
+            0
+          ],
+          [
+            "input",
+            "x"
+          ]
+        ]
+      ],
+      "expression_sha256": "c0725f3b3c590a55eab21f6bcec5c8deccce78de7d06c3f88c26342a8445884b",
+      "palette_sha256": "eb71eb2ff444850a47ea1bf232d1a3c214722022620ced0b50f501f2d870ae04",
+      "problem": "lowest-set-bit-u8",
+      "profile": "u8-mod-word/1",
+      "verification": {
+        "cases_checked": 256,
+        "declared_domain": "all-u8-inputs",
+        "method": "exhaustive-enumeration",
+        "status": "verified-within-profile"
+      }
+    },
+    {
+      "contract_sha256": "a020b57b80fc5a54243d59aeb91ed1f85bc1f6a69445cfa37bedd44bde05fbbc",
+      "cost": {
+        "baseline": 5,
+        "candidate": 5,
+        "metric": "abstract-tree-nodes"
+      },
+      "experiment_palette": "rightmost-bit-arithmetic",
+      "expression": [
+        "and",
+        [
+          "input",
+          "x"
+        ],
+        [
+          "sub",
+          [
+            "input",
+            "x"
+          ],
+          [
+            "const",
+            1
+          ]
+        ]
+      ],
+      "expression_sha256": "b1a7b05ea5c44898a51de530a5cc2c7e3c05a17bcfc1f5205a895792767e6348",
+      "palette_sha256": "a7c8b79f02f89a3a92970456871f02c13195af59be355dcf95915f42f71529cc",
+      "problem": "clear-lowest-set-bit-u8",
+      "profile": "u8-mod-word/1",
+      "verification": {
+        "cases_checked": 256,
+        "declared_domain": "all-u8-inputs",
+        "method": "exhaustive-enumeration",
+        "status": "verified-within-profile"
+      }
+    },
+    {
+      "contract_sha256": "be7a379da38b88c304780e1537d63db1525509abe0e9fa92272684167e9e5e9d",
+      "cost": {
+        "baseline": 2,
+        "candidate": 2,
+        "metric": "abstract-tree-nodes"
+      },
+      "experiment_palette": "power-of-two-divisor",
+      "expression": [
+        "lshr",
+        [
+          "input",
+          "x"
+        ],
+        3
+      ],
+      "expression_sha256": "6d49be7f02c2914f472e661aa7504b632bb24aa717f50457d645e52f751bab0b",
+      "palette_sha256": "96e4a0325ed88f88464862f98b65c5a6769904e0eaa84e94101ae03e2343dfa7",
+      "problem": "divide-by-eight-u8",
+      "profile": "u8-mod-word/1",
+      "verification": {
+        "cases_checked": 256,
+        "declared_domain": "all-u8-inputs",
+        "method": "exhaustive-enumeration",
+        "status": "verified-within-profile"
+      }
+    },
+    {
+      "contract_sha256": "8269ab4e007c5e3627661fe7e4b17c2452966fa60ce6ab73a700486e0c6257db",
+      "cost": {
+        "baseline": 3,
+        "candidate": 3,
+        "metric": "abstract-tree-nodes"
+      },
+      "experiment_palette": "power-of-two-mask",
+      "expression": [
+        "and",
+        [
+          "const",
+          7
+        ],
+        [
+          "input",
+          "x"
+        ]
+      ],
+      "expression_sha256": "52ae9a35b93c3e4c6de6513a4d67b3011eaccd8ad1c2c7b89a0c26b5794f0881",
+      "palette_sha256": "33622f884cbc9d7b9ab2b1ecb2279a39a735b846421ff98671d9555e59f7ee4d",
+      "problem": "modulo-eight-u8",
+      "profile": "u8-mod-word/1",
+      "verification": {
+        "cases_checked": 256,
+        "declared_domain": "all-u8-inputs",
+        "method": "exhaustive-enumeration",
+        "status": "verified-within-profile"
+      }
+    },
+    {
+      "contract_sha256": "78cb293907cbe9c1c79c75cc20932e9d44d8beef30d312a03527ef99e22fe19a",
+      "cost": {
+        "baseline": 4,
+        "candidate": 4,
+        "metric": "abstract-tree-nodes"
+      },
+      "experiment_palette": "gray-code-neighbor-parity",
+      "expression": [
+        "xor",
+        [
+          "input",
+          "x"
+        ],
+        [
+          "lshr",
+          [
+            "input",
+            "x"
+          ],
+          1
+        ]
+      ],
+      "expression_sha256": "8317f9c110824f615688192254fa9e9f9ee37773b5cc72e26c729b30cab91666",
+      "palette_sha256": "c3b60075638d1794f24e74c534dd0afff2792819517531c499b65ddfde443f4a",
+      "problem": "gray-code-u8",
+      "profile": "u8-mod-word/1",
+      "verification": {
+        "cases_checked": 256,
+        "declared_domain": "all-u8-inputs",
+        "method": "exhaustive-enumeration",
+        "status": "verified-within-profile"
+      }
+    },
+    {
+      "contract_sha256": "a54dc2518b73a28140121e661f82d30d9c409887d1aafcfb6402a7eaa3fe3805",
+      "cost": {
+        "baseline": 5,
+        "candidate": 5,
+        "metric": "abstract-tree-nodes"
+      },
+      "experiment_palette": "bit-rearrangement",
+      "expression": [
+        "or",
+        [
+          "lshr",
+          [
+            "input",
+            "x"
+          ],
+          7
+        ],
+        [
+          "shl",
+          [
+            "input",
+            "x"
+          ],
+          1
+        ]
+      ],
+      "expression_sha256": "5c04334b7920f07a5242290d642f82e2047bd135dc0587ddba169fb66225a3d2",
+      "palette_sha256": "478f03935707fa5d01d0be2de798cc8c490007a0e241797067e7faf74ca12bce",
+      "problem": "rotate-left-one-u8",
+      "profile": "u8-mod-word/1",
+      "verification": {
+        "cases_checked": 256,
+        "declared_domain": "all-u8-inputs",
+        "method": "exhaustive-enumeration",
+        "status": "verified-within-profile"
+      }
+    }
+  ],
+  "experiments": [
+    {
+      "candidate_budget": 10000,
+      "candidates_inspected": 12,
+      "contract_sha256": "26cf454938afc1f5482462fc626ef1e27e3b234ecf1776a836a8228987e86f2a",
+      "palette_name": "rightmost-bit-arithmetic",
+      "palette_sha256": "eb71eb2ff444850a47ea1bf232d1a3c214722022620ced0b50f501f2d870ae04",
+      "probe_survivors": 1,
+      "problem": "lowest-set-bit-u8",
+      "status": "verified-within-profile"
+    },
+    {
+      "candidate_budget": 10000,
+      "candidates_inspected": 183,
+      "contract_sha256": "26cf454938afc1f5482462fc626ef1e27e3b234ecf1776a836a8228987e86f2a",
+      "palette_name": "control-bitwise-only",
+      "palette_sha256": "dcecbfe516aaa752c5b18786da1740789c790ed6e246d268673433103efd1d1f",
+      "probe_survivors": 0,
+      "problem": "lowest-set-bit-u8",
+      "status": "none-within-grammar"
+    },
+    {
+      "candidate_budget": 10000,
+      "candidates_inspected": 11,
+      "contract_sha256": "a020b57b80fc5a54243d59aeb91ed1f85bc1f6a69445cfa37bedd44bde05fbbc",
+      "palette_name": "rightmost-bit-arithmetic",
+      "palette_sha256": "a7c8b79f02f89a3a92970456871f02c13195af59be355dcf95915f42f71529cc",
+      "probe_survivors": 1,
+      "problem": "clear-lowest-set-bit-u8",
+      "status": "verified-within-profile"
+    },
+    {
+      "candidate_budget": 10000,
+      "candidates_inspected": 183,
+      "contract_sha256": "a020b57b80fc5a54243d59aeb91ed1f85bc1f6a69445cfa37bedd44bde05fbbc",
+      "palette_name": "control-bitwise-only",
+      "palette_sha256": "dcecbfe516aaa752c5b18786da1740789c790ed6e246d268673433103efd1d1f",
+      "probe_survivors": 0,
+      "problem": "clear-lowest-set-bit-u8",
+      "status": "none-within-grammar"
+    },
+    {
+      "candidate_budget": 10000,
+      "candidates_inspected": 2,
+      "contract_sha256": "be7a379da38b88c304780e1537d63db1525509abe0e9fa92272684167e9e5e9d",
+      "palette_name": "power-of-two-divisor",
+      "palette_sha256": "96e4a0325ed88f88464862f98b65c5a6769904e0eaa84e94101ae03e2343dfa7",
+      "probe_survivors": 1,
+      "problem": "divide-by-eight-u8",
+      "status": "verified-within-profile"
+    },
+    {
+      "candidate_budget": 10000,
+      "candidates_inspected": 18,
+      "contract_sha256": "be7a379da38b88c304780e1537d63db1525509abe0e9fa92272684167e9e5e9d",
+      "palette_name": "control-no-shift",
+      "palette_sha256": "e0bde26eed8c864a6e11a5ba05e8e169dca04eebd8703c4d8005ad8294c46dbf",
+      "probe_survivors": 0,
+      "problem": "divide-by-eight-u8",
+      "status": "none-within-grammar"
+    },
+    {
+      "candidate_budget": 10000,
+      "candidates_inspected": 4,
+      "contract_sha256": "8269ab4e007c5e3627661fe7e4b17c2452966fa60ce6ab73a700486e0c6257db",
+      "palette_name": "power-of-two-mask",
+      "palette_sha256": "33622f884cbc9d7b9ab2b1ecb2279a39a735b846421ff98671d9555e59f7ee4d",
+      "probe_survivors": 1,
+      "problem": "modulo-eight-u8",
+      "status": "verified-within-profile"
+    },
+    {
+      "candidate_budget": 10000,
+      "candidates_inspected": 21,
+      "contract_sha256": "8269ab4e007c5e3627661fe7e4b17c2452966fa60ce6ab73a700486e0c6257db",
+      "palette_name": "control-no-mask-constant",
+      "palette_sha256": "93e6d27a89ebb33158cd80f441082130b95e404a85aca6d77f16881f981a132e",
+      "probe_survivors": 0,
+      "problem": "modulo-eight-u8",
+      "status": "none-within-grammar"
+    },
+    {
+      "candidate_budget": 10000,
+      "candidates_inspected": 7,
+      "contract_sha256": "78cb293907cbe9c1c79c75cc20932e9d44d8beef30d312a03527ef99e22fe19a",
+      "palette_name": "gray-code-neighbor-parity",
+      "palette_sha256": "c3b60075638d1794f24e74c534dd0afff2792819517531c499b65ddfde443f4a",
+      "probe_survivors": 1,
+      "problem": "gray-code-u8",
+      "status": "verified-within-profile"
+    },
+    {
+      "candidate_budget": 10000,
+      "candidates_inspected": 9,
+      "contract_sha256": "78cb293907cbe9c1c79c75cc20932e9d44d8beef30d312a03527ef99e22fe19a",
+      "palette_name": "control-no-shift",
+      "palette_sha256": "4708f72098ed5546bfd714ca9074fb327d7f1468968692f3fc590233798e8a64",
+      "probe_survivors": 0,
+      "problem": "gray-code-u8",
+      "status": "none-within-grammar"
+    },
+    {
+      "candidate_budget": 10000,
+      "candidates_inspected": 261,
+      "contract_sha256": "a54dc2518b73a28140121e661f82d30d9c409887d1aafcfb6402a7eaa3fe3805",
+      "palette_name": "bit-rearrangement",
+      "palette_sha256": "478f03935707fa5d01d0be2de798cc8c490007a0e241797067e7faf74ca12bce",
+      "probe_survivors": 1,
+      "problem": "rotate-left-one-u8",
+      "status": "verified-within-profile"
+    },
+    {
+      "candidate_budget": 10000,
+      "candidates_inspected": 84,
+      "contract_sha256": "a54dc2518b73a28140121e661f82d30d9c409887d1aafcfb6402a7eaa3fe3805",
+      "palette_name": "control-no-right-shift",
+      "palette_sha256": "f469ce3dc28ee539aa7ade8cd5614a5fc0569880c72f92b4780a522d7ac797b2",
+      "probe_survivors": 0,
+      "problem": "rotate-left-one-u8",
+      "status": "none-within-grammar"
+    }
+  ],
+  "schema": "zeno-fcis/algorithm-research-catalog/1",
+  "tool_source_sha256": {
+    "reference.py": "7fcc0441caac1e1513f260fa6242e4b9ca516528a21e0da570eb955b63267982",
+    "research.py": "4c41a0d0f1616f34f8760e07ba25b68d30547d55237c9bd8a816bf56b8ede6cc"
+  }
+}
