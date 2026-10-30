@@ -833,12 +833,15 @@ python3 -B -m tools.machine_code.run slice \
 ```
 
 The kernel must first check equivalent to its problem. For each result, the
-backward slice keeps every instruction whose register or flag effects can reach
-that result register at the return. It follows the instruction footprints from
-the return backwards. A partial or conditional write (`SETcc`, `CMOVcc`) reads
-its destination, so the earlier value stays in the slice. The slice keeps the
-original instruction order. For the second result, a copy into the first result
-register is appended.
+backward slice keeps every instruction whose writes reach that result register
+at the return through later reads. It uses the exact footprints from
+`footprint.py`, which come from the checker's own symbolic semantics: reads and
+writes over-approximate, and overwrites under-approximate. So a partial or
+conditional write (`SETcc`, `CMOVcc`) keeps the earlier value of its destination
+in the slice. A checked kernel's instructions are all grammar entries, so each
+has a derived footprint; the command refuses with `FootprintUnavailable`
+otherwise. The slice keeps the original instruction order. For the second
+result, a copy into the first result register is appended.
 
 Each slice becomes a one-result problem with that output alone. Its grammar is
 the original grammar plus the slice's forms, and its bound is large enough for
@@ -872,6 +875,8 @@ The output directory receives:
 - a planted footprint defect that drops `ADC`'s carry read loses the low `ADD`
   from the high word's slice, and the checker rejects that slice with a
   concrete counterexample, so nothing is written;
+- the slicer uses the shared footprints, including `ADC`'s read of CF, and
+  refuses when a footprint cannot be derived;
 - an unchecked kernel and a profile-1 problem are refused.
 
 This follows McSlice, the machine-code slicer in the same dissertation. Here it

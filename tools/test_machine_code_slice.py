@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from machine_code import library, model, slicing, verify2
+from machine_code import footprint, library, model, slicing, verify2
 from machine_code.run import main as cli
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,13 +75,13 @@ class Slicing(unittest.TestCase):
     def test_a_planted_footprint_defect_is_caught_by_the_checker(self):
         # Dropping ADC's carry read loses the low ADD from the high word's slice.
         problem, code = kernel("add128-x86")
-        real = slicing.footprint
+        real = footprint.footprints
 
-        def no_carry(target, form):
-            reads, writes, flag_reads, defined, undefined = real(target, form)
-            return reads, writes, (() if form[0] == "adc" else flag_reads), defined, undefined
+        def no_carry(value):
+            return [footprint.Footprint(p.reads - {"cf"}, p.writes, p.overwrites) if form[0] == "adc" else p
+                    for form, p in zip(value["grammar"], real(value))]
         out = self.root / "planted"
-        with mock.patch.object(slicing, "footprint", no_carry):
+        with mock.patch.object(footprint, "footprints", no_carry):
             result = slicing.slices(problem, code)
             status, printed = main(["slice", "--kernel", str(KERNELS / "add128-x86.json"), "--out", str(out)])
         self.assertEqual(result["status"], "counterexample")
@@ -89,6 +89,17 @@ class Slicing(unittest.TestCase):
         self.assertEqual(result["slices"][1]["verification"]["reason"], "Full64Mismatch")
         self.assertEqual((status, printed["status"]), (1, "counterexample"))
         self.assertFalse(out.exists())
+
+    def test_slices_follow_the_shared_exact_footprints(self):
+        problem, code = kernel("add128-x86")
+        forms = [i.form() for i in verify2.decode(problem["target"], code)[:-1]]
+        prints = slicing.instruction_footprints(problem, forms)
+        self.assertEqual(prints, footprint.footprints(problem))  # here the grammar is the kernel, in order
+        self.assertIn("cf", prints[3].reads)
+        self.assertEqual(slicing.backward(prints, "rax"), [0, 1])
+        with mock.patch.object(footprint, "footprints", lambda value: [None] * len(value["grammar"])), \
+                self.assertRaisesRegex(ValueError, "FootprintUnavailable"):
+            slicing.slices(problem, code)
 
     def test_an_unchecked_kernel_or_profile1_problem_is_refused(self):
         problem, code = kernel("add128-x86")
