@@ -55,6 +55,26 @@ fn source_admission_rejects_duplicates_unknown_fields_and_noninteger_atoms() {
     assert!(problem::parse(serde_json::to_vec(&source).unwrap()).is_err());
 }
 #[test]
+fn an_unsupported_header_names_its_field_and_the_accepted_value() {
+    let refusal = |field: &str, value: &str| {
+        let mut source: Value = serde_json::from_slice(COUNTER).unwrap();
+        source[field] = json!(value);
+        problem::parse(serde_json::to_vec(&source).unwrap()).err()
+    };
+    assert_eq!(
+        refusal("profile", "zeno-fcis/finite-i64/1").as_deref(),
+        Some(
+            "unsupported-profile-or-schema: profile `zeno-fcis/finite-i64/1` is not `zeno-fcis/finite-i128/1`"
+        )
+    );
+    assert_eq!(
+        refusal("schema", "zeno-fcis/synthesis-problem/0").as_deref(),
+        Some(
+            "unsupported-profile-or-schema: schema `zeno-fcis/synthesis-problem/0` is not `zeno-fcis/synthesis-problem/1`"
+        )
+    );
+}
+#[test]
 fn runner_verdicts_require_exact_outputs_and_complete_coverage() {
     let (problem, cases) = selected();
     let wire = cases
