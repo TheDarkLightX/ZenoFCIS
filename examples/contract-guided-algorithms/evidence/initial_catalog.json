@@ -224,14 +224,21 @@
     },
     {
       "candidate_budget": 10000,
-      "candidates_inspected": 183,
+      "candidates_inspected": 0,
       "contract_sha256": "26cf454938afc1f5482462fc626ef1e27e3b234ecf1776a836a8228987e86f2a",
       "palette_name": "control-bitwise-only",
       "palette_sha256": "dcecbfe516aaa752c5b18786da1740789c790ed6e246d268673433103efd1d1f",
       "probe_survivors": 0,
       "problem": "lowest-set-bit-u8",
-      "status": "none-within-grammar",
-      "preflight": null
+      "status": "infeasible-bitwise-local-palette",
+      "preflight": {
+        "bit": 1,
+        "input_a": 2,
+        "input_b": 3,
+        "output_a_bit": 1,
+        "output_b_bit": 0,
+        "rule": "bitwise-locality-u8/1"
+      }
     },
     {
       "candidate_budget": 10000,
@@ -246,14 +253,21 @@
     },
     {
       "candidate_budget": 10000,
-      "candidates_inspected": 183,
+      "candidates_inspected": 0,
       "contract_sha256": "a020b57b80fc5a54243d59aeb91ed1f85bc1f6a69445cfa37bedd44bde05fbbc",
       "palette_name": "control-bitwise-only",
       "palette_sha256": "dcecbfe516aaa752c5b18786da1740789c790ed6e246d268673433103efd1d1f",
       "probe_survivors": 0,
       "problem": "clear-lowest-set-bit-u8",
-      "status": "none-within-grammar",
-      "preflight": null
+      "status": "infeasible-bitwise-local-palette",
+      "preflight": {
+        "bit": 1,
+        "input_a": 2,
+        "input_b": 3,
+        "output_a_bit": 0,
+        "output_b_bit": 1,
+        "rule": "bitwise-locality-u8/1"
+      }
     },
     {
       "candidate_budget": 10000,
@@ -365,9 +379,9 @@
       }
     }
   ],
-  "schema": "zeno-fcis/algorithm-research-catalog/2",
+  "schema": "zeno-fcis/algorithm-research-catalog/3",
   "tool_source_sha256": {
     "reference.py": "7fcc0441caac1e1513f260fa6242e4b9ca516528a21e0da570eb955b63267982",
-    "research.py": "54a98a41e0eae7191df38e34b3ea64c78260344e4bcf71be07cc3e1339596e28"
+    "research.py": "b17519fd9a230152719882cba368c4eb588e970a948531fa2b6a691340240fda"
   }
 }
