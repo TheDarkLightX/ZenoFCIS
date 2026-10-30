@@ -146,16 +146,17 @@ class Rv64iModelConformance(unittest.TestCase):
         return found
 
     def test_encoder_matches_gnu_assembler_for_every_admitted_form(self):
+        # Labels avoid t0-t6 and f0-f31, which are RISC-V register names.
         source = ".option norvc\n.option norelax\n.text\n" + "".join(
-            f"t{i}:\n{gnu(f)}\n" for i, f in enumerate(self.forms)) + "tend:\n"
+            f"form{i}:\n{gnu(f)}\n" for i, f in enumerate(self.forms)) + "formend:\n"
         (self.root / "gnu.S").write_text(source)
         self.run_tool([FOUND["as"], "-march=rv64i", "-mabi=lp64", "gnu.S", "-o", "gnu.o"])
         self.run_tool([FOUND["objcopy"], "-O", "binary", "--only-section=.text", "gnu.o", "gnu.bin"])
         gnu_bytes = (self.root / "gnu.bin").read_bytes()
         symbols = {line.split()[2]: int(line.split()[0], 16) for line in
                    self.run_tool([FOUND["nm"], "gnu.o"]).splitlines() if len(line.split()) == 3}
-        ends = [symbols[f"t{i + 1}"] for i in range(len(self.forms) - 1)] + [symbols["tend"]]
-        differing = [f for i, f in enumerate(self.forms) if gnu_bytes[symbols[f"t{i}"]:ends[i]] != self.code[i]]
+        ends = [symbols[f"form{i + 1}"] for i in range(len(self.forms) - 1)] + [symbols["formend"]]
+        differing = [f for i, f in enumerate(self.forms) if gnu_bytes[symbols[f"form{i}"]:ends[i]] != self.code[i]]
         self.assertEqual(differing[:5], [])
 
     def test_decoder_round_trips_every_admitted_form(self):
