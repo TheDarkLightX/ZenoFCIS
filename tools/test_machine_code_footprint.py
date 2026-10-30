@@ -4,12 +4,15 @@ import json
 from pathlib import Path
 import random
 import unittest
+from unittest.mock import patch
 
-from machine_code import footprint, profile2, verify, verify2
+from machine_code import footprint, profile2, profile3, verify, verify2, verify3
 from machine_code.session import _grammar
 from machine_code.targets import encode_program
 
 DATA = Path(__file__).resolve().parents[1] / "test-data/machine-code"
+MEMORY = ("swap-words-x86", "load-add-store-x86", "copy2-sum-x86",
+          "swap-words-rv64i", "load-add-store-rv64i", "copy2-sum-rv64i")
 MASK = (1 << 64) - 1
 
 
@@ -17,11 +20,26 @@ def load(name):
     return json.loads((DATA / name).read_text())
 
 
+def memory_problem(name):
+    return json.loads((DATA / "memory-kernels" / (name + ".json")).read_text())["problem"]
+
+
 def behaviour(problem, code, states):
-    """Observed results on fixed entry states; a statically refused candidate has its own value."""
+    """Observed results on fixed entry states; a statically refused candidate has its own value.
+
+    For profile 3 the observed values are the results and every read-write region word.
+    """
     rows = []
     try:
-        for registers, flags in states:
+        for state in states:
+            if problem["schema"] == profile3.SCHEMA:
+                registers, flags, memory = state
+                final, _, regions = verify3.execute(problem, code, registers, flags, memory)
+                writable = [r["name"] for r in problem["regions"] if r["access"] == "read-write"]
+                rows.append((tuple(final[n] for n in verify3.RESULTS[problem["target"]][:len(problem["outputs"])]),
+                             tuple(tuple(regions[n]) for n in writable)))
+                continue
+            registers, flags = state
             if problem["schema"] == profile2.SCHEMA:
                 final, _ = verify2.execute(problem["target"], code, registers, flags)
                 rows.append(tuple(final[n] for n in sorted(footprint.observed(problem))))
@@ -37,6 +55,14 @@ def behaviour(problem, code, states):
 
 def entry_states(problem, count=24):
     generator = random.Random(20261030)
+    if problem["schema"] == profile3.SCHEMA:
+        special = (0, 1, MASK, 1 << 63)
+        word = lambda row: special[row] if row < 4 else generator.getrandbits(64)
+        x86 = problem["target"] == verify3.X86
+        return [({n: word(row) for n in verify3.REGISTERS[problem["target"]]},
+                 {f: generator.getrandbits(1) for f in verify3.FLAGS} if x86 else None,
+                 {r["name"]: [word(row) for _ in range(r["words"])] for r in problem["regions"]})
+                for row in range(count)]
     if problem["schema"] == profile2.SCHEMA:
         names, flags = verify2.REGISTERS[problem["target"]], verify2.FLAGS
     else:
@@ -49,6 +75,29 @@ def entry_states(problem, count=24):
         registers = {n: (special[row] if row < 4 else generator.getrandbits(64)) for n in names}
         states.append((registers, {f: generator.getrandbits(1) for f in flags} if x86 and flags else None))
     return states
+
+
+def least_ranks(problem):
+    """(cheapest kept member, cheapest member overall, skipped counts) per concrete behaviour class."""
+    grammar = _grammar(problem)
+    terminal = encode_program(problem["target"], [])
+    pruner = footprint.Pruner(problem, grammar)
+    # Lost-input pruning drops only non-equivalent candidates, whole classes of them; it has its own test.
+    pruner.required = frozenset()
+    states = entry_states(problem)
+    first, second = ("bytes", "instructions") if problem["objective"] == "bytes" else ("instructions", "bytes")
+    best_all, best_kept, skipped = {}, {}, {}
+    for length in range(problem["max_instructions"] + 1):
+        kept = set(footprint.sequences(len(grammar), length, pruner.judge, skipped))
+        for choices in product(range(len(grammar)), repeat=length):
+            code = b"".join(grammar[i] for i in choices) + terminal
+            key = behaviour(problem, code, states)
+            costs = {"bytes": len(code), "instructions": len(choices)}
+            rank = (costs[first], costs[second], code.hex())
+            best_all[key] = min(best_all.get(key, rank), rank)
+            if choices in kept:
+                best_kept[key] = min(best_kept.get(key, rank), rank)
+    return best_kept, best_all, skipped
 
 
 class FootprintTests(unittest.TestCase):
@@ -93,34 +142,42 @@ class FootprintTests(unittest.TestCase):
                               ["imul", "rax", "rsi"], ["cmp", "rdi", "rsi"], ["cmove", "rax", "rsi"], ["setb", "rdx"]]}
         skipped_total = 0
         for name in ("add128-x86.json", "add128-rv64i.json", "umin-x86.json", "add64-x86.json", "add64-rv64i.json",
-                     flags, both, swapped, shifts, {**shifts, "objective": "instructions"}):
-            problem = load(name) if isinstance(name, str) else name
+                     flags, both, swapped, shifts, {**shifts, "objective": "instructions"}, *MEMORY):
+            problem = (memory_problem(name) if name in MEMORY else load(name)) if isinstance(name, str) else name
             name = name if isinstance(name, str) else "synthetic-" + "-".join(map(str, name["grammar"][1][:2]))
             problem["max_instructions"] = min(problem["max_instructions"], 3)
-            grammar = _grammar(problem)
-            terminal = encode_program(problem["target"], [])
-            pruner = footprint.Pruner(problem, grammar)
-            # Lost-input pruning drops only non-equivalent candidates, whole classes of them; it has its own test.
-            pruner.required = frozenset()
-            states = entry_states(problem)
-            best_all, best_kept, skipped, total = {}, {}, {}, 0
-            for length in range(problem["max_instructions"] + 1):
-                kept = set(footprint.sequences(len(grammar), length, pruner.judge, skipped))
-                for choices in product(range(len(grammar)), repeat=length):
-                    total += 1
-                    code = b"".join(grammar[i] for i in choices) + terminal
-                    key = behaviour(problem, code, states)
-                    costs = {"bytes": len(code), "instructions": len(choices)}
-                    first, second = ("bytes", "instructions") if problem["objective"] == "bytes" else ("instructions", "bytes")
-                    rank = (costs[first], costs[second], code.hex())
-                    best_all[key] = min(best_all.get(key, rank), rank)
-                    if choices in kept:
-                        best_kept[key] = min(best_kept.get(key, rank), rank)
+            best_kept, best_all, skipped = least_ranks(problem)
             with self.subTest(problem=name):
                 self.assertEqual(best_kept, best_all)
             skipped_total += sum(skipped.values())
         self.assertGreater(skipped_total, 500)
 
+    def test_memory_footprints_name_region_words_bases_and_admission(self):
+        problem = memory_problem("swap-words-x86")
+        prints = dict(zip(map(tuple, problem["grammar"]), footprint.footprints(problem)))
+        load_word = prints[("load", "rax", "rdi", 0)]
+        self.assertEqual(load_word.reads, {"p[0]", "rdi"})
+        self.assertEqual(load_word.writes, {"rax", "admitted:load rax rdi 0"})
+        store = prints[("store", "rdi", 8, "rax")]
+        self.assertEqual(store.reads, {"rax", "rdi"})
+        self.assertEqual(store.writes, {"p[1]", "admitted:store rdi 8 rax"})
+        self.assertIn("p[1]", store.overwrites)
+        self.assertLessEqual({"p[0]", "p[1]", "admitted:store rdi 8 rax"}, footprint.observed(problem))
+
+    def test_a_store_footprint_missing_its_region_word_write_loses_behaviours(self):
+        """Negative control: the exactness check must notice a store whose region-word write is omitted."""
+        real = footprint._profile3
+        def omitted(z, context, problem, form):
+            derived, values, declared = real(z, context, problem, form)
+            words = frozenset(w for w in derived.writes if "[" in w) if form[0] == "store" else frozenset()
+            sources = tuple((location, used) for location, used in derived.sources if location not in words)
+            return (footprint.Footprint(derived.reads, derived.writes - words, derived.overwrites - words, sources),
+                    values, declared)
+        problem = memory_problem("swap-words-x86")
+        problem["max_instructions"] = 3
+        with patch.object(footprint, "_profile3", omitted):
+            best_kept, best_all, _ = least_ranks(problem)
+        self.assertNotEqual(best_kept, best_all)
 
     def test_operand_swapped_duplicates_are_found_by_proof(self):
         problem = {**load("add128-rv64i.json"),

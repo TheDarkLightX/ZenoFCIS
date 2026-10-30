@@ -61,6 +61,22 @@ def _encode_x86_profile2(insn: list) -> bytes:
     return encode_instruction(TARGETS[0], insn)
 
 
+def _encode_rv_memory(insn: list) -> bytes:
+    """RV64I LD rd, disp(base) and SD src, disp(base); other forms as profile 2."""
+    op, *args = insn
+    if op not in ("load", "store") or len(args) != 3:
+        return _encode_rv_profile2(insn)
+    displacement = integer(args[2] if op == "load" else args[1], -2048, 2047, "displacement") & 0xFFF
+    if op == "load":
+        dst, base = RV2[args[0]], RV2[args[1]]
+        if dst == 0:
+            raise ValueError("only the exact NOP may write zero")
+        return struct.pack("<I", (displacement << 20) | (base << 15) | (3 << 12) | (dst << 7) | 0x03)
+    base, source = RV2[args[0]], RV2[args[2]]
+    return struct.pack("<I", ((displacement >> 5) << 25) | (source << 20) | (base << 15) | (3 << 12)
+                       | ((displacement & 31) << 7) | 0x23)
+
+
 def _encode_rv_profile2(insn: list) -> bytes:
     op, *args = insn
     register = {"add": (0, 0), "sub": (0x20, 0), "xor": (0, 4), "and": (0, 7), "or": (0, 6),
@@ -86,9 +102,9 @@ def _encode_rv_profile2(insn: list) -> bytes:
 def encode_instruction(target: str, insn: list) -> bytes:
     if target in TARGETS3 and isinstance(insn, list) and insn:
         if insn == ["nop"]:
-            return encode_instruction(TARGETS[0], insn)
+            return encode_instruction(TARGETS[TARGETS3.index(target)], insn)
         try:
-            return _encode_x86_memory(insn)
+            return (_encode_x86_memory if target == TARGETS3[0] else _encode_rv_memory)(insn)
         except (KeyError, TypeError) as error:
             raise ValueError("instruction uses an unregistered register or operand") from error
     if target in TARGETS2 and isinstance(insn, list) and insn:

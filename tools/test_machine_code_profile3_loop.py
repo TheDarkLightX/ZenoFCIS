@@ -16,7 +16,7 @@ from machine_code.run import main
 ROOT = Path(__file__).resolve().parents[1]
 MEMORY = ROOT / "test-data/machine-code/memory-kernels"
 X86 = profile3.TARGETS[0]
-NAMES = ("swap-words-x86", "load-add-store-x86", "copy2-sum-x86")
+NAMES = tuple(f"{name}-{arch}" for name in ("swap-words", "load-add-store", "copy2-sum") for arch in ("x86", "rv64i"))
 
 
 def entry(name):

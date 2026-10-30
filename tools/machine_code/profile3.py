@@ -17,9 +17,9 @@ from . import profile2
 from .model import MAX_JSON_BYTES, canonical, integer
 
 SCHEMA = "zeno-fcis/machine-problem/3"
-TARGETS = ("x86_64-sysv-memory/3",)
-ARGUMENTS = {TARGETS[0]: ("rdi", "rsi", "rdx", "rcx", "r8", "r9")}
-RESULTS = {TARGETS[0]: ("rax", "rdx")}
+TARGETS = ("x86_64-sysv-memory/3", "rv64i-memory/3")
+ARGUMENTS = {TARGETS[0]: ("rdi", "rsi", "rdx", "rcx", "r8", "r9"), TARGETS[1]: ("a0", "a1", "a2", "a3", "a4", "a5")}
+RESULTS = {TARGETS[0]: ("rax", "rdx"), TARGETS[1]: ("a0", "a1")}
 ACCESS = ("read-only", "read-write")
 MAX_WORDS = 16
 NAME = re.compile(r"[a-z][a-z0-9_]{0,15}")
