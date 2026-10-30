@@ -38,9 +38,10 @@ build targets and evidence outside the frozen source under qualification.
 | Composition and native refinement | `crates/zeno-fcis-contract/src/checked_composition/`, `verification/verus/` | Models, restricted native checks and formal statements have distinct scopes. The complete parser-to-native-checker refinement chain remains open. |
 | Practical algorithm assessment | [feasibility standard](RESEARCH_FEASIBILITY.md) | Correctness, complexity, concrete costs, crossover and assurance are evaluated independently. Metadata validation does not prove an algorithm or a speedup. |
 
-The [twenty-one-row gap register](FACTORY_GAPS_27.md) preserves the full remaining
-scope, including first-class 256-bit arithmetic, DeFi applications, additional
-backend qualification, scaling, UI breadth, platforms and release checks.
+The [twenty-nine-row gap register](FACTORY_GAPS_27.md) preserves the full remaining
+scope, including 2.6.0 compatibility, first-class 256-bit arithmetic, DeFi
+applications, additional backend qualification, scaling, UI breadth, application
+operations, platforms and release checks.
 
 ## Reproduction entry points
 
