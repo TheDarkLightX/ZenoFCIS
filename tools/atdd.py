@@ -94,6 +94,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "-O", "-B", "tools/test_machine_code_loop.py"),
          ("python3", "-B", "tools/test_zal_word_kernel.py"),
          ("python3", "-O", "-B", "tools/test_zal_word_kernel.py"),
+         ("python3", "-B", "tools/test_zal_word_kernel2.py"),
+         ("python3", "-O", "-B", "tools/test_zal_word_kernel2.py"),
          ("python3", "-B", "tools/test_machine_code_profile2_verifier.py"),
          ("python3", "-O", "-B", "tools/test_machine_code_profile2_verifier.py"),
          ("python3", "-B", "tools/test_machine_code_profile2_loop.py"),
