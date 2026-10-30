@@ -1,0 +1,6 @@
+{
+  "bindings": [
+    {"individual": "swapBalance", "target": "U256", "type_id": 1},
+    {"individual": "signedPnl", "target": "I256", "type_id": 2}
+  ]
+}
