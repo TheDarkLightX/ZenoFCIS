@@ -29,6 +29,14 @@ def implementation():
 _LOADED = implementation()
 
 
+def source_digest(name):
+    """The digest the source pin records for one repository-relative file."""
+    path = Path(name)
+    core.need(not path.is_absolute() and ".." not in path.parts and str(path) == name,
+              "invalid source path")
+    return sha256(_read(ROOT / path)).hexdigest()
+
+
 def source_binding():
     core.need(implementation() == _LOADED, "handoff implementation changed; restart before replay")
     _require_current_implementation()
@@ -37,10 +45,7 @@ def source_binding():
     core.need(pin["schema"] == "zeno-fcis/arithmetic-handoff-sources/1", "unsupported source pin")
     core.need(type(pin["files"]) is dict and 1 <= len(pin["files"]) <= 128, "invalid source inventory")
     for name, expected in pin["files"].items():
-        path = Path(name)
-        core.need(not path.is_absolute() and ".." not in path.parts and str(path) == name,
-                  "invalid source path")
-        core.need(sha256(_read(ROOT / path)).hexdigest() == expected,
+        core.need(source_digest(name) == expected,
                   "bound arithmetic contract source changed: " + name)
     return {"contracts": pin, "bridge": dict(_LOADED), "ontology_implementation": implementation_identity()}
 

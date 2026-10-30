@@ -70,7 +70,9 @@ jobs:
         run: |
           python3 -B -m unittest discover -s integrations/zal -p 'test_ontology*.py'
           PYTHONOPTIMIZE=1 python3 -O -B -m unittest discover -s integrations/zal -p 'test_ontology*.py'
+          python3 -B tools/record_arithmetic_handoff_sources.py --check
           python3 -B tools/ontology_arithmetic_oracle.py --check
+          python3 -B -m unittest discover -s tools -p 'test_record_arithmetic_handoff_sources.py'
           python3 -B -m unittest discover -s tools -p 'test_check_arithmetic_handoff.py'
           PYTHONOPTIMIZE=1 python3 -O -B -m unittest discover -s tools -p 'test_check_arithmetic_handoff.py'
       - name: Existing review, sharing, story and Lens behavior
