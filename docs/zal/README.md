@@ -1030,25 +1030,27 @@ integers keep their existing refusal for fractions and add the named integer che
   - idiom proposals;
   - semantic-library packages;
   - finite-library contracts and tables, with the policy written inline because the category capsule pins that
-    component.
+    component;
+  - ladder context and theory files, with the policy written inline because the standalone relational route copies
+    `ladder.py` without its sibling modules.
 - **Integer-only policy:** version specifications, observation profiles, strategy problems, program-synthesis
   bindings, and word-kernel problem files and palettes. Program synthesis applies the same checks inline, because
   its interpreter closure is pinned.
+- **Contract policy JSON** (`v2/policy.json`, read by the loop workspace and coverage tools): integers from -2^127
+  to 2^127-1 only, which is what the Rust contract reader admits. A fraction or exponent is refused as
+  `json-number-not-integer`, and an integer outside that range as `json-number-out-of-range`.
 
 **Browser runtime.** The browser's `JSON.parse` gives the same decimal value for every accepted number except
 integers beyond plus or minus 2^53-1. The browser route already receives those as decimal strings.
 
-**Not covered yet.** These readers still parse numbers with plain binary floating point:
-
-- ladder context files, because the standalone relational route copies `ladder.py` without its sibling modules;
-- contract policy JSON read by the loop workspace and coverage tools, whose format the Rust reader owns;
-- the local agent transport.
+**Not covered yet.** The local agent transport still parses agent messages with plain binary floating point. It is
+targeted at 2.8, because refusing a message changes a live agent session.
 
 A component list pins the finite-library and semantic-library sources. After editing them, run
 `python3 tools/record_finite_library_components.py --write`, then `python3 tools/record_category_capsule.py --write`,
 because the capsule pins that list.
 
-The Rust readers of ZAL JSON follow in 2.7 if done in time, otherwise in 2.8. `integrations/zal/test_json_numbers.py` lists every
+The Rust readers of ZAL JSON follow in 2.8. `integrations/zal/test_json_numbers.py` lists every
 `json.load` and `json.loads` call under `integrations/zal`, and fails when a new one neither uses the policy nor
 is listed with a reason. The same test checks:
 

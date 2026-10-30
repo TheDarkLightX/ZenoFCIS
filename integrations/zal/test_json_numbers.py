@@ -26,9 +26,11 @@ sys.path.insert(0, str(ROOT))
 
 import json_numbers as N  # noqa: E402
 import app_profile  # noqa: E402
+import ladder  # noqa: E402
 import loop_learn  # noqa: E402
 import loop_strategy_modes  # noqa: E402
 import loop_versions  # noqa: E402
+import loop_workspace  # noqa: E402
 import observations  # noqa: E402
 import program_synthesis  # noqa: E402
 import relational_observation  # noqa: E402
@@ -70,11 +72,22 @@ def file_reader(read):
     return reader
 
 
+def contract_reader(text, read):
+    """A contract directory whose v2/policy.json is the given text."""
+    with tempfile.TemporaryDirectory(prefix="zal-json-numbers-contract-") as folder:
+        root = Path(folder)
+        (root / "v2").mkdir()
+        (root / "project.zeno").write_text("", encoding="ascii")
+        (root / "v2" / "policy.json").write_text(text, encoding="ascii")
+        return read(root)
+
+
 # Readers that return the parsed document, and keep every number whose exact value they can represent.
 FULL = {
     "zal_notation.core.loads": lambda text: core.loads(text)["v"],
     "semantic_library.load": lambda text: semantic_library.load(text)["v"],
     "finite_library.prototype hooks": lambda text: json.loads(text, **prototype._number_hooks())["v"],
+    "ladder hooks": lambda text: json.loads(text, **ladder._number_hooks())["v"],
     "loop_learn.strict_json": lambda text: loop_learn.strict_json(text)["v"],
     "run.user_json": lambda text: zal_run.user_json(text)["v"],
     "terminal.trace_inputs": lambda text: terminal.trace_inputs("[" + text + "]")[0]["v"],
@@ -92,16 +105,15 @@ REFUSING = {
     "program_synthesis._binding": lambda text: program_synthesis._binding(text.encode(), None),
     "loop_strategy_modes.strict_problem": lambda text: loop_strategy_modes.strict_problem(text),
     "finite_library.prototype.loads": lambda text: prototype.loads(text),
+    "ladder.load": file_reader(ladder.load),
+    "ladder.file_theory": file_reader(ladder.file_theory),
+    "loop_workspace.fields_of": lambda text: contract_reader(text, loop_workspace.fields_of),
 }
 
 # Every other json.load(s) call under integrations/zal, by "path:function", with why it does not use the policy.
 UNCOVERED = {
     # Open: these ingest outside JSON and still use plain number parsing.
-    "ladder.py:load": "open: the relational standalone route copies ladder.py without sibling modules",
-    "ladder.py:file_theory": "open: the relational standalone route copies ladder.py without sibling modules",
-    "loop_workspace.py:fields_of": "open: contract policy JSON, whose format the Rust reader owns",
-    "loop_coverage.py:run": "open: contract policy JSON, whose format the Rust reader owns",
-    "codex_transport.py:AppServer._read": "open: local agent app-server transport",
+    "codex_transport.py:AppServer._read": "open: local agent app-server transport; targeted at 2.8",
     "category_profile/adapter.py:_capture": "own protocol: pinned category capsule",
     "category_profile/provider/build.py:main": "own protocol: pinned category capsule",
     "category_profile/provider/main.py:<module>": "own protocol: pinned category capsule",
@@ -157,7 +169,8 @@ def json_reads(path):
                 # zal_notation/core.py and finite_library/prototype.py write the same policy inline as
                 # _number_hooks(), because the category capsule pins their import closure.
                 covered = any(k.arg == "parse_int" or (k.arg is None and ast.unparse(k.value).split("(")[0] in
-                                                       ("json_numbers.hooks", "_number_hooks")) for k in child.keywords)
+                                                       ("json_numbers.hooks", "json_numbers.integer_only", "_number_hooks"))
+                              for k in child.keywords)
                 found.append((where, covered))
             walk(child, inner)
     walk(ast.parse(path.read_text(encoding="utf-8")), "<module>")
@@ -183,6 +196,26 @@ class Policy(unittest.TestCase):
         for lexeme in MALFORMED:
             with self.subTest(lexeme=lexeme), self.assertRaises(json.JSONDecodeError):
                 self.loads(lexeme)
+
+
+class IntegerOnly(unittest.TestCase):
+    def loads(self, lexeme):
+        return json.loads(wrap(lexeme), **N.integer_only(N.raising(ValueError), N.I128))["v"]
+
+    def test_contract_policy_numbers_match_the_rust_rules_reader(self):
+        for lexeme in ("0", "-1", str((1 << 127) - 1), str(-(1 << 127))):
+            self.assertEqual(self.loads(lexeme), int(lexeme))
+        cases = {"-0": N.NEGATIVE_ZERO, "1.0": N.NOT_INTEGER, "1e2": N.NOT_INTEGER, "0.5": N.NOT_INTEGER,
+                 str(1 << 127): N.OUT_OF_RANGE, str(-(1 << 127) - 1): N.OUT_OF_RANGE, "NaN": N.NONFINITE,
+                 "9" * 4301: N.TOO_LONG}
+        for lexeme, reason in cases.items():
+            with self.subTest(lexeme=lexeme[:20]), self.assertRaisesRegex(ValueError, "^" + reason + ": "):
+                self.loads(lexeme)
+
+    def test_policy_readers_refuse_by_name(self):
+        for lexeme, reason in (("1.0", N.NOT_INTEGER), ("-0", N.NEGATIVE_ZERO), (str(1 << 127), N.OUT_OF_RANGE)):
+            with self.subTest(lexeme=lexeme), self.assertRaisesRegex(ValueError, "v2/policy.json: " + reason):
+                contract_reader(wrap(lexeme), loop_workspace.fields_of)
 
 
 class Readers(unittest.TestCase):
@@ -211,18 +244,24 @@ class Readers(unittest.TestCase):
     def test_every_reader_refuses_planted_lexemes_by_name(self):
         policy = {**dict.fromkeys(FULL, "full"), **dict.fromkeys(INTEGER, "integer"),
                   "app_profile._parse_binding": "full", "program_synthesis._binding": "integer",
-                  "finite_library.prototype.loads": "full",
+                  "finite_library.prototype.loads": "full", "ladder.load": "full", "ladder.file_theory": "full",
+                  "loop_workspace.fields_of": "policy",
                   "loop_strategy_modes.strict_problem": "integer"}
         readers = {**FULL, **INTEGER, **REFUSING}
         for lexeme, reason in REFUSED.items():
             for name, read in readers.items():
                 # Integer-only readers refuse fractions and NaN/Infinity with their own existing reasons.
-                named = policy[name] == "full" or integral(lexeme) and lexeme[-1].isdigit()
+                whole = integral(lexeme) and lexeme[-1].isdigit()
+                named = policy[name] in ("full", "policy") or whole
+                expected = reason
+                if policy[name] == "policy" and not whole:
+                    # Contract policy readers admit integers only, as the Rust contract reader does.
+                    expected = N.NONFINITE if lexeme.lstrip("-") in ("NaN", "Infinity") else N.NOT_INTEGER
                 with self.subTest(reader=name, lexeme=lexeme[:20]):
                     with self.assertRaises(ValueError) as caught:
                         read(wrap(lexeme))
                     if named:
-                        self.assertIn(reason + ": ", str(caught.exception))
+                        self.assertIn(expected + ": ", str(caught.exception))
         for lexeme in MALFORMED:
             for name, read in readers.items():
                 with self.subTest(reader=name, lexeme=lexeme), self.assertRaises(ValueError):
