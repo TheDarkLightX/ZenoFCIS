@@ -523,6 +523,35 @@ controls of those three defects and of their mirror defects in the other model, 
 control. A detected defect shows that one control distinguishes one edit. It does not show that the checker is
 complete. `tools/test_machine_qualification_controls.py` checks the outcome classes on small real specimens.
 
+### Search pruning: exactness, planted defects and measurement
+
+```sh
+python3 -B -m tools.machine_qualification.pruning_exactness run [--out REPORT.json]
+python3 -B -m tools.machine_qualification.pruning_defects run [--defect NAME]... [--out REPORT.json]
+python3 -B -m tools.machine_qualification.search_bench run --out REPORT.json [--no-prune] [--repeats N]
+python3 -B -m tools.machine_qualification.search_bench compare BEFORE.json AFTER.json
+```
+
+- **Exactness:** for seven small grammars over both profiles and targets, every sequence is enumerated with the
+  footprint pruning off and on. Each removed sequence needs a kept sequence of no greater cost, in bytes and in
+  instructions, whose observed result registers Z3 proves equal from every entry register and flag state. A removed
+  sequence the checker refuses statically needs none. Any other removal without a witness is an exactness failure.
+- **Planted defects:** six named edits to `footprint.py` run in isolated copies under `-B` and `-O -B`: omitted x86
+  flag writes, a conditional move treated as a full overwrite, ignored write-write and write-after-read conflicts in
+  reordering, and an unobserved result register on each profile. Each must leave a removal without a witness.
+  Crashes and timeouts never count as detections.
+- **Measurement:** the benchmark searches every problem in `test-data/machine-code/` and its kernel library at fixed
+  budgets (100,000 candidates, 128 checks, 60 s, 1 s solver timeout) and records every counter the search returns,
+  wall times, the found cost and the stopping budget. `compare` fails only when a found cost is worse or lost.
+
+At b941d3ce the pruning was exact on all seven grammars: 1,358 removals, each with a proved witness. All six
+planted defects were detected in both modes. Over the 18 problems, three repeats each, candidates fell from 107,123
+to 25,146, solver checks from 27 to 24, and the summed median time from 27.5 s to 7.5 s on one loaded machine. All
+found costs were identical except signed saturating add. It exhausted its grammar and found its 31-byte,
+7-instruction library kernel, where the unpruned search stopped at the candidate budget with none. With
+`--no-prune`, every counter and cost equalled the baseline at dc410214. The exactness result holds for these
+grammars and lengths under the registered ISA models.
+
 ## Profile 2: flags, carries and comparisons
 
 Profile 2 is a second, separately registered pair of targets for multi-word
