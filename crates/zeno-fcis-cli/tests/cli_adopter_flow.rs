@@ -499,6 +499,47 @@ fn rc3_cli_mini_determinator_check_json_contract() {
 }
 
 #[test]
+fn explain_refuses_a_code_outside_the_stable_registry_before_reading_the_project() {
+    let root = TempRoot::new("explain-code");
+    let missing = root.path().join("missing.zeno");
+    let json = run(Command::new(cli()).arg("explain").arg(&missing).args([
+        "--code",
+        "ZENO-E9999",
+        "--format",
+        "json",
+    ]));
+    assert_eq!(json.status.code(), Some(64));
+    let document = json_stdout(&json);
+    assert_eq!(document["status"], "error");
+    assert_eq!(document["error"]["code"], "unknown-diagnostic-code");
+    assert_eq!(document["error"]["requested"], "ZENO-E9999");
+    assert_eq!(document["error"]["known"][0], "ZENO-E0001");
+    assert_eq!(
+        document["error"]["known"].as_array().map(Vec::len),
+        Some(18)
+    );
+    let human = run(Command::new(cli())
+        .arg("explain")
+        .arg(&missing)
+        .args(["--code", "zeno-e0001"]));
+    assert_eq!(human.status.code(), Some(64));
+    assert!(human.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&human.stderr).contains("not a stable diagnostic code"));
+    // A registered code still reaches the project: a missing file is a read failure.
+    let registered = run(Command::new(cli()).arg("explain").arg(&missing).args([
+        "--code",
+        "ZENO-E0001",
+        "--format",
+        "json",
+    ]));
+    assert_eq!(registered.status.code(), Some(3));
+    assert_eq!(
+        json_stdout(&registered)["error"]["code"],
+        "project-read-failed"
+    );
+}
+
+#[test]
 fn cli_project_read_failures_preserve_json_and_exit_class() {
     let root = TempRoot::new("read-errors");
     let missing = root.path().join("missing.zeno");

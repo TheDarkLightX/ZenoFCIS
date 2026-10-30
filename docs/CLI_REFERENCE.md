@@ -188,6 +188,13 @@ the input path, and a diagnostic message. These failures return exit code `3`;
 the message can include operating-system-specific details. Human mode retains
 stderr diagnostics.
 
+`explain --code CODE` filters the project's diagnostics to one code. It does
+not describe a code without a project. A code outside the stable registry
+(`ZENO-E0001` to `ZENO-E0302`) is refused before the project is read. The
+refusal exits `64` and gives `error.code: "unknown-diagnostic-code"` with the
+`requested` code and the `known` codes. A registered code that the project
+does not produce prints `no matching diagnostic` and exits `0`.
+
 CLI source acquisition reads at most the one-MiB source budget plus one byte.
 An oversized file fails with exit `3` before UTF-8 interpretation or parsing;
 an exact-limit file proceeds to normal parser validation. The in-memory parser

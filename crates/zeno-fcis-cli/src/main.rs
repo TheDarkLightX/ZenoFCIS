@@ -77,10 +77,11 @@ use zeno_fcis_formal_tools::{
 };
 pub(crate) use zeno_fcis_shell_sqlite::v2::equivalence::finite_checker;
 use zeno_fcis_spec::{
-    ClaimDecl, ClaimMode, Diagnostic, DiagnosticSet, GraphFormat, ObligationKind, PathResolution,
-    ProjectLimits, ProjectSpec, ProjectionPath, ProjectionRoot, SourceLimits, StableId, Substance,
-    UnresolvedObligation, claim_paths, claim_substance, derive_composition, elaborate_project,
-    generate_project, law_paths, law_substance, parse_project, render_graph, resolve_path,
+    ClaimDecl, ClaimMode, Diagnostic, DiagnosticCode, DiagnosticSet, GraphFormat, ObligationKind,
+    PathResolution, ProjectLimits, ProjectSpec, ProjectionPath, ProjectionRoot, SourceLimits,
+    StableId, Substance, UnresolvedObligation, claim_paths, claim_substance, derive_composition,
+    elaborate_project, generate_project, law_paths, law_substance, parse_project, render_graph,
+    resolve_path,
 };
 
 const JSON_SCHEMA: &str = "zeno-fcis/cli/1";
@@ -354,7 +355,8 @@ All commands are bounded. The contained loop worker has a 64 MiB memory limit an
         #[arg(long, value_enum)]
         format: GraphOutput,
     },
-    /// Explain all diagnostics or one stable diagnostic code.
+    /// Explain a project's diagnostics: all of them, or only those with one stable
+    /// diagnostic code. An unknown code is a usage error.
     Explain {
         #[arg(default_value = "project.zeno")]
         project: PathBuf,
@@ -1439,6 +1441,30 @@ fn graph(path: &Path, format: GraphOutput) -> u8 {
 }
 
 fn explain(path: &Path, code: Option<&str>, format: OutputFormat) -> u8 {
+    // A code outside the closed registry can never match, so it would otherwise
+    // report "no matching diagnostic" and exit 0 for a typo.
+    if let Some(code) = code
+        && !DiagnosticCode::ALL
+            .iter()
+            .any(|known| known.as_str() == code)
+    {
+        let known: Vec<&str> = DiagnosticCode::ALL
+            .iter()
+            .map(|known| known.as_str())
+            .collect();
+        if matches!(format, OutputFormat::Json) {
+            print_json(&json!({
+                "schema": JSON_SCHEMA, "status": "error",
+                "error": {"code": "unknown-diagnostic-code", "requested": code, "known": known}
+            }));
+        } else {
+            eprintln!(
+                "{code} is not a stable diagnostic code; known codes: {}",
+                known.join(", ")
+            );
+        }
+        return USAGE;
+    }
     match load_project(path) {
         Ok(spec) => {
             if matches!(format, OutputFormat::Json) {
