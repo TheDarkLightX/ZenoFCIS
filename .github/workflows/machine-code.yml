@@ -32,7 +32,7 @@ permissions:
 jobs:
   registered-isa-kernels:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -66,3 +66,7 @@ jobs:
         run: python3 -B tools/test_machine_code_native.py
       - name: Every admitted x86 form against the concrete and SMT models on this CPU
         run: python3 -B tools/test_machine_code_conformance.py
+      - name: Actual x86 execution of emitted profile-2 kernels, including two-word results
+        run: python3 -B tools/test_machine_code_profile2_native.py
+      - name: Every admitted profile-2 x86 form, with CF/ZF/SF/OF, against the models on this CPU
+        run: python3 -B tools/test_machine_code_profile2_conformance.py
