@@ -68,6 +68,11 @@ def main(argv=None):
     realized.add_argument("--solver-ms", type=int, default=2000)
     realized.add_argument("--max-rounds", type=int, default=64)
     realized.add_argument("--deadline-ms", type=int, default=60_000)
+    realized.add_argument("--groups", type=int, default=1,
+                          help="split each slot's palette into this many groups and decide every subspace alone")
+    realized.add_argument("--workers", type=int, default=1, help="processes deciding subspaces (at most 4)")
+    realized.add_argument("--split-ms", type=int,
+                          help="halve any subspace whose query does not answer within this many milliseconds")
     contract = commands.add_parser("contract", help="lower an arithmetic contract to profile 2, or check bytes against it")
     contract_actions = contract.add_subparsers(dest="action", required=True)
     lowered = contract_actions.add_parser("lower", help="print the lowering record; refuse with a named missing bridge")
@@ -161,12 +166,14 @@ def main(argv=None):
             if args.session is not None:
                 if args.below is not None or args.replay is not None:
                     raise ValueError("--session takes its bound from the session; --below and --replay need --problem")
-                result = realize.realize_session(args.session, args.solver_ms, args.max_rounds, args.deadline_ms)
+                result = realize.realize_session(args.session, args.solver_ms, args.max_rounds, args.deadline_ms,
+                                                 args.groups, args.workers, args.split_ms)
             elif args.replay is not None:
                 result = realize.replay(read_json(args.problem), read_json(args.replay), args.solver_ms)
             else:
                 result = realize.realize(read_json(args.problem), args.below, args.solver_ms, args.max_rounds,
-                                         args.deadline_ms)
+                                         args.deadline_ms, groups=args.groups, workers=args.workers,
+                                         split_ms=args.split_ms)
             if args.out is not None:
                 session._json(args.out, result)
         elif args.command == "open":

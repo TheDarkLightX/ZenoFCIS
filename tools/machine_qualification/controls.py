@@ -55,6 +55,7 @@ V1 = "test_machine_code_verifier.VerifierTests."
 V2 = "test_machine_code_profile2_verifier.Profile2VerifierTests."
 V3 = "test_machine_code_profile3_verifier.Profile3VerifierTests."
 REALIZE = "test_machine_code_realize.RealizeCrossCheck."
+REALIZE_REPLAY = "test_machine_code_realize.RealizeReplay."
 CONFORMANCE1 = "test_machine_code_conformance.X86ModelConformance."
 CONFORMANCE2 = "test_machine_code_profile2_conformance."
 POSITIVE = (
@@ -319,6 +320,33 @@ DEFECTS = (
            "        pass\n",
            REALIZE + "test_every_small_problem_agrees_with_exhaustive_enumeration",
            "Programs at the bound are admitted, so a length below the least cost is reported realizable."),
+    Defect("realize-partition-omits-one-group", "realize.py", "partition coverage",
+           "    return [(bounds[g], bounds[g + 1]) for g in range(count)]",
+           "    return [(bounds[g], bounds[g + 1]) for g in range(count - 1)]",
+           REALIZE + "test_every_small_problem_agrees_in_partitioned_mode",
+           "The last palette group is never a subspace, so lengths whose programs need its forms are reported "
+           "unrealizable.",
+           REALIZE_REPLAY + "test_partitioned_record_replays_and_a_missing_subspace_fails"),
+    Defect("realize-partition-undecided-read-as-unsat", "realize.py", "partition verdict",
+           "    elif not undecided:",
+           "    elif True:",
+           REALIZE + "test_an_undecided_subspace_makes_the_length_inconclusive",
+           "A subspace that ran out of budget is counted as unsat, so an undecided length is reported unrealizable."),
+    Defect("realize-region-base-rule-dropped", "realize.py", "memory admission",
+           "                    solver.add(z.Implies(selector == index, intact[read]))\n",
+           "                    pass\n",
+           REALIZE + "test_admission_encoding_equals_the_checkers_admission",
+           "The query admits an access through a region base an earlier form wrote, which the checker refuses."),
+    Defect("realize-undefined-flag-reads-admitted", "realize.py", "flag admission",
+           "                    solver.add(z.Implies(selector == index, z.And([defined[name] for name in reads])))\n",
+           "                    pass\n",
+           REALIZE + "test_admission_encoding_equals_the_checkers_admission",
+           "The query admits a read of a flag an earlier form left undefined, which the checker refuses."),
+    Defect("realize-replay-skips-length-coverage", "realize.py", "record replay",
+           '    if _derived_status(statuses) != "realizable" and len(entries) != len(asked):',
+           "    if False:",
+           REALIZE_REPLAY + "test_replay_refuses_a_changed_bound",
+           "Replay accepts a negative record that omits an eligible length, as after its bound is raised."),
 )
 
 # Runs one control inside a specimen and prints one JSON line. A failure counts only when its AssertionError was

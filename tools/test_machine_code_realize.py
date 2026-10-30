@@ -39,10 +39,38 @@ NO_PROGRAM = {"schema": P1, "target": "x86_64-sysv-register/1", "inputs": ["x", 
               "max_instructions": 2, "objective": "instructions"}
 
 
+# A profile-3 palette in which some sequences address a region through a base register an earlier form wrote:
+# the checker refuses those, and the query must exclude exactly them.
+BASE_WRITES = {"schema": "zeno-fcis/machine-problem/3", "target": "x86_64-sysv-memory/3", "inputs": ["y"],
+               "regions": [{"name": "a", "base": "rdi", "words": 2, "access": "read-write"}],
+               "outputs": [["add", ["initial", "a", 0], ["initial", "a", 1]]],
+               "memory": {"a": [["initial", "a", 0], ["initial", "a", 1]]},
+               "grammar": [["load", "rax", "rdi", 8], ["load", "rdi", "rdi", 0], ["add", "rax", "rdi"],
+                           ["store", "rdi", 0, "rax"]],
+               "max_instructions": 3, "objective": "bytes"}
+
+
+# A profile-2 palette in which IMUL leaves ZF and SF undefined and CMOVE reads ZF: the checker refuses that order.
+FLAG_READS = {"schema": "zeno-fcis/machine-problem/2", "target": "x86_64-sysv-register/2", "inputs": ["x", "y"],
+              "outputs": [["mul", ["input", "x"], ["input", "y"]]],
+              "grammar": [["imul", "rax", "rsi"], ["cmove", "rax", "rdi"], ["cmp", "rdi", "rsi"], ["mov", "rax", "rdi"]],
+              "max_instructions": 3, "objective": "bytes"}
+
+
+# Boundary cases: an empty body is already equivalent (least cost 0), and an empty palette with positive lengths.
+ZERO_COST = {"schema": "zeno-fcis/machine-problem/2", "target": "rv64i-register/2", "inputs": ["x"],
+             "outputs": [["input", "x"]], "grammar": [], "max_instructions": 0, "objective": "instructions"}
+EMPTY_PALETTE = {"schema": "zeno-fcis/machine-problem/2", "target": "x86_64-sysv-register/2", "inputs": [],
+                 "outputs": [["const", "0"]], "grammar": [], "max_instructions": 1, "objective": "bytes"}
+
+
 def problems():
     found = [(path.stem, read_json(path)) for path in sorted(DATA.glob("*.json"))]
     found += [("kernel " + path.stem, read_json(path)["problem"]) for path in sorted((DATA / "kernels").glob("*.json"))]
-    found += [("last form needed", LAST_FORM_NEEDED), ("no program", NO_PROGRAM)]
+    found += [("memory " + path.stem, (lambda d: d.get("problem", d))(read_json(path)))
+              for path in sorted((DATA / "memory-kernels").glob("*.json"))]
+    found += [("last form needed", LAST_FORM_NEEDED), ("no program", NO_PROGRAM), ("base writes", BASE_WRITES),
+              ("flag reads", FLAG_READS), ("zero cost", ZERO_COST), ("empty palette", EMPTY_PALETTE)]
     return [(name, p) for name, p in found
             if sum(len(p["grammar"]) ** k for k in range(p["max_instructions"] + 1)) <= SMALL]
 
@@ -62,27 +90,143 @@ def exhaustive(problem, work: Path):
     return None if result["cost"] is None else primary(problem, result["cost"])
 
 
+_LEAST = {}
+
+
+def least_cost(name, problem):
+    """Cached per problem: both modes compare with the same exhaustive enumeration."""
+    if name not in _LEAST:
+        with tempfile.TemporaryDirectory() as directory:
+            _LEAST[name] = exhaustive(problem, Path(directory))
+    return _LEAST[name]
+
+
+def covers(entry, palette):
+    """The test's own exact-cover check: every candidate of the length lies in exactly one recorded subspace,
+    counted per slot range rather than by the realize code's own check."""
+    boxes = [[tuple(r) for r in sub["ranges"]] for sub in entry["subspaces"]]
+    if any(len(b) != entry["length"] or any(low < 0 or high > palette or low >= high for low, high in b)
+           for b in boxes):
+        return False
+    total = 0
+    for b in boxes:
+        size = 1
+        for low, high in b:
+            size *= high - low
+        total += size
+    for i, first in enumerate(boxes):
+        for second in boxes[i + 1:]:
+            if all(max(x[0], y[0]) < min(x[1], y[1]) for x, y in zip(first, second)):
+                return False
+    return total == palette ** entry["length"]
+
+
 class RealizeCrossCheck(unittest.TestCase):
-    def test_every_small_problem_agrees_with_exhaustive_enumeration(self):
+    def cross_check(self, **mode):
         cases = problems()
         self.assertGreaterEqual(len(cases), 15)
         for name, problem in cases:
-            with self.subTest(problem=name), tempfile.TemporaryDirectory() as directory:
-                least = exhaustive(problem, Path(directory))
+            with self.subTest(problem=name, **mode):
+                least = least_cost(name, problem)
                 if least is None:
-                    record = realize.realize(problem, None, 2000)
+                    record = realize.realize(problem, None, 2000, **mode)
                     self.assertEqual(record["status"], "unrealizable", record)
-                    self.assertEqual([e["length"] for e in record["lengths"]],
+                    self.assertEqual(sorted([e["length"] for e in record["lengths"]]
+                                            + record["excluded_by_empty_palette"]),
                                      list(range(problem["max_instructions"] + 1)))
+                    self.partition_scope(problem, record, **mode)
                     continue
-                below = realize.realize(problem, least, 2000)
+                below = realize.realize(problem, least, 2000, **mode)
                 self.assertEqual(below["status"], "unrealizable", below)
                 self.assertTrue(all(e["status"] == "unrealizable" for e in below["lengths"]), below)
-                at = realize.realize(problem, least + 1, 2000)
+                self.partition_scope(problem, below, **mode)
+                at = realize.realize(problem, least + 1, 2000, **mode)
                 self.assertEqual(at["status"], "realizable", at)
                 found = at["lengths"][-1]
                 self.assertEqual(found["verification"]["status"], "equivalent")
                 self.assertEqual(primary(problem, found["verification"]["cost"]), least)
+
+    def partition_scope(self, problem, record, groups=1, workers=1):
+        if groups == 1:
+            self.assertNotIn("partition", record)
+            return
+        palette = len(problem["grammar"])
+        self.assertEqual(record["partition"]["groups_per_slot"], min(groups, palette))
+        for entry in record["lengths"]:
+            self.assertEqual(entry["subspace_count"], min(groups, palette) ** entry["length"])
+            self.assertTrue(covers(entry, palette), entry)
+            for subspace in entry["subspaces"]:
+                self.assertEqual(subspace["status"], "unrealizable")
+                self.assertRegex(subspace["query_sha256"], "^[0-9a-f]{64}$")
+
+    def test_every_small_problem_agrees_with_exhaustive_enumeration(self):
+        self.cross_check()
+
+    def test_every_small_problem_agrees_in_partitioned_mode(self):
+        self.cross_check(groups=2, workers=4)
+
+    def test_adaptive_splitting_agrees_and_covers_the_space(self):
+        # A 1 ms probe makes nearly every query split, down to single forms where needed.
+        for name in ("add64-x86", "umin-x86", "triple64-x86"):
+            problem = read_json(DATA / f"{name}.json")
+            with self.subTest(problem=name):
+                least = least_cost(name, problem)
+                below = realize.realize(problem, least, 2000, workers=2, split_ms=1)
+                self.assertEqual(below["status"], "unrealizable", below)
+                self.assertGreater(sum(e["splits"] for e in below["lengths"]), 0)
+                for entry in below["lengths"]:
+                    self.assertTrue(covers(entry, len(problem["grammar"])), entry)
+                self.assertEqual(realize.replay(problem, below)["status"], "replayed")
+                at = realize.realize(problem, least + 1, 2000, workers=2, split_ms=1)
+                self.assertEqual(at["status"], "realizable", at)
+                self.assertEqual(primary(problem, at["lengths"][-1]["verification"]["cost"]), least)
+
+    def test_admission_encoding_equals_the_checkers_admission(self):
+        """Every selector sequence the query admits (no examples, no cost bound) is one the checker admits, and the
+        other way round, on palettes with flag reads and with region-base writes."""
+        import z3
+        from itertools import product
+        from machine_code import verify2, verify3
+        from machine_code.session import _validated
+        from machine_code.targets import encode_program
+        cases = [("umin-x86", read_json(DATA / "umin-x86.json")), ("add128-x86", read_json(DATA / "add128-x86.json")),
+                 ("flag reads", FLAG_READS), ("base writes", BASE_WRITES),
+                 ("memory swap", read_json(DATA / "memory-kernels/swap-words-x86.json")["problem"])]
+        for name, problem in cases:
+            problem = _validated(problem)
+            memory = problem["schema"].endswith("/3")
+            for length in range(min(problem["max_instructions"], 3) + 1):
+                with self.subTest(problem=name, length=length):
+                    solver, selectors, _ = realize.query(z3, problem, length, None, [])
+                    encoded = set()
+                    while solver.check() == z3.sat:
+                        model = solver.model()
+                        choice = tuple(model.eval(v, model_completion=True).as_long() for v in selectors)
+                        encoded.add(choice)
+                        solver.add(z3.Or([v != c for v, c in zip(selectors, choice)]) if selectors else z3.BoolVal(
+                            False, ctx=solver.ctx))
+                    admitted = set()
+                    for choice in product(range(len(problem["grammar"])), repeat=length):
+                        code = encode_program(problem["target"], [problem["grammar"][i] for i in choice])
+                        try:
+                            if memory:
+                                verify3.admit(problem, verify3.decode(problem["target"], code))
+                            else:
+                                verify2.require_defined_flag_reads(problem["target"],
+                                                                   verify2.decode(problem["target"], code))
+                        except ValueError:
+                            continue
+                        admitted.add(choice)
+                    self.assertEqual(encoded, admitted)
+                    if name in ("base writes", "flag reads") and length >= 2:
+                        self.assertLess(len(admitted), len(problem["grammar"]) ** length)
+
+    def test_an_undecided_subspace_makes_the_length_inconclusive(self):
+        # One weak example state and one round: every subspace's first solution agrees on it and is then refuted,
+        # so no subspace is decided.
+        record = realize.realize(NO_PROGRAM, None, 2000, max_rounds=1, seeds=[((0, 0), {}, None)], groups=2)
+        self.assertEqual(record["status"], "inconclusive", record)
+        self.assertTrue(all(e["status"] == "inconclusive" for e in record["lengths"]), record)
 
     def test_a_missing_palette_form_is_caught_by_the_cross_check(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -133,6 +277,100 @@ class RealizeReplay(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()) as printed:
                 code = run.main(argv)
             self.assertEqual(code, 65, printed.getvalue())
+
+    def test_partitioned_record_replays_and_a_missing_subspace_fails(self):
+        problem = read_json(DATA / "umin-x86.json")
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory) / "record.json"
+            argv = ["realize", "--problem", str(DATA / "umin-x86.json"), "--below", "11", "--groups", "2",
+                    "--workers", "2", "--out", str(out)]
+            with contextlib.redirect_stdout(io.StringIO()) as printed:
+                code = run.main(argv)
+            self.assertEqual(code, 0, printed.getvalue())
+            record = read_json(out)
+        self.assertEqual(record["status"], "unrealizable")
+        self.assertEqual([e["subspace_count"] for e in record["lengths"]], [1, 2, 4, 8])
+        self.assertEqual(realize.replay(problem, record)["status"], "replayed")
+        missing = json.loads(json.dumps(record))
+        missing["lengths"][-1]["subspaces"].pop()
+        result = realize.replay(problem, missing)
+        self.assertEqual(result["status"], "failed")
+        self.assertFalse(result["replayed"][-1]["coverage"])
+
+    def test_replay_refuses_a_changed_bound(self):
+        # One lea form, at most one instruction: below 1 instruction only length 0 is asked. Raising the bound to 2
+        # makes length 1 eligible, and a one-instruction program exists there.
+        problem = {"schema": P1, "target": "x86_64-sysv-register/1", "inputs": ["x", "y"],
+                   "expression": ["add", ["input", "x"], ["input", "y"]],
+                   "grammar": [["lea", "rax", "rdi", "rsi", 1]], "max_instructions": 1, "objective": "instructions"}
+        record = realize.realize(problem, 1, 2000)
+        self.assertEqual((record["status"], [e["length"] for e in record["lengths"]], record["excluded_by_cost"]),
+                         ("unrealizable", [0], [1]))
+        self.assertEqual(realize.replay(problem, record)["status"], "replayed")
+        tampered = json.loads(json.dumps(record))
+        tampered["bound"] = 2
+        for entry in tampered["lengths"]:
+            entry["statement"] = entry["statement"].replace("below 1 ", "below 2 ")
+        result = realize.replay(problem, tampered)
+        self.assertEqual(result["status"], "failed", result)
+        self.assertIn("not every eligible length is present", result["failures"])
+        self.assertEqual(realize.realize(problem, 2, 2000)["status"], "realizable")
+
+    def test_replay_binds_the_whole_record(self):
+        problem = read_json(DATA / "umin-x86.json")
+        record = realize.realize(problem, 11, 2000)
+        self.assertEqual(realize.replay(problem, record)["status"], "replayed")
+        edits = {
+            "missing length": lambda r: r["lengths"].pop(1),
+            "repeated length": lambda r: r["lengths"].insert(1, json.loads(json.dumps(r["lengths"][1]))),
+            "relabelled length": lambda r: r["lengths"][2].__setitem__("length", 1),
+            "status": lambda r: r.__setitem__("status", "inconclusive"),
+            "entry status": lambda r: r["lengths"][0].__setitem__("status", "inconclusive"),
+            "statement": lambda r: r["lengths"][0].__setitem__("statement", "no program exists"),
+            "objective": lambda r: r.__setitem__("objective", "instructions"),
+            "excluded lengths": lambda r: r.__setitem__("excluded_by_cost", [3]),
+            "mode": lambda r: r.__setitem__("partition", {"groups_per_slot": 1}),
+        }
+        for name, edit in edits.items():
+            with self.subTest(edit=name):
+                tampered = json.loads(json.dumps(record))
+                edit(tampered)
+                result = realize.replay(problem, tampered)
+                self.assertEqual(result["status"], "failed", result)
+                self.assertTrue(result["failures"], result)
+        found = realize.realize(problem, 12, 2000)
+        self.assertEqual((found["status"], realize.replay(problem, found)["status"]), ("realizable", "replayed"))
+        wrong = json.loads(json.dumps(found))
+        # Three palette forms that return x, not the minimum: the recorded bytes must recheck equivalent.
+        wrong["lengths"][-1]["code_hex"] = "4889f89090c3"
+        result = realize.replay(problem, wrong)
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["failures"], ["length 3: recorded bytes do not recheck below the bound"])
+
+    def test_zero_cost_incumbent_and_empty_palette_are_discharged(self):
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            self.assertEqual(exhaustive(ZERO_COST, work), 0)
+            with contextlib.redirect_stdout(io.StringIO()) as printed:
+                code = run.main(["realize", "--session", str(work / "session")])
+            result = json.loads(printed.getvalue())
+        self.assertEqual(code, 0, result)
+        self.assertEqual((result["status"], result["bound"], result["lengths"], result["excluded_by_cost"]),
+                         ("unrealizable", 0, [], [0]))
+        self.assertEqual(realize.replay(ZERO_COST, result)["status"], "replayed")
+        record = realize.realize(EMPTY_PALETTE, None, 2000)
+        self.assertEqual((record["status"], [e["length"] for e in record["lengths"]],
+                          record["excluded_by_empty_palette"]), ("unrealizable", [0], [1]))
+        self.assertEqual(realize.replay(EMPTY_PALETTE, record)["status"], "replayed")
+        partitioned = realize.realize(EMPTY_PALETTE, None, 2000, groups=2, workers=2)
+        self.assertEqual((partitioned["status"], realize.replay(EMPTY_PALETTE, partitioned)["status"]),
+                         ("unrealizable", "replayed"))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "empty.json"
+            path.write_text(json.dumps(EMPTY_PALETTE))
+            with contextlib.redirect_stdout(io.StringIO()) as printed:
+                code = run.main(["realize", "--problem", str(path)])
+        self.assertEqual(code, 0, printed.getvalue())
 
     def test_cli_session_mode_asks_below_the_rechecked_incumbent(self):
         with tempfile.TemporaryDirectory() as directory:
