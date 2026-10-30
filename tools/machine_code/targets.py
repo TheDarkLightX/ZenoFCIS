@@ -8,13 +8,74 @@ from __future__ import annotations
 import struct
 
 from .model import TARGETS, integer, word
+from .profile2 import TARGETS as TARGETS2
 
 X86 = {"rax": 0, "rcx": 1, "rdx": 2, "rsi": 6, "rdi": 7,
        "r8": 8, "r9": 9, "r10": 10, "r11": 11}
 RV = {"zero": 0, "t0": 5, "t1": 6, "a0": 10, "a1": 11}
+RV2 = {"zero": 0, "t0": 5, "t1": 6, "t2": 7, **{f"a{i}": 10 + i for i in range(8)}}
+CONDITIONS = {"o": 0, "no": 1, "b": 2, "ae": 3, "e": 4, "ne": 5, "be": 6, "a": 7,
+              "s": 8, "ns": 9, "l": 12, "ge": 13, "le": 14, "g": 15}
+
+
+def is_x86(target: str) -> bool:
+    return target in (TARGETS[0], TARGETS2[0])
+
+
+def _encode_x86_profile2(insn: list) -> bytes:
+    op, *args = insn
+    rm_reg = {"adc": 0x11, "sbb": 0x19, "cmp": 0x39, "test": 0x85}
+    if op in rm_reg and len(args) == 2:
+        rm, reg = (X86[a] for a in args)
+        return bytes([0x48 | ((reg >> 3) << 2) | (rm >> 3), rm_reg[op], 0xC0 | ((reg & 7) << 3) | (rm & 7)])
+    if (op == "movzx" or op[:4] == "cmov" and op[4:] in CONDITIONS) and len(args) == 2:
+        dst, src = (X86[a] for a in args)
+        second = 0xB6 if op == "movzx" else 0x40 + CONDITIONS[op[4:]]
+        return bytes([0x48 | ((dst >> 3) << 2) | (src >> 3), 0x0F, second, 0xC0 | ((dst & 7) << 3) | (src & 7)])
+    if op[:3] == "set" and op[3:] in CONDITIONS and len(args) == 1:
+        dst = X86[args[0]]
+        prefix = b"\x41" if dst >= 8 else b"\x40" if dst in (6, 7) else b""
+        return prefix + bytes([0x0F, 0x90 + CONDITIONS[op[3:]], 0xC0 | (dst & 7)])
+    if op == "neg" and len(args) == 1:
+        dst = X86[args[0]]
+        return bytes([0x48 | (dst >> 3), 0xF7, 0xD8 | (dst & 7)])
+    if op == "sar" and len(args) == 2:
+        dst = X86[args[0]]; shift = integer(args[1], 0, 63, "shift")
+        prefix = 0x48 | (dst >> 3)
+        return bytes([prefix, 0xD1, 0xF8 | (dst & 7)]) if shift == 1 else bytes([prefix, 0xC1, 0xF8 | (dst & 7), shift])
+    return encode_instruction(TARGETS[0], insn)
+
+
+def _encode_rv_profile2(insn: list) -> bytes:
+    op, *args = insn
+    register = {"add": (0, 0), "sub": (0x20, 0), "xor": (0, 4), "and": (0, 7), "or": (0, 6),
+                "slt": (0, 2), "sltu": (0, 3), "sra": (0x20, 5)}
+    immediate = {"addi": 0, "slti": 2, "sltiu": 3, "xori": 4, "ori": 6, "andi": 7}
+    shift = {"slli": (0, 1), "srli": (0, 5), "srai": (0x10, 5)}
+    if len(args) != 3 or op not in {**register, **immediate, **shift}:
+        raise ValueError("instruction is outside the registered proposal grammar")
+    dst, left = RV2[args[0]], RV2[args[1]]
+    if dst == 0:
+        raise ValueError("only the exact NOP may write zero")
+    if op in register:
+        funct7, funct3 = register[op]
+        return struct.pack("<I", (funct7 << 25) | (RV2[args[2]] << 20) | (left << 15) | (funct3 << 12) | (dst << 7) | 0x33)
+    if op in immediate:
+        value, funct3 = integer(args[2], -2048, 2047, "immediate") & 0xFFF, immediate[op]
+    else:
+        high, funct3 = shift[op]
+        value = (high << 6) | integer(args[2], 0, 63, "shift")
+    return struct.pack("<I", (value << 20) | (left << 15) | (funct3 << 12) | (dst << 7) | 0x13)
 
 
 def encode_instruction(target: str, insn: list) -> bytes:
+    if target in TARGETS2 and isinstance(insn, list) and insn:
+        if insn == ["nop"]:
+            return encode_instruction(TARGETS[TARGETS2.index(target)], insn)
+        try:
+            return (_encode_x86_profile2 if target == TARGETS2[0] else _encode_rv_profile2)(insn)
+        except (KeyError, TypeError) as error:
+            raise ValueError("instruction uses an unregistered register or operand") from error
     if target not in TARGETS or not isinstance(insn, list) or not insn:
         raise ValueError("unsupported target or instruction")
     op, *args = insn
@@ -72,7 +133,7 @@ def encode_program(target: str, instructions: list) -> bytes:
     if not isinstance(instructions, list) or len(instructions) > 16:
         raise ValueError("program exceeds16 body instructions")
     code = b"".join(encode_instruction(target, instruction) for instruction in instructions)
-    return code + (b"\xc3" if target == TARGETS[0] else bytes.fromhex("67800000"))
+    return code + (b"\xc3" if is_x86(target) else bytes.fromhex("67800000"))
 
 
 def assembly_source(code: bytes) -> bytes:
@@ -84,7 +145,7 @@ def assembly_source(code: bytes) -> bytes:
 
 def elf_object(target: str, code: bytes) -> bytes:
     """ELF64 little-endian relocatable function; no relocations or dependencies."""
-    if target not in TARGETS or not isinstance(code, bytes) or not 1 <= len(code) <= 256:
+    if target not in TARGETS + TARGETS2 or not isinstance(code, bytes) or not 1 <= len(code) <= 256:
         raise ValueError("unsupported ELF target/code")
     names = b"\0.text\0.symtab\0.strtab\0.shstrtab\0.note.GNU-stack\0"
     strings = b"\0zeno_kernel\0"
@@ -101,7 +162,7 @@ def elf_object(target: str, code: bytes) -> bytes:
         data.append(0)
     section_offset = len(data)
     sections = [(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-                (names.index(b".text"), 1, 6, 0, text_offset, len(code), 0, 0, 16 if target == TARGETS[0] else 4, 0),
+                (names.index(b".text"), 1, 6, 0, text_offset, len(code), 0, 0, 16 if is_x86(target) else 4, 0),
                 (names.index(b".symtab"), 2, 0, 0, symbol_offset, 48, 3, 1, 8, 24),
                 (names.index(b".strtab"), 3, 0, 0, string_offset, len(strings), 0, 0, 1, 0),
                 (names.index(b".shstrtab"), 3, 0, 0, name_offset, len(names), 0, 0, 1, 0),
@@ -109,6 +170,6 @@ def elf_object(target: str, code: bytes) -> bytes:
     for row in sections:
         data.extend(struct.pack("<IIQQQQIIQQ", *row))
     ident = b"\x7fELF" + bytes([2, 1, 1, 0]) + bytes(8)
-    data[:64] = struct.pack("<16sHHIQQQIHHHHHH", ident, 1, 62 if target == TARGETS[0] else 243,
+    data[:64] = struct.pack("<16sHHIQQQIHHHHHH", ident, 1, 62 if is_x86(target) else 243,
                             1, 0, 0, section_offset, 0, 64, 0, 0, 64, len(sections), 4)
     return bytes(data)
