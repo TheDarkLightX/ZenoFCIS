@@ -309,6 +309,7 @@ def structural_preflight(problem: dict, palette: dict) -> dict | None:
         return bitwise_locality_witness(problem)
     return None
 
+
 def search(problem: dict, palette: dict, max_candidates: int) -> dict:
     required(is_int(max_candidates, 1, MAX_BUDGET), "invalid candidate budget")
     witness = structural_preflight(problem, palette)
