@@ -50,6 +50,7 @@ DO-178C. It does not replace them.
 Profile 1 is listed here. [Profile 2](#profile-2-flags-carries-and-comparisons)
 is registered separately and adds flags, comparisons, selects, up to six inputs
 and two results; profile-1 problems, sessions, receipts and checks are unchanged.
+[Profile 3](#profile-3-memory-regions) adds declared memory regions on x86-64.
 
 | Target | Calling contract | Admitted computation |
 | --- | --- | --- |
@@ -376,11 +377,13 @@ python3 -B -m tools.machine_qualification.controls list
 python3 -B -m tools.machine_qualification.controls run [--defect NAME]... [--out REPORT.json]
 ```
 
-- **Defects:** each one is a single source edit to `verify.py` or `verify2.py`. Examples are a 32-bit immediate,
+- **Defects:** each one is a single source edit to `verify.py`, `verify2.py` or `verify3.py`. Examples are a 32-bit immediate,
   unextended RISC-V immediates, scratch registers or entry flags fixed instead of quantified, a dropped symbolic
   instruction, five-bit shift counts, wrong CF, ZF, SF and OF rules, a writable x0, an unknown solver answer read
-  as equivalence, and a counterexample reported without its concrete replay. Each defect names the control
-  expected to expose it.
+  as equivalence, and a counterexample reported without its concrete replay. The eleven profile-3 defects
+  include a byte displacement used as a word index, an admitted store to a read-only region, a misaligned or
+  out-of-region access, a redefined base, a store dropped from the symbolic run, and a region word, base pointer
+  or scratch register fixed instead of quantified. Each defect names the control expected to expose it.
 - **Specimens:** each edit is applied to its own copy of the checker package, the control modules and the kernel
   library. The specimen's checker identity is computed from its own sources, and the run checks that the control
   imported that copy.
@@ -388,8 +391,8 @@ python3 -B -m tools.machine_qualification.controls run [--defect NAME]... [--out
   `inconclusive` (a crash, skip or timeout, an assertion raised inside the checker, or an identity or
   session-binding refusal) or `invalid-specimen` (the edit does not apply once, the copy does not compile or
   import, or the control is missing). Only `detected` counts as a detection.
-- **Positive controls:** both verifier suites, every kernel in `test-data/machine-code/kernels` and every intended
-  control must pass on an unmodified specimen first. Each control runs under `python3 -B` and `python3 -O -B`.
+- **Positive controls:** the three verifier suites, every kernel in `test-data/machine-code/kernels` and
+  `test-data/machine-code/memory-kernels`, and every intended control must pass on an unmodified specimen first. Each control runs under `python3 -B` and `python3 -O -B`.
 - **Exit:** 0 when every defect is detected by each of its controls in both modes, 1 when a positive control fails
   or a defect survives, and 2 otherwise.
 
@@ -694,6 +697,111 @@ inconclusive. Both exit 65 on malformed input or an existing output file.
 
 The layer covers 64-bit add, subtract and multiply only. Division, shifts,
 negation, wide and effectful contracts are refused or absent.
+
+## Profile 3: memory regions
+
+**Journey.** A developer needs a kernel that swaps two words in memory, which no
+register-only profile can state. They declare the region its pointer argument
+names, its size and its access, and state the final contents they expect. The
+search or a proposer supplies bytes, and the profile-3 checker accepts them or
+returns the inputs, pointer values, entry registers, flags and region words on
+which a result or a final region word differs.
+
+Profile 3 is a third, separately registered checker for straight-line x86-64
+kernels that load and store 64-bit words. Profiles 1 and 2 are unchanged. RV64I
+is not part of profile 3 yet.
+
+| Target | Calling contract | Admitted computation |
+| --- | --- | --- |
+| `x86_64-sysv-memory/3` | Each region's base pointer in the argument register it names; word inputs in the other argument registers, in order; results in `rax`, then `rdx` | Every profile-2 x86 form, plus `mov r64, [base]`, `mov r64, [base + disp8]`, `mov [base], r64` and `mov [base + disp8], r64` |
+
+**Problem format.** The schema is `zeno-fcis/machine-problem/3`, with exactly
+the fields `schema`, `target`, `inputs`, `regions`, `outputs`, `memory`,
+`grammar`, `max_instructions` and `objective`.
+
+- `regions`: one to four regions, each with exactly `name`, `base` (a distinct
+  argument register), `words` (1 to 16) and `access` (`read-only` or
+  `read-write`).
+- `inputs`: zero to six word inputs; with the regions, at most six arguments.
+- `outputs`: zero to two result expressions.
+- `memory`: one expression per word for exactly the read-write regions: their
+  expected final contents.
+- Expressions are those of profile 2, plus `["initial", REGION, INDEX]`, the
+  word at that index of the region at entry.
+- Memory forms in `grammar` are `["load", DST, BASE, DISP]` and
+  `["store", BASE, DISP, SRC]`, with DISP in bytes.
+
+A problem needs a result or a read-write region. For example, the swap states
+`"memory": {"p": [["initial", "p", 1], ["initial", "p", 0]]}` for a two-word
+read-write region `p` based at `rdi`.
+
+**Admission.** These rules apply before any solver call, to the decoded bytes
+and to every palette form. Each refusal names its reason.
+
+| Rule | Refusal |
+| --- | --- |
+| A memory operand is `[base]` (ModRM mod 0) or `[base + disp8]` with a nonzero disp8 (mod 1) | `UnsupportedAddressing`, `NonCanonicalDisplacement` |
+| The base is a region's base register | `MemoryBaseNotARegion` |
+| No earlier instruction wrote that register | `RedefinedRegionBase` |
+| The displacement is a multiple of 8 | `MisalignedAccess` |
+| The displacement addresses a word inside the region | `DisplacementOutsideRegion` |
+| A store targets a read-write region | `StoreToReadOnlyRegion` |
+
+SIB, RIP-relative and 32-bit displacements refuse, as do every other memory
+operand and partial-width access. Writing a base register after its last access
+is admitted.
+
+**Checking.** `tools/machine_code/verify3.py` runs the decoded body over the
+whole state: each region is a list of word variables, a load reads a word and a
+store replaces it. Non-memory instructions use the profile-2 models unchanged.
+Z3 then looks for an assignment where any result or any read-write region word
+differs from the problem, or a read-only word changed. The query quantifies
+every word input, every base pointer value, every initial region word, every
+other admitted register and the four entry flags. A counterexample names all of
+them, with the expected and actual results and region words, and it is replayed
+on the concrete model before it is reported. `open`, `search`, `candidate`,
+`emit`, `replay` and `library` select this checker from the schema; their
+concrete filter states also cover region contents.
+
+**Assumptions.** These are stated in every result's scope and are not checked:
+
+- the regions are pairwise disjoint and disjoint from the stack;
+- each region base is 8-byte aligned, so an admitted access is aligned;
+- nothing else writes the regions during the call.
+
+**Evidence.**
+
+```sh
+python3 -B tools/test_machine_code_profile3_verifier.py
+python3 -O -B tools/test_machine_code_profile3_verifier.py
+python3 -B tools/test_machine_code_profile3_loop.py
+python3 -O -B tools/test_machine_code_profile3_loop.py
+python3 -B -m tools.machine_code.run library check --dir test-data/machine-code/memory-kernels
+```
+
+- The verifier suite uses literal bytes checked against GNU objdump. It covers
+  every admission refusal, a wrong store order and a dropped store, each refuted
+  with a replayed counterexample, and quantified region words, base pointers,
+  scratch registers and flags. Solver-unknown and replay-mismatch mocks are
+  never equivalent.
+- [`test-data/machine-code/memory-kernels`](../test-data/machine-code/memory-kernels)
+  holds three kernels found by `search`:
+  - a two-word swap, 15 bytes;
+  - a load, add and store, 10 bytes;
+  - a two-word copy from a read-only region that also returns the sum, 18 bytes.
+  The loop test finds each again, then emits, replays and adds it
+  byte-identically.
+- The eleven profile-3 planted defects are detected under both interpreter modes.
+
+**Non-claims.**
+
+- No memory kernel is executed natively. `library check --native` reports them
+  as not run. This is checked against the stated model only.
+- The instruction models were generated, not derived from vendor
+  specifications.
+- Aliasing between regions, faults, caches, atomicity and timing are not
+  modelled.
+- The disjointness and alignment assumptions are the caller's obligation.
 
 ## ZAL human-to-machine word-kernel connection
 
