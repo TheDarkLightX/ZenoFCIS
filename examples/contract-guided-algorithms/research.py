@@ -18,7 +18,7 @@ import tempfile
 import reference
 
 SCHEMA = "zeno-fcis/algorithm-research-corpus/1"
-CATALOG_SCHEMA = "zeno-fcis/algorithm-research-catalog/2"
+CATALOG_SCHEMA = "zeno-fcis/algorithm-research-catalog/3"
 PROFILE = "u8-mod-word/1"
 OPS = ("and", "or", "xor", "add", "sub", "not", "lshr", "shl")
 COMMUTATIVE = frozenset(("and", "or", "xor", "add"))
@@ -265,26 +265,57 @@ def prefix_dependency_witness(problem: dict) -> dict | None:
     return None
 
 
-def structural_preflight(problem: dict, palette: dict) -> dict | None:
-    """Soundly reject this closed grammar when a necessary law is violated.
+def bitwise_locality_witness(problem: dict) -> dict | None:
+    """Refute per-bit locality of a unary u8 reference with a finite witness.
 
-    Literals, input, NOT, AND, OR, XOR, modular ADD/SUB, and fixed left
-    shifts all preserve low-prefix equality under composition. Right shifts
-    by nonzero counts do *not*. A refuted reference cannot be synthesized
-    by any tree of these operations, regardless of candidate/depth budget.
-    The statement is intentionally restricted to u8-mod-word/1.
+    Every expression made solely of the input, constants and bitwise NOT,
+    AND, OR and XOR computes output bit i using only input bit i.
+    A different output bit i for two inputs agreeing on input bit i
+    therefore refutes every expression in such a closed grammar.
+    """
+    for bit in range(8):
+        first: dict[int, tuple[int, int]] = {}
+        for x in range(256):
+            input_bit = (x >> bit) & 1
+            output_bit = (reference.result(problem["reference"], x) >> bit) & 1
+            if input_bit in first:
+                prior_x, prior_output_bit = first[input_bit]
+                if prior_output_bit != output_bit:
+                    return {"rule": "bitwise-locality-u8/1", "bit": bit,
+                            "input_a": prior_x, "input_b": x,
+                            "output_a_bit": prior_output_bit,
+                            "output_b_bit": output_bit}
+            else:
+                first[input_bit] = (x, output_bit)
+    return None
+
+
+def structural_preflight(problem: dict, palette: dict) -> dict | None:
+    """Apply independently checkable necessary laws to a *closed* grammar.
+
+    Modulo-256 ADD/SUB, Boolean operations and fixed SHL all preserve
+    low-bit prefix equality. A proper right shift can break that property.
+    A stricter law applies when the only operations are bitwise Boolean:
+    output bit i then depends only on input bit i. These are profile-scoped
+    refutations; an inconclusive preflight is never treated as proof of
+    synthesis feasibility, optimality or solver success.
     """
     ops = palette["operators"]
-    if "lshr" in ops and any(shift > 0 for shift in palette["shifts"]):
-        return None
-    return prefix_dependency_witness(problem)
-
+    if not ("lshr" in ops and any(shift > 0 for shift in palette["shifts"])):
+        witness = prefix_dependency_witness(problem)
+        if witness is not None:
+            return witness
+    if set(ops).issubset({"and", "or", "xor", "not"}):
+        return bitwise_locality_witness(problem)
+    return None
 
 def search(problem: dict, palette: dict, max_candidates: int) -> dict:
     required(is_int(max_candidates, 1, MAX_BUDGET), "invalid candidate budget")
     witness = structural_preflight(problem, palette)
     if witness is not None:
-        return {"status": "infeasible-right-to-left-palette", "candidates_inspected": 0,
+        status = ("infeasible-bitwise-local-palette" if witness["rule"] == "bitwise-locality-u8/1"
+                  else "infeasible-right-to-left-palette")
+        return {"status": status, "candidates_inspected": 0,
                 "probe_survivors": 0, "candidate": None, "preflight": witness}
     # Do not construct enormous intermediate levels before enforcing work caps.
     if grammar_upper_bound(palette) > MAX_GRAMMAR_EXPRESSIONS:
