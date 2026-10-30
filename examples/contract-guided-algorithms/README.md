@@ -20,7 +20,7 @@ reviewed closed problem + fixed u8 semantics
         content-bound catalog and replay
 ```
 
-**The source contract, not the proposer, decides what counts as correct.** `corpus.json` binds six closed 8-bit functions to a fixed independent reference in `reference.py`. A palette can vary operations, constants, shifts, and search-size ceiling, but cannot change the reference, word width, inputs, semantics, or checking method. The search interpreter is separate (`research.py`). A Chapter 2 [prefix-dependency preflight](HACKERS_DELIGHT_READING.md) additionally rejects three impossible instruction palettes with independently replayed finite witnesses, before any candidate enumeration. Successful proposed expression trees are checked on **every one of the 256 possible inputs**. Probe inputs are a search filter only, not evidence of correctness.
+**The source contract, not the proposer, decides what counts as correct.** `corpus.json` binds six closed 8-bit functions to a fixed independent reference in `reference.py`. A palette can vary operations, constants, shifts, and search-size ceiling, but cannot change the reference, word width, inputs, semantics, or checking method. The search interpreter is separate (`research.py`). Two structural [feasibility preflights](HACKERS_DELIGHT_READING.md), derived from *Hacker's Delight* Chapter 2 and paired with Skiena's search-pruning method, now reject **five** impossible instruction palettes with independently replayed finite witnesses, before any candidate enumeration. Successful proposed expression trees are checked on **every one of the 256 possible inputs**. Probe inputs are a search filter only, not evidence of correctness.
 
 Existing ZenoFCIS 2.6/2.7 boundaries to reuse in a later integrated iteration:
 
