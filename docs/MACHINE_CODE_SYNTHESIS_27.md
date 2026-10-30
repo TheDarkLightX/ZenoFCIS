@@ -215,6 +215,68 @@ partial-order reduction of independent actions, keeping one representative per
 class (Godefroid, *Partial-Order Methods for the Verification of Concurrent
 Systems*, LNCS 1032, 1996).
 
+### No cheaper program in the palette
+
+An exhausted search shows that no cheaper candidate exists in the grammar, but
+only after enumerating it. `realize` asks the solver the question directly: does
+any admitted program with a cost below a bound exist?
+
+```sh
+python3 -B -m tools.machine_code.run realize --session "$machine_work/session"
+python3 -B -m tools.machine_code.run realize --problem test-data/machine-code/umin-x86.json \
+  --below 11 --out "$machine_work/realize.json"
+python3 -B -m tools.machine_code.run realize --problem test-data/machine-code/umin-x86.json \
+  --replay "$machine_work/realize.json"
+```
+
+It asks one question per length k whose cheapest possible cost is below the
+bound:
+
+- **Query.** Each of the k slots picks a form through a bounded selector that
+  ranges over exactly the problem's `grammar`, the list the enumerator walks.
+  Each form's effect comes from the profile checker's own SMT semantics. On
+  profile 2, a read of an undefined flag is excluded as a constraint, just as the
+  checker refuses it. With the `bytes` objective, the total size is also bounded.
+- **Solving.** The query must give the specified results on a set of example
+  states, starting with the search's filter states. A solution is decoded to
+  bytes and goes to the checker. A counterexample becomes a new example, and the
+  question is asked again.
+- **Answers.** Unsat means that no selector choice fits even the examples. It is
+  recorded as "no admitted program of length k with `bytes` cost below N exists
+  under the stated model and palette", with the hash of the query and the
+  examples that produced it. A solution the checker accepts is recorded with its
+  bytes, and the run stops there. A solver `unknown`, a spent budget or an
+  inconclusive check is `inconclusive`, never unrealizable.
+
+`--replay` rebuilds each recorded unsat query from its examples, requires the
+same hash and solves it again. `--session` asks below the session's best checked
+candidate after rechecking it. When every length is unsat, that candidate is the
+least-cost program within the palette and the length bound, under the registered
+model. `global_optimality` stays false: the answer says nothing about
+instructions outside the palette, longer programs or other instruction sets.
+Profile 3 is not supported.
+
+An unsat is only as exact as the claim that the query ranges over the
+enumerator's candidate space. `tools/test_machine_code_realize.py` therefore
+checks it against exhaustive exact enumeration, in both directions. It covers
+every test and library problem with at most 20,000 candidate sequences (17
+problems on both profiles), plus two built for the test: one whose only short
+program uses the palette's last form, and one with no program at all. For each,
+the enumerator must exhaust its grammar. `realize` below its least cost must
+prove every length unsat. `realize` below the least cost plus one must return
+checked bytes of exactly that cost. With no program, `realize` without a bound
+must prove every length unsat. All 19 agree. Two planted defects are registered
+with the checker controls: a selector range that drops the last form, and an
+ignored cost bound. Both are detected by their intended controls under `python3 -B` and
+`python3 -O -B`, and the dropped form also by the cross-check of every small problem.
+
+`realize` exits 0 for `unrealizable`, `realizable` and `replayed`, 1 for a failed
+replay, 2 for `inconclusive`, and 65 for refused input or an existing `--out`.
+The method is component-based synthesis by counterexample-guided refinement
+([Gulwani, Jha, Tiwari and Venkatesan, PLDI 2011](https://www.microsoft.com/en-us/research/publication/synthesis-loop-free-programs/)),
+used here as unrealizability evidence for a finite palette, as complete
+super-optimizers do ([Lu and Bodík, OOPSLA 2025](https://lsrcz.github.io/files/OOPSLA25.pdf)).
+
 Exit 0 means a completed positive operation. Counterexamples/refused candidate
 verdicts exit 1; inconclusive/no-checked-candidate exits 2; malformed input,
 binding drift and I/O refusal exit 65. Always inspect the JSON status. The tool
