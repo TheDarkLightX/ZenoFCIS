@@ -634,6 +634,62 @@ fn a_lemma_must_be_one_state_formula() {
     }
 }
 
+/// A formula the contract cannot compile is refused under its own name, not
+/// under the synthetic law ID that the judge gives it.
+#[test]
+fn a_refused_formula_is_named_as_supplied() {
+    let counter = Core::new("bounded-counter", &[("C", 2)]);
+    let lemma = |formula: &str| {
+        lemma::judge(
+            &counter.project,
+            &counter.rules,
+            &["post.100.110 >= 0".to_owned(), formula.to_owned()],
+            DEFAULT_MAX_TUPLES,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("{formula:?} was judged"))
+    };
+    let probe = |question: Question| {
+        probe::probe(
+            &counter.project,
+            &counter.rules,
+            &question,
+            DEFAULT_MAX_TUPLES,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("{question:?} was answered"))
+    };
+    for (error, place, reason) in [
+        (
+            lemma("pre.100.110 == 0"),
+            "lemma 2",
+            "applies at genesis, where `pre.100.110` has no value",
+        ),
+        (
+            lemma("post.100 == post.100"),
+            "lemma 2",
+            "`post.100` is a record; name one of its fields",
+        ),
+        (
+            probe(Question::Reachable {
+                state: "pre.100.110 == 0".to_owned(),
+            }),
+            "--state",
+            "applies at genesis, where `pre.100.110` has no value",
+        ),
+        (
+            probe(Question::Implies {
+                premise: "true".to_owned(),
+                conclusion: "pre.100 == pre.100".to_owned(),
+            }),
+            "--then",
+            "`pre.100` is a record; name one of its fields",
+        ),
+    ] {
+        assert_eq!((error.place(), error.reason()), (place, reason), "{error}");
+    }
+}
+
 const COUNTER_SCENARIOS: &str = "# Bounded counter runs.\n\
 # scenario count-up-and-down\n\
 0 | 150 | 1 | accept - 1 | -\n\

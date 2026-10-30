@@ -354,7 +354,7 @@ pub(super) fn conditions(
         LawKind::AuthoritySubjectRecipient,
     )?;
     let space = &machine.space;
-    extended.bind(&extended.rules, |authority, framer| {
+    let truths = extended.bind(&extended.rules, |authority, framer| {
         let laws = LawSet::new(authority.descriptor(), &[id]);
         let states: Vec<Vec<i128>> = (0..space.states).map(|state| space.state(state)).collect();
         Ok(parallel(space.tuples(), |ordinal| {
@@ -381,7 +381,8 @@ pub(super) fn conditions(
                 _ => Truth::Undefined,
             }
         }))
-    })
+    });
+    truths.map_err(|error| machine::judged_formula_error(error, id, what))
 }
 
 /// Two inputs that differ only in `position` and are decided differently.

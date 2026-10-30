@@ -716,6 +716,16 @@ pub(super) fn with_law(
     Ok((loaded, id))
 }
 
+/// `error` from binding a contract that [`with_law`] extended, with the
+/// judged formula named as `what` rather than as its synthetic law `id`.
+pub(super) fn judged_formula_error(error: ContractError, id: u32, what: &str) -> ContractError {
+    if error.place() == format!("project.zeno law {id}") {
+        ContractError::new(what, error.reason())
+    } else {
+        error
+    }
+}
+
 /// The reject-everything core of `rules`: every reason keeps a case of its
 /// class that never fires, so the declarations stay the contract's, and a
 /// final catch-all rejects with the least reason a reject case uses. `None`
