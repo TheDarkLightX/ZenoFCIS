@@ -1,0 +1,9 @@
+{
+  "schema": "zeno-fcis/machine-problem/2",
+  "target": "rv64i-register/2",
+  "inputs": ["a_lo", "a_hi", "b_lo", "b_hi"],
+  "outputs": [["add", ["input", "a_lo"], ["input", "b_lo"]], ["add", ["add", ["input", "a_hi"], ["input", "b_hi"]], ["ult", ["add", ["input", "a_lo"], ["input", "b_lo"]], ["input", "a_lo"]]]],
+  "grammar": [["add", "a0", "a0", "a2"], ["sltu", "t0", "a0", "a2"], ["add", "a1", "a1", "a3"], ["add", "a1", "a1", "t0"], ["nop"]],
+  "max_instructions": 4,
+  "objective": "bytes"
+}

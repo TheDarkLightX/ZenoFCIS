@@ -17,6 +17,7 @@ import re
 import sys
 import time
 
+from . import profile2
 from .model import MASK, canonical, digest, evaluate, integer, read_json, validate_problem
 from .targets import assembly_source, elf_object, encode_instruction, encode_program
 
@@ -43,6 +44,22 @@ def _receipt(receipt):
     cost = receipt["verification"].get("cost")
     if cost is not None:
         _cost(cost)
+
+
+def _validated(problem) -> dict:
+    """A profile-2 problem names its schema; every other problem keeps the profile-1 validator."""
+    if isinstance(problem, dict) and problem.get("schema") == profile2.SCHEMA:
+        return profile2.validate_problem(problem)
+    return validate_problem(problem)
+
+
+def _checker(problem: dict):
+    """The independent checker module registered for the problem's profile."""
+    if problem["schema"] == profile2.SCHEMA:
+        from . import verify2
+        return verify2
+    from . import verify
+    return verify
 
 
 def file_hash(path: Path, limit=None) -> str:
@@ -104,7 +121,7 @@ def _grammar(problem: dict):
 
 
 def open_session(problem_path: Path, directory: Path) -> dict:
-    problem = validate_problem(read_json(problem_path))
+    problem = _validated(read_json(problem_path))
     _grammar(problem)
     binding = identity()
     directory.mkdir(mode=0o700)
@@ -138,7 +155,7 @@ def _load(directory: Path):
         raise ValueError("session contains a non-regular entry")
     if sum(p.stat().st_size for p in files) > MAX_SESSION_BYTES:
         raise ValueError("session exceeds its byte limit")
-    problem = validate_problem(read_json(directory / "problem.json"))
+    problem = _validated(read_json(directory / "problem.json"))
     _grammar(problem)
     manifest = read_json(directory / "session.json")
     if (manifest.get("schema") != "zeno-fcis/machine-session/1"
@@ -226,7 +243,7 @@ def _proposal(value):
 
 
 def _record(directory, problem, manifest, events, proposal, timeout_ms):
-    from .verify import check
+    check = _checker(problem).check
     if len(events) >= MAX_EVENTS:
         raise ValueError("session proposal budget exhausted")
     code = _proposal(proposal)
@@ -264,9 +281,9 @@ def submit(directory: Path, proposal_path: Path, timeout_ms=1000) -> dict:
 
 
 def resume(directory: Path, timeout_ms=1000) -> dict:
-    from .verify import check
     integer(timeout_ms, 1, 5000, "solver timeout")
     problem, _, events = _load(directory)
+    check = _checker(problem).check
     best = _best(directory, problem, events)
     if best is None:
         return {"status": "open", "events": len(events), "incumbent": None}
@@ -285,27 +302,74 @@ def packet(directory: Path) -> dict:
     feedback = []
     for event in events[-8:]:
         receipt = read_json(directory / f"{event['sequence']:04d}.receipt.json")
-        feedback.append({"sequence": event["sequence"], "verification": receipt["verification"]})
+        row = {"sequence": event["sequence"], "verification": receipt["verification"]}
+        if receipt["verification"].get("status") == "counterexample":
+            try:
+                from .diagnose import diagnose
+                row["diagnosis"] = diagnose(problem, _code(directory / f"{event['sequence']:04d}.bin"),
+                                            receipt["verification"])
+            except (ValueError, KeyError, TypeError, IndexError) as error:
+                row["diagnosis"] = {"available": False, "reason": type(error).__name__}
+        feedback.append(row)
     return {"schema": "zeno-fcis/machine-proposer-packet/1", "authority": "none",
             "problem": problem, "problem_sha256": manifest["problem_sha256"],
             "identity_sha256": digest(canonical(manifest["identity"])), "feedback": feedback,
             "proposal_schema": {"schema": "zeno-fcis/machine-proposal/1", "code_hex": "actual lowercase machine bytes",
                                 "provenance": {"kind": "llm", "name": "proposer name", "note": "short public description"}},
-            "instruction": "Propose data only. Use declared grammar and returned counterexamples. The checker decides."}
+            "instruction": "Propose data only. Use declared grammar and returned counterexamples. Each counterexample carries an advisory diagnosis: the register trace and the first specification subterm your code never computes. The checker decides."}
+
+
+def _seeds(problem):
+    """Fixed concrete filter states as (arguments, initial scratch, initial flags)."""
+    if problem["schema"] != profile2.SCHEMA:
+        return [((x, y), {}, None) for x, y in
+                ((0, 0), (1, 0), (0, 1), (MASK, 1), (MASK, MASK), (1 << 63, (1 << 63) - 1))]
+    count = len(problem["inputs"])
+    rows = [[0] * count, [1] + [0] * (count - 1), [MASK] * count, [MASK, 1] * 3, [1 << 63, (1 << 63) - 1] * 3,
+            [(1 << 63) - 1, 1 << 63] * 3, [(0x9E3779B97F4A7C15 * (i + 1)) & MASK for i in range(count)]]
+    x86 = problem["target"] == profile2.TARGETS[0]
+    seeds = [(tuple(row[:count]), {}, {} if x86 else None) for row in rows]
+    from .verify2 import ARGUMENTS, FLAGS, REGISTERS
+    scratch = {name: MASK for name in REGISTERS[problem["target"]]
+               if name not in ARGUMENTS[problem["target"]][:count]}
+    return seeds + [(tuple(rows[1][:count]), scratch, dict.fromkeys(FLAGS, 1) if x86 else None)]
+
+
+def _agrees(problem, code, witness):
+    """Whether one concrete state gives the specified results; a statically refused candidate never agrees."""
+    arguments, initial, flags = witness
+    if problem["schema"] != profile2.SCHEMA:
+        from .verify import run_concrete
+        return run_concrete(problem["target"], code, {"x": arguments[0], "y": arguments[1]}, initial) == evaluate(
+            problem["expression"], *arguments)
+    from .verify2 import run_concrete
+    try:
+        actual = run_concrete(problem["target"], code, list(arguments), initial, flags, len(problem["outputs"]))
+    except ValueError:
+        return False
+    env = dict(zip(problem["inputs"], arguments))
+    return actual == [profile2.evaluate(output, env) for output in problem["outputs"]]
+
+
+def _witness(problem, verification):
+    inputs = verification["inputs"]
+    names = problem["inputs"] if problem["schema"] == profile2.SCHEMA else ("x", "y")
+    return (tuple(int(inputs[name]) for name in names),
+            {key: int(value) for key, value in verification["initial_registers"].items()},
+            verification.get("initial_flags"))
 
 
 def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=5000, timeout_ms=500):
-    from .verify import check, run_concrete
     integer(max_candidates, 1, 100_000, "candidate budget")
     integer(max_checks, 1, 128, "checker budget")
     integer(deadline_ms, 1, 60_000, "deadline")
     integer(timeout_ms, 1, 5000, "solver timeout")
     began = time.monotonic(); proposed = 0; checks = 0; filtered = 0; pruned = 0; stopped = "grammar-exhausted"
-    witnesses = [(0, 0, {}), (1, 0, {}), (0, 1, {}), (MASK, 1, {}), (MASK, MASK, {}),
-                 (1 << 63, (1 << 63) - 1, {})]
     verdicts = []; current_checks = {}
     with _locked(directory):
         problem, manifest, events = _load(directory)
+        check = _checker(problem).check
+        witnesses = _seeds(problem); seeds = len(witnesses)
         incumbent = _best(directory, problem, events)
         bound = None
         if incumbent:
@@ -336,8 +400,7 @@ def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=50
                 if bound is not None and _rank(problem, estimated, code) >= bound:
                     pruned += 1
                     continue
-                if any(run_concrete(problem["target"], code, {"x": x, "y": y}, initial) != evaluate(problem["expression"], x, y)
-                       for x, y, initial in witnesses):
+                if not all(_agrees(problem, code, witness) for witness in witnesses):
                     filtered += 1; continue
                 proposal = {"schema": "zeno-fcis/machine-proposal/1", "code_hex": code.hex(),
                             "provenance": {"kind": "local-search", "name": "bounded-enumerator/1",
@@ -352,10 +415,8 @@ def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=50
                 verdicts.append({"sequence": result["sequence"], "status": result["status"]})
                 verification = result["verification"]
                 if result["status"] == "counterexample":
-                    inputs = verification["inputs"]
-                    witnesses.append((int(inputs["x"]), int(inputs["y"]),
-                                      {key: int(value) for key, value in verification["initial_registers"].items()}))
-                    witnesses = witnesses[:6] + witnesses[-58:] if len(witnesses) > 64 else witnesses
+                    witnesses.append(_witness(problem, verification))
+                    witnesses = witnesses[:seeds] + witnesses[seeds - 64:] if len(witnesses) > 64 else witnesses
             if stopped != "grammar-exhausted":
                 break
         best = _best(directory, problem, events)
@@ -376,7 +437,7 @@ def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=50
                 raise ValueError("incumbent receipt disagrees with fresh byte interpretation")
         return {"status": "checked-candidate" if best else "no-checked-candidate", "stop_reason": stopped,
                 "proposed": proposed, "concrete_refutations": filtered, "objective_pruned": pruned, "solver_checks": checks,
-                "checker_verdicts": verdicts, "retained_counterexamples": len(witnesses) - 6,
+                "checker_verdicts": verdicts, "retained_counterexamples": len(witnesses) - seeds,
                 "incumbent": best[1]["sequence"] if best else None,
                 "cost": best[2]["verification"]["cost"] if best else None,
                 "elapsed_seconds": time.monotonic() - began, "global_optimality": False,
@@ -408,7 +469,6 @@ def emit(directory: Path, output: Path, timeout_ms=1000):
 
 
 def replay_artifact(directory: Path, timeout_ms=1000):
-    from .verify import check
     integer(timeout_ms, 1, 5000, "solver timeout")
     if directory.is_symlink() or not directory.is_dir():
         raise ValueError("artifact must be a non-symlink directory")
@@ -438,7 +498,8 @@ def replay_artifact(directory: Path, timeout_ms=1000):
         integer(row["bytes"], 1, 65_536, "artifact file bytes")
         if row != {"sha256": file_hash(path, 65_536), "bytes": path.stat().st_size}:
             raise ValueError("artifact bytes changed")
-    problem = validate_problem(read_json(directory / "problem.json"))
+    problem = _validated(read_json(directory / "problem.json"))
+    check = _checker(problem).check
     code = _code(directory / "kernel.bin")
     receipt = read_json(directory / "receipt.json")
     _receipt(receipt)

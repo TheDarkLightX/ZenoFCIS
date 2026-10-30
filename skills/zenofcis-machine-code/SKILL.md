@@ -1,6 +1,6 @@
 ---
 name: zenofcis-machine-code
-description: Search, synthesize or check x86-64 and RV64I word kernels through ZenoFCIS machine-byte proposal sessions, counterexamples and independently replayed artifacts. Use for LLM-guided machine-code loops and embedded kernel emission.
+description: Search, synthesize or check x86-64 and RV64I word kernels through ZenoFCIS machine-byte proposal sessions, counterexamples and independently replayed artifacts. Profile 2 adds CF/ZF/SF/OF flags, carries, comparisons, selects, up to six inputs and two results. Use for LLM-guided machine-code loops, multi-word and compare-and-select kernels, and embedded kernel emission.
 ---
 
 # Checked machine-code search
@@ -20,6 +20,27 @@ palette and a16-body-instruction ceiling. It supports x86 SysV register kernels
 and RV64I register kernels. Checked overflow, wider arithmetic, effects, memory
 and other ABIs require an explicit supported profile; do not narrow the task to
 make it fit. Inspect `test-data/machine-code/` for the closed JSON format.
+
+Profile 2 (`zeno-fcis/machine-problem/2`, targets `x86_64-sysv-register/2` and
+`rv64i-register/2`) is registered separately for carries, comparisons and
+selects. It declares one to six named u64 `inputs` (x86 `rdi, rsi, rdx, rcx,
+r8, r9`; RV64I `a0`..`a5`) and one or two `outputs` (x86 `rax, rdx`; RV64I
+`a0, a1`). Expressions add `ashr`, `ult`, `ule`, `slt`, `sle`, `eq` (each 0/1)
+and `["ite", c, a, b]` (a when c is not 0). x86 adds ADC, SBB, CMP, TEST, NEG,
+SAR, SETcc, MOVZX and CMOVcc; RV64I adds SLT, SRA, SLTI, SLTIU, XORI, ORI, ANDI
+and SRAI. Only CF/ZF/SF/OF are modelled: parity conditions refuse, and reading a
+flag left undefined (ZF/SF after IMUL, OF after a shift by 2 or more) refuses
+with `ReadsUndefinedFlag`. Entry flags are arbitrary and quantified. SETcc
+writes only the low byte, so zero the register before the flag-setting
+instruction or MOVZX afterwards. Examples: `add128-x86.json`, `umin-x86.json`,
+`add128-rv64i.json`. Counterexamples give named inputs, entry registers, entry
+flags and expected/actual result lists. The same `open/packet/candidate/search/
+resume/emit/replay` commands apply; `open` selects the checker from the schema.
+The packet `diagnosis` covers profile 2 (flags in the trace, per-result
+expected/actual, `first_missing_subterm` with its result index; comparisons
+often live only in flags). `run bench` times profile-2 x86 artifacts against
+GCC's code for the same outputs and refuses RV64I artifacts.
+The ZAL word-kernel route lowers to profile 1 only.
 
 ## Connect human ZAL requirements
 
@@ -73,6 +94,11 @@ python3 -B -m tools.machine_code.run candidate --session SESSION --proposal PROP
 python3 -B -m tools.machine_code.run packet --session SESSION
 ```
 
+For a counterexample, read the packet's advisory `diagnosis`: the register trace after each instruction, the
+specification subterms that already appear, and `first_missing_subterm`. Repair that step first. Prefer the
+`generic_failure` view to the solver view, because solver counterexamples often use degenerate values such as
+zero. The diagnosis never decides acceptance.
+
 Read the verdict, not merely the exit code: counterexample/refused exits1;
 inconclusive exits2; malformed/binding/I/O refusal exits65. Preserve failed
 proposals and actual witnesses. Correct the candidate using the inputs and
@@ -98,8 +124,11 @@ authority. Recheck artifacts before any separately authorized target execution.
 
 Compare byte/body-instruction cost, setup/search/check/replay costs, and actual
 target execution separately. The native test entry point is
-`python3 -B tools/test_machine_code_native.py`; missing platform/tool support is
-not a pass. Preserve the default compiler baseline and match the declared
+`python3 -B tools/test_machine_code_native.py`, and
+`python3 -B tools/test_machine_code_profile2_native.py` for profile 2;
+missing platform/tool support is not a pass. x86 instruction and flag models
+are compared with the executing CPU; RV64I is compared under QEMU only in the
+workflow's `rv64i-execution` job, and a local skip is no RV64I evidence. Preserve the default compiler baseline and match the declared
 hardening/ABI profile before comparing sizes. Smaller code is not necessarily
 faster. Record regressions and equal results as well as improvements.
 

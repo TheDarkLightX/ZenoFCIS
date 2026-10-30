@@ -32,7 +32,7 @@ permissions:
 jobs:
   registered-isa-kernels:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -51,10 +51,49 @@ jobs:
         run: python3 -B tools/test_machine_code_loop.py
       - name: ZAL source, human feedback and independent machine replay
         run: python3 -B tools/test_zal_word_kernel.py
+      - name: Profile-2 decoder, flag model and counterexample controls
+        run: python3 -B tools/test_machine_code_profile2_verifier.py
+      - name: Profile-2 proposal, search, emission and replay
+        run: python3 -B tools/test_machine_code_profile2_loop.py
       - name: Optimized Python keeps the same guards
         run: |
           python3 -O -B tools/test_machine_code_verifier.py
           python3 -O -B tools/test_machine_code_loop.py
           python3 -O -B tools/test_zal_word_kernel.py
+          python3 -O -B tools/test_machine_code_profile2_verifier.py
+          python3 -O -B tools/test_machine_code_profile2_loop.py
       - name: Actual x86 execution, assembler and RV64I object correspondence
         run: python3 -B tools/test_machine_code_native.py
+      - name: Every admitted x86 form against the concrete and SMT models on this CPU
+        run: python3 -B tools/test_machine_code_conformance.py
+      - name: Actual x86 execution of emitted profile-2 kernels, including two-word results
+        run: python3 -B tools/test_machine_code_profile2_native.py
+      - name: Every admitted profile-2 x86 form, with CF/ZF/SF/OF, against the models on this CPU
+        run: python3 -B tools/test_machine_code_profile2_conformance.py
+
+  rv64i-execution:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Install the hash-pinned experimental checker
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/machine-code-venv"
+          "$RUNNER_TEMP/machine-code-venv/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          printf '%s\n' "$RUNNER_TEMP/machine-code-venv/bin" >> "$GITHUB_PATH"
+      - name: Install the RISC-V user-mode emulator and cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            qemu-user gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu libc6-dev-riscv64-cross
+          dpkg-query --show qemu-user gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu libc6-dev-riscv64-cross
+          qemu-riscv64 --version | head -n 1
+      - name: Every admitted RV64I form against the concrete and SMT models under QEMU
+        env:
+          ZENO_MACHINE_REQUIRE_RV64I: '1'
+        run: python3 -B tools/test_machine_code_rv64i_conformance.py
