@@ -109,7 +109,7 @@
       "commands": [
         "contract refresh-receipts"
       ],
-      "sha256": "9179053df01a2616ea1ab8580050fc48c63869298656c188b8ffcbc6e74d7d0c"
+      "sha256": "85294093e813328aac29b803d9567880f85cf12c67ee3c49bbe16390c4ac82c4"
     },
     {
       "name": "contract-review",

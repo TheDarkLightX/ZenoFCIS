@@ -28,8 +28,8 @@
     "64": "invalid command-line usage"
   },
   "verdicts": {
-    "current": "Every receipt is already this checker's; nothing was written.",
-    "refreshed": "The listed adoptions were checked again and rebound; rules were rewritten in the templates' layout.",
+    "current": "Every receipt is already this checker's and the rules are in the templates' layout; nothing was written.",
+    "refreshed": "The listed adoptions were checked again and rebound, and the rules were rewritten in the templates' layout. An empty list with this status means only the layout changed; run it on a copy when the layout must be kept.",
     "error": "Read error.code; a non-equivalent pair is a finding, not a layout problem."
   },
   "limits": {
@@ -46,7 +46,7 @@
   },
   "steps": [
     {
-      "command": "zeno-fcis contract refresh-receipts crates/zeno-fcis-cli/tests/fixtures/spend-approval --format json",
+      "command": "cp -r crates/zeno-fcis-cli/templates/withdrawal-queue $WORK/app && zeno-fcis contract refresh-receipts $WORK/app --format json",
       "exit": 0,
       "expected": {
         "status": "current"
@@ -55,12 +55,12 @@
     }
   ],
   "example": {
-    "command": "zeno-fcis contract refresh-receipts crates/zeno-fcis-cli/templates/withdrawal-queue --format json",
+    "command": "cp -r crates/zeno-fcis-cli/tests/fixtures/spend-approval $WORK/spend && zeno-fcis contract refresh-receipts $WORK/spend --format json",
     "exit": 0,
-    "expected": {
-      "status": "current"
-    },
-    "contains": []
+    "expected": {},
+    "contains": [
+      "zeno-fcis/cli/1"
+    ]
   },
   "sources": {
     "synopsis": "docs/CLI_REFERENCE.md:2036-2235; crates/zeno-fcis-cli/tests/contract_adopt.rs; crates/zeno-fcis-cli/src/contract_adopt.rs",
@@ -75,7 +75,7 @@
   "commands": [
     "contract refresh-receipts"
   ],
-  "pitfalls": "It never reuses the old verdict. A rules file kept in its own layout by contract adopt is rewritten whole in the templates' layout here. Read the result scope before revising the input. No report grants runtime or publication authority."
+  "pitfalls": "It never reuses the old verdict. A rules file in its own layout is rewritten whole in the templates' layout here even when no receipt changes, so the worked example runs on a copy. Read the result scope before revising the input. No report grants runtime or publication authority."
 }
 ```
 
@@ -102,16 +102,16 @@ Set WORK to a fresh writable directory outside the source tree. Run commands fro
 ## Steps
 
 ```sh
-zeno-fcis contract refresh-receipts crates/zeno-fcis-cli/tests/fixtures/spend-approval --format json
+cp -r crates/zeno-fcis-cli/templates/withdrawal-queue $WORK/app && zeno-fcis contract refresh-receipts $WORK/app --format json
 ```
 
 Expected: exit 0; {"status": "current"}.
 
 ## Verdicts
 
-`current`: Every receipt is already this checker's; nothing was written.
+`current`: Every receipt is already this checker's and the rules are in the templates' layout; nothing was written.
 
-`refreshed`: The listed adoptions were checked again and rebound; rules were rewritten in the templates' layout.
+`refreshed`: The listed adoptions were checked again and rebound, and the rules were rewritten in the templates' layout. An empty list with this status means only the layout changed; run it on a copy when the layout must be kept.
 
 `error`: Read error.code; a non-equivalent pair is a finding, not a layout problem.
 
@@ -131,17 +131,17 @@ Run Commons `advise` for the task first. Compute the exact subject digest, take 
 
 ## Pitfalls
 
-It never reuses the old verdict. A rules file kept in its own layout by contract adopt is rewritten whole in the templates' layout here. Read the result scope before revising the input. No report grants runtime or publication authority.
+It never reuses the old verdict. A rules file in its own layout is rewritten whole in the templates' layout here even when no receipt changes, so the worked example runs on a copy. Read the result scope before revising the input. No report grants runtime or publication authority.
 
 Refusals and remedies: {"contract-invalid": "The old receipt's limits and digests are binding; a candidate that is no longer equivalent cannot be refreshed."}
 
 ## Worked example
 
 ```sh
-zeno-fcis contract refresh-receipts crates/zeno-fcis-cli/templates/withdrawal-queue --format json
+cp -r crates/zeno-fcis-cli/tests/fixtures/spend-approval $WORK/spend && zeno-fcis contract refresh-receipts $WORK/spend --format json
 ```
 
-Expected: exit 0; {"status": "current"}.
+Expected: exit 0; ["zeno-fcis/cli/1"].
 
 ## See also
 
