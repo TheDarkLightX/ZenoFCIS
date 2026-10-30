@@ -1,0 +1,9 @@
+{
+  "schema": "zeno-fcis/machine-problem/2",
+  "target": "x86_64-sysv-register/2",
+  "inputs": ["x", "y"],
+  "outputs": [["ite", ["ult", ["input", "x"], ["input", "y"]], ["input", "x"], ["input", "y"]], ["ite", ["ult", ["input", "x"], ["input", "y"]], ["input", "y"], ["input", "x"]]],
+  "grammar": [["mov", "rax", "rdi"], ["mov", "rdx", "rsi"], ["cmp", "rdi", "rsi"], ["cmova", "rax", "rsi"], ["cmova", "rdx", "rdi"], ["mov", "rax", "rsi"], ["mov", "rdx", "rdi"], ["nop"]],
+  "max_instructions": 6,
+  "objective": "instructions"
+}

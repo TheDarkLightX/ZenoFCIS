@@ -133,6 +133,14 @@ python3 -B -m tools.machine_code.run emit --session SESSION --out NEW_ARTIFACT
 python3 -B -m tools.machine_code.run replay --artifact ARTIFACT
 ```
 
+Search skips only candidates that exact footprints show are never needed. Its JSON
+reports `dead_pruned`, `order_pruned` and `bound_skipped`, and `--no-prune`
+restores the full enumeration for comparison. For a two-result profile-2
+problem, run `split-search --session SESSION` first. It joins single-result parts
+whose footprints cannot interfere, and its checked kernel becomes the incumbent
+that bounds a following `search`. Split search on a one-result problem exits 1
+with `not-applicable`.
+
 Search exhaustion does not establish no implementation exists. A stored
 incumbent must recheck; missing replay budget remains inconclusive. Emission
 produces machine bytes, linkable ELF and matching assembler data, not deployment
