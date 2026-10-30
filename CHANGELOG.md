@@ -17,17 +17,24 @@ embedded in ZenoFCIS values.
   This adds developer tooling; native Authority and shell qualification are
   unchanged.
 - **Breaking change for stores and adopted contracts:** a store records its
-  contract identity, which binds the evaluator, and the evaluator identity
+  contract identity, which ends with the evaluator digest, and that digest
   covers the release version in the workspace and crate manifests. A build
   from this checkout therefore refuses a store created by a 2.6.0 build of
-  the same contract with the named refusal `OtherRelease`, for `state`,
-  `--audit` and `--upgrade` alike, and writes nothing. Keep such a store on
-  its 2.6.0 build, or start a new store with this build. A contract adopted
-  with 2.6.0 refuses to generate, naming `zeno-fcis contract refresh-receipts
-  DIR`; that command checks every adoption again and changes only the checker
-  identity in each receipt. Stores created by 2.4.0 applications remain
-  upgradable. `tools/check_contract_upgrade_26.py` checks both refusals
-  against artifacts made by the 2.6.0 CLI.
+  the same contract for `state`, `--audit` and `--upgrade` alike, and writes
+  nothing. The refusal is named `OtherRelease`: the identities differ only in
+  the evaluator. Every other identity mismatch is still refused with
+  `Identity`. Migration steps:
+  - Keep using such a store with the 2.6.0 build that created it, or start a
+    new store with this build in a new, empty file. Upgrading 2.6.0 stores is
+    not supported.
+  - A contract adopted with 2.6.0 refuses to generate and names the remedy:
+    run `zeno-fcis contract refresh-receipts DIR` once. It checks every
+    adoption again and changes only the checker identity in each receipt.
+    Then rebuild the application from the refreshed directory.
+
+  Stores created by 2.4.0 applications remain upgradable.
+  `tools/check_contract_upgrade_26.py` checks both refusals against artifacts
+  made by the 2.6.0 CLI built from tag `v2.6.0`.
 
 ## 2.6.0 - 2026-10-24
 
