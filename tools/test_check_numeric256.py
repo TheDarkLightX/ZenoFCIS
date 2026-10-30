@@ -143,6 +143,27 @@ class SourceAdmission(unittest.TestCase):
             with self.subTest(mode=mode), self.assertRaises(ValueError):
                 gate.configuration(self.root, profile)
 
+    def test_muldiv_stage_is_complete_and_retains_the_wide_stage(self):
+        complete = copy.deepcopy(self.profile)
+        producer.include_muldiv(complete)
+        gate.configuration(self.root, complete)
+        for mode in ("method", "wide"):
+            profile = copy.deepcopy(complete)
+            if mode == "method":
+                profile["obligations"].pop(next(i for i, o in enumerate(profile["obligations"])
+                                                if o["member"] == "U256::products_ge"))
+            else:
+                profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != "wide"]
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                gate.configuration(self.root, profile)
+
+    def test_fixed_array_parameters_bind_their_element_type_and_length(self):
+        self.assertEqual(gate.expected_type("[U256;3]"),
+                         ["Typ", "Primitive", ["Primitive", "Array"],
+                          [gate.expected_type("U256"), ["Typ", "ConstInt", "3"]]])
+        self.assertNotEqual(gate.expected_type("[U256;3]"), gate.expected_type("[U256;2]"))
+        self.assertNotEqual(gate.expected_type("[U256;3]"), gate.expected_type("[I256;3]"))
+
     def test_every_proved_helper_has_a_semantic_control(self):
         helpers = {c["helper"] for c in self.profile["controls"] if "helper" in c}
         self.assertEqual(helpers, gate.HELPERS)

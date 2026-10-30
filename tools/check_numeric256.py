@@ -42,6 +42,8 @@ CHECKED = {"U256::checked_add", "U256::checked_sub", "I256::checked_add", "I256:
 DIVISION = {"U256::div_rem", "U256::checked_div"}
 MULTIPLICATION = {"U256::full_product", "U256::checked_mul"}
 WIDE = {"U512::checked_add", "U512::multiply_u256", "U512::div_rem", "U768::div_rem"}
+MULDIV = {"U256::mul_add_div_rem", "U256::mul_div", "U256::mul_div_half_up", "U256::mul3_div",
+          "U256::products_ge"}
 # Private module-level helpers whose actual bodies a control may mutate.
 HELPERS = {"divide", "add_word", "multiply"}
 
@@ -51,6 +53,10 @@ def expected_type(name):
         value = name[len("Result<"):-len(",Failure>")]
         return ["Typ", "Datatype", ["Dt", "Path", "core::result::Result"],
                 [expected_type(value), expected_type("Failure")], []]
+    if name.startswith("[") and name.endswith("]") and ";" in name:
+        element, count = name[1:-1].split(";")
+        return ["Typ", "Primitive", ["Primitive", "Array"],
+                [expected_type(element), ["Typ", "ConstInt", str(int(count))]]]
     if name.startswith("(") and name.endswith(")"):
         items = name[1:-1].split(",")
         return ["Typ", "Datatype", ["Dt", "Tuple", str(len(items))], [expected_type(i) for i in items], []]
@@ -111,8 +117,8 @@ def configuration(root, profile, expected=None):
     require({o["member"] for o in profile["obligations"] if o["stage"] == "constants"}
             == CONSTANTS, "constant obligations incomplete")
     stages = {o["stage"] for o in profile["obligations"]}
-    require(stages.issubset({"constants", "conversions", "checked", "division", "multiplication", "wide"}),
-            "unreviewed numeric stage")
+    require(stages.issubset({"constants", "conversions", "checked", "division", "multiplication", "wide",
+                             "muldiv"}), "unreviewed numeric stage")
     if "division" in stages:
         require("checked" in stages and
                 {o["member"] for o in profile["obligations"] if o["stage"] == "division"} == DIVISION,
@@ -125,6 +131,10 @@ def configuration(root, profile, expected=None):
         require({"division", "multiplication"}.issubset(stages) and
                 {o["member"] for o in profile["obligations"] if o["stage"] == "wide"} == WIDE,
                 "wide arithmetic obligations incomplete")
+    if "muldiv" in stages:
+        require("wide" in stages and
+                {o["member"] for o in profile["obligations"] if o["stage"] == "muldiv"} == MULDIV,
+                "mul_div obligations incomplete")
     if "checked" in stages:
         require("conversions" in stages and
                 {o["member"] for o in profile["obligations"] if o["stage"] == "checked"} == CHECKED,

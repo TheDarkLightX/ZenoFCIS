@@ -254,6 +254,61 @@ def include_wide(profile):
         "multiplier whenever its output has room for the product). U256 has no checked_neg method. "
         "The mul_div, root and signed multiply/divide families, the raw wide word views, other "
         "arithmetic and compiler/ghost-erasure correspondence are not proved.")
+    if any(o["stage"] == "muldiv" for o in profile["obligations"]):
+        include_muldiv(profile)
+
+
+def include_muldiv(profile):
+    """Reviewed exact complete-product division, rounding and comparison statements."""
+    statements = [
+        ("U256::mul_add_div_rem", ["U256", "U256", "U256", "U256"], "Result<(U256,U256),Failure>",
+         "With P = U(a)*U(b) + U(offset) and D = U(den): ZeroDivisor iff D = 0; otherwise Overflow iff "
+         "floor(P/D) >= 2^256; otherwise the canonical witness P = Q*D + R with 0 <= R < D."),
+        ("U256::mul_div", ["U256", "U256", "U256", "Rounding"], "Result<U256,Failure>",
+         "With P = U(a)*U(b): ZeroDivisor iff D = 0; then Overflow iff floor(P/D) >= 2^256; then Inexact "
+         "iff Exact and P mod D > 0; otherwise floor(P/D), or ceil(P/D) for Ceil, with the exact Overflow "
+         "partition of that value."),
+        ("U256::mul_div_half_up", ["U256", "U256", "U256"], "Result<U256,Failure>",
+         "With P = U(a)*U(b): ZeroDivisor iff D = 0; otherwise floor((P + floor(D/2))/D) iff it is below "
+         "2^256, else exactly Overflow."),
+        ("U256::mul3_div", ["U256", "U256", "U256", "U256", "Rounding"], "Result<U256,Failure>",
+         "As mul_div with the complete 768-bit product P = U(a)*U(b)*U(c)."),
+        ("U256::products_ge", ["[U256;3]", "[U256;3]"], "Result<bool,Failure>",
+         "Always succeeds with whether the complete product of the first three factors is at least that "
+         "of the second three."),
+    ]
+    profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != "muldiv"] + [
+        {"stage": "muldiv", "member": member, "parameters": parameters, "result": result,
+         "meaning": meaning, "refinement_display": gate.NAMESPACE + "arithmetic256::" + member}
+        for member, parameters, result, meaning in statements]
+    defects = [
+        ("muldiv_zero_test_ignores_low_limb", "U256::mul_add_div_rem",
+         "if den.0 == Self::ZERO.0 {", "if den.0[1] == 0 {"),
+        ("muldiv_adds_one_to_product", "U256::mul_div",
+         "self.mul_add_div_rem(b, Self::ZERO, den)?", "self.mul_add_div_rem(b, Self::ONE, den)?"),
+        ("half_up_drops_carried_bit", "U256::mul_div_half_up",
+         "Self([den.0[0] >> 1 | (den.0[1] << 127), den.0[1] >> 1])", "Self([den.0[0] >> 1, den.0[1] >> 1])"),
+        ("mul3_div_inverts_remainder", "U256::mul3_div", "r.0 != U768::ZERO.0", "r.0 == U768::ZERO.0"),
+        ("products_ge_strict_order", "U256::products_ge",
+         "!matches!(compare(&left.0, &right.0), Ordering::Less)",
+         "matches!(compare(&left.0, &right.0), Ordering::Greater)"),
+    ]
+    profile["controls"] = [c for c in profile["controls"] if c["stage"] != "muldiv"] + [
+        {"stage": "muldiv", "name": name, "member": member, "old": old, "new": new,
+         "error_source": str(gate.SUBJECT)} for name, member, old, new in defects]
+    profile["scope"] = (
+        "The eight actual associated constants, eleven public conversions and five checked 256-bit "
+        "add/subtract/negation methods with exact integer values and exact Overflow partitions; "
+        "U256::div_rem and U256::checked_div with exact canonical quotient, rounding and refusal "
+        "contracts; U256::full_product and U256::checked_mul with exact product contracts; the "
+        "U512::checked_add, U512::multiply_u256, U512::div_rem and U768::div_rem wrappers; and "
+        "U256::mul_add_div_rem, mul_div, mul_div_half_up, mul3_div and products_ge over complete "
+        "512/768-bit products with exact refusal order, all without public input preconditions. The "
+        "actual negative_bits dependency, the add/subtract carry and borrow helpers, the private "
+        "divider, word insertion and schoolbook multiplier are refined at every limb width (the "
+        "multiplier whenever its output has room for the product). U256 has no checked_neg method. "
+        "The root and signed multiply/divide families, the raw wide word views, other arithmetic and "
+        "compiler/ghost-erasure correspondence are not proved.")
 
 
 def arithmetic_exceptions(root):
@@ -289,7 +344,7 @@ def arithmetic_exceptions(root):
 
 
 def record(root, out, cache, refresh_ordering, previous_source=None, conversions=False, checked=False,
-           division=False, multiplication=False, wide=False):
+           division=False, multiplication=False, wide=False, muldiv=False):
     profile = json.loads(gate.read(root, gate.PROFILE))
     if conversions or checked:
         include_conversions(profile)
@@ -301,6 +356,8 @@ def record(root, out, cache, refresh_ordering, previous_source=None, conversions
         include_multiplication(profile)
     if wide:
         include_wide(profile)
+    if muldiv:
+        include_muldiv(profile)
     previous = json.loads(gate.read(root, Path("verification/verus/ordering_types256_profile.json")))
     exceptions = {key: entries for key, entries in previous["native_configuration_exceptions"].items()
                   if key != str(gate.SUBJECT) and key != str(Path("verification/verus/ordering256_types_harness.rs"))}
@@ -443,12 +500,14 @@ def main():
                         help="Add the reviewed U256 full_product/checked_mul stage and its semantic controls")
     parser.add_argument("--include-wide", action="store_true",
                         help="Add the reviewed 512/768-bit add, product and division wrapper stage")
+    parser.add_argument("--include-muldiv", action="store_true",
+                        help="Add the reviewed complete-product division, rounding and comparison stage")
     parser.add_argument("--previous-source", type=Path,
                         help="Exact previous profile sources, required only for a compiler-ID migration review")
     args = parser.parse_args()
     record(gate.ROOT, args.out.absolute(), args.cache, args.refresh_ordering_bindings,
            args.previous_source, args.include_conversions, args.include_checked, args.include_division,
-           args.include_multiplication, args.include_wide)
+           args.include_multiplication, args.include_wide, args.include_muldiv)
 
 
 if __name__ == "__main__":

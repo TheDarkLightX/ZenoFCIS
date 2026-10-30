@@ -159,9 +159,16 @@ fn add_word<const N: usize>(out: &mut [u128; N], at: usize, value: u128) -> Resu
         #[cfg(verus_keep_ghost)]
         proof! {
             numeric_model::place_monotone(N as nat, at as nat);
-            if value != 0 {
+            if value == 0 {
+                assert(numeric_model::place(at as nat) * value as int == 0);
+            } else {
                 vstd::arithmetic::mul::lemma_mul_inequality(1, value as int,
                     numeric_model::place(at as nat));
+                vstd::arithmetic::mul::lemma_mul_is_commutative(value as int,
+                    numeric_model::place(at as nat));
+                assert(1 * numeric_model::place(at as nat) == numeric_model::place(at as nat));
+                assert(numeric_model::value(out@) + numeric_model::place(at as nat) * value as int
+                    >= numeric_model::place(N as nat));
             }
         }
         return if value == 0 {
@@ -505,52 +512,113 @@ impl U256 {
         }
         Self::rounded(q, r.0 != Self::ZERO.0, mode)
     }
-}
-
-#[cfg_attr(verus_keep_ghost, verifier::external)]
-impl U256 {
     /// Divides the full product plus offset, refusing a quotient wider than 256 bits.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::mul_add_div_rem_result(
+            numeric_model::unsigned(self) * numeric_model::unsigned(b) + numeric_model::unsigned(offset),
+            numeric_model::unsigned(den), result),
+    ))]
     pub fn mul_add_div_rem(
         self,
         b: Self,
         offset: Self,
         den: Self,
     ) -> Result<(Self, Self), Failure> {
-        if den == Self::ZERO {
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::zero_words();
+            numeric_model::conversion_representation();
+            numeric_model::product_offset_bounds(self, b, offset);
+            numeric_model::unsigned_bounds(den);
+        }
+        if den.0 == Self::ZERO.0 {
             return Err(Failure::ZeroDivisor);
         }
         let numerator = self.full_product(b)?.checked_add(U512::from_u256(offset))?;
         let (q, r) = numerator.div_rem(U512::from_u256(den))?;
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::canonical_quotient(numeric_model::unsigned512(numerator),
+                numeric_model::unsigned(den), numeric_model::unsigned512(q), numeric_model::unsigned512(r));
+        }
         Ok((q.narrow()?, r.narrow()?))
     }
     /// Divides the full product with one final rounding and checked narrowing.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::mul_div_result(numeric_model::unsigned(self) * numeric_model::unsigned(b),
+            numeric_model::unsigned(den), mode, result),
+    ))]
     pub fn mul_div(self, b: Self, den: Self, mode: Rounding) -> Result<Self, Failure> {
         let (q, r) = self.mul_add_div_rem(b, Self::ZERO, den)?;
-        Self::rounded(q, r != Self::ZERO, mode)
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::canonical_quotient(numeric_model::unsigned(self) * numeric_model::unsigned(b),
+                numeric_model::unsigned(den), numeric_model::unsigned(q), numeric_model::unsigned(r));
+            numeric_model::zero_words();
+        }
+        Self::rounded(q, r.0 != Self::ZERO.0, mode)
     }
     /// Explicit nonnegative half-up operation, matching the app fee primitive.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::half_up_result(numeric_model::unsigned(self) * numeric_model::unsigned(b),
+            numeric_model::unsigned(den), result),
+    ))]
     pub fn mul_div_half_up(self, b: Self, den: Self) -> Result<Self, Failure> {
         let half = Self([den.0[0] >> 1 | (den.0[1] << 127), den.0[1] >> 1]);
-        self.mul_add_div_rem(b, half, den).map(|(q, _)| q)
-    }
-    /// Returns the rounded square root of the complete product.
-    pub fn geometric_mean(self, b: Self, mode: Rounding) -> Result<Self, Failure> {
-        self.full_product(b)?.sqrt(mode)
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::half_value(den, half);
+            numeric_model::canonical_quotients();
+        }
+        let (q, _) = self.mul_add_div_rem(b, half, den)?;
+        Ok(q)
     }
     /// Three complete factors before a single final division/rounding.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::mul_div_result(numeric_model::unsigned(self) * numeric_model::unsigned(b)
+            * numeric_model::unsigned(c), numeric_model::unsigned(den), mode, result),
+    ))]
     pub fn mul3_div(self, b: Self, c: Self, den: Self, mode: Rounding) -> Result<Self, Failure> {
-        if den == Self::ZERO {
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::zero_words();
+            numeric_model::zero_words768();
+            numeric_model::conversion_representation();
+            numeric_model::unsigned_bounds(den);
+        }
+        if den.0 == Self::ZERO.0 {
             return Err(Failure::ZeroDivisor);
         }
         let numerator = self.full_product(b)?.multiply_u256(c)?;
         let (q, r) = numerator.div_rem(U768::from_u256(den))?;
-        Self::rounded(q.narrow()?, r != U768::ZERO, mode)
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::canonical_quotient(numeric_model::unsigned768(numerator),
+                numeric_model::unsigned(den), numeric_model::unsigned768(q), numeric_model::unsigned768(r));
+        }
+        Self::rounded(q.narrow()?, r.0 != U768::ZERO.0, mode)
     }
     /// Compares two complete products of three unsigned factors.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures result == Ok::<bool, Failure>(numeric_model::triple(a) >= numeric_model::triple(b)),
+    ))]
     pub fn products_ge(a: [Self; 3], b: [Self; 3]) -> Result<bool, Failure> {
         let left = a[0].full_product(a[1])?.multiply_u256(a[2])?;
         let right = b[0].full_product(b[1])?.multiply_u256(b[2])?;
-        Ok(compare(&left.0, &right.0) != Ordering::Less)
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::limb_representations();
+            numeric_model::compare_order(left.0@, right.0@);
+        }
+        Ok(!matches!(compare(&left.0, &right.0), Ordering::Less))
+    }
+}
+
+#[cfg_attr(verus_keep_ghost, verifier::external)]
+impl U256 {
+    /// Returns the rounded square root of the complete product.
+    pub fn geometric_mean(self, b: Self, mode: Rounding) -> Result<Self, Failure> {
+        self.full_product(b)?.sqrt(mode)
     }
 }
 
@@ -581,7 +649,11 @@ impl U512 {
     ))]
     pub fn narrow(self) -> Result<U256, Failure> {
         #[cfg(verus_keep_ghost)]
-        proof! { numeric_model::conversion_representation(); }
+        proof! {
+            numeric_model::conversion_representation();
+            numeric_model::limb_representations();
+            numeric_model::narrow_bounds(self.0@);
+        }
         if self.0[2] == 0 && self.0[3] == 0 {
             Ok(U256([self.0[0], self.0[1]]))
         } else {
@@ -687,7 +759,11 @@ impl U768 {
     ))]
     pub fn narrow(self) -> Result<U256, Failure> {
         #[cfg(verus_keep_ghost)]
-        proof! { numeric_model::conversion_representation(); }
+        proof! {
+            numeric_model::conversion_representation();
+            numeric_model::limb_representations();
+            numeric_model::narrow_bounds(self.0@);
+        }
         if self.0[2] == 0 && self.0[3] == 0 && self.0[4] == 0 && self.0[5] == 0 {
             Ok(U256([self.0[0], self.0[1]]))
         } else {

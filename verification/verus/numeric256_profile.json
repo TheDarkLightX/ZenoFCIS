@@ -1,7 +1,7 @@
 {
   "schema": "zeno-fcis/numeric256-profile/1",
   "namespace": "numeric256_harness::",
-  "scope": "The eight actual associated constants, eleven public conversions and five checked 256-bit add/subtract/negation methods with exact integer values and exact Overflow partitions; U256::div_rem and U256::checked_div with exact canonical quotient, rounding and refusal contracts; U256::full_product and U256::checked_mul with exact product contracts; and the U512::checked_add, U512::multiply_u256, U512::div_rem and U768::div_rem wrappers with exact sum, product and canonical quotient contracts, all without public input preconditions. The actual negative_bits dependency, the add/subtract carry and borrow helpers, the private divider, word insertion and schoolbook multiplier are refined at every limb width (the multiplier whenever its output has room for the product). U256 has no checked_neg method. The mul_div, root and signed multiply/divide families, the raw wide word views, other arithmetic and compiler/ghost-erasure correspondence are not proved.",
+  "scope": "The eight actual associated constants, eleven public conversions and five checked 256-bit add/subtract/negation methods with exact integer values and exact Overflow partitions; U256::div_rem and U256::checked_div with exact canonical quotient, rounding and refusal contracts; U256::full_product and U256::checked_mul with exact product contracts; the U512::checked_add, U512::multiply_u256, U512::div_rem and U768::div_rem wrappers; and U256::mul_add_div_rem, mul_div, mul_div_half_up, mul3_div and products_ge over complete 512/768-bit products with exact refusal order, all without public input preconditions. The actual negative_bits dependency, the add/subtract carry and borrow helpers, the private divider, word insertion and schoolbook multiplier are refined at every limb width (the multiplier whenever its output has room for the product). U256 has no checked_neg method. The root and signed multiply/divide families, the raw wide word views, other arithmetic and compiler/ghost-erasure correspondence are not proved.",
   "assumptions": [
     "Soundness of the pinned Verus frontend, vstd specifications and SMT solver.",
     "Correspondence between Rust compilation and the proof frontend, including ghost erasure and the reviewed constant annotations.",
@@ -390,6 +390,79 @@
       "refinement_display": "numeric256_harness::arithmetic256::U768::div_rem",
       "refinement": "numeric256_harness::arithmetic256::impl&%32::div_rem",
       "report_function": "numeric256_harness::arithmetic256::U768::div_rem"
+    },
+    {
+      "stage": "muldiv",
+      "member": "U256::mul_add_div_rem",
+      "parameters": [
+        "U256",
+        "U256",
+        "U256",
+        "U256"
+      ],
+      "result": "Result<(U256,U256),Failure>",
+      "meaning": "With P = U(a)*U(b) + U(offset) and D = U(den): ZeroDivisor iff D = 0; otherwise Overflow iff floor(P/D) >= 2^256; otherwise the canonical witness P = Q*D + R with 0 <= R < D.",
+      "refinement_display": "numeric256_harness::arithmetic256::U256::mul_add_div_rem",
+      "refinement": "numeric256_harness::arithmetic256::impl&%28::mul_add_div_rem",
+      "report_function": "numeric256_harness::arithmetic256::number256::U256::mul_add_div_rem"
+    },
+    {
+      "stage": "muldiv",
+      "member": "U256::mul_div",
+      "parameters": [
+        "U256",
+        "U256",
+        "U256",
+        "Rounding"
+      ],
+      "result": "Result<U256,Failure>",
+      "meaning": "With P = U(a)*U(b): ZeroDivisor iff D = 0; then Overflow iff floor(P/D) >= 2^256; then Inexact iff Exact and P mod D > 0; otherwise floor(P/D), or ceil(P/D) for Ceil, with the exact Overflow partition of that value.",
+      "refinement_display": "numeric256_harness::arithmetic256::U256::mul_div",
+      "refinement": "numeric256_harness::arithmetic256::impl&%28::mul_div",
+      "report_function": "numeric256_harness::arithmetic256::number256::U256::mul_div"
+    },
+    {
+      "stage": "muldiv",
+      "member": "U256::mul_div_half_up",
+      "parameters": [
+        "U256",
+        "U256",
+        "U256"
+      ],
+      "result": "Result<U256,Failure>",
+      "meaning": "With P = U(a)*U(b): ZeroDivisor iff D = 0; otherwise floor((P + floor(D/2))/D) iff it is below 2^256, else exactly Overflow.",
+      "refinement_display": "numeric256_harness::arithmetic256::U256::mul_div_half_up",
+      "refinement": "numeric256_harness::arithmetic256::impl&%28::mul_div_half_up",
+      "report_function": "numeric256_harness::arithmetic256::number256::U256::mul_div_half_up"
+    },
+    {
+      "stage": "muldiv",
+      "member": "U256::mul3_div",
+      "parameters": [
+        "U256",
+        "U256",
+        "U256",
+        "U256",
+        "Rounding"
+      ],
+      "result": "Result<U256,Failure>",
+      "meaning": "As mul_div with the complete 768-bit product P = U(a)*U(b)*U(c).",
+      "refinement_display": "numeric256_harness::arithmetic256::U256::mul3_div",
+      "refinement": "numeric256_harness::arithmetic256::impl&%28::mul3_div",
+      "report_function": "numeric256_harness::arithmetic256::number256::U256::mul3_div"
+    },
+    {
+      "stage": "muldiv",
+      "member": "U256::products_ge",
+      "parameters": [
+        "[U256;3]",
+        "[U256;3]"
+      ],
+      "result": "Result<bool,Failure>",
+      "meaning": "Always succeeds with whether the complete product of the first three factors is at least that of the second three.",
+      "refinement_display": "numeric256_harness::arithmetic256::U256::products_ge",
+      "refinement": "numeric256_harness::arithmetic256::impl&%28::products_ge",
+      "report_function": "numeric256_harness::arithmetic256::number256::U256::products_ge"
     }
   ],
   "controls": [
@@ -402,8 +475,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::impl&%28::MAX",
       "error_region": [
-        386,
-        393
+        393,
+        400
       ]
     },
     {
@@ -415,8 +488,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::impl&%33::MIN",
       "error_region": [
-        722,
-        730
+        798,
+        806
       ]
     },
     {
@@ -428,8 +501,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::impl&%30::ZERO",
       "error_region": [
-        561,
-        568
+        629,
+        636
       ]
     },
     {
@@ -441,8 +514,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::impl&%32::ZERO",
       "error_region": [
-        667,
-        674
+        739,
+        746
       ]
     },
     {
@@ -454,8 +527,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::U256::try_u128",
       "error_region": [
-        404,
-        416
+        411,
+        423
       ]
     },
     {
@@ -467,8 +540,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::from_i128",
       "error_region": [
-        742,
-        752
+        818,
+        828
       ]
     },
     {
@@ -480,8 +553,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::magnitude",
       "error_region": [
-        770,
-        784
+        846,
+        860
       ]
     },
     {
@@ -493,8 +566,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::from_magnitude",
       "error_region": [
-        785,
-        807
+        861,
+        883
       ]
     },
     {
@@ -506,8 +579,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::try_unsigned",
       "error_region": [
-        808,
-        824
+        884,
+        900
       ]
     },
     {
@@ -519,8 +592,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::difference_unsigned",
       "error_region": [
-        825,
-        848
+        901,
+        924
       ]
     },
     {
@@ -532,8 +605,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::U512::narrow",
       "error_region": [
-        579,
-        591
+        647,
+        663
       ]
     },
     {
@@ -545,8 +618,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::U768::narrow",
       "error_region": [
-        685,
-        697
+        757,
+        773
       ]
     },
     {
@@ -558,8 +631,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::U256::checked_add",
       "error_region": [
-        436,
-        454
+        443,
+        461
       ]
     },
     {
@@ -571,8 +644,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::U256::checked_sub",
       "error_region": [
-        417,
-        435
+        424,
+        442
       ]
     },
     {
@@ -584,8 +657,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::checked_add",
       "error_region": [
-        871,
-        892
+        947,
+        968
       ]
     },
     {
@@ -597,8 +670,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::checked_sub",
       "error_region": [
-        893,
-        913
+        969,
+        989
       ]
     },
     {
@@ -610,8 +683,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::checked_neg",
       "error_region": [
-        849,
-        870
+        925,
+        946
       ]
     },
     {
@@ -624,8 +697,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::divide",
       "error_region": [
-        255,
-        362
+        262,
+        369
       ]
     },
     {
@@ -638,8 +711,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::divide",
       "error_region": [
-        255,
-        362
+        262,
+        369
       ]
     },
     {
@@ -652,8 +725,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::divide",
       "error_region": [
-        255,
-        362
+        262,
+        369
       ]
     },
     {
@@ -665,8 +738,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::U256::div_rem",
       "error_region": [
-        473,
-        481
+        480,
+        488
       ]
     },
     {
@@ -678,8 +751,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::U256::checked_div",
       "error_region": [
-        495,
-        507
+        502,
+        515
       ]
     },
     {
@@ -691,8 +764,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::U256::checked_div",
       "error_region": [
-        495,
-        507
+        502,
+        515
       ]
     },
     {
@@ -706,7 +779,7 @@
       "error_function": "numeric256_harness::arithmetic256::add_word",
       "error_region": [
         149,
-        199
+        206
       ]
     },
     {
@@ -719,8 +792,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::multiply",
       "error_region": [
-        200,
-        252
+        207,
+        259
       ]
     },
     {
@@ -733,8 +806,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::multiply",
       "error_region": [
-        200,
-        252
+        207,
+        259
       ]
     },
     {
@@ -746,8 +819,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::U256::full_product",
       "error_region": [
-        455,
-        464
+        462,
+        471
       ]
     },
     {
@@ -759,8 +832,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::U256::checked_mul",
       "error_region": [
-        465,
-        472
+        472,
+        479
       ]
     },
     {
@@ -772,8 +845,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::U512::checked_add",
       "error_region": [
-        592,
-        608
+        664,
+        680
       ]
     },
     {
@@ -785,8 +858,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::U512::multiply_u256",
       "error_region": [
-        609,
-        618
+        681,
+        690
       ]
     },
     {
@@ -798,8 +871,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::U512::div_rem",
       "error_region": [
-        619,
-        627
+        691,
+        699
       ]
     },
     {
@@ -811,8 +884,73 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::U768::div_rem",
       "error_region": [
-        698,
-        706
+        774,
+        782
+      ]
+    },
+    {
+      "stage": "muldiv",
+      "name": "muldiv_zero_test_ignores_low_limb",
+      "member": "U256::mul_add_div_rem",
+      "old": "if den.0 == Self::ZERO.0 {",
+      "new": "if den.0[1] == 0 {",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::number256::U256::mul_add_div_rem",
+      "error_region": [
+        516,
+        546
+      ]
+    },
+    {
+      "stage": "muldiv",
+      "name": "muldiv_adds_one_to_product",
+      "member": "U256::mul_div",
+      "old": "self.mul_add_div_rem(b, Self::ZERO, den)?",
+      "new": "self.mul_add_div_rem(b, Self::ONE, den)?",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::number256::U256::mul_div",
+      "error_region": [
+        547,
+        561
+      ]
+    },
+    {
+      "stage": "muldiv",
+      "name": "half_up_drops_carried_bit",
+      "member": "U256::mul_div_half_up",
+      "old": "Self([den.0[0] >> 1 | (den.0[1] << 127), den.0[1] >> 1])",
+      "new": "Self([den.0[0] >> 1, den.0[1] >> 1])",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::number256::U256::mul_div_half_up",
+      "error_region": [
+        562,
+        576
+      ]
+    },
+    {
+      "stage": "muldiv",
+      "name": "mul3_div_inverts_remainder",
+      "member": "U256::mul3_div",
+      "old": "r.0 != U768::ZERO.0",
+      "new": "r.0 == U768::ZERO.0",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::number256::U256::mul3_div",
+      "error_region": [
+        577,
+        601
+      ]
+    },
+    {
+      "stage": "muldiv",
+      "name": "products_ge_strict_order",
+      "member": "U256::products_ge",
+      "old": "!matches!(compare(&left.0, &right.0), Ordering::Less)",
+      "new": "matches!(compare(&left.0, &right.0), Ordering::Greater)",
+      "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "error_function": "numeric256_harness::arithmetic256::number256::U256::products_ge",
+      "error_region": [
+        602,
+        614
       ]
     }
   ],
@@ -952,8 +1090,8 @@
     ]
   },
   "source_hashes": {
-    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "d0d6aed6602cc514c12e5b79cd70722bdf5aacdfaf2729d3490b9983d113c652",
-    "crates/zeno-fcis-value/src/profile2/numeric256_model.rs": "1bc792e8fc4ff1c0c8c1d769871b16c03dbc20bf406e08482c4221b08a896d27",
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "667bbab2a3898ee6528cb4ee9770a29fb839e7aa46551a5b85a1b2d540a9b415",
+    "crates/zeno-fcis-value/src/profile2/numeric256_model.rs": "a0bc226857d5d4130ef09243c966a575c618a6efd4c4a9be5ca12b4ae1538c4d",
     "crates/zeno-fcis-value/src/profile2/number256.rs": "b2c8d2d6019e7b0d5eb46954a60c796df493e37cc171d1c22f1612ace900bdc5",
     "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs": "a4760c2561e903ee726c2a7489cdfdc2c46483f28861e955e27c32b58d8536a9",
     "crates/zeno-fcis-value/src/profile2/ordering256.rs": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825",
@@ -979,6 +1117,11 @@
     "numeric256_harness::arithmetic256::impl&%28::div_rem",
     "numeric256_harness::arithmetic256::impl&%28::from_u128",
     "numeric256_harness::arithmetic256::impl&%28::full_product",
+    "numeric256_harness::arithmetic256::impl&%28::mul3_div",
+    "numeric256_harness::arithmetic256::impl&%28::mul_add_div_rem",
+    "numeric256_harness::arithmetic256::impl&%28::mul_div",
+    "numeric256_harness::arithmetic256::impl&%28::mul_div_half_up",
+    "numeric256_harness::arithmetic256::impl&%28::products_ge",
     "numeric256_harness::arithmetic256::impl&%28::rounded",
     "numeric256_harness::arithmetic256::impl&%28::try_u128",
     "numeric256_harness::arithmetic256::impl&%30::ZERO",
@@ -1027,6 +1170,7 @@
     "numeric256_harness::arithmetic256::numeric_model::bit_step",
     "numeric256_harness::arithmetic256::numeric_model::borrow_step",
     "numeric256_harness::arithmetic256::numeric_model::canonical_quotient",
+    "numeric256_harness::arithmetic256::numeric_model::canonical_quotients",
     "numeric256_harness::arithmetic256::numeric_model::carry_step",
     "numeric256_harness::arithmetic256::numeric_model::carry_word",
     "numeric256_harness::arithmetic256::numeric_model::compare_order",
@@ -1034,6 +1178,7 @@
     "numeric256_harness::arithmetic256::numeric_model::constant_bits",
     "numeric256_harness::arithmetic256::numeric_model::conversion_representation",
     "numeric256_harness::arithmetic256::numeric_model::divide_finish",
+    "numeric256_harness::arithmetic256::numeric_model::half_value",
     "numeric256_harness::arithmetic256::numeric_model::lex_value",
     "numeric256_harness::arithmetic256::numeric_model::limb_representations",
     "numeric256_harness::arithmetic256::numeric_model::limbs_bounds",
@@ -1042,6 +1187,7 @@
     "numeric256_harness::arithmetic256::numeric_model::limbs_push",
     "numeric256_harness::arithmetic256::numeric_model::limbs_update",
     "numeric256_harness::arithmetic256::numeric_model::minimum_bits",
+    "numeric256_harness::arithmetic256::numeric_model::narrow_bounds",
     "numeric256_harness::arithmetic256::numeric_model::nonzero_value",
     "numeric256_harness::arithmetic256::numeric_model::one_bit",
     "numeric256_harness::arithmetic256::numeric_model::place_add",
@@ -1049,6 +1195,7 @@
     "numeric256_harness::arithmetic256::numeric_model::place_positive",
     "numeric256_harness::arithmetic256::numeric_model::place_power",
     "numeric256_harness::arithmetic256::numeric_model::prefix_two",
+    "numeric256_harness::arithmetic256::numeric_model::product_offset_bounds",
     "numeric256_harness::arithmetic256::numeric_model::product_row",
     "numeric256_harness::arithmetic256::numeric_model::product_step",
     "numeric256_harness::arithmetic256::numeric_model::quotient_bits",
@@ -1064,6 +1211,7 @@
     "numeric256_harness::arithmetic256::numeric_model::unsigned_word",
     "numeric256_harness::arithmetic256::numeric_model::upper_equal",
     "numeric256_harness::arithmetic256::numeric_model::upper_nonnegative",
+    "numeric256_harness::arithmetic256::numeric_model::upper_zero",
     "numeric256_harness::arithmetic256::numeric_model::value_bounds",
     "numeric256_harness::arithmetic256::numeric_model::value_div_place",
     "numeric256_harness::arithmetic256::numeric_model::value_four",
@@ -1075,6 +1223,7 @@
     "numeric256_harness::arithmetic256::numeric_model::wide_representations",
     "numeric256_harness::arithmetic256::numeric_model::zero_value",
     "numeric256_harness::arithmetic256::numeric_model::zero_words",
+    "numeric256_harness::arithmetic256::numeric_model::zero_words768",
     "numeric256_harness::arithmetic256::ordering256::compare",
     "numeric256_harness::arithmetic256::subtract",
     "numeric256_harness::arithmetic256::wide::less_equal",
@@ -1093,8 +1242,8 @@
       "requires": 0,
       "ensures": 2,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "31d372c8d5996b3b986ceb89876d0561cc3b08caf92564582ac106e3c1eb7152",
-      "body_sha256": "0ba043dd32b2bc501542c974de8acf1b53933c9388025c0275189d4df36a4736"
+      "ensures_sha256": "3d7a737c7f73f39ddac743ecdad6087fe0a82f70a94b53fae10b1f42cd70ee96",
+      "body_sha256": "551fcf3548b7dd4d25532bbba00bdb2c5529423ab97ace3794abd099a52a8a64"
     },
     "numeric256_harness::arithmetic256::add_word": {
       "mode": "Exec",
@@ -1102,8 +1251,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "4355034b95ee26f34820a0b1e0d1c7252d00a05eaf374c05b5dae48d2d46f0ad",
-      "body_sha256": "8ea04e3a1e5880f5eec9d63579214659fec9fae8295d2683b142db44901e45e9"
+      "ensures_sha256": "9b89a87499b2699c0d0bde79c8093ea70c5be61f7a2b221c7f39d8405d3fe632",
+      "body_sha256": "04bb00486943ecce88fe15a57fe08d8b053622056517be98a2c1194efa075606"
     },
     "numeric256_harness::arithmetic256::divide": {
       "mode": "Exec",
@@ -1111,8 +1260,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "c343756c6309db09154de3c89b3003b960d28138e1cc015edc620143a0b54f9e",
-      "body_sha256": "78e4ab1bca4cf0d9ea3940c0e647b5210bea4299de20415ae5ef677e586b962f"
+      "ensures_sha256": "2196ec3201eea0024c81e2e8dcd1ad9e3972fdbadd2260aded454ef199773045",
+      "body_sha256": "fdf6e667920e1ff1ccdfe603304a705b372c02e3a5d2627e0e4a98505e62f8e0"
     },
     "numeric256_harness::arithmetic256::impl&%15::clone": {
       "mode": "Exec",
@@ -1120,8 +1269,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "7402e3c5e85c0a3d2159463905c21edb12de3e6e6b225984373153320c45bd32",
-      "body_sha256": "152eda952b0fd810e8b6679cb3a6a19a7362516f59360db250bbfa59ae689a0c"
+      "ensures_sha256": "f69501bf76c989460a60d70ea26a2b39589002fb024a996b7588fac3441e6f7d",
+      "body_sha256": "7945304222a40da6a85267f088181070385c0bf8b5068868e46c8db205716d52"
     },
     "numeric256_harness::arithmetic256::impl&%1::clone": {
       "mode": "Exec",
@@ -1129,8 +1278,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "42ba53eb48ffa189e79c20b8ae47a75d3182e6869b51b241495cea6aa842c061",
-      "body_sha256": "1c5a8d7f298b3f8aa99a1a2ed819617edf6c43bffcfed39dbe9c9854763d53fb"
+      "ensures_sha256": "5149088fd874af77245a69683192b4de10acb3b531ec6b151fc21eb53f72fefb",
+      "body_sha256": "7a76baf61bf980aa5c7d356cdce00e4106bebc7cb06154829352d5f496a789c1"
     },
     "numeric256_harness::arithmetic256::impl&%22::clone": {
       "mode": "Exec",
@@ -1138,8 +1287,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "d8f92ff4c010a0043b83dfd9d338aa2bea55eaed856715bf380c54d81da22270",
-      "body_sha256": "eff32c82383dbcc51017653d0341c52845e120aa429bb11ee36d2288a479d9ae"
+      "ensures_sha256": "68c6944c53d9c8b1a490ad641484324496b2149d36a39371f33c8f3994296997",
+      "body_sha256": "79165c5740c629b22c5b6ce3b7c4151ff3e95bab0696afddf24f76bad841cb32"
     },
     "numeric256_harness::arithmetic256::impl&%28::MAX": {
       "mode": "Exec",
@@ -1174,8 +1323,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "a1f5a9d1c884131247b055c8c90603832ec4609a62b92df35635001d30443109",
-      "body_sha256": "c77072a7a7c53bf7d3c24857d0dc0ce81a9784bf4859861800e2cc67543ffa56"
+      "ensures_sha256": "1f81ff0bae3f335161e953999ce3e6b1aa04aed279782fa1af697f58eb4328ce",
+      "body_sha256": "16abd635ac58f04efb1b899099bc525e79f6dde12f7f0d33f03d63d5b13188e4"
     },
     "numeric256_harness::arithmetic256::impl&%28::checked_div": {
       "mode": "Exec",
@@ -1183,8 +1332,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "eae9f30815ba326bef5375a74889c0fa32a599698aa36c498a2d03c78e536f13",
-      "body_sha256": "1b7dad5753c13fc9e5677c2539ba4a34d3d6e9b7efcce45631cbf6740d3d1fe3"
+      "ensures_sha256": "9b7a65c7f065e7f88ae55d54630f93abb2e2d084844719742cb69eb1f4aa8b84",
+      "body_sha256": "d452cbd1728a1df412cb588a93778ba680b2196af18af23fdef0ce56f4e887c2"
     },
     "numeric256_harness::arithmetic256::impl&%28::checked_mul": {
       "mode": "Exec",
@@ -1192,8 +1341,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "87edadaec52fd1a201f4878f1b6f4fa917a07e6c824c30d2f5cc26573d7a6a6c",
-      "body_sha256": "253a3cf1cc38960897a5890b143ba5bd2bf8330e252ce9581c7d1b5d1744c2f7"
+      "ensures_sha256": "adbc714909f93efeaaa50d03ef1e5260d23479d06fcef4f56f21bd86e53de28b",
+      "body_sha256": "8f55352934fb000a5f7b2bdd2825d12fbccf980c11a3e20efcbb81bda27c4ecd"
     },
     "numeric256_harness::arithmetic256::impl&%28::checked_sub": {
       "mode": "Exec",
@@ -1201,8 +1350,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "c9efb1ec8be254ff537a88b0b8280052047309ec184572ab1511438d6849738e",
-      "body_sha256": "2d2a2f8110547270e9c38ef740af3b58b53a91a915f7541a50540c10d2d8fc1b"
+      "ensures_sha256": "6685c02205b54491086e1bc788a29bfdf369470182585946cb5e76462c06bbcd",
+      "body_sha256": "cb51fa9b5549d5d2361741763b3bb82e3fdb6142f8fa9a6594ab510a8b139344"
     },
     "numeric256_harness::arithmetic256::impl&%28::div_rem": {
       "mode": "Exec",
@@ -1210,8 +1359,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "985b0b591309d3af575cc464bae0e0c57db6e79672f10be9efe1d2df0d807f06",
-      "body_sha256": "4c36f5df8ebc5dd73e229d98929c9b02429255b908519ec8a9cd0cca4cbceb30"
+      "ensures_sha256": "28bab29867f9dd3f9865af6b172abf6991fdb8f426c8fd9d5d66adde68fc43f5",
+      "body_sha256": "ebe9f5f4e9908e23a4645ad2d1385b55e491453f5057a80c196129d8ba39a2fb"
     },
     "numeric256_harness::arithmetic256::impl&%28::from_u128": {
       "mode": "Exec",
@@ -1219,8 +1368,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "44e5a735d26a10c8e7237e93dafd49ae5d5d87c53ec03d7705fef629b93b00f9",
-      "body_sha256": "712d789e33b3bf3c9d651762edb77218b037fcf74d0415a4d8f4d3660e07a592"
+      "ensures_sha256": "b94e1e95cfc95f87afa0393be9767b636b3b6be16650a594113625555d25994d",
+      "body_sha256": "5ab87bcea020cab7458cfa4d98f899e72d8b77caee48c19e8e55023cf80c413c"
     },
     "numeric256_harness::arithmetic256::impl&%28::full_product": {
       "mode": "Exec",
@@ -1228,8 +1377,53 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "ae260969cf6acbf6a5a4d279d8c6df137c36632bc9652513757260d883b560a8",
-      "body_sha256": "b6242b6007ee2a16529428c426a53273d4e92ffc0b37c20ef40809f10f0b89c9"
+      "ensures_sha256": "49ff6c91add05e408c76f65eb8355dfc66e32ea73389d27fd6ab283876992ef0",
+      "body_sha256": "4f30bd3baeb55e5e137d09bd6db2e0cd42663dfc4980a9a86080f63552696ce7"
+    },
+    "numeric256_harness::arithmetic256::impl&%28::mul3_div": {
+      "mode": "Exec",
+      "signature_sha256": "9e2941a1552536070dd3d433f793fb877aefc3a45c72b88ae0eee8e542f56381",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "f866bebbc6b2b0a1caf22453e05bd157f0b09c1d5e4486635dcc986fcafa60bb",
+      "body_sha256": "8c672205795ec62cadad9c556885e4bc2fe0e965a2fa59c2b4f37b500ef763d7"
+    },
+    "numeric256_harness::arithmetic256::impl&%28::mul_add_div_rem": {
+      "mode": "Exec",
+      "signature_sha256": "aa2b41074ea7319c0abc28730219981aef26a6f057705156fc2208b0db8106d9",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "964f53cdd688ffd082e9e8c1e69ab8210a9027c3e0a4a16b4be542db9530e4b0",
+      "body_sha256": "5bd918561ba57fc751f7312a0616cba84fc2853273b6af30c333307e72487891"
+    },
+    "numeric256_harness::arithmetic256::impl&%28::mul_div": {
+      "mode": "Exec",
+      "signature_sha256": "9268e5970a6836205a6a67090cb7a7a6ccf469e3095b27542680d7cdc584a231",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "146d4fa0597f048d97bf299b360374a25b472d137498e9f244103304d0f7ceee",
+      "body_sha256": "a03730584590ea4e8f9eb056541dc3155a45b92d825e9662b57ee644c8ad23da"
+    },
+    "numeric256_harness::arithmetic256::impl&%28::mul_div_half_up": {
+      "mode": "Exec",
+      "signature_sha256": "6f0a199d28b2779aeb577c3d2ce7d0e5abfa6e4e92982862888e5b7e280286b9",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "a8028f181cd8a9aecb138ff9dacc23c760928abe8a3d2ce73aa4c0d99470b52d",
+      "body_sha256": "8cbe58027297022611c31c1236dd4790fd2319bb068268d3c693711c6284e53b"
+    },
+    "numeric256_harness::arithmetic256::impl&%28::products_ge": {
+      "mode": "Exec",
+      "signature_sha256": "695eded261ff5e1733d0bbbddf7fdabfdc3b494a536fe83d704149222335f2fc",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "52e68f9aac70d7fc69dcbbbbc645200ffe5de65ccd5670edfca5887aab7fb074",
+      "body_sha256": "25e518a5410a920e572009263b9a0fac6e733bba04c89cdd06bf183ac3366e14"
     },
     "numeric256_harness::arithmetic256::impl&%28::rounded": {
       "mode": "Exec",
@@ -1237,8 +1431,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "b4108ada5716f6382287473c963b0405ec1d195a20d4d550b76a915e4979e588",
-      "body_sha256": "5c467110e1d069b059a05b6dee67d62b4bf43b4234358713df327737f7a329d9"
+      "ensures_sha256": "c4878123f7a108b60d55a8d092752648d3e4c01addda06f753722fed9fb6f71e",
+      "body_sha256": "c7093996bb2850c2dcc043a9e6d2653abe1066a5a4a75366646a0b77e8812607"
     },
     "numeric256_harness::arithmetic256::impl&%28::try_u128": {
       "mode": "Exec",
@@ -1246,8 +1440,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "16d8b6cc87c3213c9c813eda1625adb4609b87f504cea363493755058a77fc9a",
-      "body_sha256": "70f781782d0365650678c7011b25a29853dfb2a6b8f350c09ef6b349f8b0c5dc"
+      "ensures_sha256": "c9e22a7f5506b1c5f0631976a080b682ecdbb6f211908dfbd7c4605b9df44f90",
+      "body_sha256": "616d4bc380b197185ad9f158bd044f08fba484a557c556170d0414d74d8321f3"
     },
     "numeric256_harness::arithmetic256::impl&%30::ZERO": {
       "mode": "Exec",
@@ -1264,8 +1458,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "79935410f9eb06ac7c8fc98f78f33c159f415472c394bb3908f05104c0f8f3cc",
-      "body_sha256": "b0bf83b96c02bd172ebec40a59b39a83019084c8d82f2453618cd59bd605b30c"
+      "ensures_sha256": "847fd73beeec66172554e3e481a7c65a28e80d09efef626741f8a09200be6f78",
+      "body_sha256": "0aabe02aaa0f1d8cd3e7bdf9ed893443f4c3c470556bf65681038dd4558594a2"
     },
     "numeric256_harness::arithmetic256::impl&%30::div_rem": {
       "mode": "Exec",
@@ -1273,8 +1467,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "d863a5ea389c6f32e8e3adc1462e533106d2d8b12d6ba9c1e94bf1aba6f7ff06",
-      "body_sha256": "b8ff223a0bf0a6b230903c95f6f43e0a85d56ad37fb095c650e46944c350151e"
+      "ensures_sha256": "cc8366f4f9ac01b2f3dca9abe03c60458b278e6694aa0c178cca58689f6edb4d",
+      "body_sha256": "f7076f4da7c4ffe8a08360aa104be821fee6cfba954ffc8a4abf66c2ce3f211a"
     },
     "numeric256_harness::arithmetic256::impl&%30::from_u256": {
       "mode": "Exec",
@@ -1282,8 +1476,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "d52d22f653d50e0a09626e922c02ca6c103082449c61bfeebb3c2a265af13f87",
-      "body_sha256": "a3a26449e2b23758b926aa468e07de0812528e00fa9b78b6f6edf68c7f194ad6"
+      "ensures_sha256": "a2a2cd4a1039ea679c4a741c1dcaabcfa395870c85b35114ac9cfca28d4f2a4d",
+      "body_sha256": "861997350e4504b0b2a87732abaf4e440b675ee2826f68b08e932b6a61cf1503"
     },
     "numeric256_harness::arithmetic256::impl&%30::multiply_u256": {
       "mode": "Exec",
@@ -1291,8 +1485,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "7e2b1ff5720ca681fae92ef6cd78c268bbf573ea065570e9d352fb5a68623c4a",
-      "body_sha256": "4aee9b45a98ad531d6a0036cf38b0fe6e9e29ca076c8c6eec3a3f365906397aa"
+      "ensures_sha256": "32e57d7753d07537cbe652e069685ad485eced59421db4f3b9f91b981b47b23c",
+      "body_sha256": "db180c3db9b4f211bac6fea50e908b396ccec674a45a073471ca28568b28ade2"
     },
     "numeric256_harness::arithmetic256::impl&%30::narrow": {
       "mode": "Exec",
@@ -1300,8 +1494,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "99840dc81c532c4518d15f48bcb2e867b3ba3871e9dc34c811950b0154b5818e",
-      "body_sha256": "79e81f214a50505f3077bab7b03b9aad7033235fc54b3fce3d4374871f9c908c"
+      "ensures_sha256": "38ae60ac1fb441dd8931246e8830eec4826d2fb6fb13bb948c366bad641ecd52",
+      "body_sha256": "e95031796ebc766028b2182ea3286a04f5ac8a60429c191de225632b9987bb4a"
     },
     "numeric256_harness::arithmetic256::impl&%32::ZERO": {
       "mode": "Exec",
@@ -1318,8 +1512,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "22f47c03e41c619af31d935c0ddf7f9a3e32db22deeb099211eddfa61076fe70",
-      "body_sha256": "ba437eb184b855416aef98a6f0491f98714b8da866f775bd658a33ea61524a40"
+      "ensures_sha256": "225ef8d767173548c78856c46eec83a5a226326aa3a600116a2e50f9fe263d9d",
+      "body_sha256": "aaa962d1db00efb2b0bc02c60b21afe0fc58f93243cda32f041a60743d72455c"
     },
     "numeric256_harness::arithmetic256::impl&%32::from_u256": {
       "mode": "Exec",
@@ -1327,8 +1521,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "e4ee46a4a411dd8a88fe24a67c4649d71bf6efa7cbc8150db16530f6c4ad16a2",
-      "body_sha256": "e2de71f455a86121220c8808348868fc757c8263a6b046a3370981c6a7b87fac"
+      "ensures_sha256": "346e3892860a0876152a765c08ba0c9e2610e8ed69c89918b9fffd855da51128",
+      "body_sha256": "5b862968c2561adf18932d5f121faa8855988efe215607b32bd6ac230a00031e"
     },
     "numeric256_harness::arithmetic256::impl&%32::narrow": {
       "mode": "Exec",
@@ -1336,8 +1530,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "6af40f5b50a502c9b54e59af71fd80195aeacd398f57c635c849c4d200bc5a3c",
-      "body_sha256": "ac62fa97f53934ae2b43b673ad584b8d034cc92b67121ac0dbe67f40e696e7d2"
+      "ensures_sha256": "6d7eb009a5539d035079d966c7eeb91e83029bb5dd098b92a6a204e3f9371087",
+      "body_sha256": "0357b7e800b6c16abae13f5c51a980269ece2ef7a427a8b65ad7bcd2cd54f416"
     },
     "numeric256_harness::arithmetic256::impl&%33::MAX": {
       "mode": "Exec",
@@ -1372,8 +1566,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "00f048f0fab37d045f71e0888c1f98f9dc8848bea39a1d06ca93882d4eeae839",
-      "body_sha256": "febcb04d3764adeb02204380ab817be14106d7bd00094c8f2b4aad2007b0f33f"
+      "ensures_sha256": "a8ac396642fbc2d7a5d0f76d5c0f968f4a38a42443494a124b7680ff340f292d",
+      "body_sha256": "9c40090f30e0060b0f0859734ae514c63178123a20bd97b47728be4d5e69baff"
     },
     "numeric256_harness::arithmetic256::impl&%33::checked_neg": {
       "mode": "Exec",
@@ -1381,8 +1575,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "a2031b7484ec14754f53129f91f3634f55191c21194376fc14e41db7cf582574",
-      "body_sha256": "ffeb840b5115ea26cc08a9c1dcdff9f0918e74f88e6418d1d5a37c1490410bbc"
+      "ensures_sha256": "d2a16e0aae3c238688c28d95f3c0d9eb329010a2fecf4835c7edbf9fe871b272",
+      "body_sha256": "48b0b71b37cb4864e1b089f6407b2c312ad5ea2ea3f4ec0f8a7941b48581de42"
     },
     "numeric256_harness::arithmetic256::impl&%33::checked_sub": {
       "mode": "Exec",
@@ -1390,8 +1584,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "f49c5d7aa7e8f1baf40dc137b701419c097ee00de8aa106aff32de9780f6af3f",
-      "body_sha256": "51df87e573bc11608a3b3920d3d02d5358f641d9953fd9695d1d382971525a04"
+      "ensures_sha256": "bfe05af7617a7cc4914f1e64b972091e94208c1a3c7be8d242e3c3b6f6696037",
+      "body_sha256": "b863dc769dab365174a4c67d8eb9a86611ff09c2dac71faf947373ca51c48c97"
     },
     "numeric256_harness::arithmetic256::impl&%33::difference_unsigned": {
       "mode": "Exec",
@@ -1399,8 +1593,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "b0d4be63ff552608bb5712f60b5ae0bc2543c11948f308c89613d5910f643a17",
-      "body_sha256": "3ded6898517e2ea1312d3465f6b3477a23812f5c720d8c353207a23416c4a6fe"
+      "ensures_sha256": "b107dff2b61bc5a21907af11372d00b25eb9bb23ac07ed7ab81e36baa294868c",
+      "body_sha256": "1f52210d101a2cc0f6233994b28ce03565e2d54b7203a55f2b4ba60b9df631cf"
     },
     "numeric256_harness::arithmetic256::impl&%33::from_i128": {
       "mode": "Exec",
@@ -1408,8 +1602,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "3aee66d476f1c45a5373d76ae5a38f9a769f4c432539dca60fe21cd2178a3f26",
-      "body_sha256": "0426770c0b54516714c37add2198135f0b4566f2b9546d5bebbd29f57e38cb49"
+      "ensures_sha256": "9ca1763c8197c21bd6d0937372f4b3a6fd12aa5b76d7251f7ca00777a4132641",
+      "body_sha256": "051c7996037747a359a27195d5c73c8960eee421b47cb313d705769814f32303"
     },
     "numeric256_harness::arithmetic256::impl&%33::from_magnitude": {
       "mode": "Exec",
@@ -1417,8 +1611,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "c005fa2be9d0c5659ada2b305f9f5ec7f1e16e9b0c6fdf51d7a45c6b3662255c",
-      "body_sha256": "b9af8f8a298467f2500f6fc3d5a2dca2ce57fc3c40d58b79e3c8c803f472e5bc"
+      "ensures_sha256": "1a3adb6dd7009c82bb2669cdc518536a1e4e65736150b93f32291460898ec893",
+      "body_sha256": "551c932fe4c879986df739f571c8e299f649443a52f4683993032df34e3ddea3"
     },
     "numeric256_harness::arithmetic256::impl&%33::magnitude": {
       "mode": "Exec",
@@ -1426,8 +1620,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "226bc7a0722a3575da96c7524ca3d72f8d25af264f7c07d5fccfffe6924d69c0",
-      "body_sha256": "475fcb95728646319fe76bef67a7c7227a55ca49bbe3281e598a8ef869ec832f"
+      "ensures_sha256": "d1b920de44d70273ffe638bde2cdb5cb6441b256133ded1ddf3e37bf5ef204f3",
+      "body_sha256": "f046fda38381da59c0bbabac1777bd171d3ca3ee454559bd734a78ebac0d10cc"
     },
     "numeric256_harness::arithmetic256::impl&%33::negative_bits": {
       "mode": "Exec",
@@ -1435,8 +1629,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "07457842420c5cc286484b873e1ffaf4406eba914f4bfedd2860b1b0d6c638ca",
-      "body_sha256": "430d9b0ac6f8ebe4e2a548d58f739f4581e6da2174752ae82778580000d0ade4"
+      "ensures_sha256": "a8d3fffba108d251ace52679f1e31f08a846a3e075b3a77e1c36099fef317365",
+      "body_sha256": "10645bed4f4ad42ad9ec4924d9362be750e89490f18c1fb974825c1985daf774"
     },
     "numeric256_harness::arithmetic256::impl&%33::try_unsigned": {
       "mode": "Exec",
@@ -1444,8 +1638,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "ca1e3c187d0bfd1a42f430ef8696bd1a6b93bbcba8a28ed76f2e6a8c5764f219",
-      "body_sha256": "07181bed1482d4eacddf27314644868a43476ff6ec1555cd704d9ff4b51a87b4"
+      "ensures_sha256": "16628c40a19ad03e453d1b2f133e0e4efa4b5423abf44d6053ae1370a5252035",
+      "body_sha256": "0433908c2ca31c135e26179670c52cbd1e5c28cd139e94178b6ea3f160b0e791"
     },
     "numeric256_harness::arithmetic256::impl&%8::clone": {
       "mode": "Exec",
@@ -1453,8 +1647,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "e138fcf1abc8c734c3e00b495e2a78c0bc2a7f4d0245b0285e3eb9a29d8c5cb5",
-      "body_sha256": "7c2a94f6be4a7a03eb077e4078859efdea8408a2d254d8fd6bc2cd25e1785ce5"
+      "ensures_sha256": "ed2ccddadd8d4fc43273ded597e98e4147204e37ff1e448f3fdd5a6c925d2e06",
+      "body_sha256": "0145a09339c10e59888ceee6f8d4d0e783c75391b5ef8e15216e05919c2b7b69"
     },
     "numeric256_harness::arithmetic256::multiply": {
       "mode": "Exec",
@@ -1462,8 +1656,8 @@
       "requires": 1,
       "ensures": 1,
       "requires_sha256": "30ca32258fb63a41b14b11b19885eeab2061c7e2a3d2bbb760c67b3d858ebc5c",
-      "ensures_sha256": "8a8033db6717293b4271285127bfa000608dd48f9abb40ea82bd3771ca77fbd8",
-      "body_sha256": "d55b81dce04142c3305fdd5a3d819ba43b5b6159ea340584f550196cc01bca06"
+      "ensures_sha256": "91fc15df3b3099365d6a6b111ee3d49423182d61a63a73aff1bdd610bac54537",
+      "body_sha256": "22a654f9ccc09e421bf983e652978140a69e59048d5025f6adbb165707dade0a"
     },
     "numeric256_harness::arithmetic256::number256::impl&%14::cmp": {
       "mode": "Exec",
@@ -1471,8 +1665,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "248e8c05e5571471d52460c884c6dc9554b77b498833bcda0ee9eab58777cae5",
-      "body_sha256": "94390f6fd324de920053238b3b6894a8e2502fad387bb282d57b08dc69383955"
+      "ensures_sha256": "a182e989ff24d980b0e56e9ae865566f74fe8680806b736ec9703b2fbcbaaabb",
+      "body_sha256": "664b1647745cfabb81d11b9ec063a6f3967db75167b844d96a73cd4d56b8d92c"
     },
     "numeric256_harness::arithmetic256::number256::impl&%14::from_words_le": {
       "mode": "Exec",
@@ -1480,8 +1674,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "b2b0ba0b152538a93e33e0b12a3fc232834623ec1c010b010cbeee227a239127",
-      "body_sha256": "07a6a002abc52cf6026a475aec2df2a126a71e36080acb6754faddf2f265a6da"
+      "ensures_sha256": "debdccb5b40a41cd7082124008932ee0a441f9d89a5caa5494dfac833bfc6021",
+      "body_sha256": "9bf3543ce91b241cfca13aa08c11b34620aee717ee7a22f04686d4036ccb58da"
     },
     "numeric256_harness::arithmetic256::number256::impl&%14::words_le": {
       "mode": "Exec",
@@ -1489,8 +1683,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "99d9e580431313cc820d37a1e5ae26a49cf6b7edf13db84778267a2297e0d977",
-      "body_sha256": "cd0e07879eea577c0c75c3c89457307124aa0dce92ae4f46e64d9d3da80c32bb"
+      "ensures_sha256": "c15e2a80cca7cc79cf80145b719576c325058bab7f0678e4f93e60b1a2fd535a",
+      "body_sha256": "6c43537f3ea794556a04409c17ece0bcec0e22dda9e44278e3b87de14c5a68a3"
     },
     "numeric256_harness::arithmetic256::number256::impl&%15::bits": {
       "mode": "Exec",
@@ -1498,8 +1692,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "b9717becf7af6fd7adff042cb2d1b1ac267d2bfe239ec991a0484677673219ff",
-      "body_sha256": "a1f23213ed2189ff925064662eff39d4295adaaacff2d5029a92da8154f2c56f"
+      "ensures_sha256": "5202c16ad95729eea075ad11492249e3137abbf3be785bb2782ebbf4b7a58482",
+      "body_sha256": "8f3821d778aa846a267c1b75f6cfb1bff0924a28506626ec6f1b1d4f29a61c91"
     },
     "numeric256_harness::arithmetic256::number256::impl&%15::cmp": {
       "mode": "Exec",
@@ -1507,8 +1701,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "23580005f92ed6582d21fae7f1f0fdb2b20809ae85f94c9ae02d0b72420dc789",
-      "body_sha256": "64131d972ced3bbbc9a7f9ba5a937e9b385d51d854a57784118aef1531f3982e"
+      "ensures_sha256": "ff71ed6f15a69c3549bf41e1187b75b862cee339723a1416d932d5aafecfd5a3",
+      "body_sha256": "60261c819f947207de84e91925d720c22f4727ed0d2f1552a23c2fc51997a09d"
     },
     "numeric256_harness::arithmetic256::number256::impl&%15::from_bits": {
       "mode": "Exec",
@@ -1516,8 +1710,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "e844ebcffb10c163deed71e0f33fa4a43498d13f9861a1561b29601bd01d923f",
-      "body_sha256": "e449f5eb24de9b1bc68332391b9500eff174a803301eb8520a883c50f706f97b"
+      "ensures_sha256": "5d1849213e68bb305e8f6d18109529597f28e41fc7939e525bdaee4581aa0829",
+      "body_sha256": "613ab00df9fd0fdde4c80cc513fb70d03184c2ed1a06cc6d1887a4b46b470770"
     },
     "numeric256_harness::arithmetic256::number256::impl&%15::is_negative": {
       "mode": "Exec",
@@ -1525,8 +1719,8 @@
       "requires": 0,
       "ensures": 2,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "c00a62bf3824e1aad196cef1cdec9ee30e089e7ab0fbb7dcac434c6e1102d2f8",
-      "body_sha256": "f26ed88fea569fe78864d278ef91c02a9d80aeb86f69dd5c6ff174e65a7de9cc"
+      "ensures_sha256": "08f047da7235b06c36703c8b0c374d42aede6e6199088a28d3f4757ccb8239d5",
+      "body_sha256": "42b368dd212e6e4443b99055f8124c6ea1c49a91b418fc40098455a9049677ff"
     },
     "numeric256_harness::arithmetic256::number256::impl&%16::ordering_words": {
       "mode": "Spec",
@@ -1535,7 +1729,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "34730fecb80fffef89418fb28c152416d442d4e75937ed26a41f02d71ba99d74"
+      "body_sha256": "d9e8c42f6bea639531d2bcbf5edc304e10c4ff2b4b352a6c0ea9934624f86b64"
     },
     "numeric256_harness::arithmetic256::number256::impl&%17::ordering_bits": {
       "mode": "Spec",
@@ -1544,7 +1738,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "bbc6191caff271fe261fa3fa58953a78e788537849b74c2ef89f7e877b2e114d"
+      "body_sha256": "b6cb5d6d6bb4c76ff04187bd9af19d19d9e10d5721a6c0ae8fee80079e25d841"
     },
     "numeric256_harness::arithmetic256::number256::impl&%1::clone": {
       "mode": "Exec",
@@ -1552,8 +1746,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "b67c101470d714cec1fcee94d8cafd3c6a9ac9e438692e4c8bf0c44feb0507db",
-      "body_sha256": "d8f9560f80279fa9fd5de3ac0056ae2f1fbce52beb11bd323ecb34277e507577"
+      "ensures_sha256": "87fd1bac10991095679536a10f2b61dbb54b6f070bae76ba2339e7ee524d9c0d",
+      "body_sha256": "484f6b79a9207388ad7ed59c4d2ee014fb3578c1f382c572d08fb40b0daa6814"
     },
     "numeric256_harness::arithmetic256::number256::impl&%8::clone": {
       "mode": "Exec",
@@ -1561,8 +1755,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "c5eca94e0f8bb3b4187259de61842fc43bd683332f8f7f2404979f14a196d048",
-      "body_sha256": "f04bba591e335369195099cf19c1ff6170607219e53256c7983c019a55e18315"
+      "ensures_sha256": "eab8556112f1c434b653b160ed23a6aa76685fa8852e2b5f0d891cd71913c3eb",
+      "body_sha256": "e86c662a42bfdb5ee3b5dcfd7afa854e68070a049051c38e5a17a754528f25fc"
     },
     "numeric256_harness::arithmetic256::number256::numeric_representation": {
       "mode": "Proof",
@@ -1570,7 +1764,7 @@
       "requires": 0,
       "ensures": 4,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "1ca4d9a89bbd19bd4b1e87a2d563b2f3b883daef4577ea36f0a949d96e81777d",
+      "ensures_sha256": "5855c4dae2d691abd21a07e09d5b7481d373eecacc3bcfcd0db97475a8d27789",
       "body_sha256": "8251e6fdfd64ec72c4b4c3a4cf9c5a0231a224884c8ad4a7c6a9097fe17c7e1d"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::boundary_witnesses": {
@@ -1597,8 +1791,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "ed5d51a46f43feb9d4362aaa11e4e65a182abfb84d64f6a51fd04a696dd11e01",
-      "body_sha256": "16e91e2b2e9a99f42844258e628fa32226d3d850debc49209d2ac0617748b9e3"
+      "ensures_sha256": "0663b133ff76e5e9141de96fc85edfed6b4c455e0af10abcb82ffdb881bc9994",
+      "body_sha256": "fb0acf12d5311236c4058942008d67cd60cf3da1c6815677ab8ef9d529a94d41"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::integer_order": {
       "mode": "Spec",
@@ -1607,16 +1801,16 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "8c938062c3273eb2fe63a4804b906a8cec3cf97310e0336b160638a7f0d9efb5"
+      "body_sha256": "aeb8f9f83122aae0353e018d95dd4815f6631c2ed7265171db678eee9ab48c69"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::lex_two": {
       "mode": "Proof",
       "signature_sha256": "f51db28092506b4f22b9812f4b847cb0dfa4f06fd23f9bd0990928cee80fb834",
       "requires": 1,
       "ensures": 1,
-      "requires_sha256": "08b65c575c81b6e329147d9e1db045835e21771cc5ce987e94f723b6ebc956f3",
-      "ensures_sha256": "a135347b6889dfc8bab05f912ca8c354da1fef950c842c4962b2beb1e8fae9c9",
-      "body_sha256": "10e296a81f7241051cf742b66611ded9b2793f82b73f0843192626a47d732fb3"
+      "requires_sha256": "25207812630c9ef6060c152f5bd64a03840baef3fd05b41485f5b5c7a5c9cb36",
+      "ensures_sha256": "5027059a5279629d6d278a7291b59b974ac2a6358df99e08aab82b076461364c",
+      "body_sha256": "c272034f58dec7a6d9fabef26be0330f4016848d57c34e08887832ac0807c9d3"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::limbs_bounds": {
       "mode": "Proof",
@@ -1624,8 +1818,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "164a167fb7c976fa728bc15c68dc2a7dc5a70ddb266176f4c903c2574c263629",
-      "body_sha256": "170d77056a5494a47f5e3e0dbf0d0ce1462688ece97b2c30462c4d576003aa1c"
+      "ensures_sha256": "4d329e4de2e8f12490557e117cbd0dbefeb279e391d08934e67463b5edb9a6fc",
+      "body_sha256": "7b95e9c1986172d7410188e7bc2a0054a18f6bbb356841ea3ebcd2c61f94c155"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::modulus": {
       "mode": "Spec",
@@ -1651,8 +1845,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "a1618ba9d070494c3ebc906c2d31018e7a5950b0a4168ead7b23b78727bd5dce",
-      "body_sha256": "94a5f180220b6b289905ef68cb6a88a8ce3390f3c86a321bc0a78e7f68f6b891"
+      "ensures_sha256": "12feb98b61af7266d9a80c2128412b49f44499e35ccd777df5632ae4b66587c5",
+      "body_sha256": "3c7c1a7b0b97828911daf1c4457fcdc2aad3b1b480c449a624585ca6fbfe2009"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::signed": {
       "mode": "Spec",
@@ -1661,7 +1855,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "57d956d9356f386390469cb50efafcf0c68603c848c75b637ac749ed0a142185"
+      "body_sha256": "a7a54bfa46d64efd2cac7b11bd4c4702038ffab10201bee6dc7b85f41c2d7065"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::signed_bits": {
       "mode": "Spec",
@@ -1670,7 +1864,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "d580bcfabe0e9ad9802c4e3a8cf5696847dc4f701b2b0470a5915dff0e567af5"
+      "body_sha256": "0d4731b0583810e0568fb04c4e1d58302894269f0e3aacaf3f078e5514a030cd"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::signed_bounds": {
       "mode": "Proof",
@@ -1678,8 +1872,8 @@
       "requires": 0,
       "ensures": 2,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "51651f317956b734f713a6823fdb253ab8f7f5f530cc869f38f156dfc95a079e",
-      "body_sha256": "96663641b67857b7dc42fa65857b9689fa2d893fef3d5eb6828768f21d60cb66"
+      "ensures_sha256": "76223784cdaf1df8a97d16b93ce98b674fd7dd91eacdfa9b6870a84515c201fc",
+      "body_sha256": "66b7f1e0b114f27942f767f66d1ea559bb505f5bad8556532b6c3c69cd71ff67"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::signed_order": {
       "mode": "Proof",
@@ -1687,8 +1881,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "893462b0ed49a56da2f98f9877f3d82e1e20f41363617b26ff7d8b871b8655bf",
-      "body_sha256": "0ff1542bd8dfef628df1ce369c2a89ca3072e78280e999307d5b19a272ff9cd3"
+      "ensures_sha256": "883d77ac1eddb74c71a79a7f76275cba41ef0b369c53577f2cf301376a64e93a",
+      "body_sha256": "f23d68d60efcf357dd529addc996e6a832843a0f3dd8d6bc5e52f48ea80a3ad1"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::unsigned": {
       "mode": "Spec",
@@ -1697,7 +1891,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "e558dea22f6b2fa29e12738639015245c0aa26fbce55e5190153909f013b6017"
+      "body_sha256": "6f79597b947cb1d03ba88dd293dd87403463be52a70bcd6d867e468e6f9adab9"
     },
     "numeric256_harness::arithmetic256::number256::ordering_model::unsigned_bounds": {
       "mode": "Proof",
@@ -1705,8 +1899,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "1dc6f181bf0cfabff52c20886d99abaf18b24acf2665a20af83a4aba694b81a0",
-      "body_sha256": "ec6e34b4dec8a1bb47943459619104171df4fd55468b1a9d1f5b2c8e57802d3f"
+      "ensures_sha256": "d133feace4a1c9d36031c7c6ab9b6f1f1682a95b9622e714b039595652c0075c",
+      "body_sha256": "ee7a4a55c2896bc294b97d2dc75df09113c38d85fb86354c024734d2e3b1560e"
     },
     "numeric256_harness::arithmetic256::numeric_model::add_word_result": {
       "mode": "Spec",
@@ -1722,54 +1916,63 @@
       "signature_sha256": "424c88268b179cc238943449a3893cfbb43caaee021efa9f264ddb9a5b69fcda",
       "requires": 1,
       "ensures": 1,
-      "requires_sha256": "48176b616c07712018a1b1e3639f0f6c4f2481c461dbfea1317df8f83fdc00d7",
-      "ensures_sha256": "8e22f3b5653e4c7b539ebe96cea1d556c946fc6f89202f6b674d57600b6dc04d",
-      "body_sha256": "d450dc3149ff1748c188fd8808bb23e0a83de6499fa98c6cd6870eafff98c943"
+      "requires_sha256": "6a1abe39cf20a2d407e993ae736a63e641fe9f8db53eb98ae5a9421dc43f2355",
+      "ensures_sha256": "aec6bd0bf0fc24a6509dcef07f66d6b9390d90dfccdb7ae39195a65ca40f227c",
+      "body_sha256": "d9a5b0ff7816ed02bb64b523845f0ddfa3101c1f16505b9e285693bcc1ee7c32"
     },
     "numeric256_harness::arithmetic256::numeric_model::bit_step": {
       "mode": "Proof",
       "signature_sha256": "f933e351638f3365bca2c3d2b1627f09ae949cfec5620a94f8882f82a5d57f12",
       "requires": 1,
       "ensures": 2,
-      "requires_sha256": "c73e1177fc86a595c02775132f51c53660708b16416236e97b96a9454746d23d",
-      "ensures_sha256": "b7018833d0c3d7b14054e3582730c2138e624f369d6e5b0fa3b6334a8a34880e",
-      "body_sha256": "e4952dfa40183d9e5e78438716ff84f75d68055e8b18be60ee6a89af6cb81813"
+      "requires_sha256": "b7e16e7ebbcbea77449cb3051701d016c561d49a47e7c93806d524e603c8c58d",
+      "ensures_sha256": "9ab0c5da9d18f1884aa63209e93bc59b1707ce1c510eacbe03e499ce6e294238",
+      "body_sha256": "b200e03a789059dfe45c43fb7aacfb2ab74a539351b7e2661efd1a05f7e6ce60"
     },
     "numeric256_harness::arithmetic256::numeric_model::borrow_step": {
       "mode": "Proof",
       "signature_sha256": "43edfd64ceef1e6233b75b5742e10524ba3c48f15322da505ab63637ca9b190a",
       "requires": 5,
       "ensures": 1,
-      "requires_sha256": "62a7a79e17d6068c3a32e599eb648123a5e31702e04db22b58c7e6c2606943a6",
-      "ensures_sha256": "e10fc97fbcd17d8509b616ff51156ae54323064d2aece0ee9e07ec64e63e45d7",
-      "body_sha256": "9ea522a62ae613be04d920a5f86f1182fabd99dd2e38dcbf5d2c75048df19d65"
+      "requires_sha256": "f716bf6ffdb66be15d1277499fbc811fe497e13de49737bf057e182be34c55d9",
+      "ensures_sha256": "af83c45fc47dacb6eac5295c616658aaed1f63dfc69e594af7d5d6cddc47c159",
+      "body_sha256": "0be2dc26df30699ff233ab483859fc3c8d01452b464dc81b1187446c58f4248d"
     },
     "numeric256_harness::arithmetic256::numeric_model::canonical_quotient": {
       "mode": "Proof",
       "signature_sha256": "e7e57702575626471194a791a21d5d12c1c532469005193578a6659f4582550e",
       "requires": 1,
       "ensures": 2,
-      "requires_sha256": "7002830436bdb755f726e966af317519a1725de83658cf4bc5fc679bce55dc37",
-      "ensures_sha256": "a97db617f1ac7090c6fa6c8757bdcbf2de9f76f4414e82f917512b6fcfa2d398",
-      "body_sha256": "7289430bedbe19b6cf7ec2a06b632ba13e7dac6b116f582655a17fc6ddf9439d"
+      "requires_sha256": "db5489efcba9059cdff3929302e8998cb980ddbf6c39991b93703e393488c5bb",
+      "ensures_sha256": "e03e3b4c778a854b569492bcb85bf1680f4dab2ab06416944a4142c963e8f298",
+      "body_sha256": "849a9e51b9439c3a33d2639ea39b4a87fe0362e7af5c82516ef1f24294f38137"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::canonical_quotients": {
+      "mode": "Proof",
+      "signature_sha256": "c506630c5c47ba8db01cf1fa2df8d29049dfc58a4a1e7f271c3c53e460250058",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "6f70837d69c4763d3ffbb0365ec9a5f7de8e3ee50fe58f1e261e5cd5fd0b076b",
+      "body_sha256": "9dc9d5f9a338b562fe72504d1cdf95d06955e964d3705944adeaa4f93a52b871"
     },
     "numeric256_harness::arithmetic256::numeric_model::carry_step": {
       "mode": "Proof",
       "signature_sha256": "43edfd64ceef1e6233b75b5742e10524ba3c48f15322da505ab63637ca9b190a",
       "requires": 5,
       "ensures": 1,
-      "requires_sha256": "f6bf9571bb15ee82c28dad2a3f3fa84789bb78b7fd69d96c931267914d53bc8a",
-      "ensures_sha256": "5ee924c2c319e8acadf9443dac78dcad357b413f6d6025556e802b4649cdd42c",
-      "body_sha256": "467211600d67f599dc02ea8bb64c28d313811a083e8c5f67da67a9bdba975499"
+      "requires_sha256": "cdd748dab31a1c8e1803b391c652d30627aa0d5a2e352d65e04f593099b6708e",
+      "ensures_sha256": "6a9dbe8d9b0c2b015f1bf19c12dbbdef08eaede25fb128b390242b8d616edb22",
+      "body_sha256": "76a4370a1ea862e9382f3e3055f6a8b65261511dc59abaa832b1815444f5cd7b"
     },
     "numeric256_harness::arithmetic256::numeric_model::carry_word": {
       "mode": "Proof",
       "signature_sha256": "f0165f84751cb245a4f596412afbe6557752d145fdc79e959b5506edfdc99130",
       "requires": 3,
       "ensures": 1,
-      "requires_sha256": "0295ca09287bf56899f0c66a0cb5e20e46afa25ac6cf11f7cf831eb81ed0778c",
-      "ensures_sha256": "54bc0c0b28ce7284e0bc9d3e68d10d43eb41f932280c34c8eb43baaff6308e2d",
-      "body_sha256": "e2210df086d76ae1ed7801f08feb0c34a7c539e22246a56e1a3035f9be85cf26"
+      "requires_sha256": "b48963f114e65d5e07d2494760e5d37c77bab076d960762bd6f612f8f3fa0b70",
+      "ensures_sha256": "bee3f22ad190be5d98dab7d79e90a42ea0b340f48429567f437143be0e82b53b",
+      "body_sha256": "719bf94f42bad280ca88f20eec95e75029702d92863853d722162b0dc6645992"
     },
     "numeric256_harness::arithmetic256::numeric_model::checked_div_result": {
       "mode": "Spec",
@@ -1786,8 +1989,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "40f1a3a28e6b23ebf9aca086a1beb6b5d3e5099af09e822c0db3d5f47991495d",
-      "body_sha256": "a4850fd7bb3d530629fe24f05527ce2faababbf25da8269f2f2fed5c74964218"
+      "ensures_sha256": "9ec100f1e33ee24d83484c4c57734fc2e4778a9418ab6ba3c1a42cbf27e456f8",
+      "body_sha256": "df75fa6180d93d0d402b78b99cd4b32ae5298f34a130d938b784b4c1452695d4"
     },
     "numeric256_harness::arithmetic256::numeric_model::complement": {
       "mode": "Proof",
@@ -1848,9 +2051,9 @@
       "signature_sha256": "fd278a79a38f26843ee2f5b7f899bd7e9e0f8a374f8bfe88ec0cbd2557d2af0d",
       "requires": 3,
       "ensures": 1,
-      "requires_sha256": "ae0345ba353b4bb266bee06fe8e62102f4878fc1e2579e107bd6aa17be23a537",
-      "ensures_sha256": "74809d16873770fe867e76eb968ec50840d734c8b18204ac9a3d36780ed8119b",
-      "body_sha256": "6132367d9f14336a14390d586d1a8eb4d2ad812c733cf1cde336f871e9147ec0"
+      "requires_sha256": "26cff9b34d02dc78c6d8b008ffa9e7124cab8549a21ee032fdb3712fef9dd27a",
+      "ensures_sha256": "1f8b96b3a629df78414ee007e0732b27533984694f773ac645dcfd167c9e45f2",
+      "body_sha256": "aa5e9aff3d25c2d046243448733cc8295102021eeaca3ead5cbb3fbb385a60de"
     },
     "numeric256_harness::arithmetic256::numeric_model::divide_result": {
       "mode": "Spec",
@@ -1860,6 +2063,24 @@
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "body_sha256": "9159076394fb5c3947bc3c0bb987c2c19370bdca91d43eb5a3763d1c7c8529c1"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::half_up_result": {
+      "mode": "Spec",
+      "signature_sha256": "f1decd0dfc5c9af3677d44eb54e5ce20d5ca80a4a5be845d77befc3221385f56",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "c702fdb722b19246aa594ef648c92d75860a58ddc3221568feca74cc58b31918"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::half_value": {
+      "mode": "Proof",
+      "signature_sha256": "a439958a06237dc90ac28d0ce06c439d0fac8836b2f20aec074e8ab5cabea3d3",
+      "requires": 2,
+      "ensures": 1,
+      "requires_sha256": "a351fd306aaa862838dcf735da29902fa874ae60172fb87a118ebc935f5ad149",
+      "ensures_sha256": "391f0ffbb7324c093b91475a072dd0c7a8222d9c5142378837c48e78fd20415c",
+      "body_sha256": "9aa6ac9d1f9f8479650f199d9960f58ce29d7dedc22875e2b19fa1996e435467"
     },
     "numeric256_harness::arithmetic256::numeric_model::impl&%0::numeric_words": {
       "mode": "Spec",
@@ -1884,9 +2105,9 @@
       "signature_sha256": "2914ca4e3e44812fc4b5b4434664ee8d08165c52cf1ac79b1cda80270251d05e",
       "requires": 4,
       "ensures": 1,
-      "requires_sha256": "9443f5c73f9b01e51c49c1bea3c04950afa84b771a0d273fb99040e08e5bb516",
-      "ensures_sha256": "df786915b67dd60efab767bbe762a67d944dc31863f1af18027ec57aaee00126",
-      "body_sha256": "a0a34a072c551463d985cfbd20ddede746488689aedb68483df5f4d55fc1bdce"
+      "requires_sha256": "4d2104739322f6c33f67d1b813cd05b671861262c56b85c8838c276e7e8a9f42",
+      "ensures_sha256": "007ddfd079f6af007369e9886f84231c807703d715ae6c2c7652fd597921bdad",
+      "body_sha256": "324148eaea967f3bce2ad20e9d49c3c5af37acf8d38043f6d4ae4880c5621d9d"
     },
     "numeric256_harness::arithmetic256::numeric_model::limb_representations": {
       "mode": "Proof",
@@ -1894,8 +2115,8 @@
       "requires": 0,
       "ensures": 3,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "921619050fb2cb9d0f5d33b16c338b6a3905979d00b3518504a568ded3ef8c24",
-      "body_sha256": "23621caea3d0c1cb85d30f847eb39064ed17e944656ba63c01b074fae7b9fde8"
+      "ensures_sha256": "b12a90b0b65575315d165e428ed120c89a3da1f17c721023e125449ec8731636",
+      "body_sha256": "2aad7ad559238d3c3c44149c831b383d767d83cc2aee7f99a99f051e345d8a13"
     },
     "numeric256_harness::arithmetic256::numeric_model::limbs": {
       "mode": "Spec",
@@ -1911,45 +2132,45 @@
       "signature_sha256": "bebd0123a8e9b28e9b4a814f91e37a12c815658773adc2cb8ecd3d25aa6e0731",
       "requires": 1,
       "ensures": 1,
-      "requires_sha256": "e6ac4a7b512f8598ace73cad64a6b09597f2ffa7b915a5b00de58a814ac49d55",
-      "ensures_sha256": "f58792850505f5eb9000648e2f343eb7986c4d4b2aaad7ae83bce78c83e57c78",
-      "body_sha256": "1162bbe875474629edb705776ecf47931bee08017908d03f36fd4023029cd5a5"
+      "requires_sha256": "048fd9561420545d19e5fb2db8398880e1aa27deae50d87e0229644855f3cfc5",
+      "ensures_sha256": "93e9db4b5ba4555b5b540128f763d24c166e6a843037639ae5086cd7519c6e4a",
+      "body_sha256": "a077034095f8a5781fcd4fbdcf9e2658d06d318ab8463814c9750306c0fbf912"
     },
     "numeric256_harness::arithmetic256::numeric_model::limbs_equal": {
       "mode": "Proof",
       "signature_sha256": "f3f8ee07cf70b854452306451407031bc8764fa1ebf62504165b1cc807ec84ac",
       "requires": 3,
       "ensures": 1,
-      "requires_sha256": "975346cdc1951d00f1d5420569715ad159d2cf931c1e2572b8ed30a4a2656616",
-      "ensures_sha256": "69406633d0b0a9486ede7c8d76954d4e9041d6e46a6da0e790aba494a149a562",
-      "body_sha256": "9655c9ce2fb36cf9232777e7d67b93b0a77b90dd0e099865ee6ae9a7db2f13eb"
+      "requires_sha256": "4d7e2e33c997a8a8e78ab6ecede9a8bab615b776c56ef8165c40f351a9de61f8",
+      "ensures_sha256": "582e1d339f9e4fea2a6fb6869f62f1b8ab22dd856f14b6b67d7291abcd4da9a4",
+      "body_sha256": "f29805d6b5bb9fd53eeb286e782e63386ab213fc19cb0748cc8b3596ec7326ed"
     },
     "numeric256_harness::arithmetic256::numeric_model::limbs_monotone": {
       "mode": "Proof",
       "signature_sha256": "ccccc571f143821c20015b4455332e97883476c30fe18406d2aa1c7390b06491",
       "requires": 1,
       "ensures": 1,
-      "requires_sha256": "79002a2b9597e732de480ea248d072792e04df01c1e183df9f5ddbefcd91fa18",
-      "ensures_sha256": "0529539a6786ae9af1563dba91421235f41a808190e33fc72bfd325fa2ecc6cd",
-      "body_sha256": "f3e1b6ea24b048a2a9df7e4ecf1d20722f545cd1d0b5161daffb43915e805202"
+      "requires_sha256": "16d1c2cfb5dd15ab28e2f5de967794ae7a8ddd3ca76458caf52a16f0ea3fd47c",
+      "ensures_sha256": "4230dc65f8d6735648a55367a54084a0960dc7a77360d8cf2e33c16da2b00693",
+      "body_sha256": "8c1ca3784a077b74342cfbf22e83272de8b5034f4890877a9347c0e1e892315b"
     },
     "numeric256_harness::arithmetic256::numeric_model::limbs_push": {
       "mode": "Proof",
       "signature_sha256": "b395ab0871ff11426f58fc3d85b6275dfacdf5c74709fca4e897756bdf689837",
       "requires": 1,
       "ensures": 1,
-      "requires_sha256": "29954b453e0c454635c10a132889693a9c3ef2282bac4d1bb63a9429f45feee9",
-      "ensures_sha256": "68e76e83e107de6282685c24471d0d79e29a9d5c6ea011b4455b4d28560c78bc",
-      "body_sha256": "f3446d17578201f0125c245635c51656714173cea94b627b905c8c0126755bed"
+      "requires_sha256": "41d72d2e68bc34bb2f4c3d81c0610ba9e3606ec507c76084b42480ff63d53ae0",
+      "ensures_sha256": "a97aa86e94a59bfac2903c3c2cefa2c87db70b47f3628850e33dde56ab6f618a",
+      "body_sha256": "799f321b958aeeed4bd57795931d057aa47f5c0090d67a85ba6d5bf6468ed75d"
     },
     "numeric256_harness::arithmetic256::numeric_model::limbs_update": {
       "mode": "Proof",
       "signature_sha256": "1aeab7aa65fac3a432734298e71943f62538d34354d1384a7c31b06a3063d348",
       "requires": 2,
       "ensures": 1,
-      "requires_sha256": "ef135f3fb89f11bbc79f12fb2ef6af94fe28a1ad0c7834f786966206cbfc7c55",
-      "ensures_sha256": "317b171cdd8be8fc0d98a350fc71f399851df4fc338b11dc3064312cd1988e96",
-      "body_sha256": "280ed567a32274a976482469610d86aad8654410f1c0df0a1a484e6b0ad6d524"
+      "requires_sha256": "1b44ae7d27084d702aeafa13489bc9d22ec1413fe7c056c6c4ddcf89663b55fb",
+      "ensures_sha256": "675fb07a258c3b5888ffffa05979cea0ba5ba3cbc1037ccb424bb036b1ceae00",
+      "body_sha256": "8f22f5b8c85281ff3d75e5629d3aae25aa83d023c1c25917ea1a1c8177c7b85d"
     },
     "numeric256_harness::arithmetic256::numeric_model::minimum_bits": {
       "mode": "Proof",
@@ -1960,14 +2181,41 @@
       "ensures_sha256": "eaac8cbd824089a15091607edf6c5feb7c373579fb11fbad151d677c838f0f32",
       "body_sha256": "15fbfaaf8d160eef774221decfb607ec2c6b3fcf3d7622848f0de82c4a2c9a63"
     },
+    "numeric256_harness::arithmetic256::numeric_model::mul_add_div_rem_result": {
+      "mode": "Spec",
+      "signature_sha256": "ff975f0a21a0d9aa964b49fe07c40bd8822bcf7875ac44243e797a63b1dbd956",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "079166165d94cfd8c63307e9a1930bd81b93a928be8e0d181d33611d83a44543"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::mul_div_result": {
+      "mode": "Spec",
+      "signature_sha256": "23d122dfbb7adf7fda5532c37fd68bb5e1f838d89f126a8b13d674b427293a27",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "d01f76b8c61b27c2888d2256fe7333e67e05d8ba2fc369e355b52e95247df9bb"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::narrow_bounds": {
+      "mode": "Proof",
+      "signature_sha256": "d5b8a07ecec9189e119cf70e2a447c0b3ee5d8faf385fae46c8f04f408ad2988",
+      "requires": 1,
+      "ensures": 2,
+      "requires_sha256": "3c66bf206c5b5ac8d8f14ce4bba50999ce8514eb902fafde9af9d635f31df48d",
+      "ensures_sha256": "7fc18d7156196ff1043b0ed191bc6ab4ff6d81b42276f8ae6adc2aa88cb7fb65",
+      "body_sha256": "81f92ff6a1c2e2ca839120d4b5265d96147cc341c1a77766651ef75eded2d2ba"
+    },
     "numeric256_harness::arithmetic256::numeric_model::nonzero_value": {
       "mode": "Proof",
       "signature_sha256": "9398213ebb8beff3b3eff2ebe5c64a94156ed2d7e9d63070b3d67e7b391a6736",
       "requires": 2,
       "ensures": 1,
-      "requires_sha256": "2d500bf193a4b33bced0d32689172b59740abc1516ba6cd3ab11e03318f96b6c",
-      "ensures_sha256": "718d48e3f1322fd330c31c76bdbed26300540622656a5409c90010c2217f4ddb",
-      "body_sha256": "af641031df5d0f35075850266f38e4c0250171c15ca7d1f100d540c4d47911dd"
+      "requires_sha256": "6b8dc70adf5c60eb2e5cf077a9f6ed254ee38ac3b9a16aa3db925f45e2dc8231",
+      "ensures_sha256": "fd2a125660c987c7bcded25656e47440b268c54de2a4da84190e410aa88afe94",
+      "body_sha256": "6b2a781113cad10942239c5cd8ad41a901536295f21e82a121f2cdb96449f31e"
     },
     "numeric256_harness::arithmetic256::numeric_model::one_bit": {
       "mode": "Proof",
@@ -1975,8 +2223,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "d224017bc21bd113ac9bc5e1ceb09bc8bd4e699e4f7e6dcb0d30d3831c329f98",
-      "body_sha256": "0e7dd87b2691fd8a5b842bec0baf8bf2620da8391949f23340280e476ccab4f3"
+      "ensures_sha256": "e17a2a950f54cc7989f7b4a090584f1ca5825af29208dca3e8a626c4f92d872e",
+      "body_sha256": "67eb67e7210ade02a51c25447039420be16765e0dad72a64b606a2711f0820d3"
     },
     "numeric256_harness::arithmetic256::numeric_model::place": {
       "mode": "Spec",
@@ -2002,17 +2250,17 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "b546c708f062c0e42ce18bf8cea3f18e54521782a572e28d3cdd0813b74a0b84",
-      "body_sha256": "54cd73d20b3df7efa82c19ad1b0f4cd1aa8a1d81f8caf84b93a391c04c4b59f9"
+      "ensures_sha256": "0dc73b177174d6c6ec9ba65fbdd8fbdb033402a50beea530856d886d1b4682b7",
+      "body_sha256": "790a4ccde93246c390bc76ebf0c8f8e6e8331dd5c8de205468452245fec766aa"
     },
     "numeric256_harness::arithmetic256::numeric_model::place_monotone": {
       "mode": "Proof",
       "signature_sha256": "5806fc17ce841b810c4f837b9e9230b3a808da1377a44aa620d7eb51a40054aa",
       "requires": 1,
       "ensures": 1,
-      "requires_sha256": "c00fc24ad680d7c9850e935cf7d98d2dd5165a6d3f369b8b16645a3327549630",
-      "ensures_sha256": "f85af0ce326e164151f4c78d10e3ec5bb1210f02b3e16652bc4fe0509ac260f8",
-      "body_sha256": "f597a81430c97e2ed2396f3eeac22132cf7291499e18e2d6dcb98deb25b6a9c0"
+      "requires_sha256": "b8874e05f071cf8478cade2cdb9a7a9fa4b3dba1d7b9799d32ef0d8ad4db5623",
+      "ensures_sha256": "e02e9c5c20c6b2573852bb74732dae8c35f024b41fcebfd33ac47728f441c38f",
+      "body_sha256": "7e1ce53d85a9b8db44a3fa987101687f799d9fba8e4f9c9cd05fd0799fbbd3ea"
     },
     "numeric256_harness::arithmetic256::numeric_model::place_positive": {
       "mode": "Proof",
@@ -2020,8 +2268,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "879b5ce87024eeb93bd3b4ba1e056d632e0704f8c78b33cac224c494c83f8b49",
-      "body_sha256": "a61038e4c581b69ae4341588e438dac5ce5d40743853a137004fba796a805336"
+      "ensures_sha256": "acc6ed39e8e0fbbb99156abb603876242a837e0d094aa54fbdc48be03bd36e59",
+      "body_sha256": "c27f279c5f5fffdd85e354be95011bd256793a48920d07209fec43365a70d67c"
     },
     "numeric256_harness::arithmetic256::numeric_model::place_power": {
       "mode": "Proof",
@@ -2029,8 +2277,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "ae0ffd6c82e3033d2fa06e173a180610700a9b85a2c7920190058143901ad6a8",
-      "body_sha256": "80cc12b2170268c6b1aa9852ba91aa3c654bc387d2987b26c15884eb3604ed6e"
+      "ensures_sha256": "d549635066089123d5a442dc775cf545c58ed015fb24e5809b36bf9e382e3033",
+      "body_sha256": "a0e512e1db1e6be4666bfd8bf0756bcf0fe107dcbd981c6988bfef25a5e722a1"
     },
     "numeric256_harness::arithmetic256::numeric_model::prefix2": {
       "mode": "Spec",
@@ -2046,9 +2294,9 @@
       "signature_sha256": "bebd0123a8e9b28e9b4a814f91e37a12c815658773adc2cb8ecd3d25aa6e0731",
       "requires": 2,
       "ensures": 2,
-      "requires_sha256": "018d7edd351d37b50a4454d186694ec3d40f33abe458c2d659091cde0d408d75",
-      "ensures_sha256": "38e69a48834846001872cfd1647bdc26ab35131152d1612d0f6b5a98270114db",
-      "body_sha256": "3f94043c29d3312531e59ac611a10715fc7a475a095396635a1c9af01857f5b5"
+      "requires_sha256": "9e21ab2f8747b63275d3c91459c8341aba616e345038505be7036c8834479a00",
+      "ensures_sha256": "786cc931a9ca5a8ece3eb1ef974ebfdddd57b9236d701a82ddc16b2ae40e5bd5",
+      "body_sha256": "f70bf7a98101477270f0b26950577497b692707a15195f4b7147f434e805e3c4"
     },
     "numeric256_harness::arithmetic256::numeric_model::product768_result": {
       "mode": "Spec",
@@ -2058,6 +2306,15 @@
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "body_sha256": "9512bc794ca6a40d7f2992c64cdd2fc20aba11a4778e577e5ade2a344b84315b"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::product_offset_bounds": {
+      "mode": "Proof",
+      "signature_sha256": "92112d79b13629f2a843a014e6637dfe5fea4d52e311952ffc1bf2fc09f3dd03",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "1e7b3a7c90f75e8ba50489abdc8ceeb42daadbef68c47dd4f45dfeb78d24a8e8",
+      "body_sha256": "c562bd2d4ea312ac5629684150dc089dd7686c3d73324a2b1cac59680662dd03"
     },
     "numeric256_harness::arithmetic256::numeric_model::product_result": {
       "mode": "Spec",
@@ -2073,36 +2330,36 @@
       "signature_sha256": "ab638678f74e5c80f35fa692379ddde747f6fcf7a5371f4243888762c24bcad0",
       "requires": 1,
       "ensures": 1,
-      "requires_sha256": "a911b2e7c25f18e2942f9685d2e4e4735899684736f764efc366e910f9e7fd8e",
-      "ensures_sha256": "f6042556ee000cef26a0e4fc58dbb7e3351cdad44c090490d5b3a1d9ae668d6a",
-      "body_sha256": "a8d36de23f641640e56f1405068bd04efaed62a93bb15a5c7048d89be3aa7263"
+      "requires_sha256": "98e55dbdc8734fe981af18819294e790894a077338ab4ab1e940ef2a450c2b45",
+      "ensures_sha256": "3b290447dba8bd773655d63b930f64f9bf68e22908095f7350601cb7a3d75e3f",
+      "body_sha256": "1aa7cc5bc26a51aabdecc7005902ae8b25fa06b1e802705025b0e2bec25904c7"
     },
     "numeric256_harness::arithmetic256::numeric_model::product_step": {
       "mode": "Proof",
       "signature_sha256": "30efb811a30a48cdd80fb9a550e8e3c34371fcb1f3c6e2cd5c3ba50539549b4c",
       "requires": 5,
       "ensures": 3,
-      "requires_sha256": "712f561456422c9ea623d2ac97d214118adf9f89ac7b8855f8de15deee15d6c5",
-      "ensures_sha256": "d95aeb024e548172518ad36eba6a017cf45eef4cbcbad245e1df34585605bdef",
-      "body_sha256": "b6ab3bfb0eb8c14e4051ecbceb0c171a6cf511392b73aacb27df99a94e257499"
+      "requires_sha256": "adcbed68489833e0eb4ab8b3b2235518215a85c16f8f98d558d79ef1ba78f443",
+      "ensures_sha256": "b9d278cc3be113b59ec6f5b7e407fb673c871e7230f994c6fa720b9b2438a513",
+      "body_sha256": "62caddc684d665f48897f05a06a9c394f63e0c05c3aaec695f2057a3d6ed6571"
     },
     "numeric256_harness::arithmetic256::numeric_model::quotient_bits": {
       "mode": "Proof",
       "signature_sha256": "7bc62ee9a9f7c52a3b6d40d94200c55bcb7fcfb8a0c973b6b326a8a79e158d58",
       "requires": 3,
       "ensures": 2,
-      "requires_sha256": "d99961aea354e3d4b282ed7ac1e7ddfd0ae57ac479123c632b32b349851058cc",
-      "ensures_sha256": "57ff2339f76019eb947d9fa0d22895b7fe06356fb647f3cef87d38aa0f4ebd31",
-      "body_sha256": "efc2027ac68b3c963d74968287c5122e8d24c1062f276fcdfd8d016880819e9e"
+      "requires_sha256": "13fc139bc4b0dcb6c53f02754f69683638e2bc7c39dd0cdf92a281d5c3cbf0e1",
+      "ensures_sha256": "7eeebd00e52263f5adede37adfc21afbf51d3f1f83f402723684ded179bc8be2",
+      "body_sha256": "bbb43fdf1f417b76009430c859534e0dd9724e41006c52af0fb6993e11c1dcb2"
     },
     "numeric256_harness::arithmetic256::numeric_model::quotient_step": {
       "mode": "Proof",
       "signature_sha256": "e4fdfb9da12f54f8701cd55feff9f0773e0348e7d7d25b1e52115e65720bea5f",
       "requires": 4,
       "ensures": 3,
-      "requires_sha256": "17d1ea52aad0cacf4d39d1109ac71600ba47bcad309a15e1d226259c50b4bae0",
-      "ensures_sha256": "b855996fbc0710b6b5ac184eca8409a36519319f38439870d0bd273c67312e80",
-      "body_sha256": "b06c027941ded52c6160ce68e1a03ebc6bf831f5f25f02c8968542ded1f55a8f"
+      "requires_sha256": "11610755555a249401ba5ada3ad20a8990f477a133d53579ec0336ccf56d064b",
+      "ensures_sha256": "53b317743974056c6cceebcc97249b6f9ceb7af47d41b1307f290aa87327aaf5",
+      "body_sha256": "50dda30571a1cb0994a7d180889ae718c7eb8ca7bcdb287a1b2cc8b65b510658"
     },
     "numeric256_harness::arithmetic256::numeric_model::quotient_witness": {
       "mode": "Spec",
@@ -2145,27 +2402,27 @@
       "signature_sha256": "f933e351638f3365bca2c3d2b1627f09ae949cfec5620a94f8882f82a5d57f12",
       "requires": 2,
       "ensures": 2,
-      "requires_sha256": "253b678f0567babdaf5f7c037dfdeefc33067aab76b2808671024616b6d47fde",
-      "ensures_sha256": "346658427daec391c2050b51c5a567ec93906b579d571fd7d89b2b6dfd536e98",
-      "body_sha256": "e0eb47e9434cbe9ed68fb67b704201cbc5af8f1a8e2735f3b6473b3ebcdebe71"
+      "requires_sha256": "6e77ccb8662e5e579a9290b353b5d2ff1146f590284cc5e6f37f40a63793b75d",
+      "ensures_sha256": "b45e7be5c98372ab7d45a177fedc8bf7294da2050e6938b0973c3f1d45eae27a",
+      "body_sha256": "65020631d27dd6c050286cd0ca34d4a986877604476f57c9a0ceb4cba60225f4"
     },
     "numeric256_harness::arithmetic256::numeric_model::shift_step": {
       "mode": "Proof",
       "signature_sha256": "93f0ac42a1bced7f02055663f813090843c8eecc8f3f6528d47aa989a31bfab9",
       "requires": 5,
       "ensures": 2,
-      "requires_sha256": "5b37683f08bfb04055c9a76989c267d91184d8405e6141f2cf2881c75aee8d87",
-      "ensures_sha256": "173c857a365d160cecfb8ff49e6b36257e263b688920592007260de96f398743",
-      "body_sha256": "b09ec3d821a8a6df63286e59931cbb905fac001283a2ff1b19374737cc5690fb"
+      "requires_sha256": "ccc371c9cbbf96303f06f6099afa38d82a2762a80bda13b60fb94e34a6ab6c4b",
+      "ensures_sha256": "6aeeb659d17f7fd7caffa0ae6077ab5362a8d06206cecf40ebc5f0b0a8123fd0",
+      "body_sha256": "b0bfc7517a771d24ff7d9e545225942cf1502b8b955c14ef788330b5424a396d"
     },
     "numeric256_harness::arithmetic256::numeric_model::shift_word": {
       "mode": "Proof",
       "signature_sha256": "c98d0e9f888bb647586d4b06470b6d5d3458df8c8dd8afb2dc28165b38326a0d",
       "requires": 1,
       "ensures": 2,
-      "requires_sha256": "2dd73dfa69b205c36f7cfafa14257d2c02759a2eee5ac8467514609bda1a14b5",
-      "ensures_sha256": "079ffd6286d0dcfb7a7643532ed7031081624903da95b7ff1be4d190779379c8",
-      "body_sha256": "e0e9e691b3494dfb89072c1ab36c281c7d6813f0b1b67c53a596fb2fe0165e8f"
+      "requires_sha256": "2305caa742ccee97dd812888c4e41e94b933de8d1978cb9029b97df1a38a0fa9",
+      "ensures_sha256": "75f246bc93e635919be06f45f971b01989e302884777ca9741a3f751d18f17d7",
+      "body_sha256": "ae1ac1938e9726e9fab495bd93e27bc1fab6a8aa946bd9df6c8d9d34dc49fc55"
     },
     "numeric256_harness::arithmetic256::numeric_model::signed_bounds": {
       "mode": "Proof",
@@ -2209,8 +2466,17 @@
       "requires": 0,
       "ensures": 2,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "46beca9f825798174b6c43aa0d3d268b154e597249f3db0bc1a72f7f0122ac50",
-      "body_sha256": "beed140c09600cd30e76603964185b91d1cc19690495b716642104c92592e74b"
+      "ensures_sha256": "953a3aa9f6c13d294333ba0d65faecfa093bd40dba9e6516c3576cee64a6e4a2",
+      "body_sha256": "7430313e2d307a8be6f11f5602877f4ee6b8b826cd03327ec6e554de8c3057ad"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::triple": {
+      "mode": "Spec",
+      "signature_sha256": "274621e68e2b384a4f39f9c9752645aa361a5e107b8dc162b74f59676c7eeab2",
+      "requires": 0,
+      "ensures": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "body_sha256": "a5b4d4a84a77ec9f186bf95642cf1f7e9b9d2e702aad0a17e11e3de6e37f3447"
     },
     "numeric256_harness::arithmetic256::numeric_model::unsigned512": {
       "mode": "Spec",
@@ -2280,9 +2546,9 @@
       "signature_sha256": "85fe13211d520242091cadfe8c47b005cef48fb1fa11b8b0729df8025aaf85d2",
       "requires": 2,
       "ensures": 1,
-      "requires_sha256": "75e3d96d609757952fc78ae9f516462f72a2e86db4d09cfae79594d4ca35dca3",
-      "ensures_sha256": "50f5b2de3c4c33ecb41f0338d50acd1902dad3be7ef9fcff094be7020196e3af",
-      "body_sha256": "a3f98dd0d9c5d1d5d06b345eb5e74315129c6c799535564ee02337a0bd38ac70"
+      "requires_sha256": "df91e11cafbca2007c3245d1de47dbb47924546ed2a55e65ae15e53e350d3ebb",
+      "ensures_sha256": "d148b5485ec72b1d7e7c4f2e0a13368eb14c8d258866e2b61fc8de25bb02a5ff",
+      "body_sha256": "2c3f60355242186511e681c3c883b1d0149f0e3752ae89398406ab15f0b2b7f6"
     },
     "numeric256_harness::arithmetic256::numeric_model::upper_nonnegative": {
       "mode": "Proof",
@@ -2290,8 +2556,17 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "9497f5308623bd4c0afffc9dd0008906124a9cbc531c76c088aca1ced788ae0f",
-      "body_sha256": "de4ea01a68e941d536afe995bc1093ebd575b98e8e5a1b27b2ab28dfa8aef629"
+      "ensures_sha256": "c1bd5e9ab6816c7a89e9d41a8bfa536c895affaa13087c30341413b40ba5c112",
+      "body_sha256": "fabb8f52a5d261ab91071d9020b8c518d08df625e4d2543be353fc64f9867aff"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::upper_zero": {
+      "mode": "Proof",
+      "signature_sha256": "ac03c0e8bc5a7aa62557ddc71cf7cf1ec30a8c4771e055c7863fb05927cb871f",
+      "requires": 1,
+      "ensures": 1,
+      "requires_sha256": "6d7da092406f4364928f59f2f3e01ae49db84f2d92bc8cf9a19cc18244bb70e8",
+      "ensures_sha256": "e0525dbf2ff8638cd46f6691bacba6918878c2ec02d8a959cb5a8b7f366f70a2",
+      "body_sha256": "32206c7cd146121b90b647121f99751bb8b429750a9ae01b6b579a79771cdbe1"
     },
     "numeric256_harness::arithmetic256::numeric_model::value": {
       "mode": "Spec",
@@ -2308,17 +2583,17 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "9b79677b5f06f6ebf6eabec5d6e1be8856521fbf08492ec7642d42245f6dba09",
-      "body_sha256": "81833c6889f14ee72eddf02f2cf074835a0163b64fe60b29afab38289ca7a619"
+      "ensures_sha256": "b32049090d7702ae28d1dcdc1e1b68f921527f7860431f2dccb33aaf299be0d6",
+      "body_sha256": "a41c759f29035471ecbc77d8ad78448733053ccbf8323c020ce25c047938f436"
     },
     "numeric256_harness::arithmetic256::numeric_model::value_div_place": {
       "mode": "Proof",
       "signature_sha256": "ac03c0e8bc5a7aa62557ddc71cf7cf1ec30a8c4771e055c7863fb05927cb871f",
       "requires": 1,
       "ensures": 2,
-      "requires_sha256": "749fdfacc1673de209d784eb814946e75186ebe295b12d5c275757542b33486d",
-      "ensures_sha256": "63113bbe6922a47f9cec681ce5780f2077e8f8c7ecfa5f0fe145358d3c211585",
-      "body_sha256": "b863f441664b50dc4928b1bb73f0ec41df7e5676f588e8cc99621100d9454d33"
+      "requires_sha256": "09d35486e3b218bf6274379d212a9dba022f912c25d5698efaed5f8954ebe0c7",
+      "ensures_sha256": "8cdd64c56b577f729c80be119305333d60b2c76c83a3ae334c71cf1f7c8c0dd4",
+      "body_sha256": "d249151948dc8e214e81f964ff8c36c08cdab2e7afb00c7c6aa57388e1af642c"
     },
     "numeric256_harness::arithmetic256::numeric_model::value_four": {
       "mode": "Proof",
@@ -2326,8 +2601,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "3f348715c1f362cff4558934d64287e9546a923ae5adc6003b55da6a6f2b32a9",
-      "body_sha256": "90e5bdf1d100bb1cc0cc12a165dd060bfd0d08dc26cd74442411e95ffe13e67f"
+      "ensures_sha256": "c9f568a6d8f68c24ff71de384ff1b21bf0be295bb58efd186cb7db59fd1a5364",
+      "body_sha256": "b5ae13e12c91f2712b091db138b351f165320a6ddb8f575a8b347caff615a237"
     },
     "numeric256_harness::arithmetic256::numeric_model::value_six": {
       "mode": "Proof",
@@ -2335,17 +2610,17 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "2922a7d64b7bc2af31d7895d99cff4157daf0ce9db9f58e81b0d4ce1ddd949f5",
-      "body_sha256": "2ab2fc023533974e71b6df0fc41939de215d69f384f90a82a02e0620b404a6c6"
+      "ensures_sha256": "656fe8d6500c1743bfd82a20bf09d7d4e956d9b713a5dc967b7d81cf9ecb3bf9",
+      "body_sha256": "81af27c2b80c1dcff2fae3e9a7439e0ae7265ba4bc4e5b7987ce088ad7e6ecdb"
     },
     "numeric256_harness::arithmetic256::numeric_model::value_split": {
       "mode": "Proof",
       "signature_sha256": "ac03c0e8bc5a7aa62557ddc71cf7cf1ec30a8c4771e055c7863fb05927cb871f",
       "requires": 1,
       "ensures": 1,
-      "requires_sha256": "473058ce36a6a2c653634dada13445043dd1656e0b585cf16663af9b918a17d9",
-      "ensures_sha256": "af0e1a922a638b4b5d377f54b5a05628df088c6abd3859d4f338aa4cd0f7951b",
-      "body_sha256": "3a545eb8162011e3296e91134195688e3e767c631e5bdef32973d963c2b1664d"
+      "requires_sha256": "3e548ef735543d6a78f56adfda1cc54f05f3b09bb9a83202fb9c01a549873ed1",
+      "ensures_sha256": "5f6260716ae2efc0a4039249e2160f9e5410d6c0aae71f0b81c44719852aa47a",
+      "body_sha256": "d77600ce09a51eb076e1f9d07b54050c044ac505879ef63d49b7d6056725cff0"
     },
     "numeric256_harness::arithmetic256::numeric_model::value_two": {
       "mode": "Proof",
@@ -2353,17 +2628,17 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "103f34de156ac99d0429364882d4380f65d4ec39edf04f80eef1ef6057da6d61",
-      "body_sha256": "e90847f21549eb66b04d3c6e5ffd22ff0b95d5956050ad8f672cd25bd330b3be"
+      "ensures_sha256": "e78b285fa29695cd3b2b9d0b1d3d92395e2dfe8d951556849ba04813959d1754",
+      "body_sha256": "6387ea6c1665d4256a6a430a802a5b5f2fc9403e601c6099718225f3f9939cb7"
     },
     "numeric256_harness::arithmetic256::numeric_model::value_update": {
       "mode": "Proof",
       "signature_sha256": "b8dfa169006108f23412d35e9750d388e490d4f0f307034d50a7a94125841ae6",
       "requires": 1,
       "ensures": 1,
-      "requires_sha256": "d1d1b02ce51ae4213a908f601d09bd893a9e14afc9d76b6947b0312f2219709e",
-      "ensures_sha256": "3af0e0567829e782a8c807f80bfe5e373cbf6caa7c84221cf8581cbc5ce3d222",
-      "body_sha256": "949f059ac3a49cfddc5983dee64b9515e3aa0f1dd06e4c0762085a223a5846c4"
+      "requires_sha256": "ce26cf555bab76402668ca15e4827e06f0a6b06565a242a9252e7c95c52a0889",
+      "ensures_sha256": "28f7d6de15f0d1d84a06ef4655ae3ed26085ff2d9e3850fb2b2b231828aac83e",
+      "body_sha256": "092fefe5587d6704d54a47d949e1982a264791bdafaaf2643b5e8078712e4e1e"
     },
     "numeric256_harness::arithmetic256::numeric_model::wide_product_result": {
       "mode": "Spec",
@@ -2389,7 +2664,7 @@
       "requires": 0,
       "ensures": 2,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "4d3db44d9c98d61fad78f26f7c153ca5f85af69edd672e3341ef18ce75c87ef1",
+      "ensures_sha256": "108c9738261b07b88302aa538e4c8e32070b5b364a0984bc1a473a4007b0effd",
       "body_sha256": "176e376ba2c38c203902309b2fd134068751b43ada18bba4c86f68a11521201a"
     },
     "numeric256_harness::arithmetic256::numeric_model::word_result": {
@@ -2406,9 +2681,9 @@
       "signature_sha256": "bebd0123a8e9b28e9b4a814f91e37a12c815658773adc2cb8ecd3d25aa6e0731",
       "requires": 2,
       "ensures": 1,
-      "requires_sha256": "719d4a3d1df2bc39f45d791dcee3bb91a7743d692b031a88c06565ff2a61b032",
-      "ensures_sha256": "dc80bbb0c1aff15e12a1dccfcb7b3bef2d878395f1a137cdbe0cb412da1be201",
-      "body_sha256": "1dba46ba3fe5b689d1c438f3772d5c1fff85e84ef67a386f91563f7cc9e2a092"
+      "requires_sha256": "cbf7687c1ed246a05fc5c287d9572f386998be0e9b46657936326be1d3797ec6",
+      "ensures_sha256": "6d6599036f4d6b34d2affdba471aa88797d9854bf7e774f2250abec1d86ad0bd",
+      "body_sha256": "2f3c1ad757115c8b38e515c3b365dbcd3be7a4d279cf234dcc633c7bd4d87103"
     },
     "numeric256_harness::arithmetic256::numeric_model::zero_words": {
       "mode": "Proof",
@@ -2416,8 +2691,17 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "443ad90eb21117af271675c1038518497320e5b5275d5cc1f4f4bdc02bef6426",
-      "body_sha256": "1ab33b0559e7d376bc2f054ae2d6ced427c55a6deaed0ecf14dba24d1c518032"
+      "ensures_sha256": "6a8a7077b6658631f6e005004f206ab9c2bf5bb8e6afd44efac3edac1763e5ef",
+      "body_sha256": "3bfdeabc3013a64ffe460d55512e2768c8a3e28b67903769f30eeceb3755a82b"
+    },
+    "numeric256_harness::arithmetic256::numeric_model::zero_words768": {
+      "mode": "Proof",
+      "signature_sha256": "c506630c5c47ba8db01cf1fa2df8d29049dfc58a4a1e7f271c3c53e460250058",
+      "requires": 0,
+      "ensures": 1,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "ensures_sha256": "f61337ba97f87fbf9e774341cca53c2dbd7309f8bc4f6bf0cd131982339d535b",
+      "body_sha256": "a0f12563d14495584bd9e7413f5268735e10f31022ba43378223e6fa15d5f288"
     },
     "numeric256_harness::arithmetic256::ordering256::compare": {
       "mode": "Exec",
@@ -2425,8 +2709,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "60d1905ecf4ed76987a5f70b00dcdcdce37b75e995c254899fa4229e38cdae64",
-      "body_sha256": "d2dbf1b893d44372423c99e23e199dc18e945fe2abd70fc9541d6da76de425fc"
+      "ensures_sha256": "f9d51e90d39e50cc0390e72ea25b68d123884c445c06ed4c2cf2e58213214f27",
+      "body_sha256": "72a455c57a37e0bcc986bb542e4584d3eadcccc4b5a205c83166727fe7a8ab08"
     },
     "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_gt": {
       "mode": "Spec",
@@ -2435,7 +2719,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "9f822443704ab387e377e2cae1b2081b2d18475cf8eaa52522b3b2d00eaea5ec"
+      "body_sha256": "a210a7b8c034a43285007646c6283d77ad21acba5a4273c4ba8e9c4a45ede60d"
     },
     "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_lt": {
       "mode": "Spec",
@@ -2444,7 +2728,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "095556afe06e416446360056b0fe15287632a7c467c280b08adaf545b16d32be"
+      "body_sha256": "f1fde9b8084b58057ab6572aa2f63862f61e7c9355878a57693b21e0f214db8e"
     },
     "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_result": {
       "mode": "Spec",
@@ -2453,7 +2737,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "45834c224ad4dbf41ee5597c08a07b3da73c9018ac3b2e952b47f1290d439806"
+      "body_sha256": "8d9075ce71bf61613c980c06ef8c1bcf667a6af51608175135695d0a8a73510c"
     },
     "numeric256_harness::arithmetic256::ordering256::ordering_model::suffix_equal": {
       "mode": "Spec",
@@ -2462,7 +2746,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "0331a24bfb6d5e5e42789dce4444bbdb0d1f99fa37bf27b6c077719ab8893ffd"
+      "body_sha256": "db06b88f9f87e4614a03817ebc31caf743ef1368cf355e7b112a1886b924e4b5"
     },
     "numeric256_harness::arithmetic256::subtract": {
       "mode": "Exec",
@@ -2470,8 +2754,8 @@
       "requires": 0,
       "ensures": 2,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "54b209eecb16cc972ddd99e87f48565782209ea7df5bd7ef3d15e5c79af5f903",
-      "body_sha256": "4597d715c8a5c7379f9be41f5d93c121333b389a40b7990281c96ef6acac0753"
+      "ensures_sha256": "275d9f37b272e5bf495d2887f8b135bb2ed726451a0f4649c06ec06ee5937dfa",
+      "body_sha256": "c14675b18f1a67bfb86936691ed28a44898f698ea1d908b9989e63ccd31321cc"
     },
     "numeric256_harness::arithmetic256::wide::RADIX": {
       "mode": "Spec",
@@ -2488,8 +2772,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "a2ae0f69e703990ea8a92e1996cbc1de52d87bb6b7c1fc0ffad41a04233ca13c",
-      "body_sha256": "1aa30ab3bc788a41982d6bb7b6872172997f18e0aeba6c32f721029603e2fff6"
+      "ensures_sha256": "3596bac46d9990ba66f7a1935f4e16810895f4a64f8242096d2a4678d23d33cf",
+      "body_sha256": "9318e67818bb4c8fc57157481ece82ddc8f3e34c81a03004cb0952737d097b40"
     },
     "numeric256_harness::arithmetic256::wide::mul_div_ceil": {
       "mode": "Exec",
@@ -2497,8 +2781,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "e3efc40291aa6609c29b60da9c428d29c02e1dba53fd58eda24098870cc49ec4",
-      "body_sha256": "85ba59b05c7b5b748f82959d00f25948240a5d37614edf8560ebee4aeed8fbea"
+      "ensures_sha256": "2f74e2894814d8d192deb4bd5a152e336d8a0740254b2783a8547bd176e5174e",
+      "body_sha256": "9793e97acdff83830a452e4498d33536cf295eee0d8ffd5fe2f09ece9bec42e0"
     },
     "numeric256_harness::arithmetic256::wide::mul_div_floor": {
       "mode": "Exec",
@@ -2506,8 +2790,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "13d2e772a7d13a77cc41c0dd05ab106aaf178b3be5836b73aad897e440396754",
-      "body_sha256": "23556c4b37901244fbe2a780f3dde379f7dfa2148f60d65fe26a2b18954c8e4b"
+      "ensures_sha256": "336b0f4ae371d22e5d1e90af6b294b2d82859642d6b5e0563a9d27af70f5431d",
+      "body_sha256": "fa65e01a121640395268336f290fab9db9c5ac8991de0d9de6ec65e1394f4a57"
     },
     "numeric256_harness::arithmetic256::wide::multiply": {
       "mode": "Exec",
@@ -2515,8 +2799,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "8da48cce9595b00e52188e1a0fa83663ae9997a45fb66fbb0392df65e94a403d",
-      "body_sha256": "1c4caedbc548eed0905ab48e8d25219572614f9efa4c53973d8e6f789bd866eb"
+      "ensures_sha256": "ded0439f41afd9f8e018919c5046a355ea65a014ad9d8c8eefdc7df0bd6cb823",
+      "body_sha256": "e7735ca4f9b334cb947d4ad14366816148b295cd0a3d9392ebc5ca6da367b775"
     },
     "numeric256_harness::arithmetic256::wide::multiply_three": {
       "mode": "Exec",
@@ -2524,8 +2808,8 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "e637c9974113c939537ad66b5bead5d0081edb5e2943bb2b72839eeb7eb9c908",
-      "body_sha256": "ef4fead38028d2edcf146fe87d32339753365483ef89e99070bd9e81f292d8b0"
+      "ensures_sha256": "d4c516a129115154287b1114b76d2dcba06ae19c2463ce6d4f6484863b29a9e1",
+      "body_sha256": "587dde3f905c3ad48da4386fc9c469d7f21c16f3a42201263268eadc57c4279b"
     },
     "numeric256_harness::arithmetic256::wide::products_ge": {
       "mode": "Exec",
@@ -2533,17 +2817,17 @@
       "requires": 0,
       "ensures": 1,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "829873b91885ab2f24f8bd46ff6ae0741fe0a9b91f49cfe96433c8bcd9afe5a1",
-      "body_sha256": "202a6522d1666e08608d1d8e53ecc82839212aa31041064294d8643181200429"
+      "ensures_sha256": "2fd358756dce4b1ace79120a939934ad89cc201213813997939541a460076151",
+      "body_sha256": "ac93d76260526550c47da135da96e465979b0c9d43e3336ceacb1916e1c9db62"
     },
     "numeric256_harness::arithmetic256::wide::quotient_from_interval": {
       "mode": "Proof",
       "signature_sha256": "19043915e9afa9f46e30b7d5e92e0c6e309a9d0829dd78002b018b65ad67514e",
       "requires": 3,
       "ensures": 1,
-      "requires_sha256": "dded84121f4ae356ad9b9a4d5540655d09ceed144bd69ad436d9c477b52daab0",
-      "ensures_sha256": "a57b1e8e4a5716fd92834fc4eddb8700991c71327e49d7e1a631c66e9d42b2a1",
-      "body_sha256": "cea41ed55de75a5643b9d804066fa0ae92fc58547b3e5384ff3fe800f21536c1"
+      "requires_sha256": "74db3ba6a0d3fa67863fa9f0ebef1aacad0617e68dba8bbde93500e5af29e2a9",
+      "ensures_sha256": "e6d2b0d59aff63db29c7889d5d5a45d8941dd26e092a681a5d3e925b8d9f9d30",
+      "body_sha256": "9a3e3c7a5eaaa8fa1931f6893faa4c4483ce3ab860d33c0c8a08c35ab55362bc"
     },
     "numeric256_harness::arithmetic256::wide::split64": {
       "mode": "Proof",
@@ -2551,8 +2835,8 @@
       "requires": 0,
       "ensures": 3,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "ensures_sha256": "4e1759c5ff781c95c3d270d6752a0453882fa254e5bd4e85937fb9a8a0a0b483",
-      "body_sha256": "840c3fbf080c4fce38e7910bc374c4443af44a1e865b839a97cb4f11f3c4d8f8"
+      "ensures_sha256": "f63997abc9b3659cc31bbab6662006cf0fa9167d43bf00a2f2d0bdf971a618c1",
+      "body_sha256": "9ed0963ad63d8c615168204efbd41760fd0217945a626c07b27201f7893b8386"
     },
     "numeric256_harness::arithmetic256::wide::wide_model::ceiling_value": {
       "mode": "Spec",
@@ -2561,7 +2845,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "323f0269b6783c421b934ec9a78d110499e82e2b2f4f8adeac66bb22906385d6"
+      "body_sha256": "0f3f51f995b6528d66edb04b41c5dc7bf31b87f0763d3b60e3ff258d3ebdfc88"
     },
     "numeric256_harness::arithmetic256::wide::wide_model::floor_value": {
       "mode": "Spec",
@@ -2570,7 +2854,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "5d68ebaf8a500705b63a1278b4d6dafe1fa710ff26ae8da52744b25fcaf551c2"
+      "body_sha256": "dd508ef8c82471f90cfef7a4130c106d131c549fe1e216109407c26b4fb47b54"
     },
     "numeric256_harness::arithmetic256::wide::wide_model::number2": {
       "mode": "Spec",
@@ -2579,7 +2863,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "6d600655fbb1cc30b37fd84a7ab6f770424e977d73ffa56d89d8700bb0309c34"
+      "body_sha256": "01f67aacd0c952f13eb6a9b2d625fd58f140221f5b883131752ee3c9de01d115"
     },
     "numeric256_harness::arithmetic256::wide::wide_model::number3": {
       "mode": "Spec",
@@ -2588,7 +2872,7 @@
       "ensures": 0,
       "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "body_sha256": "11d04785a8f589bbea63fa5d47f91735d24a7e03273e1e295d7fe13f1979d666"
+      "body_sha256": "a22f0de420e74f89d2c6f120ed73823075c2ba03be53a69dd0f6e0abee2108dd"
     },
     "numeric256_harness::arithmetic256::wide::wide_model::scale": {
       "mode": "Spec",
@@ -2652,7 +2936,12 @@
     "numeric256_harness::arithmetic256::number256::U256::from_u128",
     "numeric256_harness::arithmetic256::number256::U256::from_words_le",
     "numeric256_harness::arithmetic256::number256::U256::full_product",
+    "numeric256_harness::arithmetic256::number256::U256::mul3_div",
+    "numeric256_harness::arithmetic256::number256::U256::mul_add_div_rem",
+    "numeric256_harness::arithmetic256::number256::U256::mul_div",
+    "numeric256_harness::arithmetic256::number256::U256::mul_div_half_up",
     "numeric256_harness::arithmetic256::number256::U256::ordering_words",
+    "numeric256_harness::arithmetic256::number256::U256::products_ge",
     "numeric256_harness::arithmetic256::number256::U256::rounded",
     "numeric256_harness::arithmetic256::number256::U256::try_u128",
     "numeric256_harness::arithmetic256::number256::U256::words_le",
@@ -2677,6 +2966,7 @@
     "numeric256_harness::arithmetic256::numeric_model::bit_step",
     "numeric256_harness::arithmetic256::numeric_model::borrow_step",
     "numeric256_harness::arithmetic256::numeric_model::canonical_quotient",
+    "numeric256_harness::arithmetic256::numeric_model::canonical_quotients",
     "numeric256_harness::arithmetic256::numeric_model::carry_step",
     "numeric256_harness::arithmetic256::numeric_model::carry_word",
     "numeric256_harness::arithmetic256::numeric_model::checked_div_result",
@@ -2689,6 +2979,8 @@
     "numeric256_harness::arithmetic256::numeric_model::div_rem_result",
     "numeric256_harness::arithmetic256::numeric_model::divide_finish",
     "numeric256_harness::arithmetic256::numeric_model::divide_result",
+    "numeric256_harness::arithmetic256::numeric_model::half_up_result",
+    "numeric256_harness::arithmetic256::numeric_model::half_value",
     "numeric256_harness::arithmetic256::numeric_model::lex_value",
     "numeric256_harness::arithmetic256::numeric_model::limb_representations",
     "numeric256_harness::arithmetic256::numeric_model::limbs",
@@ -2698,6 +2990,9 @@
     "numeric256_harness::arithmetic256::numeric_model::limbs_push",
     "numeric256_harness::arithmetic256::numeric_model::limbs_update",
     "numeric256_harness::arithmetic256::numeric_model::minimum_bits",
+    "numeric256_harness::arithmetic256::numeric_model::mul_add_div_rem_result",
+    "numeric256_harness::arithmetic256::numeric_model::mul_div_result",
+    "numeric256_harness::arithmetic256::numeric_model::narrow_bounds",
     "numeric256_harness::arithmetic256::numeric_model::nonzero_value",
     "numeric256_harness::arithmetic256::numeric_model::one_bit",
     "numeric256_harness::arithmetic256::numeric_model::place",
@@ -2709,6 +3004,7 @@
     "numeric256_harness::arithmetic256::numeric_model::prefix2",
     "numeric256_harness::arithmetic256::numeric_model::prefix_two",
     "numeric256_harness::arithmetic256::numeric_model::product768_result",
+    "numeric256_harness::arithmetic256::numeric_model::product_offset_bounds",
     "numeric256_harness::arithmetic256::numeric_model::product_result",
     "numeric256_harness::arithmetic256::numeric_model::product_row",
     "numeric256_harness::arithmetic256::numeric_model::product_step",
@@ -2726,6 +3022,7 @@
     "numeric256_harness::arithmetic256::numeric_model::signed_word_cast",
     "numeric256_harness::arithmetic256::numeric_model::top",
     "numeric256_harness::arithmetic256::numeric_model::top_empty",
+    "numeric256_harness::arithmetic256::numeric_model::triple",
     "numeric256_harness::arithmetic256::numeric_model::unsigned512",
     "numeric256_harness::arithmetic256::numeric_model::unsigned512_result",
     "numeric256_harness::arithmetic256::numeric_model::unsigned768",
@@ -2735,6 +3032,7 @@
     "numeric256_harness::arithmetic256::numeric_model::upper",
     "numeric256_harness::arithmetic256::numeric_model::upper_equal",
     "numeric256_harness::arithmetic256::numeric_model::upper_nonnegative",
+    "numeric256_harness::arithmetic256::numeric_model::upper_zero",
     "numeric256_harness::arithmetic256::numeric_model::value",
     "numeric256_harness::arithmetic256::numeric_model::value_bounds",
     "numeric256_harness::arithmetic256::numeric_model::value_div_place",
@@ -2749,6 +3047,7 @@
     "numeric256_harness::arithmetic256::numeric_model::word_result",
     "numeric256_harness::arithmetic256::numeric_model::zero_value",
     "numeric256_harness::arithmetic256::numeric_model::zero_words",
+    "numeric256_harness::arithmetic256::numeric_model::zero_words768",
     "numeric256_harness::arithmetic256::ordering256::compare",
     "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_gt",
     "numeric256_harness::arithmetic256::ordering256::ordering_model::lex_lt",
@@ -2770,7 +3069,7 @@
     "numeric256_harness::arithmetic256::wide::wide_model::number3",
     "numeric256_harness::arithmetic256::wide::wide_model::scale"
   ],
-  "expected_verified": 179,
+  "expected_verified": 196,
   "smt_sections": [
     {
       "function": "numeric256_harness::arithmetic256::Failure::clone",
@@ -2815,7 +3114,7 @@
     {
       "function": "numeric256_harness::arithmetic256::add_word",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 182
+      "line": 189
     },
     {
       "function": "numeric256_harness::arithmetic256::add_word",
@@ -2825,207 +3124,232 @@
     {
       "function": "numeric256_harness::arithmetic256::multiply",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 231
+      "line": 238
     },
     {
       "function": "numeric256_harness::arithmetic256::multiply",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 220
+      "line": 227
     },
     {
       "function": "numeric256_harness::arithmetic256::multiply",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 204
+      "line": 211
     },
     {
       "function": "numeric256_harness::arithmetic256::divide",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 264
+      "line": 271
     },
     {
       "function": "numeric256_harness::arithmetic256::divide",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 321
+      "line": 328
     },
     {
       "function": "numeric256_harness::arithmetic256::divide",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 297
+      "line": 304
     },
     {
       "function": "numeric256_harness::arithmetic256::divide",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 258
+      "line": 265
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%28::ZERO",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 371
+      "line": 378
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%28::ONE",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 380
+      "line": 387
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%28::MAX",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 389
+      "line": 396
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::from_u128",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 398
+      "line": 405
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::try_u128",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 407
+      "line": 414
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::checked_sub",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 421
+      "line": 428
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::checked_add",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 440
+      "line": 447
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::full_product",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 459
+      "line": 466
     },
     {
       "function": "numeric256_harness::arithmetic256::U512::narrow",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 582
+      "line": 650
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::checked_mul",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 469
+      "line": 476
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::div_rem",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 476
+      "line": 483
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::rounded",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 485
+      "line": 492
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::checked_div",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 498
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::impl&%30::ZERO",
-      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 564
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::U512::from_u256",
-      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 573
+      "line": 505
     },
     {
       "function": "numeric256_harness::arithmetic256::U512::checked_add",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 596
+      "line": 668
     },
     {
-      "function": "numeric256_harness::arithmetic256::U512::multiply_u256",
+      "function": "numeric256_harness::arithmetic256::U512::from_u256",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 613
+      "line": 641
     },
     {
       "function": "numeric256_harness::arithmetic256::U512::div_rem",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 622
+      "line": 694
     },
     {
-      "function": "numeric256_harness::arithmetic256::impl&%32::ZERO",
+      "function": "numeric256_harness::arithmetic256::number256::U256::mul_add_div_rem",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 670
+      "line": 521
     },
     {
-      "function": "numeric256_harness::arithmetic256::U768::from_u256",
+      "function": "numeric256_harness::arithmetic256::number256::U256::mul_div",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 679
+      "line": 551
     },
     {
-      "function": "numeric256_harness::arithmetic256::U768::narrow",
+      "function": "numeric256_harness::arithmetic256::number256::U256::mul_div_half_up",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 688
+      "line": 566
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::U512::multiply_u256",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 685
     },
     {
       "function": "numeric256_harness::arithmetic256::U768::div_rem",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 701
+      "line": 777
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::U768::from_u256",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 751
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::U768::narrow",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 760
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::impl&%32::ZERO",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 742
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::U256::mul3_div",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 581
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::number256::U256::products_ge",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 605
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::impl&%30::ZERO",
+      "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
+      "line": 632
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%33::ZERO",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 716
+      "line": 792
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%33::MIN",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 725
+      "line": 801
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%33::MAX",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 735
+      "line": 811
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::from_i128",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 745
+      "line": 821
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::negative_bits",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 758
+      "line": 834
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::magnitude",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 775
+      "line": 851
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::from_magnitude",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 789
+      "line": 865
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::try_unsigned",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 811
+      "line": 887
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::difference_unsigned",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 829
+      "line": 905
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::checked_neg",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 852
+      "line": 928
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::checked_add",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 875
+      "line": 951
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::checked_sub",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 897
+      "line": 973
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::clone",
@@ -3193,272 +3517,302 @@
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::place_positive",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 319
+      "line": 365
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::place_add",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 329
+      "line": 375
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::place_monotone",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 343
+      "line": 389
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::radix_power",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 356
+      "line": 402
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::place_power",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 364
+      "line": 410
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::limbs_bounds",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 380
+      "line": 426
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::value_bounds",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 395
+      "line": 441
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::limbs_monotone",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 401
+      "line": 447
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::limbs_update",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 415
+      "line": 461
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::limbs_push",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 431
+      "line": 477
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::value_update",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 438
+      "line": 484
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::limbs_equal",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 447
+      "line": 493
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::upper_nonnegative",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 458
+      "line": 504
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::upper_equal",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 467
+      "line": 513
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::value_split",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 478
+      "line": 524
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::value_div_place",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 495
+      "line": 541
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::zero_value",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 509
+      "line": 555
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::nonzero_value",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 519
+      "line": 565
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::value_two",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 536
+      "line": 582
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::value_four",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 547
+      "line": 593
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::value_six",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 567
+      "line": 613
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::limb_representations",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 595
+      "line": 641
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::wide_representations",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 608
+      "line": 654
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::zero_words",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 620
+      "line": 666
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::prefix_two",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 633
+      "line": 785
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::upper_zero",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 716
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::narrow_bounds",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 679
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::zero_words768",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 727
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::product_offset_bounds",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 744
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::half_value",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 756
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::carry_step",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 650
+      "line": 802
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::borrow_step",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 674
+      "line": 826
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::carry_word",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 698
+      "line": 850
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::lex_value",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 738
+      "line": 890
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::compare_order",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 720
+      "line": 872
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::shift_word",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 761
+      "line": 913
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::one_bit",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 775
+      "line": 927
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::bit_power",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 781
+      "line": 933
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::bit_step",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 798
+      "line": 950
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::set_bit",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 847
+      "line": 999
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::top_empty",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 879
+      "line": 1031
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::shift_step",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 893
+      "line": 1045
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::quotient_step",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 914
+      "line": 1066
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::quotient_bits",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 936
+      "line": 1088
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::divide_finish",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 953
+      "line": 1105
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::canonical_quotient",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 968
+      "line": 1131
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::canonical_quotients",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1120
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::product_step",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 980
+      "line": 1143
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::product_row",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 1026
+      "line": 1189
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::bit_power",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 787
+      "line": 939
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::bit_power",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 792
+      "line": 944
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::bit_power",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 792
+      "line": 944
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::bit_step",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 827
+      "line": 979
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::bit_step",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 836
+      "line": 988
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::bit_step",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 836
+      "line": 988
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::bit_step",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 837
+      "line": 989
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::bit_step",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 837
+      "line": 989
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::borrow_step",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 693
+      "line": 845
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::carry_step",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 669
+      "line": 821
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::carry_word",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 712
+      "line": 864
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::complement",
@@ -3466,94 +3820,124 @@
       "line": 68
     },
     {
-      "function": "numeric256_harness::arithmetic256::numeric_model::limbs_bounds",
+      "function": "numeric256_harness::arithmetic256::numeric_model::half_value",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 390
+      "line": 765
     },
     {
-      "function": "numeric256_harness::arithmetic256::numeric_model::one_bit",
+      "function": "numeric256_harness::arithmetic256::numeric_model::half_value",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 778
+      "line": 767
     },
     {
-      "function": "numeric256_harness::arithmetic256::numeric_model::one_bit",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 778
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::product_step",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 1001
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::product_step",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 1003
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::product_step",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 1014
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::product_step",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 1019
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::product_step",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 1021
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::quotient_bits",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 948
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::quotient_bits",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 949
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::quotient_step",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 925
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::quotient_step",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 929
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::set_bit",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 863
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::set_bit",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 869
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::set_bit",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 869
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::shift_step",
-      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 909
-    },
-    {
-      "function": "numeric256_harness::arithmetic256::numeric_model::shift_word",
+      "function": "numeric256_harness::arithmetic256::numeric_model::half_value",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
       "line": 768
     },
     {
+      "function": "numeric256_harness::arithmetic256::numeric_model::half_value",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 769
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::half_value",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 771
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::limbs_bounds",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 436
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::one_bit",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 930
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::one_bit",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 930
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::product_offset_bounds",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 751
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::product_step",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1164
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::product_step",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1166
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::product_step",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1177
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::product_step",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1182
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::product_step",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1184
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::quotient_bits",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1100
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::quotient_bits",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1101
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::quotient_step",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1077
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::quotient_step",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1081
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::set_bit",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1015
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::set_bit",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1021
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::set_bit",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1021
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::shift_step",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 1061
+    },
+    {
       "function": "numeric256_harness::arithmetic256::numeric_model::shift_word",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 772
+      "line": 920
+    },
+    {
+      "function": "numeric256_harness::arithmetic256::numeric_model::shift_word",
+      "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
+      "line": 924
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::signed_word_cast",
@@ -3563,17 +3947,17 @@
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::value_four",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 563
+      "line": 609
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::value_six",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 589
+      "line": 635
     },
     {
       "function": "numeric256_harness::arithmetic256::numeric_model::value_split",
       "source": "crates/zeno-fcis-value/src/profile2/numeric256_model.rs",
-      "line": 489
+      "line": 535
     },
     {
       "function": "numeric256_harness::arithmetic256::ordering256::compare",
@@ -3663,12 +4047,12 @@
     {
       "function": "numeric256_harness::arithmetic256::impl&%33::MAX",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 738
+      "line": 814
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%33::MIN",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 728
+      "line": 804
     }
   ],
   "supporting_obligations": [

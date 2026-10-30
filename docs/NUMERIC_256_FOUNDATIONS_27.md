@@ -405,10 +405,53 @@ excluded 768-bit block renumbers the following signed block in the translated
 records; apart from that reviewed renumbering and compiler-assigned
 identifiers, every retained translated function is unchanged.
 
-The `mul_div`, `mul_add_div_rem`, `mul3_div`, `products_ge`, square-root and
-signed multiply/divide methods, the raw 512-bit word views and `I256::try_i128`
-remain outside this proof scope. So do compiler/ghost erasure, physical
-resource costs, and the Schema2 and factory obligations below.
+### Complete-product division, rounding and comparison
+
+Write `P` for the complete integer numerator and `D = U(den)`. Each refusal
+below is checked in the listed order, and each contract holds for every input
+with no added precondition.
+
+| Actual method | Exact result and refusal order |
+| --- | --- |
+| `U256::mul_add_div_rem(a, b, offset, den)` | `P = U(a)*U(b) + U(offset)`. `ZeroDivisor` exactly when `D = 0`; then `Overflow` exactly when `floor(P/D) >= 2^256`; otherwise the canonical witness `P = Q*D + R`, `0 <= R < D` |
+| `U256::mul_div(a, b, den, mode)` | `P = U(a)*U(b)`. `ZeroDivisor`; then `Overflow` when `floor(P/D) >= 2^256`; then `Inexact` for `Exact` with `P mod D > 0`; otherwise `floor(P/D)`, or `ceil(P/D)` for `Ceil` with the exact `Overflow` partition of that value |
+| `U256::mul_div_half_up(a, b, den)` | `P = U(a)*U(b)`. `ZeroDivisor`; otherwise `floor((P + floor(D/2)) / D)` exactly when it is below `2^256`, else `Overflow` |
+| `U256::mul3_div(a, b, c, den, mode)` | As `mul_div`, with the complete product `P = U(a)*U(b)*U(c)` of up to 768 bits |
+| `U256::products_ge(a, b)` | Always succeeds with `U(a0)*U(a1)*U(a2) >= U(b0)*U(b1)*U(b2)` |
+
+These statements are proved for the actual bodies under the stated assumptions.
+The numerator is never narrowed early: the product plus offset always fits 512
+bits, so the internal sum never overflows. Quotient narrowing precedes rounding,
+so with `a = b = 2^256 - 1` and `D = 2^256 - 2` the quotient `2^256` is refused as
+`Overflow` before any `Inexact` decision. A `Ceil` result can still overflow when
+the floor quotient is `2^256 - 1`. The half-up offset is the two-limb right shift
+of the denominator, proved to equal `floor(D/2)`.
+
+These bodies changed form in four places, with unchanged values: the zero tests
+`den == Self::ZERO` and `r != Self::ZERO` / `r != U768::ZERO` compare the same
+single field, the product comparison uses `!matches!(.., Ordering::Less)`, and
+`map(|(q, _)| q)` became `let (q, _) = ..?; Ok(q)`. A native test compares all
+five methods with verbatim copies of the previous bodies on boundary and
+generated inputs in every rounding mode, and checks the 768-bit zero test on
+all 64 zero/nonzero limb patterns. These tests support the source review; they
+are not exhaustive and do not prove compiler or ghost-erasure correspondence.
+
+Adding these proofs made three earlier proofs, word insertion and both
+narrowing methods, unstable under the pinned solver. They now use explicit
+bound lemmas; their contracts are unchanged apart from compiler-assigned
+identifiers. Five further controls are refused semantically: a zero test that
+ignores the low limb, a `mul_div` that adds one to the product, a half-up offset
+that drops the carried bit, an inverted 768-bit remainder test and a strict
+product comparison. Two of these fail at the proof step that states the changed
+fact, the others at the method contract. All thirty-seven controls must reach
+their intended semantic failure, and the complete closure has 196 verification
+conditions.
+
+The square-root methods (`U512::sqrt`, `U512::sqrt_ratio` and
+`U256::geometric_mean`), the signed multiply/divide methods, the raw 512-bit
+word views and `I256::try_i128` remain outside this proof scope. So do
+compiler/ghost erasure, physical resource costs, and the Schema2 and factory
+obligations below.
 
 ### Earlier schema checkpoint
 

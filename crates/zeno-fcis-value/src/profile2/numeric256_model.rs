@@ -314,6 +314,52 @@ pub open spec fn div_rem768_result(n: U768, d: U768, result: Result<(U768, U768)
     }
 }
 
+/// U256::mul_add_div_rem: ZeroDivisor first, then Overflow exactly when the
+/// floor quotient of the complete numerator needs more than 256 bits.
+pub open spec fn mul_add_div_rem_result(p: int, d: int, result: Result<(U256, U256), Failure>) -> bool {
+    if d == 0 {
+        result == Err::<(U256, U256), Failure>(Failure::ZeroDivisor)
+    } else if p / d >= modulus() {
+        result == Err::<(U256, U256), Failure>(Failure::Overflow)
+    } else {
+        match result {
+            Ok((q, r)) => quotient_witness(p, d, unsigned(q), unsigned(r)),
+            Err(_) => false,
+        }
+    }
+}
+/// U256::mul_div and mul3_div: ZeroDivisor, then quotient Overflow, then
+/// Inexact for Exact with a remainder, then the rounded quotient with the exact
+/// Overflow partition of that value.
+pub open spec fn mul_div_result(p: int, d: int, mode: super::Rounding, result: Result<U256, Failure>) -> bool {
+    if d == 0 {
+        result == Err::<U256, Failure>(Failure::ZeroDivisor)
+    } else if p / d >= modulus() {
+        result == Err::<U256, Failure>(Failure::Overflow)
+    } else if mode == super::Rounding::Exact && p % d != 0 {
+        result == Err::<U256, Failure>(Failure::Inexact)
+    } else {
+        unsigned_result(result, rounded_value(p / d, p % d, mode))
+    }
+}
+/// U256::mul_div_half_up: floor((p + floor(d/2)) / d), with the same refusals.
+pub open spec fn half_up_result(p: int, d: int, result: Result<U256, Failure>) -> bool {
+    if d == 0 {
+        result == Err::<U256, Failure>(Failure::ZeroDivisor)
+    } else if (p + d / 2) / d >= modulus() {
+        result == Err::<U256, Failure>(Failure::Overflow)
+    } else {
+        match result {
+            Ok(q) => unsigned(q) == (p + d / 2) / d,
+            Err(_) => false,
+        }
+    }
+}
+/// The product of three unsigned factors.
+pub open spec fn triple(x: [U256; 3]) -> int {
+    unsigned(x@[0]) * unsigned(x@[1]) * unsigned(x@[2])
+}
+
 // Limb weights.
 
 pub(super) proof fn place_positive(count: nat)
@@ -627,6 +673,112 @@ pub(super) proof fn zero_words()
             lemma_mul_inequality(1, x.0@[1] as int, radix());
         }
     }
+}
+
+/// A value fits two limbs exactly when every higher limb is zero.
+pub(super) proof fn narrow_bounds(words: Seq<u128>)
+    requires words.len() >= 2,
+    ensures
+        (forall|k: int| 2 <= k < words.len() ==> words[k] == 0)
+            ==> value(words) == words[0] as int + radix() * words[1] as int,
+        !(forall|k: int| 2 <= k < words.len() ==> words[k] == 0) ==> value(words) >= modulus(),
+{
+    value_split(words, 2);
+    limbs_bounds(words, 2);
+    prefix_two(words, 2);
+    upper_nonnegative(words, 2);
+    place_positive(2);
+    if forall|k: int| 2 <= k < words.len() ==> words[k] == 0 {
+        upper_zero(words, 2);
+    } else {
+        let k = choose|k: int| 2 <= k < words.len() && words[k] != 0;
+        value_split(words, (k + 1) as nat);
+        limbs_bounds(words, k as nat);
+        upper_nonnegative(words, (k + 1) as nat);
+        place_positive(k as nat);
+        place_positive((k + 1) as nat);
+        place_monotone(2, k as nat);
+        limbs_monotone(words, 0, k as nat);
+        assert(limbs(words, (k + 1) as nat) == limbs(words, k as nat) + place(k as nat) * words[k] as int);
+        lemma_mul_inequality(1, words[k] as int, place(k as nat));
+        lemma_mul_is_commutative(words[k] as int, place(k as nat));
+        assert(1 * place(k as nat) == place(k as nat));
+        lemma_mul_nonnegative(place((k + 1) as nat), upper(words, (k + 1) as nat));
+        assert(value(words) >= place(k as nat));
+        if upper(words, 2) == 0 {
+            assert(value(words) < place(2));
+            assert(false);
+        }
+        lemma_mul_inequality(1, upper(words, 2), place(2));
+    }
+}
+
+proof fn upper_zero(words: Seq<u128>, start: nat)
+    requires forall|k: int| start <= k < words.len() ==> words[k] == 0,
+    ensures upper(words, start) == 0,
+    decreases words.len() - start,
+{
+    if start < words.len() {
+        upper_zero(words, start + 1);
+    }
+}
+
+/// A U768 is zero exactly when all six limbs are zero.
+pub(super) proof fn zero_words768()
+    ensures forall|x: U768| #[trigger] unsigned768(x) == 0
+        <==> (forall|k: int| 0 <= k < 6 ==> x.0@[k] == 0),
+{
+    limb_representations();
+    assert forall|x: U768| #[trigger] unsigned768(x) == 0
+        <==> (forall|k: int| 0 <= k < 6 ==> x.0@[k] == 0) by {
+        if forall|k: int| 0 <= k < 6 ==> x.0@[k] == 0 {
+            zero_value(x.0@, 6);
+        } else {
+            let k = choose|k: int| 0 <= k < 6 && x.0@[k] != 0;
+            nonzero_value(x.0@, k);
+        }
+    }
+}
+
+/// The complete product plus a 256-bit offset always fits 512 bits.
+pub(super) proof fn product_offset_bounds(a: U256, b: U256, offset: U256)
+    ensures 0 <= unsigned(a) * unsigned(b) + unsigned(offset) < modulus() * modulus(),
+{
+    unsigned_bounds(a);
+    unsigned_bounds(b);
+    unsigned_bounds(offset);
+    let m = modulus();
+    assert(0 <= unsigned(a) * unsigned(b) + unsigned(offset) < m * m) by(nonlinear_arith)
+        requires 0 <= unsigned(a) < m, 0 <= unsigned(b) < m, 0 <= unsigned(offset) < m;
+}
+
+/// The actual one-bit right shift across both limbs halves the value.
+pub(super) proof fn half_value(den: U256, half: U256)
+    requires
+        half.0@[0] == den.0@[0] >> 1 | (den.0@[1] << 127),
+        half.0@[1] == den.0@[1] >> 1,
+    ensures unsigned(half) == unsigned(den) / 2,
+{
+    conversion_representation();
+    radix_power();
+    let (lo, hi) = (den.0@[0], den.0@[1]);
+    assert(((lo >> 1) | (hi << 127)) as int
+        == (lo >> 1) as int + 170141183460469231731687303715884105728int * (hi & 1) as int) by(bit_vector);
+    assert(lo as int == 2 * (lo >> 1) as int + (lo & 1) as int) by(bit_vector);
+    assert(hi as int == 2 * (hi >> 1) as int + (hi & 1) as int) by(bit_vector);
+    assert((lo & 1) <= 1) by(bit_vector);
+    let low_bit = (lo & 1) as int;
+    assert(unsigned(den) == 2 * unsigned(half) + low_bit) by(nonlinear_arith)
+        requires
+            unsigned(den) == lo as int + radix() * hi as int,
+            unsigned(half) == half.0@[0] as int + radix() * half.0@[1] as int,
+            half.0@[0] as int == (lo >> 1) as int + 170141183460469231731687303715884105728int * (hi & 1) as int,
+            half.0@[1] as int == (hi >> 1) as int,
+            lo as int == 2 * (lo >> 1) as int + low_bit,
+            hi as int == 2 * (hi >> 1) as int + (hi & 1) as int,
+            radix() == 340282366920938463463374607431768211456int;
+    unsigned_bounds(half);
+    lemma_fundamental_div_mod_converse(unsigned(den), 2, unsigned(half), low_bit);
 }
 
 /// The selected two-limb prefix meanings agree with the generic limb meaning.
@@ -962,6 +1114,17 @@ pub(super) proof fn divide_finish(n: Seq<u128>, d: Seq<u128>, q: Seq<u128>, r: S
     lemma_mod_bound(value(n), value(d));
     lemma_div_pos_is_pos(value(n), value(d));
     lemma_mul_is_commutative(value(d), value(n) / value(d));
+}
+
+/// Every canonical witness is the floor quotient and its remainder.
+pub(super) proof fn canonical_quotients()
+    ensures forall|n: int, d: int, q: int, r: int| #[trigger] quotient_witness(n, d, q, r)
+        ==> q == n / d && r == n % d,
+{
+    assert forall|n: int, d: int, q: int, r: int| #[trigger] quotient_witness(n, d, q, r)
+        implies q == n / d && r == n % d by {
+        canonical_quotient(n, d, q, r);
+    }
 }
 
 /// The canonical witness is the floor quotient and its remainder.

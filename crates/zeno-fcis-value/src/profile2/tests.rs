@@ -603,3 +603,101 @@ fn checked_division_remainder_test_matches_the_derived_equality() {
         )
     );
 }
+
+/// Verbatim copies of the previous mul_div family bodies, before the
+/// equality and closure expressions changed form.
+mod previous_muldiv {
+    use super::super::{Failure, Rounding, U256, U512, U768, compare};
+    use core::cmp::Ordering;
+
+    pub(super) fn mul_add_div_rem(
+        a: U256,
+        b: U256,
+        offset: U256,
+        den: U256,
+    ) -> Result<(U256, U256), Failure> {
+        if den == U256::ZERO {
+            return Err(Failure::ZeroDivisor);
+        }
+        let numerator = a.full_product(b)?.checked_add(U512::from_u256(offset))?;
+        let (q, r) = numerator.div_rem(U512::from_u256(den))?;
+        Ok((q.narrow()?, r.narrow()?))
+    }
+    pub(super) fn mul_div(a: U256, b: U256, den: U256, mode: Rounding) -> Result<U256, Failure> {
+        let (q, r) = mul_add_div_rem(a, b, U256::ZERO, den)?;
+        U256::rounded(q, r != U256::ZERO, mode)
+    }
+    pub(super) fn mul_div_half_up(a: U256, b: U256, den: U256) -> Result<U256, Failure> {
+        let half = U256([den.0[0] >> 1 | (den.0[1] << 127), den.0[1] >> 1]);
+        mul_add_div_rem(a, b, half, den).map(|(q, _)| q)
+    }
+    pub(super) fn mul3_div(
+        a: U256,
+        b: U256,
+        c: U256,
+        den: U256,
+        mode: Rounding,
+    ) -> Result<U256, Failure> {
+        if den == U256::ZERO {
+            return Err(Failure::ZeroDivisor);
+        }
+        let numerator = a.full_product(b)?.multiply_u256(c)?;
+        let (q, r) = numerator.div_rem(U768::from_u256(den))?;
+        U256::rounded(q.narrow()?, r != U768::ZERO, mode)
+    }
+    pub(super) fn products_ge(a: [U256; 3], b: [U256; 3]) -> Result<bool, Failure> {
+        let left = a[0].full_product(a[1])?.multiply_u256(a[2])?;
+        let right = b[0].full_product(b[1])?.multiply_u256(b[2])?;
+        Ok(compare(&left.0, &right.0) != Ordering::Less)
+    }
+}
+
+#[test]
+fn mul_div_family_preserves_the_previous_expression_forms() {
+    let values: Vec<U256> = helper_inputs::<2>(0x8f1b_bcdc_ca62_c1d6, 60)
+        .into_iter()
+        .map(U256::from_words_le)
+        .collect();
+    let modes = [Rounding::Floor, Rounding::Ceil, Rounding::Exact];
+    let mut count = 0;
+    for (index, a) in values.iter().enumerate() {
+        for b in values.iter().skip(index % 13).step_by(13) {
+            for den in values.iter().skip(index % 17).step_by(17) {
+                let (a, b, den) = (*a, *b, *den);
+                let offset = values[(index * 7) % values.len()];
+                assert_eq!(
+                    a.mul_add_div_rem(b, offset, den),
+                    previous_muldiv::mul_add_div_rem(a, b, offset, den)
+                );
+                assert_eq!(
+                    a.mul_div_half_up(b, den),
+                    previous_muldiv::mul_div_half_up(a, b, den)
+                );
+                for mode in modes {
+                    assert_eq!(
+                        a.mul_div(b, den, mode),
+                        previous_muldiv::mul_div(a, b, den, mode)
+                    );
+                    assert_eq!(
+                        a.mul3_div(b, offset, den, mode),
+                        previous_muldiv::mul3_div(a, b, offset, den, mode)
+                    );
+                }
+                assert_eq!(
+                    U256::products_ge([a, b, den], [b, den, offset]),
+                    previous_muldiv::products_ge([a, b, den], [b, den, offset])
+                );
+                count += 1;
+            }
+        }
+    }
+    assert!(count > 1000, "too few compared inputs: {count}");
+    // Wide zero tests compare the same fields as the derived equality.
+    for nonzero in [1, 1u128 << 127, u128::MAX] {
+        for mask in 0..64 {
+            let words: [u128; 6] =
+                core::array::from_fn(|i| if mask & (1 << i) != 0 { nonzero } else { 0 });
+            assert_eq!(U768(words).0 != U768::ZERO.0, U768(words) != U768::ZERO);
+        }
+    }
+}
