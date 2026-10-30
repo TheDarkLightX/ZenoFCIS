@@ -14,6 +14,11 @@ def dead_x86_mov(target, forms, results):
     return "dead" if any(a == ("mov", "rax", "rdi") and b == ("mov", "rax", "rsi") for a, b in pairs) else None
 
 
+def everything(target, forms, results):
+    """A wrong pruner on every grammar: only the empty sequence is kept."""
+    return "wrong" if forms else None
+
+
 def repeated_first(target, forms, results):
     """A wrong pruner: it removes every sequence that starts with a repeated instruction."""
     return "wrong" if len(forms) >= 2 and forms[0] == forms[1] else None
@@ -38,7 +43,7 @@ class ExactnessControl(unittest.TestCase):
     def test_a_wrong_pruner_is_an_exactness_failure_on_every_case(self):
         for case in exact.CASES:
             with self.subTest(case=case.name):
-                report = exact.check(case, repeated_first)
+                report = exact.check(case, everything)
                 self.assertFalse(report["exact"])
                 self.assertEqual(report["witnessed"] + len(report["failures"]) + report["removed_refused"],
                                  report["removed"])
@@ -62,14 +67,37 @@ class ExactnessControl(unittest.TestCase):
 
     def test_the_search_pruning_is_exact_on_every_case(self):
         report = exact.run()
-        self.assertTrue(report["exact"], [(r["case"], r["failures"][:2]) for r in report["cases"]])
+        self.assertTrue(report["exact"], [(r["case"], r["twins"]["failures"][:2], r["spec"]["failures"][:2])
+                                          for r in report["cases"]])
         for row in report["cases"]:
             with self.subTest(case=row["case"]):
-                self.assertGreater(row["removed"], 0)
-                self.assertEqual(row["witnessed"] + row["removed_refused"], row["removed"])
-        reasons = {reason for row in report["cases"] for reason in row["reasons"]}
-        self.assertEqual(reasons, {"dead", "order"})
+                twins, spec = row["twins"], row["spec"]
+                self.assertGreater(twins["removed"], 0)
+                self.assertNotIn("lost", twins["reasons"])
+                self.assertEqual(twins["witnessed"] + twins["removed_refused"], twins["removed"])
+                self.assertEqual(spec["witnessed"] + spec["lost_not_equivalent"] + spec["not_equivalent"]
+                                 + spec["removed_refused"], spec["removed"])
+                self.assertEqual(spec["lost_not_equivalent"], spec["reasons"].get("lost", 0))
+        reasons = {reason for row in report["cases"] for reason in row["spec"]["reasons"]}
+        self.assertEqual(reasons, {"dead", "order", "duplicate", "lost"})
+        for reason in ("duplicate", "lost"):
+            profiles = {row["target"] for row in report["cases"] if row["spec"]["reasons"].get(reason)}
+            self.assertEqual({target.split("/")[0] for target in profiles}, {"x86_64-sysv-register", "rv64i-register"})
+            self.assertEqual({target.split("/")[1] for target in profiles}, {"1", "2"})
         self.assertEqual({row["case"] for row in report["cases"]}, {case.name for case in exact.CASES})
+
+    def test_a_lost_removal_must_be_refuted_by_the_checker(self):
+        case = exact.CASES[0]  # x86 profile 1, specification x + y
+        self.assertEqual(case.spec, (["add", ["input", "x"], ["input", "y"]],))
+        solution = (("mov", "rax", "rdi"), ("add", "rax", "rsi"))
+        wrong = exact.check(case, lambda target, forms, results: "lost" if forms == solution else None, True)
+        self.assertEqual(wrong["failures"], [{"removed": [list(f) for f in solution], "reason": "lost",
+                                              "checker": "equivalent"}])
+        right = exact.check(case, lambda target, forms, results: "lost" if forms == solution[:1] else None, True)
+        self.assertEqual((right["lost_not_equivalent"], right["exact"]), (1, True))
+        # Removing the only solution of its cost is a failure even when the pass may consult the specification.
+        dead = exact.check(case, lambda target, forms, results: "dead" if forms == solution else None, True)
+        self.assertEqual(dead["failures"][0]["checker"], "equivalent")
 
     def test_a_removed_sequence_the_checker_refuses_needs_no_witness(self):
         case = exact.Grammar("refused", X2, (("mov", "rax", "rdi"), ("imul", "rax", "rsi"), ("sete", "rax")), 2)

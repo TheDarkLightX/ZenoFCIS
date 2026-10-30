@@ -1,11 +1,18 @@
-"""Exactness control for search pruning: every removed sequence needs a kept witness proved equal by Z3.
+"""Exactness control for search pruning: every removal needs a Z3-proved twin or a checker refutation.
 
-For a small grammar and length on one target, every instruction sequence is enumerated twice, with pruning off and
-on. For each sequence the pruning removed, the control looks for a kept sequence of no greater cost, in bytes and
-in instructions, whose observed results are identical on every entry state: every register, and for x86 profile 2
-every entry flag, is a free symbol, and Z3 must prove that no state makes the observed result registers differ. A
-removed sequence the checker refuses statically (it reads a flag left undefined) can never be accepted, so it
-needs no witness. Any other removed sequence without such a witness is an exactness failure.
+For a small grammar, length and specification on one target, every instruction sequence is enumerated with pruning
+off and on. A twin of a removed sequence is a kept sequence of no greater cost, in bytes and in instructions, whose
+observed results are identical on every entry state: every register, and for x86 profile 2 every entry flag, is a
+free symbol, and Z3 must prove that no state makes the observed result registers differ. Each case runs two passes:
+
+- twins: the lost-input rule is off (no required inputs). Every sequence removed as dead, out of order or a
+  duplicate needs a twin. This pass does not depend on the specification.
+- spec: the full pruning. A sequence removed because a required input is lost has no twin; the independent checker
+  must find it not equivalent to the specification (a counterexample or a refusal). Any other removal needs a twin
+  or, when its only twins lose an input, the same checker verdict for the sequence itself.
+
+A removed sequence the checker refuses statically (it reads a flag left undefined) can never be accepted, so it
+needs no witness. Any other removal that fails its pass is an exactness failure.
 
 Witnesses are tried in this order: the sequence with one instruction deleted, the sequence with two neighbouring
 instructions swapped, then every kept sequence of no greater cost whose results agree on fixed sample states. Only
@@ -25,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import hashlib
 from itertools import product
 import json
 from pathlib import Path
@@ -51,40 +59,54 @@ class Grammar:
     forms: tuple
     length: int
     results: int = 1
+    spec: tuple = ()  # profile-2 outputs, one per result, or the profile-1 expression; x when empty
 
     def problem(self) -> dict:
-        """The problem fields the search pruning reads: schema, target, grammar and the number of outputs."""
+        """A valid problem over the case's grammar: the lost-input rule reads its specification."""
         two = self.target in (v2.X86, v2.RV64)
+        x = ["input", "x"]
+        if two:
+            body = {"inputs": ["x", "y"], "outputs": list(self.spec) or [x] * self.results}
+        else:
+            body = {"inputs": ["x", "y"], "expression": self.spec[0] if self.spec else x}
         return {"schema": "zeno-fcis/machine-problem/2" if two else "zeno-fcis/machine-problem/1",
                 "target": self.target, "grammar": [list(form) for form in self.forms],
-                "max_instructions": self.length, "objective": "bytes",
-                **({"inputs": ["x", "y"], "outputs": [["input", "x"]] * self.results} if two
-                   else {"inputs": ["x", "y"], "expression": ["input", "x"]})}
+                "max_instructions": self.length, "objective": "bytes", **body}
 
 
-# Small grammars for both profiles and both targets, with argument, scratch and flag interactions.
+X, Y = ["input", "x"], ["input", "y"]
+SUM, CARRY = ["add", X, Y], ["ult", ["add", X, Y], X]
+X86_PROFILE2 = (("mov", "rax", "rdi"), ("add", "rax", "rsi"), ("cmp", "rdi", "rsi"), ("cmovb", "rax", "rsi"),
+                ("setb", "rdx"), ("adc", "rax", "rsi"), ("mov", "rdx", "rsi"), ("xor", "rdi", "rdi"))
+RV64_PROFILE2 = (("add", "a0", "a0", "a1"), ("sltu", "t0", "a0", "a1"), ("add", "a1", "a1", "t0"),
+                 ("addi", "t0", "zero", 1), ("sub", "a0", "a0", "a1"))
+# Small grammars for both profiles and both targets, with argument, scratch and flag interactions. Forms that
+# overwrite an argument register exercise the lost-input rule; equal-effect pairs exercise the duplicate rule.
 CASES = (
     Grammar("x86-profile1", v1.X86, (("mov", "rax", "rdi"), ("mov", "rax", "rsi"), ("add", "rax", "rsi"),
                                      ("mov", "rcx", "rax"), ("xor", "rax", "rcx"), ("shl", "rax", 1),
-                                     ("mov", "rdx", "rsi")), 3),
+                                     ("mov", "rdx", "rsi"), ("xor", "rdi", "rdi")), 3, spec=(SUM,)),
+    # The specification ignores y, so overwriting a1 never loses a required input.
     Grammar("rv64i-profile1", v1.RV64, (("add", "a0", "a0", "a1"), ("sub", "t0", "a0", "a1"), ("addi", "a0", "t0", 0),
-                                        ("xor", "a0", "a0", "a0"), ("slli", "t0", "a0", 1), ("slli", "t1", "a1", 1)),
-            3),
-    Grammar("x86-profile2-one-result", v2.X86,
-            (("mov", "rax", "rdi"), ("add", "rax", "rsi"), ("cmp", "rdi", "rsi"), ("cmovb", "rax", "rsi"),
-             ("setb", "rdx"), ("adc", "rax", "rsi"), ("mov", "rdx", "rsi")), 3, 1),
-    Grammar("x86-profile2-two-results", v2.X86,
-            (("mov", "rax", "rdi"), ("add", "rax", "rsi"), ("cmp", "rdi", "rsi"), ("cmovb", "rax", "rsi"),
-             ("setb", "rdx"), ("adc", "rax", "rsi"), ("mov", "rdx", "rsi")), 3, 2),
+                                        ("xor", "a0", "a0", "a0"), ("slli", "t0", "a0", 1), ("slli", "t1", "a1", 1),
+                                        ("addi", "a1", "zero", 0)), 3, spec=(["shl", X, 1],)),
+    Grammar("rv64i-profile1-duplicates", v1.RV64, (("add", "t0", "a0", "zero"), ("addi", "t0", "a0", 0),
+                                                   ("add", "a0", "t0", "a1"), ("sub", "a0", "a0", "a1")),
+            3, spec=(SUM,)),
+    Grammar("x86-profile2-one-result", v2.X86, X86_PROFILE2, 3, 1, spec=(SUM,)),
+    Grammar("x86-profile2-two-results", v2.X86, X86_PROFILE2, 3, 2, spec=(SUM, CARRY)),
     # Two live flag writers: only their order decides the carry that SETB and CMOVB read.
     Grammar("x86-profile2-flag-order", v2.X86,
-            (("add", "rdx", "rsi"), ("add", "rax", "rdi"), ("setb", "rax"), ("cmovb", "rdx", "rdi")), 3, 2),
-    Grammar("rv64i-profile2-one-result", v2.RV64,
-            (("add", "a0", "a0", "a1"), ("sltu", "t0", "a0", "a1"), ("add", "a1", "a1", "t0"),
-             ("addi", "t0", "zero", 1), ("sub", "a0", "a0", "a1")), 3, 1),
-    Grammar("rv64i-profile2-two-results", v2.RV64,
-            (("add", "a0", "a0", "a1"), ("sltu", "t0", "a0", "a1"), ("add", "a1", "a1", "t0"),
-             ("addi", "t0", "zero", 1), ("sub", "a0", "a0", "a1")), 3, 2),
+            (("add", "rdx", "rsi"), ("add", "rax", "rdi"), ("setb", "rax"), ("cmovb", "rdx", "rdi")), 3, 2,
+            spec=(SUM, SUM)),
+    # SUB and XOR of a register with itself leave the same register and flags; the byte-smaller one is kept.
+    Grammar("x86-profile2-duplicates", v2.X86, (("mov", "rax", "rdi"), ("xor", "rdx", "rdx"), ("sub", "rdx", "rdx"),
+                                                ("add", "rax", "rsi"), ("adc", "rax", "rdx")), 3, 1, spec=(SUM,)),
+    Grammar("rv64i-profile2-one-result", v2.RV64, RV64_PROFILE2, 3, 1, spec=(SUM,)),
+    Grammar("rv64i-profile2-duplicates", v2.RV64, (("add", "t0", "a0", "zero"), ("addi", "t0", "a0", 0),
+                                                   ("add", "a0", "t0", "a1"), ("addi", "a1", "zero", 1)),
+            3, 1, spec=(SUM,)),
+    Grammar("rv64i-profile2-two-results", v2.RV64, RV64_PROFILE2, 3, 2, spec=(SUM, CARRY)),
 )
 
 
@@ -175,8 +197,13 @@ def neighbours(forms: tuple):
         yield forms[:index] + (forms[index + 1], forms[index]) + forms[index + 2:]
 
 
-def check(case: Grammar, pruned: Pruner) -> dict:
-    """Enumerate the case with pruning off and on and witness every removed sequence."""
+def check(case: Grammar, pruned: Pruner, against_spec: bool = False) -> dict:
+    """Enumerate the case with pruning off and on and witness every removed sequence.
+
+    Without `against_spec` every removal except a lost input needs a kept twin. With it, the pruning may also
+    remove a sequence whose only twins lose an input, so a removal without a kept twin passes when the checker
+    finds the sequence itself not equivalent to the specification.
+    """
     every = [tuple(case.forms[i] for i in choice) for length in range(case.length + 1)
              for choice in product(range(len(case.forms)), repeat=length)]
     reasons = {forms: pruned(case.target, forms, case.results) for forms in every}
@@ -194,16 +221,29 @@ def check(case: Grammar, pruned: Pruner) -> dict:
     kept_set = set(kept)
     report = {"case": case.name, "target": case.target, "forms": len(case.forms), "length": case.length,
               "results": case.results, "enumerated": len(every), "kept": len(kept), "removed": len(removed),
-              "removed_refused": 0, "witnessed": 0, "failures": [], "reasons": {}}
+              "removed_refused": 0, "witnessed": 0, "lost_not_equivalent": 0, "not_equivalent": 0,
+              "failures": [], "reasons": {}}
+    problem = case.problem()
+    checker = v2 if profile2(case.target) else v1
     for forms in removed:
         report["reasons"][reasons[forms]] = report["reasons"].get(reasons[forms], 0) + 1
         if refused(case.target, forms):
             report["removed_refused"] += 1
             continue
+        if reasons[forms] == "lost":
+            # A lost input has no twin: the removed sequence itself must never be equivalent to the spec.
+            verdict = checker.check(problem, code(case.target, forms), timeout_ms=5000)
+            if verdict["status"] in ("counterexample", "refused"):
+                report["lost_not_equivalent"] += 1
+            else:
+                report["failures"].append({"removed": [list(f) for f in forms], "reason": "lost",
+                                           "checker": verdict["status"]})
+            continue
         target_print = fingerprint(forms)
         bound = cost(case.target, forms)
         ordered = [n for n in neighbours(forms) if n in kept_set]
-        ordered += [k for k in kept if k not in ordered]
+        first = set(ordered)
+        ordered += [k for k in kept if k not in first]
         witness = None
         for candidate in ordered:
             size = cost(case.target, candidate)
@@ -212,19 +252,33 @@ def check(case: Grammar, pruned: Pruner) -> dict:
             if proved_equal(case.target, forms, candidate, case.results):
                 witness = candidate
                 break
-        if witness is None:
-            report["failures"].append({"removed": [list(f) for f in forms], "reason": reasons[forms]})
-        else:
+        if witness is not None:
             report["witnessed"] += 1
+            continue
+        verdict = checker.check(problem, code(case.target, forms), timeout_ms=5000) if against_spec else None
+        if verdict and verdict["status"] in ("counterexample", "refused"):
+            report["not_equivalent"] += 1
+        else:
+            report["failures"].append({"removed": [list(f) for f in forms], "reason": reasons[forms],
+                                       **({"checker": verdict["status"]} if verdict else {})})
     report["exact"] = not report["failures"]
+    # Identifies the removal decisions, so a planted edit can be shown to change none of them.
+    decisions = sorted([[list(f) for f in forms], reasons[forms]] for forms in removed)
+    report["removals_sha256"] = hashlib.sha256(json.dumps(decisions).encode()).hexdigest()
     return report
 
 
-def search_pruner(case: Grammar) -> Pruner:
-    """The search's footprint pruning as a predicate, checked against the enumeration the search actually runs."""
+def search_pruner(case: Grammar, lost: bool = True) -> Pruner:
+    """The search's footprint pruning as a predicate, checked against the enumeration the search actually runs.
+
+    `lost=False` empties the required inputs, which turns the lost-input rule off and leaves only the rules
+    whose every removal has a twin.
+    """
     from machine_code import footprint
     encoded = [encode_instruction(case.target, list(form)) for form in case.forms]
     pruner = footprint.Pruner(case.problem(), encoded)
+    if not lost:
+        pruner.required = frozenset()
     index = {form: position for position, form in enumerate(case.forms)}
 
     def pruned(target, forms, results):
@@ -245,13 +299,21 @@ def search_pruner(case: Grammar) -> Pruner:
 
 
 def run(cases=CASES) -> dict:
-    rows = [check(case, search_pruner(case)) for case in cases]
-    for row in rows:
-        row["failure_count"] = len(row["failures"])
-        row["failures"] = row["failures"][:20]
-    return {"schema": "zeno-fcis/search-pruning-exactness/1", "authority": "none", "cases": rows,
+    """Two passes per case: twins for every removal with the lost-input rule off, then the full pruning."""
+    rows = []
+    for case in cases:
+        passes = {"twins": check(case, search_pruner(case, lost=False)),
+                  "spec": check(case, search_pruner(case), against_spec=True)}
+        for report in passes.values():
+            report["failure_count"] = len(report["failures"])
+            report["failures"] = report["failures"][:20]
+        rows.append({"case": case.name, "target": case.target, "length": case.length, "results": case.results,
+                     **passes, "failure_count": sum(r["failure_count"] for r in passes.values()),
+                     "exact": all(r["exact"] for r in passes.values())})
+    return {"schema": "zeno-fcis/search-pruning-exactness/2", "authority": "none", "cases": rows,
             "exact": all(row["exact"] for row in rows),
-            "scope": "Witnesses are proved by Z3 under the registered ISA models for these grammars and lengths."}
+            "scope": "Witnesses are proved by Z3 and verdicts given by the independent checker under the "
+                     "registered ISA models, for these grammars, lengths and specifications."}
 
 
 def main(argv=None) -> int:
@@ -265,10 +327,16 @@ def main(argv=None) -> int:
     if args.out:
         args.out.write_text(text, encoding="utf-8")
     for row in report["cases"]:
-        print(f"{row['case']}: enumerated {row['enumerated']}, removed {row['removed']} {row['reasons']}, "
-              f"witnessed {row['witnessed']}, refused {row['removed_refused']}, failures {row['failure_count']}")
-    print("ZENO_EXACTNESS " + json.dumps({"exact": report["exact"],
-                                         "failures": {r["case"]: r["failure_count"] for r in report["cases"]}}))
+        twins, spec = row["twins"], row["spec"]
+        print(f"{row['case']}: enumerated {spec['enumerated']}; without lost: removed {twins['removed']} "
+              f"{twins['reasons']}, witnessed {twins['witnessed']}, refused {twins['removed_refused']}; full: "
+              f"removed {spec['removed']} {spec['reasons']}, witnessed {spec['witnessed']}, lost not equivalent "
+              f"{spec['lost_not_equivalent']}, other not equivalent {spec['not_equivalent']}, refused "
+              f"{spec['removed_refused']}; failures {row['failure_count']}")
+    print("ZENO_EXACTNESS " + json.dumps({
+        "exact": report["exact"], "failures": {r["case"]: r["failure_count"] for r in report["cases"]},
+        "removals": {r["case"]: [r["twins"]["removals_sha256"], r["spec"]["removals_sha256"]]
+                     for r in report["cases"]}}))
     return 0 if report["exact"] else 1
 
 
