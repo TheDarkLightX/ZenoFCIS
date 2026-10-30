@@ -50,7 +50,7 @@ DO-178C. It does not replace them.
 Profile 1 is listed here. [Profile 2](#profile-2-flags-carries-and-comparisons)
 is registered separately and adds flags, comparisons, selects, up to six inputs
 and two results; profile-1 problems, sessions, receipts and checks are unchanged.
-[Profile 3](#profile-3-memory-regions) adds declared memory regions on x86-64.
+[Profile 3](#profile-3-memory-regions) adds declared memory regions on x86-64 and RV64I.
 
 | Target | Calling contract | Admitted computation |
 | --- | --- | --- |
@@ -380,8 +380,9 @@ python3 -B -m tools.machine_qualification.controls run [--defect NAME]... [--out
 - **Defects:** each one is a single source edit to `verify.py`, `verify2.py` or `verify3.py`. Examples are a 32-bit immediate,
   unextended RISC-V immediates, scratch registers or entry flags fixed instead of quantified, a dropped symbolic
   instruction, five-bit shift counts, wrong CF, ZF, SF and OF rules, a writable x0, an unknown solver answer read
-  as equivalence, and a counterexample reported without its concrete replay. The eleven profile-3 defects
-  include a byte displacement used as a word index, an admitted store to a read-only region, a misaligned or
+  as equivalence, and a counterexample reported without its concrete replay. The fourteen profile-3 defects
+  include a byte displacement used as a word index, an RV64I store offset cut to five bits, an admitted 32-bit
+  access or load into x0, an admitted store to a read-only region, a misaligned or
   out-of-region access, a redefined base, a store dropped from the symbolic run, and a region word, base pointer
   or scratch register fixed instead of quantified. Each defect names the control expected to expose it.
 - **Specimens:** each edit is applied to its own copy of the checker package, the control modules and the kernel
@@ -708,12 +709,13 @@ returns the inputs, pointer values, entry registers, flags and region words on
 which a result or a final region word differs.
 
 Profile 3 is a third, separately registered checker for straight-line x86-64
-kernels that load and store 64-bit words. Profiles 1 and 2 are unchanged. RV64I
-is not part of profile 3 yet.
+and RV64I kernels that load and store 64-bit words. Profiles 1 and 2 are
+unchanged.
 
 | Target | Calling contract | Admitted computation |
 | --- | --- | --- |
 | `x86_64-sysv-memory/3` | Each region's base pointer in the argument register it names; word inputs in the other argument registers, in order; results in `rax`, then `rdx` | Every profile-2 x86 form, plus `mov r64, [base]`, `mov r64, [base + disp8]`, `mov [base], r64` and `mov [base + disp8], r64` |
+| `rv64i-memory/3` | The same, with argument registers `a0` to `a5` and results in `a0`, then `a1` | Every profile-2 RV64I form, plus `ld rd, disp(base)` and `sd rs2, disp(base)`; `sd` may store `zero` |
 
 **Problem format.** The schema is `zeno-fcis/machine-problem/3`, with exactly
 the fields `schema`, `target`, `inputs`, `regions`, `outputs`, `memory`,
@@ -740,15 +742,17 @@ and to every palette form. Each refusal names its reason.
 
 | Rule | Refusal |
 | --- | --- |
-| A memory operand is `[base]` (ModRM mod 0) or `[base + disp8]` with a nonzero disp8 (mod 1) | `UnsupportedAddressing`, `NonCanonicalDisplacement` |
+| x86: a memory operand is `[base]` (ModRM mod 0) or `[base + disp8]` with a nonzero disp8 (mod 1) | `UnsupportedAddressing`, `NonCanonicalDisplacement` |
+| RV64I: a load or store is 64-bit (`funct3` 3), and a load does not write `zero` | `UnsupportedMemoryWidth`, `ZeroWriteHintRefused` |
 | The base is a region's base register | `MemoryBaseNotARegion` |
 | No earlier instruction wrote that register | `RedefinedRegionBase` |
 | The displacement is a multiple of 8 | `MisalignedAccess` |
 | The displacement addresses a word inside the region | `DisplacementOutsideRegion` |
 | A store targets a read-write region | `StoreToReadOnlyRegion` |
 
-SIB, RIP-relative and 32-bit displacements refuse, as do every other memory
-operand and partial-width access. Writing a base register after its last access
+On x86, SIB, RIP-relative and 32-bit displacements refuse, as do every other
+memory operand and partial-width access. On RV64I, every other load and store
+width refuses. Writing a base register after its last access
 is admitted.
 
 **Checking.** `tools/machine_code/verify3.py` runs the decoded body over the
@@ -757,7 +761,7 @@ store replaces it. Non-memory instructions use the profile-2 models unchanged.
 Z3 then looks for an assignment where any result or any read-write region word
 differs from the problem, or a read-only word changed. The query quantifies
 every word input, every base pointer value, every initial region word, every
-other admitted register and the four entry flags. A counterexample names all of
+other admitted register and, on x86, the four entry flags. A counterexample names all of
 them, with the expected and actual results and region words, and it is replayed
 on the concrete model before it is reported. `open`, `search`, `candidate`,
 `emit`, `replay` and `library` select this checker from the schema; their
@@ -779,19 +783,22 @@ python3 -O -B tools/test_machine_code_profile3_loop.py
 python3 -B -m tools.machine_code.run library check --dir test-data/machine-code/memory-kernels
 ```
 
-- The verifier suite uses literal bytes checked against GNU objdump. It covers
+- The verifier suite uses x86 bytes checked against GNU objdump and RV64I words
+  packed from the I- and S-type layouts, anchored to two known encodings. It covers
   every admission refusal, a wrong store order and a dropped store, each refuted
   with a replayed counterexample, and quantified region words, base pointers,
   scratch registers and flags. Solver-unknown and replay-mismatch mocks are
   never equivalent.
 - [`test-data/machine-code/memory-kernels`](../test-data/machine-code/memory-kernels)
-  holds three kernels found by `search`:
-  - a two-word swap, 15 bytes;
-  - a load, add and store, 10 bytes;
-  - a two-word copy from a read-only region that also returns the sum, 18 bytes.
+  holds three kernels for each target, found by `search`:
+  - a two-word swap, 15 bytes on x86-64 and 20 on RV64I;
+  - a load, add and store, 10 and 16 bytes;
+  - a two-word copy from a read-only region that also returns the sum, 18 and
+    24 bytes.
   The loop test finds each again, then emits, replays and adds it
   byte-identically.
-- The eleven profile-3 planted defects are detected under both interpreter modes.
+- The fourteen profile-3 planted defects are detected under both interpreter
+  modes.
 
 **Non-claims.**
 
