@@ -74,9 +74,18 @@ python3 tools/atdd.py run --resume RUN_DIR
   4.14.1 at `/usr/bin/ocamlopt` (`ocaml-scalar-consumer`), the pinned CVC5,
   Z3 and certificate checker variables (`symbolic-per-case-checks`), Node.js
   and the `npm ci` dependencies (`zal-dialogue`), Node.js 22 through
-  `NODE_BIN` or `node` (`finite-synthesis`), and `/usr/bin/bwrap`,
-  `/usr/bin/prlimit` and `cc` (`native-worker-host`). Ordinary runs do not
-  check them.
+  `NODE_BIN` or `node` and a reachable systemd user manager, which the
+  physical systemd stage test of the CLI crate needs (`finite-synthesis`),
+  the exact pinned Node.js 22.23.1 that the probity guardrail compares
+  against (`probity-guardrails`), GNU `gcc`, `as`, `objcopy`, `readelf` and
+  `nm` under `/usr/bin` and the Python `z3` module, which the native and
+  verifier machine-code tests resolve themselves (`machine-code-synthesis`),
+  the published 2.6.0 executable and checkout (`released-26-compatibility`),
+  and `/usr/bin/bwrap`, `/usr/bin/prlimit` and `cc` (`native-worker-host`).
+  Lean and QEMU are not declared because no scenario executes them: the Lean
+  gate tests run against recorded output, and RV64I execution under QEMU runs
+  only in the machine-code workflow, which requires it explicitly. Ordinary
+  runs do not check prerequisites.
 - `RUN_DIR/receipts/ID.json` (`zeno-fcis/atdd-receipt/1`) records the
   scenario's status, the commit, its tree, whether tracked files differ from
   it (`dirty`) and the SHA-256 of those differences, each command's argv,
