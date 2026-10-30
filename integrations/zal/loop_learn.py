@@ -16,6 +16,7 @@ import re
 import tempfile
 
 from behavior import Refusal
+import json_numbers
 import report_numbers as N
 import loop_doors as doors
 import loop_language as Z
@@ -41,11 +42,10 @@ def strict_json(text):
             out[key] = val
         return out
 
-    def constant(_):
-        raise Refusal("learn-nonfinite-json-number")
-
     try:
-        return json.loads(text, object_pairs_hook=unique, parse_constant=constant)
+        return json.loads(text, object_pairs_hook=unique, **json_numbers.hooks(json_numbers.raising(Refusal, "learn-")))
+    except Refusal:
+        raise
     except (ValueError, TypeError, RecursionError) as e:
         raise Refusal("learn-json") from e
 

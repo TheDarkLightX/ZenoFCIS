@@ -39,5 +39,9 @@ jobs:
         # The real Haskell replay and its vendor suites need separately pinned
         # build/runtime inputs; they are not selected or claimed by this job.
         run: python3 -B -m unittest discover -s integrations/zal/relational_profile -t . -p test_profile.py -v
+      - name: Exact numeric meaning across the ZAL JSON readers
+        run: |
+          python3 -B integrations/zal/test_json_numbers.py -v
+          python3 -O -B integrations/zal/test_json_numbers.py
       - name: Research feasibility record controls
         run: python3 -B tools/test_research_feasibility.py

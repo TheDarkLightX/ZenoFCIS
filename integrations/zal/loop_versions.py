@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 from behavior import Refusal
+import json_numbers
 import report_numbers as N
 import loop_doors as doors
 import loop_language as Z
@@ -44,7 +45,10 @@ def strict_json(text: str):
     def noninteger(_):
         raise Refusal("integral JSON required")
     try:
-        return json.loads(text, object_pairs_hook=pairs, parse_float=noninteger, parse_constant=noninteger)
+        return json.loads(text, object_pairs_hook=pairs, parse_float=noninteger, parse_constant=noninteger,
+                          parse_int=json_numbers.integer_hook(json_numbers.raising(Refusal)))
+    except Refusal:
+        raise
     except (ValueError, RecursionError) as exc:
         raise Refusal("invalid bounded JSON") from exc
 

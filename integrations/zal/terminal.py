@@ -7,6 +7,7 @@ import shlex
 import unicodedata
 
 from behavior import Refusal, canonical, check, explain, help_topic, legend, replay
+import json_numbers
 import constructs
 import explain as explanations
 import ladder_tools
@@ -41,7 +42,7 @@ Full-hash accept also needs the displayed corpus digest; JSON traces remain avai
 def trace_inputs(text):
     """Read a short sequence of assumed events, retaining the JSON expert form."""
     if text.lstrip().startswith("["):
-        return json.loads(text)
+        return json.loads(text, **json_numbers.hooks(json_numbers.raising(Refusal, "trace: ")))
     inputs = []
     for step in text.split(" then "):
         words = shlex.split(step)

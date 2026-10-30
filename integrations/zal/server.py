@@ -12,6 +12,7 @@ import threading
 from urllib.parse import urlsplit
 
 from behavior import Refusal, assumption_groups, canonical, explain, help_topic, legend, parse, replay
+import json_numbers
 from codex_transport import AppServer, TransportError
 from shared import SharedWorkspace
 from workflow import PROPOSAL_SCHEMA, Session, checker_identity, examples_digest
@@ -361,7 +362,7 @@ def serve(source: str, cwd: Path, port=8765, shared_path: Path | None = None):
                 length = int(self.headers.get("Content-Length", "0"))
                 if not 0 < length <= 96 * 1024:
                     raise Refusal("Request exceeds the 96 KiB workspace bound")
-                data = json.loads(self.rfile.read(length))
+                data = json.loads(self.rfile.read(length), **json_numbers.hooks(json_numbers.raising(Refusal, "request: ")))
                 if not isinstance(data, dict):
                     raise Refusal("Expected a workspace event object")
                 route = urlsplit(self.path).path.removeprefix("/api/")

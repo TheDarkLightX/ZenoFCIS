@@ -16,6 +16,7 @@ import behavior
 from behavior import MAX_SOURCE
 import behavior2
 from factory import lower, qualify, write_new
+import json_numbers
 from workflow import checker_identity
 
 
@@ -28,6 +29,11 @@ def verdict_exit(result):
     if result.get("status") in {"unfinished", "unsupported", "UNKNOWN", "unknown", "inconclusive"}:
         return 2
     return 0
+
+
+def user_json(text):
+    """A user-supplied JSON argument; every number keeps its exact value or refuses by name."""
+    return json.loads(text, **json_numbers.hooks(json_numbers.raising(behavior.Refusal, "input: ")))
 
 
 def ladder_json_refusal(source, path):
@@ -176,7 +182,7 @@ def main(argv=None):
                 raise behavior.Refusal("The explain command supports zal/effects/1 and zal/typed-fsm/1 sources")
             if options.input is None:
                 raise behavior.Refusal("Profile-2 explain needs --input with state, variables, event and context")
-            given = json.loads(options.input)
+            given = user_json(options.input)
             keys = {"state", "variables", "event", "context"}
             if not isinstance(given, dict) or set(given) != keys:
                 raise behavior.Refusal("Profile-2 explain input names exactly state, variables, event and context")
@@ -192,22 +198,22 @@ def main(argv=None):
         elif options.command == "story":
             import explain
             if options.trace:
-                result = explain.narrate_trace(model, json.loads(options.trace.read_text(encoding="ascii")), checker_identity())
+                result = explain.narrate_trace(model, user_json(options.trace.read_text(encoding="ascii")), checker_identity())
             else:
                 result = explain.narrate_check(model, profile.check(model, checker_identity()), checker_identity())
         elif options.command in {"why-not", "what-if"}:
             import explain
             import explain2
-            given = json.loads(options.input)
+            given = user_json(options.input)
             keys = {"state", "event", "context"} | ({"variables"} if profile is behavior2 else set())
             if not isinstance(given, dict) or set(given) != keys:
                 raise behavior.Refusal("The input names exactly " + ", ".join(sorted(keys)))
             module = explain2 if profile is behavior2 else explain
             head = [given["state"], *([given["variables"]] if profile is behavior2 else []), given["event"], given["context"]]
             if options.command == "why-not":
-                result = module.why_not(model, *head, json.loads(options.want), options.scope, checker_identity())
+                result = module.why_not(model, *head, user_json(options.want), options.scope, checker_identity())
             else:
-                result = module.what_if(model, *head, json.loads(options.change), checker_identity())
+                result = module.what_if(model, *head, user_json(options.change), checker_identity())
         elif options.command in {"export", "lower"}:
             if options.out is None:
                 raise behavior.Refusal("Finite-FSM lowering needs --out with an absent or empty directory")
@@ -280,7 +286,7 @@ def typed_or_effects(options, source, first):
     elif options.command == "explain" and signatures:
         result = effects_guide.explain(model, options.topic)
     elif options.command == "explain" and options.input:
-        given = json.loads(options.input)
+        given = user_json(options.input)
         if not isinstance(given, dict) or set(given) != {"state", "variables", "event", "context"}:
             raise behavior.Refusal("The input names exactly context, event, state, variables")
         result = typed2.explain(model, given["state"], given["variables"], given["event"], given["context"],

@@ -6,6 +6,7 @@ This extends the existing locked owner answer gate, never the MCP tool list.
 from copy import deepcopy
 import json
 from behavior import Refusal
+import json_numbers
 import loop_doors as D
 import loop_language as Z
 
@@ -25,7 +26,10 @@ def strict_problem(text):
     try:
         value = json.loads(text, object_pairs_hook=fields,
                            parse_float=lambda _: (_ for _ in ()).throw(Refusal("strategy-fractional-number")),
-                           parse_constant=lambda _: (_ for _ in ()).throw(Refusal("strategy-nonfinite-number")))
+                           parse_constant=lambda _: (_ for _ in ()).throw(Refusal("strategy-nonfinite-number")),
+                           parse_int=json_numbers.integer_hook(json_numbers.raising(Refusal, "strategy-")))
+    except Refusal:
+        raise
     except (ValueError, RecursionError) as error:
         raise Refusal("strategy-problem-json") from error
     if type(value) is not dict:

@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 
 from behavior import Refusal, check, explain, help_topic, parse, replay, semantic_diff
+import json_numbers
 from constructs import guide
 import explain as explanations
 from shared import SharedWorkspace
@@ -282,7 +283,7 @@ def main():
             return
         request = None
         try:
-            request = json.loads(data)
+            request = json.loads(data, **json_numbers.hooks(json_numbers.raising(ValueError, "request: ")))
             result = bridge.handle(request)
             if result is None:
                 continue

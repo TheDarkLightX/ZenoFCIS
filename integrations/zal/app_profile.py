@@ -14,6 +14,7 @@ from pathlib import Path
 
 import behavior2
 import factory
+import json_numbers
 
 FORMAT = "zal/app-binding/1"
 PRESENTATION_FORMAT = "zal/app-presentation/1"
@@ -36,10 +37,6 @@ def _pairs(pairs):
         _need(key not in out, "duplicate JSON key: " + key)
         out[key] = value
     return out
-
-
-def _bad_number(_number):
-    raise behavior2.Refusal("app-binding: nonfinite JSON number")
 
 
 def _text(value, where):
@@ -79,7 +76,8 @@ def _parse_binding(model, text):
         raise behavior2.Refusal("app-binding: invalid Unicode") from error
     _need(len(raw) <= MAX_BINDING_BYTES, "binding JSON exceeds 64 KiB")
     try:
-        binding = json.loads(text, object_pairs_hook=_pairs, parse_constant=_bad_number)
+        binding = json.loads(text, object_pairs_hook=_pairs,
+                             **json_numbers.hooks(json_numbers.raising(behavior2.Refusal, "app-binding: ")))
     except behavior2.Refusal:
         raise
     except (ValueError, RecursionError, UnicodeError) as error:
