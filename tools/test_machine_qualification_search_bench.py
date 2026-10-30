@@ -78,7 +78,10 @@ class SmallRun(unittest.TestCase):
         result = measured["problems"]["add64-rv64i.json"]
         self.assertEqual((result["status"], result["cost"], result["deterministic"]),
                          ("checked-candidate", {"bytes": 8, "instructions": 1}, True))
-        self.assertEqual(result["counters"]["proposed"], result["space"])
+        # With the grammar exhausted, every sequence is either proposed or counted as skipped by pruning.
+        counted = result["counters"]
+        self.assertEqual(counted["proposed"] + counted.get("dead_pruned", 0) + counted.get("order_pruned", 0),
+                         result["space"])
         self.assertEqual(len(result["wall_seconds"]), 2)
         self.assertGreaterEqual(result["counters"]["solver_checks"], 1)
         after = {p: hashlib.sha256(p.read_bytes()).hexdigest()

@@ -12,6 +12,7 @@ and prints the before-and-after table of solver checks, candidates and time, and
 identical. Times are for this machine and load only. Nothing here claims optimality or a runtime speedup.
 
     python3 -B -m tools.machine_qualification.search_bench run --out REPORT.json [--problem NAME]... [--repeats N]
+        [--no-prune]
     python3 -B -m tools.machine_qualification.search_bench compare BEFORE.json AFTER.json
 
 `compare` exits 1 when a problem's found cost or status differs, or a problem is missing from either report.
@@ -80,8 +81,9 @@ def budget_hit(result: dict, seconds: float, budgets: dict) -> str | None:
     return "other"
 
 
-def measure(problem: dict, budgets: dict, repeats: int) -> dict:
-    """Search a fresh session `repeats` times with the same budgets."""
+def measure(problem: dict, budgets: dict, repeats: int, prune: bool | None = None) -> dict:
+    """Search a fresh session `repeats` times with the same budgets; `prune` is passed only when given."""
+    switch = {} if prune is None else {"prune": prune}
     runs = []
     with tempfile.TemporaryDirectory(prefix="zeno-search-bench-") as temporary:
         path = Path(temporary) / "problem.json"
@@ -91,14 +93,15 @@ def measure(problem: dict, budgets: dict, repeats: int) -> dict:
             session.open_session(path, directory)
             started = time.monotonic()
             result = session.search(directory, budgets["max_candidates"], budgets["max_checks"],
-                                    budgets["deadline_ms"], budgets["timeout_ms"])
+                                    budgets["deadline_ms"], budgets["timeout_ms"], **switch)
             runs.append((time.monotonic() - started, result))
     first = runs[0][1]
     observed = [counters(result) for _, result in runs]
     seconds = [round(elapsed, 4) for elapsed, _ in runs]
     return {"status": first.get("status"), "stop_reason": first.get("stop_reason"),
             "budget_hit": budget_hit(first, seconds[0], budgets), "cost": first.get("cost"),
-            "reason": first.get("reason"), "incumbent": first.get("incumbent"), "counters": observed[0],
+            "reason": first.get("reason"), "incumbent": first.get("incumbent"), "pruning": first.get("pruning"),
+            "counters": observed[0],
             "deterministic": all(o == observed[0] and r.get("cost") == first.get("cost")
                                  and r.get("status") == first.get("status") for o, (_, r) in zip(observed, runs)),
             "wall_seconds": seconds, "wall_median_seconds": round(statistics.median(seconds), 4)}
@@ -112,7 +115,7 @@ def source_state() -> dict:
     return {"commit": git("rev-parse", "HEAD"), "dirty": bool(status) if status is not None else None}
 
 
-def run(selected: list[str] | None, budgets: dict, repeats: int) -> dict:
+def run(selected: list[str] | None, budgets: dict, repeats: int, prune: bool | None = None) -> dict:
     import z3
     registered = problems()
     unknown = sorted(set(selected or ()) - set(registered))
@@ -120,7 +123,7 @@ def run(selected: list[str] | None, budgets: dict, repeats: int) -> dict:
         raise SystemExit(f"unknown problems: {unknown}")
     report = {"schema": SCHEMA, "authority": "none", **source_state(), "python": platform.python_version(),
               "z3": z3.get_version_string(), "machine": platform.machine(), "processor": platform.processor(),
-              "load_average": list(os.getloadavg()), "budgets": budgets, "repeats": repeats,
+              "load_average": list(os.getloadavg()), "budgets": budgets, "repeats": repeats, "prune": prune,
               "scope": "Wall times hold for this machine and load only; no optimality or speedup claim.",
               "problems": {}}
     for name, item in registered.items():
@@ -129,7 +132,7 @@ def run(selected: list[str] | None, budgets: dict, repeats: int) -> dict:
         problem = item["problem"]
         row = {"schema": problem["schema"], "target": problem["target"], "grammar": len(problem["grammar"]),
                "max_instructions": problem["max_instructions"], "space": space(problem),
-               "recorded_cost": item["recorded_cost"], **measure(problem, budgets, repeats)}
+               "recorded_cost": item["recorded_cost"], **measure(problem, budgets, repeats, prune)}
         report["problems"][name] = row
         print(f"{name}: {row['status']} cost={row['cost']} stop={row['stop_reason']}/{row['budget_hit']} "
               f"checks={row['counters'].get('solver_checks')} proposed={row['counters'].get('proposed')} "
@@ -174,6 +177,8 @@ def main(argv=None) -> int:
     measured.add_argument("--out", type=Path, required=True)
     measured.add_argument("--problem", action="append")
     measured.add_argument("--repeats", type=int, default=3)
+    measured.add_argument("--no-prune", action="store_true",
+                          help="pass prune=False to a search that has the switch; the default leaves it unset")
     for key, value in BUDGETS.items():
         measured.add_argument("--" + key.replace("_", "-"), type=int, default=value)
     compared = commands.add_parser("compare")
@@ -190,7 +195,7 @@ def main(argv=None) -> int:
     if not 1 <= args.repeats <= 10:
         raise SystemExit("--repeats must be 1 to 10")
     budgets = {key: getattr(args, key) for key in BUDGETS}
-    report = run(args.problem, budgets, args.repeats)
+    report = run(args.problem, budgets, args.repeats, False if args.no_prune else None)
     args.out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     nondeterministic = [name for name, row in report["problems"].items() if not row["deterministic"]]
     print(f"wrote {args.out}: {len(report['problems'])} problems"
