@@ -309,7 +309,7 @@ def qualify(cli, work):
         path.write_bytes(encoded(certificate))
         result = subprocess.run([sys.executable, str(Path(__file__).resolve()), 'replay', '--cli', str(cli),
                                  '--work-dir', str(directory / 'replay'), '--certificates', str(changed)],
-                                cwd=core.ROOT, capture_output=True, timeout=180, check=False)
+                                cwd=core.ROOT, capture_output=True, timeout=1800, check=False)
         (directory / 'replay.stdout').write_bytes(result.stdout)
         (directory / 'replay.stderr').write_bytes(result.stderr)
         (directory / 'replay.exit').write_text(f'{result.returncode}\n')

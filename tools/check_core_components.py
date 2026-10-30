@@ -242,7 +242,8 @@ def finite_proof(cli, work):
     files = dict(initial['runtime']['files'])
     for family in core.FAMILIES:
         files.update(initial['families'][family])
-    for name in ('tools/test_core_family_proofs.py', 'tools/test_core_components.py'):
+    # cargo_source_scope.py is imported by this script inside the stage, so it is staged with the tests.
+    for name in ('tools/test_core_family_proofs.py', 'tools/test_core_components.py', 'tools/cargo_source_scope.py'):
         files[name] = core.digest((core.ROOT / name).read_bytes())
     work.mkdir(exist_ok=False)
     stage = work / 'source'

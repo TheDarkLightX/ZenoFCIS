@@ -51,7 +51,7 @@ class CertificateBoundaryTests(unittest.TestCase):
             path.parent.mkdir(parents=True)
             path.write_text('original family input')
         names = (*proof.INPUTS, 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml',
-                 'tools/test_core_family_proofs.py', 'tools/test_core_components.py')
+                 'tools/test_core_family_proofs.py', 'tools/test_core_components.py', 'tools/cargo_source_scope.py')
         for name in names:
             path = root / name
             path.parent.mkdir(parents=True, exist_ok=True)
