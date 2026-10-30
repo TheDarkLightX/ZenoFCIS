@@ -1,0 +1,26 @@
+{
+  "authority": "none",
+  "base": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted-2.5",
+  "files": {
+    "project.zeno": "9022214fe986ec1932c1e1b4d8fb8769e23f8c5beaaa49f39118036790007be4",
+    "src/v2_contract.rs": "2504cd4677031593ebf1b5f8b7a57c4fd716ca7746545b5521684207f105e959",
+    "src/v2_contract_v1.rs": "74689a8e3075d82f61f7825bca1036a8484c7e9cfbf900f2c03085c1269309be",
+    "tests/decision-examples.txt": "5f2803c30f36eb7aca0c5a8909ced3c8e7b731726320643c81d5c3a7395f3dc2",
+    "v2/adoptions/1/program.zcve": "b8b51e2b2647831cc685d38bec838090210716c0a9c3f5945479d751d857e3e2",
+    "v2/adoptions/1/receipt.json": "6c3191f81f195b2ecc48f321ea89948bc9ebba918f2b0281293d62871b5ef1b3",
+    "v2/policy.json": "ce5f46dcf4f5f9812a6eeeb3445364040d1fb01d604e6240517b90b634568e7f",
+    "v2/policy.zcve": "389436811327892a6e0bc6951f060304d6a87a8b4d16633a8a264515226e1f78",
+    "v2/policy_v1.zcve": "6aa54c1f37a09d94765da53a2745753dbee0e8190149108ce7ddc0be10b33c39",
+    "v2/schema-origin.json": "5453c89e774e714881e2504b9c3051f0cbcd289ce35b887323d21256a270c9a5",
+    "v2/schema.zcve": "918d51e8ad89df8d7ef7e43e6e88ace00296e0dae859725acfff6047c387a573"
+  },
+  "kept": [
+    "src/v2_contract.rs",
+    "v2/adoptions/1/receipt.json",
+    "v2/policy.json"
+  ],
+  "release": "2.6.0",
+  "released_cli_sha256": "f7d8cb92b588903371745e3eb11a317fe917e30a260bc4c16e3f6da87c6c4af5",
+  "schema": "zeno-fcis/released-26-adoption/1",
+  "subject": "7d175c47099866939c86acd463ac85219abba882"
+}
