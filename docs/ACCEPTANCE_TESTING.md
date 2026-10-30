@@ -46,6 +46,59 @@ python3 tools/atdd.py run --all
 The runner uses fixed argument arrays and does not execute command text from a
 feature file. This keeps Gherkin prose outside execution authority.
 
+Every run first passes the fixed preflight: `tools/test_atdd_registry.py`,
+`tools/test_scaffold_versions.py`, `tools/check_authority_v2.py
+--check-sources` and the `v2_evaluator_identity` test. A preflight failure
+stops every mode with exit 1. An ordinary run then stops at the first failing
+scenario (exit 1) and prints `atdd: complete PASS (N scenarios)` only when
+every selected scenario passed.
+
+### Inventory, receipts, shards and resume
+
+For release qualification, record a complete inventory instead:
+
+```bash
+python3 tools/atdd.py run --all --keep-going --run-dir RUN_DIR
+python3 tools/atdd.py run --all --keep-going --shard 2/4 --run-dir RUN_DIR_2
+python3 tools/atdd.py run --resume RUN_DIR
+```
+
+- `--keep-going` runs every selected scenario. Each one is `pass`, `fail` (its
+  first failing command ends that scenario, and the run continues) or
+  `blocked`. Without `--run-dir`, a new directory is created under the
+  temporary directory and printed. `--run-dir` must be absent or empty.
+- A scenario is `blocked` when a host prerequisite it declares is missing,
+  and none of its commands run. The receipt and the summary name the missing
+  tool, the unset variable or the absent path. A blocked scenario is never a
+  pass; its acceptance claim stays open. The declared prerequisites are OCaml
+  4.14.1 at `/usr/bin/ocamlopt` (`ocaml-scalar-consumer`), the pinned CVC5,
+  Z3 and certificate checker variables (`symbolic-per-case-checks`), Node.js
+  and the `npm ci` dependencies (`zal-dialogue`), Node.js 22 through
+  `NODE_BIN` or `node` (`finite-synthesis`), and `/usr/bin/bwrap`,
+  `/usr/bin/prlimit` and `cc` (`native-worker-host`). Ordinary runs do not
+  check them.
+- `RUN_DIR/receipts/ID.json` (`zeno-fcis/atdd-receipt/1`) records the
+  scenario's status, the commit, its tree, whether tracked files differ from
+  it (`dirty`) and the SHA-256 of those differences, each command's argv,
+  exit code and seconds, the missing tools or the failure, and the SHA-256 of
+  `RUN_DIR/logs/ID.log`, which holds the commands' output.
+  `RUN_DIR/summary.json` (`zeno-fcis/atdd-summary/1`) lists every selected
+  scenario once with its status and receipt digest. `RUN_DIR/run.json`
+  (`zeno-fcis/atdd-run/1`) binds the selection to the checkout.
+- Exit 0 means every selected scenario passed, 1 that one failed or has no
+  receipt, and 2 that some are blocked and none failed. `complete PASS` is
+  printed only for exit 0 without `--shard`.
+- `--shard I/N`, with `--all`, selects every Nth scenario of the sorted IDs
+  starting at the Ith, so the N shards partition the registry. A passing shard
+  prints `atdd: shard I/N PASS`, never `complete PASS`.
+- `--resume RUN_DIR` reruns, in the same selection and shard, only the
+  scenarios that have no passing receipt. Earlier receipts and logs are kept as
+  `ID.attemptK.json` and `ID.attemptK.log`. It refuses when the checkout's
+  commit, tree or tracked changes differ from those in `run.json`.
+- A scenario that changes tracked files stops the run, because later receipts
+  would no longer describe the recorded checkout. Restore the checkout and
+  resume. Untracked files are not compared.
+
 Build tests with optimization when they run contained loops:
 
 ```bash

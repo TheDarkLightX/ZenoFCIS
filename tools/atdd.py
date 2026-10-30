@@ -4,15 +4,20 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import TextIO
 
 from commons_hook import failure, report
 
@@ -32,11 +37,37 @@ class AcceptanceError(ValueError):
 
 
 @dataclass(frozen=True)
+class HostTool:
+    """A host prerequisite that a scenario needs and cannot supply itself.
+
+    Only `run --keep-going` and `run --resume` check it, before the scenario's
+    first command; a scenario with a missing tool is `blocked`, never passed.
+    `executable` is an absolute path or a name on PATH, and `executable_env`
+    may name a variable that overrides it. `version` holds the arguments that
+    print a version whose first line must fully match `version_pattern`.
+    `environment` names variables that must be set and non-empty; `paths` are
+    repository paths that must exist, such as installed npm dependencies.
+    """
+
+    name: str
+    executable: str | None = None
+    executable_env: str | None = None
+    version: tuple[str, ...] = ()
+    version_pattern: str | None = None
+    environment: tuple[str, ...] = ()
+    paths: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class AcceptanceScenario:
     """One reviewable acceptance scenario with fixed executable commands."""
 
     title: str
     commands: tuple[tuple[str, ...], ...]
+    requires: tuple[HostTool, ...] = ()
+
+
+NODE = HostTool("Node.js (node on PATH)", executable="node")
 
 
 def historical_oracle(test_filter: str, *, exact: bool = False) -> tuple[str, ...]:
@@ -324,6 +355,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "-p", "zeno-fcis-cli", "--locked"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "synthesis_javascript", "--locked", "--", "--ignored"),
          ("python3", "tools/check_synthesis.py")),
+        requires=(HostTool("Node.js 22 (NODE_BIN or node)", executable="node", executable_env="NODE_BIN",
+                           version=("--version",), version_pattern=r"v22\.\d+\.\d+"),),
     ),
     "zal-dialogue": AcceptanceScenario(
         "Review finite behavior through deterministic language help and exact revisions",
@@ -345,6 +378,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "-B", "integrations/zal/check_effects.py", "planted"),
          ("python3", "-B", "integrations/zal/check_lowering.py"),
          ("python3", "integrations/zal/run.py", "qualify", "integrations/zal/examples/order.zal")),
+        requires=(NODE, HostTool("npm dependencies (npm ci)", paths=("node_modules/@modelcontextprotocol/sdk",))),
     ),
     "core-component-families": AcceptanceScenario(
         "Replay every supported finite component instance and refuse bad family evidence",
@@ -609,6 +643,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "build", "-p", "zeno-fcis-cli", "--locked", "--offline"),
          ("python3", "tools/qualify_ocaml_consumer.py", "--cli",
           str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug" / "zeno-fcis"))),
+        requires=(HostTool("OCaml 4.14.1 (/usr/bin/ocamlopt)", executable="/usr/bin/ocamlopt",
+                           version=("-version",), version_pattern=r"4\.14\.1"),),
     ),
     "bounded-completion": AcceptanceScenario(
         "Verify finite exits and prepare bounded chunks without publication authority",
@@ -868,6 +904,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "tools/test_symbolic_solver_tests.py"),
          ("python3", "tools/symbolic_solver_tests.py"),
          ("python3", "tools/check_symbolic_certificates.py")),
+        requires=(HostTool("pinned CVC5 and Z3", environment=("ZENO_FCIS_CVC5", "ZENO_FCIS_Z3")),
+                  HostTool("pinned certificate checker", environment=("ZENO_FCIS_CERTIFICATE_CHECKER",))),
     ),
     "tau-finite-kit": AcceptanceScenario(
         "Translate finite ladders and retain exact independent check inputs",
@@ -979,6 +1017,9 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         (("python3", "-B", "tools/check_native_worker.py", "--self-test"),
          ("python3", "-O", "-B", "tools/check_native_worker.py", "--self-test"),
          ("python3", "-B", "tools/check_native_worker.py")),
+        requires=(HostTool("bubblewrap (/usr/bin/bwrap)", executable="/usr/bin/bwrap"),
+                  HostTool("prlimit (/usr/bin/prlimit)", executable="/usr/bin/prlimit"),
+                  HostTool("C compiler (cc on PATH)", executable="cc")),
     ),
     "sqlite-authority": AcceptanceScenario(
         "Persist an authorized transition and its exact outbox obligations",
@@ -1611,9 +1652,10 @@ def passed_tests(output: str) -> int:
     return sum(int(count) for count in PASSED_TESTS.findall(output))
 
 
-def run_command(command: tuple[str, ...]) -> None:
+def run_command(command: tuple[str, ...], log: TextIO | None = None) -> None:
     """Run one fixed command. A test command must pass at least one test,
-    because a filter that matches nothing passes without checking anything."""
+    because a filter that matches nothing passes without checking anything.
+    With `log`, the command's output goes to that file instead of the console."""
 
     environment = None
     resource_prefix = ("nice", "-n", "19", "ionice", "-c3")
@@ -1621,13 +1663,16 @@ def run_command(command: tuple[str, ...]) -> None:
     if executable[0:3] == ("cargo", "+1.97.1", "doc"):
         environment = {**os.environ, "RUSTDOCFLAGS": "-D warnings"}
     if executable[0:3] != ("cargo", "+1.97.1", "test"):
-        subprocess.run(command, cwd=ROOT, check=True, env=environment)
+        redirect = {} if log is None else {"stdout": log, "stderr": subprocess.STDOUT}
+        subprocess.run(command, cwd=ROOT, check=True, env=environment, **redirect)
         return
     completed = subprocess.run(
-        command, cwd=ROOT, env=environment, stdout=subprocess.PIPE, text=True
+        command, cwd=ROOT, env=environment, stdout=subprocess.PIPE, text=True,
+        **({} if log is None else {"stderr": log}),
     )
-    sys.stdout.write(completed.stdout)
-    sys.stdout.flush()
+    output = sys.stdout if log is None else log
+    output.write(completed.stdout)
+    output.flush()
     if completed.returncode != 0:
         raise subprocess.CalledProcessError(completed.returncode, command)
     if passed_tests(completed.stdout) == 0:
@@ -1654,7 +1699,273 @@ def run_scenario(scenario_id: str) -> None:
     print(f"atdd: PASS {scenario_id}", flush=True)
 
 
-def parse_args() -> argparse.Namespace:
+# Fixed integrity checks that run before any scenario in every run mode.
+PREFLIGHT: tuple[tuple[str, ...], ...] = (
+    ("python3", "tools/test_atdd_registry.py"),
+    ("python3", "tools/test_scaffold_versions.py"),
+    ("python3", "tools/check_authority_v2.py", "--check-sources"),
+    ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p",
+     "zeno-fcis-synthesis", "--test", "v2_evaluator_identity"),
+)
+
+RUN_SCHEMA = "zeno-fcis/atdd-run/1"
+RECEIPT_SCHEMA = "zeno-fcis/atdd-receipt/1"
+SUMMARY_SCHEMA = "zeno-fcis/atdd-summary/1"
+STATUSES = ("pass", "fail", "blocked", "missing")
+
+
+def run_preflight() -> None:
+    for command in PREFLIGHT:
+        run_command(command)
+
+
+def sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def source_state() -> dict[str, object]:
+    """The commit, its tree and the checkout's tracked changes; every receipt binds them.
+    Untracked files are not included, as in tools/record_gate_evidence.py."""
+
+    def git(*arguments: str) -> bytes:
+        return subprocess.run(("git", *arguments), cwd=ROOT, check=True, capture_output=True).stdout
+
+    changes = git("status", "--porcelain", "--untracked-files=no") + git("diff", "--binary", "HEAD")
+    return {"commit": git("rev-parse", "HEAD").decode().strip(),
+            "tree": git("rev-parse", "HEAD^{tree}").decode().strip(),
+            "dirty": bool(changes), "changes_sha256": sha256(changes)}
+
+
+def missing_tool(tool: HostTool) -> str | None:
+    """Why `tool` is unavailable on this host, or None when it is present."""
+
+    unset = [name for name in tool.environment if not os.environ.get(name)]
+    if unset:
+        return f"{tool.name}: {', '.join(unset)} unset"
+    for relative in tool.paths:
+        if not (ROOT / relative).exists():
+            return f"{tool.name}: {relative} absent"
+    if tool.executable is None:
+        return None
+    named = (os.environ.get(tool.executable_env) if tool.executable_env else None) or tool.executable
+    executable = shutil.which(named)
+    if executable is None:
+        return f"{tool.name}: {named} not found"
+    if tool.version_pattern is None:
+        return None
+    try:
+        completed = subprocess.run((executable, *tool.version), capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return f"{tool.name}: {named} {shlex.join(tool.version)} failed ({type(error).__name__})"
+    lines = (completed.stdout or completed.stderr).strip().splitlines()
+    found = lines[0].strip() if lines else ""
+    if completed.returncode != 0 or re.fullmatch(tool.version_pattern, found) is None:
+        return f"{tool.name}: {named} reports {found or 'no version'}"
+    return None
+
+
+def shard(text: str) -> tuple[int, int]:
+    """Parse `I/N` with 1 <= I <= N."""
+
+    match = re.fullmatch(r"([1-9][0-9]*)/([1-9][0-9]*)", text)
+    if match is None or int(match.group(1)) > int(match.group(2)):
+        raise argparse.ArgumentTypeError(f"expected I/N with 1 <= I <= N, got {text!r}")
+    return int(match.group(1)), int(match.group(2))
+
+
+def shard_of(selected: list[str], part: tuple[int, int]) -> list[str]:
+    """Shard I of N: every Nth scenario of the sorted IDs, starting at the Ith."""
+
+    index, count = part
+    return [scenario for position, scenario in enumerate(sorted(selected)) if position % count == index - 1]
+
+
+def write_json(path: Path, value: dict) -> None:
+    """Replace `path` atomically, so an interrupted run never leaves a partial receipt."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def read_json(path: Path) -> dict | None:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def receipt_path(run_dir: Path, scenario_id: str) -> Path:
+    return run_dir / "receipts" / f"{scenario_id}.json"
+
+
+def log_path(run_dir: Path, scenario_id: str) -> Path:
+    return run_dir / "logs" / f"{scenario_id}.log"
+
+
+def attempts(run_dir: Path, scenario_id: str) -> set[int]:
+    """The numbers K of the kept `ID.attemptK.json` and `ID.attemptK.log` files."""
+
+    pattern = re.compile(re.escape(scenario_id) + r"\.attempt([1-9][0-9]*)\.(?:json|log)")
+    return {int(match.group(1)) for directory in ("receipts", "logs") if (run_dir / directory).is_dir()
+            for path in (run_dir / directory).iterdir() if (match := pattern.fullmatch(path.name))}
+
+
+def archive_attempt(run_dir: Path, scenario_id: str) -> None:
+    """Keep an earlier receipt and log as `ID.attemptK.*` before the scenario runs again."""
+
+    receipt, log = receipt_path(run_dir, scenario_id), log_path(run_dir, scenario_id)
+    if not receipt.exists() and not log.exists():
+        return
+    number = max(attempts(run_dir, scenario_id), default=0) + 1
+    for path in (receipt, log):
+        if path.exists():
+            os.replace(path, path.with_name(f"{scenario_id}.attempt{number}{path.suffix}"))
+
+
+def record_scenario(scenario_id: str, run_dir: Path, state: dict[str, object]) -> dict:
+    """Run one scenario, or block it on a missing host tool, and write its receipt.
+    A failing scenario never stops the run; its first failing command ends the scenario."""
+
+    scenario = SCENARIOS[scenario_id]
+    print(f"atdd: RUN {scenario_id}: {scenario.title}", flush=True)
+    started = time.monotonic()
+    missing = [reason for tool in scenario.requires if (reason := missing_tool(tool)) is not None]
+    commands: list[dict] = []
+    problem = None
+    path = log_path(run_dir, scenario_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as log:
+        for reason in missing:
+            log.write(f"atdd: BLOCKED missing {reason}\n")
+        for command in () if missing else scenario.commands:
+            print(f"atdd: EXEC {shlex.join(command)}", flush=True)
+            log.write(f"atdd: EXEC {shlex.join(command)}\n")
+            log.flush()
+            begun, exit_code = time.monotonic(), 0
+            try:
+                run_command(command, log)
+            except subprocess.CalledProcessError as error:
+                exit_code, problem = error.returncode, f"{shlex.join(command)} exited {error.returncode}"
+            except AcceptanceError as error:
+                problem = str(error)
+            except Exception as error:  # noqa: BLE001 - an inventory records, rather than stops on, a crash
+                exit_code, problem = None, f"{shlex.join(command)}: {type(error).__name__}: {error}"
+            commands.append({"argv": list(command), "exit": exit_code,
+                             "seconds": round(time.monotonic() - begun, 3)})
+            if problem is not None:
+                break
+    status = "blocked" if missing else "fail" if problem is not None else "pass"
+    receipt = {"schema": RECEIPT_SCHEMA, "scenario": scenario_id, "title": scenario.title, "status": status,
+               **state, "commands": commands, "missing": missing, "failure": problem,
+               "seconds": round(time.monotonic() - started, 3), "finished": utc_now(),
+               "log": str(path.relative_to(run_dir)), "log_sha256": sha256(path.read_bytes())}
+    write_json(receipt_path(run_dir, scenario_id), receipt)
+    report("atdd", {"pass": "scenario-passed", "fail": "scenario-failed", "blocked": "scenario-blocked"}[status],
+           scenario_id, {"seconds": round(time.monotonic() - started, 1), "missing": missing, "failure": problem})
+    detail = "; ".join(missing) if missing else problem
+    print(f"atdd: {status.upper()} {scenario_id}" + (f": {detail}" if detail else ""), flush=True)
+    return receipt
+
+
+def bound_to(receipt: dict | None, state: dict[str, object]) -> bool:
+    return receipt is not None and all(receipt.get(key) == value for key, value in state.items())
+
+
+def summarize(run_dir: Path, run: dict, state: dict[str, object]) -> tuple[dict, int]:
+    """List every selected scenario once with its latest receipt; exit 0 all pass, 1 any
+    fail or missing, 2 blocked without a failure."""
+
+    rows = []
+    for scenario_id in run["scenarios"]:
+        path = receipt_path(run_dir, scenario_id)
+        receipt = read_json(path)
+        current = bound_to(receipt, state) and receipt.get("schema") == RECEIPT_SCHEMA
+        rows.append({"scenario": scenario_id,
+                     "status": receipt["status"] if current else "missing",
+                     "detail": ("; ".join(receipt["missing"]) or receipt["failure"]) if current else None,
+                     "seconds": receipt["seconds"] if current else None,
+                     "receipt": str(path.relative_to(run_dir)) if current else None,
+                     "receipt_sha256": sha256(path.read_bytes()) if current else None,
+                     "earlier_attempts": len(attempts(run_dir, scenario_id))})
+    counts = {status: sum(row["status"] == status for row in rows) for status in STATUSES}
+    summary = {"schema": SUMMARY_SCHEMA, **state, "selection": run["selection"], "counts": counts,
+               "scenarios": rows}
+    write_json(run_dir / "summary.json", summary)
+    code = 1 if counts["fail"] or counts["missing"] else 2 if counts["blocked"] else 0
+    return summary, code
+
+
+def run_inventory(args: argparse.Namespace) -> int:
+    """`run --keep-going` and `run --resume`: every selected scenario gets a receipt, and
+    the summary is a complete pass, fail and blocked inventory bound to one checkout."""
+
+    state = source_state()
+    if args.resume is not None:
+        run_dir = args.resume
+        run = read_json(run_dir / "run.json")
+        if run is None or run.get("schema") != RUN_SCHEMA:
+            raise AcceptanceError(f"{run_dir}: no {RUN_SCHEMA} run.json to resume")
+        recorded = {key: run.get(key) for key in state}
+        if recorded != state:
+            raise AcceptanceError(
+                f"resume refused: {run_dir} is bound to commit {recorded['commit']} with tracked changes "
+                f"{recorded['changes_sha256']}; this checkout is commit {state['commit']} with "
+                f"{state['changes_sha256']}")
+        scenarios = run.get("scenarios")
+        if not isinstance(scenarios, list) or any(scenario not in SCENARIOS for scenario in scenarios):
+            raise AcceptanceError(f"{run_dir}/run.json does not list registered scenarios")
+    else:
+        selected = sorted(SCENARIOS) if args.all else [args.scenario]
+        if args.shard is not None:
+            selected = shard_of(selected, args.shard)
+        run = {"schema": RUN_SCHEMA, **state, "scenarios": selected,
+               "selection": {"all": bool(args.all), "scenario": args.scenario,
+                             "shard": None if args.shard is None else "{}/{}".format(*args.shard)}}
+        run_dir = args.run_dir
+        if run_dir is not None and run_dir.exists() and (not run_dir.is_dir() or any(run_dir.iterdir())):
+            raise AcceptanceError(f"--run-dir {run_dir} must be absent or an empty directory")
+    run_preflight()
+    if args.resume is None:
+        if run_dir is None:
+            run_dir = Path(tempfile.mkdtemp(prefix=f"zeno-fcis-atdd-{str(state['commit'])[:12]}-"))
+        run_dir.mkdir(parents=True, exist_ok=True)
+        run["started"] = utc_now()
+    else:
+        run["resumed"] = [*run.get("resumed", []), utc_now()]
+    write_json(run_dir / "run.json", run)
+    print(f"atdd: run directory {run_dir}", flush=True)
+    for scenario_id in run["scenarios"]:
+        previous = read_json(receipt_path(run_dir, scenario_id))
+        if bound_to(previous, state) and previous.get("status") == "pass":
+            print(f"atdd: KEEP {scenario_id} (passed earlier in this run)", flush=True)
+            continue
+        archive_attempt(run_dir, scenario_id)
+        record_scenario(scenario_id, run_dir, state)
+        if source_state() != state:
+            raise AcceptanceError(
+                f"{scenario_id} changed the tracked checkout; the run stops. Restore the checkout, "
+                f"then resume {run_dir}")
+    summary, code = summarize(run_dir, run, state)
+    for row in summary["scenarios"]:
+        if row["status"] != "pass":
+            print(f"atdd: INVENTORY {row['status']} {row['scenario']}: {row['detail']}", flush=True)
+    counts = summary["counts"]
+    print(f"atdd: inventory {counts['pass']} pass, {counts['fail']} fail, {counts['blocked']} blocked, "
+          f"{counts['missing']} missing of {len(summary['scenarios'])} scenarios "
+          f"({run_dir / 'summary.json'})")
+    if code == 0 and run["selection"]["shard"] is None:
+        print(f"atdd: complete PASS ({len(summary['scenarios'])} scenarios)")
+    return code
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     subcommands = parser.add_subparsers(dest="command", required=True)
     subcommands.add_parser("self-test")
@@ -1664,7 +1975,23 @@ def parse_args() -> argparse.Namespace:
     choice = run.add_mutually_exclusive_group(required=True)
     choice.add_argument("--all", action="store_true")
     choice.add_argument("--scenario", choices=sorted(SCENARIOS))
-    return parser.parse_args()
+    choice.add_argument("--resume", type=Path, metavar="RUN_DIR",
+                        help="rerun the scenarios of RUN_DIR that have no pass receipt, at its commit")
+    run.add_argument("--keep-going", action="store_true",
+                     help="run every selected scenario, write receipts and a pass/fail/blocked inventory")
+    run.add_argument("--shard", type=shard, metavar="I/N",
+                     help="with --all, run shard I of N of the sorted scenario IDs")
+    run.add_argument("--run-dir", type=Path, metavar="DIR",
+                     help="with --keep-going, a new or empty directory for receipts and the summary")
+    args = parser.parse_args(argv)
+    if args.command == "run":
+        if args.shard is not None and not args.all:
+            run.error("--shard needs --all")
+        if args.run_dir is not None and not args.keep_going:
+            run.error("--run-dir needs --keep-going")
+        if args.resume is not None and (args.shard is not None or args.run_dir is not None):
+            run.error("--resume takes the shard and directory of the run it resumes")
+    return args
 
 
 def main() -> int:
@@ -1683,15 +2010,19 @@ def main() -> int:
                 path, line, title = found[scenario_id]
                 print(f"{scenario_id}\t{path}:{line}\t{title}")
             return 0
-        run_command(("python3", "tools/test_atdd_registry.py"))
-        run_command(("python3", "tools/test_scaffold_versions.py"))
-        run_command(("python3", "tools/check_authority_v2.py", "--check-sources"))
-        run_command(("cargo", "+1.97.1", "test", "--locked", "--offline", "-p",
-                     "zeno-fcis-synthesis", "--test", "v2_evaluator_identity"))
+        if args.keep_going or args.resume is not None:
+            return run_inventory(args)
+        run_preflight()
         selected = sorted(SCENARIOS) if args.all else [args.scenario]
+        if args.shard is not None:
+            selected = shard_of(selected, args.shard)
         for scenario_id in selected:
             run_scenario(scenario_id)
-        print(f"atdd: complete PASS ({len(selected)} scenarios)")
+        if args.shard is None:
+            print(f"atdd: complete PASS ({len(selected)} scenarios)")
+        else:
+            print(f"atdd: shard {args.shard[0]}/{args.shard[1]} PASS "
+                  f"({len(selected)} of {len(SCENARIOS)} scenarios)")
         return 0
     except (AcceptanceError, subprocess.CalledProcessError) as error:
         print(f"atdd: FAIL: {error}", file=sys.stderr)

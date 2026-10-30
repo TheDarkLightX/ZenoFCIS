@@ -1,8 +1,10 @@
 """Guard the repaired gate bindings and refusal of successful empty test runs."""
 
+import argparse
 import ast
 import collections
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -10,6 +12,7 @@ import shlex
 import io
 import subprocess
 import tempfile
+import sys
 import textwrap
 import unittest
 from pathlib import Path
@@ -215,6 +218,13 @@ def template_profile_problems(source):
     return problems
 
 
+def run_arguments(**given):
+    """The `run` arguments parse_args returns, with every option it adds defaulted."""
+    options = {"command": "run", "all": False, "scenario": None, "resume": None,
+               "keep_going": False, "shard": None, "run_dir": None}
+    return argparse.Namespace(**{**options, **given})
+
+
 class RepairedRegistryTests(unittest.TestCase):
     def test_crash_refinement_suites_enable_crash_injection(self):
         # Default store builds hide the interruption APIs. Both acceptance
@@ -240,7 +250,7 @@ class RepairedRegistryTests(unittest.TestCase):
 
     def test_registry_failure_stops_run_before_expensive_checks(self):
         command = ("python3", "tools/test_atdd_registry.py")
-        with mock.patch.object(atdd, "parse_args", return_value=mock.Mock(command="run", all=True)), \
+        with mock.patch.object(atdd, "parse_args", return_value=run_arguments(all=True)), \
                 mock.patch.object(atdd, "run_command", side_effect=subprocess.CalledProcessError(1, command)) as run, \
                 mock.patch.object(atdd, "run_scenario") as scenarios, \
                 contextlib.redirect_stderr(io.StringIO()):
@@ -1190,6 +1200,229 @@ class TestFileRegistryTests(unittest.TestCase):
         self.assertEqual(workflow_commands("jobs:\n  check:\n    strategy:\n      matrix:\n        include: [\n"
                                            "          {\"group\": \"one\"}]\n    steps:\n      - run: python3 x.py\n"),
                          [["python3", "x.py"]])
+
+
+STATE = {"commit": "c" * 40, "tree": "t" * 40, "dirty": False, "changes_sha256": hashlib.sha256(b"").hexdigest()}
+PLANTED_TOOL = "ZENO_ATDD_TEST_PLANTED_TOOL"
+FIXED = "ZENO_ATDD_TEST_FAILURE_FIXED"
+
+
+def planted_scenarios(marker):
+    """A passing, a failing and a blocked scenario whose commands append their names to `marker`."""
+    def mark(name):
+        return (sys.executable, "-c", f"import pathlib; pathlib.Path({str(marker)!r}).open('a').write('{name}\\n'); "
+                                      f"print('output of {name}')")
+    fail = (sys.executable, "-c", f"import os, sys; sys.exit(0 if os.environ.get('{FIXED}') else 3)")
+    return {
+        "a-pass": atdd.AcceptanceScenario("Planted pass", (mark("a-pass"),)),
+        "b-fail": atdd.AcceptanceScenario("Planted failure", (mark("b-fail"), fail, mark("b-after-failure"))),
+        "c-blocked": atdd.AcceptanceScenario("Planted block", (mark("c-blocked"),), requires=(
+            atdd.HostTool("planted tool", environment=(PLANTED_TOOL,)),)),
+    }
+
+
+@contextlib.contextmanager
+def inherited_stdout():
+    """Capture what child processes write to file descriptor 1 while the context is open."""
+    captured = io.StringIO()
+    with tempfile.TemporaryFile() as sink:
+        saved = os.dup(1)
+        os.dup2(sink.fileno(), 1)
+        try:
+            yield captured
+        finally:
+            os.dup2(saved, 1)
+            os.close(saved)
+            sink.seek(0)
+            captured.write(sink.read().decode())
+
+
+class InventoryRunnerTests(unittest.TestCase):
+    """`run --keep-going`, `--shard` and `--resume` over planted scenarios; no real scenario runs."""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory(prefix="zeno-atdd-inventory-")
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.marker = self.root / "executed.txt"
+        self.state = dict(STATE)
+        environment = {key: value for key, value in os.environ.items() if key not in (PLANTED_TOOL, FIXED)}
+        for patch in (mock.patch.object(atdd, "SCENARIOS", planted_scenarios(self.marker)),
+                      mock.patch.object(atdd, "run_preflight"),
+                      mock.patch.object(atdd, "source_state", side_effect=lambda: dict(self.state)),
+                      mock.patch.dict(os.environ, environment, clear=True)):
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def executed(self):
+        return self.marker.read_text().split() if self.marker.exists() else []
+
+    def inventory(self, **given):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code = atdd.run_inventory(run_arguments(**{"keep_going": True, **given}))
+        return code, output.getvalue()
+
+    def receipt(self, run_dir, scenario):
+        return json.loads((run_dir / "receipts" / f"{scenario}.json").read_text())
+
+    def test_keep_going_records_a_complete_pass_fail_blocked_inventory(self):
+        run_dir = self.root / "run"
+        code, output = self.inventory(all=True, run_dir=run_dir)
+        self.assertEqual(code, 1, output)
+        self.assertNotIn("complete PASS", output)
+        self.assertIn("atdd: inventory 1 pass, 1 fail, 1 blocked, 0 missing of 3 scenarios", output)
+        # The failure ends its own scenario only; the blocked scenario runs nothing.
+        self.assertEqual(self.executed(), ["a-pass", "b-fail"])
+        summary = json.loads((run_dir / "summary.json").read_text())
+        self.assertEqual([(row["scenario"], row["status"]) for row in summary["scenarios"]],
+                         [("a-pass", "pass"), ("b-fail", "fail"), ("c-blocked", "blocked")])
+        self.assertEqual(summary["counts"], {"pass": 1, "fail": 1, "blocked": 1, "missing": 0})
+        self.assertEqual({key: summary[key] for key in STATE}, STATE)
+        for row in summary["scenarios"]:
+            receipt_bytes = (run_dir / row["receipt"]).read_bytes()
+            self.assertEqual(row["receipt_sha256"], hashlib.sha256(receipt_bytes).hexdigest())
+            receipt = json.loads(receipt_bytes)
+            self.assertEqual({key: receipt[key] for key in STATE}, STATE)
+            self.assertEqual(receipt["log_sha256"], hashlib.sha256((run_dir / receipt["log"]).read_bytes()).hexdigest())
+        passed, failed, blocked = (self.receipt(run_dir, name) for name in ("a-pass", "b-fail", "c-blocked"))
+        self.assertEqual([command["exit"] for command in passed["commands"]], [0])
+        self.assertEqual(passed["commands"][0]["argv"], list(atdd.SCENARIOS["a-pass"].commands[0]))
+        self.assertIn("output of a-pass", (run_dir / passed["log"]).read_text())
+        self.assertNotIn("output of a-pass", output.splitlines(), "command output goes to the scenario log")
+        self.assertEqual([command["exit"] for command in failed["commands"]], [0, 3])
+        self.assertRegex(failed["failure"], "exited 3$")
+        self.assertEqual((blocked["commands"], blocked["missing"]), ([], [f"planted tool: {PLANTED_TOOL} unset"]))
+        self.assertIn(f"atdd: INVENTORY blocked c-blocked: planted tool: {PLANTED_TOOL} unset", output)
+
+    def test_blocked_is_never_a_pass_and_only_a_clean_inventory_is_complete(self):
+        with mock.patch.dict(os.environ, {FIXED: "1"}):
+            code, output = self.inventory(all=True, run_dir=self.root / "blocked")
+        self.assertEqual(code, 2, output)
+        self.assertIn("atdd: inventory 2 pass, 0 fail, 1 blocked", output)
+        self.assertNotIn("complete PASS", output)
+        with mock.patch.dict(os.environ, {FIXED: "1", PLANTED_TOOL: "1"}):
+            code, output = self.inventory(all=True, run_dir=self.root / "clean")
+        self.assertEqual(code, 0, output)
+        self.assertTrue(output.endswith("atdd: complete PASS (3 scenarios)\n"), output)
+
+    def test_shards_partition_the_sorted_scenarios_deterministically(self):
+        names = [f"s{index:02d}" for index in range(11)]
+        for count in range(1, 6):
+            shards = [atdd.shard_of(list(reversed(names)), (index, count)) for index in range(1, count + 1)]
+            self.assertEqual(sorted(sum(shards, [])), names, count)
+            self.assertEqual(sum(len(shard) for shard in shards), len(names))
+            self.assertEqual(shards, [atdd.shard_of(names, (index, count)) for index in range(1, count + 1)])
+            self.assertLessEqual(max(map(len, shards)) - min(map(len, shards)), 1)
+        code, output = self.inventory(all=True, shard=(2, 2), run_dir=self.root / "shard")
+        summary = json.loads((self.root / "shard" / "summary.json").read_text())
+        self.assertEqual(([row["scenario"] for row in summary["scenarios"]], summary["selection"]["shard"]),
+                         (["b-fail"], "2/2"))
+        self.assertEqual(self.executed(), ["b-fail"])
+        with mock.patch.dict(os.environ, {FIXED: "1"}):
+            code, output = self.inventory(all=True, shard=(2, 2), run_dir=self.root / "shard-fixed")
+        self.assertEqual(code, 0)
+        self.assertNotIn("complete PASS", output, "a shard is never a complete pass")
+
+    def test_arguments_refuse_shards_and_directories_that_do_not_apply(self):
+        accepted = atdd.parse_args(["run", "--all", "--keep-going", "--shard", "3/4", "--run-dir", "x"])
+        self.assertEqual((accepted.shard, accepted.run_dir), ((3, 4), Path("x")))
+        self.assertEqual(atdd.parse_args(["run", "--all"]).keep_going, False)
+        for argv in (["run", "--all", "--shard", "0/2"], ["run", "--all", "--shard", "3/2"],
+                     ["run", "--all", "--shard", "x"], ["run", "--scenario", "minimal-core", "--shard", "1/2"],
+                     ["run", "--all", "--run-dir", "x"], ["run", "--resume", "x", "--shard", "1/2"],
+                     ["run", "--resume", "x", "--keep-going", "--run-dir", "y"], ["run", "--all", "--resume", "x"]):
+            with self.subTest(argv=argv), contextlib.redirect_stderr(io.StringIO()), \
+                    self.assertRaises(SystemExit) as refused:
+                atdd.parse_args(argv)
+            self.assertEqual(refused.exception.code, 2)
+
+    def test_resume_reruns_only_scenarios_without_a_pass_receipt(self):
+        run_dir = self.root / "run"
+        self.assertEqual(self.inventory(all=True, run_dir=run_dir)[0], 1)
+        self.marker.unlink()
+        with mock.patch.dict(os.environ, {PLANTED_TOOL: "1", FIXED: "1"}):
+            code, output = self.inventory(resume=run_dir, keep_going=False)
+        self.assertEqual(code, 0, output)
+        self.assertIn("atdd: KEEP a-pass (passed earlier in this run)", output)
+        self.assertEqual(self.executed(), ["b-fail", "b-after-failure", "c-blocked"])
+        self.assertIn("atdd: complete PASS (3 scenarios)", output)
+        summary = json.loads((run_dir / "summary.json").read_text())
+        self.assertEqual([(row["status"], row["earlier_attempts"]) for row in summary["scenarios"]],
+                         [("pass", 0), ("pass", 1), ("pass", 1)])
+        self.assertEqual(json.loads((run_dir / "receipts" / "b-fail.attempt1.json").read_text())["status"], "fail")
+        self.assertTrue((run_dir / "logs" / "c-blocked.attempt1.log").is_file())
+        self.assertEqual(len(json.loads((run_dir / "run.json").read_text())["resumed"]), 1)
+
+    def test_resume_refuses_another_commit_a_tracked_change_or_a_foreign_directory(self):
+        run_dir = self.root / "run"
+        self.inventory(all=True, run_dir=run_dir)
+        atdd.run_preflight.reset_mock()
+        for change in ({"commit": "d" * 40, "tree": "e" * 40},
+                       {"dirty": True, "changes_sha256": hashlib.sha256(b" M tools/atdd.py").hexdigest()}):
+            self.state = {**STATE, **change}
+            with self.subTest(change=sorted(change)), \
+                    self.assertRaisesRegex(atdd.AcceptanceError, "resume refused"):
+                self.inventory(resume=run_dir)
+        self.state = dict(STATE)
+        with self.assertRaisesRegex(atdd.AcceptanceError, "no zeno-fcis/atdd-run/1 run.json"):
+            self.inventory(resume=self.root)
+        with self.assertRaisesRegex(atdd.AcceptanceError, "absent or an empty directory"):
+            self.inventory(all=True, run_dir=run_dir)
+        atdd.run_preflight.assert_not_called()
+
+    def test_a_failed_preflight_writes_no_run_directory(self):
+        atdd.run_preflight.side_effect = subprocess.CalledProcessError(1, ("python3", "tools/test_atdd_registry.py"))
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.inventory(all=True, run_dir=self.root / "run")
+        self.assertFalse((self.root / "run").exists())
+        self.assertEqual(self.executed(), [])
+
+    def test_a_tracked_change_during_the_run_stops_it(self):
+        def change():
+            self.state = {**STATE, "dirty": True, "changes_sha256": "0" * 64}
+        with mock.patch.object(atdd, "record_scenario", side_effect=lambda *args: change()), \
+                self.assertRaisesRegex(atdd.AcceptanceError, "a-pass changed the tracked checkout"):
+            self.inventory(all=True, run_dir=self.root / "run")
+        self.assertFalse((self.root / "run" / "summary.json").exists())
+
+    def test_runs_without_the_new_flags_keep_first_failure_stops(self):
+        with mock.patch.object(atdd, "validate_registry"), \
+                mock.patch.object(atdd, "parse_args", return_value=run_arguments(all=True)), \
+                mock.patch.object(atdd, "missing_tool") as checked, \
+                contextlib.redirect_stdout(io.StringIO()) as output, contextlib.redirect_stderr(io.StringIO()), \
+                inherited_stdout() as commands:
+            self.assertEqual(atdd.main(), 1)
+        self.assertEqual(self.executed(), ["a-pass", "b-fail"])
+        self.assertNotIn("complete PASS", output.getvalue())
+        self.assertEqual(commands.getvalue().split("\n")[:2], ["output of a-pass", "output of b-fail"],
+                         "ordinary runs leave command output on the console")
+        checked.assert_not_called()
+        with mock.patch.dict(os.environ, {FIXED: "1"}), mock.patch.object(atdd, "validate_registry"), \
+                mock.patch.object(atdd, "parse_args", return_value=run_arguments(all=True)), \
+                contextlib.redirect_stdout(io.StringIO()) as output, inherited_stdout():
+            self.assertEqual(atdd.main(), 0)
+        # Ordinary runs check no prerequisite: the planted block runs, as before.
+        self.assertIn("c-blocked", self.executed())
+        self.assertTrue(output.getvalue().endswith("atdd: complete PASS (3 scenarios)\n"))
+
+    def test_missing_tools_name_the_variable_path_executable_or_version(self):
+        script = self.root / "fake-node"
+        script.write_text("#!/bin/sh\necho v20.19.2\n")
+        script.chmod(0o755)
+        tool = atdd.HostTool("Node.js 22", executable="node", executable_env="NODE_BIN",
+                             version=("--version",), version_pattern=r"v22\.\d+\.\d+")
+        with mock.patch.dict(os.environ, {"NODE_BIN": str(script)}):
+            self.assertEqual(atdd.missing_tool(tool), f"Node.js 22: {script} reports v20.19.2")
+            script.write_text("#!/bin/sh\necho v22.11.0\n")
+            self.assertIsNone(atdd.missing_tool(tool))
+        absent = self.root / "absent-tool"
+        self.assertEqual(atdd.missing_tool(atdd.HostTool("absent", executable=str(absent))),
+                         f"absent: {absent} not found")
+        self.assertEqual(atdd.missing_tool(atdd.HostTool("npm", paths=("no/such/path",))),
+                         "npm: no/such/path absent")
+        with mock.patch.dict(os.environ, {PLANTED_TOOL: "set"}):
+            self.assertIsNone(atdd.missing_tool(atdd.HostTool("set", environment=(PLANTED_TOOL,))))
 
 
 if __name__ == "__main__":
