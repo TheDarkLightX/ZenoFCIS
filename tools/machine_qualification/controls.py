@@ -332,6 +332,16 @@ DEFECTS = (
            "    elif True:",
            REALIZE + "test_an_undecided_subspace_makes_the_length_inconclusive",
            "A subspace that ran out of budget is counted as unsat, so an undecided length is reported unrealizable."),
+    Defect("realize-region-base-rule-dropped", "realize.py", "memory admission",
+           "                    solver.add(z.Implies(selector == index, intact[read]))\n",
+           "                    pass\n",
+           REALIZE + "test_admission_encoding_equals_the_checkers_admission",
+           "The query admits an access through a region base an earlier form wrote, which the checker refuses."),
+    Defect("realize-undefined-flag-reads-admitted", "realize.py", "flag admission",
+           "                    solver.add(z.Implies(selector == index, z.And([defined[name] for name in reads])))\n",
+           "                    pass\n",
+           REALIZE + "test_admission_encoding_equals_the_checkers_admission",
+           "The query admits a read of a flag an earlier form left undefined, which the checker refuses."),
 )
 
 # Runs one control inside a specimen and prints one JSON line. A failure counts only when its AssertionError was

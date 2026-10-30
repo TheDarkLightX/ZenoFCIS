@@ -39,10 +39,31 @@ NO_PROGRAM = {"schema": P1, "target": "x86_64-sysv-register/1", "inputs": ["x", 
               "max_instructions": 2, "objective": "instructions"}
 
 
+# A profile-3 palette in which some sequences address a region through a base register an earlier form wrote:
+# the checker refuses those, and the query must exclude exactly them.
+BASE_WRITES = {"schema": "zeno-fcis/machine-problem/3", "target": "x86_64-sysv-memory/3", "inputs": ["y"],
+               "regions": [{"name": "a", "base": "rdi", "words": 2, "access": "read-write"}],
+               "outputs": [["add", ["initial", "a", 0], ["initial", "a", 1]]],
+               "memory": {"a": [["initial", "a", 0], ["initial", "a", 1]]},
+               "grammar": [["load", "rax", "rdi", 8], ["load", "rdi", "rdi", 0], ["add", "rax", "rdi"],
+                           ["store", "rdi", 0, "rax"]],
+               "max_instructions": 3, "objective": "bytes"}
+
+
+# A profile-2 palette in which IMUL leaves ZF and SF undefined and CMOVE reads ZF: the checker refuses that order.
+FLAG_READS = {"schema": "zeno-fcis/machine-problem/2", "target": "x86_64-sysv-register/2", "inputs": ["x", "y"],
+              "outputs": [["mul", ["input", "x"], ["input", "y"]]],
+              "grammar": [["imul", "rax", "rsi"], ["cmove", "rax", "rdi"], ["cmp", "rdi", "rsi"], ["mov", "rax", "rdi"]],
+              "max_instructions": 3, "objective": "bytes"}
+
+
 def problems():
     found = [(path.stem, read_json(path)) for path in sorted(DATA.glob("*.json"))]
     found += [("kernel " + path.stem, read_json(path)["problem"]) for path in sorted((DATA / "kernels").glob("*.json"))]
-    found += [("last form needed", LAST_FORM_NEEDED), ("no program", NO_PROGRAM)]
+    found += [("memory " + path.stem, (lambda d: d.get("problem", d))(read_json(path)))
+              for path in sorted((DATA / "memory-kernels").glob("*.json"))]
+    found += [("last form needed", LAST_FORM_NEEDED), ("no program", NO_PROGRAM), ("base writes", BASE_WRITES),
+              ("flag reads", FLAG_READS)]
     return [(name, p) for name, p in found
             if sum(len(p["grammar"]) ** k for k in range(p["max_instructions"] + 1)) <= SMALL]
 
@@ -151,6 +172,46 @@ class RealizeCrossCheck(unittest.TestCase):
                 at = realize.realize(problem, least + 1, 2000, workers=2, split_ms=1)
                 self.assertEqual(at["status"], "realizable", at)
                 self.assertEqual(primary(problem, at["lengths"][-1]["verification"]["cost"]), least)
+
+    def test_admission_encoding_equals_the_checkers_admission(self):
+        """Every selector sequence the query admits (no examples, no cost bound) is one the checker admits, and the
+        other way round, on palettes with flag reads and with region-base writes."""
+        import z3
+        from itertools import product
+        from machine_code import verify2, verify3
+        from machine_code.session import _validated
+        from machine_code.targets import encode_program
+        cases = [("umin-x86", read_json(DATA / "umin-x86.json")), ("add128-x86", read_json(DATA / "add128-x86.json")),
+                 ("flag reads", FLAG_READS), ("base writes", BASE_WRITES),
+                 ("memory swap", read_json(DATA / "memory-kernels/swap-words-x86.json")["problem"])]
+        for name, problem in cases:
+            problem = _validated(problem)
+            memory = problem["schema"].endswith("/3")
+            for length in range(min(problem["max_instructions"], 3) + 1):
+                with self.subTest(problem=name, length=length):
+                    solver, selectors, _ = realize.query(z3, problem, length, None, [])
+                    encoded = set()
+                    while solver.check() == z3.sat:
+                        model = solver.model()
+                        choice = tuple(model.eval(v, model_completion=True).as_long() for v in selectors)
+                        encoded.add(choice)
+                        solver.add(z3.Or([v != c for v, c in zip(selectors, choice)]) if selectors else z3.BoolVal(
+                            False, ctx=solver.ctx))
+                    admitted = set()
+                    for choice in product(range(len(problem["grammar"])), repeat=length):
+                        code = encode_program(problem["target"], [problem["grammar"][i] for i in choice])
+                        try:
+                            if memory:
+                                verify3.admit(problem, verify3.decode(problem["target"], code))
+                            else:
+                                verify2.require_defined_flag_reads(problem["target"],
+                                                                   verify2.decode(problem["target"], code))
+                        except ValueError:
+                            continue
+                        admitted.add(choice)
+                    self.assertEqual(encoded, admitted)
+                    if name in ("base writes", "flag reads") and length >= 2:
+                        self.assertLess(len(admitted), len(problem["grammar"]) ** length)
 
     def test_an_undecided_subspace_makes_the_length_inconclusive(self):
         # One weak example state and one round: every subspace's first solution agrees on it and is then refuted,
