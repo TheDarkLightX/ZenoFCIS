@@ -137,13 +137,16 @@ fn add_word<const N: usize>(out: &mut [u128; N], at: usize, value: u128) -> Resu
         };
     }
     let mut carry = value;
-    for limb in &mut out[at..] {
-        let (next, overflow) = limb.overflowing_add(carry);
-        *limb = next;
-        carry = u128::from(overflow);
+    let mut i = at;
+    while i < N {
+        let next = out[i].wrapping_add(carry);
+        let overflow = out[i] > u128::MAX - carry;
+        out[i] = next;
+        carry = overflow as u128;
         if carry == 0 {
             return Ok(());
         }
+        i += 1;
     }
     Err(Failure::Invariant)
 }
@@ -153,9 +156,11 @@ fn multiply<const A: usize, const B: usize, const O: usize>(
     b: [u128; B],
 ) -> Result<[u128; O], Failure> {
     let mut out = [0; O];
-    for (i, x) in a.iter().enumerate() {
-        for (j, y) in b.iter().enumerate() {
-            let product = wide::multiply(*x, *y);
+    let mut i = 0;
+    while i < A {
+        let mut j = 0;
+        while j < B {
+            let product = wide::multiply(a[i], b[j]);
             let at = i.checked_add(j).ok_or(Failure::Invariant)?;
             add_word(&mut out, at, product[0])?;
             add_word(
@@ -163,7 +168,9 @@ fn multiply<const A: usize, const B: usize, const O: usize>(
                 at.checked_add(1).ok_or(Failure::Invariant)?,
                 product[1],
             )?;
+            j += 1;
         }
+        i += 1;
     }
     Ok(out)
 }
@@ -171,20 +178,28 @@ fn multiply<const A: usize, const B: usize, const O: usize>(
 /// preserved as carry; subtraction's borrow must match it. No quotient narrowing.
 #[cfg_attr(verus_keep_ghost, verifier::external)]
 fn divide<const N: usize>(n: [u128; N], d: [u128; N]) -> Result<([u128; N], [u128; N]), Failure> {
-    if d.iter().all(|x| *x == 0) {
+    let mut zeros = 0;
+    while zeros < N && d[zeros] == 0 {
+        zeros += 1;
+    }
+    if zeros == N {
         return Err(Failure::ZeroDivisor);
     }
     let bits = N.checked_mul(128).ok_or(Failure::Domain)?;
     let mut q = [0; N];
     let mut r = [0; N];
-    for bit in (0..bits).rev() {
+    let mut bit = bits;
+    while bit > 0 {
+        bit -= 1;
         let mut carry = (n[bit / 128] >> (bit % 128)) & 1;
-        for limb in &mut r {
-            let next = *limb >> 127;
-            *limb = (*limb << 1) | carry;
+        let mut i = 0;
+        while i < N {
+            let next = r[i] >> 127;
+            r[i] = (r[i] << 1) | carry;
             carry = next;
+            i += 1;
         }
-        if carry != 0 || compare(&r, &d) != Ordering::Less {
+        if carry != 0 || !matches!(compare(&r, &d), Ordering::Less) {
             let (next, borrow) = subtract(r, d);
             if borrow != (carry != 0) {
                 return Err(Failure::Invariant);
@@ -193,7 +208,7 @@ fn divide<const N: usize>(n: [u128; N], d: [u128; N]) -> Result<([u128; N], [u12
             q[bit / 128] |= 1u128 << (bit % 128);
         }
     }
-    if compare(&r, &d) != Ordering::Less {
+    if !matches!(compare(&r, &d), Ordering::Less) {
         return Err(Failure::Invariant);
     }
     Ok((q, r))
@@ -316,7 +331,7 @@ impl U256 {
     /// Divides using the selected rounding mode and refuses a zero divisor.
     pub fn checked_div(self, den: Self, mode: Rounding) -> Result<Self, Failure> {
         let (q, r) = self.div_rem(den)?;
-        Self::rounded(q, r != Self::ZERO, mode)
+        Self::rounded(q, r.0 != Self::ZERO.0, mode)
     }
     /// Divides the full product plus offset, refusing a quotient wider than 256 bits.
     pub fn mul_add_div_rem(

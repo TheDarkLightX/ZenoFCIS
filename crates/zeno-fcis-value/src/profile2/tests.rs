@@ -350,3 +350,256 @@ fn checked_negation_preserves_the_minimum_refusal_and_exact_endpoints() {
         }
     }
 }
+
+/// Verbatim copies of the iterator helpers that the indexed loops replaced.
+mod previous_helpers {
+    use super::super::{Failure, compare, subtract, wide};
+    use core::cmp::Ordering;
+
+    pub(super) fn add_word<const N: usize>(
+        out: &mut [u128; N],
+        at: usize,
+        value: u128,
+    ) -> Result<(), Failure> {
+        if at >= N {
+            return if value == 0 {
+                Ok(())
+            } else {
+                Err(Failure::Invariant)
+            };
+        }
+        let mut carry = value;
+        for limb in &mut out[at..] {
+            let (next, overflow) = limb.overflowing_add(carry);
+            *limb = next;
+            carry = u128::from(overflow);
+            if carry == 0 {
+                return Ok(());
+            }
+        }
+        Err(Failure::Invariant)
+    }
+    pub(super) fn multiply<const A: usize, const B: usize, const O: usize>(
+        a: [u128; A],
+        b: [u128; B],
+    ) -> Result<[u128; O], Failure> {
+        let mut out = [0; O];
+        for (i, x) in a.iter().enumerate() {
+            for (j, y) in b.iter().enumerate() {
+                let product = wide::multiply(*x, *y);
+                let at = i.checked_add(j).ok_or(Failure::Invariant)?;
+                add_word(&mut out, at, product[0])?;
+                add_word(
+                    &mut out,
+                    at.checked_add(1).ok_or(Failure::Invariant)?,
+                    product[1],
+                )?;
+            }
+        }
+        Ok(out)
+    }
+    pub(super) fn divide<const N: usize>(
+        n: [u128; N],
+        d: [u128; N],
+    ) -> Result<([u128; N], [u128; N]), Failure> {
+        if d.iter().all(|x| *x == 0) {
+            return Err(Failure::ZeroDivisor);
+        }
+        let bits = N.checked_mul(128).ok_or(Failure::Domain)?;
+        let mut q = [0; N];
+        let mut r = [0; N];
+        for bit in (0..bits).rev() {
+            let mut carry = (n[bit / 128] >> (bit % 128)) & 1;
+            for limb in &mut r {
+                let next = *limb >> 127;
+                *limb = (*limb << 1) | carry;
+                carry = next;
+            }
+            if carry != 0 || compare(&r, &d) != Ordering::Less {
+                let (next, borrow) = subtract(r, d);
+                if borrow != (carry != 0) {
+                    return Err(Failure::Invariant);
+                }
+                r = next;
+                q[bit / 128] |= 1u128 << (bit % 128);
+            }
+        }
+        if compare(&r, &d) != Ordering::Less {
+            return Err(Failure::Invariant);
+        }
+        Ok((q, r))
+    }
+}
+
+/// Deterministic limb inputs: every boundary word in every limb, one-limb and
+/// top-limb shapes, then xorshift words with random zero limbs and short values.
+fn helper_inputs<const N: usize>(seed: u128, random: usize) -> Vec<[u128; N]> {
+    let boundaries = [
+        0,
+        1,
+        2,
+        3,
+        u64::MAX as u128,
+        1u128 << 64,
+        (1u128 << 127) - 1,
+        1u128 << 127,
+        u128::MAX - 1,
+        u128::MAX,
+    ];
+    let mut inputs = Vec::new();
+    for word in boundaries {
+        inputs.push([word; N]);
+        for at in 0..N {
+            let mut single = [0; N];
+            single[at] = word;
+            inputs.push(single);
+            let mut below = [u128::MAX; N];
+            below[at] = word;
+            inputs.push(below);
+        }
+    }
+    let mut state = seed | 1;
+    let mut next = || {
+        state ^= state << 7;
+        state ^= state >> 9;
+        state ^= state << 8;
+        state
+    };
+    for _ in 0..random {
+        let shape = next();
+        let mut words: [u128; N] = core::array::from_fn(|_| next());
+        for (at, word) in words.iter_mut().enumerate() {
+            if shape >> (at % 128) & 1 == 0 {
+                *word = 0;
+            } else if shape >> ((at + 64) % 128) & 1 == 0 {
+                *word >>= next() % 128;
+            }
+        }
+        inputs.push(words);
+    }
+    inputs
+}
+
+fn compare_divide<const N: usize>(seed: u128, random: usize) {
+    let inputs = helper_inputs::<N>(seed, random);
+    let mut count = 0;
+    for (index, n) in inputs.iter().enumerate() {
+        // Every divisor shape against a rotating window of numerators.
+        for d in inputs.iter().skip(index % 7).step_by(7) {
+            assert_eq!(
+                divide(*n, *d),
+                previous_helpers::divide(*n, *d),
+                "{n:?} / {d:?}"
+            );
+            count += 1;
+        }
+    }
+    assert!(count > 0 || N == 0);
+}
+
+fn compare_multiply<const A: usize, const B: usize, const O: usize>(seed: u128, random: usize) {
+    let left = helper_inputs::<A>(seed, random);
+    let right = helper_inputs::<B>(seed ^ 0x5a5a, random);
+    for (index, a) in left.iter().enumerate() {
+        for b in right.iter().skip(index % 5).step_by(5) {
+            assert_eq!(
+                multiply::<A, B, O>(*a, *b),
+                previous_helpers::multiply::<A, B, O>(*a, *b),
+                "{a:?} * {b:?}"
+            );
+        }
+    }
+}
+
+fn compare_add_word<const N: usize>(seed: u128, random: usize) {
+    let words = [
+        0,
+        1,
+        2,
+        (1u128 << 127) - 1,
+        1u128 << 127,
+        u128::MAX - 1,
+        u128::MAX,
+    ];
+    for start in helper_inputs::<N>(seed, random) {
+        for at in 0..N + 3 {
+            for value in words {
+                let mut actual = start;
+                let mut previous = start;
+                assert_eq!(
+                    add_word(&mut actual, at, value),
+                    previous_helpers::add_word(&mut previous, at, value),
+                    "{start:?} + {value} at {at}"
+                );
+                // Refusals leave the same partially carried scratch as before.
+                assert_eq!(actual, previous);
+            }
+        }
+    }
+}
+
+#[test]
+fn indexed_helpers_preserve_the_previous_iterator_helpers() {
+    compare_divide::<0>(0x11, 4);
+    compare_divide::<1>(0x2b7e_1516_28ae_d2a6, 400);
+    compare_divide::<2>(0xabf7_1588_09cf_4f3c, 900);
+    compare_divide::<3>(0x7623_8b7e_a85f_2041, 300);
+    compare_divide::<4>(0x13c6_ef37_2fe9_4f82, 400);
+    compare_divide::<6>(0xa54f_f53a_5f1d_36f1, 200);
+    compare_multiply::<0, 2, 2>(0x51, 4);
+    compare_multiply::<1, 1, 2>(0x9b05_688c_2b3e_6c1f, 400);
+    compare_multiply::<2, 2, 4>(0x1f83_d9ab_fb41_bd6b, 900);
+    compare_multiply::<4, 2, 6>(0x5be0_cd19_137e_2179, 400);
+    // Too-small outputs reach the old Invariant refusal on the same inputs.
+    compare_multiply::<2, 2, 3>(0x6a09_e667_f3bc_c908, 600);
+    compare_multiply::<2, 2, 2>(0xbb67_ae85_84ca_a73b, 400);
+    compare_multiply::<3, 2, 4>(0x3c6e_f372_fe94_f82b, 300);
+    for seed in [0xa54f_f53a_5f1d_36f1u128, 0x510e_527f_ade6_82d1] {
+        compare_add_word::<0>(seed, 4);
+        compare_add_word::<1>(seed, 60);
+        compare_add_word::<2>(seed, 60);
+        compare_add_word::<4>(seed, 60);
+        compare_add_word::<6>(seed, 60);
+    }
+}
+
+#[test]
+fn checked_division_remainder_test_matches_the_derived_equality() {
+    let words = [0, 1, 2, u64::MAX as u128, 1u128 << 127, u128::MAX];
+    for low in words {
+        for high in words {
+            let r = U256::from_words_le([low, high]);
+            assert_eq!(r.0 != U256::ZERO.0, r != U256::ZERO);
+        }
+    }
+    let seven = U256::from_u128(7);
+    let two = U256::from_u128(2);
+    assert_eq!(
+        seven.checked_div(two, Rounding::Floor),
+        Ok(U256::from_u128(3))
+    );
+    assert_eq!(
+        seven.checked_div(two, Rounding::Ceil),
+        Ok(U256::from_u128(4))
+    );
+    assert_eq!(
+        seven.checked_div(two, Rounding::Exact),
+        Err(Failure::Inexact)
+    );
+    assert_eq!(
+        seven.checked_div(U256::ZERO, Rounding::Exact),
+        Err(Failure::ZeroDivisor)
+    );
+    assert_eq!(
+        U256::MAX.checked_div(U256::MAX, Rounding::Ceil),
+        Ok(U256::ONE)
+    );
+    assert_eq!(
+        U256::MAX.checked_div(two, Rounding::Ceil),
+        U256::MAX.checked_sub(
+            U256::MAX
+                .checked_div(two, Rounding::Floor)
+                .unwrap_or(U256::ZERO)
+        )
+    );
+}

@@ -297,8 +297,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::impl&%28::MAX",
       "error_region": [
-        224,
-        231
+        239,
+        246
       ]
     },
     {
@@ -310,8 +310,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::impl&%34::MIN",
       "error_region": [
-        511,
-        519
+        526,
+        534
       ]
     },
     {
@@ -323,8 +323,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::impl&%30::ZERO",
       "error_region": [
-        370,
-        377
+        385,
+        392
       ]
     },
     {
@@ -336,8 +336,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::impl&%32::ZERO",
       "error_region": [
-        457,
-        464
+        472,
+        479
       ]
     },
     {
@@ -349,8 +349,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::U256::try_u128",
       "error_region": [
-        242,
-        254
+        257,
+        269
       ]
     },
     {
@@ -362,8 +362,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::from_i128",
       "error_region": [
-        531,
-        541
+        546,
+        556
       ]
     },
     {
@@ -375,8 +375,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::magnitude",
       "error_region": [
-        559,
-        573
+        574,
+        588
       ]
     },
     {
@@ -388,8 +388,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::from_magnitude",
       "error_region": [
-        574,
-        596
+        589,
+        611
       ]
     },
     {
@@ -401,8 +401,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::try_unsigned",
       "error_region": [
-        597,
-        613
+        612,
+        628
       ]
     },
     {
@@ -414,8 +414,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::difference_unsigned",
       "error_region": [
-        614,
-        637
+        629,
+        652
       ]
     },
     {
@@ -427,8 +427,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::U512::narrow",
       "error_region": [
-        388,
-        399
+        403,
+        414
       ]
     },
     {
@@ -440,8 +440,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::U768::narrow",
       "error_region": [
-        475,
-        486
+        490,
+        501
       ]
     },
     {
@@ -453,8 +453,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::U256::checked_add",
       "error_region": [
-        274,
-        291
+        289,
+        306
       ]
     },
     {
@@ -466,8 +466,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::U256::checked_sub",
       "error_region": [
-        255,
-        273
+        270,
+        288
       ]
     },
     {
@@ -479,8 +479,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::checked_add",
       "error_region": [
-        660,
-        681
+        675,
+        696
       ]
     },
     {
@@ -492,8 +492,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::checked_sub",
       "error_region": [
-        682,
-        702
+        697,
+        717
       ]
     },
     {
@@ -505,8 +505,8 @@
       "error_source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
       "error_function": "numeric256_harness::arithmetic256::number256::I256::checked_neg",
       "error_region": [
-        638,
-        659
+        653,
+        674
       ]
     }
   ],
@@ -666,7 +666,7 @@
     ]
   },
   "source_hashes": {
-    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "e99090c7179062248c9b4a09bcb4a1a81ebd01402dd0256dc8fc4fef4454c409",
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "1801a185c5db12b3d6cae4eaf1ed1909eff5eea46d5870aaaee1c760888eed9c",
     "crates/zeno-fcis-value/src/profile2/numeric256_model.rs": "1ee5da3301e545ba378f31e6f15cc10025ecd83353d2d81ca37effdae39f85f4",
     "crates/zeno-fcis-value/src/profile2/number256.rs": "b2c8d2d6019e7b0d5eb46954a60c796df493e37cc171d1c22f1612ace900bdc5",
     "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs": "a4760c2561e903ee726c2a7489cdfdc2c46483f28861e955e27c32b58d8536a9",
@@ -1744,127 +1744,127 @@
     {
       "function": "numeric256_harness::arithmetic256::impl&%28::ZERO",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 209
+      "line": 224
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%28::ONE",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 218
+      "line": 233
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%28::MAX",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 227
+      "line": 242
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::from_u128",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 236
+      "line": 251
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::try_u128",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 245
+      "line": 260
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::checked_sub",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 259
+      "line": 274
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::checked_add",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 278
+      "line": 293
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%30::ZERO",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 373
+      "line": 388
     },
     {
       "function": "numeric256_harness::arithmetic256::U512::from_u256",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 382
+      "line": 397
     },
     {
       "function": "numeric256_harness::arithmetic256::U512::narrow",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 391
+      "line": 406
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%32::ZERO",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 460
+      "line": 475
     },
     {
       "function": "numeric256_harness::arithmetic256::U768::from_u256",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 469
+      "line": 484
     },
     {
       "function": "numeric256_harness::arithmetic256::U768::narrow",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 478
+      "line": 493
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%34::ZERO",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 505
+      "line": 520
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%34::MIN",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 514
+      "line": 529
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%34::MAX",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 524
+      "line": 539
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::from_i128",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 534
+      "line": 549
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::negative_bits",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 547
+      "line": 562
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::magnitude",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 564
+      "line": 579
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::from_magnitude",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 578
+      "line": 593
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::try_unsigned",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 600
+      "line": 615
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::difference_unsigned",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 618
+      "line": 633
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::checked_neg",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 641
+      "line": 656
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::checked_add",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 664
+      "line": 679
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::I256::checked_sub",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 686
+      "line": 701
     },
     {
       "function": "numeric256_harness::arithmetic256::number256::U256::clone",
@@ -2109,12 +2109,12 @@
     {
       "function": "numeric256_harness::arithmetic256::impl&%34::MAX",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 527
+      "line": 542
     },
     {
       "function": "numeric256_harness::arithmetic256::impl&%34::MIN",
       "source": "crates/zeno-fcis-value/src/profile2/arithmetic256.rs",
-      "line": 517
+      "line": 532
     }
   ],
   "supporting_obligations": [
