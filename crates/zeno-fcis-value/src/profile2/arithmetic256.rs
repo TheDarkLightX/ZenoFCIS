@@ -146,9 +146,24 @@ fn subtract<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
     }
     (out, borrow)
 }
-#[cfg_attr(verus_keep_ghost, verifier::external)]
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures numeric_model::add_word_result(old(out)@, final(out)@, at, value, result),
+))]
 fn add_word<const N: usize>(out: &mut [u128; N], at: usize, value: u128) -> Result<(), Failure> {
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        numeric_model::value_bounds(out@);
+        numeric_model::place_positive(at as nat);
+    }
     if at >= N {
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::place_monotone(N as nat, at as nat);
+            if value != 0 {
+                vstd::arithmetic::mul::lemma_mul_inequality(1, value as int,
+                    numeric_model::place(at as nat));
+            }
+        }
         return if value == 0 {
             Ok(())
         } else {
@@ -157,29 +172,69 @@ fn add_word<const N: usize>(out: &mut [u128; N], at: usize, value: u128) -> Resu
     }
     let mut carry = value;
     let mut i = at;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant at < N, at <= i <= N, out@.len() == N, old(out)@.len() == N,
+            i > at ==> carry == 1,
+            numeric_model::value(out@) + numeric_model::place(i as nat) * carry as int
+                == numeric_model::value(old(out)@) + numeric_model::place(at as nat) * value as int,
+        decreases N - i,
+    ))]
     while i < N {
         let next = out[i].wrapping_add(carry);
         let overflow = out[i] > u128::MAX - carry;
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::carry_word(out@, i as nat, carry, next, overflow); }
         out[i] = next;
         carry = overflow as u128;
         if carry == 0 {
+            #[cfg(verus_keep_ghost)]
+            proof! { numeric_model::value_bounds(out@); }
             return Ok(());
         }
         i += 1;
     }
+    #[cfg(verus_keep_ghost)]
+    proof! { numeric_model::value_bounds(out@); }
     Err(Failure::Invariant)
 }
-#[cfg_attr(verus_keep_ghost, verifier::external)]
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    requires A + B <= O,
+    ensures numeric_model::product_result(a@, b@, result),
+))]
 fn multiply<const A: usize, const B: usize, const O: usize>(
     a: [u128; A],
     b: [u128; B],
 ) -> Result<[u128; O], Failure> {
     let mut out = [0; O];
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        numeric_model::zero_value(out@, O as nat);
+        assert(numeric_model::limbs(a@, 0) == 0);
+    }
     let mut i = 0;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant i <= A, a@.len() == A, b@.len() == B, out@.len() == O, A + B <= O,
+            numeric_model::value(out@) == numeric_model::limbs(a@, i as nat) * numeric_model::value(b@),
+        decreases A - i,
+    ))]
     while i < A {
         let mut j = 0;
+        #[cfg(verus_keep_ghost)]
+        proof! { assert(numeric_model::limbs(b@, 0) == 0); }
+        #[cfg_attr(verus_keep_ghost, verus_spec(
+            invariant i < A, j <= B, a@.len() == A, b@.len() == B, out@.len() == O, A + B <= O,
+                numeric_model::value(out@) == numeric_model::limbs(a@, i as nat) * numeric_model::value(b@)
+                    + numeric_model::place(i as nat) * a@[i as int] as int
+                        * numeric_model::limbs(b@, j as nat),
+            decreases B - j,
+        ))]
         while j < B {
             let product = wide::multiply(a[i], b[j]);
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                numeric_model::product_step(a@, b@, i as nat, j as nat, numeric_model::value(out@),
+                    product[0], product[1], O as nat);
+            }
             let at = i.checked_add(j).ok_or(Failure::Invariant)?;
             add_word(&mut out, at, product[0])?;
             add_word(
@@ -189,6 +244,8 @@ fn multiply<const A: usize, const B: usize, const O: usize>(
             )?;
             j += 1;
         }
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::product_row(a@, b@, i as nat); }
         i += 1;
     }
     Ok(out)
@@ -394,6 +451,24 @@ impl U256 {
             Ok(Self(value))
         }
     }
+    /// Returns the complete 512-bit product of two unsigned values.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::wide_product_result(result,
+            numeric_model::unsigned(self) * numeric_model::unsigned(other)),
+    ))]
+    pub fn full_product(self, other: Self) -> Result<U512, Failure> {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::limb_representations(); }
+        Ok(U512(multiply(self.0, other.0)?))
+    }
+    /// Multiplies two unsigned values, refusing a result wider than 256 bits.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::unsigned_result(result,
+            numeric_model::unsigned(self) * numeric_model::unsigned(other)),
+    ))]
+    pub fn checked_mul(self, other: Self) -> Result<Self, Failure> {
+        self.full_product(other)?.narrow()
+    }
     /// Returns the unsigned quotient and remainder, refusing a zero divisor.
     #[cfg_attr(verus_keep_ghost, verus_spec(result =>
         ensures numeric_model::div_rem_result(self, den, result),
@@ -434,14 +509,6 @@ impl U256 {
 
 #[cfg_attr(verus_keep_ghost, verifier::external)]
 impl U256 {
-    /// Returns the complete 512-bit product of two unsigned values.
-    pub fn full_product(self, other: Self) -> Result<U512, Failure> {
-        Ok(U512(multiply(self.0, other.0)?))
-    }
-    /// Multiplies two unsigned values, refusing a result wider than 256 bits.
-    pub fn checked_mul(self, other: Self) -> Result<Self, Failure> {
-        self.full_product(other)?.narrow()
-    }
     /// Divides the full product plus offset, refusing a quotient wider than 256 bits.
     pub fn mul_add_div_rem(
         self,

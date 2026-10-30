@@ -114,6 +114,27 @@ class SourceAdmission(unittest.TestCase):
             with self.subTest(mode=mode), self.assertRaises(ValueError):
                 gate.configuration(self.root, profile)
 
+    def test_multiplication_stage_is_complete_and_retains_conversion_dependencies(self):
+        complete = copy.deepcopy(self.profile)
+        producer.include_multiplication(complete)
+        gate.configuration(self.root, complete)
+        for mode in ("method", "conversions"):
+            profile = copy.deepcopy(complete)
+            if mode == "method":
+                profile["obligations"].pop(next(i for i, o in enumerate(profile["obligations"])
+                                                if o["member"] == "U256::checked_mul"))
+            else:
+                profile["obligations"] = [o for o in profile["obligations"]
+                                          if o["stage"] not in ("conversions", "checked", "division")]
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                gate.configuration(self.root, profile)
+
+    def test_every_proved_helper_has_a_semantic_control(self):
+        helpers = {c["helper"] for c in self.profile["controls"] if "helper" in c}
+        self.assertEqual(helpers, gate.HELPERS)
+        for helper in helpers:
+            self.assertIn(gate.NAMESPACE + "arithmetic256::" + helper, self.profile["body_covered_functions"])
+
     def test_helper_controls_must_fail_inside_the_actual_proved_helper(self):
         helper = next(i for i, c in enumerate(self.profile["controls"]) if "helper" in c)
         gate.control_sources(self.root, self.profile)

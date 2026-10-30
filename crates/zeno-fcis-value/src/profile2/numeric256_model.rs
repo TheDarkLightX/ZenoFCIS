@@ -258,6 +258,33 @@ pub open spec fn checked_div_result(n: U256, d: U256, mode: super::Rounding,
     }
 }
 
+/// add_word: adds word*2^(128*at) exactly, refusing with Invariant exactly on overflow.
+pub open spec fn add_word_result(before: Seq<u128>, after: Seq<u128>, at: usize, word: u128,
+    result: Result<(), Failure>) -> bool {
+    let total = value(before) + place(at as nat) * word as int;
+    match result {
+        Ok(_) => total < place(before.len()) && value(after) == total,
+        Err(error) => error == Failure::Invariant && total >= place(before.len()),
+    }
+}
+
+/// The private multiplier returns the exact complete product when the output has room.
+pub open spec fn product_result<const O: usize>(a: Seq<u128>, b: Seq<u128>,
+    result: Result<[u128; O], Failure>) -> bool {
+    match result {
+        Ok(out) => value(out@) == value(a) * value(b),
+        Err(_) => false,
+    }
+}
+
+/// U256::full_product: always the exact complete product.
+pub open spec fn wide_product_result(result: Result<U512, Failure>, value: int) -> bool {
+    match result {
+        Ok(product) => unsigned512(product) == value,
+        Err(_) => false,
+    }
+}
+
 // Limb weights.
 
 pub(super) proof fn place_positive(count: nat)
@@ -281,6 +308,19 @@ pub(super) proof fn place_add(m: nat, n: nat)
         lemma_mul_is_associative(radix(), place(m), place((n - 1) as nat));
         lemma_mul_is_commutative(radix(), place(m));
         lemma_mul_is_associative(place(m), radix(), place((n - 1) as nat));
+    }
+}
+
+pub(super) proof fn place_monotone(low: nat, high: nat)
+    requires low <= high,
+    ensures place(low) <= place(high),
+    decreases high,
+{
+    if low < high {
+        place_monotone(low, (high - 1) as nat);
+        place_positive((high - 1) as nat);
+        assert(place(high) == radix() * place((high - 1) as nat));
+        lemma_mul_inequality(1, radix(), place((high - 1) as nat));
     }
 }
 
@@ -475,12 +515,64 @@ pub(super) proof fn value_two(words: [u128; 2])
     assert(limbs(words@, 2) == words@[0] as int + radix() * words@[1] as int);
 }
 
-/// The generic limb meaning is the existing unsigned meaning.
+proof fn value_four(w: [u128; 4])
+    ensures value(w@) == w@[0] as int + radix() * (w@[1] as int + radix() *
+        (w@[2] as int + radix() * w@[3] as int)),
+{
+    let r = radix();
+    assert(w@.len() == 4);
+    assert(place(0) == 1);
+    assert(place(1) == r);
+    assert(place(2) == r * r);
+    assert(place(3) == r * (r * r));
+    assert(limbs(w@, 0) == 0);
+    assert(limbs(w@, 1) == w@[0] as int);
+    assert(limbs(w@, 2) == limbs(w@, 1) + r * w@[1] as int);
+    assert(limbs(w@, 3) == limbs(w@, 2) + (r * r) * w@[2] as int);
+    assert(limbs(w@, 4) == limbs(w@, 3) + (r * (r * r)) * w@[3] as int);
+    let (a, b, c, d) = (w@[0] as int, w@[1] as int, w@[2] as int, w@[3] as int);
+    assert(a + r * b + (r * r) * c + (r * (r * r)) * d == a + r * (b + r * (c + r * d)))
+        by(nonlinear_arith);
+}
+
+proof fn value_six(w: [u128; 6])
+    ensures value(w@) == w@[0] as int + radix() * (w@[1] as int + radix() *
+        (w@[2] as int + radix() * (w@[3] as int + radix() *
+        (w@[4] as int + radix() * w@[5] as int)))),
+{
+    let r = radix();
+    assert(w@.len() == 6);
+    assert(place(0) == 1);
+    assert(place(1) == r);
+    assert(place(2) == r * r);
+    assert(place(3) == r * (r * r));
+    assert(place(4) == r * (r * (r * r)));
+    assert(place(5) == r * (r * (r * (r * r))));
+    assert(limbs(w@, 0) == 0);
+    assert(limbs(w@, 1) == w@[0] as int);
+    assert(limbs(w@, 2) == limbs(w@, 1) + r * w@[1] as int);
+    assert(limbs(w@, 3) == limbs(w@, 2) + (r * r) * w@[2] as int);
+    assert(limbs(w@, 4) == limbs(w@, 3) + (r * (r * r)) * w@[3] as int);
+    assert(limbs(w@, 5) == limbs(w@, 4) + (r * (r * (r * r))) * w@[4] as int);
+    assert(limbs(w@, 6) == limbs(w@, 5) + (r * (r * (r * (r * r)))) * w@[5] as int);
+    let (a, b, c, d, e, f) = (w@[0] as int, w@[1] as int, w@[2] as int, w@[3] as int,
+        w@[4] as int, w@[5] as int);
+    assert(a + r * b + (r * r) * c + (r * (r * r)) * d + (r * (r * (r * r))) * e
+        + (r * (r * (r * (r * r)))) * f
+        == a + r * (b + r * (c + r * (d + r * (e + r * f))))) by(nonlinear_arith);
+}
+
+/// The generic limb meaning is each existing fixed-width meaning.
 pub(super) proof fn limb_representations()
-    ensures forall|x: U256| #[trigger] unsigned(x) == value(x.0@),
+    ensures
+        forall|x: U256| #[trigger] unsigned(x) == value(x.0@),
+        forall|x: U512| #[trigger] unsigned512(x) == value(x.0@),
+        forall|x: U768| #[trigger] unsigned768(x) == value(x.0@),
 {
     conversion_representation();
     assert forall|x: U256| #[trigger] unsigned(x) == value(x.0@) by { value_two(x.0); }
+    assert forall|x: U512| #[trigger] unsigned512(x) == value(x.0@) by { value_four(x.0); }
+    assert forall|x: U768| #[trigger] unsigned768(x) == value(x.0@) by { value_six(x.0); }
 }
 
 /// A U256 is zero exactly when both limbs are zero.
@@ -559,6 +651,26 @@ pub(super) proof fn borrow_step(out: Seq<u128>, a: Seq<u128>, b: Seq<u128>, i: n
     assert(place(i + 1) == radix() * p);
     assert(p * (x as int) - (radix() * p) * new == p * wa - p * wb - p * old) by(nonlinear_arith)
         requires x as int - radix() * new == wa - wb - old;
+}
+
+/// One carried limb addition preserves the whole-value carry equation.
+pub(super) proof fn carry_word(out: Seq<u128>, i: nat, carry: u128, next: u128, overflow: bool)
+    requires i < out.len(),
+        next as int == if out[i as int] as int + carry as int > u128::MAX {
+            out[i as int] as int + carry as int - radix() } else { out[i as int] as int + carry as int },
+        overflow == (out[i as int] as int + carry as int > u128::MAX),
+    ensures
+        value(out.update(i as int, next)) + place(i + 1) * (if overflow { 1int } else { 0int })
+            == value(out) + place(i) * carry as int,
+{
+    value_update(out, i as int, next);
+    let p = place(i);
+    let o = if overflow { 1int } else { 0int };
+    assert(place(i + 1) == radix() * p);
+    assert(next as int + radix() * o == out[i as int] as int + carry as int);
+    assert(p * (next as int - out[i as int] as int) + (radix() * p) * o == p * carry as int)
+        by(nonlinear_arith)
+        requires next as int + radix() * o == out[i as int] as int + carry as int;
 }
 
 // The shared comparator.
@@ -818,5 +930,64 @@ pub(super) proof fn canonical_quotient(n: int, d: int, q: int, r: int)
 {
     lemma_mul_is_commutative(q, d);
     lemma_fundamental_div_mod_converse(n, d, q, r);
+}
+
+// Schoolbook multiplication.
+
+/// One partial product: both word additions stay below the output weight and
+/// add exactly the weighted product.
+pub(super) proof fn product_step(a: Seq<u128>, b: Seq<u128>, i: nat, j: nat, current: int,
+    low: u128, high: u128, size: nat)
+    requires i < a.len(), j < b.len(), a.len() + b.len() <= size,
+        current == limbs(a, i) * value(b) + place(i) * a[i as int] as int * limbs(b, j),
+        high as int * super::wide::scale() + low as int == a[i as int] as int * b[j as int] as int,
+    ensures
+        current + place(i + j) * (low as int) < place(size),
+        current + place(i + j) * low as int + place(i + j + 1) * high as int
+            == limbs(a, i) * value(b) + place(i) * a[i as int] as int * limbs(b, j + 1),
+        limbs(a, i) * value(b) + place(i) * a[i as int] as int * limbs(b, j + 1) < place(size),
+{
+    let (x, y) = (a[i as int] as int, b[j as int] as int);
+    let (pi, pj, pij) = (place(i), place(j), place(i + j));
+    place_add(i, j);
+    place_positive(i);
+    place_positive(j);
+    place_positive(i + j);
+    assert(place(i + j + 1) == radix() * pij);
+    assert(limbs(b, j + 1) == limbs(b, j) + pj * y);
+    assert(limbs(a, i + 1) == limbs(a, i) + pi * x);
+    // The step adds exactly place(i)*x*place(j)*y.
+    assert(pij * low as int + (radix() * pij) * high as int == pij * (x * y)) by(nonlinear_arith)
+        requires high as int * radix() + low as int == x * y;
+    assert(pi * x * (limbs(b, j) + pj * y) == pi * x * limbs(b, j) + pij * (x * y)) by(nonlinear_arith)
+        requires pij == pi * pj;
+    // Upper bound: the next partial sum is at most value(a) * value(b) < place(size).
+    limbs_bounds(b, j + 1);
+    limbs_bounds(a, i);
+    limbs_bounds(a, i + 1);
+    value_bounds(a);
+    value_bounds(b);
+    limbs_monotone(b, j + 1, b.len());
+    limbs_monotone(a, i + 1, a.len());
+    let (vb, va) = (value(b), value(a));
+    assert(limbs(a, i) * vb + pi * x * limbs(b, j + 1) <= va * vb) by(nonlinear_arith)
+        requires 0 <= limbs(b, j + 1) <= vb, pi > 0, x >= 0, limbs(a, i) >= 0,
+            limbs(a, i) + pi * x <= va;
+    place_add(a.len(), b.len());
+    place_monotone(a.len() + b.len(), size);
+    assert(va * vb < place(a.len()) * place(b.len())) by(nonlinear_arith)
+        requires 0 <= va < place(a.len()), 0 <= vb < place(b.len());
+    assert(pij * low as int <= pij * low as int + (radix() * pij) * high as int) by(nonlinear_arith)
+        requires pij > 0, high >= 0, radix() > 0;
+}
+
+/// A completed row adds its limb times the complete second operand.
+pub(super) proof fn product_row(a: Seq<u128>, b: Seq<u128>, i: nat)
+    requires i < a.len(),
+    ensures limbs(a, i) * value(b) + place(i) * a[i as int] as int * value(b)
+        == limbs(a, i + 1) * value(b),
+{
+    assert(limbs(a, i + 1) == limbs(a, i) + place(i) * a[i as int] as int);
+    lemma_mul_is_distributive_add_other_way(value(b), limbs(a, i), place(i) * a[i as int] as int);
 }
 }

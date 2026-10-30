@@ -352,6 +352,41 @@ classical algorithms. The final step uses the pinned library's Euclidean
 division lemma. The contribution here is the proof of these actual bodies, not
 a new division method.
 
+### Exact unsigned products
+
+Write `U` for the unsigned 256-bit meaning and `W` for the 512-bit meaning.
+
+| Actual method | Exact result and refusal |
+| --- | --- |
+| `U256::full_product(a, b)` | Always succeeds, with `W(result) = U(a) * U(b)` |
+| `U256::checked_mul(a, b)` | Returns `U(a) * U(b)` exactly when it is below `2^256`; otherwise exactly `Overflow` |
+
+These statements are proved for the actual bodies under the stated assumptions,
+with no added public precondition. The proof reaches the private schoolbook
+multiplier and its word insertion helper. The multiplier is proved at every
+shape whose output has at least as many limbs as both inputs together; both
+callers, 2x2 into 4 limbs and 4x2 into 6 limbs, meet that private condition.
+There it returns the exact product, and its `Invariant` refusals are
+unreachable. Word insertion is proved at every width: it adds the word at its
+limb weight exactly, and refuses with `Invariant` exactly when the sum would
+not fit. Each partial product comes from the already proved two-word kernel.
+The 768-bit `U512::multiply_u256` wrapper calls the same proved multiplier but
+remains outside the proved closure.
+
+Five further controls are refused semantically: word insertion dropping a
+carry, the multiplier adding the high product word at the low position or at
+the wrong limb position, and the two public methods multiplying the wrong
+operands. All twenty-eight controls must reach their intended semantic failure
+in whole-harness runs, and the complete closure has 174 verification
+conditions. Apart from compiler-assigned identifiers, every retained translated
+function is unchanged except the representation lemma, which gained the
+512-bit and 768-bit meanings.
+
+The `mul_div`, `mul_add_div_rem`, `mul3_div`, `products_ge`, square-root and
+signed multiply/divide methods, the wider wrappers and `I256::try_i128` remain
+outside this proof scope. So do compiler/ghost erasure, physical resource
+costs, and the Schema2 and factory obligations below.
+
 ### Earlier schema checkpoint
 
 The frozen assembled source manifest

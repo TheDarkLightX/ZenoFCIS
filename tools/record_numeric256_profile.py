@@ -166,6 +166,50 @@ def include_division(profile):
         "add/subtract carry and borrow helpers and the private divider are refined at every limb width. "
         "U256 has no checked_neg method. The multiply family, the wider division wrappers, other "
         "arithmetic and compiler/ghost-erasure correspondence are not proved.")
+    if any(o["stage"] == "multiplication" for o in profile["obligations"]):
+        include_multiplication(profile)
+
+
+def include_multiplication(profile):
+    """Reviewed exact product statements; helper defects must fail inside the actual helpers."""
+    statements = [
+        ("U256::full_product", ["U256", "U256"], "Result<U512,Failure>",
+         "Always succeeds with the exact 512-bit product: W(result) = U(a)*U(b)."),
+        ("U256::checked_mul", ["U256", "U256"], "Result<U256,Failure>",
+         "Exact product iff it is below 2^256; otherwise exactly Overflow."),
+    ]
+    profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != "multiplication"] + [
+        {"stage": "multiplication", "member": member, "parameters": parameters, "result": result,
+         "meaning": meaning, "refinement_display": gate.NAMESPACE + "arithmetic256::" + member}
+        for member, parameters, result, meaning in statements]
+    defects = [
+        ("word_insertion_drops_carry", "U256::full_product", "add_word",
+         "carry = overflow as u128;", "carry = 0;"),
+        ("product_adds_high_word_at_low_position", "U256::full_product", "multiply",
+         "add_word(&mut out, at, product[0])?;", "add_word(&mut out, at, product[1])?;"),
+        ("product_uses_wrong_limb_position", "U256::full_product", "multiply",
+         "let at = i.checked_add(j).ok_or(Failure::Invariant)?;",
+         "let at = j.checked_add(j).ok_or(Failure::Invariant)?;"),
+        ("unsigned_full_product_squares_left", "U256::full_product", None,
+         "multiply(self.0, other.0)", "multiply(self.0, self.0)"),
+        ("unsigned_checked_mul_squares_right", "U256::checked_mul", None,
+         "self.full_product(other)?.narrow()", "other.full_product(other)?.narrow()"),
+    ]
+    profile["controls"] = [c for c in profile["controls"] if c["stage"] != "multiplication"] + [
+        {"stage": "multiplication", "name": name, "member": member, **({"helper": helper} if helper else {}),
+         "old": old, "new": new, "error_source": str(gate.SUBJECT)}
+        for name, member, helper, old, new in defects]
+    profile["scope"] = (
+        "The eight actual associated constants, eleven public conversions and five checked 256-bit "
+        "add/subtract/negation methods with exact integer values and exact Overflow partitions; "
+        "U256::div_rem and U256::checked_div with exact canonical quotient, rounding and refusal "
+        "contracts; and U256::full_product and U256::checked_mul with exact product contracts, all "
+        "without public input preconditions. The actual negative_bits dependency, the add/subtract "
+        "carry and borrow helpers, the private divider, word insertion and schoolbook multiplier are "
+        "refined at every limb width (the multiplier whenever its output has room for the product). "
+        "U256 has no checked_neg method. The wider wrappers, the mul_div, root and signed "
+        "multiply/divide families, other arithmetic and compiler/ghost-erasure correspondence are "
+        "not proved.")
 
 
 def arithmetic_exceptions(root):
@@ -192,8 +236,7 @@ def arithmetic_exceptions(root):
             {"text": "#[cfg_attr(verus_keep_ghost, verus_verify)]", "following": f"impl {kind} {{",
              "reason": "Verifies only the selected actual numeric constants and methods in this impl block."},
         ])
-    for item in ("fn add_word<const N: usize>", "fn multiply<const A: usize, const B: usize, const O: usize>",
-                 "impl U256 {", "impl I256 {", "impl U512 {", "impl U768 {"):
+    for item in ("impl U256 {", "impl I256 {", "impl U512 {", "impl U768 {"):
         entries.append({"text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
                         "following": item,
                         "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."})
@@ -202,7 +245,7 @@ def arithmetic_exceptions(root):
 
 
 def record(root, out, cache, refresh_ordering, previous_source=None, conversions=False, checked=False,
-           division=False):
+           division=False, multiplication=False):
     profile = json.loads(gate.read(root, gate.PROFILE))
     if conversions or checked:
         include_conversions(profile)
@@ -210,6 +253,8 @@ def record(root, out, cache, refresh_ordering, previous_source=None, conversions
         include_checked(profile)
     if division:
         include_division(profile)
+    if multiplication:
+        include_multiplication(profile)
     previous = json.loads(gate.read(root, Path("verification/verus/ordering_types256_profile.json")))
     exceptions = {key: entries for key, entries in previous["native_configuration_exceptions"].items()
                   if key != str(gate.SUBJECT) and key != str(Path("verification/verus/ordering256_types_harness.rs"))}
@@ -348,11 +393,14 @@ def main():
                         help="Include conversions and the five checked add/subtract/negation methods")
     parser.add_argument("--include-division", action="store_true",
                         help="Add the reviewed U256 div_rem/checked_div stage and its semantic controls")
+    parser.add_argument("--include-multiplication", action="store_true",
+                        help="Add the reviewed U256 full_product/checked_mul stage and its semantic controls")
     parser.add_argument("--previous-source", type=Path,
                         help="Exact previous profile sources, required only for a compiler-ID migration review")
     args = parser.parse_args()
     record(gate.ROOT, args.out.absolute(), args.cache, args.refresh_ordering_bindings,
-           args.previous_source, args.include_conversions, args.include_checked, args.include_division)
+           args.previous_source, args.include_conversions, args.include_checked, args.include_division,
+           args.include_multiplication)
 
 
 if __name__ == "__main__":
