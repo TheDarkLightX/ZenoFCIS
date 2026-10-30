@@ -10,6 +10,7 @@ import behavior
 import behavior2
 import observation_game
 import relational_observation
+import json_numbers
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -51,7 +52,8 @@ def no_number(_):
 
 
 def decode(raw):
-    return json.loads(raw, object_pairs_hook=unique, parse_float=no_number, parse_constant=no_number)
+    return json.loads(raw, object_pairs_hook=unique, parse_float=no_number, parse_constant=no_number,
+                      parse_int=json_numbers.integer_hook(json_numbers.raising(ValueError)))
 
 
 def encode(value):

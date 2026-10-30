@@ -51,11 +51,20 @@ def _number(_):
     raise behavior2.Refusal("program-synthesis: unsupported binding number")
 
 
+def _integer(lexeme):
+    # The named integer checks of json_numbers.py, inline because this module's interpreter closure is pinned.
+    if lexeme == "-0" or len(lexeme) > 4300:
+        reason = "json-number-negative-zero-integer" if lexeme == "-0" else "json-number-too-long"
+        raise behavior2.Refusal(f"program-synthesis: {reason}: {lexeme[:40]}")
+    return int(lexeme)
+
+
 def _binding(data, model):
     _need(type(data) is bytes and len(data) <= MAX_BYTES, "binding byte limit")
     try:
         document = json.loads(data.decode("utf-8"), object_pairs_hook=_pairs,
-                              parse_float=_number, parse_constant=_number)
+                              parse_float=_number, parse_constant=_number,
+                              parse_int=_integer)
     except behavior2.Refusal:
         raise
     except (UnicodeError, ValueError, RecursionError) as error:

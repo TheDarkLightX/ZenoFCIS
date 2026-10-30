@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tools.machine_code import model as mm, profile2 as mp2, session as ms, targets as mt, verify as mv
 import word_kernel2 as w2
+import json_numbers
 
 PROFILE = "zal/word-kernel/1"
 LIMIT_NAMES = ("max_candidates", "max_checks", "deadline_ms", "timeout_ms")
@@ -74,7 +75,7 @@ def read_json(path):
     def bad(_):
         raise ValueError("nonfinite/noninteger JSON refused")
     return json.loads(read_bytes(path).decode("utf-8"), object_pairs_hook=pairs,
-                      parse_float=bad, parse_constant=bad)
+                      parse_float=bad, parse_constant=bad, parse_int=json_numbers.integer_hook(json_numbers.raising(ValueError)))
 
 
 def source_identity():
@@ -230,7 +231,8 @@ def parse(source, syntax="symbolic"):
     need(expr.at == len(expr.tokens), "trailing expression")
     def bad(_):
         raise ValueError("palette floats/nonfinite numbers refused")
-    palette = json.loads(matches[5][1], parse_float=bad, parse_constant=bad)
+    palette = json.loads(matches[5][1], parse_float=bad, parse_constant=bad,
+                         parse_int=json_numbers.integer_hook(json_numbers.raising(ValueError)))
     limits = tuple(mm.integer(int(v), 1, bound, name) for v, bound, name in
                    zip(matches[8].groups(), LIMIT_BOUNDS, LIMIT_NAMES))
     kernel = Kernel(matches[1][1], matches[2][1], expression, freeze(palette),

@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import stat
 
+import json_numbers
 import ladder as l
 
 
@@ -107,7 +108,7 @@ def read_data(path):
         raw = stream.read(MAX_FILE + 1)
     if len(raw) > MAX_FILE:
         raise l.Refusal("Ladder statement exceeds 256 KiB")
-    return json.loads(raw.decode("utf-8"))
+    return json.loads(raw.decode("utf-8"), **json_numbers.hooks(json_numbers.raising(l.Refusal, "ladder statement: ")))
 
 
 def load(statement, revision):

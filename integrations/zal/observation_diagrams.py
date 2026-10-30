@@ -21,6 +21,7 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT / "tools" / "trace_game"))
 from arena_check import check as check_certificate
 from arena_spec import parse as parse_arena
+import json_numbers
 
 MAX_NODES = 64
 MAX_EDGES = 256
@@ -238,8 +239,8 @@ def artifacts(source, profile_path):
         profile_text = stream.read(65537)
     _need(len(profile_text.encode()) <= 65536, "diagram profile byte bound")
     model = behavior.parse(text)
-    value = json.loads(profile_text, object_pairs_hook=unique,
-                       parse_float=reject_number, parse_constant=reject_number)
+    value = json.loads(profile_text, object_pairs_hook=unique, parse_float=reject_number, parse_constant=reject_number,
+                       parse_int=json_numbers.integer_hook(json_numbers.raising(ValueError)))
     profile = observation_game.parse_profile(value, model)
     report = observation_game.check(model, profile)
     _need(report["status"] != "UNKNOWN", "diagram requires complete checked model")

@@ -17,6 +17,7 @@ from pathlib import Path
 import sys
 
 import behavior2 as b
+import json_numbers
 
 
 SCHEMA = "zal/relational-observation/1"
@@ -297,7 +298,8 @@ def _number(_):
 
 def load_profile(path):
     raw = _read(path, MAX_PROFILE_BYTES)
-    return json.loads(raw, object_pairs_hook=_unique, parse_float=_number, parse_constant=_number), raw
+    return json.loads(raw, object_pairs_hook=_unique, parse_float=_number, parse_constant=_number,
+                      parse_int=json_numbers.integer_hook(json_numbers.raising(b.Refusal))), raw
 
 
 def _read(path, maximum):

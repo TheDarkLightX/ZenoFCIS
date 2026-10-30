@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import hashlib
 import json
+import json_numbers
 import os
 from pathlib import Path
 import re
@@ -303,7 +304,7 @@ def proposals(path, zal_path, project, allocate, *, idioms=False):
         if not expected_variants <= variants:
             raise ValueError("ZAL model and contract do not share the profile-2 lowering variants")
     if idioms:
-        instances = json.loads(read_text(path))
+        instances = json.loads(read_text(path), **json_numbers.hooks(json_numbers.raising(ValueError, "idioms: ")))
         if not isinstance(instances, list) or len(instances) > MAX_PROPOSALS:
             raise ValueError("--idioms requires a JSON list of at most 128 instances")
         for row in instances:

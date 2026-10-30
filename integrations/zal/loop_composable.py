@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 from behavior import Refusal
+import json_numbers
 import loop_doors as doors
 import loop_language as Z
 
@@ -112,7 +113,7 @@ def route(workspace, state, ctx, kind: str, acts: list, seq: int):
         body = stream.read(65_537)
     if len(body) > 65_536:
         raise Refusal("strategy-manifest-too-large")
-    manifest = json.loads(body)
+    manifest = json.loads(body, **json_numbers.hooks(json_numbers.raising(Refusal, "strategy-manifest-")))
     instances = manifest.get("instances", [])
     if len(instances) != 2:
         raise Refusal("strategy-runtime-requires-two-instances")

@@ -12,6 +12,7 @@ import json
 import re
 
 from tools.machine_code import model as mm, profile2 as mp, session as ms, verify2 as mv2
+import json_numbers
 
 PROFILE = "zal/word-kernel/2"
 PROFILE_LINE = {"symbolic": "profile zal/word-kernel/2;", "english": "ZAL word kernel profile 2."}
@@ -233,7 +234,8 @@ def parse(lines, syntax, limit_names, limit_bounds):
         spans += nodes
     def bad(_):
         raise ValueError("palette floats/nonfinite numbers refused")
-    palette = _declared("palette", lambda: json.loads(matches[3 + results][1], parse_float=bad, parse_constant=bad))
+    palette = _declared("palette", lambda: json.loads(matches[3 + results][1], parse_float=bad, parse_constant=bad,
+                                                      parse_int=json_numbers.integer_hook(json_numbers.raising(ValueError))))
     limits = _declared("limits", lambda: tuple(mm.integer(int(v), 1, bound, name) for v, bound, name in
                                                zip(matches[-1].groups(), limit_bounds, limit_names)))
     kernel = Kernel2(matches[0][1], target, inputs, tuple(outputs), freeze(palette),
