@@ -491,6 +491,9 @@ def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=50
                     continue
                 if not all(_agrees(problem, code, witness) for witness in witnesses):
                     filtered += 1; continue
+                remaining = deadline_ms / 1000 - (time.monotonic() - began)  # filtering takes time too
+                if remaining <= 0:
+                    stopped = "budget-exhausted"; break
                 proposal = {"schema": "zeno-fcis/machine-proposal/1", "code_hex": code.hex(),
                             "provenance": {"kind": "local-search", "name": "bounded-enumerator/1",
                                            "note": "declared instruction-product enumeration with concrete counterexample filtering"}}

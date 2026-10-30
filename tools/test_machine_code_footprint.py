@@ -156,10 +156,10 @@ class FootprintTests(unittest.TestCase):
         problem = memory_problem("swap-words-x86")
         prints = dict(zip(map(tuple, problem["grammar"]), footprint.footprints(problem)))
         load_word = prints[("load", "rax", "rdi", 0)]
-        self.assertEqual(load_word.reads, {"p[0]", "rdi"})
+        self.assertEqual(load_word.reads, {"p[0]", "rdi", "based:rdi"})
         self.assertEqual(load_word.writes, {"rax", "admitted:load rax rdi 0"})
         store = prints[("store", "rdi", 8, "rax")]
-        self.assertEqual(store.reads, {"rax", "rdi"})
+        self.assertEqual(store.reads, {"rax", "rdi", "based:rdi"})
         self.assertEqual(store.writes, {"p[1]", "admitted:store rdi 8 rax"})
         self.assertIn("p[1]", store.overwrites)
         self.assertLessEqual({"p[0]", "p[1]", "admitted:store rdi 8 rax"}, footprint.observed(problem))
@@ -178,6 +178,24 @@ class FootprintTests(unittest.TestCase):
         with patch.object(footprint, "_profile3", omitted):
             best_kept, best_all, _ = least_ranks(problem)
         self.assertNotEqual(best_kept, best_all)
+
+    def test_admission_history_blocks_reordering_and_merging_around_memory_bases(self):
+        """Review counterexamples: `or rdi, rdi` leaves rdi's value but makes a later access through rdi refuse."""
+        base = {"schema": profile3.SCHEMA, "target": verify3.X86, "inputs": ["x"],
+                "regions": [{"name": "m", "base": "rdi", "words": 1, "access": "read-only"}],
+                "outputs": [["add", ["initial", "m", 0], ["input", "x"]]], "memory": {},
+                "max_instructions": 3, "objective": "bytes"}
+        order = {**base, "grammar": [["load", "rax", "rdi", 0], ["or", "rdi", "rdi"], ["adc", "rax", "rsi"]]}
+        merged = {**base, "grammar": [["test", "rdi", "rdi"], ["or", "rdi", "rdi"], ["load", "rax", "rdi", 0],
+                                      ["adc", "rax", "rsi"]]}
+        for problem in (order, merged):
+            best_kept, best_all, _ = least_ranks(problem)
+            self.assertEqual(best_kept, best_all)
+        grammar = _grammar(order)
+        pruner = footprint.Pruner(order, grammar)
+        self.assertIn((0, 1, 2), set(footprint.sequences(len(grammar), 3, pruner.judge, {})),
+                      "the only equivalent kernel is kept")
+        self.assertFalse(footprint.analyse(merged)[1], "test and or differ in admission history")
 
     def test_operand_swapped_duplicates_are_found_by_proof(self):
         problem = {**load("add128-rv64i.json"),

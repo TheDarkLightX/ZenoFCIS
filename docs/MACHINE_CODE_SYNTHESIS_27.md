@@ -214,6 +214,18 @@ follows it. The results compared at the end include every read-write region
 word. Without the `admitted:` locations, the exactness test loses the cheapest
 refused candidate of `copy2-sum-rv64i`.
 
+Admission also tracks which bases an earlier instruction wrote, and the register
+values do not show that history: `or rdi, rdi` leaves `rdi` unchanged, but a
+later access through `rdi` is then refused. For each base, the footprint asks
+the profile-3 admission rule whether an instruction marks that base written. If
+it does, the instruction writes a `based:<base>` location, which every access
+through that base reads. Such an instruction is therefore never reordered past
+the access, deleted before it, or merged with a duplicate that leaves no mark.
+
+An independent review found the counterexamples that motivated this. Without
+the marks, pruning lost the only equivalent kernel of a three-instruction
+problem, and the byte-least kernel of another. Both problems are now tests.
+
 Search and `split-search` start their concrete filters from the session's
 earlier counterexamples, as well as the seed states. Both stop at the deadline
 even while pruning is still skipping candidates.

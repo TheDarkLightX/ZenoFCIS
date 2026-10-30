@@ -8,6 +8,7 @@ import struct
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 from machine_code import footprint, model, profile2, session, targets, verify2
 from machine_code.run import main
@@ -118,6 +119,21 @@ class Profile2LoopTests(unittest.TestCase):
             result = run(self.directory, max_candidates=100_000, max_checks=8, deadline_ms=500)
             self.assertLess(time.monotonic() - began, 5, run.__name__)
             self.assertEqual((result["status"], result["stop_reason"]), ("no-checked-candidate", "budget-exhausted"))
+
+    def test_search_does_not_start_a_check_after_filtering_outlasts_the_deadline(self):
+        x = ["input", "x"]
+        self.opened(problem={"schema": profile2.SCHEMA, "target": X86, "inputs": ["x"], "outputs": [x],
+                             "grammar": [["mov", "rax", "rdi"]], "max_instructions": 1,
+                             "objective": "instructions"})
+        clock = [1000.0]
+        agrees = session._agrees
+
+        def slow(problem, code, witness):  # the real filter, on a clock that passes the deadline meanwhile
+            clock[0] += 2.0
+            return agrees(problem, code, witness)
+        with patch.object(session.time, "monotonic", lambda: clock[0]), patch.object(session, "_agrees", slow):
+            result = session.search(self.directory, max_candidates=10, max_checks=8, deadline_ms=1000)
+        self.assertEqual((result["solver_checks"], result["stop_reason"]), (0, "budget-exhausted"), result)
 
     def test_split_search_and_search_reuse_counterexamples_from_earlier_runs(self):
         x, y = ["input", "x"], ["input", "y"]

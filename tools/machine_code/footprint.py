@@ -241,12 +241,26 @@ def _profile3(z, context, problem: dict, form: list) -> Footprint:
     locations = {_word(name, i): v for name, words in memory.items() for i, v in enumerate(words)}
     finals = {_word(name, i): v for name, words in final_memory.items() for i, v in enumerate(words)}
     effects, values = _effects(z, {**entry, **flags, **locations}, {**registers, **final_flags, **finals}, declared)
-    if decoded[0].op not in verify3.MEMORY:
-        return effects, values, tuple(sorted(declared))
-    admitted = _admitted(decoded[0].form())
-    # The access's own admission location keeps distinct accesses from ever counting as duplicates.
-    return (Footprint(effects.reads, effects.writes | {admitted}, effects.overwrites | {admitted}, effects.sources),
-            values, (*sorted(declared), admitted))
+    # Admission history is state the register values do not show: `or rdi, rdi` leaves rdi unchanged, yet admission
+    # then refuses an access through rdi. Each base the instruction marks as written becomes a written `based:<base>`
+    # location, and each access reads its base's, so such pairs are never reordered, deleted or merged.
+    marks = {"based:" + r["base"] for r in problem["regions"] if _marks_base(problem, decoded, r["base"])}
+    uses = {"based:" + verify3._access(decoded[0].form())[0]} if decoded[0].op in verify3.MEMORY else set()
+    extra = marks | ({_admitted(decoded[0].form())} if decoded[0].op in verify3.MEMORY else set())
+    # Admission locations also keep distinct accesses, and base-marking instructions, from counting as duplicates.
+    return (Footprint(effects.reads | uses, effects.writes | extra, effects.overwrites | extra, effects.sources),
+            values, (*sorted(declared), *sorted(extra), *sorted(uses)))
+
+
+def _marks_base(problem: dict, decoded: list, base: str) -> bool:
+    """Whether verify3's admission counts the instruction as writing `base`: it would refuse a later access."""
+    from . import verify3
+    access = verify3.Instruction("load", (verify3.REGISTERS[problem["target"]][0], base, 0), 0, 0)
+    try:
+        verify3.admit(problem, [decoded[0], access, decoded[-1]])
+    except ValueError:
+        return True  # RedefinedRegionBase, or any other refusal, which is treated as marked (prunes less)
+    return False
 
 
 def footprints(problem: dict) -> list:
