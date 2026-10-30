@@ -2,7 +2,7 @@
   "components": {
     "../semantic_library.py": {
       "path": "../semantic_library.py",
-      "sha256": "93a5974b58e5cb7ac678e2cd3ab943070a57eab128ef1b6724e8b086a5d3fa2d"
+      "sha256": "addcce7462969e99e0e427925e943c34542db9b3a4cebecb84cc3069c4294bdd"
     },
     "LICENSE": {
       "path": "LICENSE",
@@ -10,7 +10,7 @@
     },
     "prototype.py": {
       "path": "prototype.py",
-      "sha256": "3ce64a86b737854eab627255a25f0a403fb13d1b257a07c3e21471dc5bcd0ed1"
+      "sha256": "04fdd73f21eb5b820eafafb277a50929d7381ebe9329b7a7b6615d84a9b86407"
     },
     "test_prototype.py": {
       "path": "test_prototype.py",

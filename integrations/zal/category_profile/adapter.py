@@ -15,7 +15,7 @@ import types
 
 PROFILE = Path(__file__).resolve().parent
 ZAL_ROOT = PROFILE.parent
-DEPENDENCIES_SHA256 = 'a93c5b3d023867028162682e798b280c33d81c81c3305e74e9c1ff81f52abe84'
+DEPENDENCIES_SHA256 = 'd06b65b7bcb8ca7dfb7610c867c81148ef99d8cfd34480880674016d9c77c190'
 PROVIDER_MANIFEST = '2628e184504a84753b9a775779e9e9660ea3f6947734e96de64aae41e7c91cec'
 FORMAL_PROFILE = 'zal/finite-category-source/1'
 OPERATIONS = ('check-category', 'compose-path', 'invertible', 'check-functor', 'compose-functors', 'compose-symbolic')

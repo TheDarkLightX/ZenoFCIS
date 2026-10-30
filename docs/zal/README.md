@@ -1027,7 +1027,10 @@ integers keep their existing refusal for fractions and add the named integer che
   - application bindings;
   - ladder statements read by the ladder tools;
   - strategy manifests;
-  - idiom proposals.
+  - idiom proposals;
+  - semantic-library packages;
+  - finite-library contracts and tables, with the policy written inline because the category capsule pins that
+    component.
 - **Integer-only policy:** version specifications, observation profiles, strategy problems, program-synthesis
   bindings, and word-kernel problem files and palettes. Program synthesis applies the same checks inline, because
   its interpreter closure is pinned.
@@ -1037,13 +1040,15 @@ integers beyond plus or minus 2^53-1. The browser route already receives those a
 
 **Not covered yet.** These readers still parse numbers with plain binary floating point:
 
-- `semantic_library.load` and the finite-library documents, because their pins include a component list that has
-  no producer;
 - ladder context files, because the standalone relational route copies `ladder.py` without its sibling modules;
 - contract policy JSON read by the loop workspace and coverage tools, whose format the Rust reader owns;
 - the local agent transport.
 
-The Rust readers of ZAL JSON were not examined. `integrations/zal/test_json_numbers.py` lists every
+A component list pins the finite-library and semantic-library sources. After editing them, run
+`python3 tools/record_finite_library_components.py --write`, then `python3 tools/record_category_capsule.py --write`,
+because the capsule pins that list.
+
+The Rust readers of ZAL JSON are planned for 2.7.1. `integrations/zal/test_json_numbers.py` lists every
 `json.load` and `json.loads` call under `integrations/zal`, and fails when a new one neither uses the policy nor
 is listed with a reason. The same test checks:
 
