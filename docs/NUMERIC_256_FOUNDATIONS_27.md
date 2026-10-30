@@ -382,10 +382,33 @@ conditions. Apart from compiler-assigned identifiers, every retained translated
 function is unchanged except the representation lemma, which gained the
 512-bit and 768-bit meanings.
 
+### Exact 512-bit and 768-bit wrappers
+
+Write `W` and `W768` for the 512-bit and 768-bit unsigned meanings.
+
+| Actual method | Exact result and refusal |
+| --- | --- |
+| `U512::checked_add(a, b)` | Returns `W(a) + W(b)` exactly when it is below `2^512`; otherwise exactly `Overflow` |
+| `U512::multiply_u256(a, b)` | Always succeeds, with `W768(result) = W(a) * U(b)` |
+| `U512::div_rem(n, d)` | For `W(d) > 0`, the canonical 512-bit witness; for `W(d) = 0`, exactly `ZeroDivisor` |
+| `U768::div_rem(n, d)` | For `W768(d) > 0`, the canonical 768-bit witness; for `W768(d) = 0`, exactly `ZeroDivisor` |
+
+These statements are proved for the actual bodies under the stated assumptions,
+with no added public precondition. Each wrapper calls the carry helper, the
+multiplier or the divider already proved at every width, so the new proof
+obligations are the limb-meaning bridges for four and six limbs. Four controls
+are refused semantically: a sum that misses the top-limb carry, a product that
+swaps the factor's words, and quotient/remainder results or operands swapped.
+All thirty-two controls must reach their intended semantic failure, and the
+complete closure has 179 verification conditions. Removing the now empty
+excluded 768-bit block renumbers the following signed block in the translated
+records; apart from that reviewed renumbering and compiler-assigned
+identifiers, every retained translated function is unchanged.
+
 The `mul_div`, `mul_add_div_rem`, `mul3_div`, `products_ge`, square-root and
-signed multiply/divide methods, the wider wrappers and `I256::try_i128` remain
-outside this proof scope. So do compiler/ghost erasure, physical resource
-costs, and the Schema2 and factory obligations below.
+signed multiply/divide methods, the raw 512-bit word views and `I256::try_i128`
+remain outside this proof scope. So do compiler/ghost erasure, physical
+resource costs, and the Schema2 and factory obligations below.
 
 ### Earlier schema checkpoint
 

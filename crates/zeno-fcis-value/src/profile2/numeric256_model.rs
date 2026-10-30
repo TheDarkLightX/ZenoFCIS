@@ -285,6 +285,35 @@ pub open spec fn wide_product_result(result: Result<U512, Failure>, value: int) 
     }
 }
 
+/// U512::checked_add: the exact sum iff it is below 2^512, otherwise exactly Overflow.
+pub open spec fn unsigned512_result(result: Result<U512, Failure>, value: int) -> bool {
+    match result {
+        Ok(actual) => 0 <= value < modulus() * modulus() && unsigned512(actual) == value,
+        Err(error) => error == Failure::Overflow && !(0 <= value < modulus() * modulus()),
+    }
+}
+/// U512::multiply_u256: always the exact complete 768-bit product.
+pub open spec fn product768_result(result: Result<U768, Failure>, value: int) -> bool {
+    match result {
+        Ok(product) => unsigned768(product) == value,
+        Err(_) => false,
+    }
+}
+/// U512::div_rem: an exact canonical witness, or ZeroDivisor exactly when den is zero.
+pub open spec fn div_rem512_result(n: U512, d: U512, result: Result<(U512, U512), Failure>) -> bool {
+    match result {
+        Ok((q, r)) => quotient_witness(unsigned512(n), unsigned512(d), unsigned512(q), unsigned512(r)),
+        Err(error) => error == Failure::ZeroDivisor && unsigned512(d) == 0,
+    }
+}
+/// U768::div_rem: an exact canonical witness, or ZeroDivisor exactly when den is zero.
+pub open spec fn div_rem768_result(n: U768, d: U768, result: Result<(U768, U768), Failure>) -> bool {
+    match result {
+        Ok((q, r)) => quotient_witness(unsigned768(n), unsigned768(d), unsigned768(q), unsigned768(r)),
+        Err(error) => error == Failure::ZeroDivisor && unsigned768(d) == 0,
+    }
+}
+
 // Limb weights.
 
 pub(super) proof fn place_positive(count: nat)
@@ -573,6 +602,18 @@ pub(super) proof fn limb_representations()
     assert forall|x: U256| #[trigger] unsigned(x) == value(x.0@) by { value_two(x.0); }
     assert forall|x: U512| #[trigger] unsigned512(x) == value(x.0@) by { value_four(x.0); }
     assert forall|x: U768| #[trigger] unsigned768(x) == value(x.0@) by { value_six(x.0); }
+}
+
+/// The 512-bit meaning, with the weight of its four limbs.
+pub(super) proof fn wide_representations()
+    ensures
+        forall|x: U512| #[trigger] unsigned512(x) == value(x.0@),
+        place(4) == modulus() * modulus(),
+{
+    limb_representations();
+    place_add(2, 2);
+    reveal_with_fuel(place, 3);
+    assert(place(2) == modulus());
 }
 
 /// A U256 is zero exactly when both limbs are zero.

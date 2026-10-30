@@ -129,6 +129,20 @@ class SourceAdmission(unittest.TestCase):
             with self.subTest(mode=mode), self.assertRaises(ValueError):
                 gate.configuration(self.root, profile)
 
+    def test_wide_stage_is_complete_and_retains_its_helper_stages(self):
+        complete = copy.deepcopy(self.profile)
+        producer.include_wide(complete)
+        gate.configuration(self.root, complete)
+        for mode in ("method", "division", "multiplication"):
+            profile = copy.deepcopy(complete)
+            if mode == "method":
+                profile["obligations"].pop(next(i for i, o in enumerate(profile["obligations"])
+                                                if o["member"] == "U768::div_rem"))
+            else:
+                profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != mode]
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                gate.configuration(self.root, profile)
+
     def test_every_proved_helper_has_a_semantic_control(self):
         helpers = {c["helper"] for c in self.profile["controls"] if "helper" in c}
         self.assertEqual(helpers, gate.HELPERS)

@@ -4,7 +4,7 @@
   "source_hashes": {
     "crates/zeno-fcis-value/src/profile2/ordering256.rs": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825",
     "crates/zeno-fcis-value/src/profile2/ordering_model.rs": "d02708ccbae41434efc8acb8e8bcd7bd30f2abc04b7256bd32d15421c3f1544a",
-    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "423f45be0d7eb01877ec9f6d35c59ba89b23d96f2f5c18822ccf2309d2e2a96b",
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "d0d6aed6602cc514c12e5b79cd70722bdf5aacdfaf2729d3490b9983d113c652",
     "crates/zeno-fcis-value/src/profile2/mod.rs": "8e086860ac68d991eeb7b982e8b4ed58a83c77139a326f268dc27d5840d9a6ca",
     "verification/verus/ordering256_harness.rs": "83ed73a6504208f584b6a0f2a77b23525f3caa055b3da248c8d2098ee3faf17f"
   },
@@ -106,11 +106,6 @@
       {
         "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
         "following": "impl U512 {",
-        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
-      },
-      {
-        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
-        "following": "impl U768 {",
         "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
       }
     ],

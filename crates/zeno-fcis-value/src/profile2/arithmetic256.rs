@@ -588,6 +588,43 @@ impl U512 {
             Err(Failure::Overflow)
         }
     }
+    /// Adds two 512-bit values, refusing overflow.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::unsigned512_result(result,
+            numeric_model::unsigned512(self) + numeric_model::unsigned512(other)),
+    ))]
+    pub fn checked_add(self, other: Self) -> Result<Self, Failure> {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::wide_representations(); }
+        let (value, carry) = add(self.0, other.0);
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::value_bounds(value@); }
+        if carry {
+            Err(Failure::Overflow)
+        } else {
+            Ok(Self(value))
+        }
+    }
+    /// Returns the complete 768-bit product with an unsigned 256-bit value.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::product768_result(result,
+            numeric_model::unsigned512(self) * numeric_model::unsigned(other)),
+    ))]
+    pub fn multiply_u256(self, other: U256) -> Result<U768, Failure> {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::limb_representations(); }
+        Ok(U768(multiply(self.0, other.0)?))
+    }
+    /// Returns the 512-bit quotient and remainder, refusing a zero divisor.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::div_rem512_result(self, den, result),
+    ))]
+    pub fn div_rem(self, den: Self) -> Result<(Self, Self), Failure> {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::limb_representations(); }
+        let (q, r) = divide(self.0, den.0)?;
+        Ok((Self(q), Self(r)))
+    }
 }
 
 #[cfg_attr(verus_keep_ghost, verifier::external)]
@@ -599,24 +636,6 @@ impl U512 {
     /// Returns four words in least significant word order.
     pub const fn words_le(self) -> [u128; 4] {
         self.0
-    }
-    /// Adds two 512-bit values, refusing overflow.
-    pub fn checked_add(self, other: Self) -> Result<Self, Failure> {
-        let (value, carry) = add(self.0, other.0);
-        if carry {
-            Err(Failure::Overflow)
-        } else {
-            Ok(Self(value))
-        }
-    }
-    /// Returns the complete 768-bit product with an unsigned 256-bit value.
-    pub fn multiply_u256(self, other: U256) -> Result<U768, Failure> {
-        Ok(U768(multiply(self.0, other.0)?))
-    }
-    /// Returns the 512-bit quotient and remainder, refusing a zero divisor.
-    pub fn div_rem(self, den: Self) -> Result<(Self, Self), Failure> {
-        let (q, r) = divide(self.0, den.0)?;
-        Ok((Self(q), Self(r)))
     }
     /// Returns the rounded square root with checked 256-bit narrowing.
     pub fn sqrt(self, mode: Rounding) -> Result<U256, Failure> {
@@ -675,12 +694,13 @@ impl U768 {
             Err(Failure::Overflow)
         }
     }
-}
-
-#[cfg_attr(verus_keep_ghost, verifier::external)]
-impl U768 {
     /// Returns the 768-bit quotient and remainder, refusing a zero divisor.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::div_rem768_result(self, den, result),
+    ))]
     pub fn div_rem(self, den: Self) -> Result<(Self, Self), Failure> {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::limb_representations(); }
         let (q, r) = divide(self.0, den.0)?;
         Ok((Self(q), Self(r)))
     }
