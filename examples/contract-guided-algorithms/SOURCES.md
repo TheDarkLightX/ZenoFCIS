@@ -40,3 +40,9 @@ The eight file paths below are those in [`lancetw/ebook-1/02_algorithm`](https:/
 ## Knowledge extraction gate for later chapters
 
 Before importing a new strategy, record: (1) exact public bibliographic chapter/section, (2) the mathematical claim rewritten independently, (3) domain and refusal semantics, (4) relevant target/memory/cost assumptions, (5) an independent oracle or proof obligation, (6) known counterexamples, (7) training-versus-evaluation separation, and (8) authorship/copyright provenance. A claimed novel algorithm must additionally have a substantive prior-art review; rediscovering an established technique is not mathematical novelty.
+
+## Subsequent focused *Hacker's Delight* intake
+
+After the initial directory/metadata review, a **separate technical reading** reviewed the major sections of all 18 chapters of the second edition through an available full-text HTML rendering, compared to the publisher's contents and sample PDF. The original GitHub **PDF binary remains inaccessible**, and some HTML mathematics is degraded: this is **not** a claim that every page, exact constant, diagram, or exercise has been verified. No copyrighted textbook implementation is included in the code.
+
+The resulting [chapter-by-chapter research map](HACKERS_DELIGHT_READING.md) identifies contract and search obligations, and **Chapter 2's right-to-left dependency constraint is implemented** as a finite structural palette preflight with replayable witnesses and three negative controls. The other seven PDFs retain their initial reading limitations.
