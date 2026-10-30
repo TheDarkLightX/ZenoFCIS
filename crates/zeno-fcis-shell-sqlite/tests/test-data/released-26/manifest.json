@@ -1,0 +1,14 @@
+{
+  "authority": "none",
+  "files": {
+    "genesis.sql": "b1f1039364cee28c3cf66510693a3fb6ad97c7bc2c8580594365892615051462",
+    "pending.sql": "e3fe0fc9c183995bfde83123774002bd16c34a8c518d6357024208eb7d2fe1cf"
+  },
+  "pending_ids": [
+    "6658a15314f970b6dde810d49a8f4ed24b9dc7cf52fd2992d55fff26db5b4b83"
+  ],
+  "release": "2.6.0",
+  "released_cli_sha256": "f7d8cb92b588903371745e3eb11a317fe917e30a260bc4c16e3f6da87c6c4af5",
+  "schema": "zeno-fcis/released-26-test-inputs/1",
+  "subject": "7d175c47099866939c86acd463ac85219abba882"
+}

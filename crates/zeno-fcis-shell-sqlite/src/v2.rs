@@ -1356,6 +1356,17 @@ fn released_identity_lookup(current: &[u8], retained: &[u8]) -> bool {
         && retained[prefix..] == zeno_fcis_synthesis::finite::historical::RELEASED_EVALUATOR
         && current[..prefix] == retained[..prefix]
 }
+/// Diagnosis only, after the lookup refused: the retained identity is a
+/// member's contract under another evaluator, whose 32-byte digest ends the
+/// identity. Nothing is admitted or relabelled.
+fn other_release(current: &[u8], retained: &[u8]) -> bool {
+    let Some(prefix) = current.len().checked_sub(32) else {
+        return false;
+    };
+    retained.len() == current.len()
+        && current[..prefix] == retained[..prefix]
+        && current[prefix..] != retained[prefix..]
+}
 impl Segments {
     fn load<'p, D: DescriptorData<'p> + 'p>(
         connection: &Connection,
@@ -1381,7 +1392,17 @@ impl Segments {
                     .unwrap_or(retained)
             })
             .collect();
-        let positions = upgrade::assign(&members, &lookup)?;
+        let positions = upgrade::assign(&members, &lookup).map_err(|error| {
+            if lookup.iter().any(|retained| {
+                members
+                    .iter()
+                    .any(|current| other_release(current, retained))
+            }) {
+                Error::OtherRelease
+            } else {
+                error
+            }
+        })?;
         Ok(Self {
             genesis_identity,
             upgrades,
@@ -2766,6 +2787,10 @@ pub enum Error {
     /// history segment was published under no lineage member in order, or the
     /// store does not run the contract the operation needs.
     Identity,
+    /// A history segment was published under a lineage member's contract by
+    /// another ZenoFCIS release: the identities differ only in the trailing
+    /// evaluator digest. Nothing was written.
+    OtherRelease,
     /// The library refused to bind a lineage catalog into an Authority.
     Authority,
     /// A lineage needs at least one version and exactly one step, an
@@ -2861,6 +2886,9 @@ impl fmt::Display for Error {
             ),
             Self::Identity => f.write_str(
                 "this database, or a checkpoint or publication used with it, belongs to a different contract: audit the database with the build that created it, or upgrade it with a build that adopted its contract",
+            ),
+            Self::OtherRelease => f.write_str(
+                "this database was created by another ZenoFCIS release of this contract, such as 2.6.0, whose evaluator differs from this build's, so nothing was written: keep using the database with the build that created it, or start a new store with this build in a new, empty file",
             ),
             Self::Authority => f.write_str(
                 "the library refused to bind a contract version of the lineage: regenerate the contract and rebuild the application with the same ZenoFCIS version",
@@ -3027,6 +3055,7 @@ mod message_tests {
             Error::Provider => "Provider",
             Error::Schema(_) => "Schema",
             Error::Identity => "Identity",
+            Error::OtherRelease => "OtherRelease",
             Error::Authority => "Authority",
             Error::Lineage => "Lineage",
             Error::Checkpoint => "Checkpoint",
@@ -3088,6 +3117,10 @@ mod message_tests {
             (
                 Error::Identity,
                 "this database, or a checkpoint or publication used with it, belongs to a different contract: audit the database with the build that created it, or upgrade it with a build that adopted its contract",
+            ),
+            (
+                Error::OtherRelease,
+                "this database was created by another ZenoFCIS release of this contract, such as 2.6.0, whose evaluator differs from this build's, so nothing was written: keep using the database with the build that created it, or start a new store with this build in a new, empty file",
             ),
             (
                 Error::Authority,
@@ -3261,7 +3294,7 @@ mod message_tests {
             assert!(format!("{error:?}").starts_with(stem), "{error:?}");
             covered.insert(name);
         }
-        assert_eq!(covered.len(), 33, "{covered:?}");
+        assert_eq!(covered.len(), 34, "{covered:?}");
     }
 }
 
