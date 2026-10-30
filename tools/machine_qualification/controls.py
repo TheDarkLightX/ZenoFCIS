@@ -1,6 +1,6 @@
 """Registered planted-defect controls for the independent machine-code checkers.
 
-Each defect is one named source edit to `tools/machine_code/verify.py` or `verify2.py`. The edit is applied to an
+Each defect is one named source edit to `tools/machine_code/verify.py`, `verify2.py` or `verify3.py`. The edit is applied to an
 isolated specimen: a fresh copy of the checker package, the test modules that hold the controls, and the kernel
 library. Its checker identity is computed from the specimen's own sources, so it is consistent with the edit. The
 defect names the control that should expose it, and optionally a second control that must also expose it; only
@@ -45,13 +45,14 @@ MODES = (("-B",), ("-O", "-B"))
 TIMEOUT = 900
 TEST_MODULES = ("test_machine_code_verifier.py", "test_machine_code_profile2_verifier.py",
                 "test_machine_code_library.py", "test_machine_code_conformance.py",
-                "test_machine_code_profile2_conformance.py")
+                "test_machine_code_profile2_conformance.py", "test_machine_code_profile3_verifier.py")
 # A failure that mentions any of these is a refusal of the specimen's identity, not of the defect. The session
 # refuses a changed checker with "session problem/checker/solver binding drifted".
 IDENTITY_MARKERS = ("identity", "stale", "hash refus", "binding drifted")
 
 V1 = "test_machine_code_verifier.VerifierTests."
 V2 = "test_machine_code_profile2_verifier.Profile2VerifierTests."
+V3 = "test_machine_code_profile3_verifier.Profile3VerifierTests."
 CONFORMANCE1 = "test_machine_code_conformance.X86ModelConformance."
 CONFORMANCE2 = "test_machine_code_profile2_conformance."
 POSITIVE = (
@@ -60,6 +61,8 @@ POSITIVE = (
     ("profile-2 verifier, including flags, aliases, high-bit inputs and quantified scratch and flags",
      "test_machine_code_profile2_verifier"),
     ("every kernel in test-data/machine-code/kernels at its recorded cost", "test_machine_code_library"),
+    ("profile-3 verifier, including region, base, scratch and flag quantification and every memory kernel",
+     "test_machine_code_profile3_verifier"),
 )
 
 
@@ -240,6 +243,55 @@ DEFECTS = (
            'if e != [_ast_concrete(output, values) for output in p["outputs"]] or a != replayed or e == a:',
            'if False:',
            V2 + "test_solver_absent_unknown_and_replay_mismatch_are_never_equivalent",
+           "A solver model is reported as a counterexample without its concrete replay."),
+    Defect("v3-displacement-not-scaled", "verify3.py", "memory displacement scale",
+           "    return displacement // WORD", "    return displacement",
+           V3 + "test_swap_and_copy_kernels_are_equivalent",
+           "A byte displacement is used as a word index, so [base+8] addresses word 8 instead of word 1."),
+    Defect("v3-store-to-read-only-admitted", "verify3.py", "memory permission",
+           '    _require(op == "load" or region["access"] == "read-write", "StoreToReadOnlyRegion")\n', "",
+           V3 + "test_store_to_read_only_region_refuses",
+           "A store to a read-only region is admitted."),
+    Defect("v3-region-word-unquantified", "verify3.py", "region quantification",
+           'memory = {r["name"]: [word(f"mc_region_{r[\'name\']}_{i}") for i in range(r["words"])] for r in p["regions"]}',
+           'memory = {r["name"]: [word(f"mc_region_{r[\'name\']}_{i}") if i else z.BitVecVal(0, 64, ctx=context)'
+           ' for i in range(r["words"])] for r in p["regions"]}',
+           V3 + "test_initial_region_words_are_quantified",
+           "The first word of every region is assumed 0 at entry instead of quantified."),
+    Defect("v3-misaligned-access-admitted", "verify3.py", "memory alignment",
+           '    _require(type(displacement) is int and displacement % WORD == 0, "MisalignedAccess")\n', "",
+           V3 + "test_misaligned_access_refuses",
+           "A displacement that is not a multiple of 8 is admitted."),
+    Defect("v3-store-dropped-in-smt", "verify3.py", "dropped store",
+           "        m[regions[base]][_index(displacement)] = r[src]\n    else:\n        verify2._x86_smt(",
+           "        pass\n    else:\n        verify2._x86_smt(",
+           V3 + "test_swap_and_copy_kernels_are_equivalent",
+           "The symbolic run drops every store, so correct kernels stop being equivalent."),
+    Defect("v3-redefined-base-admitted", "verify3.py", "base redefinition",
+           '            _require(base not in written, "RedefinedRegionBase")\n', "",
+           V3 + "test_a_redefined_base_refuses",
+           "An access through a base register that an earlier instruction overwrote is admitted."),
+    Defect("v3-out-of-region-admitted", "verify3.py", "region bounds",
+           '    _require(0 <= displacement < WORD * region["words"], "DisplacementOutsideRegion")\n', "",
+           V3 + "test_out_of_region_displacements_refuse",
+           "A displacement past the region's last word, or negative, is admitted."),
+    Defect("v3-base-pointer-fixed", "verify3.py", "base quantification",
+           'bases = {n: word("mc_base_" + n) for n in base_registers}',
+           'bases = {n: z.BitVecVal(0, 64, ctx=context) for n in base_registers}',
+           V3 + "test_base_pointer_values_are_quantified",
+           "Every region base pointer is assumed 0 instead of quantified."),
+    Defect("v3-scratch-fixed-to-zero", "verify3.py", "scratch quantification",
+           'initial = {n: word("mc_initial_" + n) for n in scratch}',
+           'initial = {n: z.BitVecVal(0, 64, ctx=context) for n in scratch}',
+           V3 + "test_scratch_and_flags_are_quantified",
+           "Scratch registers are assumed 0 at entry instead of quantified."),
+    Defect("v3-solver-unknown-read-as-equivalent", "verify3.py", "solver result",
+           "if answer == z.unsat:", "if answer != z.sat:",
+           V3 + "test_solver_absent_unknown_and_replay_mismatch_are_never_equivalent",
+           "An unknown solver answer is reported as equivalence."),
+    Defect("v3-counterexample-without-replay", "verify3.py", "counterexample replay",
+           "if e != concrete_expected or a != concrete_actual or (e == a and read_only_kept):", "if False:",
+           V3 + "test_solver_absent_unknown_and_replay_mismatch_are_never_equivalent",
            "A solver model is reported as a counterexample without its concrete replay."),
 )
 
