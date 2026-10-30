@@ -37,8 +37,8 @@ def _encode_x86_memory(insn: list) -> bytes:
     return encoded + (displacement.to_bytes(1, "little", signed=True) if mod else b"")
 
 
-IMMEDIATE_GROUP = {"add": 0, "or": 1, "and": 4, "sub": 5, "xor": 6, "cmp": 7}
-ACCUMULATOR = {"add": 0x05, "or": 0x0D, "and": 0x25, "sub": 0x2D, "xor": 0x35, "cmp": 0x3D}
+IMMEDIATE_GROUP = {"add": 0, "or": 1, "adc": 2, "sbb": 3, "and": 4, "sub": 5, "xor": 6, "cmp": 7}
+ACCUMULATOR = {"add": 0x05, "or": 0x0D, "adc": 0x15, "sbb": 0x1D, "and": 0x25, "sub": 0x2D, "xor": 0x35, "cmp": 0x3D}
 
 
 def _encode_x86_immediate(op: str, register: str, value: int) -> bytes:
@@ -57,6 +57,10 @@ def _encode_x86_profile2(insn: list) -> bytes:
     op, *args = insn
     if op in IMMEDIATE_GROUP and len(args) == 2 and type(args[1]) is int:
         return _encode_x86_immediate(op, args[0], args[1])
+    if op == "mov" and len(args) == 2 and type(args[1]) is int:
+        dst = X86[args[0]]
+        value = integer(args[1], -(1 << 31), (1 << 31) - 1, "sign-extended immediate")
+        return bytes([0x48 | (dst >> 3), 0xC7, 0xC0 | (dst & 7)]) + struct.pack("<i", value)
     rm_reg = {"adc": 0x11, "sbb": 0x19, "cmp": 0x39, "test": 0x85}
     if op in rm_reg and len(args) == 2:
         rm, reg = (X86[a] for a in args)

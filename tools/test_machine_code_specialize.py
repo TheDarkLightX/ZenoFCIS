@@ -101,7 +101,8 @@ class Specialization(unittest.TestCase):
         self.assertEqual(special["inputs"], [])
         self.assertEqual(special["outputs"], [["const", "0"], ["const", "17"]])
         forms = [i.form() for i in verify2.decode(special["target"], (out / "kernel.bin").read_bytes())[:-1]]
-        self.assertTrue(all(form[0] in ("imm", "xor") for form in forms), forms)
+        # Only constant loads remain: the zero idiom and MOV with a 32-bit immediate (MOVABS for wider values).
+        self.assertEqual(forms, [["xor", "rax", "rax"], ["mov", "rdx", 17]])
         self.assertEqual(verify2.check(special, (out / "kernel.bin").read_bytes(), timeout_ms=SOLVER_MS)["status"], "equivalent")
         self.assertEqual(verify2.run_concrete(special["target"], (out / "kernel.bin").read_bytes(), [], results=2),
                          [0, 17])
