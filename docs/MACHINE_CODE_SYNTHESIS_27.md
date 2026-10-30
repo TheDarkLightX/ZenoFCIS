@@ -139,6 +139,31 @@ python3 -O -B tools/test_machine_code_loop.py
 python3 -B tools/test_machine_code_native.py
 ```
 
+The instruction model itself is checked against the executing CPU, which serves as the oracle, following the
+differential method for testing CPU emulators (Martignoni et al., ISSTA 2009):
+
+```sh
+python3 -B tools/test_machine_code_conformance.py
+```
+
+It runs on Linux x86-64 with GNU `gcc`, `as`, `objcopy` and `nm`.
+
+- **What it enumerates:** every admitted x86 form. That is the seven register ALU operations over all register
+  pairs, SHL/SHR with every count, MOVABS with edge immediates, LEA over every base, index and scale, and NOP.
+  That is 4,699 forms.
+- **Encoding and decoding:** each encoding is compared with GNU `as`, and each form must round-trip through the
+  independent decoder.
+- **Execution:** each form runs from full register states, 16 by default, set with
+  `ZENO_MACHINE_CONFORMANCE_STATES`. The destination must equal the concrete model on every state and the SMT
+  model on a subset, and every other admitted register must be unchanged.
+- **Controls:** two planted model defects, a wrong LEA scale and an arithmetic right shift, must be detected.
+
+A 64-state run on an AMD Ryzen Threadripper 1950X compared 300,736 executions with the concrete model and
+28,194 with the SMT model, with no disagreement. Agreement covers the sampled states on the executing processor.
+It is not a proof of the ISA or of other processors. Hand-written x86 semantics are known to be error-prone:
+stratified synthesis found errors in 58 manually specified instruction variants (Heule et al., PLDI 2016).
+The RV64I model has not yet been compared with any RISC-V execution environment.
+
 The separate native gate requires a Linux x86-64 host with GNU `gcc`, `as`,
 `objcopy`, `readelf` and `nm`. It checks x86 bytes against GNU assembler and actual linked
 execution on boundary and deterministic pseudorandom inputs. GNU readelf independently identifies

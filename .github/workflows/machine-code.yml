@@ -58,3 +58,5 @@ jobs:
           python3 -O -B tools/test_zal_word_kernel.py
       - name: Actual x86 execution, assembler and RV64I object correspondence
         run: python3 -B tools/test_machine_code_native.py
+      - name: Every admitted x86 form against the concrete and SMT models on this CPU
+        run: python3 -B tools/test_machine_code_conformance.py
