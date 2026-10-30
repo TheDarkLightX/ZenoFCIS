@@ -87,9 +87,13 @@ class FootprintTests(unittest.TestCase):
         swapped = {**load("add128-rv64i.json"),
                    "grammar": [["add", "a0", "a0", "a2"], ["add", "a0", "a2", "a0"], ["sltu", "t0", "a0", "a2"],
                                ["add", "a1", "a1", "a3"], ["add", "a1", "a3", "a1"], ["add", "a1", "a1", "t0"]]}
+        # Shifts (count 1 and greater), undefined flags after imul, conditional moves and partial setcc writes.
+        shifts = {**flags, "outputs": [["lshr", x, 1], ["ult", x, y]],
+                  "grammar": [["mov", "rax", "rdi"], ["shr", "rax", 1], ["sar", "rax", 2], ["shl", "rax", 1],
+                              ["imul", "rax", "rsi"], ["cmp", "rdi", "rsi"], ["cmove", "rax", "rsi"], ["setb", "rdx"]]}
         skipped_total = 0
         for name in ("add128-x86.json", "add128-rv64i.json", "umin-x86.json", "add64-x86.json", "add64-rv64i.json",
-                     flags, both, swapped):
+                     flags, both, swapped, shifts, {**shifts, "objective": "instructions"}):
             problem = load(name) if isinstance(name, str) else name
             name = name if isinstance(name, str) else "synthetic-" + "-".join(map(str, name["grammar"][1][:2]))
             problem["max_instructions"] = min(problem["max_instructions"], 3)
@@ -106,7 +110,9 @@ class FootprintTests(unittest.TestCase):
                     total += 1
                     code = b"".join(grammar[i] for i in choices) + terminal
                     key = behaviour(problem, code, states)
-                    rank = (len(choices), len(code), code.hex())
+                    costs = {"bytes": len(code), "instructions": len(choices)}
+                    first, second = ("bytes", "instructions") if problem["objective"] == "bytes" else ("instructions", "bytes")
+                    rank = (costs[first], costs[second], code.hex())
                     best_all[key] = min(best_all.get(key, rank), rank)
                     if choices in kept:
                         best_kept[key] = min(best_kept.get(key, rank), rank)

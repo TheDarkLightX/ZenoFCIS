@@ -392,6 +392,30 @@ def _agrees(problem, code, witness):
     return actual == [profile2.evaluate(output, env) for output in problem["outputs"]]
 
 
+def _retained(directory, problem, events):
+    """Concrete states from this session's earlier counterexample receipts, oldest first, without repeats.
+
+    `_load` has already bound every receipt to this problem and checker identity.
+    """
+    states = []
+    for event in events:
+        if event["status"] != "counterexample":
+            continue
+        try:
+            state = _witness(problem, read_json(directory / f"{event['sequence']:04d}.receipt.json")["verification"])
+        except (ValueError, KeyError, TypeError):
+            continue
+        if repr(state) not in map(repr, states):
+            states.append(state)
+    return states
+
+
+def _filters(directory, problem, events):
+    """Seed states plus at most 64 states retained from earlier counterexamples, the most recent kept."""
+    seeds = _seeds(problem)
+    return seeds, seeds + _retained(directory, problem, events)[-64:]
+
+
 def _witness(problem, verification):
     inputs = verification["inputs"]
     if problem["schema"] == profile3.SCHEMA:
@@ -417,7 +441,7 @@ def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=50
     with _locked(directory):
         problem, manifest, events = _load(directory)
         check = _checker(problem).check
-        witnesses = _seeds(problem); seeds = len(witnesses)
+        seed_states, witnesses = _filters(directory, problem, events); seeds = len(seed_states)
         incumbent = _best(directory, problem, events)
         bound = None
         if incumbent:
@@ -439,13 +463,21 @@ def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=50
         terminal = encode_program(problem["target"], [])
         pruner = footprint.Pruner(problem, grammar) if prune else None
         skipped = {}
+        expired = lambda: time.monotonic() - began >= deadline_ms / 1000
         for length in range(problem["max_instructions"] + 1):
             if pruner is not None and bound is not None and _least_rank(problem, grammar, terminal, length) > bound[:2]:
                 skipped["bound"] = sum(len(grammar) ** rest for rest in range(length, problem["max_instructions"] + 1))
                 break
             choices_in_order = (product(range(len(grammar)), repeat=length) if pruner is None
-                                else footprint.sequences(len(grammar), length, pruner.judge, skipped))
-            for choices in choices_in_order:
+                                else footprint.sequences(len(grammar), length, pruner.judge, skipped, expired))
+            stream = iter(choices_in_order)
+            while True:
+                try:
+                    choices = next(stream)
+                except StopIteration:
+                    break
+                except footprint.Expired:  # the deadline passed while pruning skipped prefixes
+                    stopped = "budget-exhausted"; break
                 remaining = deadline_ms / 1000 - (time.monotonic() - began)
                 if remaining <= 0 or proposed >= max_candidates or checks >= max_checks or len(events) >= MAX_EVENTS:
                     stopped = "budget-exhausted"; break
@@ -560,13 +592,15 @@ def split_search(directory: Path, max_candidates=10_000, max_checks=64, deadline
         results = RESULTS[problem["target"]][:2]
         grammar = _grammar(problem)
         terminal = encode_program(problem["target"], [])
-        witnesses = _seeds(problem)
+        seed_states, witnesses = _filters(directory, problem, events)
         limit = problem["max_instructions"]
+        expired = lambda: time.monotonic() - began >= deadline_ms / 1000
+
         def stream(observed):
             pruner = footprint.Pruner(problem, grammar)
             pruner.observed = frozenset({observed})
             for length in range(1, limit + 1):
-                yield from footprint.sequences(len(grammar), length, pruner.judge, {})
+                yield from footprint.sequences(len(grammar), length, pruner.judge, {}, expired)
 
         streams, parts = [stream(results[0]), stream(results[1])], ([], [])
         prints = footprint.footprints(problem)
@@ -579,7 +613,10 @@ def split_search(directory: Path, max_candidates=10_000, max_checks=64, deadline
                 remaining = deadline_ms / 1000 - (time.monotonic() - began)
                 if remaining <= 0 or proposed >= max_candidates or checks >= max_checks or len(events) >= MAX_EVENTS:
                     stopped = "budget-exhausted"; live = [False, False]; break
-                choices = next(streams[k], None)
+                try:
+                    choices = next(streams[k], None)
+                except footprint.Expired:  # the deadline passed while pruning skipped prefixes
+                    stopped = "budget-exhausted"; live = [False, False]; break
                 if choices is None:
                     live[k] = False; continue
                 proposed += 1
@@ -591,14 +628,16 @@ def split_search(directory: Path, max_candidates=10_000, max_checks=64, deadline
                 if all(_agrees_on(problem, code_of(choices), w, (0, 1)) for w in witnesses):
                     joined.insert(0, (choices, (), k))
                 for first, second, first_result in joined:
+                    if expired():
+                        stopped = "budget-exhausted"; live = [False, False]; break
                     if len(first) + len(second) > limit or not _joinable(prints, first, second, results[first_result]):
                         continue
                     code = code_of(first + second)
                     if not all(_agrees_on(problem, code, w, (0, 1)) for w in witnesses):
                         continue
-                    if checks >= max_checks:
-                        stopped = "budget-exhausted"; live = [False, False]; break
                     remaining = deadline_ms / 1000 - (time.monotonic() - began)
+                    if checks >= max_checks or remaining <= 0 or len(events) >= MAX_EVENTS:
+                        stopped = "budget-exhausted"; live = [False, False]; break
                     proposal = {"schema": "zeno-fcis/machine-proposal/1", "code_hex": code.hex(),
                                 "provenance": {"kind": "local-search", "name": "split-search/1",
                                                "note": "two single-result parts joined where footprints show no interference"}}
@@ -617,7 +656,7 @@ def split_search(directory: Path, max_candidates=10_000, max_checks=64, deadline
         return {"status": "checked-candidate" if found else "no-checked-candidate",
                 "stop_reason": "joined" if found else stopped, "proposed": proposed,
                 "parts": [len(parts[0]), len(parts[1])], "joins_checked": joins, "solver_checks": checks,
-                "checker_verdicts": verdicts, "retained_counterexamples": len(witnesses) - len(_seeds(problem)),
+                "checker_verdicts": verdicts, "retained_counterexamples": len(witnesses) - len(seed_states),
                 "joined": found["sequence"] if found else None, "split": True,
                 "minimality": "not proved: a joint search must exhaust every cheaper length",
                 "cost": found["verification"]["cost"] if found else None,

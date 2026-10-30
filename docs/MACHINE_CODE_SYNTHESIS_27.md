@@ -169,21 +169,28 @@ read conservatively. Four classes are skipped:
   sources.
 - **Reorderings.** Two neighbouring instructions that are independent, meaning
   neither writes what the other reads or writes. Swapping them changes neither
-  the results nor the cost, so only the byte-least ordering is proposed.
+  the results nor the cost. A neighbouring pair is never proposed in
+  byte-descending order, so at least the byte-least ordering of each class is
+  proposed; other orderings may be proposed too.
 - **Lost inputs.** Once an input the specification depends on is held by no
   register or flag, no continuation can be equivalent. Dependence is decided
   semantically, by one Z3 query per input, so `(xor x x)` does not require `x`.
 - **Dead instructions.** An instruction whose every write is overwritten before
-  being read, or is never read and is not a result. Deleting it gives a strictly
-  cheaper sequence with the same results, which the length-ordered search has
-  already proposed.
+  being read, or is never read and is not a result. Deleting it from an admitted
+  candidate gives an admitted, strictly cheaper sequence with the same results,
+  which the length-ordered search has already proposed. A refused candidate can
+  become admitted by the deletion, for example a dead conditional move that
+  reads an undefined flag. Refused candidates are never accepted, so skipping
+  them loses nothing.
 
-Once no longer sequence can reach the incumbent's cost, the remaining lengths are
-skipped as well.
+These four rules are semantic: every skipped admitted candidate is either never
+equivalent (a lost input) or has a kept, admitted candidate with no greater cost
+and the same results. Separately, the cost bound stops the search once no longer
+sequence can reach the incumbent's cost; it preserves the optimum, not one
+representative of every behaviour.
 
-The result: every skipped candidate is either never equivalent (a lost input) or
-has a kept candidate with no greater cost and the same results. A search that exhausts its grammar therefore reports the
-same optimum as before. Search results report `duplicate_pruned`, `order_pruned`,
+A search that exhausts its grammar therefore reports the same optimum as before,
+provided no solver answer was unknown. Search results report `duplicate_pruned`, `order_pruned`,
 `lost_pruned`, `dead_pruned` and `bound_skipped`, and `--no-prune` restores the
 full enumeration. Measured on the
 test problems (checker decisions unchanged):
@@ -194,6 +201,10 @@ test problems (checker decisions unchanged):
 | `add128-x86` | 1,555 | 228 |
 | `minmax-x86` | 100,000 (budget exhausted) | 438 (grammar exhausted) |
 | library `signed-saturating-add-x86` | 100,000 (budget exhausted, no candidate) | 23,897 of 960,800 (grammar exhausted, 31-byte kernel) |
+
+Search and `split-search` start their concrete filters from the session's
+earlier counterexamples, as well as the seed states. Both stop at the deadline
+even while pruning is still skipping candidates.
 
 `split-search` handles two-result problems. It searches for each result alone,
 then joins two parts when their footprints show that the second part neither
@@ -214,12 +225,25 @@ The footprints and joins only steer the search. The checker still decides every
 candidate, and `global_optimality` stays false: an exhausted grammar says
 nothing about instructions outside it.
 
-The tests compare the cheapest kept candidate of every behaviour class with the
-cheapest candidate overall on eight problems. They also check that the checker
-refutes every candidate skipped for a lost input, through each problem's full
-length. Planted defects fail these tests: an unobserved result, omitted flag
-reads or writes, an ignored write-write conflict, unproved duplicates, a
-syntactic "required", and copies not counted as holding an input.
+The tests compare, on ten small problems up to three instructions, the cheapest
+kept candidate with the cheapest candidate overall, for each objective. They do
+this per behaviour class, where a class is the results on 24 fixed entry states.
+The problems include shifts, `imul`'s undefined flags, conditional moves and
+partial `setcc` writes.
+
+The tests also check that the checker refutes every candidate skipped for a lost
+input, through each problem's full length. Planted defects fail these tests:
+- an unobserved result;
+- omitted flag reads or writes;
+- an ignored write-write conflict;
+- empty shift footprints;
+- unproved duplicates;
+- a syntactic "required";
+- copies not counted as holding an input.
+
+An independent review also checked every admitted form's footprint symbolically
+(59,322 forms) and checked dead and order preservation with full-word Z3 queries
+on 1,245 sequences. These checks are bounded evidence, not a general proof.
 
 These are the semantic pruning and decomposition ideas of McSynth and McSynth++
 ([Srinivasan 2017](https://research.cs.wisc.edu/wpis/papers/tr1844.pdf);
@@ -227,7 +251,7 @@ These are the semantic pruning and decomposition ideas of McSynth and McSynth++
 restricted to the skips that lose no candidate. The lost-input rule is the
 McSynth++ bits-lost pruner with a semantic notion of "required", which is what
 keeps it exact. The reordering rule is the partial-order reduction of
-independent actions, keeping one representative per class (Godefroid,
+independent actions, keeping at least one representative per class (Godefroid,
 *Partial-Order Methods for the Verification of Concurrent Systems*, LNCS 1032,
 1996). The duplicate rule is equivalence reduction over single instructions
 (Smith and Albarghouthi, VMCAI 2019).

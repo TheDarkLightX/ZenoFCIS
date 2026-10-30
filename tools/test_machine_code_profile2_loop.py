@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import struct
 import tempfile
+import time
 import unittest
 
 from machine_code import footprint, model, profile2, session, targets, verify2
@@ -105,6 +106,32 @@ class Profile2LoopTests(unittest.TestCase):
         self.assertEqual(joint["cost"]["instructions"], 5, "the shared comparison beats the joined parts")
         self.assertGreater(joint["bound_skipped"], 0)
         self.assertEqual(session.resume(self.directory)["status"], "replayed")
+
+    def test_pruned_search_and_split_search_keep_their_deadline_with_no_survivors(self):
+        # No palette entry writes a result register, so every prefix is skipped and nothing reaches the caller.
+        x, y = ["input", "x"], ["input", "y"]
+        self.opened(problem={"schema": profile2.SCHEMA, "target": X86, "inputs": ["x", "y"], "outputs": [x, y],
+                             "grammar": [["add", "r10", "rdi"], ["sub", "r10", "rsi"], ["xor", "r10", "r8"]],
+                             "max_instructions": 16, "objective": "instructions"})
+        for run in (session.search, session.split_search):
+            began = time.monotonic()
+            result = run(self.directory, max_candidates=100_000, max_checks=8, deadline_ms=500)
+            self.assertLess(time.monotonic() - began, 5, run.__name__)
+            self.assertEqual((result["status"], result["stop_reason"]), ("no-checked-candidate", "budget-exhausted"))
+
+    def test_split_search_and_search_reuse_counterexamples_from_earlier_runs(self):
+        x, y = ["input", "x"], ["input", "y"]
+        self.opened(problem={"schema": profile2.SCHEMA, "target": X86, "inputs": ["x", "y"],
+                             "outputs": [["eq", x, ["const", "2"]], y],
+                             "grammar": [["xor", "rax", "rax"], ["mov", "rdx", "rsi"]],
+                             "max_instructions": 2, "objective": "instructions"})
+        first = session.split_search(self.directory, max_checks=1, deadline_ms=20000)
+        self.assertEqual(first["checker_verdicts"][0]["status"], "counterexample")
+        second = session.split_search(self.directory, max_checks=1, deadline_ms=20000)
+        self.assertEqual((second["solver_checks"], second["retained_counterexamples"]), (0, 1),
+                         "the retained failure filters the same join without a solver call")
+        again = session.search(self.directory, max_checks=1, deadline_ms=20000)
+        self.assertEqual(again["solver_checks"], 0)
 
     def test_split_search_refuses_one_result_problems_and_unsafe_joins(self):
         self.opened("umin-x86.json")

@@ -15,18 +15,22 @@ Four candidate classes are then skipped during enumeration:
   declared flag reads) with a shorter or byte-smaller encoding. Substituting that entry keeps results and
   admission and lowers the rank.
 - **order**: two neighbouring instructions are independent (neither writes what the other reads or writes) and
-  their bytes are out of order. Swapping them preserves the results and the cost and lowers the bytes.
+  their bytes are out of order. Swapping them preserves the results, the admission and the cost, and gives
+  byte-smaller code. At least the byte-least ordering of each class is kept; other orderings may be kept too.
 - **lost**: a required input (one the specification semantically depends on, by a Z3 query per input) is no longer
   held by any register or flag. No extension can recover it, so no extension is equivalent. This is the bits-lost
   pruner of McSynth++ made exact by computing "required" semantically, not syntactically.
 - **dead**: one instruction's every write is overwritten before it is read, or reaches the end unread and
-  unobserved. Deleting it gives a strictly cheaper sequence with the same results and the same admission, which the
-  length-ordered enumeration has already proposed.
+  unobserved. Deleting it from an *admitted* candidate gives an admitted, strictly cheaper sequence with the same
+  results, which the length-ordered enumeration has already proposed. (A refused candidate may become admitted by
+  the deletion, for example a dead conditional move reading an undefined flag; refused candidates are never
+  accepted, so skipping them loses nothing.)
 
-So every skipped candidate is either never equivalent (lost) or has a candidate of strictly lower rank (cost, then
-bytes) with the same observed results; following those steps ends at a kept candidate. A search that exhausts its
-grammar therefore reports the same cost-then-bytes optimum with or without pruning. Footprints only steer the
-search; the checker still decides every candidate. A footprint that cannot be derived is never pruned against.
+So every skipped admitted candidate is either never equivalent (lost) or has an admitted candidate of strictly lower
+rank (cost, then bytes) with the same observed results; following those steps ends at a kept candidate. A search
+that exhausts its grammar therefore reports the same cost-then-bytes optimum with or without pruning, provided no
+solver answer was unknown. Footprints only steer the search; the checker still decides every candidate. A footprint
+that cannot be derived is never pruned against.
 """
 
 from __future__ import annotations
@@ -194,7 +198,11 @@ def analyse(problem: dict):
                     and _same(z, context, values[a], values[b])):
                 dominated.add(b)
                 break
-    return prints, frozenset(dominated), _required(z, context, problem)
+    try:
+        required = _required(z, context, problem)
+    except (ValueError, KeyError, TypeError, IndexError, z.Z3Exception):
+        required = frozenset()  # an unreadable specification prunes nothing for lost inputs
+    return prints, frozenset(dominated), required
 
 
 def footprints(problem: dict) -> list:
@@ -301,10 +309,15 @@ class Pruner:
         return None
 
 
-def sequences(size: int, length: int, judge, skipped: dict):
+class Expired(Exception):
+    """The caller's deadline passed while enumeration was still skipping prefixes."""
+
+
+def sequences(size: int, length: int, judge, skipped: dict, expired=None):
     """Index tuples in itertools.product order, omitting every extension of a prefix that `judge` refuses.
 
-    `skipped` counts the omitted complete sequences by reason.
+    `skipped` counts the omitted complete sequences by reason. `expired()` is polled at every prefix, because a
+    long run of skipped prefixes yields nothing the caller could time; when it returns true, Expired is raised.
     """
     prefix = []
 
@@ -313,6 +326,8 @@ def sequences(size: int, length: int, judge, skipped: dict):
             yield tuple(prefix)
             return
         for index in range(size):
+            if expired is not None and expired():
+                raise Expired()
             prefix.append(index)
             reason = judge(prefix, length)
             if reason:
