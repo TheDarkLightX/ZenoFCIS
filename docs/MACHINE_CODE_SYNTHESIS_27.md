@@ -647,8 +647,8 @@ machine, load and call ABI only. They are not a portable speedup claim.
 
 ### Calling-convention qualification
 
-`tools/machine_qualification/abi.py` checks that a register-profile kernel is a
-correct leaf function. It covers obligations A-01 to A-07 of the qualification
+`tools/machine_qualification/abi.py` checks that a kernel is a correct leaf
+function. It covers obligations A-01 to A-07 of the qualification
 design, for the profiles `linux-x86_64-sysv-u64-leaf/1` and
 `linux-rv64-lp64-u64-leaf/1`:
 
@@ -705,6 +705,44 @@ python3 -B -m tools.machine_qualification.abi --dir test-data/machine-code/kerne
 
 On 2026-10-30 all 13 library kernels met A-01 to A-07. The 11 x86 kernels
 conformed natively on 512 vectors each; RV64I kernels are not run here.
+
+**Memory kernels.** Profile-3 kernels use the profiles
+`linux-x86_64-sysv-u64-region-leaf/1` and `linux-rv64-lp64-u64-region-leaf/1`.
+Region bases arrive in the argument registers the problem names. Three
+obligations gain a memory part:
+
+- **A-03 frame:** the footprints' memory writes must be read-write region
+  words only, and profile-3 admission must pass. Nothing else in memory is
+  written: every store is an aligned word inside a read-write region.
+- **A-04 return:** each store is placed at its region word's layout address,
+  and the return slot must still hold `R`.
+- **A-06 coverage:** region `k` starts at `0x100000000000 + k * 0x10000`. The
+  regions are 64-byte aligned, disjoint and at least 1 MiB from the entry
+  stack window, chosen before and independently of any input.
+
+A-05 admits loads and stores only when admission passed, and A-07 states that
+the x86 memory forms have native library runs but no per-form conformance, and
+that RV64I `ld` and `sd` have no differential evidence yet.
+
+The native harness passes each region's address in its base register. Each
+region is a static, 64-byte-aligned array with 8 canary words before and after
+it. After the return it checks everything the register harness checks. It also
+checks the read-write words against the integer reference, that the read-only
+words are unchanged, and that every out-of-region canary is unchanged. Three
+more planted fixtures outside every palette return normally. Each is reported
+as exactly its fault:
+- a store one word past a region;
+- a store into a read-only region;
+- a callee-saved write.
+
+A dropped store is reported as a region-word fault.
+
+```sh
+python3 -B -m tools.machine_qualification.abi --dir test-data/machine-code/memory-kernels
+```
+
+On 2026-10-30 all six memory kernels met A-01 to A-07, and the three x86
+kernels conformed natively on 512 vectors each. RV64I is not run here.
 
 The CET profile `linux-x86_64-sysv-u64-leaf-cet/1` prefixes the legacy fragment
 with `ENDBR64`. The fragment's obligations are checked, and the prefixed
