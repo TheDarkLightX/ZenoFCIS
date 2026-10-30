@@ -269,7 +269,7 @@ mod tests {
         }
         assert_eq!(
             names.len(),
-            29,
+            41,
             "the reviewed card count is independent of the producer"
         );
         let inventory: Value = serde_json::from_str(include_str!("../guide-card-inventory.json"))

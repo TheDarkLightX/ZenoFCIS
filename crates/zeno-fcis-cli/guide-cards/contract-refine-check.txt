@@ -19,7 +19,7 @@
     "ABSTRACT_DIR and CONCRETE_DIR: each holds project.zeno and v2/policy.json, at most 1 MiB per file, at most 4096 states and 64 input tuples per contract. --abstraction: zeno-fcis/contract-refinement/1 with the four lowercase SHA-256 of the exact source bytes, `abstraction` (one abstract state ordinal or null per raw concrete state) and `invalid_state_law`. --max-checks (default 262144, maximum 262144) counts completed pair comparisons. Writes nothing."
   ],
   "outputs": [
-    "stdout zeno-fcis/contract-refinement-result/1: status refines, counterexample or inconclusive, the smallest failing state and input ordinals, Authority invocation counts and summed resource usage as decimal strings; authority none"
+    "stdout zeno-fcis/contract-refinement-result/1: verdict refines, counterexample or inconclusive, reason and witness (the smallest failing state and input ordinals), raw/valid/abstract state counts, checked_rows, Authority invocation counts and summed resource usage as decimal strings; authority none"
   ],
   "exit_codes": {
     "0": "refines: every pair compared",
@@ -56,7 +56,7 @@
       "command": "zeno-fcis contract refine-check examples/contract-refinement/reservation/abstract examples/contract-refinement/reservation/concrete --abstraction examples/contract-refinement/reservation/abstraction.json --max-checks 384 --format json",
       "exit": 0,
       "expected": {
-        "status": "refines"
+        "verdict": "refines"
       },
       "contains": []
     }
@@ -65,7 +65,7 @@
     "command": "zeno-fcis contract refine-check examples/contract-refinement/reservation/abstract examples/contract-refinement/reservation/concrete --abstraction examples/contract-refinement/reservation/abstraction.json --max-checks 0 --format json",
     "exit": 2,
     "expected": {
-      "status": "inconclusive"
+      "verdict": "inconclusive"
     },
     "contains": []
   },
@@ -112,7 +112,7 @@ Set WORK to a fresh writable directory outside the source tree. Run commands fro
 zeno-fcis contract refine-check examples/contract-refinement/reservation/abstract examples/contract-refinement/reservation/concrete --abstraction examples/contract-refinement/reservation/abstraction.json --max-checks 384 --format json
 ```
 
-Expected: exit 0; {"status": "refines"}.
+Expected: exit 0; {"verdict": "refines"}.
 
 ## Verdicts
 
@@ -124,7 +124,7 @@ Expected: exit 0; {"status": "refines"}.
 
 Exit codes: {"0": "refines: every pair compared", "1": "counterexample: initial-state, coverage or pair failure", "2": "inconclusive: --max-checks exhausted, domain product too large, or a meter refusal", "3": "a source file cannot be read", "64": "invalid command-line usage", "65": "malformed or unsupported intake: digests, layouts, bounds or a comparison limit above 262144"}
 
-Outputs: ["stdout zeno-fcis/contract-refinement-result/1: status refines, counterexample or inconclusive, the smallest failing state and input ordinals, Authority invocation counts and summed resource usage as decimal strings; authority none"]
+Outputs: ["stdout zeno-fcis/contract-refinement-result/1: verdict refines, counterexample or inconclusive, reason and witness (the smallest failing state and input ordinals), raw/valid/abstract state counts, checked_rows, Authority invocation counts and summed resource usage as decimal strings; authority none"]
 
 ## Cost
 
@@ -148,7 +148,7 @@ Refusals and remedies: {"digest-mismatch": "Recompute the four SHA-256 values ov
 zeno-fcis contract refine-check examples/contract-refinement/reservation/abstract examples/contract-refinement/reservation/concrete --abstraction examples/contract-refinement/reservation/abstraction.json --max-checks 0 --format json
 ```
 
-Expected: exit 2; {"status": "inconclusive"}.
+Expected: exit 2; {"verdict": "inconclusive"}.
 
 ## See also
 

@@ -16,7 +16,7 @@
     "quick checks: the build takes a release binary build and real-process tests"
   ],
   "inputs": [
-    "ASSEMBLY.json: at most 64 KiB, closed schema with no duplicate keys, produced by `python3 -B tools/runtime_assembler.py --cli CLI --prepare` and reviewed by the owner (configuration, exact identities, experimental profile). --out must not exist; --out and --scratch must be outside the source tree. --source: the reviewed source tree, default the tree this CLI was built from. Source files are bounded to 128 MiB and the CLI is stream-hashed with a 1 GiB limit. Compiler, linker and flag variables and any Cargo configuration file under CARGO_HOME or a parent of the paths refuse by name; build.jobs and CARGO_BUILD_JOBS are accepted."
+    "ASSEMBLY.json: at most 64 KiB, closed schema with no duplicate keys, produced by `python3 -B tools/runtime_assembler.py --cli CLI --prepare` (CLI is the executable's real path; a symbolic link is refused with AssemblySymlink; ZENO_FCIS_CLI holds it in the card harness) and reviewed by the owner (configuration, exact identities, experimental profile). --out must not exist; --out and --scratch must be outside the source tree. --source: the reviewed source tree, default the tree this CLI was built from. Source files are bounded to 128 MiB and the CLI is stream-hashed with a 1 GiB limit. Compiler, linker and flag variables and any Cargo configuration file under CARGO_HOME or a parent of the paths refuse by name; build.jobs and CARGO_BUILD_JOBS are accepted."
   ],
   "outputs": [
     "--out/package.json binds the final files, assembly.json the selected inputs, evidence/checks.json the actual command outcomes and log identities, evidence/server.log the launcher log; on failure the failed command's diagnostic and stage logs are retained beside --out and no package is published"
@@ -40,6 +40,7 @@
   },
   "refusals": {
     "AssemblyArguments": "Pass --assembly, --out and --scratch together (or --prepare alone) to the assembler.",
+    "AssemblySymlink": "Pass the executable's real path to --cli, not a symbolic link.",
     "AssemblyAmbientCargoConfiguration": "Remove or move the named Cargo configuration setting; only build.jobs is accepted.",
     "pinned-assembler-differs": "The source tree's tools/runtime_assembler.py is not the one this CLI was built with; rebuild the CLI from that tree."
   },
@@ -51,7 +52,7 @@
   },
   "steps": [
     {
-      "command": "python3 -B tools/runtime_assembler.py --cli \"$(command -v zeno-fcis)\" --prepare > $WORK/task-assembly.json",
+      "command": "python3 -B tools/runtime_assembler.py --cli \"$ZENO_FCIS_CLI\" --prepare > $WORK/task-assembly.json",
       "exit": 0,
       "expected": {},
       "contains": []
@@ -94,7 +95,7 @@ a universal application framework or completed qualification; publication author
 
 ## Inputs
 
-ASSEMBLY.json: at most 64 KiB, closed schema with no duplicate keys, produced by `python3 -B tools/runtime_assembler.py --cli CLI --prepare` and reviewed by the owner (configuration, exact identities, experimental profile). --out must not exist; --out and --scratch must be outside the source tree. --source: the reviewed source tree, default the tree this CLI was built from. Source files are bounded to 128 MiB and the CLI is stream-hashed with a 1 GiB limit. Compiler, linker and flag variables and any Cargo configuration file under CARGO_HOME or a parent of the paths refuse by name; build.jobs and CARGO_BUILD_JOBS are accepted.
+ASSEMBLY.json: at most 64 KiB, closed schema with no duplicate keys, produced by `python3 -B tools/runtime_assembler.py --cli CLI --prepare` (CLI is the executable's real path; a symbolic link is refused with AssemblySymlink; ZENO_FCIS_CLI holds it in the card harness) and reviewed by the owner (configuration, exact identities, experimental profile). --out must not exist; --out and --scratch must be outside the source tree. --source: the reviewed source tree, default the tree this CLI was built from. Source files are bounded to 128 MiB and the CLI is stream-hashed with a 1 GiB limit. Compiler, linker and flag variables and any Cargo configuration file under CARGO_HOME or a parent of the paths refuse by name; build.jobs and CARGO_BUILD_JOBS are accepted.
 
 Engine: The pinned runtime assembler (tools/runtime_assembler.py, digest-bound into the CLI) admits a reviewed zeno-fcis/app-assembly/1 description, refuses ambient build inputs, builds the generated application with the app factory, runs the native contract review, ZenoUI checks, HTTP/SQLite journeys, interruption tests and a copied-binary launcher journey, then packages failure-atomically.
 
@@ -105,7 +106,7 @@ Set WORK to a fresh writable directory outside the source tree. Run commands fro
 ## Steps
 
 ```sh
-python3 -B tools/runtime_assembler.py --cli "$(command -v zeno-fcis)" --prepare > $WORK/task-assembly.json
+python3 -B tools/runtime_assembler.py --cli "$ZENO_FCIS_CLI" --prepare > $WORK/task-assembly.json
 ```
 
 Expected: exit 0; [].
@@ -134,7 +135,7 @@ Run Commons `advise` for the task first. Compute the exact subject digest, take 
 
 Review the prepared description before building: the assembler never executes manifest-provided commands, but it does build and run the described application. Diagnostic and mocked unit checks are not installed-app evidence. The retained scaffold keeps absolute Cargo paths to the reviewed tree and is not a portable source release. Read the result scope before revising the input. No report grants runtime or publication authority.
 
-Refusals and remedies: {"AssemblyAmbientCargoConfiguration": "Remove or move the named Cargo configuration setting; only build.jobs is accepted.", "AssemblyArguments": "Pass --assembly, --out and --scratch together (or --prepare alone) to the assembler.", "pinned-assembler-differs": "The source tree's tools/runtime_assembler.py is not the one this CLI was built with; rebuild the CLI from that tree."}
+Refusals and remedies: {"AssemblyAmbientCargoConfiguration": "Remove or move the named Cargo configuration setting; only build.jobs is accepted.", "AssemblyArguments": "Pass --assembly, --out and --scratch together (or --prepare alone) to the assembler.", "AssemblySymlink": "Pass the executable's real path to --cli, not a symbolic link.", "pinned-assembler-differs": "The source tree's tools/runtime_assembler.py is not the one this CLI was built with; rebuild the CLI from that tree."}
 
 ## Worked example
 

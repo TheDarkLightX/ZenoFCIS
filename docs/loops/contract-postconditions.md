@@ -19,7 +19,7 @@
     "DIR: scalar application with project.zeno and v2/policy.json. --intent: written requirements, at most 65536 bytes; the exact bytes bind prompt and check. --max-tuples 1..=4096 (default 4096) must match between prompt and check. check: --proposals FILE in the schema the prompt states; --mutant FILE repeatable up to 8, a complete policy JSON whose only changed fields are cases and variables; duplicates refused. No writes; no model or network call."
   ],
   "outputs": [
-    "prompt: request JSON on stdout containing the written intent and request digest. check: zeno-fcis/postcondition-report/1 with authority none, status and candidates[].status checked-discriminating, refused or refuted, plus no-discrimination rows"
+    "prompt: zeno-fcis/postcondition-request/1 on stdout: binding (intent, policy, project and scoped checker SHA-256, max_tuples), prompt (grammar, feedback rules), scope, target and request_sha256. check: zeno-fcis/postcondition-report/1 with authority none, status and candidates[].status checked-discriminating, refused or refuted, plus no-discrimination rows"
   ],
   "exit_codes": {
     "0": "check: every proposal is checked-discriminating; prompt: request emitted",
@@ -52,10 +52,11 @@
     {
       "command": "printf 'Increment adds exactly one; decrement subtracts exactly one.\\n' > $WORK/intent.txt && zeno-fcis contract postconditions prompt examples/guide-counter --intent $WORK/intent.txt",
       "exit": 0,
-      "expected": {},
-      "contains": [
-        "written-intent"
-      ]
+      "expected": {
+        "schema": "zeno-fcis/postcondition-request/1",
+        "authority": "none"
+      },
+      "contains": []
     }
   ],
   "example": {
@@ -109,7 +110,7 @@ Set WORK to a fresh writable directory outside the source tree. Run commands fro
 printf 'Increment adds exactly one; decrement subtracts exactly one.\n' > $WORK/intent.txt && zeno-fcis contract postconditions prompt examples/guide-counter --intent $WORK/intent.txt
 ```
 
-Expected: exit 0; ["written-intent"].
+Expected: exit 0; {"authority": "none", "schema": "zeno-fcis/postcondition-request/1"}.
 
 ## Verdicts
 
@@ -123,7 +124,7 @@ Expected: exit 0; ["written-intent"].
 
 Exit codes: {"0": "check: every proposal is checked-discriminating; prompt: request emitted", "1": "refused (oversize intent, domain above cap, malformed proposals, duplicate mutant) or a refuted proposal", "2": "inconclusive, trivial, or no discrimination against the supplied mutants", "64": "invalid command-line usage"}
 
-Outputs: ["prompt: request JSON on stdout containing the written intent and request digest. check: zeno-fcis/postcondition-report/1 with authority none, status and candidates[].status checked-discriminating, refused or refuted, plus no-discrimination rows"]
+Outputs: ["prompt: zeno-fcis/postcondition-request/1 on stdout: binding (intent, policy, project and scoped checker SHA-256, max_tuples), prompt (grammar, feedback rules), scope, target and request_sha256. check: zeno-fcis/postcondition-report/1 with authority none, status and candidates[].status checked-discriminating, refused or refuted, plus no-discrimination rows"]
 
 ## Cost
 

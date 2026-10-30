@@ -11,7 +11,7 @@
       "commands": [
         "assemble"
       ],
-      "sha256": "b4bab70163f798fb1afe382fa6e86245342b63bce9d6285fdeecfaa9409ee215"
+      "sha256": "b7e66cdf8e31639e97d00e94b7d556e4a82db884bbe1e4ca71b510d6b4155e5e"
     },
     {
       "name": "check",
@@ -88,7 +88,7 @@
       "commands": [
         "contract postconditions"
       ],
-      "sha256": "4ee380b4a9013b4955491c0572b985da193963a98caa06f89d6ad8e78a6f0424"
+      "sha256": "72a1dd4286a2c5865e938a9cbd094009227d6c147abed329e2818ea954b06663"
     },
     {
       "name": "contract-probe",
@@ -102,7 +102,7 @@
       "commands": [
         "contract refine-check"
       ],
-      "sha256": "8e2867ddd8aee17d9c6634d976f4d6160a07a427933dccfe2e5319c9dfc833b5"
+      "sha256": "483273ca5fe7d4a0182dcb3502d9ae9d95b62a27a537b46de798030debfc4cb6"
     },
     {
       "name": "contract-refresh-receipts",
