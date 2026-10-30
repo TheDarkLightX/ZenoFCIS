@@ -304,8 +304,29 @@ bound:
   bytes, and the run stops there. A solver `unknown`, a spent budget or an
   inconclusive check is `inconclusive`, never unrealizable.
 
-`--replay` rebuilds each recorded unsat query from its examples, requires the
-same hash and solves it again. `--session` asks below the session's best checked
+`--replay` re-establishes the record's whole claim, not only its queries.
+
+- **Lengths:** it recomputes which lengths the problem, objective and bound make
+  eligible, which the bound excludes and which an empty palette leaves without
+  any candidate. Every eligible length must appear once, in order. A realizable
+  record may stop at its realizable length.
+- **Status:** the record's status must follow from its entries, and every unsat
+  entry must carry the exact statement for its length and bound.
+- **Queries:** each query is rebuilt from its examples. It must have the recorded
+  hash and stay unsat.
+- **Bytes:** a realizable entry's bytes must recheck equivalent, at that length
+  and below the bound.
+
+A record whose bound was raised afterwards therefore fails, because a length the
+new bound makes eligible is missing. So do records with missing, repeated or
+relabelled lengths, a changed status, statement or objective, or another
+mode's entries.
+
+A bound of 0 is admitted: no length can cost less, so every length is excluded
+and the record is unrealizable without a query. This is what `--session` asks
+when the best candidate is an empty body. With an empty palette, every positive
+length has no candidate at all, and the record lists it under
+`excluded_by_empty_palette`. `--session` asks below the session's best checked
 candidate after rechecking it. When every length is unsat, that candidate is the
 least-cost program within the palette and the length bound, under the registered
 model. `global_optimality` stays false: the answer says nothing about
@@ -323,27 +344,31 @@ An unsat is only as exact as the claim that the query ranges over the
 enumerator's candidate space. `tools/test_machine_code_realize.py` therefore
 checks it against exhaustive exact enumeration, in both directions. It covers
 every test, library and memory-kernel problem with at most 20,000 candidate
-sequences (23 problems on all three profiles), plus four built for the test.
+sequences (23 problems on all three profiles), plus six built for the test.
 - one whose only short program uses the palette's last form;
 - one with no program at all;
 - one with region-base writes;
 - one where IMUL leaves ZF undefined before a CMOVE.
+- one whose empty body is already equivalent;
+- one with an empty palette.
 
 For each, the enumerator must exhaust its grammar. `realize` below its least cost
 must prove every length unsat. `realize` below the least cost plus one must
 return checked bytes of exactly that cost. With no program, `realize` without a
-bound must prove every length unsat. All 27 agree.
+bound must prove every length unsat, apart from those an empty palette leaves
+without candidates. All 29 agree.
 
 A second control checks the admission constraints directly. With no examples
 and no bound, the set of selector sequences the query admits must equal the set
 the checker's own admission accepts. It enumerates both on palettes with flag
 reads, undefined flags and region-base writes, at lengths 0 to 3.
 
-Four planted defects are registered with the checker controls for this part:
+Five planted defects are registered with the checker controls for this part:
 - a selector range that drops the last form;
 - an ignored cost bound;
 - a dropped region-base rule;
-- admitted undefined-flag reads.
+- admitted undefined-flag reads;
+- a replay that skips the eligible-length check.
 
 Each is detected by its intended control under `python3 -B` and `python3 -O -B`.
 
@@ -385,7 +410,7 @@ check therefore does not assume a grid. It requires every subspace to lie in the
 palette, no two to overlap, and their sizes to add up to the whole space.
 
 The cross-check also runs in partitioned mode, with 2 groups and 4 workers, on
-the same 27 problems, and all agree. With a 1 ms probe, which splits nearly
+the same 29 problems, and all agree. With a 1 ms probe, which splits nearly
 everything, it is cross-checked and replayed on three problems. Two more planted
 defects are detected under both modes: a partition that omits its last group,
 and an undecided subspace counted as unsat.
