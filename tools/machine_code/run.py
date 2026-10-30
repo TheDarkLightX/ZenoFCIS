@@ -38,6 +38,17 @@ def main(argv=None):
     replay = commands.add_parser("replay", help="recheck exact emitted machine bytes and bindings")
     replay.add_argument("--artifact", required=True, type=Path)
     replay.add_argument("--solver-ms", type=int, default=1000)
+    library = commands.add_parser("library", help="recheck, or add to, a checked kernel library")
+    actions = library.add_subparsers(dest="action", required=True)
+    checked = actions.add_parser("check", help="recheck every entry; exit 0 only if all are equivalent")
+    added = actions.add_parser("add", help="add an emitted artifact that replays here; never overwrites")
+    for sub in (checked, added):
+        sub.add_argument("--dir", required=True, type=Path)
+        sub.add_argument("--solver-ms", type=int, default=1000)
+    added.add_argument("--artifact", required=True, type=Path)
+    added.add_argument("--name", required=True)
+    added.add_argument("--summary", required=True)
+    added.add_argument("--route", required=True, choices=("proposal", "search"))
     args = parser.parse_args(argv)
     try:
         if args.command == "open":
@@ -56,12 +67,18 @@ def main(argv=None):
         elif args.command == "bench":
             from .bench import bench
             result = bench(args.artifact, args.out, args.iterations, args.repeats, args.solver_ms)
+        elif args.command == "library":
+            from . import library
+            if args.action == "check":
+                result = library.check(args.dir, args.solver_ms)
+            else:
+                result = library.add(args.artifact, args.dir, args.name, args.summary, args.route, args.solver_ms)
         else:
             result = session.replay_artifact(args.artifact, args.solver_ms)
         result.setdefault("authority", "none")
         print(json.dumps(result, sort_keys=True, allow_nan=False))
         status = result["status"] if "status" in result else "packet"
-        return 2 if status in ("inconclusive", "no-checked-candidate") else 1 if status in ("counterexample", "refused") else 0
+        return 2 if status in ("inconclusive", "no-checked-candidate") else 1 if status in ("counterexample", "refused", "failed") else 0
     except ImportError as error:
         print(json.dumps({"status": "inconclusive", "reason": str(error), "authority": "none"}))
         return 2

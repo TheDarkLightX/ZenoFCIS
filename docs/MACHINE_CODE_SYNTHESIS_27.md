@@ -180,6 +180,39 @@ writes, unexpected files, source drift or an existing lock refuse. Storage and
 the host are trusted; this is not authenticated publication or anti-rollback.
 Use a new session after a deliberate specification or checker change.
 
+## Checked kernel library
+
+A developer who needs a branch-free 128-bit add, a saturating add or an
+absolute value should not have to rerun a search or trust old output. The
+library in `test-data/machine-code/kernels/` keeps each checked kernel as one
+entry: the problem it was checked against, the exact bytes, the cost and how the
+bytes were found (`proposal` or `search`). It holds 12 kernels across both
+profiles and both targets, such as `add128-x86`, `add128-rv64i`, `sub128-x86`,
+`umin-x86`, `signed-saturating-add-x86` and `abs-x86`.
+
+```text
+python3 -B -m tools.machine_code.run library check --dir test-data/machine-code/kernels
+python3 -B -m tools.machine_code.run library add --artifact ARTIFACT --dir test-data/machine-code/kernels \
+    --name NAME --summary "One line." --route proposal
+```
+
+`check` rechecks every entry now with the independent checker for its profile,
+requires the recorded cost, and rebuilds the ELF object and assembly from the
+bytes. It reports `checked` (exit 0) only when every entry is `equivalent`;
+otherwise `failed` (exit 1), with `counterexample`, `cost-differs` or `refused`
+on each failing entry. An empty library, a stray file, a misnamed entry or an
+unknown field fails. `add` imports only an emitted artifact that replays here,
+and never replaces an existing entry (exit 65).
+
+Entries store no verdict or receipt. A receipt binds the checker identity (the
+checker sources, Python and Z3 hashes), so it would go stale after any checker
+edit or on another host. A fresh recheck does not. The library check gives the
+same ISA-model guarantee as a session check, for each entry on the current
+checker. It does not establish native execution, timing, global optimality or
+fitness for a particular use; the native and conformance tests cover execution
+separately. CI runs `tools/test_machine_code_library.py`, which also checks
+that a wrong kernel, a wrong cost and malformed entries fail.
+
 ## Qualification and costs
 
 ```sh

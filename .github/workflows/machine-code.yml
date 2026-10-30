@@ -55,6 +55,8 @@ jobs:
         run: python3 -B tools/test_machine_code_profile2_verifier.py
       - name: Profile-2 proposal, search, emission and replay
         run: python3 -B tools/test_machine_code_profile2_loop.py
+      - name: Every checked-library kernel rechecked at its recorded cost
+        run: python3 -B tools/test_machine_code_library.py
       - name: Optimized Python keeps the same guards
         run: |
           python3 -O -B tools/test_machine_code_verifier.py
@@ -62,6 +64,7 @@ jobs:
           python3 -O -B tools/test_zal_word_kernel.py
           python3 -O -B tools/test_machine_code_profile2_verifier.py
           python3 -O -B tools/test_machine_code_profile2_loop.py
+          python3 -O -B tools/test_machine_code_library.py
       - name: Actual x86 execution, assembler and RV64I object correspondence
         run: python3 -B tools/test_machine_code_native.py
       - name: Every admitted x86 form against the concrete and SMT models on this CPU

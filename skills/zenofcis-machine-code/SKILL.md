@@ -120,6 +120,22 @@ incumbent must recheck; missing replay budget remains inconclusive. Emission
 produces machine bytes, linkable ELF and matching assembler data, not deployment
 authority. Recheck artifacts before any separately authorized target execution.
 
+## Reuse checked kernels
+
+Before searching, look in `test-data/machine-code/kernels/` for a checked
+kernel with the same problem. Recheck the whole library, and add a replayed
+artifact under a new name (an existing entry is never replaced):
+
+```sh
+python3 -B -m tools.machine_code.run library check --dir test-data/machine-code/kernels
+python3 -B -m tools.machine_code.run library add --artifact ARTIFACT \
+  --dir test-data/machine-code/kernels --name NAME --summary "One line." --route search
+```
+
+`check` exits 0 with `checked` only if every entry is `equivalent` at its
+recorded cost now; `failed` exits 1 and names each failing entry; refusals exit
+65. An entry carries no stored verdict, so cite the fresh check, not the file.
+
 ## Judge usefulness
 
 Compare byte/body-instruction cost, setup/search/check/replay costs, and actual
