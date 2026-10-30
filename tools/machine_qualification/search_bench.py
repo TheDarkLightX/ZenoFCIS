@@ -16,7 +16,8 @@ identical. Times are for this machine and load only. Nothing here claims optimal
     python3 -B -m tools.machine_qualification.search_bench compare BEFORE.json AFTER.json
 
 `compare` marks each found cost identical, improved (none found before, or a lower rank now) or worse, and exits 1
-when any is worse, a found cost is lost, or a problem is missing from either report.
+when any is worse, a found cost is lost, or a problem of the first report is missing from the second. A problem only
+in the second report is listed as new.
 """
 
 from __future__ import annotations
@@ -157,7 +158,7 @@ def verdict(old, new) -> str:
 
 
 def compare(before: dict, after: dict) -> tuple[str, int]:
-    """The before-and-after table; exit 1 when a found cost is worse or lost, or a problem is missing."""
+    """The before-and-after table; exit 1 when a found cost is worse or lost, or a problem disappears."""
     names = sorted(set(before["problems"]) | set(after["problems"]))
     extra = sorted({key for row in after["problems"].values() for key in row["counters"]} - set(COLUMNS))
     header = ["problem", *(f"{c} before/after" for c in COLUMNS), "median s before/after", "cost", *extra]
@@ -165,8 +166,12 @@ def compare(before: dict, after: dict) -> tuple[str, int]:
     code = 0
     for name in names:
         old, new = before["problems"].get(name), after["problems"].get(name)
-        if old is None or new is None:
-            lines.append(f"{name} | missing from {'before' if old is None else 'after'}")
+        if old is None:
+            lines.append(f"{name} | new: {new['status']} cost {new['cost']} | "
+                         f"{new['counters'].get('solver_checks')} checks | {new['wall_median_seconds']} s")
+            continue
+        if new is None:
+            lines.append(f"{name} | missing from after")
             code = 1
             continue
         found = verdict(old["cost"], new["cost"])
@@ -176,9 +181,10 @@ def compare(before: dict, after: dict) -> tuple[str, int]:
                  found if found == "identical" else f"{found} {old['cost']} -> {new['cost']}",
                  *(str(new["counters"].get(key, "-")) for key in extra)]
         lines.append(" | ".join(cells))
-    totals = [sum(report["problems"][n]["counters"].get("solver_checks", 0) for n in names if n in report["problems"])
+    common = [n for n in names if n in before["problems"] and n in after["problems"]]
+    totals = [sum(report["problems"][n]["counters"].get("solver_checks", 0) for n in common)
               for report in (before, after)]
-    lines.append(f"solver checks in total: {totals[0]} before, {totals[1]} after; "
+    lines.append(f"solver checks over the {len(common)} common problems: {totals[0]} before, {totals[1]} after; "
                  f"commits {before.get('commit')} -> {after.get('commit')}")
     return "\n".join(lines), code
 

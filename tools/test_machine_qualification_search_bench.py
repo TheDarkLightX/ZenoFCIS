@@ -64,6 +64,11 @@ class Comparison(unittest.TestCase):
                 text, code = bench.compare(report(a=base), after)
                 self.assertEqual(code, 1, text)
 
+    def test_a_problem_added_after_the_baseline_is_listed_but_does_not_fail(self):
+        text, code = bench.compare(report(), report(b=row({"bytes": 5, "instructions": 1})))
+        self.assertEqual(code, 0, text)
+        self.assertIn("b | new", text)
+
     def test_a_cost_found_only_after_or_lower_after_is_an_improvement(self):
         for old, new in ((None, {"bytes": 31, "instructions": 7}),
                          ({"bytes": 8, "instructions": 2}, {"bytes": 5, "instructions": 1})):
@@ -86,10 +91,12 @@ class SmallRun(unittest.TestCase):
         result = measured["problems"]["add64-rv64i.json"]
         self.assertEqual((result["status"], result["cost"], result["deterministic"]),
                          ("checked-candidate", {"bytes": 8, "instructions": 1}, True))
-        # With the grammar exhausted, every sequence is either proposed or counted as skipped by pruning.
+        # With the grammar exhausted, every sequence is either proposed or counted as skipped by pruning or by
+        # the cost bound. Objective prunes are counted among the proposed sequences.
         counted = result["counters"]
-        self.assertEqual(counted["proposed"] + counted.get("dead_pruned", 0) + counted.get("order_pruned", 0),
-                         result["space"])
+        skipped = sum(value for key, value in counted.items()
+                      if key.endswith("_skipped") or (key.endswith("_pruned") and key != "objective_pruned"))
+        self.assertEqual(counted["proposed"] + skipped, result["space"])
         self.assertEqual(len(result["wall_seconds"]), 2)
         self.assertGreaterEqual(result["counters"]["solver_checks"], 1)
         after = {p: hashlib.sha256(p.read_bytes()).hexdigest()
