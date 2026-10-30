@@ -141,6 +141,15 @@ whose footprints cannot interfere, and its checked kernel becomes the incumbent
 that bounds a following `search`. Split search on a one-result problem exits 1
 with `not-applicable`.
 
+When search exhausts a palette without a kernel, or you need to know whether a
+cheaper kernel exists in it, run `realize --session SESSION`. Each length below
+the bound comes back unrealizable, realizable with checked bytes, or
+inconclusive. "Unrealizable" covers only that palette. As a proposer, widen the
+palette with the idioms the specification needs (for example a borrow mask
+`sbb r,r`, a carry chain `adc`, or a zero idiom then `setcc`), reopen a session
+with the new problem, and search again. The palette is your proposal; the exact
+search and the checker decide.
+
 Search exhaustion does not establish no implementation exists. A stored
 incumbent must recheck; missing replay budget remains inconclusive. Emission
 produces machine bytes, linkable ELF and matching assembler data, not deployment
