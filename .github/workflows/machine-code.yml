@@ -51,11 +51,14 @@ jobs:
         run: python3 -B tools/test_machine_code_loop.py
       - name: ZAL source, human feedback and independent machine replay
         run: python3 -B tools/test_zal_word_kernel.py
+      - name: Profile-2 decoder, flag model and counterexample controls
+        run: python3 -B tools/test_machine_code_profile2_verifier.py
       - name: Optimized Python keeps the same guards
         run: |
           python3 -O -B tools/test_machine_code_verifier.py
           python3 -O -B tools/test_machine_code_loop.py
           python3 -O -B tools/test_zal_word_kernel.py
+          python3 -O -B tools/test_machine_code_profile2_verifier.py
       - name: Actual x86 execution, assembler and RV64I object correspondence
         run: python3 -B tools/test_machine_code_native.py
       - name: Every admitted x86 form against the concrete and SMT models on this CPU
