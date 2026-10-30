@@ -73,12 +73,34 @@ def main(argv=None):
                          help="input name and canonical unsigned decimal word; repeatable")
     special.add_argument("--out", required=True, type=Path, help="new directory; never overwrites")
     special.add_argument("--solver-ms", type=int, default=1000)
+    sliced = commands.add_parser("slice", help="per-result backward slices of a checked profile-2 kernel, each "
+                                 "checked as a one-result kernel; writes nothing unless all are equivalent")
+    sliced.add_argument("--problem", type=Path, help="profile-2 problem (or use --kernel)")
+    sliced.add_argument("--code", type=Path, help="kernel bytes for --problem")
+    sliced.add_argument("--kernel", type=Path, help="checked-library entry; its problem and bytes are used")
+    sliced.add_argument("--out", required=True, type=Path, help="new directory; never overwrites")
+    sliced.add_argument("--solver-ms", type=int, default=1000)
     replayed = commands.add_parser("specialize-replay", help="recompute a written specialization and recheck it")
     replayed.add_argument("--dir", required=True, type=Path)
     replayed.add_argument("--solver-ms", type=int, default=1000)
     args = parser.parse_args(argv)
     try:
-        if args.command in ("specialize", "specialize-replay"):
+        if args.command == "slice":
+            from . import slicing
+            from .model import read_json
+            if (args.kernel is None) == (args.problem is None) or (args.kernel is None) == (args.code is None):
+                raise ValueError("give exactly one of --problem with --code, or --kernel")
+            if args.kernel is not None:
+                from .library import _validate
+                problem, code = _validate(read_json(args.kernel))
+            else:
+                problem, code = read_json(args.problem), session._code(args.code)
+            result = slicing.slices(problem, code, args.solver_ms)
+            if result["status"] == "sliced":
+                result["record"] = slicing.write(result, args.out, problem, code)
+            for row in result.get("slices", []):
+                row.pop("problem", None)
+        elif args.command in ("specialize", "specialize-replay"):
             from . import specialize
             if args.command == "specialize-replay":
                 result = specialize.replay(args.dir, args.solver_ms)

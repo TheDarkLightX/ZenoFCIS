@@ -735,9 +735,10 @@ remaining 64-bit inputs. Nothing is written unless the answer is unsat. The
 query is stored as `proof.smt2`, and the record binds its SHA-256. Replay
 recomputes the specialization and reruns the stored query.
 
-**Kernel rewrite (advisory).** In the spirit of WiPEr (Srinivasan and Reps,
-"Partial Evaluation of Machine Code", OOPSLA 2015), the specializer works on the
-kernel's decoded instructions:
+**Kernel rewrite (advisory).** The specializer works on the kernel's decoded
+instructions, in the spirit of WiPEr, the machine-code partial evaluator in
+V. Srinivasan's dissertation *Synthesis of Machine Code: Algorithms and
+Applications* (University of Wisconsin–Madison, 2017, TR1844):
 
 1. It sets the fixed inputs as constants and propagates values, both registers
    and CF/ZF/SF/OF, through the instructions in their original order.
@@ -819,6 +820,65 @@ from the specialized problem.
 registered ISA model. The proof covers output equality only. Kernel equivalence
 comes from the checker, not from the rewrite. Not claimed: native conformance,
 timing, a smaller or optimal rewritten kernel, or other targets.
+
+### Per-result slices
+
+**Journey.** A reviewer wants to know which instructions of a two-result kernel
+compute each result. They slice it. Each result gets the instructions that can
+reach it, checked as a kernel of its own.
+
+```sh
+python3 -B -m tools.machine_code.run slice \
+  --kernel test-data/machine-code/kernels/add128-x86.json --out "$machine_work/slices"
+```
+
+The kernel must first check equivalent to its problem. For each result, the
+backward slice keeps every instruction whose register or flag effects can reach
+that result register at the return. It follows the instruction footprints from
+the return backwards. A partial or conditional write (`SETcc`, `CMOVcc`) reads
+its destination, so the earlier value stays in the slice. The slice keeps the
+original instruction order. For the second result, a copy into the first result
+register is appended.
+
+Each slice becomes a one-result problem with that output alone. Its grammar is
+the original grammar plus the slice's forms, and its bound is large enough for
+the slice. The independent profile-2 checker must find every slice equivalent
+to its own output, over every input, scratch register and entry flag. Otherwise
+nothing is written; the slicer has no authority of its own.
+
+The output directory receives:
+
+- `original.json` and `original.bin`;
+- `resultN.json` and `resultN.bin` for each result;
+- `slices.json`, with:
+  - the original problem and code hashes;
+  - for each slice, its instruction indices, problem and code hashes, and its
+    checked cost.
+
+`slice` exits with these codes:
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | sliced |
+| 1 | a slice was rejected, or the kernel did not check (refused) |
+| 2 | inconclusive |
+| 65 | malformed input, or the output directory already exists |
+
+`tools/test_machine_code_slice.py` checks these behaviours:
+
+- every profile-2 library kernel slices into checked one-result kernels;
+- `add128-x86`'s low word needs only its `MOV` and `ADD`, and its high word
+  needs all four instructions;
+- a planted footprint defect that drops `ADC`'s carry read loses the low `ADD`
+  from the high word's slice, and the checker rejects that slice with a
+  concrete counterexample, so nothing is written;
+- an unchecked kernel and a profile-1 problem are refused.
+
+This follows McSlice, the machine-code slicer in the same dissertation. Here it
+covers straight-line register-only kernels, where the instruction footprints
+fully describe the dependences. Slices are checked, not trusted. They are not
+claimed minimal: a slice keeps every instruction its footprints reach, even
+when the value would not change the result.
 
 ## ZAL human-to-machine word-kernel connection
 
