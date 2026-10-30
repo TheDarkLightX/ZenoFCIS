@@ -366,6 +366,40 @@ Apply the [five-part feasibility standard](RESEARCH_FEASIBILITY.md) before
 promoting a route. These experiments do not complete native-checker refinement,
 installed isolation, full-width DeFi, arbitrary embedded apps or release gates.
 
+### Planted-defect controls for the checkers
+
+`tools/machine_qualification/controls.py` registers named planted defects in the two independent checkers, after
+mutation analysis (DeMillo, Lipton and Sayward, IEEE Computer 1978):
+
+```sh
+python3 -B -m tools.machine_qualification.controls list
+python3 -B -m tools.machine_qualification.controls run [--defect NAME]... [--out REPORT.json]
+```
+
+- **Defects:** each one is a single source edit to `verify.py` or `verify2.py`. Examples are a 32-bit immediate,
+  unextended RISC-V immediates, scratch registers or entry flags fixed instead of quantified, a dropped symbolic
+  instruction, five-bit shift counts, wrong CF, ZF, SF and OF rules, a writable x0, an unknown solver answer read
+  as equivalence, and a counterexample reported without its concrete replay. Each defect names the control
+  expected to expose it.
+- **Specimens:** each edit is applied to its own copy of the checker package, the control modules and the kernel
+  library. The specimen's checker identity is computed from its own sources, and the run checks that the control
+  imported that copy.
+- **Outcomes:** `detected` (the intended control failed on a test assertion), `survived` (it passed),
+  `inconclusive` (a crash, skip or timeout, an assertion raised inside the checker, or an identity or
+  session-binding refusal) or `invalid-specimen` (the edit does not apply once, the copy does not compile or
+  import, or the control is missing). Only `detected` counts as a detection.
+- **Positive controls:** both verifier suites, every kernel in `test-data/machine-code/kernels` and every intended
+  control must pass on an unmodified specimen first. Each control runs under `python3 -B` and `python3 -O -B`.
+- **Exit:** 0 when every defect is detected in both modes, 1 when a positive control fails or a defect survives,
+  and 2 otherwise.
+
+At 0dd0dce1 all 29 registered defects were detected by their intended control in both modes. Three of them, a
+concrete SRA that masks its count to five bits, a concrete SF read from bit 62 and a symbolic LE that ignores ZF,
+pass the profile-2 verifier suite and the kernel library. Only the x86 hardware conformance run, or for SRA the
+host-independent comparison of the RV64I concrete and SMT models, detects them. A detected defect shows that one control
+distinguishes one edit. It does not show that the checker is complete. `tools/test_machine_qualification_controls.py`
+checks the outcome classes on small real specimens.
+
 ## Profile 2: flags, carries and comparisons
 
 Profile 2 is a second, separately registered pair of targets for multi-word
