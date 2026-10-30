@@ -1,7 +1,12 @@
 """Exact instruction footprints and the search prunings they justify.
 
 Each grammar instruction runs once through its profile checker's own symbolic semantics, from an entry state in
-which every register (and, on x86 profile 2, every modelled flag) is a distinct variable. After simplification:
+which every register (and, on x86, every modelled flag) is a distinct variable. For profile 3 every region word is
+a location too, named `<region>[<index>]`, and a load or store also reads the base register it addresses through,
+because admission requires that register to still hold its region's base. Each load or store also writes, and
+overwrites, its own observed location `admitted:<form>`: removing an access could turn a refused candidate (an
+access through a redefined base) into an admitted one, so an access is never dead unless an identical access
+follows it. After simplification:
 
 - an instruction *writes* every location whose value is not syntactically its entry variable (over-approximate);
 - it *reads* every entry variable that occurs in a written value, plus the flags it is declared to read
@@ -107,14 +112,51 @@ def _profile2(z, context, target: str, form: list) -> Footprint:
     return _effects(z, {**entry, **flags}, {**final, **final_flags}, declared)
 
 
+def _word(region: str, index: int) -> str:
+    return f"{region}[{index}]"
+
+
+def _admitted(form: list) -> str:
+    return "admitted:" + " ".join(map(str, form))
+
+
+def _profile3(z, context, problem: dict, form: list) -> Footprint:
+    from . import verify2, verify3
+    target = problem["target"]
+    word = lambda name: z.BitVec("loc_" + name, 64, ctx=context)
+    entry = {name: word(name) for name in verify3.REGISTERS[target]}
+    flags = {name: z.Bool("loc_" + name, ctx=context) for name in verify3.FLAGS} if target == verify3.X86 else {}
+    memory = {r["name"]: [word(_word(r["name"], i)) for i in range(r["words"])] for r in problem["regions"]}
+    decoded = verify3.decode(target, encode_program(target, [form]))
+    if len(decoded) != 2:
+        raise ValueError("grammar entry did not decode to one instruction")
+    registers, final_flags = dict(entry), dict(flags)
+    if target == verify3.RV64:
+        registers["zero"] = z.BitVecVal(0, 64, ctx=context)
+    final_memory = {name: list(words) for name, words in memory.items()}
+    regions = {r["base"]: r["name"] for r in problem["regions"]}
+    verify3._step_smt(z, target, decoded[0], registers, final_flags, final_memory, regions, context)
+    registers.pop("zero", None)
+    declared = verify2.flag_effects(decoded[0])[0] if target == verify3.X86 else ()
+    if decoded[0].op in verify3.MEMORY:
+        declared = (*declared, verify3._access(decoded[0].form())[0])
+    locations = {_word(name, i): v for name, words in memory.items() for i, v in enumerate(words)}
+    finals = {_word(name, i): v for name, words in final_memory.items() for i, v in enumerate(words)}
+    effects = _effects(z, {**entry, **flags, **locations}, {**registers, **final_flags, **finals}, declared)
+    if decoded[0].op not in verify3.MEMORY:
+        return effects
+    admitted = frozenset({_admitted(decoded[0].form())})
+    return Footprint(effects.reads, effects.writes | admitted, effects.overwrites | admitted)
+
+
 def footprints(problem: dict) -> list:
     """One Footprint per grammar entry, in grammar order; None where it cannot be derived."""
-    if problem["schema"] not in (profile2.SCHEMA, "zeno-fcis/machine-problem/1"):
-        # No footprint model yet (profile 3 memory); nothing is pruned against an underivable footprint.
-        return [None] * len(problem["grammar"])
     import z3 as z
     context = z.Context()
-    derive = _profile2 if problem["schema"] == profile2.SCHEMA else _profile1
+    if problem["schema"] == "zeno-fcis/machine-problem/3":
+        derive = lambda z, context, target, form: _profile3(z, context, problem, form)
+    else:
+        derive = _profile2 if problem["schema"] == profile2.SCHEMA else _profile1
     result = []
     for form in problem["grammar"]:
         try:
@@ -125,7 +167,13 @@ def footprints(problem: dict) -> list:
 
 
 def observed(problem: dict) -> frozenset:
-    """Registers the checker compares at the end."""
+    """Registers, and for profile 3 read-write region words, the checker compares at the end."""
+    if problem["schema"] == "zeno-fcis/machine-problem/3":
+        from . import verify3
+        words = {_word(r["name"], i) for r in problem["regions"] if r["access"] == "read-write"
+                 for i in range(r["words"])}
+        accesses = {_admitted(form) for form in problem["grammar"] if form[0] in verify3.MEMORY}
+        return frozenset({*verify3.RESULTS[problem["target"]][:len(problem["outputs"])], *words, *accesses})
     if problem["schema"] == profile2.SCHEMA:
         from . import verify2
         return frozenset(verify2.RESULTS[problem["target"]][:len(problem["outputs"])])
