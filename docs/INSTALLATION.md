@@ -229,6 +229,19 @@ archive's hash with its entry in the signed file. Confirm the key's fingerprint
 through a trusted channel, because downloading it from the same release does
 not independently establish trust.
 
+The signatures are OpenSSH signatures in the `file` namespace. With the key
+and the checksum list in the current directory, this verifies the Linux list;
+use the Mac or Windows list and its `.sig` the same way:
+
+```bash
+printf 'release %s\n' "$(cat RELEASE-SIGNING-KEY.pub)" > allowed_signers
+ssh-keygen -Y verify -f allowed_signers -I release -n file \
+  -s DOWNLOADS.sha256.sig < DOWNLOADS.sha256
+```
+
+A good signature prints `Good "file" signature for release` and the key's
+fingerprint. Any other namespace, key or edited list fails.
+
 ## Matching source and current library API
 
 The current V2 API uses source or path dependencies on the revision matching
