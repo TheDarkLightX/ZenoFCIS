@@ -139,6 +139,12 @@ After the release assembly is complete, freeze its inputs and run:
 python3 tools/atdd.py run --all
 ```
 
+To qualify on several hosts or continue after a resource stop, record the same
+assembly as an inventory with `run --all --keep-going --run-dir DIR`, optionally
+in `--shard I/N` parts, and continue it with `run --resume DIR`. A `blocked`
+scenario names its missing host tool and leaves its claim open; see
+[acceptance testing](ACCEPTANCE_TESTING.md#inventory-receipts-shards-and-resume).
+
 Complete the affected proofs, platform, artifact, privacy and package checks on
 that same assembly. This development handoff leaves those release obligations
 open and requests no merge, deployment or release.
