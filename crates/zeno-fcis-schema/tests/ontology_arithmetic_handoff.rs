@@ -11,11 +11,15 @@ use zeno_fcis_schema::profile2::{
 };
 use zeno_fcis_value::profile2::{I256, U256, Value};
 
+fn must<T, E: core::fmt::Debug>(result: Result<T, E>) -> T {
+    result.unwrap_or_else(|error| panic!("test operation failed: {error:?}"))
+}
+
 fn bits(hex: &str) -> U256 {
     assert_eq!(hex.len(), 64);
     U256::from_words_le([
-        u128::from_str_radix(&hex[32..], 16).unwrap(),
-        u128::from_str_radix(&hex[..32], 16).unwrap(),
+        must(u128::from_str_radix(&hex[32..], 16)),
+        must(u128::from_str_radix(&hex[..32], 16)),
     ])
 }
 
@@ -35,15 +39,19 @@ fn ordinal(order: Ordering) -> i8 {
 
 fn schema(kind: TypeKind, id: u32) -> Schema {
     let id = TypeId::new(id);
-    Schema::try_new(
+    must(Schema::try_new(
         SchemaProfile::VALUE2,
         "OntologyAmount",
         1,
         id,
-        vec![TypeDef::try_new(id, "Amount", kind, SchemaLimits::default()).unwrap()],
+        vec![must(TypeDef::try_new(
+            id,
+            "Amount",
+            kind,
+            SchemaLimits::default(),
+        ))],
         SchemaLimits::default(),
-    )
-    .unwrap()
+    ))
 }
 
 #[test]
@@ -58,19 +66,19 @@ fn independent_vectors() {
         // Expected words are parsed separately; compare against the actual view.
         assert_eq!(
             a.words_le()[0],
-            u128::from_str_radix(&row[0][32..], 16).unwrap()
+            must(u128::from_str_radix(&row[0][32..], 16))
         );
         assert_eq!(
             a.words_le()[1],
-            u128::from_str_radix(&row[0][..32], 16).unwrap()
+            must(u128::from_str_radix(&row[0][..32], 16))
         );
         let sa = I256::from_bits(a);
         assert_eq!(sa.bits(), a);
         assert_eq!(sa.is_negative(), row[0].as_bytes()[0] >= b'8');
-        assert_eq!(ordinal(a.cmp(b)), row[2].parse::<i8>().unwrap());
+        assert_eq!(ordinal(a.cmp(b)), must(row[2].parse::<i8>()));
         assert_eq!(
             ordinal(sa.cmp(I256::from_bits(b))),
-            row[3].parse::<i8>().unwrap()
+            must(row[3].parse::<i8>())
         );
         count += 1;
     }
@@ -105,14 +113,13 @@ fn schema_ranges_and_nominal_refusals() {
         let result = selected.validate_root(&correct, ValidationLimits::default());
         if row[4] == "1" {
             assert!(result.is_ok(), "{row:?}");
-            let owned = SchemaAdmittedEnvelope::try_new::<Hash>(
+            let owned = must(SchemaAdmittedEnvelope::try_new::<Hash>(
                 &selected,
                 correct.clone(),
                 ValidationLimits::default(),
-            )
-            .unwrap();
+            ));
             assert_eq!(owned.value().value(), &correct);
-            assert_eq!(owned.validation_report(), result.unwrap());
+            assert_eq!(owned.validation_report(), must(result));
         } else {
             assert_eq!(result, Err(ValueValidationError::IntegerRange));
         }
@@ -122,7 +129,7 @@ fn schema_ranges_and_nominal_refusals() {
                 Err(ValueValidationError::TypeMismatch)
             );
             // Even the expected schema hash cannot authorize a wrong nominal leaf.
-            let raw = Envelope::new(1, selected.schema_hash::<Hash>().unwrap(), rejected);
+            let raw = Envelope::new(1, must(selected.schema_hash::<Hash>()), rejected);
             assert_eq!(
                 SchemaAdmittedEnvelope::try_from_envelope::<Hash>(
                     &selected,
@@ -151,7 +158,7 @@ fn requirements_select_actual_schema_types() {
             "signedPnl" => (2, "I256"),
             _ => panic!("unexpected requirement"),
         };
-        assert_eq!(row[1].parse::<u32>().unwrap(), expected_id);
+        assert_eq!(must(row[1].parse::<u32>()), expected_id);
         assert_eq!(
             row[2], expected_kind,
             "signed and unsigned requirements interchanged"
