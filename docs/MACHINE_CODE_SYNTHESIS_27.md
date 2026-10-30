@@ -186,6 +186,18 @@ test problems (checker decisions unchanged):
 | `add128-x86` | 1,555 | 292 |
 | `minmax-x86` | 100,000 (budget exhausted) | 438 (grammar exhausted) |
 | library `signed-saturating-add-x86` | 100,000 (budget exhausted, no candidate) | 23,897 of 960,800 (grammar exhausted, 31-byte kernel) |
+| memory `copy2-sum-x86` | 3,906 | 366 |
+| memory `copy2-sum-rv64i` | 3,906 | 296 |
+
+For [profile 3](#profile-3-memory-regions), every region word is a footprint
+location named `<region>[<index>]`, and a load or store also reads its base
+register, because admission needs that register to still hold the region base.
+Each access also writes its own observed location `admitted:<form>`. Deleting an
+access can turn a refused candidate, one that accesses through a redefined
+base, into an admitted one, so an access is dead only when an identical access
+follows it. The results compared at the end include every read-write region
+word. Without the `admitted:` locations, the exactness test loses the cheapest
+refused candidate of `copy2-sum-rv64i`.
 
 `split-search` handles two-result problems. It searches for each result alone,
 then joins two parts when their footprints show that the second part neither
@@ -204,8 +216,10 @@ python3 -B -m tools.machine_code.run search --session "$machine_work/session"
 The footprints and joins only steer the search. The checker still decides every
 candidate, and `global_optimality` stays false: an exhausted grammar says
 nothing about instructions outside it. The tests compare the cheapest kept
-candidate of every behaviour class with the cheapest candidate overall on seven
-problems, and planted footprint defects fail them.
+candidate of every behaviour class with the cheapest candidate overall on
+thirteen problems, including the six memory kernels, and planted footprint
+defects fail them. One such defect omits a store's region-word write; it fails
+all six memory problems.
 
 These are the semantic pruning and decomposition ideas of McSynth and McSynth++
 ([Srinivasan 2017](https://research.cs.wisc.edu/wpis/papers/tr1844.pdf);
@@ -765,7 +779,8 @@ register-only profile can state. They declare the region its pointer argument
 names, its size and its access, and state the final contents they expect. The
 search or a proposer supplies bytes, and the profile-3 checker accepts them or
 returns the inputs, pointer values, entry registers, flags and region words on
-which a result or a final region word differs.
+which a result or a final region word differs. Search prunes memory kernels
+with the same exact footprint rules as the other profiles.
 
 Profile 3 is a third, separately registered checker for straight-line x86-64
 and RV64I kernels that load and store 64-bit words. Profiles 1 and 2 are
