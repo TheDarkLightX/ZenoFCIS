@@ -97,6 +97,9 @@ fn released_stores_are_refused_by_name_and_left_unchanged() {
     }
 }
 
+/// One edit of a stored identity.
+type Edit = fn(&mut Vec<u8>);
+
 /// The released genesis identity with one edit applied, stored back.
 fn edited(edit: impl Fn(&mut Vec<u8>)) -> StoreFile {
     let file = StoreFile::released(PENDING);
@@ -128,7 +131,7 @@ fn only_an_evaluator_difference_is_another_release() {
             Err(Error::OtherRelease)
         ));
     });
-    let edits: [(&str, fn(&mut Vec<u8>)); 4] = [
+    let edits: [(&str, Edit); 4] = [
         ("first contract byte", |identity| identity[0] ^= 1),
         ("last byte before the digest", |identity| {
             let index = identity.len() - 33;
