@@ -96,9 +96,26 @@ def main(argv=None):
     replayed = commands.add_parser("specialize-replay", help="recompute a written specialization and recheck it")
     replayed.add_argument("--dir", required=True, type=Path)
     replayed.add_argument("--solver-ms", type=int, default=1000)
+    confirmed = commands.add_parser("second-solver",
+                                    help="recheck every library entry and confirm each equivalent verdict with the pinned cvc5")
+    confirmed.add_argument("--dir", required=True, type=Path)
+    confirmed.add_argument("--cvc5", required=True, type=Path)
+    confirmed.add_argument("--solver-ms", type=int, default=10_000)
     args = parser.parse_args(argv)
     try:
-        if args.command == "slice":
+        if args.command == "second-solver":
+            from . import second_solver
+            from .library import _validate
+            from .model import read_json
+            rows = []
+            for path in sorted(args.dir.glob("*.json")):
+                problem, code = _validate(read_json(path))
+                verdict = second_solver.confirm(problem, code, args.cvc5, args.solver_ms)
+                rows.append({"entry": path.name, "status": verdict["status"], "reason": verdict.get("reason"),
+                             "second_solver": verdict["second_solver"]})
+            agreed = bool(rows) and all(row["status"] == "equivalent" for row in rows)
+            result = {"status": "confirmed" if agreed else "inconclusive", "entries": rows, "authority": "none"}
+        elif args.command == "slice":
             from . import slicing
             from .model import read_json
             if (args.kernel is None) == (args.problem is None) or (args.kernel is None) == (args.code is None):

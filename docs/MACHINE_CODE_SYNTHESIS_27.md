@@ -351,6 +351,26 @@ binding drift and I/O refusal exit 65. Always inspect the JSON status. The tool
 does not call a hosted LLM or require model credentials: coding agents consume
 packets and supply proposals through their existing tool loop.
 
+### A second solver for "equivalent"
+
+`second-solver` rechecks every entry of a library directory. It then gives the
+query of each `equivalent` verdict to cvc5, the 1.3.3 release that the
+formal-tools workflow pins by hash. The verdict counts as confirmed only when
+cvc5 also answers unsat. A different answer, a timeout or another cvc5 version
+reports `inconclusive`.
+
+```sh
+python3 -B -m tools.machine_code.run second-solver --dir test-data/machine-code/kernels \
+  --cvc5 "$ZENO_FCIS_CVC5"
+```
+
+Both solvers read the same SMT-LIB text, Z3's rendering of the checker's query.
+This narrows the trust placed in one solver. It does not check the instruction
+models or the encoding. On 2026-10-30 every kernel in `kernels/` (13) and
+`memory-kernels/` (6) was confirmed. `tools/test_machine_code_second_solver.py`
+runs only when `ZENO_FCIS_CVC5` names that cvc5. A planted disagreement, where
+the query loses its assertions, is reported `inconclusive`.
+
 ## Artifacts and independent replay
 
 Emission first rechecks the selected incumbent and writes:
