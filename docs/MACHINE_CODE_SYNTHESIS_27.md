@@ -425,7 +425,11 @@ footprints without reads), each caught. Two source edits are registered with
 the checker controls. Measured on the padded 32-form Hacker's Delight x86
 problems at length 4 (300 s per query, shared machine), the constrained query
 decided six lengths the unchanged query left undecided and matched it on the
-rest; it is off by default because the gain is not uniform.
+rest; it is off by default because the gain is not uniform. Stating a
+search's normal form as constraints of the synthesis query is equivalence
+reduction ([Smith and Albarghouthi, *Program Synthesis with Equivalence
+Reduction*, VMCAI 2019](https://doi.org/10.1007/978-3-030-11245-5_2)); the
+normal form here is the footprint rules above.
 
 #### Partitioned subspaces
 
