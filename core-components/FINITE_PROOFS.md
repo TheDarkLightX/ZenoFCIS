@@ -114,6 +114,19 @@ trust these advisory references. The internal certificate-construction route
 renders the same rules without a self-referential certificate comment; its
 canonical generated artifacts must be identical to the referenced app's.
 
+The coupled applications in `core-apps/` hold the same references, and each
+`composition.json` pins its components' `core-instance.json`. After a certificate
+refresh, `python3 tools/record_core_app_references.py --check` lists each stale
+reference with its old and new SHA-256 and exits 1. `--write` rewrites only the
+certificate SHA-256 in `core-instance.json`, its one occurrence in the
+`project.zeno` comment, and the `instance_sha256` in `composition.json`. Both
+refuse, with exit 2, any other difference from the base revision (`--base`,
+default `HEAD`): a certificate field other than `cli_sha256` and
+`runtime_source_sha256`, a stale reference that does not name the base
+certificate, or any other component or composition change. The tool never writes
+a certificate. `tools/check_core_app.py` then reproduces every component from the
+catalog.
+
 Trusted base: the contract compiler, canonical codecs, mandatory Authority,
 eager-i64 and law interpreters, review enumeration/framing/reporting, explicit
 finite-product and identity comparisons in this replayer, Python/Rust

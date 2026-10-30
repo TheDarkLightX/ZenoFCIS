@@ -47,7 +47,13 @@ An operator runtime approval file has exactly:
 ```
 
 Assess actual build provenance before approving it. Provider/source inventory must
-match the shipped capsule. The host snapshots immutable path/pins, checks actual
+match the shipped capsule. `python3 tools/record_category_capsule.py --check` lists
+each stale capsule pin with its old and new SHA-256 and exits 1, in chain order:
+`provider/SOURCE_MANIFEST.json`, `MANIFEST_SHA256` and `PROVIDER_MANIFEST`,
+`DEPENDENCIES.json`, `DEPENDENCIES_SHA256`, then `ADAPTER_SHA256` in `host.py`.
+`--write` rewrites only those pins. Both refuse, with exit 2, a provider file
+outside the ten captured ones, or a manifest whose path set, schema or scope differs
+from the base revision. Neither prepares or runs the provider. The host snapshots immutable path/pins, checks actual
 files before execution and returned identities afterward. Hashes identify content;
 they do not attest a compiler/host or authenticate author intent.
 

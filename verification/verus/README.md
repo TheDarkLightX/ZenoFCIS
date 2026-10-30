@@ -788,7 +788,13 @@ Run each script's unit tests and then its default gate with fresh `--out` and
 dependencies, Rust 1.97.1, and the verifier cache selected by
 `ZENO_FCIS_VERUS_CACHE`. They do not install dependencies or access the network.
 Profiles and source receipts bind exact files; changing them requires review
-and replay rather than automatic pin replacement.
+and replay. After a reviewed source change,
+`python3 tools/record_arithmetic_proof_sources.py --check` lists each stale
+bound file of the typed and emission profiles with its old and new SHA-256 and
+exits 1. `--write` rewrites only those `source_sha256` pins. Both refuse, with
+exit 2, a bound path set or any other profile field that differs from the base
+revision (`--base`, default `HEAD`). Neither runs a gate; replay both gates
+afterwards.
 
 Scope is Linux x86-64, native Rust 1.97.1 and the verifier identified by
 [toolchain.json](toolchain.json). Rust code generation/erasure, standard-library

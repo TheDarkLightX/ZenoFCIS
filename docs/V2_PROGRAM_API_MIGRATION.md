@@ -102,7 +102,11 @@ compiles and runs against the locked workspace graph in the acceptance scenario
 `test-data/v1-compatibility/baseline.json` is now a V2 migration pin. It pins
 the migrated consumer and the V2 foundational protocol sources with their
 embedded wire tests, and `tools/check_v1_compatibility.py` refuses when any
-pinned file differs. V2 intentionally changes the V1.0 foundational sources
+pinned file differs. After reviewing a change to a pinned file against this
+migration, `python3 tools/record_v1_baseline.py --check` lists each stale entry
+with its old and new SHA-256 and length and exits 1; `--write` rewrites only those
+entries. Both refuse, with exit 2, a changed file list, baseline commit, version,
+format or scope. V2 intentionally changes the V1.0 foundational sources
 (ADR 0004). The V1.0 pins remain in git history at `02694c2`. The pin shows that
 the documented migration compiles; it does not establish universal downstream
 source compatibility.
