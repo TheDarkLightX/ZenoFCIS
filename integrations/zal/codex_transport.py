@@ -15,6 +15,8 @@ import threading
 import time
 from typing import Any, Callable
 
+import json_numbers
+
 
 MAX_MESSAGE = 512 * 1024
 MAX_EVENTS = 2048
@@ -191,7 +193,8 @@ class AppServer:
                     break
                 if len(data) > MAX_MESSAGE or not data.endswith(b"\n"):
                     raise TransportError("Overlong or incomplete protocol message")
-                self._dispatch(json.loads(data))
+                # Every number keeps its exact value or the message is refused by name and the session closes.
+                self._dispatch(json.loads(data, **json_numbers.hooks(json_numbers.raising(TransportError, "agent message: "))))
         except (ValueError, OSError, AssertionError) as error:
             self.on_event({"method": "zal/transportError", "params": {"message": str(error)[:2000]}})
         finally:
