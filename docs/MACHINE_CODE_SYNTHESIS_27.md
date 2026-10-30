@@ -85,7 +85,20 @@ python3 -B -m tools.machine_code.run resume --session "$machine_work/session"
 
 The accepted sum bytes decode as `lea rax,[rdi+rsi]` followed by `ret`.
 A wrong candidate returns actual input/scratch values and expected/actual
-results. Revise from that feedback. Descriptive model provenance is not
+results. Revise from that feedback.
+
+Each counterexample in the packet also carries an advisory `diagnosis`. It is computed with the concrete model, and it
+covers both the solver's counterexample and the first of 64 deterministic pseudo-random inputs on which the
+candidate also fails. Solver counterexamples often use degenerate values such as zero, which make value matching
+ambiguous. The diagnosis holds:
+
+- every admitted register after each body instruction;
+- every specification subterm with its value, and the earliest point and registers at which that value appears;
+- `first_missing_subterm`, the earliest compound subterm the candidate never computes.
+
+For example, for `(xor (mul x 3) (lshr y 1))`, a candidate that shifts left instead of right shows
+`(mul x 3)` in `rax` after instruction 1 and reports `(lshr y 1)` as never computed. The diagnosis has no authority:
+a value can appear by coincidence, and only the independent checker decides. Descriptive model provenance is not
 authenticated origin or approval.
 
 The built-in proposer can also search the declared finite instruction product:

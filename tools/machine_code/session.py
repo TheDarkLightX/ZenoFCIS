@@ -285,13 +285,21 @@ def packet(directory: Path) -> dict:
     feedback = []
     for event in events[-8:]:
         receipt = read_json(directory / f"{event['sequence']:04d}.receipt.json")
-        feedback.append({"sequence": event["sequence"], "verification": receipt["verification"]})
+        row = {"sequence": event["sequence"], "verification": receipt["verification"]}
+        if receipt["verification"].get("status") == "counterexample":
+            try:
+                from .diagnose import diagnose
+                row["diagnosis"] = diagnose(problem, _code(directory / f"{event['sequence']:04d}.bin"),
+                                            receipt["verification"])
+            except (ValueError, KeyError, TypeError, IndexError) as error:
+                row["diagnosis"] = {"available": False, "reason": type(error).__name__}
+        feedback.append(row)
     return {"schema": "zeno-fcis/machine-proposer-packet/1", "authority": "none",
             "problem": problem, "problem_sha256": manifest["problem_sha256"],
             "identity_sha256": digest(canonical(manifest["identity"])), "feedback": feedback,
             "proposal_schema": {"schema": "zeno-fcis/machine-proposal/1", "code_hex": "actual lowercase machine bytes",
                                 "provenance": {"kind": "llm", "name": "proposer name", "note": "short public description"}},
-            "instruction": "Propose data only. Use declared grammar and returned counterexamples. The checker decides."}
+            "instruction": "Propose data only. Use declared grammar and returned counterexamples. Each counterexample carries an advisory diagnosis: the register trace and the first specification subterm your code never computes. The checker decides."}
 
 
 def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=5000, timeout_ms=500):
