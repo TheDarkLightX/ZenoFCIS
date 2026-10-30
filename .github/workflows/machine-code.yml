@@ -79,6 +79,10 @@ jobs:
         run: |
           python3 -B tools/test_machine_qualification_search_bench.py
           python3 -O -B tools/test_machine_qualification_search_bench.py
+      - name: Search-pruning exactness control on reference pruners
+        run: |
+          python3 -B tools/test_machine_qualification_pruning_exactness.py
+          python3 -O -B tools/test_machine_qualification_pruning_exactness.py
       - name: Arithmetic contracts lowered to profile 2, refused by named bridge, or checked
         run: python3 -B tools/test_machine_code_contracts.py
       - name: Profile-3 memory decoder, admission refusals and counterexample controls
