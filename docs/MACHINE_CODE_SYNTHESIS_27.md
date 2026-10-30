@@ -587,6 +587,76 @@ cannot be executed on an x86 host.
   without paired timing on the target.
 - The ZAL `zal/word-kernel/1` route lowers to profile 1, and `zal/word-kernel/2` lowers to profile 2.
 
+### Arithmetic contracts
+
+**Journey.** A developer needs `x + y` that must never wrap silently. They write
+a contract that names the arithmetic meaning, lower it to a profile-2 problem,
+and propose or search against that problem. A kernel that is only correct
+modulo 2^64 fails it with a counterexample.
+
+A `zeno-fcis/machine-contract/1` contract has exactly the fields `schema`,
+`target`, `operation` (`add`, `sub` or `mul`), `signedness` (`unsigned` or
+`signed`), `bits` (64, 128 or 256), `meaning` (`modular`, `checked`,
+`saturating` or `trapping`), `inputs` (two names), and the problem's `grammar`,
+`max_instructions` and `objective`. With `r` the result modulo 2^64:
+
+| Meaning | Lowered results |
+| --- | --- |
+| `modular` | One: `r`. Signedness does not change these bits. |
+| `checked` | Two: `r`, then a status word, 1 when the mathematical result is outside the declared unsigned or signed 64-bit range and 0 otherwise. Read the status first; `r` is the mathematical result only when the status is 0. |
+| `saturating` | One: the mathematical result clamped to the declared range. |
+
+The status word is `(ult r x)` for unsigned add, `(ult x y)` for unsigned
+subtract, `(slt (and (xor x r) (xor y r)) 0)` for signed add and
+`(slt (and (xor x y) (xor x r)) 0)` for signed subtract. A checked contract
+therefore never lowers to a one-result modular problem.
+
+Routing is a finite decision, applied in this order:
+
+1. an unknown meaning, operation, signedness or width, or a target outside
+   profile 2, is unsupported, with the exact reason;
+2. `trapping` names the missing bridge `effectful-overflow`, because profile-2
+   kernels are pure register functions;
+3. 128 and 256 bits name `multiword`;
+4. checked or saturating `mul` names `high-product`, because profile 2 has only
+   the low 64 bits of a product.
+
+A refusal carries no problem. `problem_sha256` digests the lowered problem, as
+for any session. `contract_problem_sha256` digests the contract's digest
+together with that problem digest. Modular signed and unsigned addition share
+a problem but not this identity. The lowering record has no authority; only the
+checker decides whether bytes meet the lowered problem.
+
+```sh
+machine_work=$(mktemp -d)
+python3 -B -m tools.machine_code.run contract lower --contract CONTRACT.json \
+  --problem-out "$machine_work/problem.json"
+python3 -B -m tools.machine_code.run open --problem "$machine_work/problem.json" \
+  --session "$machine_work/session"
+python3 -B -m tools.machine_code.run contract check --contract CONTRACT.json --code kernel.bin
+```
+
+`contract lower` exits 0 when lowered and 1 when refused. `contract check` exits
+0 when equivalent, 1 on a counterexample or a refused contract, and 2 when
+inconclusive. Both exit 65 on malformed input or an existing output file.
+
+`tools/test_machine_code_contracts.py` checks:
+
+- (2^64 - 1) + 1 gives 0 when modular, 0 with status 1 when checked, and
+  2^64 - 1 when saturating; as signed words it does not overflow;
+- all 720 routing cases against an independent table;
+- each of the 14 supported lowerings equals exact arithmetic on wider bit
+  vectors for all 2^128 input pairs, under Z3 and the checker's expression
+  semantics;
+- a kernel with the correct wrapped sum and a constant zero status word passes
+  the modular contract and fails the checked and saturating ones;
+- three lowerings reproduce the library problems `add-carry-out-x86`,
+  `saturating-add-x86` and `signed-saturating-add-x86` exactly, and every
+  library problem keeps its stored form.
+
+The layer covers 64-bit add, subtract and multiply only. Division, shifts,
+negation, wide and effectful contracts are refused or absent.
+
 ## ZAL human-to-machine word-kernel connection
 
 Use `integrations/zal/run.py word-kernel` for this closed profile. It leaves
