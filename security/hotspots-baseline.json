@@ -763,27 +763,27 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 473,
+      "production_lines": 471,
       "rank": 4,
       "score": 98,
       "signals": [
         {
           "id": "canonical-commitment",
           "lines": [
-            252
+            250
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            280
+            278
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
             171,
-            312
+            310
           ]
         },
         {
@@ -791,7 +791,7 @@
           "lines": [
             129,
             206,
-            488
+            486
           ]
         },
         {
@@ -799,8 +799,8 @@
           "lines": [
             147,
             194,
-            225,
-            226
+            223,
+            224
           ]
         },
         {
@@ -813,7 +813,7 @@
           "id": "replay-outbox-commit",
           "lines": [
             160,
-            310
+            308
           ]
         },
         {
@@ -2121,65 +2121,65 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 1906,
+      "production_lines": 1929,
       "rank": 17,
       "score": 93,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            628
+            630
           ]
         },
         {
           "id": "concurrency-primitive",
           "lines": [
-            96
+            97
           ]
         },
         {
           "id": "external-verifier-result",
           "lines": [
-            1865
+            1891
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            879,
-            2041
+            881,
+            2067
           ]
         },
         {
           "id": "generated-source",
           "lines": [
             83,
-            1315
+            1317
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            683
+            685
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            1981
+            2007
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            279,
-            602,
-            629,
-            660,
-            835,
-            836,
-            1065,
-            1169
+            280,
+            604,
+            631,
+            662,
+            837,
+            838,
+            1067,
+            1171
           ]
         }
       ],
@@ -3732,7 +3732,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 804,
+      "production_lines": 873,
       "rank": 32,
       "score": 89,
       "signals": [
@@ -3754,8 +3754,8 @@
             77,
             306,
             543,
-            831,
-            868
+            907,
+            944
           ]
         },
         {
@@ -3780,11 +3780,11 @@
         {
           "id": "replay-outbox-commit",
           "lines": [
-            649,
-            664,
-            677,
-            701,
-            726
+            725,
+            740,
+            753,
+            777,
+            802
           ]
         },
         {
@@ -3794,8 +3794,8 @@
             77,
             306,
             543,
-            831,
-            868
+            907,
+            944
           ]
         }
       ],
@@ -3864,16 +3864,16 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 740,
+      "production_lines": 748,
       "rank": 33,
       "score": 89,
       "signals": [
         {
           "id": "cryptographic-verification",
           "lines": [
-            811,
-            812,
-            814
+            824,
+            825,
+            827
           ]
         },
         {
@@ -3887,14 +3887,14 @@
         {
           "id": "panic-or-unchecked-result",
           "lines": [
-            787,
-            788,
-            789,
-            798,
-            799,
-            808,
-            816,
-            826
+            800,
+            801,
+            802,
+            811,
+            812,
+            821,
+            829,
+            839
           ]
         },
         {
@@ -5939,17 +5939,17 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 20294562,
-    "admitted_files": 1320,
-    "inventory_sha256": "5a8ba0382064cc096af613f075386f26b99ff6f31c3b03dbfe83aeec0af76cf6",
-    "ranked_above_minimum": 1135,
+    "admitted_bytes": 20739736,
+    "admitted_files": 1349,
+    "inventory_sha256": "8fbbc864d9891793840039cc4d2cf3494b7cd6ab20817c011ea392680bfb63aa",
+    "ranked_above_minimum": 1164,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 76,
-      "priority-2": 366,
-      "priority-3": 429,
-      "priority-4": 164,
+      "priority-2": 374,
+      "priority-3": 448,
+      "priority-4": 166,
       "priority-5": 285
     }
   }
