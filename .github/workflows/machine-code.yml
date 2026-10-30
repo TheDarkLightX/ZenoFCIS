@@ -143,6 +143,11 @@ jobs:
           python3 -O -B tools/test_machine_qualification_controls.py
       - name: Every registered checker defect detected by its intended control under -B and -O -B
         run: python3 -B -m tools.machine_qualification.controls run --out "$RUNNER_TEMP/machine-checker-controls.json"
+      - name: Planted search-pruning defects detected by the exactness control
+        run: |
+          python3 -B tools/test_machine_qualification_pruning_defects.py
+          python3 -O -B tools/test_machine_qualification_pruning_defects.py
+          python3 -B -m tools.machine_qualification.pruning_defects run --out "$RUNNER_TEMP/search-pruning-defects.json"
 
   rv64i-execution:
     runs-on: ubuntu-24.04
