@@ -310,21 +310,42 @@ candidate after rechecking it. When every length is unsat, that candidate is the
 least-cost program within the palette and the length bound, under the registered
 model. `global_optimality` stays false: the answer says nothing about
 instructions outside the palette, longer programs or other instruction sets.
-Profile 3 is not supported.
+
+Profile 3 is supported too. Region words are quantified state next to the
+registers and flags, and loads and stores step through the profile-3 checker's
+own semantics. Results, every read-write region word and every read-only region
+word, which must stay unchanged, are compared on each example. The checker's
+order-dependent admission rules are constraints of the query: a slot may not
+address a region through a base register an earlier slot wrote, and on x86 may
+not read a flag an earlier slot left undefined.
 
 An unsat is only as exact as the claim that the query ranges over the
 enumerator's candidate space. `tools/test_machine_code_realize.py` therefore
 checks it against exhaustive exact enumeration, in both directions. It covers
-every test and library problem with at most 20,000 candidate sequences (17
-problems on both profiles), plus two built for the test: one whose only short
-program uses the palette's last form, and one with no program at all. For each,
-the enumerator must exhaust its grammar. `realize` below its least cost must
-prove every length unsat. `realize` below the least cost plus one must return
-checked bytes of exactly that cost. With no program, `realize` without a bound
-must prove every length unsat. All 19 agree. Two planted defects are registered
-with the checker controls: a selector range that drops the last form, and an
-ignored cost bound. Both are detected by their intended controls under `python3 -B` and
-`python3 -O -B`, and the dropped form also by the cross-check of every small problem.
+every test, library and memory-kernel problem with at most 20,000 candidate
+sequences (23 problems on all three profiles), plus four built for the test.
+- one whose only short program uses the palette's last form;
+- one with no program at all;
+- one with region-base writes;
+- one where IMUL leaves ZF undefined before a CMOVE.
+
+For each, the enumerator must exhaust its grammar. `realize` below its least cost
+must prove every length unsat. `realize` below the least cost plus one must
+return checked bytes of exactly that cost. With no program, `realize` without a
+bound must prove every length unsat. All 27 agree.
+
+A second control checks the admission constraints directly. With no examples
+and no bound, the set of selector sequences the query admits must equal the set
+the checker's own admission accepts. It enumerates both on palettes with flag
+reads, undefined flags and region-base writes, at lengths 0 to 3.
+
+Four planted defects are registered with the checker controls for this part:
+- a selector range that drops the last form;
+- an ignored cost bound;
+- a dropped region-base rule;
+- admitted undefined-flag reads.
+
+Each is detected by its intended control under `python3 -B` and `python3 -O -B`.
 
 `realize` exits 0 for `unrealizable`, `realizable` and `replayed`, 1 for a failed
 replay, 2 for `inconclusive`, and 65 for refused input or an existing `--out`.
@@ -332,6 +353,71 @@ The method is component-based synthesis by counterexample-guided refinement
 ([Gulwani, Jha, Tiwari and Venkatesan, PLDI 2011](https://www.microsoft.com/en-us/research/publication/synthesis-loop-free-programs/)),
 used here as unrealizability evidence for a finite palette, as complete
 super-optimizers do ([Lu and Bodík, OOPSLA 2025](https://lsrcz.github.io/files/OOPSLA25.pdf)).
+
+#### Partitioned subspaces
+
+`--groups G` splits the palette into G contiguous groups of forms. Each slot
+picks one group, so a length k has G^k subspaces. Together they cover every
+candidate exactly once. Each subspace has its own query: its slots range only
+over their group's forms. `--workers W` (at most 4) decides the subspaces in W
+processes, each with its own Z3 context, and all work shares one deadline.
+
+```sh
+python3 -B -m tools.machine_code.run realize --problem test-data/machine-code/umin-x86.json \
+  --below 11 --groups 2 --workers 4 --out "$machine_work/realize.json"
+```
+
+- **Combining:** a length is unsat only when every one of its subspaces is unsat.
+  A subspace that finds bytes the checker accepts makes the length realizable. A
+  subspace that runs out of time or rounds makes the length `inconclusive`.
+- **Record:** each subspace keeps its group ranges, its query hash and its
+  examples. `--replay` checks, without the code that made the partition, that
+  each slot's ranges are contiguous and cover the palette. It also checks that
+  the subspaces are exactly their product. Then it rebuilds and re-solves every
+  subspace query.
+- **Unchanged default:** without `--groups`, the query is byte-for-byte the one
+  above, and older records still replay.
+
+`--split-ms P` makes the decomposition adaptive and hierarchical. A subspace
+whose query does not answer within P ms is halved on its widest slot. Its two
+children replace it and inherit the counterexamples it found. Replay's cover
+check therefore does not assume a grid. It requires every subspace to lie in the
+palette, no two to overlap, and their sizes to add up to the whole space.
+
+The cross-check also runs in partitioned mode, with 2 groups and 4 workers, on
+the same 27 problems, and all agree. With a 1 ms probe, which splits nearly
+everything, it is cross-checked and replayed on three problems. Two more planted
+defects are detected under both modes: a partition that omits its last group,
+and an undecided subspace counted as unsat.
+
+Measured wall times are below. They come from paired runs, one mode after
+another, on an AMD Ryzen Threadripper 1950X shared with other work (load average
+5 to 13). The 60 s limit applies to each query, and the run deadline was 900 s
+for the 32-form problems and 1,800 s for the others. Each answer is the same in
+every mode where it was decided. The decoys are admitted forms over the
+problem's own registers. 32 forms is the profile limit.
+
+| Problem (forms, bound) | Single query | 2 groups, 4 workers | 3 groups, 4 workers | Adaptive, 4 workers |
+| --- | --- | --- | --- | --- |
+| `minmax-x86` (8, below 5 instructions) | 1.4 to 1.6 s | 1.7 s | 3.4 s | 1.7 s (probe 2 s or 5 s, no split) |
+| library signed saturating add (7, below 31 bytes) | 10.0 to 12.5 s | 33.5 s | 197.3 s | 12.4 s (probe 2 s), 10.6 s (5 s) |
+| the same with 10 decoys (17) | 83.3 to 101.2 s | 251.5 s | not completed | 677.2 s (probe 2 s, 581 splits), 296.7 s (5 s, 99 splits) |
+| `minmax-x86` with 24 decoys (32) | 7.8 s | 7.4 s | not run | 9.0 s (probe 10 s, no split) |
+| signed saturating add with 25 decoys (32) | lengths 0 to 4 unsat; 5 to 7 time out (277.7 s) | lengths 0 to 5 unsat; 6 and 7 inconclusive at the deadline | not run | lengths 0 to 5 unsat; 6 and 7 inconclusive at the deadline |
+
+At these palette sizes, splitting does not make a decided question faster.
+
+- **Costs:** every subspace pays for building its own query, and repeats the
+  counterexample rounds from the filter states. A split also discards the work
+  its parent's query had done.
+- **Gain:** on the hardest problem, splitting decides one more length, because
+  each subspace gets its own query time limit. It does this by spending more
+  solver time in total, not by being faster.
+- **Default:** the single query stays the default. Use `--groups` or
+  `--split-ms` when a length times out.
+
+HieraSynth's gains come from instruction sets of hundreds of instructions. Our
+problems are capped at 32 forms.
 
 Exit 0 means a completed positive operation. Counterexamples/refused candidate
 verdicts exit 1; inconclusive/no-checked-candidate exits 2; malformed input,
