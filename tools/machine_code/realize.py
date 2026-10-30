@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import time
 
-from . import profile2
+from . import profile2, profile3
 from .model import canonical, digest, integer
 from .targets import encode_instruction, encode_program
 
@@ -64,21 +64,19 @@ class _Profile1:
     def start(self, z, context, example):
         arguments, initial, _ = example
         registers = self.verify._arguments(self.target, {"x": arguments[0], "y": arguments[1]}, initial)
-        return {name: z.BitVecVal(registers[name], 64, ctx=context) for name in self.locations}, {}
+        return {name: z.BitVecVal(registers[name], 64, ctx=context) for name in self.locations}, {}, {}
 
-    def step(self, z, context, index, registers, flags):
+    def step(self, z, context, index, registers, flags, memory):
         pairs = [(self.entry[name], registers[name]) for name in self.locations]
-        return {name: z.substitute(self.transfers[index][name], *pairs) for name in self.locations}, {}
+        return {name: z.substitute(self.transfers[index][name], *pairs) for name in self.locations}, {}, {}
 
     def flag_effects(self, index):
         return (), (), ()
 
-    def results(self, registers):
-        return [registers[self.result]]
-
-    def expected(self, example):
+    def pairs(self, registers, memory, example):
         arguments = example[0]
-        return [self.verify._ast_concrete(self.problem["expression"], {"x": arguments[0], "y": arguments[1]})]
+        return [(registers[self.result],
+                 self.verify._ast_concrete(self.problem["expression"], {"x": arguments[0], "y": arguments[1]}))]
 
 
 class _Profile2:
@@ -103,25 +101,88 @@ class _Profile2:
         arguments, initial, flags = example
         registers, entry_flags = self.verify2.entry_state(self.target, list(arguments), initial, flags)
         return ({name: z.BitVecVal(registers[name], 64, ctx=context) for name in self.locations},
-                {name: z.BoolVal(bool(entry_flags[name]), ctx=context) for name in self.flags})
+                {name: z.BoolVal(bool(entry_flags[name]), ctx=context) for name in self.flags}, {})
 
-    def step(self, z, context, index, registers, flags):
+    def step(self, z, context, index, registers, flags, memory):
         final, final_flags = self.verify2.machine_smt(z, self.target, self.decoded[index], registers, flags, context)
         # A flag the form leaves undefined is never read by an admitted program (see `admitted`), so its
         # placeholder value cannot reach a result.
         placeholder = z.BoolVal(False, ctx=context)
         return ({name: final[name] for name in self.locations},
-                {name: placeholder if final_flags.get(name) is None else final_flags[name] for name in self.flags})
+                {name: placeholder if final_flags.get(name) is None else final_flags[name] for name in self.flags}, {})
 
     def flag_effects(self, index):
         return self.effects[index]
 
-    def results(self, registers):
-        return [registers[name] for name in self.results_names]
-
-    def expected(self, example):
+    def pairs(self, registers, memory, example):
         values = dict(zip(self.problem["inputs"], example[0]))
-        return [self.verify2._ast_concrete(output, values) for output in self.problem["outputs"]]
+        return [(registers[name], self.verify2._ast_concrete(output, values))
+                for name, output in zip(self.results_names, self.problem["outputs"])]
+
+
+class _Profile3:
+    """Profile 3: registers, x86 flags and every region word as quantified state; region bases must stay intact."""
+
+    bases_rule = True
+
+    def __init__(self, z, context, problem):
+        from . import verify2, verify3
+        self.verify3, self.problem, self.target = verify3, problem, problem["target"]
+        verify3._palette(problem)
+        self.x86 = self.target == verify3.X86
+        self.locations = list(verify3.REGISTERS[self.target])
+        self.flags = verify3.FLAGS if self.x86 else ()
+        self.inputs, self.base_of, self.scratch = verify3._layout(problem)
+        self.regions = {region["base"]: region["name"] for region in problem["regions"]}
+        self.writable = [r["name"] for r in problem["regions"] if r["access"] == "read-write"]
+        self.results_names = verify3.RESULTS[self.target][:len(problem["outputs"])]
+        self.decoded, self.effects, self.bases = [], [], sorted(self.regions)
+        for form in problem["grammar"]:
+            decoded = verify3.decode(self.target, encode_program(self.target, [form]))
+            if len(decoded) != 2:
+                raise ValueError("grammar entry did not decode to one instruction")
+            ins = decoded[0]
+            self.decoded.append(ins)
+            self.effects.append(verify2.flag_effects(ins) if self.x86 else ((), (), ()))
+
+    def base_effect(self, index):
+        """(region base this form addresses or None, register it writes or None), as `verify3.admit` reads them."""
+        ins = self.decoded[index]
+        read = self.verify3._access(ins.form())[0] if ins.op in self.verify3.MEMORY else None
+        written = None if ins.op in ("cmp", "test", "nop", "store") else ins.operands[0]
+        return read, written
+
+    def start(self, z, context, example):
+        inputs, bases, initial, flags, memory = example
+        word = lambda value: z.BitVecVal(value, 64, ctx=context)
+        registers = {name: word(initial.get(name, 0)) for name in self.scratch}
+        registers.update({self.inputs[n]: word(v) for n, v in zip(self.problem["inputs"], inputs)})
+        registers.update({self.base_of[r["name"]]: word(v) for r, v in zip(self.problem["regions"], bases)})
+        entry_flags = {name: z.BoolVal(bool((flags or {}).get(name, 0)), ctx=context) for name in self.flags}
+        return registers, entry_flags, {r["name"]: [word(v) for v in memory[r["name"]]] for r in self.problem["regions"]}
+
+    def step(self, z, context, index, registers, flags, memory):
+        r, f, m = dict(registers), dict(flags), {name: list(words) for name, words in memory.items()}
+        if not self.x86:
+            r["zero"] = z.BitVecVal(0, 64, ctx=context)
+        self.verify3._step_smt(z, self.target, self.decoded[index], r, f, m, self.regions, context)
+        r.pop("zero", None)
+        placeholder = z.BoolVal(False, ctx=context)
+        return ({name: r[name] for name in self.locations},
+                {name: placeholder if f.get(name) is None else f[name] for name in self.flags}, m)
+
+    def flag_effects(self, index):
+        return self.effects[index]
+
+    def pairs(self, registers, memory, example):
+        inputs, _, _, _, initial = example
+        values = dict(zip(self.problem["inputs"], inputs))
+        results, words = profile3.expected(self.problem, values, {n: list(v) for n, v in initial.items()})
+        pairs = [(registers[name], value) for name, value in zip(self.results_names, results)]
+        pairs += [(term, value) for name in self.writable for term, value in zip(memory[name], words[name])]
+        pairs += [(term, value) for name, terms in memory.items() if name not in self.writable
+                  for term, value in zip(terms, initial[name])]
+        return pairs
 
 
 def _profile(z, context, problem):
@@ -129,7 +190,9 @@ def _profile(z, context, problem):
         return _Profile2(z, context, problem)
     if problem["schema"] == "zeno-fcis/machine-problem/1":
         return _Profile1(z, context, problem)
-    raise ValueError("realize supports profiles 1 and 2 only")
+    if problem["schema"] == profile3.SCHEMA:
+        return _Profile3(z, context, problem)
+    raise ValueError("realize supports profiles 1, 2 and 3 only")
 
 
 def _select(z, selector, values, indices=None):
@@ -142,6 +205,12 @@ def _select(z, selector, values, indices=None):
 
 
 def _example_json(example):
+    if len(example) == 5:
+        inputs, bases, initial, flags, regions = example
+        return {"inputs": [str(v) for v in inputs], "bases": [str(v) for v in bases],
+                "initial_registers": {k: str(v) for k, v in sorted(initial.items())},
+                "initial_flags": None if flags is None else {k: int(v) for k, v in sorted(flags.items())},
+                "initial_regions": {k: [str(v) for v in words] for k, words in sorted(regions.items())}}
     arguments, initial, flags = example
     return {"arguments": [str(v) for v in arguments], "initial_registers": {k: str(v) for k, v in sorted(initial.items())},
             "initial_flags": None if flags is None else {k: int(v) for k, v in sorted(flags.items())}}
@@ -149,9 +218,12 @@ def _example_json(example):
 
 def _example(value):
     flags = value["initial_flags"]
-    return (tuple(int(v) for v in value["arguments"]),
-            {k: int(v) for k, v in value["initial_registers"].items()},
-            None if flags is None else {k: int(v) for k, v in flags.items()})
+    flags = None if flags is None else {k: int(v) for k, v in flags.items()}
+    initial = {k: int(v) for k, v in value["initial_registers"].items()}
+    if "initial_regions" in value:
+        return (tuple(int(v) for v in value["inputs"]), tuple(int(v) for v in value["bases"]), initial, flags,
+                {k: tuple(int(v) for v in words) for k, words in value["initial_regions"].items()})
+    return tuple(int(v) for v in value["arguments"]), initial, flags
 
 
 def query(z, problem, length, bound, examples, ranges=None):
@@ -198,13 +270,25 @@ def query(z, problem, length, bound, examples, ranges=None):
                                    else z.BoolVal(True, ctx=context) if name in written else defined[name])
                 after[name] = _select(z, selector, options, forms)
             defined = after
-    for example in examples:
-        registers, flags = profile.start(z, context, example)
+    if getattr(profile, "bases_rule", False):
+        intact = {base: z.BoolVal(True, ctx=context) for base in profile.bases}
         for selector, forms in zip(selectors, slots):
-            steps = [profile.step(z, context, index, registers, flags) for index in forms]
+            for index in forms:
+                read = profile.base_effect(index)[0]
+                if read is not None:
+                    solver.add(z.Implies(selector == index, intact[read]))
+            intact = {base: _select(z, selector, [z.BoolVal(False, ctx=context) if profile.base_effect(i)[1] == base
+                                                  else intact[base] for i in forms], forms)
+                      for base in profile.bases}
+    for example in examples:
+        registers, flags, memory = profile.start(z, context, example)
+        for selector, forms in zip(selectors, slots):
+            steps = [profile.step(z, context, index, registers, flags, memory) for index in forms]
             registers = {name: _select(z, selector, [s[0][name] for s in steps], forms) for name in profile.locations}
             flags = {name: _select(z, selector, [s[1][name] for s in steps], forms) for name in profile.flags}
-        for actual, value in zip(profile.results(registers), profile.expected(example)):
+            memory = {name: [_select(z, selector, [s[2][name][i] for s in steps], forms) for i in range(len(words))]
+                      for name, words in memory.items()}
+        for actual, value in profile.pairs(registers, memory, example):
             solver.add(actual == z.BitVecVal(value, 64, ctx=context))
     return solver, selectors, profile
 
@@ -361,8 +445,8 @@ def realize(problem, bound=None, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadlin
     import z3 as z
     from .session import _seeds, _validated
     problem = _validated(problem)
-    if problem["schema"] not in (profile2.SCHEMA, "zeno-fcis/machine-problem/1"):
-        raise ValueError("realize supports profiles 1 and 2 only")
+    if problem["schema"] not in (profile2.SCHEMA, profile3.SCHEMA, "zeno-fcis/machine-problem/1"):
+        raise ValueError("realize supports profiles 1, 2 and 3 only")
     if bound is not None:
         integer(bound, 1, 1 << 16, "cost bound")
     integer(timeout_ms, 1, 60_000, "solver timeout")
