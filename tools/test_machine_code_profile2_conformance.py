@@ -48,6 +48,8 @@ EDGE = [0, 1, 2, MASK, 1 << 63, (1 << 63) - 1, MASK - 1, 195, 0x5555555555555555
 STATES = int(os.environ.get("ZENO_MACHINE_CONFORMANCE_STATES", "16"))
 SMT_STATES = 2
 IMM32 = [-(1 << 31), -(1 << 31) + 1, -0x12345678, -256, -129, 128, 255, 65536, 0x12345678, (1 << 31) - 1]
+# Listed here, not taken from the checker, so a checker edit cannot drop forms from the enumeration.
+IMMEDIATE_OPS = ("add", "or", "adc", "sbb", "and", "sub", "xor", "cmp")
 # MOV r64, imm32 has no 8-bit form: edge values around both sign boundaries.
 MOV_IMM32 = sorted(set(IMM32) | {-128, -2, -1, 0, 1, 2, 127})
 # The SMT comparison samples 8-bit immediates; the concrete comparison covers all of them.
@@ -67,7 +69,7 @@ def forms():
     for d in REGS:
         out += [["imm", d, str(x)] for x in (0, 1, MASK, 1 << 63, (1 << 63) - 1, 195, 0x0123456789ABCDEF)]
     out += [["lea", d, b, i, s] for d, b, i in itertools.product(REGS, REGS, REGS) for s in (1, 2, 4, 8)]
-    out += [[op, d, k] for op in v.IMMEDIATE_OPS for d in REGS for k in list(range(-128, 128)) + IMM32]
+    out += [[op, d, k] for op in IMMEDIATE_OPS for d in REGS for k in list(range(-128, 128)) + IMM32]
     out += [["mov", d, k] for d in REGS for k in MOV_IMM32]
     return out + [["nop"]]
 
@@ -291,7 +293,7 @@ class X86FlagModelConformance(unittest.TestCase):
         import z3
         context = z3.Context()
         for i, form in enumerate(self.forms):
-            if form[0] in v.IMMEDIATE_OPS and isinstance(form[-1], int) and -128 <= form[-1] <= 127 \
+            if form[0] in IMMEDIATE_OPS and isinstance(form[-1], int) and -128 <= form[-1] <= 127 \
                     and form[-1] not in SMT_IMM8:
                 continue
             decoded = v.decode(v.X86, self.code[i] + b"\xc3")
@@ -340,7 +342,7 @@ class X86FlagModelConformance(unittest.TestCase):
             return after, after_flags
 
         def immediate_zero_extended(form, probe, registers, flags):
-            if form[0] in v.IMMEDIATE_OPS and isinstance(form[2], int) and form[2] < 0:
+            if form[0] in IMMEDIATE_OPS and isinstance(form[2], int) and form[2] < 0:
                 width = 0xFF if form[2] >= -128 else 0xFFFFFFFF
                 after, after_flags = dict(registers), dict(flags)
                 v._x86_concrete(v.Instruction(form[0], (form[1], form[2] & width), 0, 0), after, after_flags)
