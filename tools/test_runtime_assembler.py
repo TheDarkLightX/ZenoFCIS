@@ -217,9 +217,9 @@ class AssemblyTests(Fixture):
     def test_ambient_cargo_home_and_parent_config_refuse(self):
         default_config = self.owner_home / ".cargo/config.toml"
         default_config.parent.mkdir(parents=True)
-        default_config.write_text("[build]\n")
+        default_config.write_text("[build]\njobs = 8\nincremental = true\n")
         with patch.dict(os.environ, {}, clear=True), patch.object(assembler, "run_checked") as child:
-            self.refuse("AssemblyAmbientCargoConfiguration:" + re.escape(str(default_config)) + "$",
+            self.refuse("AssemblyAmbientCargoConfiguration:" + re.escape(str(default_config)) + ":build.incremental$",
                         assembler.build, self.description,
                         self.cli, self.root / "package", self.root / "scratch")
             child.assert_not_called()
@@ -230,20 +230,48 @@ class AssemblyTests(Fixture):
         config.write_text('[build]\nrustflags = ["--cfg", "injected"]\n')
         with patch.dict(os.environ, {"CARGO_HOME": str(cargo_home)}, clear=True), \
              patch.object(assembler, "run_checked") as child:
-            self.refuse("AssemblyAmbientCargoConfiguration:" + re.escape(str(config)) + "$",
+            self.refuse("AssemblyAmbientCargoConfiguration:" + re.escape(str(config)) + ":build.rustflags$",
                         assembler.build, self.description,
                         self.cli, self.root / "package", self.root / "scratch")
             child.assert_not_called()
         config.unlink()
         parent_config = self.root / ".cargo/config"
         parent_config.parent.mkdir()
-        parent_config.write_text("[build]\n")
+        parent_config.write_text('[source.crates-io]\nreplace-with = "vendored"\n')
         with patch.dict(os.environ, {"CARGO_HOME": str(cargo_home)}, clear=True), \
              patch.object(assembler, "run_checked") as child:
-            self.refuse("AssemblyAmbientCargoConfiguration:" + re.escape(str(parent_config)) + "$",
+            self.refuse("AssemblyAmbientCargoConfiguration:" + re.escape(str(parent_config))
+                        + ":source.crates-io.replace-with$",
                         assembler.build, self.description,
                         self.cli, self.root / "package", self.root / "scratch")
             child.assert_not_called()
+
+    def test_job_count_settings_are_the_only_ambient_cargo_settings_admitted(self):
+        # build.jobs and CARGO_BUILD_JOBS only schedule compilation; they cannot change what is built.
+        cargo_home = self.owner_home / ".cargo"
+        cargo_home.mkdir(parents=True)
+        (cargo_home / "config.toml").write_text("# cap parallel jobs\n[build]\njobs = 8\n")
+        (self.root / ".cargo").mkdir()
+        (self.root / ".cargo/config").write_text('[build]\njobs = "default"\n')
+        reached = []
+        def child(command, log, cwd, environment):
+            reached.append(log.name)
+            raise ValueError("AssemblyCheckFailed:" + log.name)
+        with patch.dict(os.environ, {"CARGO_BUILD_JOBS": "4"}, clear=True), \
+             patch.object(assembler, "run_checked", side_effect=child):
+            self.refuse("AssemblyCheckFailed:rustc-version.log", assembler.build, self.description,
+                        self.cli, self.root / "package", self.root / "scratch")
+        self.assertEqual(reached, ["rustc-version.log"])
+        for text, setting in (("[build]\njobs = 0\n", "build.jobs"), ("[build]\njobs = true\n", "build.jobs"),
+                              ("jobs = 8\n", "jobs"), ("[build\n", "unreadable"),
+                              ('[profile.release]\nopt-level = 1\n', "profile.release.opt-level")):
+            (cargo_home / "config.toml").write_text(text)
+            with self.subTest(text=text), patch.dict(os.environ, {}, clear=True), \
+                 patch.object(assembler, "run_checked") as untouched:
+                self.refuse("AssemblyAmbientCargoConfiguration:" + re.escape(str(cargo_home / "config.toml"))
+                            + ":" + re.escape(setting) + "$", assembler.build, self.description,
+                            self.cli, self.root / "package", self.root / "scratch")
+                untouched.assert_not_called()
 
     def test_failed_factory_leaves_no_published_package(self):
         output = self.root / "package"

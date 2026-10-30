@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 FORMAT = "zeno-fcis/app-assembly/1"
@@ -207,6 +208,30 @@ def run_checked(command, log, cwd, environment):
     return {"check": log.stem, "exit": 0, "log_sha256": digest(read(log, 64 * 1024 * 1024))}
 
 
+# Ambient Cargo settings that only schedule compilation and cannot change what is built. An ordinary
+# developer machine often caps parallel jobs; every other setting, or an unreadable file, still refuses.
+NEUTRAL_CARGO_SETTINGS = {"build.jobs"}
+
+
+def ambient_cargo_setting(config):
+    """The first configuration key that may change the build, or None if the file only caps jobs."""
+    try:
+        table = tomllib.loads(config.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+        return "unreadable"
+    pending = [("", table)]
+    while pending:
+        prefix, value = pending.pop()
+        for key in sorted(value):
+            name = prefix + key
+            if isinstance(value[key], dict):
+                pending.append((name + ".", value[key]))
+            elif name not in NEUTRAL_CARGO_SETTINGS or not (
+                    value[key] == "default" or (type(value[key]) is int and value[key] != 0)):
+                return name
+    return None
+
+
 def build(description, cli, output, scratch):
     document = decode(description)
     validate(document)
@@ -220,7 +245,7 @@ def build(description, cli, output, scratch):
     output.parent.mkdir(parents=True, exist_ok=True)
     scratch.mkdir(parents=True, exist_ok=True)
     environment = dict(os.environ)
-    allowed = {"CARGO_HOME", "CARGO_TARGET_DIR", "RUSTUP_HOME"}
+    allowed = {"CARGO_HOME", "CARGO_TARGET_DIR", "RUSTUP_HOME", "CARGO_BUILD_JOBS"}
     # Each refusal names the variable or file to remove, never a value.
     for key in sorted(environment):
         if ((key.startswith(("CARGO_", "RUST", "CC_", "CXX_", "LD_", "PKG_CONFIG")) and key not in allowed)
@@ -230,8 +255,10 @@ def build(description, cli, output, scratch):
     parents = {ROOT, *ROOT.parents, output.parent, *output.parents, scratch, *scratch.parents} - {ROOT}
     for config in [*(parent / ".cargo" / name for parent in sorted(parents) for name in ["config", "config.toml"]),
                    *(cargo_home / name for name in ["config", "config.toml"])]:
-        if config.exists():
-            refuse("AssemblyAmbientCargoConfiguration:" + str(config))
+        if config.exists() or config.is_symlink():
+            setting = "symlink" if config.is_symlink() else ambient_cargo_setting(config)
+            if setting is not None:
+                refuse("AssemblyAmbientCargoConfiguration:" + str(config) + ":" + setting)
     for key in sorted(environment):
         if key.startswith("ZENO_APP_"):
             refuse("AssemblyAmbientAppConfiguration:" + key)

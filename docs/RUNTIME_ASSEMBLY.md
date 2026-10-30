@@ -42,6 +42,15 @@ additional fields, symlinks and authority-widening configuration refuse. Hashes
 establish content identity, not behavior, authentication or whole-program proof.
 The assembler does not execute manifest-provided commands.
 
+The build runs with the caller's environment only after ambient build inputs
+are refused. Compiler, linker and flag variables refuse by name, and so does
+any Cargo configuration file in `CARGO_HOME` or in a parent of the source,
+output or scratch path. The refusal names the file and the first setting that
+could change the build, for example
+`AssemblyAmbientCargoConfiguration:/home/user/.cargo/config.toml:build.rustflags`.
+The one exception is a parallel job count: `build.jobs` in a configuration file
+and the `CARGO_BUILD_JOBS` variable only schedule compilation and are accepted.
+
 `package.json` binds the final files, `assembly.json` binds the selected inputs,
 and `evidence/checks.json` records actual command outcomes and log identities.
 The retained factory manifest is explicitly intermediate: the assembler adds
