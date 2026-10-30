@@ -83,6 +83,14 @@ jobs:
         run: python3 -B tools/test_machine_code_profile2_loop.py
       - name: Every checked-library kernel rechecked at its recorded cost
         run: python3 -B tools/test_machine_code_library.py
+      - name: Fixed-budget search benchmark harness on a small real search
+        run: |
+          python3 -B tools/test_machine_qualification_search_bench.py
+          python3 -O -B tools/test_machine_qualification_search_bench.py
+      - name: Search-pruning exactness control on reference pruners
+        run: |
+          python3 -B tools/test_machine_qualification_pruning_exactness.py
+          python3 -O -B tools/test_machine_qualification_pruning_exactness.py
       - name: Arithmetic contracts lowered to profile 2, refused by named bridge, or checked
         run: python3 -B tools/test_machine_code_contracts.py
       - name: Profile-3 memory decoder, admission refusals and counterexample controls
@@ -128,7 +136,7 @@ jobs:
 
   checker-controls:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -147,6 +155,11 @@ jobs:
           python3 -O -B tools/test_machine_qualification_controls.py
       - name: Every registered checker defect detected by its intended control under -B and -O -B
         run: python3 -B -m tools.machine_qualification.controls run --out "$RUNNER_TEMP/machine-checker-controls.json"
+      - name: Planted search-pruning defects detected by the exactness control
+        run: |
+          python3 -B tools/test_machine_qualification_pruning_defects.py
+          python3 -O -B tools/test_machine_qualification_pruning_defects.py
+          python3 -B -m tools.machine_qualification.pruning_defects run --out "$RUNNER_TEMP/search-pruning-defects.json"
 
   rv64i-execution:
     runs-on: ubuntu-24.04
