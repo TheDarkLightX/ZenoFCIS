@@ -1,7 +1,8 @@
 """Fixed-budget measurement of the bounded machine-code search over every registered problem.
 
 `run` opens a fresh session for each problem in `test-data/machine-code/` and each kernel in
-`test-data/machine-code/kernels/`, runs `session.search` with the same budgets, and records per problem:
+`test-data/machine-code/kernels/` and `memory-kernels/`, runs `session.search` with the same budgets, and records
+per problem:
 - every numeric counter the search returns, whatever its name (for example `proposed`, `concrete_refutations`,
   `objective_pruned`, `solver_checks`, and pruning counters a later search adds), and the count of each checker
   verdict;
@@ -50,7 +51,7 @@ def problems() -> dict[str, dict]:
     for path in sorted(data.glob("*.json")):
         found[str(path.relative_to(data))] = {"problem": json.loads(path.read_text(encoding="utf-8")),
                                               "recorded_cost": None}
-    for path in sorted((data / "kernels").glob("*.json")):
+    for path in sorted([*(data / "kernels").glob("*.json"), *(data / "memory-kernels").glob("*.json")]):
         entry = json.loads(path.read_text(encoding="utf-8"))
         found[str(path.relative_to(data))] = {"problem": entry["problem"], "recorded_cost": entry["cost"]}
     return found

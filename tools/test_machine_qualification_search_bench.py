@@ -80,10 +80,12 @@ class Comparison(unittest.TestCase):
 
 class SmallRun(unittest.TestCase):
     def test_a_real_search_is_measured_repeatably_without_changing_the_repository(self):
-        names = {"add64-rv64i.json", "kernels/add64-rv64i.json", "kernels/signed-saturating-add-x86.json"}
+        names = {"add64-rv64i.json", "kernels/add64-rv64i.json", "kernels/signed-saturating-add-x86.json",
+                 "memory-kernels/swap-words-x86.json"}
         self.assertLessEqual(names, set(bench.problems()))
-        self.assertEqual(len(bench.problems()), len(list((ROOT / "test-data/machine-code").glob("*.json")))
-                         + len(list((ROOT / "test-data/machine-code/kernels").glob("*.json"))))
+        data = ROOT / "test-data/machine-code"
+        self.assertEqual(len(bench.problems()), sum(len(list((data / folder).glob("*.json")))
+                                                    for folder in (".", "kernels", "memory-kernels")))
         before = {p: hashlib.sha256(p.read_bytes()).hexdigest()
                   for p in sorted((ROOT / "test-data/machine-code").rglob("*.json"))}
         with redirect_stderr(io.StringIO()):
