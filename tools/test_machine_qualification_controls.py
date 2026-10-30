@@ -45,7 +45,7 @@ class Registry(unittest.TestCase):
                             methods[f"{module[:-3]}.{node.name}.{item.name}"] = module
         for d in controls.DEFECTS:
             with self.subTest(defect=d.name):
-                self.assertIn(d.file, ("verify.py", "verify2.py", "verify3.py", "realize.py"))
+                self.assertIn(d.file, ("verify.py", "verify2.py", "verify3.py", "realize.py", "realize_rules.py"))
                 source = (ROOT / "tools/machine_code" / d.file).read_text()
                 self.assertEqual(source.count(d.anchor), 1)
                 self.assertNotEqual(d.anchor, d.replacement)
@@ -55,7 +55,7 @@ class Registry(unittest.TestCase):
                     self.assertNotEqual(d.second, d.control)
         kinds = {d.kind for d in controls.DEFECTS}
         self.assertLessEqual(BRIEF_KINDS | FLAG_KINDS, kinds)
-        self.assertEqual({d.file for d in controls.DEFECTS}, {"verify.py", "verify2.py", "verify3.py", "realize.py"})
+        self.assertEqual({d.file for d in controls.DEFECTS}, {"verify.py", "verify2.py", "verify3.py", "realize.py", "realize_rules.py"})
 
     def test_defects_once_left_to_hardware_conformance_have_a_unit_control_first(self):
         # These three edits pass the verifier suites as they were before their unit controls; conformance stays

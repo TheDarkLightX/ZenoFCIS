@@ -1,6 +1,7 @@
 """Registered planted-defect controls for the independent machine-code checkers.
 
-Each defect is one named source edit to `tools/machine_code/verify.py`, `verify2.py`, `verify3.py` or `realize.py`
+Each defect is one named source edit to `tools/machine_code/verify.py`, `verify2.py`, `verify3.py`, `realize.py` or
+`realize_rules.py`
 (whose unsat verdicts carry checker-like weight). The edit is applied to an isolated specimen: a fresh copy of the checker package, the test modules that hold the controls, and the kernel
 library. Its checker identity is computed from the specimen's own sources, so it is consistent with the edit. The
 defect names the control that should expose it, and optionally a second control that must also expose it; only
@@ -394,6 +395,13 @@ DEFECTS = (
            RULES + "test_constraints_keep_exactly_the_judged_candidates",
            "Both orders of an independent pair are excluded, so a length whose programs need that pair is "
            "reported unsat under the rules.",
+           "test_machine_code_realize_rules.RulesCrossCheck.test_every_small_problem_agrees_with_exhaustive_enumeration"),
+    Defect("realize-rules-extra-dominated-form", "realize_rules.py", "rule constraints",
+           "        for d in pruner.dominated:\n",
+           "        for d in pruner.dominated | {0}:\n",
+           RULES + "test_constraints_keep_exactly_the_judged_candidates",
+           "The palette's first form is excluded as if dominated, so a length whose programs need it is reported "
+           "unsat under the rules.",
            "test_machine_code_realize_rules.RulesCrossCheck.test_every_small_problem_agrees_with_exhaustive_enumeration"),
     Defect("realize-rules-dead-ignores-results", "realize_rules.py", "rule constraints",
            "            if L in pruner.observed:\n",
