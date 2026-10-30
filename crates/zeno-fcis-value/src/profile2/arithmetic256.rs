@@ -61,6 +61,9 @@ use ordering256::compare;
     ensures N == 2 ==> numeric_model::prefix2(result.0@, 2)
         + numeric_model::modulus() * (if result.1 { 1int } else { 0int })
         == numeric_model::prefix2(a@, 2) + numeric_model::prefix2(b@, 2),
+        numeric_model::value(result.0@)
+            + numeric_model::place(N as nat) * (if result.1 { 1int } else { 0int })
+            == numeric_model::value(a@) + numeric_model::value(b@),
 ))]
 fn add<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
     let mut out = [0; N];
@@ -69,6 +72,10 @@ fn add<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
         invariant N == 2 ==> numeric_model::prefix2(out@, i as int)
             + numeric_model::place2(i as int) * (if carry { 1int } else { 0int })
             == numeric_model::prefix2(a@, i as int) + numeric_model::prefix2(b@, i as int),
+            out@.len() == N, a@.len() == N, b@.len() == N,
+            numeric_model::limbs(out@, i as nat)
+                + numeric_model::place(i as nat) * (if carry { 1int } else { 0int })
+                == numeric_model::limbs(a@, i as nat) + numeric_model::limbs(b@, i as nat),
     ))]
     for i in 0..N {
         let (x, p) = (a[i].wrapping_add(b[i]), a[i] > u128::MAX - b[i]);
@@ -77,12 +84,16 @@ fn add<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
         proof! {
             assert(x as int + numeric_model::radix() * (if p || q { 1int } else { 0int })
                 == a@[i as int] as int + b@[i as int] as int + (if carry { 1int } else { 0int }));
+            numeric_model::carry_step(out@, a@, b@, i as nat, x, carry, p || q);
         }
         out[i] = x;
         carry = p || q;
         #[cfg(verus_keep_ghost)]
         proof! {
             if N == 2 {
+                numeric_model::prefix_two(out@, i as nat + 1);
+                numeric_model::prefix_two(a@, i as nat + 1);
+                numeric_model::prefix_two(b@, i as nat + 1);
                 assert(numeric_model::prefix2(out@, i as int + 1)
                     + numeric_model::place2(i as int + 1) * (if carry { 1int } else { 0int })
                     == numeric_model::prefix2(a@, i as int + 1)
@@ -96,6 +107,9 @@ fn add<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
     ensures N == 2 ==> numeric_model::prefix2(result.0@, 2)
         - numeric_model::modulus() * (if result.1 { 1int } else { 0int })
         == numeric_model::prefix2(a@, 2) - numeric_model::prefix2(b@, 2),
+        numeric_model::value(result.0@)
+            - numeric_model::place(N as nat) * (if result.1 { 1int } else { 0int })
+            == numeric_model::value(a@) - numeric_model::value(b@),
 ))]
 fn subtract<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
     let mut out = [0; N];
@@ -104,6 +118,10 @@ fn subtract<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
         invariant N == 2 ==> numeric_model::prefix2(out@, i as int)
             - numeric_model::place2(i as int) * (if borrow { 1int } else { 0int })
             == numeric_model::prefix2(a@, i as int) - numeric_model::prefix2(b@, i as int),
+            out@.len() == N, a@.len() == N, b@.len() == N,
+            numeric_model::limbs(out@, i as nat)
+                - numeric_model::place(i as nat) * (if borrow { 1int } else { 0int })
+                == numeric_model::limbs(a@, i as nat) - numeric_model::limbs(b@, i as nat),
     ))]
     for i in 0..N {
         let (x, p) = (a[i].wrapping_sub(b[i]), a[i] < b[i]);
@@ -112,6 +130,7 @@ fn subtract<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
         proof! {
             assert(x as int - numeric_model::radix() * (if p || q { 1int } else { 0int })
                 == a@[i as int] as int - b@[i as int] as int - (if borrow { 1int } else { 0int }));
+            numeric_model::borrow_step(out@, a@, b@, i as nat, x, borrow, p || q);
         }
         out[i] = x;
         borrow = p || q;
@@ -176,31 +195,98 @@ fn multiply<const A: usize, const B: usize, const O: usize>(
 }
 /// Adapted from the audited owned zUSD wide divider. The extra shifted bit is
 /// preserved as carry; subtraction's borrow must match it. No quotient narrowing.
-#[cfg_attr(verus_keep_ghost, verifier::external)]
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures numeric_model::divide_result(n@, d@, result),
+))]
 fn divide<const N: usize>(n: [u128; N], d: [u128; N]) -> Result<([u128; N], [u128; N]), Failure> {
     let mut zeros = 0;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant zeros <= N, d@.len() == N, forall|k: int| 0 <= k < zeros ==> d@[k] == 0,
+        decreases N - zeros,
+    ))]
     while zeros < N && d[zeros] == 0 {
         zeros += 1;
     }
     if zeros == N {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::zero_value(d@, N as nat); }
         return Err(Failure::ZeroDivisor);
     }
+    #[cfg(verus_keep_ghost)]
+    proof! { numeric_model::nonzero_value(d@, zeros as int); }
     let bits = N.checked_mul(128).ok_or(Failure::Domain)?;
     let mut q = [0; N];
     let mut r = [0; N];
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        numeric_model::zero_value(q@, N as nat);
+        numeric_model::zero_value(r@, N as nat);
+        numeric_model::top_empty(n@);
+        numeric_model::value_bounds(d@);
+        vstd::arithmetic::div_mod::lemma_small_mod(0nat, numeric_model::value(d@) as nat);
+        vstd::arithmetic::div_mod::lemma_basic_div(0, numeric_model::value(d@));
+    }
     let mut bit = bits;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant
+            bits == 128 * N, bit <= bits,
+            n@.len() == N, d@.len() == N, q@.len() == N, r@.len() == N,
+            0 < numeric_model::value(d@) < numeric_model::place(N as nat),
+            numeric_model::value(r@) == numeric_model::top(n@, bit as nat) % numeric_model::value(d@),
+            numeric_model::value(q@) == numeric_model::top(n@, bit as nat) / numeric_model::value(d@)
+                * vstd::arithmetic::power2::pow2(bit as nat) as int,
+        decreases bit,
+    ))]
     while bit > 0 {
         bit -= 1;
         let mut carry = (n[bit / 128] >> (bit % 128)) & 1;
+        #[cfg(verus_keep_ghost)]
+        proof_decl! {
+            let ghost before = r@;
+            let ghost incoming = carry;
+            let ghost high = numeric_model::top(n@, bit as nat + 1);
+        }
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::bit_step(n@, bit);
+            numeric_model::one_bit(n@[(bit / 128) as int], bit % 128);
+            assert(numeric_model::limbs(r@, 0) == 0);
+            assert(numeric_model::place(0) == 1);
+        }
         let mut i = 0;
+        #[cfg_attr(verus_keep_ghost, verus_spec(
+            invariant i <= N, r@.len() == N, before.len() == N, carry <= 1, incoming <= 1,
+                forall|k: int| i <= k < N ==> r@[k] == before[k],
+                numeric_model::limbs(r@, i as nat) + numeric_model::place(i as nat) * carry as int
+                    == 2 * numeric_model::limbs(before, i as nat) + incoming as int,
+            decreases N - i,
+        ))]
         while i < N {
             let next = r[i] >> 127;
+            #[cfg(verus_keep_ghost)]
+            proof! { numeric_model::shift_step(r@, before, i as nat, carry, incoming); }
             r[i] = (r[i] << 1) | carry;
             carry = next;
             i += 1;
         }
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            let d_value = numeric_model::value(d@);
+            numeric_model::value_bounds(r@);
+            numeric_model::value_bounds(n@);
+            vstd::arithmetic::power2::lemma_pow2_pos(bit as nat + 1);
+            vstd::arithmetic::div_mod::lemma_div_pos_is_pos(numeric_model::value(n@),
+                vstd::arithmetic::power2::pow2(bit as nat + 1) as int);
+            numeric_model::quotient_step(high, incoming as int, d_value,
+                numeric_model::value(r@) + numeric_model::place(N as nat) * carry as int);
+            numeric_model::compare_order(r@, d@);
+            vstd::arithmetic::div_mod::lemma_div_pos_is_pos(high, d_value);
+            numeric_model::quotient_bits(q@, bit, high / d_value);
+        }
         if carry != 0 || !matches!(compare(&r, &d), Ordering::Less) {
             let (next, borrow) = subtract(r, d);
+            #[cfg(verus_keep_ghost)]
+            proof! { numeric_model::value_bounds(next@); }
             if borrow != (carry != 0) {
                 return Err(Failure::Invariant);
             }
@@ -208,9 +294,13 @@ fn divide<const N: usize>(n: [u128; N], d: [u128; N]) -> Result<([u128; N], [u12
             q[bit / 128] |= 1u128 << (bit % 128);
         }
     }
+    #[cfg(verus_keep_ghost)]
+    proof! { numeric_model::compare_order(r@, d@); }
     if !matches!(compare(&r, &d), Ordering::Less) {
         return Err(Failure::Invariant);
     }
+    #[cfg(verus_keep_ghost)]
+    proof! { numeric_model::divide_finish(n@, d@, q@, r@); }
     Ok((q, r))
 }
 
@@ -304,6 +394,42 @@ impl U256 {
             Ok(Self(value))
         }
     }
+    /// Returns the unsigned quotient and remainder, refusing a zero divisor.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::div_rem_result(self, den, result),
+    ))]
+    pub fn div_rem(self, den: Self) -> Result<(Self, Self), Failure> {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::limb_representations(); }
+        let (q, r) = divide(self.0, den.0)?;
+        Ok((Self(q), Self(r)))
+    }
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::rounded_result(q, remainder, mode, result),
+    ))]
+    fn rounded(q: Self, remainder: bool, mode: Rounding) -> Result<Self, Failure> {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::unsigned_bounds(q); }
+        match mode {
+            Rounding::Exact if remainder => Err(Failure::Inexact),
+            Rounding::Ceil if remainder => q.checked_add(Self::ONE),
+            _ => Ok(q),
+        }
+    }
+    /// Divides using the selected rounding mode and refuses a zero divisor.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::checked_div_result(self, den, mode, result),
+    ))]
+    pub fn checked_div(self, den: Self, mode: Rounding) -> Result<Self, Failure> {
+        let (q, r) = self.div_rem(den)?;
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::canonical_quotient(numeric_model::unsigned(self), numeric_model::unsigned(den),
+                numeric_model::unsigned(q), numeric_model::unsigned(r));
+            numeric_model::zero_words();
+        }
+        Self::rounded(q, r.0 != Self::ZERO.0, mode)
+    }
 }
 
 #[cfg_attr(verus_keep_ghost, verifier::external)]
@@ -315,23 +441,6 @@ impl U256 {
     /// Multiplies two unsigned values, refusing a result wider than 256 bits.
     pub fn checked_mul(self, other: Self) -> Result<Self, Failure> {
         self.full_product(other)?.narrow()
-    }
-    /// Returns the unsigned quotient and remainder, refusing a zero divisor.
-    pub fn div_rem(self, den: Self) -> Result<(Self, Self), Failure> {
-        let (q, r) = divide(self.0, den.0)?;
-        Ok((Self(q), Self(r)))
-    }
-    fn rounded(q: Self, remainder: bool, mode: Rounding) -> Result<Self, Failure> {
-        match mode {
-            Rounding::Exact if remainder => Err(Failure::Inexact),
-            Rounding::Ceil if remainder => q.checked_add(Self::ONE),
-            _ => Ok(q),
-        }
-    }
-    /// Divides using the selected rounding mode and refuses a zero divisor.
-    pub fn checked_div(self, den: Self, mode: Rounding) -> Result<Self, Failure> {
-        let (q, r) = self.div_rem(den)?;
-        Self::rounded(q, r.0 != Self::ZERO.0, mode)
     }
     /// Divides the full product plus offset, refusing a quotient wider than 256 bits.
     pub fn mul_add_div_rem(

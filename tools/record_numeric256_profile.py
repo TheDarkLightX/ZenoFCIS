@@ -121,6 +121,51 @@ def include_checked(profile):
         "public input preconditions. The actual negative_bits dependency and two-limb carry/borrow helper "
         "instantiations are refined. U256 has no checked_neg method. Other helper widths, the multiply/divide "
         "family, other arithmetic and compiler/ghost-erasure correspondence are not proved.")
+    if any(o["stage"] == "division" for o in profile["obligations"]):
+        include_division(profile)
+
+
+def include_division(profile):
+    """Reviewed exact division statements; helper defects must fail inside the actual divider."""
+    statements = [
+        ("U256::div_rem", ["U256", "U256"], "Result<(U256,U256),Failure>",
+         "For D > 0, exactly the canonical witness N = Q*D + R with Q >= 0 and 0 <= R < D; "
+         "for D = 0, exactly ZeroDivisor."),
+        ("U256::checked_div", ["U256", "U256", "Rounding"], "Result<U256,Failure>",
+         "ZeroDivisor iff D = 0; otherwise Inexact iff Exact and N mod D > 0; otherwise floor(N/D), "
+         "or ceil(N/D) for Ceil, with the exact Overflow partition of that value."),
+    ]
+    profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != "division"] + [
+        {"stage": "division", "member": member, "parameters": parameters, "result": result,
+         "meaning": meaning, "refinement_display": gate.NAMESPACE + "arithmetic256::" + member}
+        for member, parameters, result, meaning in statements]
+    defects = [
+        ("division_shift_drops_incoming_bit", "U256::div_rem", "divide",
+         "r[i] = (r[i] << 1) | carry;", "r[i] = r[i] << 1;"),
+        ("division_sets_wrong_quotient_bit", "U256::div_rem", "divide",
+         "q[bit / 128] |= 1u128 << (bit % 128);", "q[bit / 128] |= 1u128 << ((bit + 1) % 128);"),
+        ("division_ignores_shifted_out_bit", "U256::div_rem", "divide",
+         "if carry != 0 || !matches!(compare(&r, &d), Ordering::Less) {",
+         "if !matches!(compare(&r, &d), Ordering::Less) {"),
+        ("unsigned_div_rem_swaps_results", "U256::div_rem", None,
+         "Ok((Self(q), Self(r)))", "Ok((Self(r), Self(q)))"),
+        ("unsigned_checked_div_inverts_remainder", "U256::checked_div", None,
+         "r.0 != Self::ZERO.0", "r.0 == Self::ZERO.0"),
+        ("unsigned_checked_div_always_ceil", "U256::checked_div", None,
+         "Self::rounded(q, r.0 != Self::ZERO.0, mode)", "Self::rounded(q, r.0 != Self::ZERO.0, Rounding::Ceil)"),
+    ]
+    profile["controls"] = [c for c in profile["controls"] if c["stage"] != "division"] + [
+        {"stage": "division", "name": name, "member": member, **({"helper": helper} if helper else {}),
+         "old": old, "new": new, "error_source": str(gate.SUBJECT)}
+        for name, member, helper, old, new in defects]
+    profile["scope"] = (
+        "The eight actual associated constants, eleven public conversions and five checked 256-bit "
+        "add/subtract/negation methods with exact integer values and exact Overflow partitions, and "
+        "U256::div_rem and U256::checked_div with exact canonical quotient, rounding and refusal "
+        "contracts, without public input preconditions. The actual negative_bits dependency, the "
+        "add/subtract carry and borrow helpers and the private divider are refined at every limb width. "
+        "U256 has no checked_neg method. The multiply family, the wider division wrappers, other "
+        "arithmetic and compiler/ghost-erasure correspondence are not proved.")
 
 
 def arithmetic_exceptions(root):
@@ -148,7 +193,7 @@ def arithmetic_exceptions(root):
              "reason": "Verifies only the selected actual numeric constants and methods in this impl block."},
         ])
     for item in ("fn add_word<const N: usize>", "fn multiply<const A: usize, const B: usize, const O: usize>",
-                 "fn divide<const N: usize>", "impl U256 {", "impl I256 {", "impl U512 {", "impl U768 {"):
+                 "impl U256 {", "impl I256 {", "impl U512 {", "impl U768 {"):
         entries.append({"text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
                         "following": item,
                         "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."})
@@ -156,12 +201,15 @@ def arithmetic_exceptions(root):
     return entries
 
 
-def record(root, out, cache, refresh_ordering, previous_source=None, conversions=False, checked=False):
+def record(root, out, cache, refresh_ordering, previous_source=None, conversions=False, checked=False,
+           division=False):
     profile = json.loads(gate.read(root, gate.PROFILE))
     if conversions or checked:
         include_conversions(profile)
     if checked:
         include_checked(profile)
+    if division:
+        include_division(profile)
     previous = json.loads(gate.read(root, Path("verification/verus/ordering_types256_profile.json")))
     exceptions = {key: entries for key, entries in previous["native_configuration_exceptions"].items()
                   if key != str(gate.SUBJECT) and key != str(Path("verification/verus/ordering256_types_harness.rs"))}
@@ -205,7 +253,10 @@ def record(root, out, cache, refresh_ordering, previous_source=None, conversions
         obligation = next(o for o in profile["obligations"] if o["member"] == control["member"])
         control["error_function"] = obligation["report_function"]
         source = gate.read(root, Path(control["error_source"]))
-        if control["stage"] != "constants":
+        if "helper" in control:
+            control["error_function"] = gate.NAMESPACE + "arithmetic256::" + control["helper"]
+            control["error_region"] = list(gate.helper_region(source, control["helper"]))
+        elif control["stage"] != "constants":
             control["error_region"] = list(method_region(source, *control["member"].split("::")))
         else:
             at = source.index(control["old"])
@@ -295,11 +346,13 @@ def main():
                         help="Add the reviewed complete conversion stage and its semantic controls")
     parser.add_argument("--include-checked", action="store_true",
                         help="Include conversions and the five checked add/subtract/negation methods")
+    parser.add_argument("--include-division", action="store_true",
+                        help="Add the reviewed U256 div_rem/checked_div stage and its semantic controls")
     parser.add_argument("--previous-source", type=Path,
                         help="Exact previous profile sources, required only for a compiler-ID migration review")
     args = parser.parse_args()
     record(gate.ROOT, args.out.absolute(), args.cache, args.refresh_ordering_bindings,
-           args.previous_source, args.include_conversions, args.include_checked)
+           args.previous_source, args.include_conversions, args.include_checked, args.include_division)
 
 
 if __name__ == "__main__":

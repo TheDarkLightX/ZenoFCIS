@@ -284,11 +284,73 @@ constant, conversion and checked-arithmetic controls. Each must reach its
 intended semantic failure in a whole-harness run, with exact typed/body and
 solver-section coverage and source/tool postchecks.
 
-`U256` has no public `checked_neg` method; none is added. The multiply/divide,
-root and rounding families, `I256::try_i128`, wider arithmetic and wider raw
-constructors/views remain outside this proof scope. So do carry/borrow result
-claims for helper widths other than two limbs, compiler/ghost erasure, physical
-resource costs, and the Schema2 and factory obligations below.
+`U256` has no public `checked_neg` method; none is added. At this checkpoint the
+multiply/divide, root and rounding families, `I256::try_i128`, wider arithmetic
+and wider raw constructors/views remained outside this proof scope. So did
+carry/borrow result claims for helper widths other than two limbs, compiler/ghost
+erasure, physical resource costs, and the Schema2 and factory obligations below.
+The next sections narrow that list.
+
+### Exact unsigned division
+
+Write `N` and `D` for the unsigned meanings of the numerator and denominator.
+Both contracts hold for every input, with no added precondition.
+
+| Actual method | Exact result and refusal |
+| --- | --- |
+| `U256::div_rem(n, d)` | For `D > 0`, returns `(Q, R)` with `N = Q*D + R`, `Q >= 0` and `0 <= R < D`, the unique canonical pair; for `D = 0`, exactly `ZeroDivisor` |
+| `U256::checked_div(n, d, mode)` | `ZeroDivisor` exactly when `D = 0`; otherwise `Inexact` exactly when `mode` is `Exact` and `N mod D > 0`; otherwise `floor(N/D)`, or `ceil(N/D)` for `Ceil`, with the exact `Overflow` partition of that value |
+
+These statements are proved for the actual bodies under the stated assumptions.
+The refusal order matches the code: the zero divisor is refused before rounding
+is considered. For `checked_div`, `ceil(N/D) <= N`, so its `Overflow` branch is
+never reached; the contract states the partition rather than relying on that.
+
+The proof reaches the private restoring divider used by every width. Its
+contract holds at every limb count `N`: the result is the canonical witness of
+the limb meanings, `ZeroDivisor` exactly for a zero divisor, or `Domain` only
+when `128*N` exceeds `usize::MAX`. Both internal `Invariant` refusals, the
+borrow/carry mismatch and the final remainder check, are proved unreachable.
+The loop invariant states that after the bits above position `k` are consumed,
+the remainder and quotient are exactly `floor(N / 2^k) mod D` and
+`floor(floor(N / 2^k) / D) * 2^k`. Each step uses the extracted limb bit, the
+doubled remainder with its shifted-out carry, and the subtraction's borrow.
+The two-limb carry and borrow helpers now also have contracts at every width.
+The 512-bit and 768-bit division wrappers call the same proved divider, but
+those wrappers remain outside the proved closure.
+
+To state those invariants, the helpers use indexed `while` loops instead of
+the earlier iterator loops; the pinned verifier has no contract connecting
+`for limb in &mut array` with the array. Two expressions changed form:
+`compare(..) != Ordering::Less` became `!matches!(compare(..), Ordering::Less)`,
+and `r != Self::ZERO` in `checked_div` became `r.0 != Self::ZERO.0`. The pinned
+library specifies neither `Ordering` inequality nor the derived wrapper
+equality; the derived equality compares that same single field. A native test
+compares the indexed helpers with verbatim copies of the iterator helpers on
+boundary words, single-limb and top-limb shapes and deterministic generated
+inputs: division at widths 0, 1, 2, 3, 4 and 6, multiplication at seven shapes
+including outputs too small for the product, and word insertion at every
+position, including the scratch state a refusal leaves. These tests support
+the source review; they are not exhaustive and do not prove compiler or
+ghost-erasure correspondence.
+
+The numeric gate now also accounts for the termination conditions of the three
+recursive limb-meaning definitions, and it admits semantic controls inside a
+named private helper. Such a control must fail inside that helper's own proved
+body. Six new controls are refused semantically: three in the divider (dropping
+the incoming bit, setting the wrong quotient bit, ignoring the shifted-out bit),
+`div_rem` returning its results swapped, and `checked_div` inverting the
+remainder test or always rounding up. With the seventeen earlier controls, all
+twenty-three must reach their intended semantic failure in whole-harness runs.
+The complete closure has 153 verification conditions. Comparing the translated
+records before and after this step, all retained functions except the two carry
+and borrow helpers are identical apart from compiler-assigned identifiers.
+
+Restoring binary division is a standard multiple-precision technique; see
+Knuth, *The Art of Computer Programming*, Vol. 2, section 4.3.1, for the
+classical algorithms. The final step uses the pinned library's Euclidean
+division lemma. The contribution here is the proof of these actual bodies, not
+a new division method.
 
 ### Earlier schema checkpoint
 

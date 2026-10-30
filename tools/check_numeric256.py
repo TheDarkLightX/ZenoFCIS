@@ -39,6 +39,9 @@ CONVERSIONS = {"U256::from_u128", "U256::try_u128", "I256::from_i128", "I256::ma
                "I256::from_magnitude", "I256::try_unsigned", "I256::difference_unsigned",
                "U512::from_u256", "U512::narrow", "U768::from_u256", "U768::narrow"}
 CHECKED = {"U256::checked_add", "U256::checked_sub", "I256::checked_add", "I256::checked_sub", "I256::checked_neg"}
+DIVISION = {"U256::div_rem", "U256::checked_div"}
+# Private module-level helpers whose actual bodies a control may mutate.
+HELPERS = {"divide"}
 
 
 def expected_type(name):
@@ -46,7 +49,10 @@ def expected_type(name):
         value = name[len("Result<"):-len(",Failure>")]
         return ["Typ", "Datatype", ["Dt", "Path", "core::result::Result"],
                 [expected_type(value), expected_type("Failure")], []]
-    if name in ("U256", "I256", "U512", "U768", "Failure"):
+    if name.startswith("(") and name.endswith(")"):
+        items = name[1:-1].split(",")
+        return ["Typ", "Datatype", ["Dt", "Tuple", str(len(items))], [expected_type(i) for i in items], []]
+    if name in ("U256", "I256", "U512", "U768", "Failure", "Rounding"):
         path = NAMESPACE + "arithmetic256::" + ("number256::" if name in ("U256", "I256") else "") + name
         return ["Typ", "Datatype", ["Dt", "Path", path], [], []]
     if name in ("u128", "i128"):
@@ -103,7 +109,11 @@ def configuration(root, profile, expected=None):
     require({o["member"] for o in profile["obligations"] if o["stage"] == "constants"}
             == CONSTANTS, "constant obligations incomplete")
     stages = {o["stage"] for o in profile["obligations"]}
-    require(stages.issubset({"constants", "conversions", "checked"}), "unreviewed numeric stage")
+    require(stages.issubset({"constants", "conversions", "checked", "division"}), "unreviewed numeric stage")
+    if "division" in stages:
+        require("checked" in stages and
+                {o["member"] for o in profile["obligations"] if o["stage"] == "division"} == DIVISION,
+                "division obligations incomplete")
     if "checked" in stages:
         require("conversions" in stages and
                 {o["member"] for o in profile["obligations"] if o["stage"] == "checked"} == CHECKED,
@@ -120,6 +130,23 @@ def configuration(root, profile, expected=None):
     return admitted
 
 
+def helper_region(source, name):
+    """Resolve a private module-level helper, from its contract to its closing brace."""
+    tokens = verifier._rust_tokens(source)
+    values = [t[0] for t in tokens]
+    starts = [i for i in range(len(values) - 1) if values[i] == "fn" and values[i + 1] == name]
+    require(len(starts) == 1 and "{" in values[starts[0]:], f"missing or ambiguous helper: {name}")
+    end, depth = values.index("{", starts[0]), 0
+    while True:
+        require(end < len(values), f"unclosed helper: {name}")
+        depth += (values[end] == "{") - (values[end] == "}")
+        if not depth:
+            break
+        end += 1
+    first, _ = verifier.function_lines(source, name)
+    return first, source.count("\n", 0, tokens[end][1]) + 1
+
+
 def control_sources(root, profile):
     controls = profile["controls"]
     require(len({c["name"] for c in controls}) == len(controls), "duplicate numeric control")
@@ -132,10 +159,18 @@ def control_sources(root, profile):
         require(control["member"] in obligations
                 and control["stage"] == obligations[control["member"]]["stage"],
                 "control has no corresponding obligation")
-        require(control["error_function"] == obligations[control["member"]]["report_function"],
-                "control targets a different refinement")
-        first, last = (method_region(source, *control["member"].split("::"))
-                       if control["stage"] != "constants" else (1, len(source.splitlines())))
+        if "helper" in control:
+            # A defect in a private helper must fail inside that helper's own proof.
+            require(control["helper"] in HELPERS
+                    and control["error_function"] == NAMESPACE + "arithmetic256::" + control["helper"]
+                    and control["error_function"] in profile["body_covered_functions"],
+                    "helper control targets an unproved or different helper")
+            first, last = helper_region(source, control["helper"])
+        else:
+            require(control["error_function"] == obligations[control["member"]]["report_function"],
+                    "control targets a different refinement")
+            first, last = (method_region(source, *control["member"].split("::"))
+                           if control["stage"] != "constants" else (1, len(source.splitlines())))
         lines = source.splitlines(keepends=True)
         selected = "".join(lines[first - 1:last])
         require(control["old"] and selected.count(control["old"]) == 1
@@ -181,19 +216,22 @@ def solver_sections(directory, root):
     for path in sorted(directory.glob("*.smt2")):
         text = path.read_text()
         queries += len(re.findall(r"^\s*\(check-sat\)\s*$", text, re.M))
-        headers = re.findall(r"^;; Function-Def (\S+)\n;; (.+):(\d+):(\d+):[^\n]*$", text, re.M)
-        require(text.count(";; Function-Def ") == len(headers), "unknown numeric body header")
-        for name, source, line, _ in headers:
+        # Bodies and the termination checks of recursive specification functions.
+        headers = re.findall(r"^;; (Function-Def|Spec-Termination) (\S+)\n;; (.+):(\d+):(\d+):[^\n]*$",
+                             text, re.M)
+        require(text.count(";; Function-Def ") + text.count(";; Spec-Termination ") == len(headers),
+                "unknown numeric body header")
+        for kind, name, source, line, _ in headers:
             resolved = Path(source) if Path(source).is_absolute() else root / source
             require(resolved.resolve().is_relative_to(root.resolve()), "body outside qualified source")
             sections.append({"function": name, "source": str(resolved.resolve().relative_to(root.resolve())),
-                             "line": int(line)})
+                             "line": int(line), **({"kind": "termination"} if kind == "Spec-Termination" else {})})
     return sections, queries
 
 
 def smt_coverage(directory, root, profile):
     sections, queries = solver_sections(directory, root)
-    key = lambda s: (s["function"], s["source"], s["line"])
+    key = lambda s: (s.get("kind", "body"), s["function"], s["source"], s["line"])
     require(queries == profile["expected_verified"] == len(profile["smt_sections"])
             and Counter(map(key, sections)) == Counter(map(key, profile["smt_sections"])),
             "missing, duplicate or foreign numeric verification condition")
@@ -247,6 +285,7 @@ def check(cache, install, directory, root=ROOT):
                     region=tuple(control["error_region"]), target_functions=[control["error_function"]]),
                 f"defect did not reach intended semantic failure: {name}")
         outcomes.append({"name": name, "member": control["member"], "stage": control["stage"],
+                         **({"helper": control["helper"]} if "helper" in control else {}),
                          "exit": failed_proc.returncode, "source_sha256": expected[str(SUBJECT)],
                          "semantic_refusal": True})
     require(snapshot(root) == before, "numeric qualification inputs changed")
