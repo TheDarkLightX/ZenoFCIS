@@ -60,6 +60,17 @@ class ExactnessControl(unittest.TestCase):
         self.assertFalse(exact.proved_equal(X2, (("mov", "rax", "rdi"), ("adc", "rax", "rsi")),
                                             (("mov", "rax", "rdi"), ("add", "rax", "rsi")), 1))
 
+    def test_the_search_pruning_is_exact_on_every_case(self):
+        report = exact.run()
+        self.assertTrue(report["exact"], [(r["case"], r["failures"][:2]) for r in report["cases"]])
+        for row in report["cases"]:
+            with self.subTest(case=row["case"]):
+                self.assertGreater(row["removed"], 0)
+                self.assertEqual(row["witnessed"] + row["removed_refused"], row["removed"])
+        reasons = {reason for row in report["cases"] for reason in row["reasons"]}
+        self.assertEqual(reasons, {"dead", "order"})
+        self.assertEqual({row["case"] for row in report["cases"]}, {case.name for case in exact.CASES})
+
     def test_a_removed_sequence_the_checker_refuses_needs_no_witness(self):
         case = exact.Grammar("refused", X2, (("mov", "rax", "rdi"), ("imul", "rax", "rsi"), ("sete", "rax")), 2)
         report = exact.check(case, lambda target, forms, results: "all" if forms else None)

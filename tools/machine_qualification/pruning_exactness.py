@@ -13,13 +13,20 @@ the Z3 proof accepts a witness; the samples only order the attempts. The proof c
 `verify.py` and `verify2.py`, not hardware.
 
 The pruning under test is a predicate `pruned(target, forms, results) -> str | None` over the grammar forms of one
-sequence, in enumeration order; it returns the pruning reason or None.
+sequence, in enumeration order; it returns the pruning reason or None. `search_pruner` adapts the search's own
+`footprint.Pruner`, and checks that it removes exactly what `footprint.sequences` omits from the enumeration.
+
+    python3 -B -m tools.machine_qualification.pruning_exactness run [--out REPORT.json]
+
+Exit 0 when every case is exact, 1 when any removal has no witness.
 """
 
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass
 from itertools import product
+import json
 from pathlib import Path
 import random
 import sys
@@ -45,19 +52,33 @@ class Grammar:
     length: int
     results: int = 1
 
+    def problem(self) -> dict:
+        """The problem fields the search pruning reads: schema, target, grammar and the number of outputs."""
+        two = self.target in (v2.X86, v2.RV64)
+        return {"schema": "zeno-fcis/machine-problem/2" if two else "zeno-fcis/machine-problem/1",
+                "target": self.target, "grammar": [list(form) for form in self.forms],
+                "max_instructions": self.length, "objective": "bytes",
+                **({"inputs": ["x", "y"], "outputs": [["input", "x"]] * self.results} if two
+                   else {"inputs": ["x", "y"], "expression": ["input", "x"]})}
+
 
 # Small grammars for both profiles and both targets, with argument, scratch and flag interactions.
 CASES = (
     Grammar("x86-profile1", v1.X86, (("mov", "rax", "rdi"), ("mov", "rax", "rsi"), ("add", "rax", "rsi"),
-                                     ("mov", "rcx", "rax"), ("xor", "rax", "rcx"), ("shl", "rax", 1)), 3),
+                                     ("mov", "rcx", "rax"), ("xor", "rax", "rcx"), ("shl", "rax", 1),
+                                     ("mov", "rdx", "rsi")), 3),
     Grammar("rv64i-profile1", v1.RV64, (("add", "a0", "a0", "a1"), ("sub", "t0", "a0", "a1"), ("addi", "a0", "t0", 0),
-                                        ("xor", "a0", "a0", "a0"), ("slli", "t0", "a0", 1)), 3),
+                                        ("xor", "a0", "a0", "a0"), ("slli", "t0", "a0", 1), ("slli", "t1", "a1", 1)),
+            3),
     Grammar("x86-profile2-one-result", v2.X86,
             (("mov", "rax", "rdi"), ("add", "rax", "rsi"), ("cmp", "rdi", "rsi"), ("cmovb", "rax", "rsi"),
              ("setb", "rdx"), ("adc", "rax", "rsi"), ("mov", "rdx", "rsi")), 3, 1),
     Grammar("x86-profile2-two-results", v2.X86,
             (("mov", "rax", "rdi"), ("add", "rax", "rsi"), ("cmp", "rdi", "rsi"), ("cmovb", "rax", "rsi"),
              ("setb", "rdx"), ("adc", "rax", "rsi"), ("mov", "rdx", "rsi")), 3, 2),
+    # Two live flag writers: only their order decides the carry that SETB and CMOVB read.
+    Grammar("x86-profile2-flag-order", v2.X86,
+            (("add", "rdx", "rsi"), ("add", "rax", "rdi"), ("setb", "rax"), ("cmovb", "rdx", "rdi")), 3, 2),
     Grammar("rv64i-profile2-one-result", v2.RV64,
             (("add", "a0", "a0", "a1"), ("sltu", "t0", "a0", "a1"), ("add", "a1", "a1", "t0"),
              ("addi", "t0", "zero", 1), ("sub", "a0", "a0", "a1")), 3, 1),
@@ -197,3 +218,59 @@ def check(case: Grammar, pruned: Pruner) -> dict:
             report["witnessed"] += 1
     report["exact"] = not report["failures"]
     return report
+
+
+def search_pruner(case: Grammar) -> Pruner:
+    """The search's footprint pruning as a predicate, checked against the enumeration the search actually runs."""
+    from machine_code import footprint
+    encoded = [encode_instruction(case.target, list(form)) for form in case.forms]
+    pruner = footprint.Pruner(case.problem(), encoded)
+    index = {form: position for position, form in enumerate(case.forms)}
+
+    def pruned(target, forms, results):
+        chosen = [index[form] for form in forms]
+        for end in range(1, len(chosen) + 1):
+            reason = pruner.judge(chosen[:end], len(chosen))
+            if reason:
+                return reason
+        return None
+
+    for length in range(case.length + 1):
+        enumerated = set(footprint.sequences(len(case.forms), length, pruner.judge, {}))
+        mine = {choice for choice in product(range(len(case.forms)), repeat=length)
+                if pruned(case.target, tuple(case.forms[i] for i in choice), case.results) is None}
+        if enumerated != mine:
+            raise ValueError(f"{case.name}: the predicate and footprint.sequences disagree at length {length}")
+    return pruned
+
+
+def run(cases=CASES) -> dict:
+    rows = [check(case, search_pruner(case)) for case in cases]
+    for row in rows:
+        row["failure_count"] = len(row["failures"])
+        row["failures"] = row["failures"][:20]
+    return {"schema": "zeno-fcis/search-pruning-exactness/1", "authority": "none", "cases": rows,
+            "exact": all(row["exact"] for row in rows),
+            "scope": "Witnesses are proved by Z3 under the registered ISA models for these grammars and lengths."}
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    commands = parser.add_subparsers(dest="command", required=True)
+    measured = commands.add_parser("run")
+    measured.add_argument("--out", type=Path)
+    args = parser.parse_args(argv)
+    report = run()
+    text = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    if args.out:
+        args.out.write_text(text, encoding="utf-8")
+    for row in report["cases"]:
+        print(f"{row['case']}: enumerated {row['enumerated']}, removed {row['removed']} {row['reasons']}, "
+              f"witnessed {row['witnessed']}, refused {row['removed_refused']}, failures {row['failure_count']}")
+    print("ZENO_EXACTNESS " + json.dumps({"exact": report["exact"],
+                                         "failures": {r["case"]: r["failure_count"] for r in report["cases"]}}))
+    return 0 if report["exact"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
