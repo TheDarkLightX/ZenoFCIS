@@ -217,10 +217,10 @@
       "contract_sha256": "26cf454938afc1f5482462fc626ef1e27e3b234ecf1776a836a8228987e86f2a",
       "palette_name": "rightmost-bit-arithmetic",
       "palette_sha256": "eb71eb2ff444850a47ea1bf232d1a3c214722022620ced0b50f501f2d870ae04",
+      "preflight": null,
       "probe_survivors": 1,
       "problem": "lowest-set-bit-u8",
-      "status": "verified-within-profile",
-      "preflight": null
+      "status": "verified-within-profile"
     },
     {
       "candidate_budget": 10000,
@@ -228,9 +228,6 @@
       "contract_sha256": "26cf454938afc1f5482462fc626ef1e27e3b234ecf1776a836a8228987e86f2a",
       "palette_name": "control-bitwise-only",
       "palette_sha256": "dcecbfe516aaa752c5b18786da1740789c790ed6e246d268673433103efd1d1f",
-      "probe_survivors": 0,
-      "problem": "lowest-set-bit-u8",
-      "status": "infeasible-bitwise-local-palette",
       "preflight": {
         "bit": 1,
         "input_a": 2,
@@ -238,7 +235,10 @@
         "output_a_bit": 1,
         "output_b_bit": 0,
         "rule": "bitwise-locality-u8/1"
-      }
+      },
+      "probe_survivors": 0,
+      "problem": "lowest-set-bit-u8",
+      "status": "infeasible-bitwise-local-palette"
     },
     {
       "candidate_budget": 10000,
@@ -246,10 +246,10 @@
       "contract_sha256": "a020b57b80fc5a54243d59aeb91ed1f85bc1f6a69445cfa37bedd44bde05fbbc",
       "palette_name": "rightmost-bit-arithmetic",
       "palette_sha256": "a7c8b79f02f89a3a92970456871f02c13195af59be355dcf95915f42f71529cc",
+      "preflight": null,
       "probe_survivors": 1,
       "problem": "clear-lowest-set-bit-u8",
-      "status": "verified-within-profile",
-      "preflight": null
+      "status": "verified-within-profile"
     },
     {
       "candidate_budget": 10000,
@@ -257,9 +257,6 @@
       "contract_sha256": "a020b57b80fc5a54243d59aeb91ed1f85bc1f6a69445cfa37bedd44bde05fbbc",
       "palette_name": "control-bitwise-only",
       "palette_sha256": "dcecbfe516aaa752c5b18786da1740789c790ed6e246d268673433103efd1d1f",
-      "probe_survivors": 0,
-      "problem": "clear-lowest-set-bit-u8",
-      "status": "infeasible-bitwise-local-palette",
       "preflight": {
         "bit": 1,
         "input_a": 2,
@@ -267,7 +264,10 @@
         "output_a_bit": 0,
         "output_b_bit": 1,
         "rule": "bitwise-locality-u8/1"
-      }
+      },
+      "probe_survivors": 0,
+      "problem": "clear-lowest-set-bit-u8",
+      "status": "infeasible-bitwise-local-palette"
     },
     {
       "candidate_budget": 10000,
@@ -275,10 +275,10 @@
       "contract_sha256": "be7a379da38b88c304780e1537d63db1525509abe0e9fa92272684167e9e5e9d",
       "palette_name": "power-of-two-divisor",
       "palette_sha256": "96e4a0325ed88f88464862f98b65c5a6769904e0eaa84e94101ae03e2343dfa7",
+      "preflight": null,
       "probe_survivors": 1,
       "problem": "divide-by-eight-u8",
-      "status": "verified-within-profile",
-      "preflight": null
+      "status": "verified-within-profile"
     },
     {
       "candidate_budget": 10000,
@@ -286,9 +286,6 @@
       "contract_sha256": "be7a379da38b88c304780e1537d63db1525509abe0e9fa92272684167e9e5e9d",
       "palette_name": "control-no-shift",
       "palette_sha256": "e0bde26eed8c864a6e11a5ba05e8e169dca04eebd8703c4d8005ad8294c46dbf",
-      "probe_survivors": 0,
-      "problem": "divide-by-eight-u8",
-      "status": "infeasible-right-to-left-palette",
       "preflight": {
         "bits": 1,
         "input_a": 0,
@@ -296,7 +293,10 @@
         "output_a_low": 0,
         "output_b_low": 1,
         "rule": "right-to-left-prefix-u8/1"
-      }
+      },
+      "probe_survivors": 0,
+      "problem": "divide-by-eight-u8",
+      "status": "infeasible-right-to-left-palette"
     },
     {
       "candidate_budget": 10000,
@@ -304,10 +304,10 @@
       "contract_sha256": "8269ab4e007c5e3627661fe7e4b17c2452966fa60ce6ab73a700486e0c6257db",
       "palette_name": "power-of-two-mask",
       "palette_sha256": "33622f884cbc9d7b9ab2b1ecb2279a39a735b846421ff98671d9555e59f7ee4d",
+      "preflight": null,
       "probe_survivors": 1,
       "problem": "modulo-eight-u8",
-      "status": "verified-within-profile",
-      "preflight": null
+      "status": "verified-within-profile"
     },
     {
       "candidate_budget": 10000,
@@ -315,10 +315,10 @@
       "contract_sha256": "8269ab4e007c5e3627661fe7e4b17c2452966fa60ce6ab73a700486e0c6257db",
       "palette_name": "control-no-mask-constant",
       "palette_sha256": "93e6d27a89ebb33158cd80f441082130b95e404a85aca6d77f16881f981a132e",
+      "preflight": null,
       "probe_survivors": 0,
       "problem": "modulo-eight-u8",
-      "status": "none-within-grammar",
-      "preflight": null
+      "status": "none-within-grammar"
     },
     {
       "candidate_budget": 10000,
@@ -326,10 +326,10 @@
       "contract_sha256": "78cb293907cbe9c1c79c75cc20932e9d44d8beef30d312a03527ef99e22fe19a",
       "palette_name": "gray-code-neighbor-parity",
       "palette_sha256": "c3b60075638d1794f24e74c534dd0afff2792819517531c499b65ddfde443f4a",
+      "preflight": null,
       "probe_survivors": 1,
       "problem": "gray-code-u8",
-      "status": "verified-within-profile",
-      "preflight": null
+      "status": "verified-within-profile"
     },
     {
       "candidate_budget": 10000,
@@ -337,9 +337,6 @@
       "contract_sha256": "78cb293907cbe9c1c79c75cc20932e9d44d8beef30d312a03527ef99e22fe19a",
       "palette_name": "control-no-shift",
       "palette_sha256": "4708f72098ed5546bfd714ca9074fb327d7f1468968692f3fc590233798e8a64",
-      "probe_survivors": 0,
-      "problem": "gray-code-u8",
-      "status": "infeasible-right-to-left-palette",
       "preflight": {
         "bits": 1,
         "input_a": 0,
@@ -347,7 +344,10 @@
         "output_a_low": 0,
         "output_b_low": 1,
         "rule": "right-to-left-prefix-u8/1"
-      }
+      },
+      "probe_survivors": 0,
+      "problem": "gray-code-u8",
+      "status": "infeasible-right-to-left-palette"
     },
     {
       "candidate_budget": 10000,
@@ -355,10 +355,10 @@
       "contract_sha256": "a54dc2518b73a28140121e661f82d30d9c409887d1aafcfb6402a7eaa3fe3805",
       "palette_name": "bit-rearrangement",
       "palette_sha256": "478f03935707fa5d01d0be2de798cc8c490007a0e241797067e7faf74ca12bce",
+      "preflight": null,
       "probe_survivors": 1,
       "problem": "rotate-left-one-u8",
-      "status": "verified-within-profile",
-      "preflight": null
+      "status": "verified-within-profile"
     },
     {
       "candidate_budget": 10000,
@@ -366,9 +366,6 @@
       "contract_sha256": "a54dc2518b73a28140121e661f82d30d9c409887d1aafcfb6402a7eaa3fe3805",
       "palette_name": "control-no-right-shift",
       "palette_sha256": "f469ce3dc28ee539aa7ade8cd5614a5fc0569880c72f92b4780a522d7ac797b2",
-      "probe_survivors": 0,
-      "problem": "rotate-left-one-u8",
-      "status": "infeasible-right-to-left-palette",
       "preflight": {
         "bits": 1,
         "input_a": 0,
@@ -376,7 +373,10 @@
         "output_a_low": 0,
         "output_b_low": 1,
         "rule": "right-to-left-prefix-u8/1"
-      }
+      },
+      "probe_survivors": 0,
+      "problem": "rotate-left-one-u8",
+      "status": "infeasible-right-to-left-palette"
     }
   ],
   "schema": "zeno-fcis/algorithm-research-catalog/3",
