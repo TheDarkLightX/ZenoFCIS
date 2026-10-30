@@ -73,6 +73,8 @@ jobs:
         run: |
           python3 -B tools/test_machine_code_realize.py
           python3 -O -B tools/test_machine_code_realize.py
+          python3 -B tools/test_machine_code_realize_rules.py
+          python3 -O -B tools/test_machine_code_realize_rules.py
       - name: ZAL source, human feedback and independent machine replay
         run: python3 -B tools/test_zal_word_kernel.py
       - name: ZAL word-kernel profile 2, library-equal lowering and profile-2 replay
