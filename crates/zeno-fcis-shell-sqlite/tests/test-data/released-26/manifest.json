@@ -6,7 +6,9 @@
       "new",
       "./released-version-1",
       "--contract",
-      "./original-contract"
+      "./original-contract",
+      "--source",
+      "V260"
     ],
     [
       "cargo",
@@ -69,7 +71,9 @@
       "new",
       "./released-adopted",
       "--contract",
-      "./adopted-contract"
+      "./adopted-contract",
+      "--source",
+      "V260"
     ],
     [
       "cargo",
@@ -98,30 +102,16 @@
     "6658a15314f970b6dde810d49a8f4ed24b9dc7cf52fd2992d55fff26db5b4b83"
   ],
   "provenance": {
-    "build": {
-      "command": [
-        "cargo",
-        "+1.97.1",
-        "build",
-        "-p",
-        "zeno-fcis-cli",
-        "--locked",
-        "--offline"
-      ],
-      "directory": "the released checkout",
-      "environment": {
-        "CARGO_PROFILE_DEV_DEBUG": "0"
-      }
-    },
+    "build": null,
     "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
-    "released_cli_sha256": "0fa89cd29e00f68dbdd649663f171ff0393f89437185dab838353869e199965d",
+    "released_cli_sha256": "ce6f0c037c92d9c1c8ec1358e259239f133828e76f583cdc97441ee995f01227",
     "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "source_lock_sha256": "ebdae23dea679a4a817d4e668ac8b68c1dd7560b4f1b6b87d9bfdf51bf909c88",
     "subject": "7d175c47099866939c86acd463ac85219abba882",
     "tag": "v2.6.0"
   },
   "release": "2.6.0",
-  "released_cli_sha256": "0fa89cd29e00f68dbdd649663f171ff0393f89437185dab838353869e199965d",
+  "released_cli_sha256": "ce6f0c037c92d9c1c8ec1358e259239f133828e76f583cdc97441ee995f01227",
   "schema": "zeno-fcis/released-26-test-inputs/1",
   "subject": "7d175c47099866939c86acd463ac85219abba882",
   "version_1_lock_sha256": "b2c03656dd93f38b9974aa5c7211c9e760c14c1f48dac17ea70705d800c281d1"

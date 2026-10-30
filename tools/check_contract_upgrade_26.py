@@ -167,7 +167,9 @@ def released(directory: Path, cli: Path, source: Path, build: dict | None = None
     (raw / "tests").mkdir()
     (raw / EXAMPLES).write_text(upgrade.SESSION)
     first = directory / "released-version-1"
-    step([cli, "new", first, "--contract", raw])
+    # `--source` names the released checkout explicitly: a published executable
+    # is built without a bound source tree, and a build from the tag binds to it.
+    step([cli, "new", first, "--contract", raw, "--source", source])
     first_graph = prepare(first, source)
     commands.append(["cargo", "+1.97.1", "build", "--locked", "--offline", "# in ./released-version-1"])
     first = upgrade.build_app(first)
@@ -206,7 +208,7 @@ def released(directory: Path, cli: Path, source: Path, build: dict | None = None
 
     # Control: the released version 2 build upgrades both released stores.
     second = directory / "released-adopted"
-    step([cli, "new", second, "--contract", adopted])
+    step([cli, "new", second, "--contract", adopted, "--source", source])
     second_graph = prepare(second, source)
     commands.append(["cargo", "+1.97.1", "build", "--locked", "--offline", "# in ./released-adopted"])
     second = upgrade.build_app(second)
