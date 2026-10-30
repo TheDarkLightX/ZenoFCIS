@@ -544,13 +544,15 @@ python3 -B -m tools.machine_qualification.search_bench compare BEFORE.json AFTER
   budgets (100,000 candidates, 128 checks, 60 s, 1 s solver timeout) and records every counter the search returns,
   wall times, the found cost and the stopping budget. `compare` fails only when a found cost is worse or lost.
 
-At b941d3ce the pruning was exact on all seven grammars: 1,358 removals, each with a proved witness. All six
-planted defects were detected in both modes. Over the 18 problems, three repeats each, candidates fell from 107,123
-to 25,146, solver checks from 27 to 24, and the summed median time from 27.5 s to 7.5 s on one loaded machine. All
-found costs were identical except signed saturating add. It exhausted its grammar and found its 31-byte,
-7-instruction library kernel, where the unpruned search stopped at the candidate budget with none. With
-`--no-prune`, every counter and cost equalled the baseline at dc410214. The exactness result holds for these
-grammars and lengths under the registered ISA models.
+With the pruning and cost-bound stop of b7ad132e, the pruning was exact on all seven grammars: 1,358 removals, each
+with a proved witness. All six planted defects were detected in both modes. Over the 18 problems measured at
+dc410214, three repeats each, candidates fell from 107,123 to 25,010, solver checks from 27 to 24, and the summed
+median time from 27.5 s to 8.2 s on one loaded machine. All found costs were identical except signed saturating add.
+It exhausted its grammar and found its 31-byte, 7-instruction library kernel, where the unpruned search stopped at
+the candidate budget with none. The newer `minmax-x86` problem finds its 18-byte, 5-instruction kernel after 438
+proposals and 3 solver checks; unpruned, it reaches the same cost but stops at the 100,000-candidate budget. With
+`--no-prune`, every counter and cost equalled the baseline. The exactness result holds for these grammars and
+lengths under the registered ISA models.
 
 ## Profile 2: flags, carries and comparisons
 
