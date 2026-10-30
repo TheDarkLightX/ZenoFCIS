@@ -9,14 +9,21 @@ checker edit or another host; a fresh recheck can.
 `add` imports only an emitted artifact that replays here, and never overwrites an entry. The library check
 establishes the registered ISA-model equivalence for each entry on this checker; it is not native execution,
 timing, a kernel proof or a deployment grant.
+
+`check --native` also runs each x86 entry's rebuilt object on this processor (see `native.py`) and reports RV64I
+entries as not run. `bench` times each rechecked x86 entry against GCC's code for the same expression (see
+`bench.py`) and writes one table, scoped to this machine and load.
 """
 
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 import re
+import tempfile
 
-from . import session
+from . import bench as timing, native as execution, session
 from .model import canonical, digest, read_json
 from .targets import assembly_source, elf_object
 
@@ -72,8 +79,8 @@ def add(artifact: Path, library: Path, name: str, summary: str, route: str, time
             "cost": value["cost"], "authority": "none"}
 
 
-def check(library: Path, timeout_ms: int = 1000) -> dict:
-    """Recheck every entry; the library passes only if every entry is equivalent at its recorded cost."""
+def _recheck(library: Path, timeout_ms: int) -> list:
+    """(report row, problem, code) for every file; problem and code are None for a refused file."""
     if library.is_symlink() or not library.is_dir():
         raise ValueError("library must be an existing non-symlink directory")
     paths = sorted(library.iterdir())
@@ -81,7 +88,7 @@ def check(library: Path, timeout_ms: int = 1000) -> dict:
         raise ValueError("library holds more than 256 entries")
     rows = []
     for path in paths:
-        row = {"file": path.name}
+        row, problem, code = {"file": path.name}, None, None
         try:
             if path.suffix != ".json" or path.is_symlink() or not path.is_file():
                 raise ValueError("library holds a non-entry file")
@@ -100,10 +107,107 @@ def check(library: Path, timeout_ms: int = 1000) -> dict:
                 row.update(status="equivalent")
         except (ValueError, TypeError, KeyError, OSError) as error:
             row.update(status="refused", reason=str(error) or type(error).__name__)
-        rows.append(row)
+            problem = code = None
+        rows.append((row, problem, code))
+    return rows
+
+
+def check(library: Path, timeout_ms: int = 1000, native: bool = False) -> dict:
+    """Recheck every entry; the library passes only if every entry is equivalent at its recorded cost.
+
+    With `native`, every x86 entry must also agree natively, and RV64I entries are reported as not run.
+    """
+    checked = _recheck(library, timeout_ms)
+    rows = [row for row, _, _ in checked]
     passed = bool(rows) and all(row["status"] == "equivalent" for row in rows)
-    return {"schema": REPORT, "status": "checked" if passed else "failed", "kernels": rows,
-            "identity": session.identity(), "assurance": session.ASSURANCE, "authority": "none",
-            "scope": ("Each entry was rechecked now by the independent checker for its profile, at its recorded "
-                      "cost, and its ELF object and assembly were rebuilt from the bytes. Not native execution, "
-                      "timing, global optimality, a kernel proof or a deployment grant.")}
+    scope = ("Each entry was rechecked now by the independent checker for its profile, at its recorded "
+             "cost, and its ELF object and assembly were rebuilt from the bytes. Not native execution, "
+             "timing, global optimality, a kernel proof or a deployment grant.")
+    report = {"schema": REPORT, "status": "checked" if passed else "failed", "kernels": rows,
+              "identity": session.identity(), "assurance": session.ASSURANCE, "authority": "none", "scope": scope}
+    if not native:
+        return report
+    unsupported = execution.unsupported_host()
+    with tempfile.TemporaryDirectory(prefix="zeno-library-native-") as work:
+        for index, (row, problem, code) in enumerate(checked):
+            if problem is None:
+                row["native"] = {"status": "not-run", "reason": "entry refused"}
+            elif problem["target"] not in execution.X86_TARGETS:
+                row["native"] = dict(execution.NOT_RV64I)
+            elif unsupported:
+                row["native"] = {"status": "not-run", "reason": unsupported}
+            else:
+                row["native"] = execution.execute(problem, code, Path(work) / str(index), row["name"])
+    states = [row["native"]["status"] for row in rows]
+    report["native_summary"] = {
+        "agreed": states.count("agreed"), "mismatch": states.count("mismatch"), "error": states.count("error"),
+        "not_run": {row["file"]: row["native"]["reason"] for row in rows if row["native"]["status"] == "not-run"},
+        "vectors": sum(row["native"].get("vectors", 0) for row in rows)}
+    if any(state in ("mismatch", "error") for state in states):
+        report["status"] = "failed"
+    elif passed and unsupported and any(p is not None and p["target"] in execution.X86_TARGETS for _, p, _ in checked):
+        report["status"] = "inconclusive"
+    report["scope"] = scope.replace("Not native execution, timing", "Not timing") + " " + execution.SCOPE
+    return report
+
+
+def bench(library: Path, output: Path, iterations: int = 1_000_000, repeats: int = 21, timeout_ms: int = 1000) -> dict:
+    """Recheck every entry, then time each equivalent x86 entry against GCC's code for the same expression."""
+    refused = timing.unsupported_host()
+    if refused:
+        return refused
+    timing.budget(iterations, repeats)
+    gcc, refused = timing.compiler()
+    if refused:
+        return refused
+    checked = _recheck(library, timeout_ms)
+    output.mkdir(mode=0o700)
+    start, compiler = os.getloadavg(), None
+    rows = []
+    for row, problem, code in checked:
+        line = {"kernel": row.get("name", row["file"]), "target": row.get("target"),
+                "bytes": len(code) if code else None}
+        if row["status"] != "equivalent":
+            line.update(status="not-timed", reason="did not recheck: " + row["status"])
+        elif problem["target"] not in timing.X86_TARGETS:
+            line.update(status="not-run", reason=execution.NOT_RV64I["reason"])
+        else:
+            work = output / row["name"]
+            work.mkdir(mode=0o700)
+            (work / "kernel.o").write_bytes(elf_object(problem["target"], code))
+            measured = timing.measure(problem, code, work / "kernel.o", work, iterations, repeats, gcc)
+            line.update(status="measured", baseline_c=measured["baseline_c"],
+                        ticks_per_call=measured["ticks_per_call"], ratio=measured["ratio_kernel_over_baseline"])
+            compiler = measured["environment"]["compiler"]
+        rows.append(line)
+    environment = {"cpu": timing._cpu(), "load_average_start": start, "load_average_end": os.getloadavg(),
+                   "compiler": compiler}
+    passed = bool(rows) and all(line["status"] in ("measured", "not-run") for line in rows)
+    report = {"schema": "zeno-fcis/machine-kernel-library-bench/1", "status": "measured" if passed else "failed",
+              "kernels": rows, "iterations": iterations, "repeats": repeats, "environment": environment,
+              "authority": "none", "scope": "This machine and load only. " + timing.SCOPE}
+    report["table"] = _table(report)
+    (output / "bench.json").write_text(json.dumps(report, indent=1, sort_keys=True) + "\n")
+    (output / "bench.md").write_text(report["table"])
+    return report
+
+
+def _table(report: dict) -> str:
+    environment = report["environment"]
+    load = lambda values: ", ".join(f"{value:.2f}" for value in values)
+    lines = [f"Paired timing on {environment['cpu']}, load average {load(environment['load_average_start'])} at the "
+             f"start and {load(environment['load_average_end'])} at the end, {environment['compiler'] or 'gcc'}, "
+             f"{report['iterations']} iterations and {report['repeats']} repeats. This machine and load only; not a "
+             "portable speedup claim.", "",
+             "| Kernel | Target | Bytes | Latency ticks, kernel / GCC | Ratio | Throughput ticks, kernel / GCC | Ratio |",
+             "| --- | --- | --- | --- | --- | --- | --- |"]
+    for row in report["kernels"]:
+        if row["status"] != "measured":
+            lines.append(f"| {row['kernel']} | {row['target'] or ''} | {row['bytes'] or ''} | "
+                         f"{row['status']}: {row['reason']} | | | |")
+            continue
+        ticks, ratio = row["ticks_per_call"], row["ratio"]
+        lines.append(f"| {row['kernel']} | {row['target']} | {row['bytes']} | "
+                     f"{ticks['kernel_latency']:.2f} / {ticks['baseline_latency']:.2f} | {ratio['latency']:.2f} | "
+                     f"{ticks['kernel_throughput']:.2f} / {ticks['baseline_throughput']:.2f} | {ratio['throughput']:.2f} |")
+    return "\n".join(lines) + "\n"

@@ -130,40 +130,69 @@ def _run(arguments, cwd):
     return result.stdout
 
 
+X86_TARGETS = ("x86_64-sysv-register/1", "x86_64-sysv-register/2")
+SCOPE = ("RDTSC reference ticks per call through a function pointer, median of alternating repeats on "
+         "this machine and load. Not a portable speedup claim; call overhead is included equally.")
+
+
+def unsupported_host():
+    """The inconclusive result when this is not a Linux x86-64 host, else None."""
+    if platform.system() != "Linux" or platform.machine() != "x86_64":
+        return {"status": "inconclusive", "reason": "paired timing needs an actual Linux x86-64 host"}
+    return None
+
+
+def compiler() -> tuple:
+    """(gcc path, None), or (None, the inconclusive result) when gcc is missing."""
+    gcc = shutil.which("gcc", path="/usr/bin:/bin")
+    return (gcc, None) if gcc else (None, {"status": "inconclusive", "reason": "gcc is required for the baseline"})
+
+
+def budget(iterations: int, repeats: int):
+    if not (1_000 <= iterations <= 100_000_000 and 3 <= repeats <= 101):
+        raise ValueError("iterations must be 1,000..100,000,000 and repeats 3..101")
+
+
 def bench(artifact: Path, output: Path, iterations=1_000_000, repeats=21, timeout_ms=1000) -> dict:
     from .session import replay_artifact
     from .model import read_json
-    if platform.system() != "Linux" or platform.machine() != "x86_64":
-        return {"status": "inconclusive", "reason": "paired timing needs an actual Linux x86-64 host"}
-    if not (1_000 <= iterations <= 100_000_000 and 3 <= repeats <= 101):
-        raise ValueError("iterations must be 1,000..100,000,000 and repeats 3..101")
-    gcc = shutil.which("gcc", path="/usr/bin:/bin")
-    if gcc is None:
-        return {"status": "inconclusive", "reason": "gcc is required for the baseline"}
+    refused = unsupported_host()
+    if refused:
+        return refused
+    budget(iterations, repeats)
+    gcc, refused = compiler()
+    if refused:
+        return refused
     replayed = replay_artifact(artifact, timeout_ms)
     if replayed.get("status") != "replayed":
         return {"status": "inconclusive", "reason": "artifact did not replay", "detail": replayed}
     problem = read_json(artifact / "problem.json")
-    if problem["target"] not in ("x86_64-sysv-register/1", "x86_64-sysv-register/2"):
+    if problem["target"] not in X86_TARGETS:
         return {"status": "inconclusive", "reason": "only x86-64 kernels can be executed on this host"}
     output.mkdir(mode=0o700)
+    return measure(problem, (artifact / "kernel.bin").read_bytes(), (artifact / "kernel.o").resolve(), output,
+                   iterations, repeats, gcc)
+
+
+def measure(problem: dict, code: bytes, kernel_object: Path, output: Path, iterations: int, repeats: int,
+            gcc: str) -> dict:
+    """Time an already rechecked x86 kernel object against GCC's code for the same expression, in `output`."""
     baseline, harness, expression = _sources(problem)
     (output / "baseline.c").write_text(baseline)
     (output / "harness.c").write_text(harness)
     _run([gcc, "-std=gnu11", "-O2", "-fno-lto", "-c", "baseline.c", "-o", "baseline.o"], output)
     _run([gcc, "-std=gnu11", "-O2", "-fno-lto", "-Wl,-z,noexecstack", "harness.c", "baseline.o",
-          str((artifact / "kernel.o").resolve()), "-o", "bench"], output)
+          str(kernel_object), "-o", "bench"], output)
     rows = json.loads(_run([str(output / "bench"), str(iterations), str(repeats)], output))["rows"]
     median = lambda column: statistics.median(row[column] for row in rows)
     report = {"schema": "zeno-fcis/machine-bench/1", "status": "measured", "authority": "none",
-              "artifact_code_hex": (artifact / "kernel.bin").read_bytes().hex(), "baseline_c": expression,
+              "artifact_code_hex": code.hex(), "baseline_c": expression,
               "ticks_per_call": {"kernel_latency": median(0), "baseline_latency": median(1),
                                  "kernel_throughput": median(2), "baseline_throughput": median(3)},
               "ratio_kernel_over_baseline": {"latency": median(0) / median(1), "throughput": median(2) / median(3)},
               "iterations": iterations, "repeats": repeats,
               "environment": {"cpu": _cpu(), "load_average": os.getloadavg(), "compiler": _run([gcc, "--version"], output).splitlines()[0]},
-              "scope": ("RDTSC reference ticks per call through a function pointer, median of alternating repeats on "
-                        "this machine and load. Not a portable speedup claim; call overhead is included equally.")}
+              "scope": SCOPE}
     (output / "report.json").write_text(json.dumps(report, indent=1, sort_keys=True) + "\n")
     return report
 
