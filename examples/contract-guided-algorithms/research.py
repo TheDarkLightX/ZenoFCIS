@@ -18,7 +18,7 @@ import tempfile
 import reference
 
 SCHEMA = "zeno-fcis/algorithm-research-corpus/1"
-CATALOG_SCHEMA = "zeno-fcis/algorithm-research-catalog/1"
+CATALOG_SCHEMA = "zeno-fcis/algorithm-research-catalog/2"
 PROFILE = "u8-mod-word/1"
 OPS = ("and", "or", "xor", "add", "sub", "not", "lshr", "shl")
 COMMUTATIVE = frozenset(("and", "or", "xor", "add"))
@@ -239,8 +239,53 @@ def palette_expressions(palette: dict):
         yield from by_size[n]
 
 
+def prefix_dependency_witness(problem: dict) -> dict | None:
+    """Find a finite u8 refutation of right-to-left bit dependency.
+
+    A function is right-to-left if output bits 0..k depend only on input
+    bits 0..k. These 8-bit scans check the *reference*, not candidate code.
+    A witness identifies two inputs sharing a low prefix but whose outputs
+    differ in that same prefix. This is a necessary-condition check, not an
+    optimizer or a general decidability procedure for other semantic profiles.
+    """
+    for bits in range(1, 8):
+        mask = (1 << bits) - 1
+        first: dict[int, tuple[int, int]] = {}
+        for x in range(256):
+            key = x & mask
+            out = reference.result(problem["reference"], x) & mask
+            if key in first:
+                prior_x, prior_out = first[key]
+                if out != prior_out:
+                    return {"rule": "right-to-left-prefix-u8/1", "bits": bits,
+                            "input_a": prior_x, "input_b": x,
+                            "output_a_low": prior_out, "output_b_low": out}
+            else:
+                first[key] = (x, out)
+    return None
+
+
+def structural_preflight(problem: dict, palette: dict) -> dict | None:
+    """Soundly reject this closed grammar when a necessary law is violated.
+
+    Literals, input, NOT, AND, OR, XOR, modular ADD/SUB, and fixed left
+    shifts all preserve low-prefix equality under composition. Right shifts
+    by nonzero counts do *not*. A refuted reference cannot be synthesized
+    by any tree of these operations, regardless of candidate/depth budget.
+    The statement is intentionally restricted to u8-mod-word/1.
+    """
+    ops = palette["operators"]
+    if "lshr" in ops and any(shift > 0 for shift in palette["shifts"]):
+        return None
+    return prefix_dependency_witness(problem)
+
+
 def search(problem: dict, palette: dict, max_candidates: int) -> dict:
     required(is_int(max_candidates, 1, MAX_BUDGET), "invalid candidate budget")
+    witness = structural_preflight(problem, palette)
+    if witness is not None:
+        return {"status": "infeasible-right-to-left-palette", "candidates_inspected": 0,
+                "probe_survivors": 0, "candidate": None, "preflight": witness}
     # Do not construct enormous intermediate levels before enforcing work caps.
     if grammar_upper_bound(palette) > MAX_GRAMMAR_EXPRESSIONS:
         return {"status": "inconclusive-grammar-size", "candidates_inspected": 0,
@@ -287,7 +332,8 @@ def run(corpus: dict, max_candidates: int) -> dict:
                       "status": result["status"],
                       "candidates_inspected": result["candidates_inspected"],
                       "probe_survivors": result["probe_survivors"],
-                      "candidate_budget": max_candidates}
+                      "candidate_budget": max_candidates,
+                      "preflight": result.get("preflight")}
             experiments.append(record)
             if result["candidate"] is None:
                 continue
@@ -362,7 +408,8 @@ def replay(corpus: dict, catalog: dict) -> int:
     required(is_int(len(catalog["experiments"]), 1, MAX_CASES * 8), "invalid experiment count")
     for record in catalog["experiments"]:
         exact_keys(record, {"problem", "contract_sha256", "palette_name", "palette_sha256",
-                            "status", "candidates_inspected", "probe_survivors", "candidate_budget"},
+                            "status", "candidates_inspected", "probe_survivors", "candidate_budget",
+                            "preflight"},
                    "experiment")
         required(record["problem"] in problems, "unknown experiment problem")
         p = problems[record["problem"]]
@@ -374,7 +421,8 @@ def replay(corpus: dict, catalog: dict) -> int:
         expected = search(p, matches[0], record["candidate_budget"])
         required(record["status"] == expected["status"] and
                  record["candidates_inspected"] == expected["candidates_inspected"] and
-                 record["probe_survivors"] == expected["probe_survivors"],
+                 record["probe_survivors"] == expected["probe_survivors"] and
+                 record["preflight"] == expected.get("preflight"),
                  "experiment replay mismatch")
         if expected["candidate"] is not None:
             required(any(e["problem"] == record["problem"] and
