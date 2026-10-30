@@ -33,7 +33,8 @@ class ExactnessControl(unittest.TestCase):
                 self.assertEqual(report["kept"], sum(len(case.forms) ** n for n in range(case.length + 1)))
         self.assertEqual({case.target for case in exact.CASES},
                          {"x86_64-sysv-register/1", "rv64i-register/1", "x86_64-sysv-register/2",
-                          "rv64i-register/2"})
+                          "rv64i-register/2", "x86_64-sysv-memory/3", "rv64i-memory/3"})
+        self.assertEqual(len([case for case in exact.CASES if case.base]), 6)
 
     def test_a_correct_pruner_has_a_proved_witness_for_every_removal(self):
         report = exact.check(exact.CASES[0], dead_x86_mov)
@@ -64,6 +65,20 @@ class ExactnessControl(unittest.TestCase):
         # Entry flags are free: ADC is not ADD.
         self.assertFalse(exact.proved_equal(X2, (("mov", "rax", "rdi"), ("adc", "rax", "rsi")),
                                             (("mov", "rax", "rdi"), ("add", "rax", "rsi")), 1))
+
+    def test_profile3_proofs_observe_results_and_read_write_words(self):
+        case = next(case for case in exact.CASES if case.name == "memory-swap-words-x86")
+        problem, target = case.problem(), case.target
+        loads, stores = case.forms[:2], case.forms[2:]
+        self.assertTrue(exact.proved_equal(target, loads + stores, loads[::-1] + stores, 0, problem=problem))
+        self.assertFalse(exact.proved_equal(target, loads + stores, loads + stores[:1], 0, problem=problem))
+        # Loads alone change no observed location.
+        self.assertTrue(exact.proved_equal(target, loads, (), 0, problem=problem))
+        sum_case = next(case for case in exact.CASES if case.name == "memory-copy2-sum-rv64i")
+        # Adding into a0 redefines the source base, so a later load through it is refused.
+        load, add = sum_case.forms[0], sum_case.forms[4]
+        self.assertTrue(exact.refused(sum_case.target, (add, load), sum_case.problem()))
+        self.assertFalse(exact.refused(sum_case.target, (load, add), sum_case.problem()))
 
     def test_the_search_pruning_is_exact_on_every_case(self):
         report = exact.run()

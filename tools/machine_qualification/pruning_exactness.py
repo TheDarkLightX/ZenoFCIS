@@ -1,9 +1,11 @@
 """Exactness control for search pruning: every removal needs a Z3-proved twin or a checker refutation.
 
 For a small grammar, length and specification on one target, every instruction sequence is enumerated with pruning
-off and on. A twin of a removed sequence is a kept sequence of no greater cost, in bytes and in instructions, whose
-observed results are identical on every entry state: every register, and for x86 profile 2 every entry flag, is a
-free symbol, and Z3 must prove that no state makes the observed result registers differ. Each case runs two passes:
+off and on. The cases cover profiles 1 and 2 on both targets and every registered profile-3 memory kernel over its
+own grammar. A twin of a removed sequence is a kept, admitted sequence of no greater cost, in bytes and in
+instructions, whose observed results are identical on every entry state: every register, every x86 entry flag on
+profiles 2 and 3, and every profile-3 region word is a free symbol, and Z3 must prove that no state makes the
+observed result registers (and, on profile 3, the read-write region words) differ. Each case runs two passes:
 
 - twins: the lost-input rule is off (no required inputs). Every sequence removed as dead, out of order or a
   duplicate needs a twin. This pass does not depend on the specification.
@@ -31,7 +33,7 @@ Exit 0 when every case is exact, 1 when any removal has no witness.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 from itertools import product
 import json
@@ -42,7 +44,7 @@ from typing import Callable
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
-from machine_code import verify as v1, verify2 as v2  # noqa: E402
+from machine_code import verify as v1, verify2 as v2, verify3 as v3  # noqa: E402
 from machine_code.targets import encode_instruction, encode_program  # noqa: E402
 
 MASK = (1 << 64) - 1
@@ -60,9 +62,12 @@ class Grammar:
     length: int
     results: int = 1
     spec: tuple = ()  # profile-2 outputs, one per result, or the profile-1 expression; x when empty
+    base: dict | None = field(default=None, compare=False)  # a whole profile-3 problem
 
     def problem(self) -> dict:
         """A valid problem over the case's grammar: the lost-input rule reads its specification."""
+        if self.base is not None:
+            return {**self.base, "grammar": [list(form) for form in self.forms], "max_instructions": self.length}
         two = self.target in (v2.X86, v2.RV64)
         x = ["input", "x"]
         if two:
@@ -90,6 +95,10 @@ CASES = (
     Grammar("rv64i-profile1", v1.RV64, (("add", "a0", "a0", "a1"), ("sub", "t0", "a0", "a1"), ("addi", "a0", "t0", 0),
                                         ("xor", "a0", "a0", "a0"), ("slli", "t0", "a0", 1), ("slli", "t1", "a1", 1),
                                         ("addi", "a1", "zero", 0)), 3, spec=(["shl", X, 1],)),
+    # x is irrelevant to (x ^ x) ^ y although it occurs in it; overwriting x's register loses nothing.
+    Grammar("x86-profile1-irrelevant-input", v1.X86, (("mov", "rax", "rsi"), ("xor", "rdi", "rdi"), ("mov", "rax", "rdi"),
+                                                      ("xor", "rax", "rdi"), ("xor", "rax", "rsi")),
+            3, spec=(["xor", ["xor", X, X], Y],)),
     Grammar("rv64i-profile1-duplicates", v1.RV64, (("add", "t0", "a0", "zero"), ("addi", "t0", "a0", 0),
                                                    ("add", "a0", "t0", "a1"), ("sub", "a0", "a0", "a1")),
             3, spec=(SUM,)),
@@ -107,11 +116,39 @@ CASES = (
                                                    ("add", "a0", "t0", "a1"), ("addi", "a1", "zero", 1)),
             3, 1, spec=(SUM,)),
     Grammar("rv64i-profile2-two-results", v2.RV64, RV64_PROFILE2, 3, 2, spec=(SUM, CARRY)),
+    Grammar("rv64i-profile2-irrelevant-input", v2.RV64, (("add", "a0", "a1", "zero"), ("addi", "a0", "zero", 0),
+                                                         ("xor", "a0", "a0", "a1"), ("addi", "a0", "a1", 0)),
+            3, 1, spec=(["xor", ["xor", X, X], Y],)),
 )
+
+
+def memory_cases() -> tuple:
+    """The registered profile-3 memory kernels, each over its own grammar up to its instruction bound."""
+    cases = []
+    for path in sorted((ROOT / "test-data/machine-code/memory-kernels").glob("*.json")):
+        kernel = json.loads(path.read_text(encoding="utf-8"))
+        problem = kernel["problem"]
+        cases.append(Grammar("memory-" + kernel["name"], problem["target"],
+                             tuple(tuple(form) for form in problem["grammar"]), problem["max_instructions"],
+                             len(problem["outputs"]), base=problem))
+    return tuple(cases)
+
+
+CASES += memory_cases()
 
 
 def profile2(target: str) -> bool:
     return target in (v2.X86, v2.RV64)
+
+
+def profile3(target: str) -> bool:
+    return target in (v3.X86, v3.RV64)
+
+
+def writable(problem: dict | None) -> list:
+    """(region, word index) of every read-write region word, which profile 3 observes at the end."""
+    return [(r["name"], i) for r in (problem or {}).get("regions", []) if r["access"] == "read-write"
+            for i in range(r["words"])]
 
 
 def code(target: str, forms: tuple) -> bytes:
@@ -122,32 +159,47 @@ def cost(target: str, forms: tuple) -> tuple[int, int]:
     return sum(len(encode_instruction(target, list(form))) for form in forms), len(forms)
 
 
-def refused(target: str, forms: tuple) -> bool:
-    """Whether the checker refuses the sequence before any solver call: it reads a flag left undefined."""
-    if not profile2(target):
+def refused(target: str, forms: tuple, problem: dict | None = None) -> bool:
+    """Whether the checker refuses the sequence before any solver call: it reads a flag left undefined or, on
+    profile 3, breaks a memory admission rule such as addressing through a redefined base."""
+    if not (profile2(target) or profile3(target)):
         return False
     try:
-        v2.require_defined_flag_reads(target, v2.decode(target, code(target, forms)))
+        if profile3(target):
+            v3.admit(problem, v3.decode(target, code(target, forms)))
+        else:
+            v2.require_defined_flag_reads(target, v2.decode(target, code(target, forms)))
     except ValueError:
         return True
     return False
 
 
 def registers(target: str) -> tuple:
+    if profile3(target):
+        return v3.REGISTERS[target]
     if profile2(target):
         return v2.REGISTERS[target]
     return tuple(v1._SCRATCH[target]) + (("rdi", "rsi") if target == v1.X86 else ("a0", "a1"))
 
 
 def results(target: str, count: int) -> tuple:
+    if profile3(target):
+        return v3.RESULTS[target][:count]
     if profile2(target):
         return v2.RESULTS[target][:count]
     return ("rax",) if target == v1.X86 else ("a0",)
 
 
-def concrete(target: str, forms: tuple, state: dict, flags: dict | None, count: int) -> tuple:
-    """Observed results of one sequence from one complete entry state."""
+def concrete(target: str, forms: tuple, state: dict, flags: dict | None, count: int,
+             problem: dict | None = None) -> tuple:
+    """Observed results (and profile-3 read-write region words) of one sequence from one complete entry state."""
     raw = code(target, forms)
+    if profile3(target):
+        memory = {r["name"]: [state[f"{r['name']}[{i}]"] for i in range(r["words"])] for r in problem["regions"]}
+        final, _, words = v3.execute(problem, raw, {name: state[name] for name in registers(target)},
+                                     dict(flags) if flags is not None else None, memory)
+        return tuple(final[name] for name in results(target, count)) + tuple(words[n][i] for n, i in
+                                                                             writable(problem))
     if profile2(target):
         final, _ = v2.execute(target, raw, dict(state), dict(flags) if flags is not None else None)
         return tuple(final[name] for name in results(target, count))
@@ -156,26 +208,45 @@ def concrete(target: str, forms: tuple, state: dict, flags: dict | None, count: 
     return (v1.run_concrete(target, raw, {"x": state[arguments[0]], "y": state[arguments[1]]}, initial),)
 
 
-def samples(target: str) -> list:
+def samples(target: str, problem: dict | None = None) -> list:
     rng = random.Random(20261030)
     edge = [0, 1, MASK, 1 << 63, (1 << 63) - 1, 0x5555555555555555]
+    words = [f"{r['name']}[{i}]" for r in (problem or {}).get("regions", []) for i in range(r["words"])]
     states = []
     for index in range(SAMPLES):
-        state = {name: (rng.choice(edge) if index % 3 == 0 else rng.getrandbits(64)) for name in registers(target)}
-        flags = {name: rng.getrandbits(1) for name in v2.FLAGS} if target == v2.X86 else None
+        state = {name: (rng.choice(edge) if index % 3 == 0 else rng.getrandbits(64))
+                 for name in (*registers(target), *words)}
+        flags = {name: rng.getrandbits(1) for name in v2.FLAGS} if target in (v2.X86, v3.X86) else None
         states.append((state, flags))
     return states
 
 
-def proved_equal(target: str, left: tuple, right: tuple, count: int, timeout_ms: int = 10_000) -> bool:
-    """Z3 proof that both sequences give the same observed results from every entry state."""
+def proved_equal(target: str, left: tuple, right: tuple, count: int, timeout_ms: int = 10_000,
+                 problem: dict | None = None, context=None) -> bool:
+    """Z3 proof that both sequences give the same observed results from every entry state.
+
+    One `context` may serve many proofs: the entry variables are the same in each, and each proof has its own
+    solver.
+    """
     import z3
-    context = z3.Context()
+    context = context or z3.Context()
     state = {name: z3.BitVec("entry_" + name, 64, ctx=context) for name in registers(target)}
     observed = []
     for forms in (left, right):
         raw = code(target, forms)
-        if profile2(target):
+        if profile3(target):
+            # Every register, flag and region word is free; addresses are region-relative, as in the checker.
+            flags = {name: z3.Bool("entry_" + name, ctx=context) for name in v3.FLAGS} if target == v3.X86 else {}
+            r, f = dict(state), dict(flags)
+            if target == v3.RV64:
+                r["zero"] = z3.BitVecVal(0, 64, ctx=context)
+            m = {region["name"]: [z3.BitVec(f"entry_{region['name']}_{i}", 64, ctx=context)
+                                  for i in range(region["words"])] for region in problem["regions"]}
+            bases = {region["base"]: region["name"] for region in problem["regions"]}
+            for instruction in v3.decode(target, raw)[:-1]:
+                v3._step_smt(z3, target, instruction, r, f, m, bases, context)
+            observed.append([r[name] for name in results(target, count)] + [m[n][i] for n, i in writable(problem)])
+        elif profile2(target):
             flags = {name: z3.Bool("entry_" + name, ctx=context) for name in v2.FLAGS} if target == v2.X86 else {}
             final, _ = v2.machine_smt(z3, target, v2.decode(target, raw), state, flags, context)
             observed.append([final[name] for name in results(target, count)])
@@ -209,25 +280,29 @@ def check(case: Grammar, pruned: Pruner, against_spec: bool = False) -> dict:
     reasons = {forms: pruned(case.target, forms, case.results) for forms in every}
     kept = [forms for forms in every if reasons[forms] is None]
     removed = [forms for forms in every if reasons[forms] is not None]
-    states = samples(case.target)
+    problem = case.problem()
+    states = samples(case.target, problem)
 
     def fingerprint(forms):
         try:
-            return tuple(concrete(case.target, forms, state, flags, case.results) for state, flags in states)
+            return tuple(concrete(case.target, forms, state, flags, case.results, problem)
+                         for state, flags in states)
         except ValueError:
             return None
 
-    prints = {forms: fingerprint(forms) for forms in kept}
+    # A twin must itself be admitted, or the search could never accept it in place of the removed sequence.
+    prints = {forms: None if refused(case.target, forms, problem) else fingerprint(forms) for forms in kept}
     kept_set = set(kept)
     report = {"case": case.name, "target": case.target, "forms": len(case.forms), "length": case.length,
               "results": case.results, "enumerated": len(every), "kept": len(kept), "removed": len(removed),
               "removed_refused": 0, "witnessed": 0, "lost_not_equivalent": 0, "not_equivalent": 0,
               "failures": [], "reasons": {}}
-    problem = case.problem()
-    checker = v2 if profile2(case.target) else v1
+    checker = v3 if profile3(case.target) else v2 if profile2(case.target) else v1
+    import z3
+    context = z3.Context()
     for forms in removed:
         report["reasons"][reasons[forms]] = report["reasons"].get(reasons[forms], 0) + 1
-        if refused(case.target, forms):
+        if refused(case.target, forms, problem):
             report["removed_refused"] += 1
             continue
         if reasons[forms] == "lost":
@@ -247,9 +322,10 @@ def check(case: Grammar, pruned: Pruner, against_spec: bool = False) -> dict:
         witness = None
         for candidate in ordered:
             size = cost(case.target, candidate)
-            if size[0] > bound[0] or size[1] > bound[1] or prints[candidate] != target_print:
+            if (size[0] > bound[0] or size[1] > bound[1] or prints[candidate] is None
+                    or prints[candidate] != target_print):
                 continue
-            if proved_equal(case.target, forms, candidate, case.results):
+            if proved_equal(case.target, forms, candidate, case.results, problem=problem, context=context):
                 witness = candidate
                 break
         if witness is not None:
