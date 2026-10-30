@@ -1,6 +1,6 @@
 # *Hacker's Delight*, second edition — contract-guided research intake
 
-**Intake status:** The linked 12.8 MB GitHub PDF could not be fetched by the available text-only GitHub connector. I reviewed the major technical sections of all 18 chapters in an [accessible HTML rendering](https://studylib.net/doc/28542894/hacker-s-delight-2nd-edition) and cross-checked the edition and chapter contents with the [publisher's PDF sample](https://ptgmedia.pearsoncmg.com/images/9780321842688/samplepages/0321842685.pdf). HTML extraction garbles some equations and figures. This is **not** a claim of exact review of every formula, table, figure, or exercise in the binary PDF. Unclear formulas and machine-specific details require direct verification against legible authorized references.
+**Source update (October 30, 2026):** The user uploaded an actual, readable **470-page** second-edition PDF, so the earlier HTML-only limitation is superseded. The uploaded PDF has SHA-256 `f89446c3655975af750b964c70bb8fbeb0567a970a62032f9f9139d00f0523c0`. Its chapter 2 §2-1 theorem (PDF p. 25) and §2-5 overflow-safe averaging (PDF p. 30) were inspected in rendered form; §2-13 overflow behavior (PDF pp. 40–43), chapter 4 bounds and chapter 10 constant division were examined from PDF text and sample pages. The chapter inventory below remains a *research map*, not a claim to have independently checked every equation or exercise. The PDF itself is not redistributed. The GitHub binary was inaccessible through the text-only connector; the hash identifies the **uploaded** copy, not the GitHub blob.
 
 **Attribution and prior art:** Henry S. Warren, Jr., *Hacker's Delight*, second edition (Addison-Wesley, 2013). The mathematical techniques are established prior art; automated rediscovery is not new mathematics. These are independent research notes, not reproduced chapters, tables, or code listings. No book PDF or program listing is copied into this repository.
 
@@ -81,3 +81,15 @@ python3 -B research.py replay --catalog evidence/initial_catalog.json
 ```
 
 The first gate's observed local result was **14 tests passing** and an independently replayed catalog with six verified finite entries, twelve experiments and three structural impossibility witnesses. CI and external native execution remain separate gates. This research component does not grant ZenoFCIS application Authority or touch effect handlers.
+
+## Second derived rule from the direct PDF: bitwise-only locality
+
+The necessity direction of Warren's §2-1 right-to-left theorem yields a stricter, separately derived property for a *smaller* grammar. Every unary function built only from `input`, fixed constants and bitwise `AND/OR/XOR/NOT` computes output bit `i` from only **input bit `i`**. Every atom respects bitwise locality; structural induction proves closure for all finite expression trees. This additional argument is *not* a claim that Warren supplies our exact code or catalog format.
+
+For both `lowest-set-bit-u8` and `clear-lowest-set-bit-u8`, inputs **2** (binary 00000010) and **3** (00000011) have identical input bit 1, but different required output bit 1. These independent reference witnesses refute *every* candidate over the control's Boolean-only palette, not just candidates within the previous bounded search. A positive-right or positive-left shift could break this locality, and arithmetic carry can also break it; the pilot uses this stricter rule only for palettes containing exclusively Boolean operations. It retains the weaker prefix law for broader grammars.
+
+The two controls previously enumerated **183 + 183 = 366** candidates. Now they return `infeasible-bitwise-local-palette` before enumeration, alongside the original three prefix impossibility controls, which avoided 111 previous candidates. Total **477 candidate enumerations bypassed** across five exact controls, without a claim of measured wall-clock improvement or native machine-code savings. Witnesses and source identities are recomputed at replay; forged output bits are detected.
+
+This also applies Skiena's explicit **search-pruning discipline**, *The Algorithm Design Manual*, second edition, §7.2 (PDF p. 250): reject an entire unproductive search subtree on a sound condition, before materializing its descendants. See [direct Skiena reading](ALGORITHM_DESIGN_MANUAL_READING.md).
+
+**Evidence version:** `zeno-fcis/algorithm-research-catalog/3`; 16 focused tests pass locally and the six original independently verified finite u8 candidates remain unchanged. The source contracts, cost model and search semantics are not rewritten to make the negative cases pass. Python execution, reference semantics and host are trusted premises; this is not a machine-checked theorem of arbitrary 64-bit ISA behavior.
