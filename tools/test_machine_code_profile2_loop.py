@@ -8,7 +8,7 @@ import struct
 import tempfile
 import unittest
 
-from machine_code import model, profile2, session, targets, verify2
+from machine_code import footprint, model, profile2, session, targets, verify2
 from machine_code.run import main
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -91,6 +91,35 @@ class Profile2LoopTests(unittest.TestCase):
         self.assertEqual(result["status"], "checked-candidate", result)
         self.assertEqual(result["cost"], {"bytes": 11, "instructions": 3})
         self.assertEqual(session.resume(self.directory)["code_hex"], "4839f74889f0480f42c7c3")
+
+    def test_split_search_joins_independent_parts_and_bounds_the_joint_search(self):
+        self.opened("minmax-x86.json")
+        split = session.split_search(self.directory, max_candidates=5000, max_checks=8, deadline_ms=20000)
+        self.assertEqual((split["status"], split["stop_reason"]), ("checked-candidate", "joined"), split)
+        self.assertEqual((split["cost"]["instructions"], split["solver_checks"]), (6, 1))
+        proposal = json.loads((self.directory / "0001.proposal.json").read_text())
+        self.assertEqual(proposal["provenance"]["name"], "split-search/1")
+        joint = session.search(self.directory, max_candidates=5000, max_checks=8, deadline_ms=20000)
+        self.assertEqual((joint["status"], joint["stop_reason"]), ("checked-candidate", "grammar-exhausted"), joint)
+        self.assertEqual(joint["cost"]["instructions"], 5, "the shared comparison beats the joined parts")
+        self.assertGreater(joint["bound_skipped"], 0)
+        self.assertEqual(session.resume(self.directory)["status"], "replayed")
+
+    def test_split_search_refuses_one_result_problems_and_unsafe_joins(self):
+        self.opened("umin-x86.json")
+        self.assertEqual(session.split_search(self.directory)["status"], "not-applicable")
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(main(["split-search", "--session", str(self.directory)]), 1)
+        problem = json.loads((DATA / "minmax-x86.json").read_text())
+        prints = footprint.footprints(problem)
+        index = {tuple(form): i for i, form in enumerate(problem["grammar"])}
+        umin = (index[("mov", "rax", "rdi")], index[("cmp", "rdi", "rsi")], index[("cmova", "rax", "rsi")])
+        umax = (index[("mov", "rdx", "rsi")], index[("cmp", "rdi", "rsi")], index[("cmova", "rdx", "rdi")])
+        self.assertTrue(session._joinable(prints, umin, umax, "rax"))
+        # The second part may not read flags the first wrote, nor write the first part's result.
+        self.assertFalse(session._joinable(prints, (index[("cmp", "rdi", "rsi")],), (index[("cmova", "rdx", "rdi")],), "rax"))
+        self.assertFalse(session._joinable(prints, umin, (index[("mov", "rax", "rsi")],), "rax"))
+        self.assertFalse(session._joinable([None] * len(prints), umin, umax, "rax"))
 
     def test_search_filters_undefined_flag_reads_without_refusing_the_session(self):
         x, y = ["input", "x"], ["input", "y"]

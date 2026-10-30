@@ -209,6 +209,13 @@ def _load(directory: Path):
     return problem, manifest, events
 
 
+def _least_rank(problem, grammar, terminal, length):
+    """The least (first, second) cost any sequence of `length` grammar instructions can have."""
+    least = {"bytes": length * min(map(len, grammar), default=0) + len(terminal), "instructions": length}
+    first, second = ("bytes", "instructions") if problem["objective"] == "bytes" else ("instructions", "bytes")
+    return least[first], least[second]
+
+
 def _rank(problem, verification, code):
     first, second = ("bytes", "instructions") if problem["objective"] == "bytes" else ("instructions", "bytes")
     return verification["cost"][first], verification["cost"][second], code.hex()
@@ -393,6 +400,9 @@ def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=50
         pruner = footprint.Pruner(problem, grammar) if prune else None
         skipped = {}
         for length in range(problem["max_instructions"] + 1):
+            if pruner is not None and bound is not None and _least_rank(problem, grammar, terminal, length) > bound[:2]:
+                skipped["bound"] = sum(len(grammar) ** rest for rest in range(length, problem["max_instructions"] + 1))
+                break
             choices_in_order = (product(range(len(grammar)), repeat=length) if pruner is None
                                 else footprint.sequences(len(grammar), length, pruner.judge, skipped))
             for choices in choices_in_order:
@@ -443,12 +453,134 @@ def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=50
         return {"status": "checked-candidate" if best else "no-checked-candidate", "stop_reason": stopped,
                 "proposed": proposed, "concrete_refutations": filtered, "objective_pruned": pruned,
                 "pruning": footprint.SCHEME if prune else "off", "dead_pruned": skipped.get("dead", 0),
-                "order_pruned": skipped.get("order", 0), "solver_checks": checks,
+                "order_pruned": skipped.get("order", 0), "bound_skipped": skipped.get("bound", 0),
+                "solver_checks": checks,
                 "checker_verdicts": verdicts, "retained_counterexamples": len(witnesses) - seeds,
                 "incumbent": best[1]["sequence"] if best else None,
                 "cost": best[2]["verification"]["cost"] if best else None,
                 "elapsed_seconds": time.monotonic() - began, "global_optimality": False,
                 "runtime_speedup": "unmeasured", "authority": "none"}
+
+
+def _agrees_on(problem, code, witness, positions):
+    """Whether one concrete state gives the specified profile-2 results at `positions`."""
+    arguments, initial, flags = witness
+    from .verify2 import run_concrete
+    try:
+        actual = run_concrete(problem["target"], code, list(arguments), initial, flags, len(problem["outputs"]))
+    except ValueError:
+        return False
+    env = dict(zip(problem["inputs"], arguments))
+    return all(actual[k] == profile2.evaluate(problem["outputs"][k], env) for k in positions)
+
+
+def _joinable(prints, first, second, result):
+    """Running `first` then `second` keeps `first`'s result and gives `second` its entry inputs.
+
+    `second` must not read, before overwriting, anything `first` may write, and must not write `first`'s result
+    register. Unknown footprints never join.
+    """
+    written, exposed, overwritten = set(), set(), set()
+    for index in first:
+        if prints[index] is None:
+            return False
+        written |= prints[index].writes
+    for index in second:
+        if prints[index] is None:
+            return False
+        exposed |= prints[index].reads - overwritten
+        overwritten |= prints[index].overwrites
+        if result in prints[index].writes:
+            return False
+    return not written & exposed
+
+
+def split_search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=5000, timeout_ms=500):
+    """Two-result problems: find each result alone, join two parts that cannot interfere, and check the join.
+
+    Each part is enumerated with the exact pruning, observing only its own result register, and filtered on the
+    concrete states. Two parts join when footprints show the second neither disturbs the first's result nor reads
+    anything the first may write. A join that agrees on every state goes to the checker like any proposal; a
+    counterexample joins the filter states. A joined kernel need not be optimal, but recorded as the incumbent it
+    bounds a later `search`, which then skips every length that cannot beat it.
+    """
+    integer(max_candidates, 1, 100_000, "candidate budget")
+    integer(max_checks, 1, 128, "checker budget")
+    integer(deadline_ms, 1, 60_000, "deadline")
+    integer(timeout_ms, 1, 5000, "solver timeout")
+    began = time.monotonic(); proposed = 0; checks = 0; joins = 0; stopped = "grammar-exhausted"; found = None
+    verdicts = []
+    with _locked(directory):
+        problem, manifest, events = _load(directory)
+        if problem["schema"] != profile2.SCHEMA or len(problem["outputs"]) != 2:
+            return {"status": "not-applicable", "reason": "split search needs a two-result profile-2 problem",
+                    "proposed": 0, "solver_checks": 0, "authority": "none"}
+        from .verify2 import RESULTS
+        results = RESULTS[problem["target"]][:2]
+        grammar = _grammar(problem)
+        terminal = encode_program(problem["target"], [])
+        witnesses = _seeds(problem)
+        limit = problem["max_instructions"]
+        def stream(observed):
+            pruner = footprint.Pruner(problem, grammar)
+            pruner.observed = frozenset({observed})
+            for length in range(1, limit + 1):
+                yield from footprint.sequences(len(grammar), length, pruner.judge, {})
+
+        streams, parts = [stream(results[0]), stream(results[1])], ([], [])
+        prints = footprint.footprints(problem)
+        code_of = lambda choices: b"".join(grammar[i] for i in choices) + terminal
+        live = [True, True]
+        while any(live) and found is None:
+            for k in (0, 1):
+                if not live[k] or found is not None:
+                    continue
+                remaining = deadline_ms / 1000 - (time.monotonic() - began)
+                if remaining <= 0 or proposed >= max_candidates or checks >= max_checks or len(events) >= MAX_EVENTS:
+                    stopped = "budget-exhausted"; live = [False, False]; break
+                choices = next(streams[k], None)
+                if choices is None:
+                    live[k] = False; continue
+                proposed += 1
+                if not all(_agrees_on(problem, code_of(choices), w, (k,)) for w in witnesses):
+                    continue
+                parts[k].append(choices)
+                pairs = [(choices, other) if k == 0 else (other, choices) for other in parts[1 - k]]
+                joined = [(a, b, 0) for a, b in pairs] + [(b, a, 1) for a, b in pairs]
+                if all(_agrees_on(problem, code_of(choices), w, (0, 1)) for w in witnesses):
+                    joined.insert(0, (choices, (), k))
+                for first, second, first_result in joined:
+                    if len(first) + len(second) > limit or not _joinable(prints, first, second, results[first_result]):
+                        continue
+                    code = code_of(first + second)
+                    if not all(_agrees_on(problem, code, w, (0, 1)) for w in witnesses):
+                        continue
+                    if checks >= max_checks:
+                        stopped = "budget-exhausted"; live = [False, False]; break
+                    remaining = deadline_ms / 1000 - (time.monotonic() - began)
+                    proposal = {"schema": "zeno-fcis/machine-proposal/1", "code_hex": code.hex(),
+                                "provenance": {"kind": "local-search", "name": "split-search/1",
+                                               "note": "two single-result parts joined where footprints show no interference"}}
+                    result = _record(directory, problem, manifest, events, proposal,
+                                     max(1, min(timeout_ms, int(remaining * 1000))))
+                    checks += 1; joins += 1
+                    verdicts.append({"sequence": result["sequence"], "status": result["status"]})
+                    if result["status"] == "equivalent":
+                        found = result; break
+                    if result["status"] == "counterexample":
+                        witnesses.append(_witness(problem, result["verification"]))
+                        for j in (0, 1):
+                            parts[j][:] = [c for c in parts[j] if all(_agrees_on(problem, code_of(c), w, (j,))
+                                                                      for w in witnesses[-1:])]
+        best = _best(directory, problem, events)
+        return {"status": "checked-candidate" if found else "no-checked-candidate",
+                "stop_reason": "joined" if found else stopped, "proposed": proposed,
+                "parts": [len(parts[0]), len(parts[1])], "joins_checked": joins, "solver_checks": checks,
+                "checker_verdicts": verdicts, "retained_counterexamples": len(witnesses) - len(_seeds(problem)),
+                "joined": found["sequence"] if found else None,
+                "cost": found["verification"]["cost"] if found else None,
+                "incumbent": best[1]["sequence"] if best else None,
+                "elapsed_seconds": time.monotonic() - began, "global_optimality": False, "authority": "none"}
 
 
 def emit(directory: Path, output: Path, timeout_ms=1000):

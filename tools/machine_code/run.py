@@ -16,19 +16,20 @@ def main(argv=None):
     opened = commands.add_parser("open", help="create a source/solver-bound proposal session")
     opened.add_argument("--problem", required=True, type=Path)
     opened.add_argument("--session", required=True, type=Path)
-    for command in ("packet", "candidate", "search", "resume", "emit"):
+    for command in ("packet", "candidate", "search", "split-search", "resume", "emit"):
         sub = commands.add_parser(command)
         sub.add_argument("--session", required=True, type=Path)
-        if command in ("candidate", "resume", "emit", "search"):
+        if command in ("candidate", "resume", "emit", "search", "split-search"):
             sub.add_argument("--solver-ms", type=int, default=1000)
         if command == "candidate":
             sub.add_argument("--proposal", required=True, type=Path)
         if command == "emit":
             sub.add_argument("--out", required=True, type=Path)
-        if command == "search":
+        if command in ("search", "split-search"):
             sub.add_argument("--max-candidates", type=int, default=10_000)
             sub.add_argument("--max-checks", type=int, default=64)
             sub.add_argument("--deadline-ms", type=int, default=5000)
+        if command == "search":
             sub.add_argument("--no-prune", action="store_true",
                              help="enumerate every sequence (the exact footprint pruning is on by default)")
     bench = commands.add_parser("bench", help="paired timing of a replayed x86 artifact against gcc -O2 for the same expression")
@@ -86,6 +87,9 @@ def main(argv=None):
         elif args.command == "search":
             result = session.search(args.session, args.max_candidates, args.max_checks,
                                     args.deadline_ms, args.solver_ms, prune=not args.no_prune)
+        elif args.command == "split-search":
+            result = session.split_search(args.session, args.max_candidates, args.max_checks,
+                                          args.deadline_ms, args.solver_ms)
         elif args.command == "resume":
             result = session.resume(args.session, args.solver_ms)
         elif args.command == "emit":
@@ -106,7 +110,7 @@ def main(argv=None):
         result.setdefault("authority", "none")
         print(json.dumps(result, sort_keys=True, allow_nan=False))
         status = result["status"] if "status" in result else "packet"
-        return 2 if status in ("inconclusive", "no-checked-candidate") else 1 if status in ("counterexample", "refused", "failed") else 0
+        return 2 if status in ("inconclusive", "no-checked-candidate") else 1 if status in ("counterexample", "refused", "failed", "not-applicable") else 0
     except ImportError as error:
         print(json.dumps({"status": "inconclusive", "reason": str(error), "authority": "none"}))
         return 2

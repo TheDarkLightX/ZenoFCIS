@@ -155,6 +155,65 @@ A selected stored incumbent must recheck within that budget; otherwise the
 result is inconclusive. An in-memory result from the current invocation can be
 reused on its unchanged candidate. Budget exhaustion is not unrealizability.
 
+### Exact pruning and split search
+
+Search skips candidates that cannot be needed, using each grammar instruction's
+footprint. A footprint is what the instruction reads, may write and always
+overwrites. It is derived from the profile checker's own symbolic semantics, and
+read conservatively. Two classes are skipped:
+
+- **Dead instructions.** An instruction whose every write is overwritten before
+  being read, or is never read and is not a result. Deleting it gives a strictly
+  cheaper sequence with the same results, which the length-ordered search has
+  already proposed.
+- **Reorderings.** Two neighbouring instructions that are independent, meaning
+  neither writes what the other reads or writes. Swapping them changes neither
+  the results nor the cost, so only the byte-least ordering is proposed.
+
+Once no longer sequence can reach the incumbent's cost, the remaining lengths are
+skipped as well.
+
+The result: for every skipped candidate a kept one exists with no greater cost
+and the same results. A search that exhausts its grammar therefore reports the
+same optimum as before. Search results report `dead_pruned`, `order_pruned` and
+`bound_skipped`, and `--no-prune` restores the full enumeration. Measured on the
+test problems (checker decisions unchanged):
+
+| Problem | Proposed without pruning | Proposed with pruning |
+| --- | --- | --- |
+| `add64-x86` | 156 | 29 |
+| `add128-x86` | 1,555 | 292 |
+| `minmax-x86` | 100,000 (budget exhausted) | 438 (grammar exhausted) |
+| library `signed-saturating-add-x86` | 100,000 (budget exhausted, no candidate) | 23,897 of 960,800 (grammar exhausted, 31-byte kernel) |
+
+`split-search` handles two-result problems. It searches for each result alone,
+then joins two parts when their footprints show that the second part neither
+reads what the first may write nor overwrites the first part's result. A join
+that agrees on the filter states goes to the checker like any proposal.
+
+The joined kernel need not be optimal. For example, the two parts of `minmax`
+each need their own comparison. Recorded as the incumbent, it bounds a later
+`search`:
+
+```sh
+python3 -B -m tools.machine_code.run split-search --session "$machine_work/session"
+python3 -B -m tools.machine_code.run search --session "$machine_work/session"
+```
+
+The footprints and joins only steer the search. The checker still decides every
+candidate, and `global_optimality` stays false: an exhausted grammar says
+nothing about instructions outside it. The tests compare the cheapest kept
+candidate of every behaviour class with the cheapest candidate overall on seven
+problems, and planted footprint defects fail them.
+
+These are the semantic pruning and decomposition ideas of McSynth and McSynth++
+([Srinivasan 2017](https://research.cs.wisc.edu/wpis/papers/tr1844.pdf);
+[Srinivasan, Sharma and Reps 2016](https://research.cs.wisc.edu/wpis/abstracts/oopsla16-synthesis.abs.html)),
+restricted to the skips that lose no candidate. The reordering rule is the
+partial-order reduction of independent actions, keeping one representative per
+class (Godefroid, *Partial-Order Methods for the Verification of Concurrent
+Systems*, LNCS 1032, 1996).
+
 Exit 0 means a completed positive operation. Counterexamples/refused candidate
 verdicts exit 1; inconclusive/no-checked-candidate exits 2; malformed input,
 binding drift and I/O refusal exit 65. Always inspect the JSON status. The tool
