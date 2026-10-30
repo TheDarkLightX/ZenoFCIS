@@ -889,14 +889,17 @@ controls of those three defects and of their mirror defects in the other model, 
 control. A detected defect shows that one control distinguishes one edit. It does not show that the checker is
 complete. `tools/test_machine_qualification_controls.py` checks the outcome classes on small real specimens.
 
-Seven defects cover the immediate forms. The profile-2 verifier tests are their intended controls, and five of them
-also have a hardware or decoder-scan conformance test as a second control:
+Twelve defects cover the immediate forms. The profile-2 verifier tests are their intended controls, and ten of them
+also have a hardware or decoder conformance test as a second control:
 
 - an 8-bit, a 32-bit or a RAX short-form immediate zero-extended in the decoder;
 - a negative immediate zero-extended in the symbolic model;
 - a concrete CMP carry computed against the unwrapped negative immediate;
 - an accepted `81 /n id` whose value fits 8 bits;
-- an accepted `81 /n id` on RAX.
+- an accepted `81 /n id` on RAX;
+- `83 /2` and `81 /2` (ADC) decoded as ADD, and the RAX short form `1D` (SBB) decoded as SUB;
+- a MOV immediate zero-extended in the decoder or in the symbolic model;
+- an accepted `C7` with a nonzero ModRM reg field.
 
 ### Search pruning: exactness, planted defects and measurement
 
@@ -962,7 +965,7 @@ compare-and-select guards. Profile 1 keeps its own validator, checker
 
 | Target | Calling contract | Admitted computation |
 | --- | --- | --- |
-| `x86_64-sysv-register/2` | Inputs in `rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9`, in declared order; results in `rax`, then `rdx`. Every other admitted register and CF, ZF, SF and OF initially arbitrary | Every profile-1 x86 form; 64-bit register ADC, SBB, CMP and TEST; NEG; SAR by an immediate; SETcc on the low byte of an admitted register; MOVZX of a low byte into a 64-bit register; 64-bit register CMOVcc; ADD, SUB, AND, OR, XOR and CMP with a sign-extended 8-bit or 32-bit immediate |
+| `x86_64-sysv-register/2` | Inputs in `rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9`, in declared order; results in `rax`, then `rdx`. Every other admitted register and CF, ZF, SF and OF initially arbitrary | Every profile-1 x86 form; 64-bit register ADC, SBB, CMP and TEST; NEG; SAR by an immediate; SETcc on the low byte of an admitted register; MOVZX of a low byte into a 64-bit register; 64-bit register CMOVcc; ADD, ADC, SUB, SBB, AND, OR, XOR and CMP with a sign-extended 8-bit or 32-bit immediate; MOV with a sign-extended 32-bit immediate |
 | `rv64i-register/2` | Inputs in `a0` to `a5`, in declared order; results in `a0`, then `a1`. `t0` to `t2` and every `a` register without an input initially arbitrary; `zero=0` | Every profile-1 RV64I form, plus SLT, SRA, SLTI, SLTIU, XORI, ORI, ANDI and SRAI, over `zero`, `t0` to `t2` and `a0` to `a7` |
 
 The admitted x86 registers are the nine of profile 1: `rax`, `rcx`, `rdx`, `rsi`,
@@ -977,25 +980,29 @@ flow, memory, system or privileged operations.
 ### Immediate operands
 
 `["add", "rax", -5]` adds a constant: an integer as the second operand of
-`add`, `sub`, `and`, `or`, `xor` or `cmp` is a signed immediate from -2^31 to
-2^31-1. The instruction uses it sign-extended to 64 bits, so `-5` means
-2^64-5 and `["and", "rax", -256]` clears the low byte. Flags follow the register
-forms of the same instructions. ADC, SBB, TEST and MOV have no immediate form in
-the profile.
+`add`, `adc`, `sub`, `sbb`, `and`, `or`, `xor`, `cmp` or `mov` is a signed
+immediate from -2^31 to 2^31-1. The instruction uses it sign-extended to 64
+bits, so `-5` means 2^64-5, `["and", "rax", -256]` clears the low byte and
+`["mov", "rax", -1]` sets all 64 bits. Flags follow the register forms of the
+same instructions: ADC and SBB read CF, and MOV leaves every flag unchanged.
+TEST has no immediate form in the profile. `["imm", "rax", "5"]` remains the
+separate 10-byte MOVABS form for any 64-bit constant.
 
 Each form has exactly one admitted encoding, the one GNU `as` emits:
 
-| Immediate | Encoding |
-| --- | --- |
-| -128 to 127 | `REX.W 83 /n ib` (4 bytes) |
-| Otherwise, on `rax` | the short form `REX.W 05`, `0D`, `25`, `2D`, `35` or `3D` with `id` (6 bytes) |
-| Otherwise | `REX.W 81 /n id` (7 bytes) |
+| Form | Immediate | Encoding |
+| --- | --- | --- |
+| ADD, ADC, SUB, SBB, AND, OR, XOR, CMP | -128 to 127 | `REX.W 83 /n ib` (4 bytes) |
+| ADD, ADC, SUB, SBB, AND, OR, XOR, CMP | otherwise, on `rax` | the short form `REX.W 05`, `15`, `2D`, `1D`, `25`, `0D`, `35` or `3D` with `id` (6 bytes) |
+| ADD, ADC, SUB, SBB, AND, OR, XOR, CMP | otherwise | `REX.W 81 /n id` (7 bytes) |
+| MOV | any | `REX.W C7 /0 id` (7 bytes) |
 
 The decoder refuses other encodings of the same instruction:
 
 - `Imm32WhereImm8Fits`: a 32-bit immediate that fits in 8 bits;
 - `AccumulatorFormRequired`: `81 /n id` on `rax`;
-- `UnsupportedImmediateGroup`: `/2` (ADC) or `/3` (SBB);
+- `UnsupportedMovImmediate`: `C7` with a nonzero ModRM reg field;
+- `UnsupportedPrefixOrOpcode`: `C7` or `B8+r` without REX.W, which write 32 bits;
 - `UnusedRexBits`: a REX bit with no register to select;
 - `MemoryOperandRefused`: a memory operand.
 
@@ -1129,34 +1136,37 @@ python3 -B tools/test_machine_code_rv64i_conformance.py
   undefined-flag reads, refused parity, byte-register and width variants, and
   solver-unknown and replay-mismatch mocks.
 - **x86 conformance:** the conformance test enumerates every admitted x86 form,
-  21,313 forms in all. Of these, 14,364 are immediate forms: every 8-bit
-  immediate and ten edge 32-bit immediates for each of the six operations and
-  nine registers. Each encoding is compared with GNU `as` and round-trips
+  26,254 forms in all. Of these, 19,305 are immediate forms: every 8-bit
+  immediate and ten edge 32-bit immediates for each of the eight ALU operations
+  and nine registers, and 17 edge MOV immediates for each register. Each encoding is compared with GNU `as` and round-trips
   through the decoder. Each form then runs on the CPU from full register states
   with CF, ZF, SF, OF, PF and AF loaded by POPFQ. All nine registers and the
   four modelled flags, read back by PUSHFQ, must equal the concrete model on every
   state, and the SMT model on two states. The SMT comparison skips 8-bit
-  immediates outside a sample of ten values, which leaves 8,029 forms. Flags the
-  model leaves undefined are not compared. Six planted model defects must be
+  immediates outside a sample of ten values, which leaves 8,542 forms. Flags the
+  model leaves undefined are not compared. Eight planted model defects must be
   detected:
   - SBB carry without borrow;
   - ADD overflow equal to carry;
   - SETcc writing the whole register;
   - CMOVLE ignoring ZF;
   - an SHL carry taken from the wrong bit;
-  - a negative immediate zero-extended.
-- **Decoder language:** a scan of 3,438,592 short byte bodies checks that every
+  - a negative immediate zero-extended;
+  - an ADC immediate ignoring the carry in;
+  - a MOV immediate zero-extended.
+- **Decoder language:** a scan of 3,459,072 short byte bodies checks that every
   accepted body is an enumerated form in its unique canonical encoding. The scan
   covers:
   - every two-byte body, and every three-byte body under the profile's prefixes;
   - every four-byte `REX.W 83` body;
   - every REX prefix and ModRM byte of `81 /n id`, and the RAX short forms, with
-    sampled 32-bit immediates. These include 8-bit values, which must be refused.
+    sampled 32-bit immediates. These include 8-bit values, which must be refused;
+  - every REX prefix and ModRM byte of `C7 id`, with sampled immediates.
 - **Immediate forms on this CPU:** the default 16-state run passes on an AMD
-  Ryzen Threadripper 1950X. It makes 341,008 hardware comparisons with the
-  concrete model over all 21,313 forms, and every GNU `as` encoding matches the
+  Ryzen Threadripper 1950X. It makes 420,064 hardware comparisons with the
+  concrete model over all 26,254 forms, and every GNU `as` encoding matches the
   encoder.
-- **Measured run:** a 64-state run on an AMD Ryzen Threadripper 1950X compared
+- **Measured run:** before the ADC, SBB and MOV immediates, a 64-state run on an AMD Ryzen Threadripper 1950X compared
   444,736 executions with the concrete model and 13,898 with the SMT model,
   with no disagreement.
 - **Native execution:** eight kernels go through `open`, a proposal or search,
@@ -1596,20 +1606,22 @@ own.
   rewrite either checks equivalent or is refused for its size before checking;
   none may produce a counterexample.
 
-At this checkpoint that last test covers 9 kernels and 61 cases:
+At this checkpoint that last test covers 10 kernels and 64 cases:
 
-- the checker accepts 60 rewrites;
-- one RV64I case needs more than 16 instructions for its constants and is
-  refused before checking;
-- all 8 fully fixed cases have fewer instructions than the original kernel;
-- of the 52 partly fixed cases, 8 have fewer instructions, 14 the same number
-  and 30 more.
+- the checker accepts 63 rewrites;
+- one case needs more than 16 instructions for its constants and is refused
+  before checking;
+- all 9 fully fixed cases have fewer instructions than the original kernel;
+- of the 54 partly fixed cases, 10 have fewer instructions, 24 the same number
+  and 20 more. On average a partly fixed rewrite is 8.6 bytes longer than the
+  original kernel.
 
-On x86, a constant that fits a sign-extended 32-bit immediate now goes directly
-into `add`, `sub`, `and`, `or`, `xor` or `cmp`. A commutative operation whose
-destination holds the constant swaps its operands first. Other constants still
-cost a 10-byte load, and ADC, SBB and CMOVcc still need their constant in a
-register, so partly fixed rewrites are often longer. Finding smaller kernels for
+On x86, a constant that fits a sign-extended 32-bit immediate goes directly
+into `add`, `adc`, `sub`, `sbb`, `and`, `or`, `xor` or `cmp`. A commutative
+operation whose destination holds the constant swaps its operands first. A
+constant that must sit in a register is loaded with the 7-byte `mov` immediate
+when it fits, and with the 10-byte MOVABS otherwise. CMOVcc still needs its
+constant in a register, so partly fixed rewrites are often longer. Finding smaller kernels for
 a specialized problem is a search question; `search` can start from the
 specialized problem.
 

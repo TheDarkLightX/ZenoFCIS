@@ -248,18 +248,60 @@ class Profile2VerifierTests(unittest.TestCase):
     def test_x86_immediate_non_canonical_and_unadmitted_encodings_refuse(self):
         for raw, reason in [("4881c005000000c3", "Imm32WhereImm8Fits"), ("4805ffffffffc3", "Imm32WhereImm8Fits"),
                             ("4881c0e8030000c3", "AccumulatorFormRequired"),
-                            ("4883d005c3", "UnsupportedImmediateGroup"), ("4883d805c3", "UnsupportedImmediateGroup"),
+                            ("4881d005000000c3", "Imm32WhereImm8Fits"), ("4815ffffffffc3", "Imm32WhereImm8Fits"),
+                            ("4881d8e8030000c3", "AccumulatorFormRequired"),
                             ("4c83c005c3", "UnusedRexBits"), ("4905e8030000c3", "UnusedRexBits"),
                             ("48830005c3", "MemoryOperandRefused"), ("4883c0c3", "MissingTerminalReturn")]:
             with self.subTest(raw=raw), self.assertRaisesRegex(ValueError, reason):
                 v.decode(X, code(raw))
-        for form in (["add", "rax", 1 << 31], ["add", "rax", -(1 << 31) - 1], ["adc", "rax", 1],
+        for form in (["add", "rax", 1 << 31], ["add", "rax", -(1 << 31) - 1], ["sbb", "rax", 1 << 31],
+                     ["mov", "rax", 1 << 31], ["mov", "rax", -(1 << 31) - 1], ["mov", "rax", "5"],
                      ["test", "rax", 1], ["add", "rbx", 1]):
             with self.subTest(form=form):
                 result = v.check(problem(X, ["x"], [i("x")], [form], 0), code("c3"))
                 self.assertEqual((result["status"], result["reason"]), ("refused", "InvalidDeclaredInstruction"))
         self.assertEqual(v.check(problem(X, ["x"], [i("x")], [["add", "rax", True]], 0), code("c3"))["status"],
                          "refused")
+
+    def test_x86_adc_and_sbb_immediates_carry_through_and_read_entry_carry(self):
+        # mov rax,rdi; add rax,-5; mov rdx,rsi; adc rdx,7 (83 /2 ib): a 128-bit add of the constant 7:2^64-5.
+        lo = ["add", i("a_lo"), c(MASK - 4)]
+        self.equivalent(X, ["a_lo", "a_hi"], [lo, ["add", ["add", i("a_hi"), c(7)], ["ult", lo, i("a_lo")]]],
+                        "4889f84883c0fb4889f24883d207c3")
+        # mov rdx,rdi; sub rdx,1000; mov rax,rsi; sbb rax,0x12345 (the RAX short form 1D id): high word in rax.
+        self.equivalent(X, ["a_lo", "a_hi"], [["sub", ["sub", i("a_hi"), c(0x12345)], ["ult", i("a_lo"), c(1000)]],
+                                              ["sub", i("a_lo"), c(1000)]],
+                        "4889fa4881eae80300004889f0481d45230100c3")
+        # mov rax,rdi; adc rax,5 is not x + 5: the entry carry is quantified.
+        lost = self.counterexample(X, ["x"], [["add", i("x"), c(5)]], "4889f84883d005c3")
+        self.assertEqual(lost["initial_flags"]["cf"], 1)
+        # Known answers in both models: adc rdi,-1 and sbb rdi,1 with the carry set; sbb r9,1000 (81 /3 id).
+        for raw, registers, expected in [
+                ("4883d7ffc3", state(X), (state(X), {"cf": 1, "zf": 1, "sf": 0, "of": 0})),
+                ("4883df01c3", state(X, rdi=1), (state(X, rdi=MASK), {"cf": 1, "zf": 0, "sf": 1, "of": 0})),
+                ("4981d9e8030000c3", state(X, r9=MIN + 1000),
+                 (state(X, r9=MAX), {"cf": 0, "zf": 0, "sf": 0, "of": 1}))]:
+            with self.subTest(raw=raw):
+                carry = dict.fromkeys(v.FLAGS, 0) | {"cf": 1}
+                self.assertEqual(v.execute(X, code(raw), registers, carry), expected)
+                self.assertEqual(smt_point(X, raw, registers, carry), expected)
+
+    def test_x86_mov_imm32_sign_extends_and_refuses_other_encodings(self):
+        # mov rax,-1 (REX.W C7 /0 id) is all ones; the zero-extended reading is refuted.
+        self.equivalent(X, ["x"], [c(MASK)], "48c7c0ffffffffc3")
+        self.counterexample(X, ["x"], [c(0xFFFFFFFF)], "48c7c0ffffffffc3")
+        # mov r11,0x7fffffff; mov rax,r11; mov rdx,-2^31.
+        self.equivalent(X, [], [c(0x7FFFFFFF), c(MASK + 1 - (1 << 31))], "49c7c3ffffff7f4c89d848c7c200000080c3")
+        self.assertEqual(v.decode(X, code("48c7c005000000c3"))[0].form(), ["mov", "rax", 5])
+        # MOV flags are unchanged: the entry carry survives.
+        self.assertEqual(v.execute(X, code("48c7c005000000c3"), state(X), dict.fromkeys(v.FLAGS, 1)),
+                         (state(X, rax=5), dict.fromkeys(v.FLAGS, 1)))
+        for raw, reason in [("48c7c805000000c3", "UnsupportedMovImmediate"), ("48c70005000000c3", "MemoryOperandRefused"),
+                            ("c7c005000000c3", "UnsupportedPrefixOrOpcode"), ("40c7c005000000c3", "UnsupportedPrefixOrOpcode"),
+                            ("b805000000c3", "UnsupportedPrefixOrOpcode"), ("4cc7c005000000c3", "UnusedRexBits"),
+                            ("4ac7c005000000c3", "UnusedRexBits"), ("48c7c0050000c3", "MissingTerminalReturn")]:
+            with self.subTest(raw=raw), self.assertRaisesRegex(ValueError, reason):
+                v.decode(X, code(raw))
 
     def test_rv_comparisons_immediates_and_arithmetic_shifts(self):
         ret = RET_R
@@ -340,7 +382,7 @@ class Profile2VerifierTests(unittest.TestCase):
     def test_unused_malformed_or_unsafe_declared_forms_refuse(self):
         for target, raw, forms in [
                 (X, "c3", [["setb", "rax", "rax"], ["cmovp", "rax", "rsi"], ["setp", "rax"], ["neg", "rbx"],
-                           ["sar", "rax", 64], ["movzx", "rax"], ["adc", "rax", 1], ["cmovb", "rax", "rsp"]]),
+                           ["sar", "rax", 64], ["movzx", "rax"], ["adc", "rax", 1 << 31], ["cmovb", "rax", "rsp"]]),
                 (R, RET_R, [["slti", "zero", "a0", 1], ["srai", "a0", "a0", 64], ["sltiu", "a0", "a0", 2048],
                             ["sra", "a0", "a0", "s0"], ["sll", "a0", "a0", "a1"], ["andi", "a0", "a0", True]])]:
             for form in forms:

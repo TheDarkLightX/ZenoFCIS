@@ -5,8 +5,9 @@ Every admitted x86_64-sysv-register/2 instruction form is enumerated:
 - SHL/SHR/SAR with every count;
 - the fourteen SETcc on every register byte, and NEG on every register;
 - MOVABS with edge immediates, LEA over every base, index and scale, and NOP;
-- ADD, SUB, AND, OR, XOR and CMP with every 8-bit immediate and edge 32-bit immediates on every register, in the
-  canonical encodings (83 /n ib, the RAX short form, 81 /n id).
+- ADD, ADC, SUB, SBB, AND, OR, XOR and CMP with every 8-bit immediate and edge 32-bit immediates on every register,
+  in the canonical encodings (83 /n ib, the RAX short form, 81 /n id);
+- MOV with edge sign-extended 32-bit immediates on every register (C7 /0 id).
 
 For each form, three independent checks run:
 1. The encoding is compared with GNU `as`.
@@ -15,7 +16,7 @@ For each form, three independent checks run:
    register and every CF/ZF/SF/OF bit read back with PUSHFQ is compared with the concrete model on every state,
    and with the SMT model on a subset. A flag the model leaves undefined is not compared.
 
-Five planted model defects must be detected, so a vacuous comparison cannot pass. Host-independent checks scan
+Eight planted model defects must be detected, so a vacuous comparison cannot pass. Host-independent checks scan
 that every short body the decoder accepts is one of the enumerated forms in its unique canonical encoding, and
 that the RV64I concrete and SMT models agree with each other on sampled states; that agreement is not execution.
 Agreement is evidence for the sampled states on the executing CPU only. It is not a proof of the ISA or of other
@@ -47,6 +48,10 @@ EDGE = [0, 1, 2, MASK, 1 << 63, (1 << 63) - 1, MASK - 1, 195, 0x5555555555555555
 STATES = int(os.environ.get("ZENO_MACHINE_CONFORMANCE_STATES", "16"))
 SMT_STATES = 2
 IMM32 = [-(1 << 31), -(1 << 31) + 1, -0x12345678, -256, -129, 128, 255, 65536, 0x12345678, (1 << 31) - 1]
+# Listed here, not taken from the checker, so a checker edit cannot drop forms from the enumeration.
+IMMEDIATE_OPS = ("add", "or", "adc", "sbb", "and", "sub", "xor", "cmp")
+# MOV r64, imm32 has no 8-bit form: edge values around both sign boundaries.
+MOV_IMM32 = sorted(set(IMM32) | {-128, -2, -1, 0, 1, 2, 127})
 # The SMT comparison samples 8-bit immediates; the concrete comparison covers all of them.
 SMT_IMM8 = {-128, -127, -2, -1, 0, 1, 2, 64, 126, 127}
 WORDS = len(REGS) + 1  # registers then RFLAGS, for the state before and after
@@ -64,7 +69,8 @@ def forms():
     for d in REGS:
         out += [["imm", d, str(x)] for x in (0, 1, MASK, 1 << 63, (1 << 63) - 1, 195, 0x0123456789ABCDEF)]
     out += [["lea", d, b, i, s] for d, b, i in itertools.product(REGS, REGS, REGS) for s in (1, 2, 4, 8)]
-    out += [[op, d, k] for op in v.IMMEDIATE_OPS for d in REGS for k in list(range(-128, 128)) + IMM32]
+    out += [[op, d, k] for op in IMMEDIATE_OPS for d in REGS for k in list(range(-128, 128)) + IMM32]
+    out += [["mov", d, k] for d in REGS for k in MOV_IMM32]
     return out + [["nop"]]
 
 
@@ -114,7 +120,10 @@ class HostIndependentModelChecks(unittest.TestCase):
             (bytes([r, 0x81, modrm]) + struct.pack("<i", k) for r in range(0x48, 0x50) for modrm in range(256)
              for k in IMM32 + [-128, -1, 0, 127]),
             (bytes([r, o]) + struct.pack("<i", k) for r in range(0x40, 0x50) for o in range(0x05, 0x40, 8)
-             for k in IMM32 + [-128, -1, 0, 127]))
+             for k in IMM32 + [-128, -1, 0, 127]),
+            # MOV r64, imm32: every REX prefix and ModRM byte with sampled values.
+            (bytes([r, 0xC7, modrm]) + struct.pack("<i", k) for r in range(0x40, 0x50) for modrm in range(256)
+             for k in (-(1 << 31), -1, 0, 127, 0x12345678)))
         accepted = 0
         for body in bodies:
             try:
@@ -284,7 +293,7 @@ class X86FlagModelConformance(unittest.TestCase):
         import z3
         context = z3.Context()
         for i, form in enumerate(self.forms):
-            if form[0] in v.IMMEDIATE_OPS and isinstance(form[-1], int) and -128 <= form[-1] <= 127 \
+            if form[0] in IMMEDIATE_OPS and isinstance(form[-1], int) and -128 <= form[-1] <= 127 \
                     and form[-1] not in SMT_IMM8:
                 continue
             decoded = v.decode(v.X86, self.code[i] + b"\xc3")
@@ -303,7 +312,8 @@ class X86FlagModelConformance(unittest.TestCase):
         def sbb_ignores_borrow_in_carry(form, probe, registers, flags):
             after, after_flags = exact(form, probe, registers, flags)
             if form[0] == "sbb":
-                after_flags["cf"] = int(registers[form[1]] < registers[form[2]])
+                right = registers[form[2]] if isinstance(form[2], str) else form[2] & MASK
+                after_flags["cf"] = int(registers[form[1]] < right)
             return after, after_flags
 
         def add_overflow_is_carry(form, probe, registers, flags):
@@ -332,14 +342,27 @@ class X86FlagModelConformance(unittest.TestCase):
             return after, after_flags
 
         def immediate_zero_extended(form, probe, registers, flags):
-            if form[0] in v.IMMEDIATE_OPS and isinstance(form[2], int) and form[2] < 0:
+            if form[0] in IMMEDIATE_OPS and isinstance(form[2], int) and form[2] < 0:
                 width = 0xFF if form[2] >= -128 else 0xFFFFFFFF
                 after, after_flags = dict(registers), dict(flags)
                 v._x86_concrete(v.Instruction(form[0], (form[1], form[2] & width), 0, 0), after, after_flags)
                 return after, after_flags
             return exact(form, probe, registers, flags)
 
+        def adc_immediate_ignores_carry(form, probe, registers, flags):
+            if form[0] == "adc" and isinstance(form[2], int):
+                return exact(form, probe, registers, {**flags, "cf": 0})
+            return exact(form, probe, registers, flags)
+
+        def mov_immediate_zero_extended(form, probe, registers, flags):
+            after, after_flags = exact(form, probe, registers, flags)
+            if form[0] == "mov" and isinstance(form[2], int):
+                after[form[1]] = form[2] & 0xFFFFFFFF
+            return after, after_flags
+
         for name, model in (("immediate-zero-extended", immediate_zero_extended),
+                            ("adc-immediate-carry", adc_immediate_ignores_carry),
+                            ("mov-immediate-zero-extended", mov_immediate_zero_extended),
                             ("sbb-carry", sbb_ignores_borrow_in_carry), ("add-overflow", add_overflow_is_carry),
                             ("setcc-width", setcc_writes_whole_register), ("cmovle-zero", cmovle_ignores_zero),
                             ("shl-carry", shl_carry_off_by_one)):

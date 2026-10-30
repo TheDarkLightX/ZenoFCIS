@@ -1,9 +1,9 @@
 """Independent profile-2 byte decoder, flag model and modular-64 equivalence checker.
 
 Profile 2 adds the x86 CF, ZF, SF and OF flags, carries, comparisons, SETcc,
-CMOVcc, arithmetic shifts and ADD/SUB/AND/OR/XOR/CMP with a sign-extended
-8-bit or 32-bit immediate in its unique canonical encoding, and RV64I
-set-less-than, immediate logic and
+CMOVcc, arithmetic shifts, ADD/ADC/SUB/SBB/AND/OR/XOR/CMP with a sign-extended
+8-bit or 32-bit immediate and MOV with a sign-extended 32-bit immediate, each
+in its unique canonical encoding, and RV64I set-less-than, immediate logic and
 arithmetic shifts, with up to six arguments and two results. PF, AF and every
 other flag are unmodelled: no admitted instruction reads them, and an
 instruction reading a flag that an earlier instruction left undefined refuses.
@@ -39,10 +39,11 @@ _ALU = {0x89: "mov", 0x01: "add", 0x29: "sub", 0x21: "and", 0x09: "or", 0x31: "x
         0x11: "adc", 0x19: "sbb", 0x39: "cmp", 0x85: "test"}
 _SHIFT = {4: "shl", 5: "shr", 7: "sar"}
 _X86_PAIR = set(_ALU.values()) | {"imul", "movzx"} | set(CMOVCC)
-# 83 /n ib and 81 /n id with a sign-extended immediate; /2 (ADC) and /3 (SBB) stay outside the profile.
-_IMMEDIATE_GROUP = {0: "add", 1: "or", 4: "and", 5: "sub", 6: "xor", 7: "cmp"}
+# 83 /n ib and 81 /n id with a sign-extended immediate.
+_IMMEDIATE_GROUP = {0: "add", 1: "or", 2: "adc", 3: "sbb", 4: "and", 5: "sub", 6: "xor", 7: "cmp"}
 # The 6-byte RAX forms that GNU as and the canonical rule choose over 81 /n id.
-_ACCUMULATOR = {0x05: "add", 0x0D: "or", 0x25: "and", 0x2D: "sub", 0x35: "xor", 0x3D: "cmp"}
+_ACCUMULATOR = {0x05: "add", 0x0D: "or", 0x15: "adc", 0x1D: "sbb", 0x25: "and", 0x2D: "sub", 0x35: "xor",
+                0x3D: "cmp"}
 IMMEDIATE_OPS = tuple(_IMMEDIATE_GROUP.values())
 IMMEDIATE_RANGE = (-(1 << 31), (1 << 31) - 1)
 _RV_REGISTER = {(0, 0): "add", (32, 0): "sub", (0, 4): "xor", (0, 7): "and", (0, 6): "or",
@@ -59,7 +60,7 @@ def _palette(target, grammar):
         op, args = form[0], form[1:]
         if op == "nop":
             valid = not args
-        elif target == X86 and op in IMMEDIATE_OPS and len(args) == 2 and type(args[1]) is int:
+        elif target == X86 and (op in IMMEDIATE_OPS or op == "mov") and len(args) == 2 and type(args[1]) is int:
             valid = names(args[:1]) and IMMEDIATE_RANGE[0] <= args[1] <= IMMEDIATE_RANGE[1]
         elif target == X86 and op in _X86_PAIR:
             valid = len(args) == 2 and names(args)
@@ -154,6 +155,12 @@ def _decode_x86(code):
                     _require(not -128 <= value <= 127, "Imm32WhereImm8Fits")
                     _require(dst != "rax", "AccumulatorFormRequired")
                 op, operands = _IMMEDIATE_GROUP[field], (dst, value)
+            elif opcode == 0xC7:
+                # MOV r64, imm32 (C7 /0 id), sign-extended; MOVABS (B8+r io) is the separate "imm" form.
+                _require(not rex_r and not rex_x, "UnusedRexBits")
+                field, low = register_modrm()
+                _require(field == 0, "UnsupportedMovImmediate")
+                op, operands = "mov", (_reg(_XREG, low + 8 * rex_b), int.from_bytes(take(4), "little", signed=True))
             elif opcode in _ACCUMULATOR:
                 _require(not rex_r and not rex_x and not rex_b, "UnusedRexBits")
                 value = int.from_bytes(take(4), "little", signed=True)
@@ -296,7 +303,7 @@ def _x86_concrete(ins, r, f):
     if op == "imm":
         r[dst] = a[1]
     elif op == "mov":
-        r[dst] = r[a[1]]
+        r[dst] = r[a[1]] if type(a[1]) is str else a[1] & MASK
     elif op == "lea":
         r[dst] = (r[a[1]] + r[a[2]] * a[3]) & MASK
     elif op == "movzx":
@@ -526,7 +533,7 @@ def _x86_smt(z, ins, r, f, context):
         if op == "imm":
             r[dst] = word(a[1])
         elif op == "mov":
-            r[dst] = r[a[1]]
+            r[dst] = r[a[1]] if type(a[1]) is str else word(a[1] & MASK)
         elif op == "lea":
             r[dst] = r[a[1]] + r[a[2]] * a[3]
         elif op == "movzx":

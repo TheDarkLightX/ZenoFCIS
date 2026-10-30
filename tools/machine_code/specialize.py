@@ -150,7 +150,7 @@ def _x86_footprint(form):
     if op == "imm":
         return (), (args[0],), (), (), ()
     if op in ("mov", "movzx"):
-        return (args[1],), (args[0],), (), (), ()
+        return tuple(a for a in args[1:] if isinstance(a, str)), (args[0],), (), (), ()  # an immediate is no read
     if op == "lea":
         return (args[1], args[2]), (args[0],), (), (), ()
     ins = Instruction(op, tuple(args), 0, 0)
@@ -206,9 +206,11 @@ def fold(target, form, registers: dict, flags: dict):
 
 def materialize(target, register: str, value: int) -> list:
     """Forms that set one register to a constant without touching flags."""
-    if target == verify2.X86:
-        return [["imm", register, str(value)]]
     signed = value - (1 << 64) if value >> 63 else value
+    if target == verify2.X86:
+        if verify2.IMMEDIATE_RANGE[0] <= signed <= verify2.IMMEDIATE_RANGE[1]:
+            return [["mov", register, signed]]  # 7 bytes, sign-extended
+        return [["imm", register, str(value)]]
 
     def build(constant):
         if -2048 <= constant <= 2047:
@@ -224,7 +226,7 @@ def materialize(target, register: str, value: int) -> list:
 
 def _copy(target, form):
     """(destination, source) when a form only copies one register to another, else None."""
-    if target == verify2.X86 and form[0] == "mov":
+    if target == verify2.X86 and form[0] == "mov" and isinstance(form[2], str):
         return form[1], form[2]
     if target == verify2.RV64 and form[0] == "addi" and form[3] == 0 and form[2] != "zero":
         return form[1], form[2]
@@ -333,7 +335,7 @@ def _operands(target, form):
     if op == "lea":
         return (2, 3), 1, False
     if op in ("mov", "movzx"):
-        return (2,), 1, False
+        return ((2,) if isinstance(form[2], str) else ()), 1, False
     if op == "imm":
         return (), 1, False
     if op in verify2.SETCC or op in ("neg", "shl", "shr", "sar"):
@@ -353,13 +355,13 @@ def _flags_live(target, forms):
 
 
 def _zero_idioms(target, forms):
-    """x86: replace a 10-byte zero immediate by 3-byte XOR at the earliest point where no flag is live."""
+    """x86: replace a zero immediate load (7 or 10 bytes) by 3-byte XOR at the earliest point where no flag is live."""
     if target != verify2.X86:
         return forms
     forms = [list(form) for form in forms]
     for index in range(len(forms)):
         form = forms[index]
-        if form[0] != "imm" or form[2] != "0":
+        if not (form[0] == "mov" and type(form[2]) is int and form[2] == 0 or form[0] == "imm" and form[2] == "0"):
             continue
         register = form[1]
         rest = forms[:index] + forms[index + 1:]
