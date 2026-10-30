@@ -61,6 +61,10 @@ jobs:
         run: |
           python3 -B tools/test_machine_code_footprint.py
           python3 -O -B tools/test_machine_code_footprint.py
+      - name: Solver unrealizability agrees with exhaustive exact enumeration
+        run: |
+          python3 -B tools/test_machine_code_realize.py
+          python3 -O -B tools/test_machine_code_realize.py
       - name: ZAL source, human feedback and independent machine replay
         run: python3 -B tools/test_zal_word_kernel.py
       - name: ZAL word-kernel profile 2, library-equal lowering and profile-2 replay
