@@ -360,10 +360,19 @@ fn check_files(out: &Path, expected: &BTreeMap<String, Vec<u8>>) -> Result<()> {
     }
     actual.sort();
     if actual != expected.keys().cloned().collect::<Vec<_>>() {
+        // Name the difference: another target's artifacts differ in their source file.
+        let missing: Vec<&String> = expected
+            .keys()
+            .filter(|name| !actual.contains(name))
+            .collect();
+        let unexpected: Vec<&String> = actual
+            .iter()
+            .filter(|name| !expected.contains_key(*name))
+            .collect();
         return Err(fail(
             crate::INVALID,
             "artifact-drift",
-            json!({"message":"artifact file set differs"}),
+            json!({"message":"artifact file set differs","missing":missing,"unexpected":unexpected}),
         ));
     }
     for (name, bytes) in expected {

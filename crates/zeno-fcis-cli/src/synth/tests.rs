@@ -141,6 +141,31 @@ fn discovery_has_distinct_language_adapters_and_missing_tools_stay_unknown() {
     all(target_os = "linux", not(target_env = "uclibc"))
 ))]
 #[test]
+fn a_different_artifact_file_set_names_the_missing_and_unexpected_files() {
+    let temp = runner::Temp::new().unwrap_or_else(|error| panic!("{}", error.message));
+    // Python artifacts checked as Rust ones: only the source file differs.
+    for name in ["manifest.json", "transition.py"] {
+        fs::write(temp.path().join(name), b"").unwrap();
+    }
+    let expected: BTreeMap<String, Vec<u8>> = ["manifest.json", "transition.rs"]
+        .into_iter()
+        .map(|name| (name.to_owned(), Vec::new()))
+        .collect();
+    let Err(failure) = check_files(temp.path(), &expected) else {
+        panic!("a different file set was accepted")
+    };
+    assert_eq!(failure.exit, crate::INVALID);
+    assert_eq!(failure.report["status"], "artifact-drift");
+    assert_eq!(
+        failure.report["detail"],
+        json!({"message":"artifact file set differs","missing":["transition.rs"],"unexpected":["transition.py"]})
+    );
+}
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
+#[test]
 fn javascript_runner_refuses_an_unqualified_runtime_version() {
     use std::os::unix::fs::PermissionsExt;
     let temp = runner::Temp::new().unwrap_or_else(|error| panic!("{}", error.message));
