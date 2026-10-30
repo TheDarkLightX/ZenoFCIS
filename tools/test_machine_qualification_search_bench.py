@@ -18,8 +18,8 @@ def report(**problems):
     return {"schema": bench.SCHEMA, "commit": "c", "problems": problems}
 
 
-def row(cost, status="checked-candidate", seconds=0.5, **counters):
-    return {"cost": cost, "status": status, "wall_median_seconds": seconds,
+def row(cost, status="checked-candidate", seconds=0.5, objective="bytes", **counters):
+    return {"cost": cost, "status": status, "wall_median_seconds": seconds, "objective": objective,
             "counters": {"solver_checks": 1, "proposed": 10, "concrete_refutations": 2, "objective_pruned": 3,
                          **counters}}
 
@@ -78,6 +78,39 @@ class Comparison(unittest.TestCase):
                 self.assertIn("improved", text)
 
 
+    def test_costs_are_ranked_by_the_recorded_objective(self):
+        # Constant one under the instruction objective: imm rax,1 (11 bytes, 1 instruction) against
+        # xor rax,rax; or rax,1 (8 bytes, 2 instructions). Both are checker-equivalent.
+        from machine_code import verify2
+        from machine_code.targets import encode_program
+        one, two = [["imm", "rax", "1"]], [["xor", "rax", "rax"], ["or", "rax", 1]]
+        problem = {"schema": "zeno-fcis/machine-problem/2", "target": verify2.X86, "inputs": [],
+                   "outputs": [["const", "1"]], "grammar": one + two, "max_instructions": 2,
+                   "objective": "instructions"}
+        costs = []
+        for body in (one, two):
+            result = verify2.check(problem, encode_program(problem["target"], body))
+            self.assertEqual(result["status"], "equivalent")
+            costs.append(result["cost"])
+        self.assertEqual(costs, [{"bytes": 11, "instructions": 1}, {"bytes": 8, "instructions": 2}])
+        for objective, expected, exit_code in (("instructions", "worse", 1), ("bytes", "improved", 0)):
+            with self.subTest(objective=objective):
+                text, code = bench.compare(report(a=row(costs[0], objective=objective)),
+                                           report(a=row(costs[1], objective=objective)))
+                self.assertEqual((code, text.splitlines()[1].split(" | ")[6].split()[0]), (exit_code, expected), text)
+
+    def test_unknown_or_changed_objectives_are_not_ranked(self):
+        old, new = {"bytes": 11, "instructions": 1}, {"bytes": 8, "instructions": 2}
+        text, code = bench.compare(report(a=row(old, objective=None)), report(a=row(new, objective=None)))
+        self.assertEqual(code, 1, text)
+        self.assertIn("unranked", text)
+        # One report without the objective (an older baseline) is ranked by the other's.
+        text, code = bench.compare(report(a=row(old, objective=None)), report(a=row(new, objective="bytes")))
+        self.assertEqual((code, "improved" in text), (0, True), text)
+        text, code = bench.compare(report(a=row(old)), report(a=row(old, objective="instructions")))
+        self.assertEqual((code, "objective changed" in text), (1, True), text)
+
+
 class SmallRun(unittest.TestCase):
     def test_a_real_search_is_measured_repeatably_without_changing_the_repository(self):
         names = {"add64-rv64i.json", "kernels/add64-rv64i.json", "kernels/signed-saturating-add-x86.json",
@@ -91,8 +124,8 @@ class SmallRun(unittest.TestCase):
         with redirect_stderr(io.StringIO()):
             measured = bench.run(["add64-rv64i.json"], BUDGETS, 2)
         result = measured["problems"]["add64-rv64i.json"]
-        self.assertEqual((result["status"], result["cost"], result["deterministic"]),
-                         ("checked-candidate", {"bytes": 8, "instructions": 1}, True))
+        self.assertEqual((result["status"], result["cost"], result["deterministic"], result["objective"]),
+                         ("checked-candidate", {"bytes": 8, "instructions": 1}, True, "bytes"))
         # With the grammar exhausted, every sequence is either proposed or counted as skipped by pruning or by
         # the cost bound. Objective prunes are counted among the proposed sequences.
         counted = result["counters"]
