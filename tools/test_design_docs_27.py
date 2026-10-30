@@ -13,6 +13,11 @@ DESIGNS = {
         "sections": ["What exists and what is missing", "Commands", "Verification", "Scope"],
         "mentions": ["zeno-fcis/app-backup/1", "delivery_id", "--resume-deliveries", "DATABASE.submissions"],
     },
+    "docs/zal/APPLICATION_BRIDGE.md": {
+        "sections": ["The user story", "Assessment", "Design: one qualified bridge for finite models that send messages",
+                     "Route status for the rest of ZAL", "Next steps and required evidence", "Scope", "Lineage"],
+        "mentions": ["zal/app-effects/1", "zal/effect-plan/1", "CHANNEL@ORDINAL:IDEMPOTENCY", "zal/typed-fsm/1"],
+    },
 }
 FORBIDDEN = re.compile(r"correct by construction|/home/|/tmp/|Claude|Codex|GPT|Opus|Sonnet|Astra|Luna|Sol 6", re.I)
 
