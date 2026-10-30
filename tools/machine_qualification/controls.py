@@ -1,7 +1,7 @@
 """Registered planted-defect controls for the independent machine-code checkers.
 
-Each defect is one named source edit to `tools/machine_code/verify.py`, `verify2.py` or `verify3.py`. The edit is applied to an
-isolated specimen: a fresh copy of the checker package, the test modules that hold the controls, and the kernel
+Each defect is one named source edit to `tools/machine_code/verify.py`, `verify2.py`, `verify3.py` or `realize.py`
+(whose unsat verdicts carry checker-like weight). The edit is applied to an isolated specimen: a fresh copy of the checker package, the test modules that hold the controls, and the kernel
 library. Its checker identity is computed from the specimen's own sources, so it is consistent with the edit. The
 defect names the control that should expose it, and optionally a second control that must also expose it; only
 those controls are judged. Each run of a control records one outcome:
@@ -45,7 +45,8 @@ MODES = (("-B",), ("-O", "-B"))
 TIMEOUT = 900
 TEST_MODULES = ("test_machine_code_verifier.py", "test_machine_code_profile2_verifier.py",
                 "test_machine_code_library.py", "test_machine_code_conformance.py",
-                "test_machine_code_profile2_conformance.py", "test_machine_code_profile3_verifier.py")
+                "test_machine_code_profile2_conformance.py", "test_machine_code_profile3_verifier.py",
+                "test_machine_code_realize.py")
 # A failure that mentions any of these is a refusal of the specimen's identity, not of the defect. The session
 # refuses a changed checker with "session problem/checker/solver binding drifted".
 IDENTITY_MARKERS = ("identity", "stale", "hash refus", "binding drifted")
@@ -53,6 +54,7 @@ IDENTITY_MARKERS = ("identity", "stale", "hash refus", "binding drifted")
 V1 = "test_machine_code_verifier.VerifierTests."
 V2 = "test_machine_code_profile2_verifier.Profile2VerifierTests."
 V3 = "test_machine_code_profile3_verifier.Profile3VerifierTests."
+REALIZE = "test_machine_code_realize.RealizeCrossCheck."
 CONFORMANCE1 = "test_machine_code_conformance.X86ModelConformance."
 CONFORMANCE2 = "test_machine_code_profile2_conformance."
 POSITIVE = (
@@ -293,6 +295,18 @@ DEFECTS = (
            "if e != concrete_expected or a != concrete_actual or (e == a and read_only_kept):", "if False:",
            V3 + "test_solver_absent_unknown_and_replay_mismatch_are_never_equivalent",
            "A solver model is reported as a counterexample without its concrete replay."),
+    Defect("realize-slot-range-drops-last-form", "realize.py", "palette coverage",
+           "        solver.add(selector >= 0, selector < palette)\n",
+           "        solver.add(selector >= 0, selector < palette - 1)\n",
+           REALIZE + "test_a_missing_palette_form_is_caught_by_the_cross_check",
+           "The query never selects the palette's last form, so a length whose programs all need it is reported "
+           "unrealizable.",
+           REALIZE + "test_every_small_problem_agrees_with_exhaustive_enumeration"),
+    Defect("realize-cost-bound-ignored", "realize.py", "cost bound",
+           "        solver.add(total < bound)\n",
+           "        pass\n",
+           REALIZE + "test_every_small_problem_agrees_with_exhaustive_enumeration",
+           "Programs at the bound are admitted, so a length below the least cost is reported realizable."),
 )
 
 # Runs one control inside a specimen and prints one JSON line. A failure counts only when its AssertionError was
