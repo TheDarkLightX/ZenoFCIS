@@ -338,6 +338,11 @@ def _cegis(problem, length, bound, examples, ranges, timeout_ms, max_rounds, dea
             return entry
         entry["rounds"] += 1
         solver, selectors, _ = query(z, problem, length, bound, examples, ranges)
+        # Building the query takes time: the solver gets only what is left of the deadline now.
+        remaining = int((deadline - time.time()) * 1000)
+        if remaining <= 0:
+            entry.update(status="inconclusive", reason="budget-exhausted")
+            return entry
         solver.set(timeout=min(timeout_ms if probe_ms is None else probe_ms, remaining))
         answer = solver.check()
         if answer == z.unsat:
@@ -355,6 +360,10 @@ def _cegis(problem, length, bound, examples, ranges, timeout_ms, max_rounds, dea
         code = encode_program(problem["target"], [problem["grammar"][i] for i in choice])
         if not all(_agrees(problem, code, e) for e in examples):
             raise ValueError("encoding disagrees with the checker's concrete model on an example state")
+        remaining = int((deadline - time.time()) * 1000)
+        if remaining <= 0:
+            entry.update(status="inconclusive", reason="budget-exhausted")
+            return entry
         verification = check(problem, code, timeout_ms=max(1, min(timeout_ms, remaining)))
         if verification["status"] == "counterexample":
             examples.append(_witness(problem, verification))
@@ -384,10 +393,13 @@ def _halve(ranges):
     return [ranges[:slot] + [(low, middle)] + ranges[slot + 1:], ranges[:slot] + [(middle, high)] + ranges[slot + 1:]]
 
 
-def _partitioned(problem, length, bound, examples, initial, timeout_ms, split_ms, max_rounds, deadline, pool):
-    """Decide every subspace of one length. `initial` partitions the space; with `split_ms`, a subspace whose query
-    does not answer in time is halved and its two children replace it. Unsat needs every final subspace unsat; any
-    checked solution makes the length realizable; anything undecided makes it inconclusive."""
+def _partitioned(problem, length, bound, examples, initial, timeout_ms, split_ms, max_rounds, deadline, pool,
+                 workers=1):
+    """Decide every subspace of one length. `initial` partitions the space and is consumed lazily; with `split_ms`, a
+    subspace whose query does not answer in time is halved and its two children are decided next. Unsat needs every
+    final subspace unsat; any checked solution makes the length realizable; anything undecided, or left unvisited
+    when the deadline passes, makes it inconclusive. At most 2 * `workers` jobs are outstanding, and none starts
+    after the deadline."""
     def job(ranges, known):
         probe = split_ms if split_ms is not None and any(high - low > 1 for low, high in ranges) else None
         return (problem, length, bound, [tuple(r) for r in ranges], known, timeout_ms, probe, max_rounds, deadline)
@@ -404,24 +416,49 @@ def _partitioned(problem, length, bound, examples, initial, timeout_ms, split_ms
          else undecided).append(result)
         return []
 
-    queue = [job(ranges, examples) for ranges in initial]
+    pending, fresh = [], iter(initial)
+
+    def take():
+        """The next job: split children first, then the next initial subspace; None when none is left."""
+        if pending:
+            return pending.pop(0)
+        ranges = next(fresh, None)
+        return None if ranges is None else job(ranges, examples)
+
+    def expired():
+        return time.time() >= deadline
+
     if pool is None:
-        while queue and not found:
-            queue = settle(_decide(queue.pop(0))) + queue
+        while not found and not expired():
+            item = take()
+            if item is None:
+                break
+            pending[:0] = settle(_decide(item))
     else:
         from concurrent.futures import FIRST_COMPLETED, wait
         from concurrent.futures.process import BrokenProcessPool
-        running = {pool.submit(_decide, item) for item in queue}
+        running = set()
         try:
-            while running and not found:
+            while not found:
+                while len(running) < 2 * workers and not expired():
+                    item = take()
+                    if item is None:
+                        break
+                    running.add(pool.submit(_decide, item))
+                if not running:
+                    break
                 done, running = wait(running, return_when=FIRST_COMPLETED)
                 for future in done:
-                    running |= {pool.submit(_decide, item) for item in settle(future.result())}
+                    pending[:0] = settle(future.result())
         except BrokenProcessPool:
             # A worker that died decided nothing; the length cannot be unsat without every subspace.
             undecided.append({"status": "inconclusive", "reason": "WorkerProcessFailed", "rounds": 0})
         for future in running:
             future.cancel()
+    if not found and take() is not None:
+        # Subspaces were left unvisited: the length cannot be unsat without them.
+        undecided.append({"status": "inconclusive", "rounds": 0,
+                          "reason": "budget-exhausted" if expired() else "unvisited-subspaces"})
     entry = {"length": length, "subspace_count": len(leaves) + len(undecided) + len(found), "splits": splits,
              "rounds": rounds}
     if found:
@@ -476,10 +513,11 @@ def realize(problem, bound=None, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadlin
             examples = list(_seeds(problem) if seeds is None else seeds)
             if partitioned:
                 from itertools import product
-                initial = [[palette_groups[g] for g in combo]
-                           for combo in product(range(len(palette_groups)), repeat=length)]
+                # Generated as consumed: the number of subspaces grows exponentially with the length.
+                initial = ([palette_groups[g] for g in combo]
+                           for combo in product(range(len(palette_groups)), repeat=length))
                 entry = _partitioned(problem, length, bound, examples, initial, timeout_ms, split_ms, max_rounds,
-                                     deadline, pool)
+                                     deadline, pool, workers)
             else:
                 entry = {"length": length, **_cegis(problem, length, bound, examples, None, timeout_ms, max_rounds,
                                                     deadline)}
@@ -585,12 +623,19 @@ def replay(problem, record, timeout_ms=10_000):
         if partitioned != ("subspaces" in entry) or ("subspaces" in entry) == ("query_sha256" in entry):
             failures.append(f"length {length}: entry shape does not match the record's mode")
             continue
-        if "subspaces" not in entry:
-            parts = [(None, entry["examples"], entry["query_sha256"])]
-            covered = True
-        else:
-            parts = [(s["ranges"], s["examples"], s["query_sha256"]) for s in entry["subspaces"]]
-            covered = _covers(entry, len(problem["grammar"]))
+        try:
+            if "subspaces" not in entry:
+                parts = [(None, entry["examples"], entry["query_sha256"])]
+                covered = True
+            else:
+                parts = [(s["ranges"], s["examples"], s["query_sha256"]) for s in entry["subspaces"]]
+                covered = _covers(entry, len(problem["grammar"]))
+        except (KeyError, TypeError, ValueError):
+            failures.append(f"length {length}: entry is malformed")
+            continue
+        # Checked here, not only on replayed queries: an entry with no subspaces replays no query at all.
+        if not covered:
+            failures.append(f"length {length}: subspaces do not cover the palette space exactly once")
         for ranges, examples, recorded in parts:
             solver, _, _ = query(z, problem, length, bound, [_example(e) for e in examples],
                                  None if ranges is None else [tuple(r) for r in ranges])

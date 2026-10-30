@@ -12,8 +12,10 @@ import contextlib
 import io
 import json
 from pathlib import Path
+import shutil
 import sys
 import tempfile
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +26,11 @@ from machine_code.model import read_json  # noqa: E402
 
 DATA = ROOT / "test-data/machine-code"
 SMALL = 20_000  # candidate sequences, all lengths
+# Generous per-query and per-run budgets, so that a loaded host turns no answer into a timeout. An unloaded host
+# answers these queries in well under a second; the budgets only bound how long a slow one may take.
+QUERY_MS = 20_000
+DEADLINE_MS = 600_000
+BUDGET = ["--solver-ms", str(QUERY_MS), "--deadline-ms", str(DEADLINE_MS)]
 P1 = "zeno-fcis/machine-problem/1"
 
 # The palette's last form is the only single-instruction sum: a selector range that drops one form must show.
@@ -57,6 +64,17 @@ FLAG_READS = {"schema": "zeno-fcis/machine-problem/2", "target": "x86_64-sysv-re
               "max_instructions": 3, "objective": "bytes"}
 
 
+# One lea form, at most one instruction: below 1 instruction only length 0 is asked; a one-instruction sum exists.
+LEA_ONLY = {"schema": P1, "target": "x86_64-sysv-register/1", "inputs": ["x", "y"],
+            "expression": ["add", ["input", "x"], ["input", "y"]],
+            "grammar": [["lea", "rax", "rdi", "rsi", 1]], "max_instructions": 1, "objective": "instructions"}
+# Two constant forms that never compute x+y; with two groups per slot, lengths 0 to 16 have 2**17 - 1 subspaces.
+CONSTANTS_ONLY = {"schema": "zeno-fcis/machine-problem/2", "target": "x86_64-sysv-register/2", "inputs": ["x", "y"],
+                  "outputs": [["add", ["input", "x"], ["input", "y"]]],
+                  "grammar": [["imm", "rax", "0"], ["imm", "rax", "1"]], "max_instructions": 16,
+                  "objective": "instructions"}
+
+
 # Boundary cases: an empty body is already equivalent (least cost 0), and an empty palette with positive lengths.
 ZERO_COST = {"schema": "zeno-fcis/machine-problem/2", "target": "rv64i-register/2", "inputs": ["x"],
              "outputs": [["input", "x"]], "grammar": [], "max_instructions": 0, "objective": "instructions"}
@@ -79,15 +97,23 @@ def primary(problem, cost):
     return cost["bytes"] if problem["objective"] == "bytes" else cost["instructions"]
 
 
-def exhaustive(problem, work: Path):
-    """The exact enumerator's least primary cost, or None; it must exhaust the grammar."""
+def exhaustive(problem, work: Path, attempts=3):
+    """The exact enumerator's least primary cost, or None. It must exhaust the grammar with every checker verdict
+    decided; search's own limits (5 s per check, 60 s in all) are fixed, so a loaded host gets fresh attempts."""
     (work / "problem.json").write_text(json.dumps(problem))
-    session.open_session(work / "problem.json", work / "session")
-    result = session.search(work / "session", max_candidates=100_000, max_checks=128, deadline_ms=60_000,
-                            timeout_ms=2000, prune=True)
-    if result["stop_reason"] != "grammar-exhausted":
-        raise AssertionError(f"enumeration did not exhaust: {result['stop_reason']}")
-    return None if result["cost"] is None else primary(problem, result["cost"])
+    folder = work / "session"  # session-mode tests read it afterwards
+    for _ in range(attempts):
+        if folder.exists():
+            shutil.rmtree(folder)
+        session.open_session(work / "problem.json", folder)
+        result = session.search(folder, max_candidates=100_000, max_checks=128, deadline_ms=60_000,
+                                timeout_ms=5000, prune=True)
+        undecided = [v for v in result.get("checker_verdicts", []) if v["status"] not in ("equivalent",
+                                                                                         "counterexample")]
+        if result.get("stop_reason") == "grammar-exhausted" and not undecided:
+            return None if result["cost"] is None else primary(problem, result["cost"])
+    raise AssertionError(f"enumeration did not exhaust with decided verdicts: {result.get('stop_reason')}, "
+                         f"{len(undecided)} undecided")
 
 
 _LEAST = {}
@@ -129,18 +155,18 @@ class RealizeCrossCheck(unittest.TestCase):
             with self.subTest(problem=name, **mode):
                 least = least_cost(name, problem)
                 if least is None:
-                    record = realize.realize(problem, None, 2000, **mode)
+                    record = realize.realize(problem, None, QUERY_MS, deadline_ms=DEADLINE_MS, **mode)
                     self.assertEqual(record["status"], "unrealizable", record)
                     self.assertEqual(sorted([e["length"] for e in record["lengths"]]
                                             + record["excluded_by_empty_palette"]),
                                      list(range(problem["max_instructions"] + 1)))
                     self.partition_scope(problem, record, **mode)
                     continue
-                below = realize.realize(problem, least, 2000, **mode)
+                below = realize.realize(problem, least, QUERY_MS, deadline_ms=DEADLINE_MS, **mode)
                 self.assertEqual(below["status"], "unrealizable", below)
                 self.assertTrue(all(e["status"] == "unrealizable" for e in below["lengths"]), below)
                 self.partition_scope(problem, below, **mode)
-                at = realize.realize(problem, least + 1, 2000, **mode)
+                at = realize.realize(problem, least + 1, QUERY_MS, deadline_ms=DEADLINE_MS, **mode)
                 self.assertEqual(at["status"], "realizable", at)
                 found = at["lengths"][-1]
                 self.assertEqual(found["verification"]["status"], "equivalent")
@@ -171,13 +197,13 @@ class RealizeCrossCheck(unittest.TestCase):
             problem = read_json(DATA / f"{name}.json")
             with self.subTest(problem=name):
                 least = least_cost(name, problem)
-                below = realize.realize(problem, least, 2000, workers=2, split_ms=1)
+                below = realize.realize(problem, least, QUERY_MS, deadline_ms=DEADLINE_MS, workers=2, split_ms=1)
                 self.assertEqual(below["status"], "unrealizable", below)
                 self.assertGreater(sum(e["splits"] for e in below["lengths"]), 0)
                 for entry in below["lengths"]:
                     self.assertTrue(covers(entry, len(problem["grammar"])), entry)
-                self.assertEqual(realize.replay(problem, below)["status"], "replayed")
-                at = realize.realize(problem, least + 1, 2000, workers=2, split_ms=1)
+                self.assertEqual(realize.replay(problem, below, QUERY_MS)["status"], "replayed")
+                at = realize.realize(problem, least + 1, QUERY_MS, deadline_ms=DEADLINE_MS, workers=2, split_ms=1)
                 self.assertEqual(at["status"], "realizable", at)
                 self.assertEqual(primary(problem, at["lengths"][-1]["verification"]["cost"]), least)
 
@@ -224,7 +250,8 @@ class RealizeCrossCheck(unittest.TestCase):
     def test_an_undecided_subspace_makes_the_length_inconclusive(self):
         # One weak example state and one round: every subspace's first solution agrees on it and is then refuted,
         # so no subspace is decided.
-        record = realize.realize(NO_PROGRAM, None, 2000, max_rounds=1, seeds=[((0, 0), {}, None)], groups=2)
+        record = realize.realize(NO_PROGRAM, None, QUERY_MS, deadline_ms=DEADLINE_MS, max_rounds=1,
+                                 seeds=[((0, 0), {}, None)], groups=2)
         self.assertEqual(record["status"], "inconclusive", record)
         self.assertTrue(all(e["status"] == "inconclusive" for e in record["lengths"]), record)
 
@@ -232,12 +259,12 @@ class RealizeCrossCheck(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             least = exhaustive(LAST_FORM_NEEDED, Path(directory))
         self.assertEqual(least, 5)
-        at = realize.realize(LAST_FORM_NEEDED, least + 1, 2000)
+        at = realize.realize(LAST_FORM_NEEDED, least + 1, QUERY_MS, deadline_ms=DEADLINE_MS)
         self.assertEqual(at["status"], "realizable", at)
         self.assertEqual(at["lengths"][-1]["code_hex"], "488d0437c3")
 
     def test_records_state_scope_and_never_global_optimality(self):
-        record = realize.realize(LAST_FORM_NEEDED, 5, 2000)
+        record = realize.realize(LAST_FORM_NEEDED, 5, QUERY_MS, deadline_ms=DEADLINE_MS)
         self.assertEqual(record["status"], "unrealizable")
         self.assertFalse(record["global_optimality"])
         self.assertEqual(record["authority"], "none")
@@ -251,12 +278,12 @@ class RealizeCrossCheck(unittest.TestCase):
 class RealizeReplay(unittest.TestCase):
     def test_replay_rebuilds_the_same_query_and_tampering_fails(self):
         problem = read_json(DATA / "umin-x86.json")
-        record = realize.realize(problem, 11, 2000)
+        record = realize.realize(problem, 11, QUERY_MS, deadline_ms=DEADLINE_MS)
         self.assertEqual(record["status"], "unrealizable", record)
-        self.assertEqual(realize.replay(problem, record)["status"], "replayed")
+        self.assertEqual(realize.replay(problem, record, QUERY_MS)["status"], "replayed")
         tampered = json.loads(json.dumps(record))
         tampered["lengths"][-1]["examples"][0]["arguments"][0] = "7"
-        result = realize.replay(problem, tampered)
+        result = realize.replay(problem, tampered, QUERY_MS)
         self.assertEqual(result["status"], "failed")
         self.assertFalse(result["replayed"][-1]["query_hash_matches"])
         with self.assertRaises(ValueError):
@@ -265,13 +292,15 @@ class RealizeReplay(unittest.TestCase):
     def test_cli_realize_writes_a_record_and_replays_it(self):
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory) / "record.json"
-            argv = ["realize", "--problem", str(DATA / "add64-rv64i.json"), "--below", "8", "--out", str(out)]
+            argv = ["realize", "--problem", str(DATA / "add64-rv64i.json"), "--below", "8", "--out", str(out),
+                    *BUDGET]
             with contextlib.redirect_stdout(io.StringIO()) as printed:
                 code = run.main(argv)
             self.assertEqual(code, 0, printed.getvalue())
             self.assertEqual(json.loads(printed.getvalue())["status"], "unrealizable")
             with contextlib.redirect_stdout(io.StringIO()) as printed:
-                code = run.main(["realize", "--problem", str(DATA / "add64-rv64i.json"), "--replay", str(out)])
+                code = run.main(["realize", "--problem", str(DATA / "add64-rv64i.json"), "--replay", str(out),
+                                 *BUDGET])
             self.assertEqual(code, 0, printed.getvalue())
             self.assertEqual(json.loads(printed.getvalue())["status"], "replayed")
             with contextlib.redirect_stdout(io.StringIO()) as printed:
@@ -283,17 +312,17 @@ class RealizeReplay(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory) / "record.json"
             argv = ["realize", "--problem", str(DATA / "umin-x86.json"), "--below", "11", "--groups", "2",
-                    "--workers", "2", "--out", str(out)]
+                    "--workers", "2", "--out", str(out), *BUDGET]
             with contextlib.redirect_stdout(io.StringIO()) as printed:
                 code = run.main(argv)
             self.assertEqual(code, 0, printed.getvalue())
             record = read_json(out)
         self.assertEqual(record["status"], "unrealizable")
         self.assertEqual([e["subspace_count"] for e in record["lengths"]], [1, 2, 4, 8])
-        self.assertEqual(realize.replay(problem, record)["status"], "replayed")
+        self.assertEqual(realize.replay(problem, record, QUERY_MS)["status"], "replayed")
         missing = json.loads(json.dumps(record))
         missing["lengths"][-1]["subspaces"].pop()
-        result = realize.replay(problem, missing)
+        result = realize.replay(problem, missing, QUERY_MS)
         self.assertEqual(result["status"], "failed")
         self.assertFalse(result["replayed"][-1]["coverage"])
 
@@ -303,23 +332,50 @@ class RealizeReplay(unittest.TestCase):
         problem = {"schema": P1, "target": "x86_64-sysv-register/1", "inputs": ["x", "y"],
                    "expression": ["add", ["input", "x"], ["input", "y"]],
                    "grammar": [["lea", "rax", "rdi", "rsi", 1]], "max_instructions": 1, "objective": "instructions"}
-        record = realize.realize(problem, 1, 2000)
+        record = realize.realize(problem, 1, QUERY_MS, deadline_ms=DEADLINE_MS)
         self.assertEqual((record["status"], [e["length"] for e in record["lengths"]], record["excluded_by_cost"]),
                          ("unrealizable", [0], [1]))
-        self.assertEqual(realize.replay(problem, record)["status"], "replayed")
+        self.assertEqual(realize.replay(problem, record, QUERY_MS)["status"], "replayed")
         tampered = json.loads(json.dumps(record))
         tampered["bound"] = 2
         for entry in tampered["lengths"]:
             entry["statement"] = entry["statement"].replace("below 1 ", "below 2 ")
-        result = realize.replay(problem, tampered)
+        result = realize.replay(problem, tampered, QUERY_MS)
         self.assertEqual(result["status"], "failed", result)
         self.assertIn("not every eligible length is present", result["failures"])
-        self.assertEqual(realize.realize(problem, 2, 2000)["status"], "realizable")
+        self.assertEqual(realize.realize(problem, 2, QUERY_MS, deadline_ms=DEADLINE_MS)["status"], "realizable")
+
+    def test_replay_refuses_a_length_with_no_subspaces(self):
+        # Independent review 3, finding 1: a genuine partitioned record below 1, its bound raised to 2, with length 1
+        # claimed unrealizable by an empty subspace list. No query is replayed for that length, so the failed
+        # coverage must fail the replay on its own, through the API and the CLI.
+        record = realize.realize(LEA_ONLY, 1, QUERY_MS, deadline_ms=DEADLINE_MS, groups=2)
+        self.assertEqual(realize.replay(LEA_ONLY, record, QUERY_MS)["status"], "replayed")
+        forged = json.loads(json.dumps(record))
+        forged["bound"] = 2
+        forged["excluded_by_cost"] = []
+        forged["lengths"][0]["statement"] = realize.STATEMENT.format(length=0, objective="instructions", bound=2)
+        statement = realize.STATEMENT.format(length=1, objective="instructions", bound=2)
+        forged["lengths"].append({"length": 1, "status": "unrealizable", "subspaces": [], "subspace_count": 0,
+                                  "statement": statement})
+        result = realize.replay(LEA_ONLY, forged, QUERY_MS)
+        self.assertEqual(result["status"], "failed", result)
+        self.assertEqual(result["failures"], ["length 1: subspaces do not cover the palette space exactly once"])
+        with tempfile.TemporaryDirectory() as directory:
+            problem, path = Path(directory) / "problem.json", Path(directory) / "record.json"
+            problem.write_text(json.dumps(LEA_ONLY))
+            path.write_text(json.dumps(forged))
+            with contextlib.redirect_stdout(io.StringIO()) as printed:
+                code = run.main(["realize", "--problem", str(problem), "--replay", str(path), *BUDGET])
+        self.assertEqual((code, json.loads(printed.getvalue())["status"]), (1, "failed"), printed.getvalue())
+        # The known solution the forged claim denies.
+        fresh = realize.realize(LEA_ONLY, 2, QUERY_MS, deadline_ms=DEADLINE_MS)
+        self.assertEqual((fresh["status"], fresh["lengths"][-1]["code_hex"]), ("realizable", "488d0437c3"))
 
     def test_replay_binds_the_whole_record(self):
         problem = read_json(DATA / "umin-x86.json")
-        record = realize.realize(problem, 11, 2000)
-        self.assertEqual(realize.replay(problem, record)["status"], "replayed")
+        record = realize.realize(problem, 11, QUERY_MS, deadline_ms=DEADLINE_MS)
+        self.assertEqual(realize.replay(problem, record, QUERY_MS)["status"], "replayed")
         edits = {
             "missing length": lambda r: r["lengths"].pop(1),
             "repeated length": lambda r: r["lengths"].insert(1, json.loads(json.dumps(r["lengths"][1]))),
@@ -335,15 +391,16 @@ class RealizeReplay(unittest.TestCase):
             with self.subTest(edit=name):
                 tampered = json.loads(json.dumps(record))
                 edit(tampered)
-                result = realize.replay(problem, tampered)
+                result = realize.replay(problem, tampered, QUERY_MS)
                 self.assertEqual(result["status"], "failed", result)
                 self.assertTrue(result["failures"], result)
-        found = realize.realize(problem, 12, 2000)
-        self.assertEqual((found["status"], realize.replay(problem, found)["status"]), ("realizable", "replayed"))
+        found = realize.realize(problem, 12, QUERY_MS, deadline_ms=DEADLINE_MS)
+        self.assertEqual((found["status"], realize.replay(problem, found, QUERY_MS)["status"]),
+                         ("realizable", "replayed"))
         wrong = json.loads(json.dumps(found))
         # Three palette forms that return x, not the minimum: the recorded bytes must recheck equivalent.
         wrong["lengths"][-1]["code_hex"] = "4889f89090c3"
-        result = realize.replay(problem, wrong)
+        result = realize.replay(problem, wrong, QUERY_MS)
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["failures"], ["length 3: recorded bytes do not recheck below the bound"])
 
@@ -352,24 +409,24 @@ class RealizeReplay(unittest.TestCase):
             work = Path(directory)
             self.assertEqual(exhaustive(ZERO_COST, work), 0)
             with contextlib.redirect_stdout(io.StringIO()) as printed:
-                code = run.main(["realize", "--session", str(work / "session")])
+                code = run.main(["realize", "--session", str(work / "session"), *BUDGET])
             result = json.loads(printed.getvalue())
         self.assertEqual(code, 0, result)
         self.assertEqual((result["status"], result["bound"], result["lengths"], result["excluded_by_cost"]),
                          ("unrealizable", 0, [], [0]))
-        self.assertEqual(realize.replay(ZERO_COST, result)["status"], "replayed")
-        record = realize.realize(EMPTY_PALETTE, None, 2000)
+        self.assertEqual(realize.replay(ZERO_COST, result, QUERY_MS)["status"], "replayed")
+        record = realize.realize(EMPTY_PALETTE, None, QUERY_MS, deadline_ms=DEADLINE_MS)
         self.assertEqual((record["status"], [e["length"] for e in record["lengths"]],
                           record["excluded_by_empty_palette"]), ("unrealizable", [0], [1]))
-        self.assertEqual(realize.replay(EMPTY_PALETTE, record)["status"], "replayed")
-        partitioned = realize.realize(EMPTY_PALETTE, None, 2000, groups=2, workers=2)
-        self.assertEqual((partitioned["status"], realize.replay(EMPTY_PALETTE, partitioned)["status"]),
+        self.assertEqual(realize.replay(EMPTY_PALETTE, record, QUERY_MS)["status"], "replayed")
+        partitioned = realize.realize(EMPTY_PALETTE, None, QUERY_MS, deadline_ms=DEADLINE_MS, groups=2, workers=2)
+        self.assertEqual((partitioned["status"], realize.replay(EMPTY_PALETTE, partitioned, QUERY_MS)["status"]),
                          ("unrealizable", "replayed"))
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "empty.json"
             path.write_text(json.dumps(EMPTY_PALETTE))
             with contextlib.redirect_stdout(io.StringIO()) as printed:
-                code = run.main(["realize", "--problem", str(path)])
+                code = run.main(["realize", "--problem", str(path), *BUDGET])
         self.assertEqual(code, 0, printed.getvalue())
 
     def test_cli_session_mode_asks_below_the_rechecked_incumbent(self):
@@ -377,12 +434,33 @@ class RealizeReplay(unittest.TestCase):
             work = Path(directory)
             exhaustive(read_json(DATA / "add64-x86.json"), work)
             with contextlib.redirect_stdout(io.StringIO()) as printed:
-                code = run.main(["realize", "--session", str(work / "session")])
+                code = run.main(["realize", "--session", str(work / "session"), *BUDGET])
             result = json.loads(printed.getvalue())
             self.assertEqual(code, 0, result)
             self.assertEqual(result["status"], "unrealizable")
             self.assertEqual(result["bound"], 5)
             self.assertEqual(result["incumbent"]["recheck"], "equivalent")
+
+
+
+class RealizeBudget(unittest.TestCase):
+    def test_partitioned_search_stops_at_its_deadline(self):
+        # Independent review 3, finding 7: after the deadline no further subspace may be generated or decided, with
+        # or without workers, and every length is still reported (inconclusive where undecided). With workers the
+        # space is cut to lengths 0 to 12 (8,191 subspaces), so that a defect that submits every job still finishes.
+        for workers, longest in ((1, 16), (2, 12)):
+            with self.subTest(workers=workers):
+                problem = dict(CONSTANTS_ONLY, max_instructions=longest)
+                began = time.monotonic()
+                record = realize.realize(problem, None, QUERY_MS, deadline_ms=100, groups=2, workers=workers)
+                elapsed = time.monotonic() - began
+                self.assertEqual(record["status"], "inconclusive", record["status"])
+                self.assertEqual([e["length"] for e in record["lengths"]], list(range(longest + 1)))
+                self.assertEqual(record["lengths"][-1]["status"], "inconclusive")
+                self.assertIn("budget-exhausted", record["lengths"][-1]["reason"])
+                visited = sum(e.get("subspace_count", 1) for e in record["lengths"])
+                self.assertLess(visited, 1000, visited)
+                self.assertLess(elapsed, 60, elapsed)
 
 
 if __name__ == "__main__":
