@@ -1,8 +1,7 @@
 """Registered planted-defect controls for the independent machine-code checkers.
 
-Each defect is one named source edit to `tools/machine_code/verify.py`, `verify2.py`, `verify3.py`, `realize.py` or
-`realize_rules.py`
-(whose unsat verdicts carry checker-like weight). The edit is applied to an isolated specimen: a fresh copy of the checker package, the test modules that hold the controls, and the kernel
+Each defect is one named source edit to `tools/machine_code/verify.py`, `verify2.py`, `verify3.py`, `realize.py`
+or `realize_rules.py` (whose unsat verdicts carry checker-like weight). The edit is applied to an isolated specimen: a fresh copy of the checker package, the test modules that hold the controls, and the kernel
 library. Its checker identity is computed from the specimen's own sources, so it is consistent with the edit. The
 defect names the control that should expose it, and optionally a second control that must also expose it; only
 those controls are judged. Each run of a control records one outcome:
