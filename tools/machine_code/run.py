@@ -38,11 +38,17 @@ def main(argv=None):
     replay = commands.add_parser("replay", help="recheck exact emitted machine bytes and bindings")
     replay.add_argument("--artifact", required=True, type=Path)
     replay.add_argument("--solver-ms", type=int, default=1000)
-    library = commands.add_parser("library", help="recheck, or add to, a checked kernel library")
+    library = commands.add_parser("library", help="recheck, run, time or add to a checked kernel library")
     actions = library.add_subparsers(dest="action", required=True)
     checked = actions.add_parser("check", help="recheck every entry; exit 0 only if all are equivalent")
+    checked.add_argument("--native", action="store_true",
+                         help="also run every x86 entry on this processor against the integer reference")
+    timed = actions.add_parser("bench", help="recheck, then time every x86 entry against gcc -O2 in one table")
+    timed.add_argument("--out", required=True, type=Path)
+    timed.add_argument("--iterations", type=int, default=1_000_000)
+    timed.add_argument("--repeats", type=int, default=21)
     added = actions.add_parser("add", help="add an emitted artifact that replays here; never overwrites")
-    for sub in (checked, added):
+    for sub in (checked, timed, added):
         sub.add_argument("--dir", required=True, type=Path)
         sub.add_argument("--solver-ms", type=int, default=1000)
     added.add_argument("--artifact", required=True, type=Path)
@@ -70,7 +76,9 @@ def main(argv=None):
         elif args.command == "library":
             from . import library
             if args.action == "check":
-                result = library.check(args.dir, args.solver_ms)
+                result = library.check(args.dir, args.solver_ms, args.native)
+            elif args.action == "bench":
+                result = library.bench(args.dir, args.out, args.iterations, args.repeats, args.solver_ms)
             else:
                 result = library.add(args.artifact, args.dir, args.name, args.summary, args.route, args.solver_ms)
         else:
