@@ -995,6 +995,61 @@ identity in either profile. The identity binds all declarations except the
 display ID, formula text and fixtures. Different normal forms do not prove
 different meanings.
 
+## Numbers in ZAL JSON
+
+**Journey.** A person or an agent hands a ZAL command some JSON: an explain or what-if input, a trace, a strategy
+problem, an MCP request, a binding. Every number in it should mean exactly what was written. If it cannot, the
+command should say which number and why, not change the value without notice.
+
+**Meaning.** `integrations/zal/json_numbers.py` states the policy, and the readers below use it.
+
+| Source number | Meaning | Refusal |
+| --- | --- | --- |
+| Integer, such as `9007199254740993` | That integer, exactly | `json-number-negative-zero-integer` for `-0`; `json-number-too-long` beyond 4,300 characters |
+| Fraction or exponent, such as `0.1`, `1e-07`, `1.50`, `1e2` | The nearest binary64 value, when that value's shortest decimal equals the written decimal | `json-number-inexact-decimal` otherwise, for example `0.30000000000000001` or `1e-400` |
+| `NaN`, `Infinity`, or a value beyond binary64 range such as `1e400` | Not supported | `json-number-nonfinite` |
+
+For every accepted number, the source text, the in-memory value and the canonical JSON output denote the same
+decimal. The spelling can change: `1.50` is written back as `1.5`, and `1e2` as `100.0`. A reader that needs the
+original spelling keeps raw tokens; `zal_notation.normalizer.canonical_json` does. Readers that accept only
+integers keep their existing refusal for fractions and add the named integer checks.
+
+**Readers.**
+
+- **Full policy:**
+  - the `run.py` explain, why-not, what-if and story inputs;
+  - `terminal.py` JSON traces;
+  - MCP requests;
+  - browser workspace requests;
+  - learn specifications;
+  - application bindings;
+  - ladder statements read by the ladder tools;
+  - strategy manifests;
+  - idiom proposals.
+- **Integer-only policy:** version specifications, observation profiles, strategy problems, program-synthesis
+  bindings, and word-kernel problem files and palettes. Program synthesis applies the same checks inline, because
+  its interpreter closure is pinned.
+
+**Browser runtime.** The browser's `JSON.parse` gives the same decimal value for every accepted number except
+integers beyond plus or minus 2^53-1. The browser route already receives those as decimal strings.
+
+**Not covered yet.** These readers still parse numbers with plain binary floating point:
+
+- the generic `zal_notation.core.loads`, because the category capsule pins `core.py` and its import closure;
+- `semantic_library.load` and the finite-library documents, because their pins include a component list that has
+  no producer;
+- ladder context files, because the standalone relational route copies `ladder.py` without its sibling modules;
+- contract policy JSON read by the loop workspace and coverage tools, whose format the Rust reader owns;
+- the local agent transport.
+
+The Rust readers of ZAL JSON were not examined. `integrations/zal/test_json_numbers.py` lists every
+`json.load` and `json.loads` call under `integrations/zal`, and fails when a new one neither uses the policy nor
+is listed with a reason. The same test checks:
+
+- planted lexemes against each reader;
+- agreement among readers, and with the exact-token reader;
+- the browser differential.
+
 ## Lineage and scope
 
 **Background.** Niklaus Wirth, “Program Development by Stepwise Refinement,”
