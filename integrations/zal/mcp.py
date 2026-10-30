@@ -120,6 +120,10 @@ from zal_notation.ontology_tools import tool_definitions as ontology_definitions
 TOOLS += [{"name": tool["name"], "description": tool["description"] + " Authority: none; no behavioral acceptance.",
            "inputSchema": tool["input_schema"]} for tool in ontology_definitions()]
 
+from arithmetic_handoff_tools import tool_definitions as arithmetic_definitions
+
+TOOLS += arithmetic_definitions()
+
 
 def validate(value, specification, path="arguments"):
     """Enforce the small published tool-schema vocabulary before any action."""
@@ -183,6 +187,9 @@ class Bridge:
             raise Refusal("Unknown tool")
         if name.startswith("zal_ontology_"):
             from zal_notation.ontology_tools import dispatch
+            return dispatch(name, arguments)
+        if name.startswith("zal_arithmetic_"):
+            from arithmetic_handoff_tools import dispatch
             return dispatch(name, arguments)
         validate(arguments, tool["inputSchema"])
         if name.startswith("zal_capture_"):

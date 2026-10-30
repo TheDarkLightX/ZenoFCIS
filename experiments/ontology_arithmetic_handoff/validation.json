@@ -1,0 +1,184 @@
+{
+  "authority": "none",
+  "base_revision": "3a7da94f7318f7b821cb682ce7d5c7d3cebfe9a4",
+  "earlier_attempt": {
+    "qualification_sha256": "f13be128f8c33b3b3e9d5a3e9832b2a423ce5f38ddc93cbebcc9c2910b752dba",
+    "reason": "Two controls remained open: signed raw-bit order refuted two test assertions, and a shared Cargo target reused a previous mutant library. The corrected gate declares the exact expected failure set and uses a fresh target per specimen. This earlier attempt is not passing evidence.",
+    "status": "incomplete"
+  },
+  "python": "3.12.14",
+  "python_tests_per_mode": 223,
+  "qualification_sha256": "ef495dad39a9a140063a078a1c357df372862e1fa3257fd5000f4bf08c9e1ece",
+  "schema": "zeno-fcis/arithmetic-handoff-validation/1",
+  "scope": "Fresh final source runs. Documentation and retained evidence added afterwards; all qualified source bytes rechecked unchanged. Not full release qualification.",
+  "tests": [
+    {
+      "PYTHONOPTIMIZE": "unset",
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "integrations/zal",
+        "-p",
+        "test_ontology*.py"
+      ],
+      "count": 94,
+      "cwd": ".",
+      "exit": 0,
+      "group": "ontology",
+      "mode": "normal",
+      "output_sha256": "90396bca518f35a8be3a43e4c6c9aa70ff197610ea1bf092f58297f5d6593fd7"
+    },
+    {
+      "PYTHONOPTIMIZE": "unset",
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools",
+        "-p",
+        "test_check_arithmetic_handoff.py"
+      ],
+      "count": 10,
+      "cwd": ".",
+      "exit": 0,
+      "group": "gate",
+      "mode": "normal",
+      "output_sha256": "d9853af017010fbcf76d87c8fe46b87ae058237da982d900a1181a4a916ad331"
+    },
+    {
+      "PYTHONOPTIMIZE": "unset",
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "integrations/zal",
+        "-p",
+        "test_setup.py"
+      ],
+      "count": 6,
+      "cwd": ".",
+      "exit": 0,
+      "group": "setup",
+      "mode": "normal",
+      "output_sha256": "e38e28587d85ab5e7516728eefe6b95880a1a02618e747f0ad6c36992885091a"
+    },
+    {
+      "PYTHONOPTIMIZE": "unset",
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_shared",
+        "test_reviewed_export",
+        "test_ladder_tools",
+        "zal_notation.tests.test_sharing",
+        "zal_notation.tests.test_story",
+        "zal_notation.tests.test_lenses",
+        "zal_notation.tests.test_lens_integration"
+      ],
+      "count": 113,
+      "cwd": "integrations/zal",
+      "exit": 0,
+      "group": "regression",
+      "mode": "normal",
+      "output_sha256": "273a13240ac7e5f0f2de8d0b69692cb58a1fd625d146852bdc7cb61700e54c64"
+    },
+    {
+      "PYTHONOPTIMIZE": "1",
+      "argv": [
+        "python3",
+        "-O",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "integrations/zal",
+        "-p",
+        "test_ontology*.py"
+      ],
+      "count": 94,
+      "cwd": ".",
+      "exit": 0,
+      "group": "ontology",
+      "mode": "optimized",
+      "output_sha256": "6194aa487df33c839ab2b73b5d4eb54d7150d6a2f7c41d1918078bcaa9522185"
+    },
+    {
+      "PYTHONOPTIMIZE": "1",
+      "argv": [
+        "python3",
+        "-O",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools",
+        "-p",
+        "test_check_arithmetic_handoff.py"
+      ],
+      "count": 10,
+      "cwd": ".",
+      "exit": 0,
+      "group": "gate",
+      "mode": "optimized",
+      "output_sha256": "f21cf8f81dbfe5d72a7e0bee6069a3c3fc0e651e4938e2d690e9e9ff41748af0"
+    },
+    {
+      "PYTHONOPTIMIZE": "1",
+      "argv": [
+        "python3",
+        "-O",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "integrations/zal",
+        "-p",
+        "test_setup.py"
+      ],
+      "count": 6,
+      "cwd": ".",
+      "exit": 0,
+      "group": "setup",
+      "mode": "optimized",
+      "output_sha256": "1cbb1d36dbeffbc9a96e0aded04eb88219e347905ca8351ec85c143bc44f376e"
+    },
+    {
+      "PYTHONOPTIMIZE": "1",
+      "argv": [
+        "python3",
+        "-O",
+        "-B",
+        "-m",
+        "unittest",
+        "test_shared",
+        "test_reviewed_export",
+        "test_ladder_tools",
+        "zal_notation.tests.test_sharing",
+        "zal_notation.tests.test_story",
+        "zal_notation.tests.test_lenses",
+        "zal_notation.tests.test_lens_integration"
+      ],
+      "count": 113,
+      "cwd": "integrations/zal",
+      "exit": 0,
+      "group": "regression",
+      "mode": "optimized",
+      "output_sha256": "81ae8041d391f218607e8c73ae527d142613297084b2e3f787063d62fbd7e61a"
+    }
+  ]
+}

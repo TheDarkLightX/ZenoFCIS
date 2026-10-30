@@ -68,6 +68,14 @@ def main(argv=None):
     classify_command.add_argument("--max-facts", type=int, default=1024)
     classify_command.add_argument("--max-work", type=int, default=1_000_000)
     classify_command.add_argument("--output")
+    handoff_command = commands.add_parser("arithmetic-handoff")
+    source = handoff_command.add_mutually_exclusive_group(required=True)
+    source.add_argument("--ontology")
+    source.add_argument("--source")
+    handoff_command.add_argument("--bindings", required=True)
+    handoff_command.add_argument("--max-facts", type=int, default=1024)
+    handoff_command.add_argument("--max-work", type=int, default=1_000_000)
+    handoff_command.add_argument("--output")
     for name in ("ontology-demo", "ontology-browse"):
         command = commands.add_parser(name)
         command.add_argument("--output", required=True)
@@ -102,6 +110,15 @@ def main(argv=None):
             run = classify(document, max_facts=args.max_facts, max_work=args.max_work)
             emit(run, args.output)
             return 0 if run["result"]["status"] == "classified" else 2
+        elif args.command == "arithmetic-handoff":
+            from arithmetic_handoff_tools import handoff
+            document = (core.loads(read_text(args.ontology)) if args.ontology
+                        else parse_ontology_cnl(read_text(args.source)))
+            bindings = core.loads(read_text(args.bindings))
+            core.keys(bindings, {"bindings"}, where="binding document")
+            result = handoff(document, bindings["bindings"], max_facts=args.max_facts, max_work=args.max_work)
+            emit(result, args.output)
+            return 0 if result["status"] == "ready" else 2
         elif args.command in ("ontology-demo", "ontology-browse"):
             from .ontology_demo import generate
             document = None
