@@ -61,6 +61,22 @@ def ladder_json_refusal(source, path):
     }
 
 
+def syntax_mismatch(source, syntax):
+    """Name the flag for a header in the other surface syntax; the parsers keep their own refusals."""
+    for number, line in enumerate(source.splitlines(), 1):
+        header = line.strip()
+        if not header or header.startswith("#"):
+            continue
+        if header.startswith("ZAL ") and header.endswith(".") and syntax != "english":
+            return behavior.Refusal(f"The header {header!r} is the English syntax; pass --syntax english",
+                                    location=(number, 1))
+        if header.startswith("zal ") and header.endswith(";") and syntax == "english":
+            return behavior.Refusal(f"The header {header!r} is the symbolic syntax; omit --syntax english",
+                                    location=(number, 1))
+        return None
+    return None
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else list(argv)
     if argv[:1] == ["word-kernel"]:
@@ -139,7 +155,10 @@ def main(argv=None):
         if format_refusal is not None:
             print(json.dumps(format_refusal, indent=2), file=sys.stderr)
             return 2
-        first = next((line.strip() for line in source.splitlines() if line.strip() and not line.lstrip().startswith("#")), "")
+        mismatch = syntax_mismatch(source, options.syntax)
+        if mismatch is not None:
+            raise mismatch
+        first =next((line.strip() for line in source.splitlines() if line.strip() and not line.lstrip().startswith("#")), "")
         if first in {"zal effects 1;", "ZAL effects version 1.", "zal typed 1;", "ZAL typed version 1."}:
             return typed_or_effects(options, source, first)
         if options.command == "guide":

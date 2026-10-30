@@ -71,6 +71,30 @@ class VerdictExits(unittest.TestCase):
         self.assertEqual(verdict_exit({'status': 'unknown'}), 2)
         self.assertEqual(verdict_exit({'status': 'UNKNOWN'}), 2)
 
+    def test_a_header_in_the_other_syntax_names_the_flag(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for name in ('order.zal', 'order2.zal', 'relay_typed.zal'):
+                symbolic = HERE / 'examples' / name
+                english = Path(folder) / name
+                rendered = subprocess.run([sys.executable, '-B', str(HERE / 'run.py'), 'render', str(symbolic),
+                                           '--to', 'english'], capture_output=True, text=True, timeout=30, check=True)
+                english.write_text('# a leading comment\n' + rendered.stdout)
+                for path, extra, flag in ((english, (), '--syntax english'), (symbolic, ('--syntax', 'english'), 'omit')):
+                    with self.subTest(profile=name, flag=flag):
+                        completed = subprocess.run([sys.executable, '-B', str(HERE / 'run.py'), 'check', str(path), *extra],
+                                                   capture_output=True, text=True, timeout=30)
+                        self.assertEqual(completed.returncode, 2, completed.stderr + completed.stdout)
+                        refusal = json.loads(completed.stderr)
+                        self.assertIn(flag, refusal['diagnostic'])
+                        diagnostic = refusal['source_diagnostic']
+                        self.assertEqual(diagnostic['code'], 'syntax-mismatch', diagnostic)
+                        header = next(number for number, line in enumerate(path.read_text().splitlines(), 1)
+                                      if line.strip() and not line.lstrip().startswith('#'))
+                        self.assertEqual(diagnostic['location'], {'file': str(path), 'line': header, 'column': 1})
+                completed, report = self.call('check', english, '--syntax', 'english')
+                self.assertEqual(completed.returncode, 0, completed.stderr + completed.stdout)
+                self.assertEqual(report['status'], 'pass-with-scope')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -568,7 +568,7 @@ The first command prints this JSON:
   "status": "pass-with-scope",
   "revision": "62f361bbe3dbdb74bdbfe7050626e26f4d029990be5ddc1d37f9187dd729b8e0",
   "profile": "zal/finite-fsm/2",
-  "checker": "ac403ada07f61e63f4bfac2c92cc343c7bf1b873775dc9cbc97af320550b0cf8",
+  "checker": "ac5378bd5862825b67288715695e272908d7ec5155cc602bfc5c49eb3c45ea9f",
   "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
   "checks": {
     "initial_nonempty": "pass-with-scope",
@@ -678,7 +678,7 @@ The first command prints:
   "status": "pass-with-scope",
   "revision": "f9d5a4db71761f0ef6b9a5dff04bfec3189c617f56ff8cfe18b77facd49e9aef",
   "profile": "zal/finite-fsm/2",
-  "checker": "ac403ada07f61e63f4bfac2c92cc343c7bf1b873775dc9cbc97af320550b0cf8",
+  "checker": "ac5378bd5862825b67288715695e272908d7ec5155cc602bfc5c49eb3c45ea9f",
   "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
   "checks": {
     "initial_nonempty": "pass-with-scope",
@@ -826,7 +826,7 @@ The first command prints:
   "status": "pass-with-scope",
   "revision": "5eb629ebc9bff7c65dc6e06613dd1126f0cf4775a080f161adabbfb7531da3af",
   "profile": "zal/finite-fsm/2",
-  "checker": "ac403ada07f61e63f4bfac2c92cc343c7bf1b873775dc9cbc97af320550b0cf8",
+  "checker": "ac5378bd5862825b67288715695e272908d7ec5155cc602bfc5c49eb3c45ea9f",
   "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
   "checks": {
     "initial_nonempty": "pass-with-scope",
