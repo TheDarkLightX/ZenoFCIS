@@ -1,11 +1,13 @@
 """Independent literal-byte controls for the profile-3 memory-region decoder, admission rules and SMT checker.
 
-x86 bytes were checked against GNU objdump and are written here as literals; nothing imports the proposal
-encoder, search or session. Memory kernels are never executed natively here. Solver unknown and replay mismatch
+x86 bytes were checked against GNU objdump and are written here as literals. RV64I words are packed by the local
+field helpers below from the ISA's I- and S-type layouts, anchored to two well-known encodings. Nothing imports
+the proposal encoder, search or session. Memory kernels are never executed natively here. Solver unknown and replay mismatch
 controls are deterministic mocks.
 """
 from pathlib import Path
 import copy
+import struct
 import sys
 import unittest
 from unittest.mock import patch
@@ -13,7 +15,23 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from machine_code import library, profile3, verify3 as v
 
-X, MASK = v.X86, (1 << 64) - 1
+X, R, MASK = v.X86, v.RV64, (1 << 64) - 1
+RV = {"zero": 0, "t0": 5, "t1": 6, "t2": 7, **{f"a{i}": 10 + i for i in range(8)}}
+RET_R = "67800000"
+
+
+def ld(rd, base, offset, funct3=3):
+    return struct.pack("<I", ((offset & 0xFFF) << 20) | (RV[base] << 15) | (funct3 << 12) | (RV[rd] << 7) | 0x03).hex()
+
+
+def sd(source, base, offset, funct3=3):
+    offset &= 0xFFF
+    return struct.pack("<I", ((offset >> 5) << 25) | (RV[source] << 20) | (RV[base] << 15) | (funct3 << 12)
+                       | ((offset & 31) << 7) | 0x23).hex()
+
+
+def add(rd, left, right):
+    return struct.pack("<I", (RV[right] << 20) | (RV[left] << 15) | (RV[rd] << 7) | 0x33).hex()
 ROOT = Path(__file__).resolve().parents[1]
 LOAD_RAX_P0, LOAD_RCX_P1 = "488b07", "488b4f08"          # mov rax,[rdi]  mov rcx,[rdi+8]
 STORE_P0_RCX, STORE_P1_RAX = "48890f", "48894708"        # mov [rdi],rcx  mov [rdi+8],rax
@@ -35,14 +53,14 @@ def region(name, base, words, access):
     return {"name": name, "base": base, "words": words, "access": access}
 
 
-def problem(regions, memory, outputs=(), inputs=(), grammar=None, bound=8):
-    return {"schema": profile3.SCHEMA, "target": X, "inputs": list(inputs), "regions": regions,
+def problem(regions, memory, outputs=(), inputs=(), grammar=None, bound=8, target=X):
+    return {"schema": profile3.SCHEMA, "target": target, "inputs": list(inputs), "regions": regions,
             "outputs": list(outputs), "memory": memory, "grammar": grammar if grammar is not None else [],
             "max_instructions": bound, "objective": "bytes"}
 
 
-def forms(text):
-    return [i.form() for i in v.decode(code(text))[:-1]]
+def forms(text, target=X):
+    return [i.form() for i in v.decode(target, code(text))[:-1]]
 
 
 def swap():
@@ -142,13 +160,13 @@ class Profile3VerifierTests(unittest.TestCase):
         p["grammar"] = []
         self.assertEqual(v.check(p, code(text))["reason"], "InstructionOutsideGrammar")
         with self.assertRaisesRegex(ValueError, "MisalignedAccess"):
-            v.admit(p, v.decode(code(text)))
+            v.admit(p, v.decode(X, code(text)))
 
     def test_out_of_region_displacements_refuse(self):
         p = problem([region("p", "rdi", 2, "read-write")], {"p": [initial("p", 0), initial("p", 1)]})
         for text in ("488b4710" + "c3", "488b47f8" + "c3"):    # [rdi+16] and [rdi-8]
             with self.subTest(text=text), self.assertRaisesRegex(ValueError, "DisplacementOutsideRegion"):
-                v.admit(p, v.decode(code(text)))
+                v.admit(p, v.decode(X, code(text)))
         with self.assertRaisesRegex(ValueError, "DisplacementOutsideRegion"):
             v._palette({**p, "grammar": [["store", "rdi", 16, "rax"]]})
 
@@ -156,19 +174,19 @@ class Profile3VerifierTests(unittest.TestCase):
         p = problem([region("p", "rdi", 1, "read-only")], {}, outputs=[initial("p", 0)], inputs=["x"])
         for text in ("4889f7" + LOAD_RAX_P0 + "c3", "488b3f" + LOAD_RAX_P0 + "c3"):  # mov rdi,rsi / mov rdi,[rdi]
             with self.subTest(text=text), self.assertRaisesRegex(ValueError, "RedefinedRegionBase"):
-                v.admit(p, v.decode(code(text)))
+                v.admit(p, v.decode(X, code(text)))
         # Writing the base after its last access is admitted.
-        v.admit(p, v.decode(code(LOAD_RAX_P0 + "4889f7" + "c3")))
+        v.admit(p, v.decode(X, code(LOAD_RAX_P0 + "4889f7" + "c3")))
 
     def test_other_addressing_and_bases_refuse(self):
         p = problem([region("p", "rdi", 1, "read-only")], {}, outputs=[initial("p", 0)], inputs=["x"])
         with self.assertRaisesRegex(ValueError, "MemoryBaseNotARegion"):
-            v.admit(p, v.decode(code("488b06" + "c3")))        # mov rax,[rsi]; rsi holds x
+            v.admit(p, v.decode(X, code("488b06" + "c3")))        # mov rax,[rsi]; rsi holds x
         for text, reason in (("488b0424c3", "UnsupportedAddressing"), ("488b0500000000c3", "UnsupportedAddressing"),
                              ("488b8708000000c3", "UnsupportedAddressing"), ("488b4700c3", "NonCanonicalDisplacement"),
                              ("4a8b07c3", "UnusedRexBits"), ("488b07", "MissingTerminalReturn")):
             with self.subTest(text=text), self.assertRaisesRegex(ValueError, reason):
-                v.decode(code(text))
+                v.decode(X, code(text))
 
     def test_problem_schema_refusals(self):
         good = swap()
@@ -214,8 +232,55 @@ class Profile3VerifierTests(unittest.TestCase):
         report = library.check(ROOT / "test-data/machine-code/memory-kernels")
         self.assertEqual(report["status"], "checked", report["kernels"])
         self.assertEqual({row["name"] for row in report["kernels"]},
-                         {"swap-words-x86", "load-add-store-x86", "copy2-sum-x86"})
-        self.assertEqual({row["target"] for row in report["kernels"]}, {X})
+                         {f"{name}-{arch}" for name in ("swap-words", "load-add-store", "copy2-sum")
+                          for arch in ("x86", "rv64i")})
+        self.assertEqual({row["target"] for row in report["kernels"]}, {X, R})
+
+    def test_rv_field_helpers_match_known_encodings(self):
+        self.assertEqual((ld("a0", "a0", 0), sd("a1", "a0", 0)), ("03350500", "2330b500"))
+
+    def test_rv_swap_and_copy_are_equivalent_and_a_wrong_order_is_refuted(self):
+        text = ld("t0", "a0", 0) + ld("t1", "a0", 8) + sd("t1", "a0", 0) + sd("t0", "a0", 8) + RET_R
+        p = problem([region("p", "a0", 2, "read-write")], {"p": [initial("p", 1), initial("p", 0)]},
+                    grammar=forms(text, R), target=R)
+        result = v.check(p, code(text))
+        self.assertEqual((result["status"], result["cost"]), ("equivalent", {"bytes": 20, "instructions": 4}), result)
+        wrong = ld("t1", "a0", 8) + sd("t1", "a0", 0) + ld("t0", "a0", 0) + sd("t0", "a0", 8) + RET_R
+        p["grammar"] = forms(wrong, R)
+        result = v.check(p, code(wrong))
+        self.assertEqual(result["status"], "counterexample", result)
+        self.assertIsNone(result["initial_flags"])
+        text = ld("t0", "a0", 0) + ld("t1", "a0", 8) + sd("t0", "a1", 0) + sd("t1", "a1", 8) + add("a0", "t0", "t1") + RET_R
+        p = problem([region("src", "a0", 2, "read-only"), region("dst", "a1", 2, "read-write")],
+                    {"dst": [initial("src", 0), initial("src", 1)]},
+                    outputs=[["add", initial("src", 0), initial("src", 1)]], grammar=forms(text, R), target=R)
+        self.assertEqual(v.check(p, code(text))["status"], "equivalent")
+
+    def test_rv_store_offsets_use_all_twelve_bits(self):
+        text = sd("a1", "a0", 40) + RET_R                      # imm[11:5] = 1, imm[4:0] = 8
+        memory = [initial("p", i) for i in range(5)] + [["input", "x"]]
+        p = problem([region("p", "a0", 6, "read-write")], {"p": memory}, inputs=["x"], grammar=forms(text, R), target=R)
+        self.assertEqual(v.decode(R, code(text))[0].form(), ["store", "a0", 40, "a1"])
+        self.assertEqual(v.check(p, code(text))["status"], "equivalent")
+        text = sd("zero", "a0", 0) + RET_R                     # the zero register stores 0
+        p = problem([region("p", "a0", 1, "read-write")], {"p": [["const", "0"]]}, grammar=forms(text, R), target=R)
+        self.assertEqual(v.check(p, code(text))["status"], "equivalent")
+
+    def test_rv_refusals(self):
+        p = problem([region("p", "a0", 2, "read-only")], {}, outputs=[initial("p", 0)], inputs=["x"], target=R)
+        for text, reason in ((ld("t0", "a0", 0, funct3=2) + RET_R, "UnsupportedMemoryWidth"),
+                             (sd("t0", "a0", 0, funct3=2) + RET_R, "UnsupportedMemoryWidth"),
+                             (ld("zero", "a0", 0) + RET_R, "ZeroWriteHintRefused")):
+            with self.subTest(text=text), self.assertRaisesRegex(ValueError, reason):
+                v.decode(R, code(text))
+        for text, reason in ((ld("t0", "a0", 4) + RET_R, "MisalignedAccess"),
+                             (ld("t0", "a0", 16) + RET_R, "DisplacementOutsideRegion"),
+                             (ld("t0", "a0", -8) + RET_R, "DisplacementOutsideRegion"),
+                             (sd("t0", "a0", 0) + RET_R, "StoreToReadOnlyRegion"),
+                             (ld("t0", "a1", 0) + RET_R, "MemoryBaseNotARegion"),
+                             (add("a0", "a0", "a1") + ld("t0", "a0", 0) + RET_R, "RedefinedRegionBase")):
+            with self.subTest(text=text), self.assertRaisesRegex(ValueError, reason):
+                v.admit(p, v.decode(R, code(text)))
 
     def test_refused_problem_or_palette_is_never_checked(self):
         p = copy.deepcopy(swap())
