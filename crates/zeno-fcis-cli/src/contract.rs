@@ -1635,6 +1635,10 @@ fn replay_reason(replay: &Replay) -> String {
         Replay::Differs(fields) if fields.is_empty() => {
             "the recomputed receipt differs in its encoding".to_owned()
         }
+        // Only the checker identity differs: another ZenoFCIS build wrote the receipt.
+        Replay::Differs(fields) if fields.iter().all(|field| field == "checker") => {
+            "`checker` differ from the record: another ZenoFCIS build, such as 2.6.0, wrote this receipt; run `zeno-fcis contract refresh-receipts DIR` on this contract directory to check every adoption again with this build".to_owned()
+        }
         Replay::Differs(fields) => format!("`{}` differ from the record", fields.join("`, `")),
         Replay::NotEquivalent(Rejection::Counterexample(witness)) => format!(
             "the programs differ on input tuple {} of the enumeration",

@@ -596,7 +596,9 @@ impl<'c, 'p> Lineage<'c, 'p> {
     /// # Errors
     /// `Schema` for a schema other than v9 or v10 or a v9 store that is not
     /// exactly the previous shell's, `Identity` for a segment under no
-    /// version or out of order, and `History` for a failed audit.
+    /// version or out of order, `OtherRelease` for a segment under a
+    /// version's contract from another ZenoFCIS release, and `History` for a
+    /// failed audit.
     pub fn open(&self, path: impl AsRef<Path>) -> Result<Opened<'_, 'p>, Error> {
         let mut connection = open_existing(path)?;
         provider()?;

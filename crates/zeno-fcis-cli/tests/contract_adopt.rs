@@ -644,7 +644,7 @@ fn refresh_rebinds_a_receipt_from_an_older_checker_identity() {
     assert_eq!(refused.status.code(), Some(1));
     assert_eq!(
         json(&refused)["error"]["message"],
-        "v2/adoptions/1/receipt.json does not replay against version 1's program and the candidate: `checker` differ from the record"
+        "v2/adoptions/1/receipt.json does not replay against version 1's program and the candidate: `checker` differ from the record: another ZenoFCIS build, such as 2.6.0, wrote this receipt; run `zeno-fcis contract refresh-receipts DIR` on this contract directory to check every adoption again with this build"
     );
     assert_eq!(snapshot(&dir), before);
 
@@ -751,4 +751,65 @@ fn replays_released_24_receipt() {
     );
     assert_eq!(read(dir.join("v2/adoptions/1/receipt.json")), receipt);
     assert_eq!(read(dir.join("v2/policy_v1.zcve")), policy);
+}
+
+/// The contract the released 2.6.0 CLI adopted: this checkout's fixture with
+/// the retained files that differ, every file checked against the release
+/// record that `tools/check_contract_upgrade_26.py` wrote.
+fn released_26(root: &TempRoot) -> PathBuf {
+    let retained = manifest("tests/fixtures/withdrawal-queue-adopted-2.6.0");
+    let record: Value = serde_json::from_slice(&read(retained.join("released.json")))
+        .unwrap_or_else(|error| panic!("release record: {error}"));
+    assert_eq!(record["release"], "2.6.0");
+    let dir = root.path().join("app");
+    for (name, bytes) in snapshot(&fixture()) {
+        write(dir.join(name), &bytes);
+    }
+    for (name, bytes) in snapshot(&retained) {
+        if name != "released.json" {
+            write(dir.join(name), &bytes);
+        }
+    }
+    let files = snapshot(&dir);
+    let expected = record["files"].as_object().cloned().unwrap_or_default();
+    assert_eq!(files.len(), expected.len());
+    for (name, bytes) in &files {
+        let hash =
+            <zeno_fcis_crypto::RustCryptoSha256 as zeno_fcis_codec::CommitmentHasher>::hash(bytes);
+        let hex: String = hash.as_bytes().iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(expected[name.as_str()], Value::from(hex), "{name}");
+    }
+    dir
+}
+
+/// A 2.6.0 adoption is refused by a refusal that names the remedy, and the
+/// remedy yields exactly this checkout's own adoption of the same candidate.
+#[test]
+fn a_released_26_adoption_refreshes_to_this_checkouts_fixture() {
+    let root = TempRoot::new("released-26");
+    let dir = released_26(&root);
+    let before = snapshot(&dir);
+    let refused = generate(&dir, true);
+    assert_eq!(refused.status.code(), Some(1));
+    assert_eq!(
+        json(&refused)["error"]["message"],
+        "v2/adoptions/1/receipt.json does not replay against version 1's program and the candidate: `checker` differ from the record: another ZenoFCIS build, such as 2.6.0, wrote this receipt; run `zeno-fcis contract refresh-receipts DIR` on this contract directory to check every adoption again with this build"
+    );
+    assert_eq!(snapshot(&dir), before);
+    let output = zeno(&[
+        "contract".as_ref(),
+        "refresh-receipts".as_ref(),
+        dir.as_os_str(),
+        "--format".as_ref(),
+        "json".as_ref(),
+    ]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(json(&output)["refreshed"], json!([1]));
+    assert_eq!(snapshot(&dir), snapshot(&fixture()));
+    assert_eq!(generate(&dir, true).status.code(), Some(0));
 }

@@ -619,7 +619,8 @@ fn answer(port: Port, result: Result<Response, Error>, writes: bool) -> Handled 
         Error::Encoding(_) | Error::Range => Code::Range,
         Error::Provider => Code::Provider,
         Error::Schema(_) => Code::Schema,
-        Error::Identity => Code::Identity,
+        // The port keeps one identity code; the store names the release case.
+        Error::Identity | Error::OtherRelease => Code::Identity,
         Error::Authority => Code::Authority,
         Error::Lineage => Code::Lineage,
         Error::Checkpoint => Code::Checkpoint,

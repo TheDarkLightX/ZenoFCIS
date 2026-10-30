@@ -509,8 +509,10 @@ and the checker identity: the checker's semantics version,
 `zeno-fcis/transform-check/5`, and the library's evaluator digest. The
 semantics version changes only with a deliberate change of what the check
 means. Known answers under `crates/zeno-fcis-cli/tests/fixtures/transform-check/`
-pin it, so a refactor of the checker or a new crate version changes no
-receipt.
+pin it, so a refactor of the checker changes no receipt. The evaluator digest
+covers the evaluator's sources and build files, including the release version
+in the workspace and crate manifests, so a new ZenoFCIS release changes it,
+and a receipt from an earlier release no longer replays.
 `transform replay` first checks the receipt's program digests and domain size
 against the supplied files, and the domain against its own tuple cap. Only then
 does it rerun the check with the receipt's limits; it accepts the receipt only
@@ -2007,7 +2009,12 @@ APP version [--format human|json]
 Every command that reads a store opens it through the contract lineage, as
 `--audit` and `--decide` do, so the Authority of the version the store runs
 decides, and a store of another contract, or of a later version of this one,
-is refused with `Identity`. `submit`, `decide`, `pending` and `deliver` need
+is refused with `Identity`. A store of this contract created by a build with
+a different evaluator, for example another ZenoFCIS release such as 2.6.0, is
+refused with `OtherRelease`, because the identity binds the evaluator; nothing
+is written. Open such a store with the build that created it, or start a new
+store with this build.
+`submit`, `decide`, `pending` and `deliver` need
 a store at the build's own version and name `--upgrade` otherwise; `state`
 and `history` read a store at an earlier version too. The forms without a
 command, `NEW_DATABASE_PATH`, `--decide`, `--audit`, `--deliver`,
@@ -2121,10 +2128,13 @@ or `error` with `contract-invalid` (exit 1), `contract-read-failed` (exit 3)
 or `adoption-write-failed` (exit 3).
 
 Each receipt binds the transform checker's semantics version and the
-library's evaluator digest, not the checker's source or the crate version, so
-a new crate version or a refactor of the checker leaves recorded receipts
-valid. After a deliberate change of the checker's semantics version, or of
-the evaluator, recorded receipts no longer replay. `contract refresh-receipts
+library's evaluator digest, not the checker's source, so a refactor of the
+checker leaves recorded receipts valid. The evaluator digest covers the
+evaluator's sources and build files, including the release version in the
+workspace and crate manifests. After a new ZenoFCIS release, a deliberate
+change of the checker's semantics version, or a change of the evaluator,
+recorded receipts no longer replay, and contract generation names this
+command. `contract refresh-receipts
 DIR` then checks every adoption again with the current checker, under its
 receipt's limits, and requires the new receipt to record exactly what the old
 one does in every field but `checker`. It writes the new receipts, the
