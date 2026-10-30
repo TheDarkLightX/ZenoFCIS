@@ -84,6 +84,7 @@ with [Get started](#get-started), then follow a tutorial.
 - [ZAL observation contracts and generated diagrams](zal/OBSERVATION_CONTRACTS.md)
 - [`zal/finite-fsm/1` grammar and limits](zal/GRAMMAR.md)
 - [ZAL types and effect signatures](zal/EFFECTS.md)
+- [From a ZAL model to a complete application: assessment and bridge design](zal/APPLICATION_BRIDGE.md)
 - [ZAL harness integration](zal/HARNESS_INTEGRATION.md)
 - [ZAL prototype source map](ZAL_SOURCE_MAP.md)
 
