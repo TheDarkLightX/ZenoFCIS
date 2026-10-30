@@ -159,6 +159,16 @@ class NativeCorpusTests(unittest.TestCase):
         self.assertEqual(expected, {"symbolic": tests(*symbolic), "contract-runtime": 1,
                                     "owned-program": tests(owned)})
 
+    def test_every_corpus_target_is_built_before_its_timed_run(self):
+        builds = [arguments for _, arguments in gate.NATIVE_BUILDS]
+        used = set()
+        for name, arguments, _ in gate.NATIVE_CORPUS:
+            matches = [i for i, build in enumerate(builds) if arguments[:len(build)] == build]
+            self.assertEqual(len(matches), 1, name)
+            used.add(matches[0])
+        self.assertEqual(used, set(range(len(builds))))
+        self.assertGreater(gate.BUILD_TIMEOUT, 600)
+
 
 if __name__ == "__main__":
     unittest.main()

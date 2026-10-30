@@ -47,6 +47,14 @@ NATIVE_CORPUS = (
     ("owned-program", ["-p", "zeno-fcis-synthesis", "--lib",
                       "finite::ir::evaluation_tests::", "--", "--test-threads=1"], 7),
 )
+# Each corpus target is built first under its own limit. A cold one-job build of the CLI test binary outlasts
+# the 600 s step limit on a 32-thread host (killed while compiling the CLI, twice on 2026-10-30), so the step
+# limit then covers only the tests.
+NATIVE_BUILDS = (
+    ("build-cli-tests", ["-p", "zeno-fcis-cli", "--bin", "zeno-fcis"]),
+    ("build-synthesis-tests", ["-p", "zeno-fcis-synthesis", "--lib"]),
+)
+BUILD_TIMEOUT = 3600
 
 
 def source_paths() -> tuple[Path, ...]:
@@ -178,7 +186,7 @@ def check(cache: Path, install: bool, logs: Path) -> dict:
                "-V", "spinoff-all", "--output-json", "--rlimit", "100",
                "--triggers-mode", "silent", "--log", "vir",
                "--log", "vir-option=no_span+no_type+no_fn_details"]
-    def run(label: str, args: list[str], cwd=ROOT, env=environment):
+    def run(label: str, args: list[str], cwd=ROOT, env=environment, timeout=600):
         folder = logs / label
         folder.mkdir()
         (folder / "command.json").write_text(json.dumps(
@@ -188,7 +196,7 @@ def check(cache: Path, install: bool, logs: Path) -> dict:
                                    start_new_session=True)
         timed_out = False
         try:
-            stdout, stderr = process.communicate(timeout=600)
+            stdout, stderr = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
             timed_out = True
             os.killpg(process.pid, signal.SIGTERM)
@@ -252,6 +260,9 @@ def check(cache: Path, install: bool, logs: Path) -> dict:
     native = []
     cargo = ["cargo", f"+{pin['runtime_rust']}", "test", "--locked", "--offline"]
     native_env = {**environment, "RUSTUP_TOOLCHAIN": pin["runtime_rust"]}
+    for name, arguments in NATIVE_BUILDS:
+        proc, _ = run(name, cargo + arguments + ["--no-run"], env=native_env, timeout=BUILD_TIMEOUT)
+        verifier.require_success(proc)
     for name, arguments, expected in NATIVE_CORPUS:
         proc, folder = run(name, cargo + arguments, env=native_env)
         verifier.require_success(proc)
