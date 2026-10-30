@@ -404,7 +404,8 @@ with gcc.
   generated C runner.
 - **Comparison:** every result word is compared with the problem's integer
   reference, `model.evaluate` for profile 1 and the profile-2 checker's
-  expression evaluator for profile 2.
+  expression evaluator for profile 2. Profile-3 entries also compare every
+  region word; see [native memory runs](#native-memory-runs).
 - **Vectors:** every combination of eight edge values per argument when there
   are at most 4,096 of them, otherwise 4,096 sampled edge vectors. Then 4,096
   deterministic pseudo-random vectors.
@@ -962,6 +963,9 @@ python3 -O -B tools/test_machine_code_profile3_verifier.py
 python3 -B tools/test_machine_code_profile3_loop.py
 python3 -O -B tools/test_machine_code_profile3_loop.py
 python3 -B -m tools.machine_code.run library check --dir test-data/machine-code/memory-kernels
+python3 -B tools/test_machine_code_profile3_native.py
+python3 -O -B tools/test_machine_code_profile3_native.py
+python3 -B -m tools.machine_code.run library check --native --dir test-data/machine-code/memory-kernels
 ```
 
 - The verifier suite uses x86 bytes checked against GNU objdump and RV64I words
@@ -981,10 +985,41 @@ python3 -B -m tools.machine_code.run library check --dir test-data/machine-code/
 - The fourteen profile-3 planted defects are detected under both interpreter
   modes.
 
+<a id="native-memory-runs"></a>**Native memory runs.** `library check --native`
+runs each x86 memory entry on this processor. It never decides equivalence.
+
+- A kernel runs only if its bytes pass profile-3 admission. Otherwise the
+  entry reports `not-run` with `memory access not admitted: REASON`.
+- Each region is its own 64-byte-aligned static array, so the regions are
+  disjoint, aligned and apart from the stack. The runner passes each region's
+  address in its base register and the word inputs in the other argument
+  registers.
+- Per state the runner loads the initial words, calls the kernel, and writes
+  back the results and every region word. The states are the six search filter
+  states, 1,024 states of edge values and 4,096 pseudo-random states.
+- Results and read-write words are compared with the problem's integer
+  reference. Read-only words must come back unchanged.
+- RV64I entries report `needs RV64I execution`, and `bench` does not time
+  memory kernels.
+
+On an AMD Ryzen Threadripper 1950X, the three x86 memory entries agreed on
+5,126 states each. A swap with a dropped store and a copy that returns the
+wrong sum, both accepted by a stubbed model check, fail natively. A store to a
+read-only region is never run.
+
+**Counterexample diagnosis.** For profile 3 the packet's advisory `diagnosis`
+adds a memory view. It lists every region word at entry and after each
+instruction, the words each instruction wrote, and the expected and actual
+final value of every read-write word. `first_differing_region_word` names the
+first read-write word, in region and index order, whose final value differs,
+with the instruction that last wrote it. Subterms are matched against registers
+and region words.
+
 **Non-claims.**
 
-- No memory kernel is executed natively. `library check --native` reports them
-  as not run. This is checked against the stated model only.
+- Native agreement covers the listed states on that processor only. Faults,
+  invalid buffers and overlapping regions are never run. RV64I memory kernels
+  are not executed. Otherwise this is checked against the stated model only.
 - The instruction models were generated, not derived from vendor
   specifications.
 - Aliasing between regions, faults, caches, atomicity and timing are not
