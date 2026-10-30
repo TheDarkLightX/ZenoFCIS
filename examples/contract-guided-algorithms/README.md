@@ -20,7 +20,7 @@ reviewed closed problem + fixed u8 semantics
         content-bound catalog and replay
 ```
 
-**The source contract, not the proposer, decides what counts as correct.** `corpus.json` binds six closed 8-bit functions to a fixed independent reference in `reference.py`. A palette can vary operations, constants, shifts, and search-size ceiling, but cannot change the reference, word width, inputs, semantics, or checking method. The search interpreter is separate (`research.py`). Successful proposed expression trees are checked on **every one of the 256 possible inputs**. Probe inputs are a search filter only, not evidence of correctness.
+**The source contract, not the proposer, decides what counts as correct.** `corpus.json` binds six closed 8-bit functions to a fixed independent reference in `reference.py`. A palette can vary operations, constants, shifts, and search-size ceiling, but cannot change the reference, word width, inputs, semantics, or checking method. The search interpreter is separate (`research.py`). A Chapter 2 [prefix-dependency preflight](HACKERS_DELIGHT_READING.md) additionally rejects three impossible instruction palettes with independently replayed finite witnesses, before any candidate enumeration. Successful proposed expression trees are checked on **every one of the 256 possible inputs**. Probe inputs are a search filter only, not evidence of correctness.
 
 Existing ZenoFCIS 2.6/2.7 boundaries to reuse in a later integrated iteration:
 
@@ -69,6 +69,8 @@ python3 research.py replay --corpus corpus.json \
 
 The catalog retains:
 
+- A structural palette-level refutation when a contract needs downward bit information but the admitted operations preserve low-bit prefixes. This has a finite witness and replay; see [reading notes](HACKERS_DELIGHT_READING.md).
+
 - SHA-256 identities of the exact corpus, candidate expressions, palettes, and the two checker/interpreter source files.
 - Reproducible palette-by-palette search results, including failed searches and exact candidate/check budgets.
 - A deduplicated entry per distinct `(contract identity, candidate identity)` and its full-domain evidence.
@@ -85,4 +87,4 @@ The catalog retains:
 5. **Cross-target catalog:** Keep separate target identities, cost evidence and checker receipts, and deduplicate reusable candidates without erasing competing baselines or failure evidence.
 6. **Experimental discipline:** Compare manually curated palettes, model-proposed palettes and literature-informed palettes under equal budgets, predeclare train/test separation, and count all failed and inconclusive runs. A prompt withholding a textbook example is not proof that an LLM has never seen it during training.
 
-See [`SOURCES.md`](SOURCES.md) for the eight-book inventory, ideas selected for follow-up, rights caveats, and **explicit reading limitations**. No copyrighted PDF or copied implementation is included here.
+See [`SOURCES.md`](SOURCES.md) for the eight-book inventory and rights caveats, and the [*Hacker's Delight* chapter research map](HACKERS_DELIGHT_READING.md) for the structural feasibility rule, explicit mathematical limits, and remaining source-access caveats. No copyrighted PDF or copied implementation is included here.
