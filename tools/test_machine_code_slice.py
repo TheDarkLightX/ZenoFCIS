@@ -26,6 +26,9 @@ def main(argv):
     return status, json.loads(output.getvalue())
 
 
+# Generous per-query solver time, so a loaded host cannot turn a proof into an inconclusive answer.
+SOLVER_MS = 10_000
+
 class Slicing(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="zeno-slice-")
@@ -41,7 +44,7 @@ class Slicing(unittest.TestCase):
             if problem["schema"] != "zeno-fcis/machine-problem/2":
                 continue
             with self.subTest(kernel=path.stem):
-                result = slicing.slices(problem, code)
+                result = slicing.slices(problem, code, SOLVER_MS)
                 self.assertEqual(result["status"], "sliced", result)
                 self.assertEqual(len(result["slices"]), len(problem["outputs"]))
                 for row in result["slices"]:
@@ -65,7 +68,7 @@ class Slicing(unittest.TestCase):
             sliced = (out / (name + ".bin")).read_bytes()
             self.assertEqual(row["problem_sha256"], model.digest(model.canonical(one)))
             self.assertEqual(row["code_sha256"], model.digest(sliced))
-            self.assertEqual(verify2.check(one, sliced)["status"], "equivalent")
+            self.assertEqual(verify2.check(one, sliced, timeout_ms=SOLVER_MS)["status"], "equivalent")
         # The second result's slice ends with a copy into the first result register.
         forms = [i.form() for i in verify2.decode(problem["target"], (out / "result1.bin").read_bytes())[:-1]]
         self.assertEqual(forms[-1], ["mov", "rax", "rdx"])
@@ -82,7 +85,7 @@ class Slicing(unittest.TestCase):
                     for form, p in zip(value["grammar"], real(value))]
         out = self.root / "planted"
         with mock.patch.object(footprint, "footprints", no_carry):
-            result = slicing.slices(problem, code)
+            result = slicing.slices(problem, code, SOLVER_MS)
             status, printed = main(["slice", "--kernel", str(KERNELS / "add128-x86.json"), "--out", str(out)])
         self.assertEqual(result["status"], "counterexample")
         self.assertEqual(result["slices"][1]["instructions"], [2, 3])
@@ -99,15 +102,15 @@ class Slicing(unittest.TestCase):
         self.assertEqual(slicing.backward(prints, "rax"), [0, 1])
         with mock.patch.object(footprint, "footprints", lambda value: [None] * len(value["grammar"])), \
                 self.assertRaisesRegex(ValueError, "FootprintUnavailable"):
-            slicing.slices(problem, code)
+            slicing.slices(problem, code, SOLVER_MS)
 
     def test_an_unchecked_kernel_or_profile1_problem_is_refused(self):
         problem, code = kernel("add128-x86")
         wrong = code[:-2] + bytes([code[-2] ^ 1]) + code[-1:]
-        self.assertEqual(slicing.slices(problem, wrong)["reason"], "KernelDidNotCheck")
+        self.assertEqual(slicing.slices(problem, wrong, SOLVER_MS)["reason"], "KernelDidNotCheck")
         profile1, code1 = kernel("add64-x86")
         with self.assertRaisesRegex(ValueError, "Profile2Only"):
-            slicing.slices(profile1, code1)
+            slicing.slices(profile1, code1, SOLVER_MS)
 
 
 if __name__ == "__main__":

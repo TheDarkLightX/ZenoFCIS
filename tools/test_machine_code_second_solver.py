@@ -39,6 +39,37 @@ class SecondSolverTests(unittest.TestCase):
             verdict = second_solver.confirm(problem, code, Path(CVC5))
         self.assertEqual((verdict["status"], verdict["reason"]), ("inconclusive", "SecondSolverDisagrees:sat"))
 
+    def test_overlapping_confirmations_each_send_their_own_query(self):
+        # Review 3: without the hook lock, a second call could record the first call's solver and restore a stale
+        # class. The barrier tries to interleave the two checker calls; with the lock the second waits instead.
+        import threading
+        import z3
+        from machine_code import session
+        sequential = {name: second_solver.confirm(*self.kernel(name), Path(CVC5))["second_solver"]["query_sha256"]
+                      for name in ("add64-x86.json", "umin-x86.json")}
+        barrier, lookup, results = threading.Barrier(2, timeout=1), session._checker, {}
+
+        def paused(problem):
+            try:
+                barrier.wait()
+            except threading.BrokenBarrierError:
+                pass
+            return lookup(problem)
+
+        def run(name):
+            results[name] = second_solver.confirm(*self.kernel(name), Path(CVC5))
+        original = z3.Solver
+        with patch.object(session, "_checker", paused):
+            threads = [threading.Thread(target=run, args=(name,)) for name in sequential]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+        self.assertIs(z3.Solver, original)
+        for name, digest in sequential.items():
+            self.assertEqual((results[name]["status"], results[name]["second_solver"]["query_sha256"]),
+                             ("equivalent", digest), name)
+
     def test_another_cvc5_version_is_refused(self):
         with tempfile.TemporaryDirectory() as folder:
             fake = Path(folder) / "cvc5"

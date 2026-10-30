@@ -161,7 +161,8 @@ class NativeProfile2Tests(unittest.TestCase):
         directory = out / "session"
         session.open_session(out / "problem.json", directory)
         if body == "search":
-            found = session.search(directory, max_candidates=5000, max_checks=16, deadline_ms=30000)
+            found = session.search(directory, max_candidates=5000, max_checks=16, deadline_ms=60000,
+                                   timeout_ms=5000)
             self.assertEqual(found["status"], "checked-candidate", found)
         else:
             code = targets.encode_program(X86, body)

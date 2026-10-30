@@ -476,6 +476,9 @@ python3 -B -m tools.machine_code.run second-solver --dir test-data/machine-code/
 ```
 
 Both solvers read the same SMT-LIB text, Z3's rendering of the checker's query.
+The query is recorded by briefly replacing Z3's solver class. One lock serializes
+every such recording, so overlapping calls in one process each send their own
+query; a control interleaves two calls to show this.
 This narrows the trust placed in one solver. It does not check the instruction
 models or the encoding. On 2026-10-30 every kernel in `kernels/` (13) and
 `memory-kernels/` (6) was confirmed. `tools/test_machine_code_second_solver.py`
@@ -656,17 +659,40 @@ design, for the profiles `linux-x86_64-sysv-u64-leaf/1` and
 | A-03 frame | every register a body instruction may write is caller-saved (flags are scratch) | footprints from the checker's own semantics |
 | A-04 return | the return transition gives `RIP = [S]`, `RSP = S + 8` (x86) or `pc = ra & ~1` with `ra`, `sp` unchanged (RV64) | solver over the return rule, given A-03 |
 | A-05 termination | straight-line, with no admitted operation that faults in the model | admitted operation set |
-| A-06 coverage | the mismatch query has exactly one assertion and no premise; an entry layout chosen independently of the inputs | recorded query |
+| A-06 coverage | the recorded query is exactly the unrestricted mismatch formula, rebuilt from the problem and the bytes and compared by Z3; an entry layout chosen independently of the inputs | recorded query |
 | A-07 model | the evidence kind: GNU `as` and CPU conformance (x86); GNU `as` and QEMU in CI (RV64I) | stated, not proved |
 
-The native harness (x86 only) calls each kernel through a trampoline generated
-at run time. Before the call, it seeds distinct canaries in `rbx`, `rbp` and
-`r12` to `r15`, and in the 16 words below the return slot. Immediately after
-the return, it captures the results, those registers, the stack pointer, the
-canaries and DF.
+These checks are weaker than the design's full obligations, and the gate says
+so. A-03 covers the modelled general registers and flags, not the extended-state
+frame. A-04 proves the return rule, not a composed permission, canonical-address
+and protection model. A-05 excludes faulting operations by name rather than
+encoding fetch and return faults. A-07 states its evidence kind without binding
+an ISA edition.
 
-Five planted fixtures outside every palette each return normally, and each is
-reported as exactly its fault:
+The native harness (x86 only) calls each kernel through a trampoline generated
+at run time.
+
+- **Call site:** 16-byte aligned, so the kernel enters with `RSP + 8` a multiple
+  of 16.
+- **Before the call:** distinct canaries go into `rbx`, `rbp` and `r12` to
+  `r15`, and into the 16 words below the return slot. MXCSR and the x87 control
+  word are recorded.
+- **At the true continuation:** the first instruction sets a flag. The return
+  slot is then compared with that continuation's address, so a kernel that
+  returns anywhere else is reported.
+- **Immediately after the return:** the harness captures the results, those
+  registers, the stack pointer, the canaries, DF, MXCSR and the x87 control
+  word.
+- **Refusals:** a run of zero vectors is refused. A library directory with no
+  applicable entry reports `not-applicable`, never `qualified`.
+
+Fixtures outside every palette are each reported as their fault. These cover
+the five that return normally, listed below, plus three from the third review:
+- a rewritten return address;
+- a changed MXCSR rounding mode;
+- an alignment probe, which shows the kernel's entry alignment.
+
+The five that return normally:
 - a callee-saved write;
 - a stack write;
 - DF left set;

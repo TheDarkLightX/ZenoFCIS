@@ -60,6 +60,43 @@ def _decode(problem, code):
     return checker.decode(problem["target"], code)
 
 
+def _mismatch(z3, problem: dict, code: bytes, context):
+    """The unrestricted mismatch formula over the checker's own variable names and semantics."""
+    checker = _checker(problem)
+    target = problem["target"]
+    word = lambda name: z3.BitVec(name, 64, ctx=context)
+    instructions = checker.decode(target, code)
+    if problem["schema"] == profile2.SCHEMA:
+        names = problem["inputs"]
+        arguments = checker.ARGUMENTS[target][:len(names)]
+        inputs = {n: word("mc_input_" + n) for n in names}
+        initial = {n: word("mc_initial_" + n) for n in checker.REGISTERS[target] if n not in arguments}
+        flags = ({n: z3.Bool("mc_flag_" + n, ctx=context) for n in checker.FLAGS}
+                 if target == checker.X86 else {})
+        registers = {**initial, **{r: inputs[n] for n, r in zip(names, arguments)}}
+        expected = [checker._ast_smt(z3, output, inputs, context) for output in problem["outputs"]]
+        final, _ = checker.machine_smt(z3, target, instructions, registers, flags, context)
+        results = checker.RESULTS[target][:len(problem["outputs"])]
+        return z3.Or([e != final[r] for e, r in zip(expected, results)])
+    inputs = {n: word("mc_input_" + n) for n in ("x", "y")}
+    scratch = {n: word("mc_initial_" + n) for n in checker._SCRATCH[target]}
+    return checker._ast_smt(z3, problem["expression"], inputs) != checker._machine_smt(
+        z3, target, instructions, inputs, scratch)
+
+
+def _unrestricted(z3, problem, code, recorded, timeout_ms) -> str:
+    """"same" when exactly one solver holds exactly one assertion equivalent to the unrestricted mismatch."""
+    if len(recorded) != 1 or len(recorded[0].assertions()) != 1:
+        return f"shape: {len(recorded)} solvers"
+    context = z3.Context()
+    query = recorded[0].assertions()[0].translate(context)
+    solver = z3.Solver(ctx=context)
+    solver.set(timeout=timeout_ms)
+    solver.add(query != _mismatch(z3, problem, code, context))
+    answer = solver.check()
+    return "same" if answer == z3.unsat else "differs" if answer == z3.sat else "unknown"
+
+
 def obligations(problem: dict, code: bytes, timeout_ms: int = 5000) -> dict:
     """A-01..A-07 for one register-profile kernel; every obligation must pass for status `qualified`."""
     import z3
@@ -75,26 +112,19 @@ def obligations(problem: dict, code: bytes, timeout_ms: int = 5000) -> dict:
     except ValueError as error:
         rows["A-01"] = {"status": "failed", "evidence": "closed decoder", "reason": str(error)}
         return {"status": "refused", "profile": PROFILES[family], "obligations": rows, "authority": "none"}
-    # A-02 and A-06: the word query, recorded, must be the only assertion: no premise narrows the inputs.
-    recorded, original = [], z3.Solver
-
-    class Recording(original):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            recorded.append(self)
-    z3.Solver = Recording
-    try:
-        verdict = _checker(problem).check(problem, code, timeout_ms=timeout_ms)
-    finally:
-        z3.Solver = original
+    # A-02 and A-06: the checker's decisive query is recorded (under the shared hook lock) and must be exactly the
+    # unrestricted mismatch formula, rebuilt here from the problem and the decoded bytes; a premise that narrows the
+    # inputs, as a separate assertion or folded into the one assertion, makes the two formulas differ.
+    verdict, recorded = _module("second_solver").recorded_check(problem, code, timeout_ms)
     rows["A-02"] = {"status": "passed" if verdict["status"] == "equivalent" else "failed",
                     "evidence": "solver relative to the generated model", "verdict": verdict["status"]}
-    premises = len(recorded[0].assertions()) if len(recorded) == 1 else None
+    unrestricted = _unrestricted(z3, problem, code, recorded, timeout_ms)
     layout = LAYOUT[family]
     aligned = (layout["S"] + 8) % 16 == 0 if family == "x86" else layout["sp"] % 16 == 0
-    rows["A-06"] = {"status": "passed" if premises == 1 and aligned else "failed",
-                    "evidence": "one mismatch assertion and no premise; an input-independent entry layout",
-                    "assertions": premises, "layout": {k: hex(v) for k, v in layout.items()}}
+    rows["A-06"] = {"status": "passed" if unrestricted == "same" and aligned else "failed",
+                    "evidence": "the recorded query equals the rebuilt unrestricted mismatch formula (Z3); "
+                                "an input-independent entry layout",
+                    "query": unrestricted, "layout": {k: hex(v) for k, v in layout.items()}}
     # A-03: every register any body instruction may write is caller-saved (flags are scratch); derived from the
     # checker's own symbolic semantics through the search footprints.
     forms = [ins.form() for ins in decoded[:-1]]
@@ -138,7 +168,7 @@ TRAMPOLINE = r'''
 .globl zeno_abi_args, zeno_abi_seed, zeno_abi_out, zeno_abi_target, zeno_abi_canary
 zeno_abi_args: .zero 48
 zeno_abi_seed: .zero 72
-zeno_abi_out: .zero 216
+zeno_abi_out: .zero 272
 zeno_abi_target: .quad 0
 zeno_abi_canary: .quad 0
 zeno_abi_saved: .quad 0
@@ -152,7 +182,11 @@ zeno_abi_call:
     push %r13
     push %r14
     push %r15
+    sub $8, %rsp
     mov %rsp, zeno_abi_saved(%rip)
+    movq $0, zeno_abi_out+216(%rip)
+    stmxcsr zeno_abi_out+240(%rip)
+    fnstcw zeno_abi_out+248(%rip)
     mov zeno_abi_canary(%rip), %rax
 CANARY_STORES
     mov zeno_abi_seed+0(%rip), %rbx
@@ -171,6 +205,8 @@ CANARY_STORES
     mov zeno_abi_args+32(%rip), %r8
     mov zeno_abi_args+40(%rip), %r9
     call *zeno_abi_target(%rip)
+zeno_abi_return:
+    movq $1, zeno_abi_out+216(%rip)
     mov %rax, zeno_abi_out+0(%rip)
     mov %rdx, zeno_abi_out+8(%rip)
     mov %rbx, zeno_abi_out+16(%rip)
@@ -180,13 +216,22 @@ CANARY_STORES
     mov %r14, zeno_abi_out+48(%rip)
     mov %r15, zeno_abi_out+56(%rip)
     mov %rsp, zeno_abi_out+64(%rip)
+    stmxcsr zeno_abi_out+256(%rip)
+    fnstcw zeno_abi_out+264(%rip)
     mov zeno_abi_saved(%rip), %rsp
     mov %rsp, zeno_abi_out+208(%rip)
+    mov -8(%rsp), %rax
+    mov %rax, zeno_abi_out+224(%rip)
+    lea zeno_abi_return(%rip), %rax
+    mov %rax, zeno_abi_out+232(%rip)
 CANARY_LOADS
     pushfq
     pop %rax
     mov %rax, zeno_abi_out+72(%rip)
     cld
+    ldmxcsr zeno_abi_out+240(%rip)
+    fldcw zeno_abi_out+248(%rip)
+    add $8, %rsp
     pop %r15
     pop %r14
     pop %r13
@@ -198,12 +243,16 @@ CANARY_LOADS
 '''
 # Canaries fill the 16 words below the return slot (the callee's red zone), -16 to -136 from the call-site RSP,
 # and are read back relative to that same RSP after it is restored, so a wrong stack delta cannot hide them.
+# The call site is 16-byte aligned (six pushes and 8 bytes of padding), so the kernel enters with RSP + 8 a
+# multiple of 16, as System V requires. A flag written by the first instruction at the true continuation and the
+# return slot compared with that continuation's address catch a kernel that returns anywhere else; MXCSR and the
+# x87 control word are captured before and after and then restored.
 _SLOTS = [16 + 8 * k for k in range(16)]
 
 RUNNER = r'''
 #include <stdint.h>
 #include <stdio.h>
-extern uint64_t zeno_abi_args[6], zeno_abi_seed[9], zeno_abi_out[27], zeno_abi_canary;
+extern uint64_t zeno_abi_args[6], zeno_abi_seed[9], zeno_abi_out[34], zeno_abi_canary;
 extern void *zeno_abi_target;
 extern void zeno_abi_call(void);
 extern char zeno_kernel[];
@@ -216,7 +265,7 @@ int main(void) {
         if (fread(zeno_abi_args, 8, 6, in) != 6 || fread(zeno_abi_seed, 8, 9, in) != 9
             || fread(&zeno_abi_canary, 8, 1, in) != 1) return 3;
         zeno_abi_call();
-        if (fwrite(zeno_abi_out, 8, 27, out) != 27) return 4;
+        if (fwrite(zeno_abi_out, 8, 34, out) != 34) return 4;
     }
     return fclose(out) ? 5 : 0;
 }
@@ -231,6 +280,8 @@ def native(problem: dict, code: bytes, work: Path, vectors: int = 512, seed: str
            expected=None, prefix: bytes = b"") -> dict:
     """Run `prefix + code` as an x86 leaf function through the trampoline and report every contract violation."""
     reference, elf_object = _module("native").reference, _module("targets").elf_object
+    if type(vectors) is not int or vectors < 1:
+        raise ValueError("the native harness needs at least one vector")
     if _family(problem) != "x86":
         return {"status": "not-run", "reason": "needs x86-64 execution"}
     if _gcc() is None:
@@ -265,11 +316,12 @@ def native(problem: dict, code: bytes, work: Path, vectors: int = 512, seed: str
     if done.returncode:
         return {"status": "crashed", "exit": done.returncode, "vectors": len(rows)}
     data = (work / "results.bin").read_bytes()
-    if len(data) != 8 * 27 * len(rows):
+    if len(data) != 8 * 34 * len(rows):
         return {"status": "error", "reason": "short result file"}
-    faults = {"result": 0, "callee-saved": 0, "stack-pointer": 0, "stack-memory": 0, "direction-flag": 0}
+    faults = {"result": 0, "callee-saved": 0, "stack-pointer": 0, "stack-memory": 0, "direction-flag": 0,
+              "continuation": 0, "control-state": 0}
     for index, (args, seeds, canary) in enumerate(rows):
-        out = struct.unpack_from("<27Q", data, 8 * 27 * index)
+        out = struct.unpack_from("<34Q", data, 8 * 34 * index)
         if list(out[:outputs]) != expected(args[:arity]):
             faults["result"] += 1
         if list(out[2:8]) != seeds[:6]:
@@ -280,6 +332,10 @@ def native(problem: dict, code: bytes, work: Path, vectors: int = 512, seed: str
             faults["stack-memory"] += 1
         if out[9] & (1 << 10):
             faults["direction-flag"] += 1
+        if out[27] != 1 or out[28] != out[29]:  # skipped the true continuation, or a rewritten return slot
+            faults["continuation"] += 1
+        if (out[30] & 0xFFFFFFFF, out[31] & 0xFFFF) != (out[32] & 0xFFFFFFFF, out[33] & 0xFFFF):
+            faults["control-state"] += 1
     return {"status": "conforms" if not any(faults.values()) else "violated", "vectors": len(rows),
             "faults": faults, "prefix": prefix.hex()}
 
@@ -317,7 +373,7 @@ def main(argv=None) -> int:
     parser.add_argument("--dir", required=True, type=Path)
     parser.add_argument("--vectors", type=int, default=512)
     args = parser.parse_args(argv)
-    rows, ok = [], True
+    rows, ok, applicable = [], True, 0
     for path in sorted(args.dir.glob("*.json")):
         entry = json.loads(path.read_text())
         problem, code = entry["problem"], bytes.fromhex(entry["code_hex"])
@@ -328,11 +384,14 @@ def main(argv=None) -> int:
         with tempfile.TemporaryDirectory() as folder:
             run = native(problem, code, Path(folder) / "work", args.vectors)
         ok &= gate["status"] == "qualified" and run["status"] in ("conforms", "not-run")
+        applicable += 1
         rows.append({"entry": path.name, "profile": gate["profile"], "obligations": gate["status"],
                      "native": run["status"], "faults": run.get("faults")})
-    print(json.dumps({"status": "qualified" if ok and rows else "not-qualified", "entries": rows,
+    # At least one entry must be applicable; not-applicable and not-run entries never count as qualification.
+    status = "not-applicable" if not applicable else "qualified" if ok else "not-qualified"
+    print(json.dumps({"status": status, "applicable": applicable, "entries": rows,
                       "authority": "none"}, indent=1))
-    return 0 if ok and rows else 1
+    return 0 if status == "qualified" else 1
 
 
 if __name__ == "__main__":
