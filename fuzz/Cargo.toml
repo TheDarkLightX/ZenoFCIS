@@ -10,13 +10,15 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "=0.4.13"
-zeno-fcis-codec = { version = "=2.7.0-rc.1", path = "../crates/zeno-fcis-codec" }
+zeno-fcis-codec = { version = "=2.7.0-rc.1", path = "../crates/zeno-fcis-codec", features = ["value-profile-2"] }
 zeno-fcis-core = { version = "=2.7.0-rc.1", path = "../crates/zeno-fcis-core" }
 zeno-fcis-crypto = { version = "=2.7.0-rc.1", path = "../crates/zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
 zeno-fcis-patch = { version = "=2.7.0-rc.1", path = "../crates/zeno-fcis-patch" }
 zeno-fcis-plan = { version = "=2.7.0-rc.1", path = "../crates/zeno-fcis-plan" }
 zeno-fcis-receipt = { version = "=2.7.0-rc.1", path = "../crates/zeno-fcis-receipt" }
+zeno-fcis-schema = { version = "=2.7.0-rc.1", path = "../crates/zeno-fcis-schema", features = ["schema-profile-2"] }
 zeno-fcis-shell = { version = "=2.7.0-rc.1", path = "../crates/zeno-fcis-shell" }
+zeno-fcis-shell-sqlite = { version = "=2.7.0-rc.1", path = "../crates/zeno-fcis-shell-sqlite" }
 zeno-fcis-spec = { version = "=2.7.0-rc.1", path = "../crates/zeno-fcis-spec" }
 zeno-fcis-value = { version = "=2.7.0-rc.1", path = "../crates/zeno-fcis-value" }
 
@@ -37,6 +39,27 @@ bench = false
 [[bin]]
 name = "zeno_parser"
 path = "fuzz_targets/zeno_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "codec2_envelope"
+path = "fuzz_targets/codec2_envelope.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "schema2_envelope"
+path = "fuzz_targets/schema2_envelope.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "worker_channel_frames"
+path = "fuzz_targets/worker_channel_frames.rs"
 test = false
 doc = false
 bench = false

@@ -18,15 +18,26 @@ pub(crate) enum Command {
 
 const CARDS: &[&str] = &[
     include_str!("../guide-cards/adversarial-synthesis-duel.txt"),
+    include_str!("../guide-cards/assemble.txt"),
     include_str!("../guide-cards/check.txt"),
+    include_str!("../guide-cards/contract-check-composition.txt"),
+    include_str!("../guide-cards/contract-check-symbolic.txt"),
     include_str!("../guide-cards/contract-collections.txt"),
+    include_str!("../guide-cards/contract-diff.txt"),
     include_str!("../guide-cards/contract-distribution.txt"),
+    include_str!("../guide-cards/contract-draft.txt"),
+    include_str!("../guide-cards/contract-evolve.txt"),
     include_str!("../guide-cards/contract-gaps.txt"),
     include_str!("../guide-cards/contract-lemma.txt"),
+    include_str!("../guide-cards/contract-postconditions.txt"),
     include_str!("../guide-cards/contract-probe.txt"),
+    include_str!("../guide-cards/contract-refine-check.txt"),
+    include_str!("../guide-cards/contract-refresh-receipts.txt"),
     include_str!("../guide-cards/contract-review.txt"),
     include_str!("../guide-cards/contract-risk.txt"),
+    include_str!("../guide-cards/contract-runs.txt"),
     include_str!("../guide-cards/contract-scenario.txt"),
+    include_str!("../guide-cards/contract-two-run.txt"),
     include_str!("../guide-cards/generate.txt"),
     include_str!("../guide-cards/knowledge.txt"),
     include_str!("../guide-cards/loop-capture.txt"),
@@ -42,6 +53,7 @@ const CARDS: &[&str] = &[
     include_str!("../guide-cards/new.txt"),
     include_str!("../guide-cards/program-search.txt"),
     include_str!("../guide-cards/prove.txt"),
+    include_str!("../guide-cards/purity.txt"),
     include_str!("../guide-cards/synth.txt"),
     include_str!("../guide-cards/trace-game.txt"),
     include_str!("../guide-cards/transform.txt"),
@@ -257,7 +269,7 @@ mod tests {
         }
         assert_eq!(
             names.len(),
-            29,
+            41,
             "the reviewed card count is independent of the producer"
         );
         let inventory: Value = serde_json::from_str(include_str!("../guide-card-inventory.json"))
