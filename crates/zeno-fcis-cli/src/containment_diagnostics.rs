@@ -127,7 +127,9 @@ impl Record {
             return Err("operator-record-bound".into());
         }
         let retention = Retention::environment()?;
-        prune(&root, retention, SystemTime::now()).map_err(|e| e.to_string())?;
+        // One pass after publishing leaves the same records as a pass before
+        // and after: both remove the oldest eligible records until the caps
+        // hold. Each pass lists and stats every record in the directory.
         publish_record(&root, &name, |file| {
             file.write_all(&bytes)?;
             file.flush()
