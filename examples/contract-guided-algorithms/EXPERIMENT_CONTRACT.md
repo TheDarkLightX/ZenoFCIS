@@ -22,3 +22,9 @@ python3 research.py replay --catalog evidence/initial_catalog.json
 ```
 
 A real next-stage Cranelift comparison requires a **separate** target contract with signedness, flags, poison/undefined assumptions, ABI and exact native cost. Translation from this pilot's u8 AST to ISLE/CLIF is not yet implemented and must not be implied.
+
+## Catalog version 2: structural feasibility preflight
+
+For palettes without positive logical right shifts, check whether the reference requires a higher input bit to influence a lower output bit. The admitted operations `and`, `or`, `xor`, modular `add/sub`, `not` and fixed `shl` preserve low-prefix equality; by induction all finite expression trees built from them do too. A finite reference counterexample therefore refutes the **entire closed palette**, independently of candidate enumeration bounds.
+
+A refutation produces `infeasible-right-to-left-palette` with zero enumerated candidates and a `preflight` witness. All experiments now carry a `preflight` field (null otherwise), with independent recomputation at replay. This is a scoped structural argument over the named 8-bit model, **not** a machine-checked theorem about arbitrary machine code. See [the source chapter and validation notes](HACKERS_DELIGHT_READING.md).
