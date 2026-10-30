@@ -14,6 +14,7 @@ from itertools import product
 
 import behavior
 from behavior import Refusal
+import json_numbers
 
 PROFILE = "zal/semantic-library-finite-enum/1"
 MAX_BYTES = 1 << 20
@@ -71,17 +72,14 @@ def _unique(pairs):
     return result
 
 
-def _constant(value):
-    raise Refusal("semantic-library: non-JSON numeric constant")
-
-
 def load(source):
     """Read one bounded, duplicate-free package, without executing its contents."""
     need(type(source) is str, "source must be JSON text")
     need(len(source) <= MAX_BYTES, "source exceeds 1 MiB")
     try:
         need(len(source.encode("utf-8")) <= MAX_BYTES, "source exceeds 1 MiB")
-        return json.loads(source, object_pairs_hook=_unique, parse_constant=_constant)
+        return json.loads(source, object_pairs_hook=_unique,
+                          **json_numbers.hooks(json_numbers.raising(Refusal, "semantic-library: ")))
     except (ValueError, UnicodeError, RecursionError) as error:
         if isinstance(error, Refusal):
             raise

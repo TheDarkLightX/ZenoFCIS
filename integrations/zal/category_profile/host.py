@@ -7,7 +7,7 @@ import threading
 import types
 
 ROOT = Path(__file__).resolve().parent
-ADAPTER_SHA256 = '75884e2b0f1858e8b3d43ee9a7a8b6ea291827c95e082f04d13ffd904f064920'
+ADAPTER_SHA256 = 'b7deeb5ddeaaa91146cd53234c6b1c16cd7f97511d3218db224affbf8ff8d33c'
 _loaded = None
 _lock = threading.Lock()
 

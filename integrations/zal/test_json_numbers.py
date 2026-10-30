@@ -33,8 +33,10 @@ import observations  # noqa: E402
 import program_synthesis  # noqa: E402
 import relational_observation  # noqa: E402
 import report_numbers  # noqa: E402
+import semantic_library  # noqa: E402
 import terminal  # noqa: E402
 import word_kernel  # noqa: E402
+from finite_library import prototype  # noqa: E402
 from zal_notation import core, normalizer  # noqa: E402
 
 # Other modules put directories holding their own run.py first on sys.path, so load this CLI module by path.
@@ -71,6 +73,8 @@ def file_reader(read):
 # Readers that return the parsed document, and keep every number whose exact value they can represent.
 FULL = {
     "zal_notation.core.loads": lambda text: core.loads(text)["v"],
+    "semantic_library.load": lambda text: semantic_library.load(text)["v"],
+    "finite_library.prototype hooks": lambda text: json.loads(text, **prototype._number_hooks())["v"],
     "loop_learn.strict_json": lambda text: loop_learn.strict_json(text)["v"],
     "run.user_json": lambda text: zal_run.user_json(text)["v"],
     "terminal.trace_inputs": lambda text: terminal.trace_inputs("[" + text + "]")[0]["v"],
@@ -87,14 +91,12 @@ REFUSING = {
     "app_profile._parse_binding": lambda text: app_profile._parse_binding(None, text),
     "program_synthesis._binding": lambda text: program_synthesis._binding(text.encode(), None),
     "loop_strategy_modes.strict_problem": lambda text: loop_strategy_modes.strict_problem(text),
+    "finite_library.prototype.loads": lambda text: prototype.loads(text),
 }
 
 # Every other json.load(s) call under integrations/zal, by "path:function", with why it does not use the policy.
 UNCOVERED = {
     # Open: these ingest outside JSON and still use plain number parsing.
-    "semantic_library.py:load": "open: finite_library/UPSTREAM.json pins this file and has no producer",
-    "finite_library/prototype.py:loads": "open: pinned by the category capsule and finite_library/UPSTREAM.json",
-    "finite_library/prototype.py:parse_table": "open: pinned by the category capsule and finite_library/UPSTREAM.json",
     "ladder.py:load": "open: the relational standalone route copies ladder.py without sibling modules",
     "ladder.py:file_theory": "open: the relational standalone route copies ladder.py without sibling modules",
     "loop_workspace.py:fields_of": "open: contract policy JSON, whose format the Rust reader owns",
@@ -152,7 +154,8 @@ def json_reads(path):
                 inner = child.name if where == "<module>" else where + "." + child.name
             if (isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute) and child.func.attr in ("load", "loads")
                     and isinstance(child.func.value, ast.Name) and child.func.value.id == "json"):
-                # zal_notation/core.py writes the same policy inline as _number_hooks(); its import closure is pinned.
+                # zal_notation/core.py and finite_library/prototype.py write the same policy inline as
+                # _number_hooks(), because the category capsule pins their import closure.
                 covered = any(k.arg == "parse_int" or (k.arg is None and ast.unparse(k.value).split("(")[0] in
                                                        ("json_numbers.hooks", "_number_hooks")) for k in child.keywords)
                 found.append((where, covered))
@@ -208,6 +211,7 @@ class Readers(unittest.TestCase):
     def test_every_reader_refuses_planted_lexemes_by_name(self):
         policy = {**dict.fromkeys(FULL, "full"), **dict.fromkeys(INTEGER, "integer"),
                   "app_profile._parse_binding": "full", "program_synthesis._binding": "integer",
+                  "finite_library.prototype.loads": "full",
                   "loop_strategy_modes.strict_problem": "integer"}
         readers = {**FULL, **INTEGER, **REFUSING}
         for lexeme, reason in REFUSED.items():
