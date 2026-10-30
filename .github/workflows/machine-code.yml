@@ -115,6 +115,10 @@ jobs:
         run: |
           python3 -B tools/test_machine_code_library_native.py
           python3 -O -B tools/test_machine_code_library_native.py
+      - name: Every x86 memory kernel run natively on aligned, disjoint buffers against the integer reference
+        run: |
+          python3 -B tools/test_machine_code_profile3_native.py
+          python3 -O -B tools/test_machine_code_profile3_native.py
       - name: Every admitted profile-2 x86 form, with CF/ZF/SF/OF, against the models on this CPU
         run: python3 -B tools/test_machine_code_profile2_conformance.py
 

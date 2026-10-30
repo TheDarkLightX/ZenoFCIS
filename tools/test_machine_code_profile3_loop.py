@@ -1,6 +1,6 @@
 """Profile-3 memory kernels through proposal sessions, search, emission, replay and the kernel library.
 
-No memory kernel is executed natively here; `library check --native` reports them as not run.
+No memory kernel is executed here; native runs are in `test_machine_code_profile3_native.py`.
 """
 
 from contextlib import redirect_stdout
@@ -59,10 +59,9 @@ class Profile3LoopTests(unittest.TestCase):
                 self.assertEqual(replayed["verification"]["cost"], value["cost"])
                 library.add(artifact, added, name, value["summary"], "search")
                 self.assertEqual((added / (name + ".json")).read_bytes(), (MEMORY / (name + ".json")).read_bytes())
-        report = library.check(added, native=True)
+        report = library.check(added)
         self.assertEqual(report["status"], "checked")
-        self.assertEqual(report["native_summary"]["not_run"],
-                         {name + ".json": "memory kernels are not executed natively" for name in NAMES})
+        self.assertEqual({row["name"]: row["status"] for row in report["kernels"]}, dict.fromkeys(NAMES, "equivalent"))
 
     def test_proposals_are_refuted_refused_or_accepted_by_the_checker(self):
         value = entry("swap-words-x86")
