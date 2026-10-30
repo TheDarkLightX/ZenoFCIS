@@ -17,7 +17,7 @@ import re
 import sys
 import time
 
-from . import profile2
+from . import footprint, profile2
 from .model import MASK, canonical, digest, evaluate, integer, read_json, validate_problem
 from .targets import assembly_source, elf_object, encode_instruction, encode_program
 
@@ -359,7 +359,8 @@ def _witness(problem, verification):
             verification.get("initial_flags"))
 
 
-def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=5000, timeout_ms=500):
+def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=5000, timeout_ms=500, prune=True):
+    """Length-ordered enumeration; `prune` skips only candidates footprint.py shows are never needed."""
     integer(max_candidates, 1, 100_000, "candidate budget")
     integer(max_checks, 1, 128, "checker budget")
     integer(deadline_ms, 1, 60_000, "deadline")
@@ -389,8 +390,12 @@ def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=50
             bound = _rank(problem, fresh, code)
         grammar = _grammar(problem)
         terminal = encode_program(problem["target"], [])
+        pruner = footprint.Pruner(problem, grammar) if prune else None
+        skipped = {}
         for length in range(problem["max_instructions"] + 1):
-            for choices in product(range(len(grammar)), repeat=length):
+            choices_in_order = (product(range(len(grammar)), repeat=length) if pruner is None
+                                else footprint.sequences(len(grammar), length, pruner.judge, skipped))
+            for choices in choices_in_order:
                 remaining = deadline_ms / 1000 - (time.monotonic() - began)
                 if remaining <= 0 or proposed >= max_candidates or checks >= max_checks or len(events) >= MAX_EVENTS:
                     stopped = "budget-exhausted"; break
@@ -436,7 +441,9 @@ def search(directory: Path, max_candidates=10_000, max_checks=64, deadline_ms=50
             if fresh != receipt["verification"]:
                 raise ValueError("incumbent receipt disagrees with fresh byte interpretation")
         return {"status": "checked-candidate" if best else "no-checked-candidate", "stop_reason": stopped,
-                "proposed": proposed, "concrete_refutations": filtered, "objective_pruned": pruned, "solver_checks": checks,
+                "proposed": proposed, "concrete_refutations": filtered, "objective_pruned": pruned,
+                "pruning": footprint.SCHEME if prune else "off", "dead_pruned": skipped.get("dead", 0),
+                "order_pruned": skipped.get("order", 0), "solver_checks": checks,
                 "checker_verdicts": verdicts, "retained_counterexamples": len(witnesses) - seeds,
                 "incumbent": best[1]["sequence"] if best else None,
                 "cost": best[2]["verification"]["cost"] if best else None,

@@ -71,10 +71,19 @@ class Profile2LoopTests(unittest.TestCase):
 
     def test_search_finds_the_carry_chain_and_an_unsigned_minimum(self):
         self.opened("add128-x86.json")
-        result = session.search(self.directory, max_candidates=5000, max_checks=8, deadline_ms=20000)
+        result = session.search(self.directory, max_candidates=5000, max_checks=8, deadline_ms=20000, prune=False)
         self.assertEqual((result["status"], result["stop_reason"]), ("checked-candidate", "grammar-exhausted"), result)
         self.assertEqual((result["proposed"], result["cost"]), (1555, {"bytes": 13, "instructions": 4}))
         self.assertGreater(result["concrete_refutations"], 1000)
+        self.assertEqual(session.resume(self.directory)["code_hex"], "4889f84801d04889f24811cac3")
+        self.directory = self.root / "pruned"
+        self.opened("add128-x86.json")
+        result = session.search(self.directory, max_candidates=5000, max_checks=8, deadline_ms=20000)
+        self.assertEqual((result["status"], result["stop_reason"]), ("checked-candidate", "grammar-exhausted"), result)
+        self.assertEqual(result["proposed"] + result["dead_pruned"] + result["order_pruned"], 1555)
+        self.assertLess(result["proposed"], 1555 // 4)
+        self.assertGreater(result["order_pruned"], 0)
+        self.assertEqual(result["cost"], {"bytes": 13, "instructions": 4})
         self.assertEqual(session.resume(self.directory)["code_hex"], "4889f84801d04889f24811cac3")
         self.directory = self.root / "umin"
         self.opened("umin-x86.json")
