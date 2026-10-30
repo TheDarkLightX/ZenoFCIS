@@ -26,6 +26,7 @@ sys.path.insert(0, str(ROOT))
 
 import json_numbers as N  # noqa: E402
 import app_profile  # noqa: E402
+import codex_transport  # noqa: E402
 import ladder  # noqa: E402
 import loop_learn  # noqa: E402
 import loop_strategy_modes  # noqa: E402
@@ -113,7 +114,6 @@ REFUSING = {
 # Every other json.load(s) call under integrations/zal, by "path:function", with why it does not use the policy.
 UNCOVERED = {
     # Open: these ingest outside JSON and still use plain number parsing.
-    "codex_transport.py:AppServer._read": "open: local agent app-server transport; targeted at 2.8",
     "category_profile/adapter.py:_capture": "own protocol: pinned category capsule",
     "category_profile/provider/build.py:main": "own protocol: pinned category capsule",
     "category_profile/provider/main.py:<module>": "own protocol: pinned category capsule",
@@ -279,6 +279,31 @@ class Readers(unittest.TestCase):
             replies = [json.loads(line) for line in done.stdout.splitlines()]
         self.assertEqual([reply["error"]["message"].split(":")[1].strip() for reply in replies],
                          [N.NONFINITE, N.NEGATIVE_ZERO, N.INEXACT])
+
+    def agent_session(self, lines):
+        """Feed newline-delimited messages from a stand-in app-server process through the real reader."""
+        events = []
+        client = codex_transport.AppServer(events.append, executable=sys.executable)
+        script = "import sys\nfor line in sys.argv[1:]:\n    sys.stdout.write(line + '\\n')\n"
+        client.process = subprocess.Popen([sys.executable, "-c", script, *lines], stdout=subprocess.PIPE)
+        try:
+            client._read()
+        finally:
+            client.process.wait(timeout=30)
+            client.process.stdout.close()
+        return events
+
+    def test_agent_transport_keeps_exact_numbers_or_closes_with_the_reason(self):
+        kept = self.agent_session(['{"method":"item/agentMessage/delta","params":{"v":0.1,"w":18446744073709551616}}'])
+        self.assertEqual(kept[0]["params"], {"v": 0.1, "w": 1 << 64})
+        self.assertEqual(kept[-1]["method"], "zal/transportError")
+        for lexeme, reason in (("1e400", N.NONFINITE), ("-0", N.NEGATIVE_ZERO), ("0.30000000000000001", N.INEXACT)):
+            with self.subTest(lexeme=lexeme):
+                events = self.agent_session(['{"method":"first","params":{}}',
+                                             '{"method":"second","params":{"v":' + lexeme + '}}',
+                                             '{"method":"third","params":{}}'])
+                self.assertEqual([event["method"] for event in events], ["first", "zal/transportError"])
+                self.assertEqual(events[1]["params"]["message"], f"agent message: {reason}: {lexeme}")
 
     @unittest.skipUnless(shutil.which("node"), "the browser runtime differential needs node")
     def test_browser_runtime_agrees_except_beyond_the_safe_integer_range(self):

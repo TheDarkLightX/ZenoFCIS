@@ -1043,8 +1043,9 @@ integers keep their existing refusal for fractions and add the named integer che
 **Browser runtime.** The browser's `JSON.parse` gives the same decimal value for every accepted number except
 integers beyond plus or minus 2^53-1. The browser route already receives those as decimal strings.
 
-**Not covered yet.** The local agent transport still parses agent messages with plain binary floating point. It is
-targeted at 2.8, because refusing a message changes a live agent session.
+**Agent transport.** Messages from the local agent app-server follow the full policy. A refused number ends the
+session with a `zal/transportError` event naming the reason code. Nothing after the refused message is dispatched,
+because later messages could depend on it.
 
 A component list pins the finite-library and semantic-library sources. After editing them, run
 `python3 tools/record_finite_library_components.py --write`, then `python3 tools/record_category_capsule.py --write`,
