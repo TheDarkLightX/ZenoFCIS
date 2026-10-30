@@ -212,6 +212,55 @@ class Profile2VerifierTests(unittest.TestCase):
                          "48f7c000000000c3", "48f71fc3", "48c1f801c3", "481906c3", "4811c3c3",
                          "4885d8c3", "4839e0c3", "4ef7d8c3", "4cf7d8c3", "48d3e0c3", "480fa3c6c3"])
 
+    def test_x86_immediate_alu_forms_sign_extend_both_widths(self):
+        # mov rax,rdi; add rax,-5 (83 /0 ib, sign-extended).
+        self.equivalent(X, ["x"], [["add", i("x"), c(MASK - 4)]], "4889f84883c0fbc3")
+        # mov rax,rdi; and rax,-256 (the RAX short form 25 id, sign-extended).
+        self.equivalent(X, ["x"], [["and", i("x"), c(MASK - 255)]], "4889f8482500ffffffc3")
+        # mov r11,rdi; xor r11,0x7fffffff (81 /6 id); sub r11,-2^31 (81 /5 id); mov rax,r11.
+        self.equivalent(X, ["x"], [["add", ["xor", i("x"), c(0x7FFFFFFF)], c(1 << 31)]],
+                        "4989fb4981f3ffffff7f4981eb000000804c89d8c3")
+        # The same bytes refute the zero-extended readings of both immediates.
+        self.counterexample(X, ["x"], [["add", i("x"), c(0xFB)]], "4889f84883c0fbc3")
+        self.counterexample(X, ["x"], [["and", i("x"), c(0xFFFFFF00)]], "4889f8482500ffffffc3")
+        # mov rax,rdi; or rax,-1 gives all ones whatever x is.
+        self.equivalent(X, ["x"], [c(MASK)], "4883c9ff4889c8c3")
+
+    def test_x86_immediate_compare_flags(self):
+        # xor rax,rax; cmp rdi,-1; setb al and setl al: unsigned and signed comparisons with all ones.
+        self.equivalent(X, ["x"], [["ult", i("x"), c(MASK)]], "4831c04883ffff0f92c0c3")
+        self.equivalent(X, ["x"], [["slt", i("x"), c(MASK)]], "4831c04883ffff0f9cc0c3")
+        # xor rax,rax; cmp rdi,-1000 (81 /7 id); seta al.
+        self.equivalent(X, ["x"], [["ult", c(MASK - 999), i("x")]], "4831c04881ff18fcffff0f97c0c3")
+        self.counterexample(X, ["x"], [["ult", c(0xFFFFFC18), i("x")]], "4831c04881ff18fcffff0f97c0c3")
+        # Known answers for every modelled flag after an immediate CMP, in both models.
+        for raw, rdi, expected in [("4883ffffc3", 5, {"cf": 1, "zf": 0, "sf": 0, "of": 0}),
+                                   ("4883ffffc3", MASK, {"cf": 0, "zf": 1, "sf": 0, "of": 0}),
+                                   ("4883ff01c3", MIN, {"cf": 0, "zf": 0, "sf": 0, "of": 1}),
+                                   ("4881ff18fcffffc3", 0, {"cf": 1, "zf": 0, "sf": 0, "of": 0}),
+                                   ("4881ff18fcffffc3", MAX, {"cf": 1, "zf": 0, "sf": 1, "of": 1})]:
+            with self.subTest(raw=raw, rdi=rdi):
+                registers = state(X, rdi=rdi)
+                final, flags = v.execute(X, code(raw), registers, dict.fromkeys(v.FLAGS, 0))
+                self.assertEqual((final, flags), (registers, expected))
+                self.assertEqual(smt_point(X, raw, registers, dict.fromkeys(v.FLAGS, 0)), (registers, expected))
+
+    def test_x86_immediate_non_canonical_and_unadmitted_encodings_refuse(self):
+        for raw, reason in [("4881c005000000c3", "Imm32WhereImm8Fits"), ("4805ffffffffc3", "Imm32WhereImm8Fits"),
+                            ("4881c0e8030000c3", "AccumulatorFormRequired"),
+                            ("4883d005c3", "UnsupportedImmediateGroup"), ("4883d805c3", "UnsupportedImmediateGroup"),
+                            ("4c83c005c3", "UnusedRexBits"), ("4905e8030000c3", "UnusedRexBits"),
+                            ("48830005c3", "MemoryOperandRefused"), ("4883c0c3", "MissingTerminalReturn")]:
+            with self.subTest(raw=raw), self.assertRaisesRegex(ValueError, reason):
+                v.decode(X, code(raw))
+        for form in (["add", "rax", 1 << 31], ["add", "rax", -(1 << 31) - 1], ["adc", "rax", 1],
+                     ["test", "rax", 1], ["add", "rbx", 1]):
+            with self.subTest(form=form):
+                result = v.check(problem(X, ["x"], [i("x")], [form], 0), code("c3"))
+                self.assertEqual((result["status"], result["reason"]), ("refused", "InvalidDeclaredInstruction"))
+        self.assertEqual(v.check(problem(X, ["x"], [i("x")], [["add", "rax", True]], 0), code("c3"))["status"],
+                         "refused")
+
     def test_rv_comparisons_immediates_and_arithmetic_shifts(self):
         ret = RET_R
         self.equivalent(R, ["x", "y"], [["slt", i("x"), i("y")]], rtype(0, "a0", "a0", "a1", 2) + ret)

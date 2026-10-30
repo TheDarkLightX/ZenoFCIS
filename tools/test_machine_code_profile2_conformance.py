@@ -4,7 +4,9 @@ Every admitted x86_64-sysv-register/2 instruction form is enumerated:
 - MOV, ADD, SUB, AND, OR, XOR, IMUL, ADC, SBB, CMP, TEST, MOVZX and the fourteen CMOVcc over all register pairs;
 - SHL/SHR/SAR with every count;
 - the fourteen SETcc on every register byte, and NEG on every register;
-- MOVABS with edge immediates, LEA over every base, index and scale, and NOP.
+- MOVABS with edge immediates, LEA over every base, index and scale, and NOP;
+- ADD, SUB, AND, OR, XOR and CMP with every 8-bit immediate and edge 32-bit immediates on every register, in the
+  canonical encodings (83 /n ib, the RAX short form, 81 /n id).
 
 For each form, three independent checks run:
 1. The encoding is compared with GNU `as`.
@@ -44,6 +46,9 @@ MASK = (1 << 64) - 1
 EDGE = [0, 1, 2, MASK, 1 << 63, (1 << 63) - 1, MASK - 1, 195, 0x5555555555555555, 0xAAAAAAAAAAAAAAAA]
 STATES = int(os.environ.get("ZENO_MACHINE_CONFORMANCE_STATES", "16"))
 SMT_STATES = 2
+IMM32 = [-(1 << 31), -(1 << 31) + 1, -0x12345678, -256, -129, 128, 255, 65536, 0x12345678, (1 << 31) - 1]
+# The SMT comparison samples 8-bit immediates; the concrete comparison covers all of them.
+SMT_IMM8 = {-128, -127, -2, -1, 0, 1, 2, 64, 126, 127}
 WORDS = len(REGS) + 1  # registers then RFLAGS, for the state before and after
 
 
@@ -59,6 +64,7 @@ def forms():
     for d in REGS:
         out += [["imm", d, str(x)] for x in (0, 1, MASK, 1 << 63, (1 << 63) - 1, 195, 0x0123456789ABCDEF)]
     out += [["lea", d, b, i, s] for d, b, i in itertools.product(REGS, REGS, REGS) for s in (1, 2, 4, 8)]
+    out += [[op, d, k] for op in v.IMMEDIATE_OPS for d in REGS for k in list(range(-128, 128)) + IMM32]
     return out + [["nop"]]
 
 
@@ -101,8 +107,14 @@ class HostIndependentModelChecks(unittest.TestCase):
             families,
             (bytes([b0, b1, b2]) for b0 in [0x0F, *range(0x40, 0x50)] for b1 in range(256) for b2 in range(256)),
             (bytes([b0, b1, b2, b3]) for b0, b1 in [(0x40, 0x0F), (0x41, 0x0F)]
-             + [(r, o) for r in range(0x48, 0x50) for o in (0x0F, 0x8D, 0xC1)]
-             for b2 in range(256) for b3 in range(256)))
+             + [(r, o) for r in range(0x48, 0x50) for o in (0x0F, 0x8D, 0xC1, 0x83)]
+             for b2 in range(256) for b3 in range(256)),
+            # 32-bit immediates: every REX.W prefix, ModRM byte and accumulator opcode, with sampled values
+            # including some that fit eight bits and so must refuse.
+            (bytes([r, 0x81, modrm]) + struct.pack("<i", k) for r in range(0x48, 0x50) for modrm in range(256)
+             for k in IMM32 + [-128, -1, 0, 127]),
+            (bytes([r, o]) + struct.pack("<i", k) for r in range(0x40, 0x50) for o in range(0x05, 0x40, 8)
+             for k in IMM32 + [-128, -1, 0, 127]))
         accepted = 0
         for body in bodies:
             try:
@@ -272,6 +284,9 @@ class X86FlagModelConformance(unittest.TestCase):
         import z3
         context = z3.Context()
         for i, form in enumerate(self.forms):
+            if form[0] in v.IMMEDIATE_OPS and isinstance(form[-1], int) and -128 <= form[-1] <= 127 \
+                    and form[-1] not in SMT_IMM8:
+                continue
             decoded = v.decode(v.X86, self.code[i] + b"\xc3")
             for (registers, flags, _), (hardware, hardware_flags) in list(zip(self.states[i], self.hardware[i]))[:SMT_STATES]:
                 symbolic = {r: z3.BitVecVal(value, 64, context) for r, value in zip(REGS, registers)}
@@ -316,7 +331,16 @@ class X86FlagModelConformance(unittest.TestCase):
                 after_flags["cf"] = (registers[form[1]] >> (63 - form[2])) & 1 if form[2] < 63 else 0
             return after, after_flags
 
-        for name, model in (("sbb-carry", sbb_ignores_borrow_in_carry), ("add-overflow", add_overflow_is_carry),
+        def immediate_zero_extended(form, probe, registers, flags):
+            if form[0] in v.IMMEDIATE_OPS and isinstance(form[2], int) and form[2] < 0:
+                width = 0xFF if form[2] >= -128 else 0xFFFFFFFF
+                after, after_flags = dict(registers), dict(flags)
+                v._x86_concrete(v.Instruction(form[0], (form[1], form[2] & width), 0, 0), after, after_flags)
+                return after, after_flags
+            return exact(form, probe, registers, flags)
+
+        for name, model in (("immediate-zero-extended", immediate_zero_extended),
+                            ("sbb-carry", sbb_ignores_borrow_in_carry), ("add-overflow", add_overflow_is_carry),
                             ("setcc-width", setcc_writes_whole_register), ("cmovle-zero", cmovle_ignores_zero),
                             ("shl-carry", shl_carry_off_by_one)):
             self.assertTrue(self.mismatches(model), f"planted defect not detected: {name}")
