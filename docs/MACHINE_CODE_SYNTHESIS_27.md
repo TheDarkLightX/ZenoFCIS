@@ -208,10 +208,53 @@ Entries store no verdict or receipt. A receipt binds the checker identity (the
 checker sources, Python and Z3 hashes), so it would go stale after any checker
 edit or on another host. A fresh recheck does not. The library check gives the
 same ISA-model guarantee as a session check, for each entry on the current
-checker. It does not establish native execution, timing, global optimality or
-fitness for a particular use; the native and conformance tests cover execution
-separately. CI runs `tools/test_machine_code_library.py`, which also checks
-that a wrong kernel, a wrong cost and malformed entries fail.
+checker. On its own it does not establish native execution, timing, global
+optimality or fitness for a particular use. CI runs
+`tools/test_machine_code_library.py`, which also checks that a wrong kernel, a
+wrong cost and malformed entries fail.
+
+```text
+python3 -B -m tools.machine_code.run library check --native --dir test-data/machine-code/kernels
+python3 -B -m tools.machine_code.run library bench --dir test-data/machine-code/kernels --out NEW_DIR \
+    [--iterations 1000000] [--repeats 21]
+```
+
+`check --native` also executes each x86 entry. It needs a Linux x86-64 host
+with gcc.
+
+- **Method:** each entry's ELF object is rebuilt from its bytes and linked with a
+  generated C runner.
+- **Comparison:** every result word is compared with the problem's integer
+  reference, `model.evaluate` for profile 1 and the profile-2 checker's
+  expression evaluator for profile 2.
+- **Vectors:** every combination of eight edge values per argument when there
+  are at most 4,096 of them, otherwise 4,096 sampled edge vectors. Then 4,096
+  deterministic pseudo-random vectors.
+- **RV64I:** each RV64I entry reports `native: not-run`, reason `needs RV64I
+  execution`.
+- **Unsupported host:** a host that cannot run x86 code natively reports
+  `inconclusive` (exit 2), never a pass.
+- **Failure:** a mismatch or a runner error fails the library (exit 1), and
+  reports the first mismatching arguments with their expected and actual
+  results. This happens even when the model check passed.
+- **Result:** on an AMD Ryzen Threadripper 1950X, the 10 x86 entries in the
+  repository agreed on 49,608 vectors. The 2 RV64I entries were not run.
+
+Native agreement covers the vectors run on that processor only.
+
+`bench` rechecks every entry first. It then times each x86 entry that
+rechecked, using the paired harness of `run bench`, against GCC's `-O2` code
+for the same expressions. It writes `bench.json` and one table, `bench.md`. The
+table records the CPU, the load average at the start and at the end, the
+compiler, the iterations and the repeats, and states *This machine and load
+only; not a portable speedup claim.* An entry that does not recheck is not
+timed, and the result is `failed`. RV64I rows read `not-run: needs RV64I
+execution`.
+
+`tools/test_machine_code_library_native.py` covers both commands. It checks
+that a planted wrong entry fails natively, including a wrong second result that
+a stubbed model check accepts. It also checks that an unsupported host is
+inconclusive and that the table keeps its scope.
 
 ## Qualification and costs
 
