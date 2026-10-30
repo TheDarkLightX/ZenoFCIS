@@ -82,7 +82,7 @@ def source_identity():
     for module in (mm, ms, mt, mv):
         need(Path(module.__file__).resolve().parent == base, "machine module loaded from another source tree")
     paths = sorted(base.glob("*.py"))
-    need(0 < len(paths) <= 16, "machine source inventory")
+    need(0 < len(paths) <= 32, "machine source inventory")
     return {p.name: digest(read_bytes(p, 131072)) for p in paths}
 
 

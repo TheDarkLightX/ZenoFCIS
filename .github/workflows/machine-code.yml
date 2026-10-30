@@ -81,6 +81,14 @@ jobs:
         run: python3 -B tools/test_machine_code_profile3_verifier.py
       - name: Profile-3 search, emission, replay and the memory-kernel library
         run: python3 -B tools/test_machine_code_profile3_loop.py
+      - name: Exact specialization with a Z3 proof, and checker-accepted specialized kernels
+        run: |
+          python3 -B tools/test_machine_code_specialize.py
+          python3 -O -B tools/test_machine_code_specialize.py
+      - name: Per-result backward slices, each checked as a one-result kernel
+        run: |
+          python3 -B tools/test_machine_code_slice.py
+          python3 -O -B tools/test_machine_code_slice.py
       - name: Optimized Python keeps the same guards
         run: |
           python3 -O -B tools/test_machine_code_verifier.py

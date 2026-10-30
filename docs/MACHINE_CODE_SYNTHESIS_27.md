@@ -577,8 +577,11 @@ The schema is `zeno-fcis/machine-problem/2`. It has exactly the fields
 `schema`, `target`, `inputs`, `outputs`, `grammar`, `max_instructions` and
 `objective`.
 
-- `inputs`: one to six distinct names, each matching `[a-z][a-z0-9_]{0,15}`.
-  They are assigned to the input registers in order.
+- `inputs`: zero to six distinct names, each matching `[a-z][a-z0-9_]{0,15}`.
+  They are assigned to the input registers in order. A problem with no inputs
+  is a constant problem, for example one whose every input was fixed by
+  [specialization](#exact-specialization); then every argument register is
+  quantified scratch.
 - `outputs`: one or two expressions, assigned to the result registers in order.
   Each has at most 64 nodes and depth 16.
 - `grammar`, `max_instructions` and `objective`: as in profile 1. Forms use
@@ -925,6 +928,193 @@ python3 -B -m tools.machine_code.run library check --dir test-data/machine-code/
 - Aliasing between regions, faults, caches, atomicity and timing are not
   modelled.
 - The disjointness and alignment assumptions are the caller's obligation.
+
+### Exact specialization
+
+**Journey.** A developer has a checked 128-bit adder, but every caller passes
+zero for both high words. They fix those two inputs. The tool writes a smaller
+problem over the two low words, a Z3 proof that it agrees with the original
+problem at those values, and a rewritten kernel that the checker accepts
+against the smaller problem.
+
+```sh
+machine_work=$(mktemp -d)
+python3 -B -m tools.machine_code.run specialize \
+  --kernel test-data/machine-code/kernels/add128-x86.json \
+  --fix a_hi=0 --fix b_hi=0 --out "$machine_work/low-words"
+python3 -B -m tools.machine_code.run specialize-replay --dir "$machine_work/low-words"
+```
+
+`--problem P` specializes a profile-2 problem alone. `--problem P --code K.bin`
+or `--kernel ENTRY.json` also specializes a kernel; that kernel must first check
+equivalent to the original problem. Repeat `--fix NAME=VALUE` with a declared
+input and a canonical unsigned decimal word.
+
+**Specialized problem.** The remaining inputs keep their original order and are
+renumbered from the first argument register. Each output is the original output
+with the fixed inputs replaced by constants. It is then simplified by constant
+folding and by these identities: `x+0`, `x-0`, `x|0`, `x^0`, `x*1`,
+`x&(2^64-1)`, `x*0`, `x&0`, a select with a constant condition, and a shift by 0.
+Without a kernel, the grammar and bound stay as in the original problem. With a
+kernel, the rewritten kernel's forms are added to the grammar (refused above 32
+forms), and the bound becomes the larger of the original bound and the new
+length (refused above 16). Fixing every input gives a constant problem.
+
+**Proof.** Z3 checks a query asserting that some specialized output differs from
+the original output with the fixed values, over every assignment of the
+remaining 64-bit inputs. Nothing is written unless the answer is unsat. The
+query is stored as `proof.smt2`, and the record binds its SHA-256. Replay
+recomputes the specialization and reruns the stored query.
+
+**Kernel rewrite (advisory).** The specializer works on the kernel's decoded
+instructions, in the spirit of WiPEr, the machine-code partial evaluator in
+V. Srinivasan's dissertation *Synthesis of Machine Code: Algorithms and
+Applications* (University of Wisconsin–Madison, 2017, TR1844):
+
+1. It sets the fixed inputs as constants and propagates values, both registers
+   and CF/ZF/SF/OF, through the instructions in their original order.
+2. It folds every instruction whose reads are all known, and every instruction
+   that known operands turn into a copy or a constant (for example `x+0` or
+   `x&0`). An x86 instruction is folded this way only when every flag read
+   later then has a known value. For example, `x+0` clears CF and OF.
+   `ADC`/`SBB` with a known clear CF become `ADD`/`SUB`. A `CMOVcc` with a known
+   condition becomes a copy or is dropped. Logic operations record that they
+   clear CF and OF.
+3. It keeps, to a fixpoint, the instruction that set each flag a kept
+   instruction reads.
+4. The kept instructions run in order. Each operand comes from whichever
+   register holds its value, so renumbered arguments need no prologue of moves.
+   A value is computed in the register where a later instruction or a result
+   needs it. On x86, a commutative operation may swap its operands to do this.
+   A missing constant is set just before it is needed: by `MOV r64, imm64` on
+   x86, or by an `ADDI`/`SLLI` chain on RV64I.
+5. Backward register and flag liveness removes dead instructions. On x86, a
+   zero constant becomes a hoisted `XOR r, r` where no flag is live.
+
+The independent profile-2 checker must then find the bytes equivalent to the
+specialized problem. It quantifies every remaining input, scratch register and
+entry flag. Otherwise nothing is written. The rewrite has no authority of its
+own.
+
+`--out` must be a new directory; nothing is overwritten. It receives:
+
+- `original.json`, `problem.json` and `proof.smt2`;
+- `original.bin` and `kernel.bin`, when a kernel was given;
+- `specialization.json`, which records:
+  - the original and specialized problem hashes;
+  - the fixed values, the remaining inputs and the argument map;
+  - the proof answer, solver and query hash;
+  - for a kernel, both code hashes and costs.
+
+`specialize` and `specialize-replay` exit with these codes:
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | specialized or replayed |
+| 1 | counterexample: a failed proof or a rejected kernel; also a refused original kernel |
+| 2 | inconclusive |
+| 65 | malformed input, or the output directory already exists |
+
+`tools/test_machine_code_specialize.py` checks these behaviours:
+
+- a wrong simplification makes the proof fail, and nothing is written;
+- four library kernels on both targets specialize; the specialized kernel
+  rechecks against its specialized problem; the record names both problem and
+  both code hashes; replay passes; and concrete runs agree with the original
+  kernel at the fixed values;
+- fixing all four inputs of `add128-x86` gives a constant problem and a kernel
+  made only of constant loads;
+- a planted off-by-one constant fold is rejected by the checker with a concrete
+  counterexample, and nothing is written;
+- malformed fixes, profile-1 problems, an existing output directory, an
+  unchecked original kernel and a changed record are refused;
+- every profile-2 library kernel specializes over every nonempty subset of its
+  inputs, with one deterministic draw of boundary or random words each. Each
+  rewrite either checks equivalent or is refused for its size before checking;
+  none may produce a counterexample.
+
+At this checkpoint that last test covers 9 kernels and 61 cases:
+
+- the checker accepts 60 rewrites;
+- one RV64I case needs more than 16 instructions for its constants and is
+  refused before checking;
+- all 8 fully fixed cases have fewer instructions than the original kernel;
+- of the 52 partly fixed cases, 7 have fewer instructions, 11 the same number
+  and 34 more.
+
+Partly fixed rewrites are often longer because x86 profile 2 has no immediate
+arithmetic, so each needed constant costs a 10-byte load. Finding smaller
+kernels for a specialized problem is a search question; `search` can start
+from the specialized problem.
+
+**Scope.** Profile-2 problems and straight-line, register-only kernels under the
+registered ISA model. The proof covers output equality only. Kernel equivalence
+comes from the checker, not from the rewrite. Not claimed: native conformance,
+timing, a smaller or optimal rewritten kernel, or other targets.
+
+### Per-result slices
+
+**Journey.** A reviewer wants to know which instructions of a two-result kernel
+compute each result. They slice it. Each result gets the instructions that can
+reach it, checked as a kernel of its own.
+
+```sh
+python3 -B -m tools.machine_code.run slice \
+  --kernel test-data/machine-code/kernels/add128-x86.json --out "$machine_work/slices"
+```
+
+The kernel must first check equivalent to its problem. For each result, the
+backward slice keeps every instruction whose writes reach that result register
+at the return through later reads. It uses the exact footprints from
+`footprint.py`, which come from the checker's own symbolic semantics: reads and
+writes over-approximate, and overwrites under-approximate. So a partial or
+conditional write (`SETcc`, `CMOVcc`) keeps the earlier value of its destination
+in the slice. A checked kernel's instructions are all grammar entries, so each
+has a derived footprint; the command refuses with `FootprintUnavailable`
+otherwise. The slice keeps the original instruction order. For the second
+result, a copy into the first result register is appended.
+
+Each slice becomes a one-result problem with that output alone. Its grammar is
+the original grammar plus the slice's forms, and its bound is large enough for
+the slice. The independent profile-2 checker must find every slice equivalent
+to its own output, over every input, scratch register and entry flag. Otherwise
+nothing is written; the slicer has no authority of its own.
+
+The output directory receives:
+
+- `original.json` and `original.bin`;
+- `resultN.json` and `resultN.bin` for each result;
+- `slices.json`, with:
+  - the original problem and code hashes;
+  - for each slice, its instruction indices, problem and code hashes, and its
+    checked cost.
+
+`slice` exits with these codes:
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | sliced |
+| 1 | a slice was rejected, or the kernel did not check (refused) |
+| 2 | inconclusive |
+| 65 | malformed input, or the output directory already exists |
+
+`tools/test_machine_code_slice.py` checks these behaviours:
+
+- every profile-2 library kernel slices into checked one-result kernels;
+- `add128-x86`'s low word needs only its `MOV` and `ADD`, and its high word
+  needs all four instructions;
+- a planted footprint defect that drops `ADC`'s carry read loses the low `ADD`
+  from the high word's slice, and the checker rejects that slice with a
+  concrete counterexample, so nothing is written;
+- the slicer uses the shared footprints, including `ADC`'s read of CF, and
+  refuses when a footprint cannot be derived;
+- an unchecked kernel and a profile-1 problem are refused.
+
+This follows McSlice, the machine-code slicer in the same dissertation. Here it
+covers straight-line register-only kernels, where the instruction footprints
+fully describe the dependences. Slices are checked, not trusted. They are not
+claimed minimal: a slice keeps every instruction its footprints reach, even
+when the value would not change the result.
 
 ## ZAL human-to-machine word-kernel connection
 

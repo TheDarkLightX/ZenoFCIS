@@ -394,7 +394,7 @@ def execute(target, code, registers, flags=None):
 
 def entry_state(target, arguments, initial=None, flags=None):
     """Whole entry state from positional arguments; omitted scratch registers and flags are zero."""
-    _require(type(arguments) is list and 1 <= len(arguments) <= len(ARGUMENTS[target]), "ArgumentsMustBe1To6Words")
+    _require(type(arguments) is list and 0 <= len(arguments) <= len(ARGUMENTS[target]), "ArgumentsMustBe0To6Words")
     for value in arguments:
         _require(type(value) is int and 0 <= value <= MASK, "InputMustBeU64")
     scratch = [name for name in REGISTERS[target] if name not in ARGUMENTS[target][:len(arguments)]]

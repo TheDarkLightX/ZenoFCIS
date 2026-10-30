@@ -67,9 +67,59 @@ def main(argv=None):
     against.add_argument("--solver-ms", type=int, default=1000)
     for sub in (lowered, against):
         sub.add_argument("--contract", required=True, type=Path)
+    special = commands.add_parser("specialize", help="fix some inputs of a profile-2 problem with a Z3 proof; "
+                                  "optionally rewrite a checked kernel and check it; writes nothing on failure")
+    special.add_argument("--problem", type=Path, help="profile-2 problem (or use --kernel)")
+    special.add_argument("--code", type=Path, help="checked kernel bytes for --problem")
+    special.add_argument("--kernel", type=Path, help="checked-library entry; its problem and bytes are used")
+    special.add_argument("--fix", action="append", required=True, metavar="NAME=VALUE",
+                         help="input name and canonical unsigned decimal word; repeatable")
+    special.add_argument("--out", required=True, type=Path, help="new directory; never overwrites")
+    special.add_argument("--solver-ms", type=int, default=1000)
+    sliced = commands.add_parser("slice", help="per-result backward slices of a checked profile-2 kernel, each "
+                                 "checked as a one-result kernel; writes nothing unless all are equivalent")
+    sliced.add_argument("--problem", type=Path, help="profile-2 problem (or use --kernel)")
+    sliced.add_argument("--code", type=Path, help="kernel bytes for --problem")
+    sliced.add_argument("--kernel", type=Path, help="checked-library entry; its problem and bytes are used")
+    sliced.add_argument("--out", required=True, type=Path, help="new directory; never overwrites")
+    sliced.add_argument("--solver-ms", type=int, default=1000)
+    replayed = commands.add_parser("specialize-replay", help="recompute a written specialization and recheck it")
+    replayed.add_argument("--dir", required=True, type=Path)
+    replayed.add_argument("--solver-ms", type=int, default=1000)
     args = parser.parse_args(argv)
     try:
-        if args.command == "contract":
+        if args.command == "slice":
+            from . import slicing
+            from .model import read_json
+            if (args.kernel is None) == (args.problem is None) or (args.kernel is None) == (args.code is None):
+                raise ValueError("give exactly one of --problem with --code, or --kernel")
+            if args.kernel is not None:
+                from .library import _validate
+                problem, code = _validate(read_json(args.kernel))
+            else:
+                problem, code = read_json(args.problem), session._code(args.code)
+            result = slicing.slices(problem, code, args.solver_ms)
+            if result["status"] == "sliced":
+                result["record"] = slicing.write(result, args.out, problem, code)
+            for row in result.get("slices", []):
+                row.pop("problem", None)
+        elif args.command in ("specialize", "specialize-replay"):
+            from . import specialize
+            if args.command == "specialize-replay":
+                result = specialize.replay(args.dir, args.solver_ms)
+            else:
+                from .model import read_json
+                if (args.kernel is None) == (args.problem is None) or (args.kernel is not None and args.code):
+                    raise ValueError("give exactly one of --problem [--code] or --kernel")
+                if args.kernel is not None:
+                    from .library import _validate
+                    problem, code = _validate(read_json(args.kernel))
+                else:
+                    problem = read_json(args.problem)
+                    code = session._code(args.code) if args.code is not None else None
+                result = specialize.specialize(problem, args.fix, args.out, code, args.solver_ms)
+                result.pop("problem", None)
+        elif args.command == "contract":
             from . import contracts
             from .model import read_json
             if args.action == "lower":
