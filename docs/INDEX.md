@@ -32,6 +32,8 @@ with [Get started](#get-started), then follow a tutorial.
   and [experiment checklist](ABSTRACT_MACHINE_DISCOVERY_27_PROGRESS.md)
 - [Computational feasibility standard for verification and synthesis research](RESEARCH_FEASIBILITY.md)
 - [Experimental machine-code synthesis and LLM proposal loops](MACHINE_CODE_SYNTHESIS_27.md)
+- 2.7.1 designs: [purity check on generated applications](PURITY_GENERATED_APPLICATIONS_27.md)
+  and [application backup and verified restore](APPLICATION_BACKUP_RESTORE_27.md)
 - [Generated durable application milestone](GENERATED_APPLICATION_MILESTONE.md)
 - [Packaged application qualification](PACKAGED_APPLICATION_QUALIFICATION.md)
 - [Symbolic per-case checks](SYMBOLIC_CHECKS.md)
