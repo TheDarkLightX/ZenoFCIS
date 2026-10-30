@@ -8,7 +8,9 @@ core-instance.json. All three use the digest of tools/instantiate_core.py.
 
 Only these pins may move. Everything else is the declared closure and must
 equal the base revision:
-- a certificate may differ only in cli_sha256 and runtime_source_sha256, and
+- a certificate may differ only in cli_sha256 and runtime_source_sha256, and in
+  the source digest of a bound file whose bytes changed from the base
+  certificate's record and now hash as the new certificate records, and
   a stale reference must name the base certificate;
 - core-instance.json may differ only in the certificate SHA-256;
 - project.zeno may differ only in that SHA-256, which it holds exactly once;
@@ -45,8 +47,29 @@ def certificate_fields(root: Path, base: str, name: str, old_pin: str | None) ->
         raise pins.Refusal(f"{name}: the stale reference does not name the certificate at {base}")
     old, new = json.loads(declared), json.loads(current)
     changed = sorted(k for k in set(old) | set(new) if old.get(k) != new.get(k))
+    if "sources" in changed and source_moves(root, base, name, old.get("sources"), new.get("sources")):
+        changed.remove("sources")
     if not set(changed) <= CERTIFICATE_FIELDS:
         raise pins.Refusal(f"{name}: change outside the declared closure (fields {changed})")
+
+
+def source_moves(root: Path, base: str, name: str, old, new) -> bool:
+    """Whether every moved `sources` digest belongs to a file whose bytes no longer match the base certificate and
+    which now hashes exactly as the new certificate records.
+
+    A family input edited for this refresh (for example a fix to the family tools) moves its own digest; the set of
+    bound files and every other digest must stay as declared at base.
+    """
+    if not isinstance(old, dict) or not isinstance(new, dict) or set(old) != set(new):
+        raise pins.Refusal(f"{name}: the certificate's bound source set changed")
+    for path in sorted(k for k in old if old[k] != new[k]):
+        try:
+            current = core.digest(pins.read(root, path))
+        except (OSError, ValueError):
+            raise pins.Refusal(f"{name}: source digest moved for an unreadable file: {path}") from None
+        if current == old[path] or current != new[path]:
+            raise pins.Refusal(f"{name}: source digest moved for an unchanged or mismatched file: {path}")
+    return True
 
 
 def without_reference_pin(instance: dict) -> dict:

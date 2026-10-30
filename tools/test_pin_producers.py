@@ -295,6 +295,32 @@ class CoreAppReferences(ProducerContract, unittest.TestCase):
         fixture.edit_json(directory + "/core-instance.json", lambda i: i.update(owner_adoption=True))
         self.refused(fixture, "a field other than the certificate SHA-256")
 
+    def test_a_source_digest_moves_only_with_its_file(self):
+        bound = sorted(json.loads((ROOT / self.planted_name).read_bytes())["sources"])[0]
+        # Accepted: the bound file's bytes changed, and the certificate records the new digest.
+        fixture = self.fixture()
+        target = fixture.path(bound)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / bound).read_bytes() + b"edited for this refresh\n")
+        fresh = sha(target.read_bytes())
+        fixture.edit_json(self.planted_name, lambda c: (c.update(cli_sha256="1" * 64), c["sources"].update({bound: fresh})),
+                          certificate_layout)
+        code, output = self.check(fixture)
+        self.assertEqual(code, 1, output)  # stale pins listed, nothing refused
+        self.assertNotIn("refused", output)
+        self.assertIn(self.planted_name, output)
+        # Refused: the digest moves although the file still matches the base certificate's record.
+        fixture = self.fixture()
+        target = fixture.path(bound)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / bound).read_bytes())
+        fixture.edit_json(self.planted_name, lambda c: c["sources"].update({bound: "0" * 64}), certificate_layout)
+        self.refused(fixture, "source digest moved for an unchanged or mismatched file")
+        # Refused: a bound file that is absent cannot justify a moved digest.
+        fixture = self.fixture()
+        fixture.edit_json(self.planted_name, lambda c: c["sources"].update({bound: "0" * 64}), certificate_layout)
+        self.refused(fixture, "source digest moved for an unreadable file")
+
 
 if __name__ == "__main__":
     unittest.main()
