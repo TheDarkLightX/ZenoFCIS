@@ -721,7 +721,7 @@ class LoopMcpTools(unittest.TestCase):
         self.assertEqual(names[12:17], ["zal_capture_read", "zal_capture_packet", "zal_capture_submit",
                                         "zal_capture_translate", "zal_capture_legend"])
         self.assertTrue(all(name.startswith(("zal_why_not", "zal_what_if", "zal_narrate", "zal_guide",
-                                            "zal_ladder_", "zal_ontology_"))
+                                            "zal_ladder_", "zal_ontology_", "zal_arithmetic_"))
                             for name in names[17:]), names[17:])
         for tool in mcp.TOOLS:
             self.assertFalse(any(word in tool["name"] for word in ("answer", "say", "accept")), tool["name"])
