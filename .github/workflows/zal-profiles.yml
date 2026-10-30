@@ -39,5 +39,9 @@ jobs:
         # The real Haskell replay and its vendor suites need separately pinned
         # build/runtime inputs; they are not selected or claimed by this job.
         run: python3 -B -m unittest discover -s integrations/zal/relational_profile -t . -p test_profile.py -v
+      - name: Relational profile qualification-driver controls
+        # Planted controls for qualify.py's own gates; the driver itself needs
+        # the pinned GHC and is run by hand (integrations/zal/relational_profile/README.md).
+        run: python3 -B integrations/zal/relational_profile/test_qualify.py
       - name: Research feasibility record controls
         run: python3 -B tools/test_research_feasibility.py
