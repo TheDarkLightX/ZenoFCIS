@@ -394,6 +394,39 @@ The method is component-based synthesis by counterexample-guided refinement
 used here as unrealizability evidence for a finite palette, as complete
 super-optimizers do ([Lu and Bodík, OOPSLA 2025](https://lsrcz.github.io/files/OOPSLA25.pdf)).
 
+#### Rule-constrained queries
+
+`--rules` restricts every query to the candidates the exact search rules keep.
+The duplicate, order and dead rules of `footprint.Pruner` depend only on which
+forms fill the slots, so they are stated as constraints over the selectors,
+generated from the same tables the enumerator judges with (`realize_rules.py`).
+The lost-input rule is not encoded.
+
+```sh
+python3 -B -m tools.machine_code.run realize --problem test-data/machine-code/umin-x86.json \
+  --below 11 --rules --out "$machine_work/realize-rules.json"
+```
+
+An unsat length then says that no *kept* program of that length exists, and its
+statement says so. Because every skipped admitted candidate has a kept
+equivalent candidate of no greater length and cost, and the lengths are asked
+from 0 upward, a record whose every asked length is unsat still establishes
+that no admitted program below the bound exists. The record carries
+`"rules": "exact-footprint/2"`, and replay rebuilds the constrained queries;
+a record relabelled into or out of the mode fails to replay. The solver's
+candidates are rechecked against `Pruner.judge` before the checker sees them;
+a disagreement refuses the run.
+
+The tests compare the constrained query, with no examples and no bound, against
+`Pruner.judge` on every selector sequence of four palettes up to length 3, run
+the exhaustive cross-check above with the rules on, and plant four generator
+defects (a symmetric order table, unobserved results, an extra dominated form,
+footprints without reads), each caught. Two source edits are registered with
+the checker controls. Measured on the padded 32-form Hacker's Delight x86
+problems at length 4 (300 s per query, shared machine), the constrained query
+decided six lengths the unchanged query left undecided and matched it on the
+rest; it is off by default because the gain is not uniform.
+
 #### Partitioned subspaces
 
 `--groups G` splits the palette into G contiguous groups of forms. Each slot

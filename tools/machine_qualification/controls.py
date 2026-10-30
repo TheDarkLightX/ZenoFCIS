@@ -46,7 +46,7 @@ TIMEOUT = 900
 TEST_MODULES = ("test_machine_code_verifier.py", "test_machine_code_profile2_verifier.py",
                 "test_machine_code_library.py", "test_machine_code_conformance.py",
                 "test_machine_code_profile2_conformance.py", "test_machine_code_profile3_verifier.py",
-                "test_machine_code_realize.py")
+                "test_machine_code_realize.py", "test_machine_code_realize_rules.py")
 # A failure that mentions any of these is a refusal of the specimen's identity, not of the defect. The session
 # refuses a changed checker with "session problem/checker/solver binding drifted".
 IDENTITY_MARKERS = ("identity", "stale", "hash refus", "binding drifted")
@@ -57,6 +57,7 @@ V3 = "test_machine_code_profile3_verifier.Profile3VerifierTests."
 REALIZE = "test_machine_code_realize.RealizeCrossCheck."
 REALIZE_REPLAY = "test_machine_code_realize.RealizeReplay."
 REALIZE_BUDGET = "test_machine_code_realize.RealizeBudget."
+RULES = "test_machine_code_realize_rules.RulesEqualTheJudge."
 CONFORMANCE1 = "test_machine_code_conformance.X86ModelConformance."
 CONFORMANCE2 = "test_machine_code_profile2_conformance."
 POSITIVE = (
@@ -387,6 +388,18 @@ DEFECTS = (
            "                    pass\n",
            REALIZE + "test_admission_encoding_equals_the_checkers_admission",
            "The query admits a read of a flag an earlier form left undefined, which the checker refuses."),
+    Defect("realize-rules-order-symmetric", "realize_rules.py", "rule constraints",
+           "                if pruner.order[a][b]:\n",
+           "                if pruner.order[a][b] or pruner.order[b][a]:\n",
+           RULES + "test_constraints_keep_exactly_the_judged_candidates",
+           "Both orders of an independent pair are excluded, so a length whose programs need that pair is "
+           "reported unsat under the rules.",
+           "test_machine_code_realize_rules.RulesCrossCheck.test_every_small_problem_agrees_with_exhaustive_enumeration"),
+    Defect("realize-rules-dead-ignores-results", "realize_rules.py", "rule constraints",
+           "            if L in pruner.observed:\n",
+           "            if False:\n",
+           RULES + "test_constraints_keep_exactly_the_judged_candidates",
+           "A write that is only observed at the end counts as dead, so every program is excluded."),
     Defect("realize-replay-skips-length-coverage", "realize.py", "record replay",
            '    if _derived_status(statuses) != "realizable" and len(entries) != len(asked):',
            "    if False:",

@@ -158,6 +158,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "-O", "-B", "tools/test_machine_code_slice.py"),
          ("python3", "-B", "tools/test_machine_code_realize.py"),
          ("python3", "-O", "-B", "tools/test_machine_code_realize.py"),
+         ("python3", "-B", "tools/test_machine_code_realize_rules.py"),
+         ("python3", "-O", "-B", "tools/test_machine_code_realize_rules.py"),
          ("python3", "-B", "tools/test_machine_qualification_abi.py"),
          ("python3", "-O", "-B", "tools/test_machine_qualification_abi.py"),
          ("python3", "-B", "tools/test_machine_qualification_search_bench.py"),

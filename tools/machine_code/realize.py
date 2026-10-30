@@ -28,6 +28,9 @@ from .model import canonical, digest, integer
 from .targets import encode_instruction, encode_program
 
 SCHEMA = "zeno-fcis/machine-realize/1"
+RULES_STATEMENT = ("no program of length {length} with {objective} cost below {bound} that the exact-footprint/2 "
+                   "duplicate, order and dead rules keep exists under the stated model and palette; with every "
+                   "shorter length also unsat, no admitted program of length at most {length} exists")
 STATEMENT = ("no admitted program of length {length} with {objective} cost below {bound} exists "
              "under the stated model and palette")
 MAX_ROUNDS = 64
@@ -226,11 +229,13 @@ def _example(value):
     return tuple(int(v) for v in value["arguments"]), initial, flags
 
 
-def query(z, problem, length, bound, examples, ranges=None):
+def query(z, problem, length, bound, examples, ranges=None, rules=False):
     """(solver, selectors, profile) for one length; deterministic in its inputs, so its SMT-LIB text replays.
 
     `ranges`, one (low, high) per slot, restricts each slot to forms low..high-1 of the palette: the query of one
-    subspace of a partition. Without it every slot ranges over the whole palette."""
+    subspace of a partition. Without it every slot ranges over the whole palette. With `rules`, the exact
+    duplicate, order and dead rules of the enumerator are added as constraints over the selectors
+    (`realize_rules`); the slot ranges stay as they are."""
     context = z.Context()
     profile = _profile(z, context, problem)
     grammar = problem["grammar"]
@@ -280,6 +285,12 @@ def query(z, problem, length, bound, examples, ranges=None):
             intact = {base: _select(z, selector, [z.BoolVal(False, ctx=context) if profile.base_effect(i)[1] == base
                                                   else intact[base] for i in forms], forms)
                       for base in profile.bases}
+    if rules:
+        from . import realize_rules
+        found = realize_rules.tables(problem)
+        if found is None:
+            raise ValueError("rules need a derivable footprint for every palette form")
+        realize_rules.constrain(z, solver, selectors, slots, *found)
     for example in examples:
         registers, flags, memory = profile.start(z, context, example)
         for selector, forms in zip(selectors, slots):
@@ -321,7 +332,7 @@ def _groups(palette, count):
     return [(bounds[g], bounds[g + 1]) for g in range(count)]
 
 
-def _cegis(problem, length, bound, examples, ranges, timeout_ms, max_rounds, deadline, probe_ms=None):
+def _cegis(problem, length, bound, examples, ranges, timeout_ms, max_rounds, deadline, probe_ms=None, rules=False):
     """Decide one length, or one subspace of it, before the wall-clock `deadline` (a time.time() value).
 
     With `probe_ms`, a query that does not answer within it returns status `split`, carrying the examples found so
@@ -337,7 +348,7 @@ def _cegis(problem, length, bound, examples, ranges, timeout_ms, max_rounds, dea
             entry.update(status="inconclusive", reason="budget-exhausted")
             return entry
         entry["rounds"] += 1
-        solver, selectors, _ = query(z, problem, length, bound, examples, ranges)
+        solver, selectors, _ = query(z, problem, length, bound, examples, ranges, rules)
         # Building the query takes time: the solver gets only what is left of the deadline now.
         remaining = int((deadline - time.time()) * 1000)
         if remaining <= 0:
@@ -360,6 +371,10 @@ def _cegis(problem, length, bound, examples, ranges, timeout_ms, max_rounds, dea
         code = encode_program(problem["target"], [problem["grammar"][i] for i in choice])
         if not all(_agrees(problem, code, e) for e in examples):
             raise ValueError("encoding disagrees with the checker's concrete model on an example state")
+        if rules:
+            from . import realize_rules
+            if not realize_rules.kept(realize_rules.tables(problem)[0], choice):
+                raise ValueError("rule constraints admitted a candidate the enumerator prunes")
         remaining = int((deadline - time.time()) * 1000)
         if remaining <= 0:
             entry.update(status="inconclusive", reason="budget-exhausted")
@@ -379,8 +394,8 @@ def _cegis(problem, length, bound, examples, ranges, timeout_ms, max_rounds, dea
 
 def _decide(job):
     """Worker entry point: one subspace in this process, with its own Z3 context."""
-    problem, length, bound, ranges, examples, timeout_ms, probe_ms, max_rounds, deadline = job
-    entry = _cegis(problem, length, bound, examples, ranges, timeout_ms, max_rounds, deadline, probe_ms)
+    problem, length, bound, ranges, examples, timeout_ms, probe_ms, max_rounds, deadline, rules = job
+    entry = _cegis(problem, length, bound, examples, ranges, timeout_ms, max_rounds, deadline, probe_ms, rules)
     entry["ranges"] = [list(r) for r in ranges]
     return entry
 
@@ -394,7 +409,7 @@ def _halve(ranges):
 
 
 def _partitioned(problem, length, bound, examples, initial, timeout_ms, split_ms, max_rounds, deadline, pool,
-                 workers=1):
+                 workers=1, rules=False):
     """Decide every subspace of one length. `initial` partitions the space and is consumed lazily; with `split_ms`, a
     subspace whose query does not answer in time is halved and its two children are decided next. Unsat needs every
     final subspace unsat; any checked solution makes the length realizable; anything undecided, or left unvisited
@@ -402,7 +417,8 @@ def _partitioned(problem, length, bound, examples, initial, timeout_ms, split_ms
     after the deadline."""
     def job(ranges, known):
         probe = split_ms if split_ms is not None and any(high - low > 1 for low, high in ranges) else None
-        return (problem, length, bound, [tuple(r) for r in ranges], known, timeout_ms, probe, max_rounds, deadline)
+        return (problem, length, bound, [tuple(r) for r in ranges], known, timeout_ms, probe, max_rounds, deadline,
+                rules)
 
     leaves, undecided, found, splits, rounds = [], [], [], 0, 0
 
@@ -475,17 +491,26 @@ def _partitioned(problem, length, bound, examples, initial, timeout_ms, split_ms
 
 
 def realize(problem, bound=None, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadline_ms=60_000, seeds=None,
-            groups=1, workers=1, split_ms=None):
+            groups=1, workers=1, split_ms=None, rules=False):
     """One record: for every length whose cost can be below `bound` (None = no bound), unrealizable, realizable or
     inconclusive. A realizable length carries checked bytes; the first one found stops the run.
 
     With `groups` > 1 each slot's palette is split into that many contiguous groups, and every combination of groups
     over the slots is one subspace, decided by its own query; `workers` > 1 decides them in that many processes.
     With `split_ms`, a subspace whose query does not answer within it is halved, as many times as needed (adaptive,
-    hierarchical decomposition). All work shares one deadline."""
+    hierarchical decomposition). All work shares one deadline.
+
+    With `rules`, every query is restricted to the candidates the enumerator's exact duplicate, order and dead rules
+    keep (`realize_rules`). An unsat length then states that no kept program of that length exists; because the
+    lengths are asked from 0 upward, a record whose every asked length is unsat still says that no admitted program
+    below the bound exists."""
     import z3 as z
     from .session import _seeds, _validated
     problem = _validated(problem)
+    if rules:
+        from . import realize_rules
+        if realize_rules.tables(problem) is None:
+            raise ValueError("rules need a derivable footprint for every palette form")
     if problem["schema"] not in (profile2.SCHEMA, profile3.SCHEMA, "zeno-fcis/machine-problem/1"):
         raise ValueError("realize supports profiles 1, 2 and 3 only")
     if bound is not None:
@@ -517,13 +542,13 @@ def realize(problem, bound=None, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadlin
                 initial = ([palette_groups[g] for g in combo]
                            for combo in product(range(len(palette_groups)), repeat=length))
                 entry = _partitioned(problem, length, bound, examples, initial, timeout_ms, split_ms, max_rounds,
-                                     deadline, pool, workers)
+                                     deadline, pool, workers, rules)
             else:
                 entry = {"length": length, **_cegis(problem, length, bound, examples, None, timeout_ms, max_rounds,
-                                                    deadline)}
+                                                    deadline, rules=rules)}
             if entry["status"] == "unrealizable":
-                entry["statement"] = STATEMENT.format(length=length, objective=problem["objective"],
-                                                      bound="infinity" if bound is None else bound)
+                entry["statement"] = (RULES_STATEMENT if rules else STATEMENT).format(
+                    length=length, objective=problem["objective"], bound="infinity" if bound is None else bound)
             lengths.append(entry)
             if entry["status"] == "realizable":
                 status = "realizable"
@@ -540,7 +565,14 @@ def realize(problem, bound=None, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadlin
     if partitioned:
         record["partition"] = {"groups_per_slot": len(palette_groups), "palette_groups": [list(g) for g in palette_groups],
                                "workers": workers, "split_ms": split_ms}
+    if rules:
+        record["rules"] = footprint_scheme()
     return record
+
+
+def footprint_scheme():
+    from .footprint import SCHEME
+    return SCHEME
 
 
 def _covers(entry, palette):
@@ -602,6 +634,9 @@ def replay(problem, record, timeout_ms=10_000):
     if record.get("status") != _derived_status(statuses):
         failures.append("record status does not follow from its entries")
     partitioned = "partition" in record
+    rules = "rules" in record
+    if rules and record["rules"] != footprint_scheme():
+        failures.append("rules scheme differs from this source's")
     for entry in entries:
         length = entry.get("length")
         if type(length) is not int or length not in asked:
@@ -617,8 +652,8 @@ def replay(problem, record, timeout_ms=10_000):
             continue
         if entry.get("status") != "unrealizable":
             continue
-        if entry.get("statement") != STATEMENT.format(length=length, objective=problem["objective"],
-                                                      bound="infinity" if bound is None else bound):
+        if entry.get("statement") != (RULES_STATEMENT if rules else STATEMENT).format(
+                length=length, objective=problem["objective"], bound="infinity" if bound is None else bound):
             failures.append(f"length {length}: statement does not match the bound")
         if partitioned != ("subspaces" in entry) or ("subspaces" in entry) == ("query_sha256" in entry):
             failures.append(f"length {length}: entry shape does not match the record's mode")
@@ -638,7 +673,7 @@ def replay(problem, record, timeout_ms=10_000):
             failures.append(f"length {length}: subspaces do not cover the palette space exactly once")
         for ranges, examples, recorded in parts:
             solver, _, _ = query(z, problem, length, bound, [_example(e) for e in examples],
-                                 None if ranges is None else [tuple(r) for r in ranges])
+                                 None if ranges is None else [tuple(r) for r in ranges], rules)
             same = _query_hash(solver) == recorded
             solver.set(timeout=timeout_ms)
             answer = solver.check()
@@ -650,7 +685,7 @@ def replay(problem, record, timeout_ms=10_000):
 
 
 def realize_session(directory, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadline_ms=60_000, groups=1, workers=1,
-                    split_ms=None):
+                    split_ms=None, rules=False):
     """Ask below the session's best checked candidate, after rechecking it now."""
     from .session import _best, _checker, _load, _locked, _rank
     with _locked(directory):
@@ -664,6 +699,6 @@ def realize_session(directory, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadline_
         return {"status": "inconclusive", "reason": "session incumbent did not recheck", "authority": "none"}
     bound = _rank(problem, fresh, code)[0]
     record = realize(problem, bound, timeout_ms, max_rounds, deadline_ms, groups=groups, workers=workers,
-                     split_ms=split_ms)
+                     split_ms=split_ms, rules=rules)
     record["incumbent"] = {"code_hex": code.hex(), "cost": fresh["cost"], "recheck": "equivalent"}
     return record
