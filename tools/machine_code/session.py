@@ -17,7 +17,7 @@ import re
 import sys
 import time
 
-from . import profile2
+from . import profile2, profile3
 from .model import MASK, canonical, digest, evaluate, integer, read_json, validate_problem
 from .targets import assembly_source, elf_object, encode_instruction, encode_program
 
@@ -50,6 +50,8 @@ def _validated(problem) -> dict:
     """A profile-2 problem names its schema; every other problem keeps the profile-1 validator."""
     if isinstance(problem, dict) and problem.get("schema") == profile2.SCHEMA:
         return profile2.validate_problem(problem)
+    if isinstance(problem, dict) and problem.get("schema") == profile3.SCHEMA:
+        return profile3.validate_problem(problem)
     return validate_problem(problem)
 
 
@@ -58,6 +60,9 @@ def _checker(problem: dict):
     if problem["schema"] == profile2.SCHEMA:
         from . import verify2
         return verify2
+    if problem["schema"] == profile3.SCHEMA:
+        from . import verify3
+        return verify3
     from . import verify
     return verify
 
@@ -319,8 +324,25 @@ def packet(directory: Path) -> dict:
             "instruction": "Propose data only. Use declared grammar and returned counterexamples. Each counterexample carries an advisory diagnosis: the register trace and the first specification subterm your code never computes. The checker decides."}
 
 
+def _memory_seeds(problem):
+    """Profile-3 filter states as (inputs, bases, initial scratch, initial flags, initial regions)."""
+    inputs, bases = problem["inputs"], [region["name"] for region in problem["regions"]]
+    pattern = lambda k: (0x9E3779B97F4A7C15 * (k + 1)) & MASK
+    words = lambda fill: {r["name"]: tuple(fill(sum(x["words"] for x in problem["regions"][:j]) + i)
+                                           for i in range(r["words"])) for j, r in enumerate(problem["regions"])}
+    pointers = tuple(0x10000 * (j + 1) for j in range(len(bases)))
+    rows = [(lambda k: 0, lambda k: 0), (lambda k: 1, lambda k: k + 1), (lambda k: MASK, lambda k: MASK),
+            (lambda k: (1 << 63) - k, lambda k: 1 << (63 - k)), (pattern, lambda k: pattern(k + 7))]
+    seeds = [(tuple(value(i) for i in range(len(inputs))), pointers, {}, {}, words(fill)) for value, fill in rows]
+    from .verify3 import FLAGS, _layout
+    scratch = dict.fromkeys(_layout(problem)[2], MASK)
+    return seeds + [(seeds[1][0], pointers, scratch, dict.fromkeys(FLAGS, 1), words(lambda k: k + 1))]
+
+
 def _seeds(problem):
     """Fixed concrete filter states as (arguments, initial scratch, initial flags)."""
+    if problem["schema"] == profile3.SCHEMA:
+        return _memory_seeds(problem)
     if problem["schema"] != profile2.SCHEMA:
         return [((x, y), {}, None) for x, y in
                 ((0, 0), (1, 0), (0, 1), (MASK, 1), (MASK, MASK), (1 << 63, (1 << 63) - 1))]
@@ -337,6 +359,18 @@ def _seeds(problem):
 
 def _agrees(problem, code, witness):
     """Whether one concrete state gives the specified results; a statically refused candidate never agrees."""
+    if problem["schema"] == profile3.SCHEMA:
+        from .verify3 import run_concrete
+        inputs, bases, initial, flags, memory = witness
+        values = dict(zip(problem["inputs"], inputs))
+        regions = [region["name"] for region in problem["regions"]]
+        try:
+            actual, final = run_concrete(problem, code, values, dict(zip(regions, bases)),
+                                         {name: list(words) for name, words in memory.items()}, initial, flags)
+        except ValueError:
+            return False
+        results, expected = profile3.expected(problem, values, memory)
+        return actual == results and all(final[name] == words for name, words in expected.items())
     arguments, initial, flags = witness
     if problem["schema"] != profile2.SCHEMA:
         from .verify import run_concrete
@@ -353,6 +387,12 @@ def _agrees(problem, code, witness):
 
 def _witness(problem, verification):
     inputs = verification["inputs"]
+    if problem["schema"] == profile3.SCHEMA:
+        return (tuple(int(inputs[name]) for name in problem["inputs"]),
+                tuple(int(verification["bases"][region["name"]]) for region in problem["regions"]),
+                {key: int(value) for key, value in verification["initial_registers"].items()},
+                verification["initial_flags"],
+                {name: tuple(int(v) for v in words) for name, words in verification["initial_regions"].items()})
     names = problem["inputs"] if problem["schema"] == profile2.SCHEMA else ("x", "y")
     return (tuple(int(inputs[name]) for name in names),
             {key: int(value) for key, value in verification["initial_registers"].items()},

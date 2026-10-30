@@ -9,6 +9,7 @@ import struct
 
 from .model import TARGETS, integer, word
 from .profile2 import TARGETS as TARGETS2
+from .profile3 import TARGETS as TARGETS3
 
 X86 = {"rax": 0, "rcx": 1, "rdx": 2, "rsi": 6, "rdi": 7,
        "r8": 8, "r9": 9, "r10": 10, "r11": 11}
@@ -19,7 +20,21 @@ CONDITIONS = {"o": 0, "no": 1, "b": 2, "ae": 3, "e": 4, "ne": 5, "be": 6, "a": 7
 
 
 def is_x86(target: str) -> bool:
-    return target in (TARGETS[0], TARGETS2[0])
+    return target in (TARGETS[0], TARGETS2[0], TARGETS3[0])
+
+
+def _encode_x86_memory(insn: list) -> bytes:
+    """REX.W MOV with a [base], or [base + disp8] for a nonzero disp8, memory operand."""
+    op, *args = insn
+    if op not in ("load", "store") or len(args) != 3:
+        return _encode_x86_profile2(insn)
+    data, base, displacement = (args[0], args[1], args[2]) if op == "load" else (args[2], args[0], args[1])
+    data, base = X86[data], X86[base]
+    displacement = integer(displacement, -128, 127, "displacement")
+    rex = 0x48 | ((data >> 3) << 2) | (base >> 3)
+    mod = 0 if displacement == 0 else 1
+    encoded = bytes([rex, 0x8B if op == "load" else 0x89, (mod << 6) | ((data & 7) << 3) | (base & 7)])
+    return encoded + (displacement.to_bytes(1, "little", signed=True) if mod else b"")
 
 
 def _encode_x86_profile2(insn: list) -> bytes:
@@ -69,6 +84,13 @@ def _encode_rv_profile2(insn: list) -> bytes:
 
 
 def encode_instruction(target: str, insn: list) -> bytes:
+    if target in TARGETS3 and isinstance(insn, list) and insn:
+        if insn == ["nop"]:
+            return encode_instruction(TARGETS[0], insn)
+        try:
+            return _encode_x86_memory(insn)
+        except (KeyError, TypeError) as error:
+            raise ValueError("instruction uses an unregistered register or operand") from error
     if target in TARGETS2 and isinstance(insn, list) and insn:
         if insn == ["nop"]:
             return encode_instruction(TARGETS[TARGETS2.index(target)], insn)
@@ -145,7 +167,7 @@ def assembly_source(code: bytes) -> bytes:
 
 def elf_object(target: str, code: bytes) -> bytes:
     """ELF64 little-endian relocatable function; no relocations or dependencies."""
-    if target not in TARGETS + TARGETS2 or not isinstance(code, bytes) or not 1 <= len(code) <= 256:
+    if target not in TARGETS + TARGETS2 + TARGETS3 or not isinstance(code, bytes) or not 1 <= len(code) <= 256:
         raise ValueError("unsupported ELF target/code")
     names = b"\0.text\0.symtab\0.strtab\0.shstrtab\0.note.GNU-stack\0"
     strings = b"\0zeno_kernel\0"
