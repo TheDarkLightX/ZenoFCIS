@@ -94,6 +94,16 @@ DEFECTS = (
            'if solver.check() == z.sat:',
            'if repr(["input", name]) in repr(outputs):',
            "An input is required when the specification mentions it, as in (x ^ x) ^ y, not when it depends on it."),
+    Defect("duplicate-tie-reversed",
+           'and (len(encoded[a]), encoded[a]) < (len(encoded[b]), encoded[b])',
+           'and (len(encoded[a]), encoded[a]) > (len(encoded[b]), encoded[b])',
+           "The larger of two equal-effect entries dominates, so the byte-larger code is kept; at equal length only "
+           "the search's final hex tie-break tells them apart."),
+    Defect("order-tie-reversed",
+           'encoded[b] + encoded[a] < encoded[a] + encoded[b]',
+           'encoded[b] + encoded[a] > encoded[a] + encoded[b]',
+           "Independent neighbours are kept in byte-descending order; the cost is equal, only the hex tie-break "
+           "differs."),
     Defect("copied-input-forgotten",
            'parent.get(source, {source})',
            'parent.get(source, frozenset())',

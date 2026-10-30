@@ -114,6 +114,19 @@ class ExactnessControl(unittest.TestCase):
         dead = exact.check(case, lambda target, forms, results: "dead" if forms == solution else None, True)
         self.assertEqual(dead["failures"][0]["checker"], "equivalent")
 
+    def test_a_twin_must_not_rank_after_the_removed_sequence_on_the_byte_tie_break(self):
+        # SUB and XOR of rax with itself both give 0 in 3 bytes; the search keeps 4829c0 (sub) before 4831c0 (xor).
+        forms = (("sub", "rax", "rax"), ("xor", "rax", "rax"))
+        case = exact.Grammar("byte-tie", X2, forms, 1, 1, spec=(["const", "0"],))
+        for removed, failures in ((forms[0], 1), (forms[1], 0)):
+            pruner = lambda target, sequence, results, removed=removed: "duplicate" if removed in sequence else None
+            for against_spec in (False, True):
+                with self.subTest(removed=removed, against_spec=against_spec):
+                    report = exact.check(case, pruner, against_spec)
+                    self.assertEqual(len(report["failures"]), failures, report["failures"])
+                    if failures:  # the removed sequence is equivalent, so no checker verdict excuses it
+                        self.assertEqual(report["failures"][0]["removed"], [list(forms[0])])
+
     def test_a_removed_sequence_the_checker_refuses_needs_no_witness(self):
         case = exact.Grammar("refused", X2, (("mov", "rax", "rdi"), ("imul", "rax", "rsi"), ("sete", "rax")), 2)
         report = exact.check(case, lambda target, forms, results: "all" if forms else None)

@@ -3,9 +3,11 @@
 For a small grammar, length and specification on one target, every instruction sequence is enumerated with pruning
 off and on. The cases cover profiles 1 and 2 on both targets and every registered profile-3 memory kernel over its
 own grammar. A twin of a removed sequence is a kept, admitted sequence of no greater cost, in bytes and in
-instructions, whose observed results are identical on every entry state: every register, every x86 entry flag on
-profiles 2 and 3, and every profile-3 region word is a free symbol, and Z3 must prove that no state makes the
-observed result registers (and, on profile 3, the read-write region words) differ. Each case runs two passes:
+instructions, and of no greater search rank (the problem's objective cost, the other cost, then the code's hex, the
+search's final tie-break), whose observed results are identical on every entry state: every register, every x86
+entry flag on profiles 2 and 3, and every profile-3 region word is a free symbol, and Z3 must prove that no state
+makes the observed result registers (and, on profile 3, the read-write region words) differ. So an exhausted search
+reports the same least-ranked kernel with or without the pruning. Each case runs two passes:
 
 - twins: the lost-input rule is off (no required inputs). Every sequence removed as dead, out of order or a
   duplicate needs a twin. This pass does not depend on the specification.
@@ -307,6 +309,15 @@ def check(case: Grammar, pruned: Pruner, against_spec: bool = False, memo: dict 
             cache[forms] = checker.check(problem, code(case.target, forms), timeout_ms=5000)["status"]
         return cache[forms]
 
+    def rank(forms):
+        """The search's rank: objective cost, the other cost, then the code's hex (its final tie-break)."""
+        cache = memo.setdefault("ranks", {})
+        if forms not in cache:
+            size = {"bytes": cost(case.target, forms)[0], "instructions": len(forms)}
+            other = "instructions" if problem["objective"] == "bytes" else "bytes"
+            cache[forms] = (size[problem["objective"]], size[other], code(case.target, forms).hex())
+        return cache[forms]
+
     def equal(forms, candidate):
         cache = memo.setdefault("proofs", {})
         if (forms, candidate) not in cache:
@@ -341,14 +352,14 @@ def check(case: Grammar, pruned: Pruner, against_spec: bool = False, memo: dict 
                                            "checker": status})
             continue
         target_print = fingerprint(forms)
-        bound = cost(case.target, forms)
+        bound, place = cost(case.target, forms), rank(forms)
         ordered = [n for n in neighbours(forms) if n in kept_set]
         first = set(ordered)
         ordered += [k for k in kept if k not in first]
         witness = None
         for candidate in ordered:
             size = cost(case.target, candidate)
-            if (size[0] > bound[0] or size[1] > bound[1] or prints[candidate] is None
+            if (size[0] > bound[0] or size[1] > bound[1] or rank(candidate) > place or prints[candidate] is None
                     or prints[candidate] != target_print):
                 continue
             if equal(forms, candidate):

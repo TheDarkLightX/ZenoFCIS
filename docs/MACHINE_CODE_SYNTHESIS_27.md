@@ -795,26 +795,30 @@ python3 -B -m tools.machine_qualification.search_bench compare BEFORE.json AFTER
 - **Exactness:** for twelve small grammars with specifications over profiles 1 and 2 on both targets, and for the
   six profile-3 memory kernels over their own grammars, every sequence is enumerated with the footprint pruning off
   and on. A twin of a removed sequence is a kept, admitted sequence of no greater cost, in bytes and in
-  instructions, whose observed results Z3 proves equal from every entry register, flag and region word: the result
-  registers and, on profile 3, every read-write region word. With the lost-input rule turned off, every sequence
+  instructions, and of no greater search rank (objective cost, other cost, then the code's hex), whose observed
+  results Z3 proves equal from every entry register, flag and region word: the result registers and, on profile 3,
+  every read-write region word. With the lost-input rule turned off, every sequence
   removed as dead, out of order or a duplicate needs a twin. With the full pruning, every sequence removed because a
   required input is lost must be refuted by the independent checker against the specification; any other removal
   needs a twin or, when its only twins lose an input, the same refutation. A removed sequence the checker refuses
   statically (an undefined flag read, or a memory access through a redefined base) needs neither. Any other removal
   is an exactness failure.
-- **Planted defects:** eleven named edits to `footprint.py` run in isolated copies under `-B` and `-O -B`: omitted
-  x86 flag writes, a conditional move treated as a full overwrite, ignored write-write and write-after-read
+- **Planted defects:** thirteen named edits to `footprint.py` run in isolated copies under `-B` and `-O -B`:
+  omitted x86 flag writes, a conditional move treated as a full overwrite, ignored write-write and write-after-read
   conflicts in reordering, an unobserved result register on each profile, duplicates accepted without the Z3 proof,
-  every argument register taken as required, an input taken as required because the specification mentions it, and
-  an input copied to another register forgotten. Each must leave a failing removal. The syntactic edit is caught
+  every argument register taken as required, an input taken as required because the specification mentions it, an
+  input copied to another register forgotten, and the byte tie-break reversed in the duplicate and in the order rule.
+  Each must leave a failing removal. The two tie-break edits keep equal-cost code that ranks later on the hex
+  tie-break; only the rank condition on twins detects them. The syntactic edit is caught
   only by the two cases that specify (x ^ x) ^ y, where x occurs but is irrelevant. The eleventh, a conditional move
   marked as overwriting its destination while still reading it, is a registered equivalent mutant: the dead rule
   consults reads before overwrites. It counts as an invalid specimen only when it survives with removal decisions
   identical to the unmodified pruning on every case. Crashes and timeouts never count as detections.
 - **Measurement:** the benchmark searches every problem in `test-data/machine-code/`, its kernel library and its
   memory kernels at fixed budgets (100,000 candidates, 128 checks, 60 s, 1 s solver timeout) and records every
-  counter the search returns, wall times, the found cost and the stopping budget. `compare` fails only when a found
-  cost is worse or lost.
+  counter the search returns, wall times, the objective, the found cost and the stopping budget. `compare` ranks
+  each found cost by the problem's objective first, as the search does, and fails when a cost is worse or lost, the
+  objective changed, or two different costs cannot be ranked because no objective was recorded.
 
 At 50ada8ee (scheme `exact-footprint/2`), the pruning was exact on all eighteen cases. With the lost-input rule off,
 8,874 removals each had a proved twin and 1,328 were refused (profile-3 loads through a redefined base). With the
