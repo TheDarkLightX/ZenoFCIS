@@ -70,3 +70,30 @@ jobs:
         run: python3 -B tools/test_machine_code_profile2_native.py
       - name: Every admitted profile-2 x86 form, with CF/ZF/SF/OF, against the models on this CPU
         run: python3 -B tools/test_machine_code_profile2_conformance.py
+
+  rv64i-execution:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Install the hash-pinned experimental checker
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/machine-code-venv"
+          "$RUNNER_TEMP/machine-code-venv/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          printf '%s\n' "$RUNNER_TEMP/machine-code-venv/bin" >> "$GITHUB_PATH"
+      - name: Install the RISC-V user-mode emulator and cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            qemu-user gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu libc6-dev-riscv64-cross
+          dpkg-query --show qemu-user gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu libc6-dev-riscv64-cross
+          qemu-riscv64 --version | head -n 1
+      - name: Every admitted RV64I form against the concrete and SMT models under QEMU
+        env:
+          ZENO_MACHINE_REQUIRE_RV64I: '1'
+        run: python3 -B tools/test_machine_code_rv64i_conformance.py
