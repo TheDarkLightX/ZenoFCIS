@@ -12,6 +12,39 @@ profile below connects controlled human wording to this one modular-word
 problem format. Other ZAL profiles and full application lowering retain their
 own ABI, rejection, effects and metering obligations.
 
+## What a checked kernel guarantees
+
+> Under the stated machine model and environmental assumptions, these exact bytes satisfy these specified
+> properties for every admitted input and initial state.
+
+Every qualification in that sentence matters.
+
+**The compiler is out of the trusted path for the checked bytes, but these remain trusted:**
+
+- the byte decoder;
+- the instruction semantics, checked against the executing CPU on sampled states but not proved;
+- the SMT checker and Z3;
+- loading and linking;
+- the calling convention;
+- the hardware.
+
+**Outside the check:**
+
+- missing or wrong requirements: a modular sum that returns 0 for `MAX + 1` is correct under its contract, and
+  wrong for a contract that must refuse overflow;
+- integration mistakes;
+- timing and side channels;
+- unmodelled processor behaviour.
+
+**Proved separately or not at all:** correctness, code size and measured speed. Optimality would need a defined
+candidate space, a cost model, and evidence that no cheaper admissible candidate exists.
+
+**Counterexamples:** retained counterexamples reject a repeated failure automatically. They do not make a
+proposer learn, and they do not make search terminate.
+
+**Certification:** formal evidence can support assurance objectives, for example under DO-333 alongside
+DO-178C. It does not replace them.
+
 ## Registered profiles
 
 Profile 1 is listed here. [Profile 2](#profile-2-flags-carries-and-comparisons)
@@ -90,7 +123,20 @@ python3 -B -m tools.machine_code.run resume --session "$machine_work/session"
 
 The accepted sum bytes decode as `lea rax,[rdi+rsi]` followed by `ret`.
 A wrong candidate returns actual input/scratch values and expected/actual
-results. Revise from that feedback. Descriptive model provenance is not
+results. Revise from that feedback.
+
+Each counterexample in the packet also carries an advisory `diagnosis`. It is computed with the concrete model, and it
+covers both the solver's counterexample and the first of 64 deterministic pseudo-random inputs on which the
+candidate also fails. Solver counterexamples often use degenerate values such as zero, which make value matching
+ambiguous. The diagnosis holds:
+
+- every admitted register after each body instruction;
+- every specification subterm with its value, and the earliest point and registers at which that value appears;
+- `first_missing_subterm`, the earliest compound subterm the candidate never computes.
+
+For example, for `(xor (mul x 3) (lshr y 1))`, a candidate that shifts left instead of right shows
+`(mul x 3)` in `rax` after instruction 1 and reports `(lshr y 1)` as never computed. The diagnosis has no authority:
+a value can appear by coincidence, and only the independent checker decides. Descriptive model provenance is not
 authenticated origin or approval.
 
 The built-in proposer can also search the declared finite instruction product:
@@ -179,6 +225,24 @@ The objective counts raw kernel bytes or body instructions, excluding the final
 return from the instruction count. ELF overhead, synthesis/checking/setup cost,
 memory, compilation and measured execution cost are separate quantities.
 No global optimality or runtime speedup follows from a smaller candidate.
+
+Measure time with the paired benchmark, never infer it from size:
+
+```sh
+python3 -B -m tools.machine_code.run bench --artifact ARTIFACT --out NEW_DIR [--iterations N] [--repeats R]
+```
+
+- **Replay first:** a kernel is timed only after its artifact replays. A changed artifact is refused before
+  any timing.
+- **Baseline:** generated from the problem's expression as C and compiled with `gcc -O2`.
+- **Harness:** both functions go through the same function-pointer harness, in a latency mode (dependent calls)
+  and a throughput mode (independent inputs). Repeats alternate kernel and baseline, with RDTSC between LFENCEs.
+- **Report:** median ticks per call and the kernel/baseline ratios, with the CPU, load and compiler.
+
+Example: the searched 64-bit sum (`lea rax,[rdi+rsi]; ret`, 5 bytes) against GCC's `endbr64; lea; ret`
+(9 bytes), on an AMD Ryzen Threadripper 1950X under load, measured latency ratio 0.999 and throughput ratio
+0.97. At this size the call dominates, and the 4 saved bytes buy no measurable time. Results hold for that
+machine, load and call ABI only. They are not a portable speedup claim.
 
 Keep the default GCC baseline and the explicitly matching register-kernel
 baseline. Some distributions add ENDBR64 by default; its four bytes are a

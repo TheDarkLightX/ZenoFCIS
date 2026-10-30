@@ -29,6 +29,12 @@ def main(argv=None):
             sub.add_argument("--max-candidates", type=int, default=10_000)
             sub.add_argument("--max-checks", type=int, default=64)
             sub.add_argument("--deadline-ms", type=int, default=5000)
+    bench = commands.add_parser("bench", help="paired timing of a replayed x86 artifact against gcc -O2 for the same expression")
+    bench.add_argument("--artifact", required=True, type=Path)
+    bench.add_argument("--out", required=True, type=Path)
+    bench.add_argument("--iterations", type=int, default=1_000_000)
+    bench.add_argument("--repeats", type=int, default=21)
+    bench.add_argument("--solver-ms", type=int, default=1000)
     replay = commands.add_parser("replay", help="recheck exact emitted machine bytes and bindings")
     replay.add_argument("--artifact", required=True, type=Path)
     replay.add_argument("--solver-ms", type=int, default=1000)
@@ -47,6 +53,9 @@ def main(argv=None):
             result = session.resume(args.session, args.solver_ms)
         elif args.command == "emit":
             result = session.emit(args.session, args.out, args.solver_ms)
+        elif args.command == "bench":
+            from .bench import bench
+            result = bench(args.artifact, args.out, args.iterations, args.repeats, args.solver_ms)
         else:
             result = session.replay_artifact(args.artifact, args.solver_ms)
         result.setdefault("authority", "none")

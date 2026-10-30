@@ -49,6 +49,21 @@ class MachineLoopTests(unittest.TestCase):
         packet = session.packet(self.directory)
         self.assertEqual([row["verification"]["status"] for row in packet["feedback"]],
                          ["counterexample", "equivalent"])
+        diagnosis = packet["feedback"][0]["diagnosis"]
+        self.assertTrue(diagnosis["available"])
+        self.assertEqual(diagnosis["authority"], "none")
+        solver = diagnosis["solver_counterexample"]
+        self.assertEqual([row["instruction"] for row in solver["trace"]], ["mov rax, rdi"])
+        x = wrong["verification"]["inputs"]["x"]
+        self.assertEqual(solver["trace"][0]["registers"]["rax"], x)
+        first = solver["spec_subterms"][0]
+        self.assertEqual((first["expression"], first["value"], first["first_seen"]["after"]), ("x", x, 0))
+        self.assertIn("rdi", first["first_seen"]["registers"])
+        generic = diagnosis["generic_failure"]
+        self.assertNotEqual(generic["inputs"], wrong["verification"]["inputs"])
+        self.assertEqual(diagnosis["first_missing_subterm"]["expression"], "(add x y)")
+        self.assertIsNone(generic["spec_subterms"][-1]["first_seen"])
+        self.assertNotIn("diagnosis", packet["feedback"][1])
         replayed = session.resume(self.directory)
         self.assertEqual(replayed["status"], "replayed")
         self.assertEqual(replayed["verification"]["cost"], {"bytes": 5, "instructions": 1})

@@ -90,6 +90,11 @@ python3 -B -m tools.machine_code.run candidate --session SESSION --proposal PROP
 python3 -B -m tools.machine_code.run packet --session SESSION
 ```
 
+For a counterexample, read the packet's advisory `diagnosis`: the register trace after each instruction, the
+specification subterms that already appear, and `first_missing_subterm`. Repair that step first. Prefer the
+`generic_failure` view to the solver view, because solver counterexamples often use degenerate values such as
+zero. The diagnosis never decides acceptance.
+
 Read the verdict, not merely the exit code: counterexample/refused exits1;
 inconclusive exits2; malformed/binding/I/O refusal exits65. Preserve failed
 proposals and actual witnesses. Correct the candidate using the inputs and
