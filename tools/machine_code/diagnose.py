@@ -9,12 +9,18 @@ For one counterexample (actual inputs and scratch registers), it uses the concre
 
 That tells a proposer where its computation departs from the requirement. A value can appear by coincidence, so an
 appearance is a hint, not evidence of a correct partial computation.
+
+Profile-2 problems get the same report over every declared result, using the profile-2 concrete model. Their trace
+also shows CF, ZF, SF and OF on x86, with null for a flag the model leaves undefined, and each view lists the
+expected and actual value of every result. Subterms are matched against registers only. A comparison usually lives
+in a flag, so a comparison reported as never computed may still be held in a flag the trace shows.
 """
 
 from __future__ import annotations
 
 import random
 
+from . import profile2, verify2
 from .model import evaluate
 from .targets import encode_instruction
 from .verify import X86, decode, run_concrete
@@ -25,24 +31,27 @@ NOTE = ("Advisory and untrusted: computed with the concrete model on this counte
         "It never changes a verdict; a matching value can be a coincidence.")
 
 
+def _children(node) -> list:
+    op = node[0]
+    if op in ("input", "const"):
+        return []
+    if op in ("not", "shl", "lshr", "ashr"):
+        return [node[1]]
+    return list(node[1:])
+
+
 def _text(node) -> str:
     op = node[0]
-    if op == "input":
+    if op in ("input", "const"):
         return node[1]
-    if op == "const":
-        return node[1]
-    if op in ("shl", "lshr"):
+    if op in ("shl", "lshr", "ashr"):
         return f"({op} {_text(node[1])} {node[2]})"
     return "(" + " ".join([op] + [_text(child) for child in node[1:]]) + ")"
 
 
 def _subterms(node, out):
-    op = node[0]
-    if op in ("not", "shl", "lshr"):
-        _subterms(node[1], out)
-    elif op not in ("input", "const"):
-        _subterms(node[1], out)
-        _subterms(node[2], out)
+    for child in _children(node):
+        _subterms(child, out)
     out.append(node)
     return out
 
@@ -75,6 +84,8 @@ def diagnose(problem: dict, code: bytes, verification: dict) -> dict:
     """
     if verification.get("status") != "counterexample":
         return {"available": False, "reason": "only counterexamples are diagnosed"}
+    if problem.get("schema") == profile2.SCHEMA:
+        return _diagnose_profile2(problem, code, verification)
     inputs = {k: int(v) for k, v in verification["inputs"].items()}
     initial = {k: int(v) for k, v in verification["initial_registers"].items()}
     solver = _one(problem, code, inputs, initial)
@@ -105,3 +116,56 @@ def _one(problem: dict, code: bytes, inputs: dict, initial: dict) -> dict:
     return {"inputs": {k: str(v) for k, v in inputs.items()}, "initial_registers": {k: str(v) for k, v in initial.items()},
             "entry": {r: str(v) for r, v in states[0].items()}, "trace": trace,
             "spec_subterms": subterms, "first_missing_subterm": missing}
+
+
+def _diagnose_profile2(problem: dict, code: bytes, verification: dict) -> dict:
+    names, target = problem["inputs"], problem["target"]
+    arguments = [int(verification["inputs"][name]) for name in names]
+    initial = {k: int(v) for k, v in verification["initial_registers"].items()}
+    flags = verification.get("initial_flags")
+    solver = _one_profile2(problem, code, arguments, initial, flags)
+    rng = random.Random(0x5EED)
+    generic_report = None
+    for _ in range(64):
+        values = [rng.getrandbits(64) for _ in names]
+        scratch = {name: rng.getrandbits(64) for name in initial}
+        entry = {name: rng.getrandbits(1) for name in verify2.FLAGS} if target == verify2.X86 else None
+        env = dict(zip(names, values))
+        if (verify2.run_concrete(target, code, values, scratch, entry, len(problem["outputs"]))
+                != [profile2.evaluate(output, env) for output in problem["outputs"]]):
+            generic_report = _one_profile2(problem, code, values, scratch, entry)
+            break
+    preferred = generic_report or solver
+    return {"available": True, "authority": "none", "note": NOTE, "solver_counterexample": solver,
+            "generic_failure": generic_report, "first_missing_subterm": preferred["first_missing_subterm"]}
+
+
+def _one_profile2(problem: dict, code: bytes, arguments: list, initial: dict, flags) -> dict:
+    target, names = problem["target"], problem["inputs"]
+    x86 = target == verify2.X86
+    instructions = verify2.decode(target, code)
+    terminal = code[instructions[-1].offset:]
+    registers, entry_flags = verify2.entry_state(target, arguments, initial, flags)
+    states = [(registers, entry_flags)]
+    for ins in instructions[:-1]:
+        states.append(verify2.execute(target, code[:ins.offset + ins.size] + terminal, registers, entry_flags))
+    shown = lambda state: {"registers": {r: str(state[0][r]) for r in verify2.REGISTERS[target]},
+                           **({"flags": dict(state[1])} if x86 else {})}
+    trace = [{"after": k, "instruction": instructions[k - 1].text(), **shown(states[k])}
+             for k in range(1, len(states))]
+    env = dict(zip(names, arguments))
+    final = states[-1][0]
+    results = [{"register": register, "expected": str(profile2.evaluate(output, env)), "actual": str(final[register])}
+               for register, output in zip(verify2.RESULTS[target], problem["outputs"])]
+    subterms, missing = [], None
+    for index, output in enumerate(problem["outputs"]):
+        for node in _subterms(output, []):
+            value = profile2.evaluate(node, env)
+            seen = next(({"after": k, "registers": [r for r, v in state[0].items() if v == value]}
+                         for k, state in enumerate(states) if value in state[0].values()), None)
+            subterms.append({"output": index, "expression": _text(node), "value": str(value), "first_seen": seen})
+            if seen is None and missing is None and node[0] not in ("input", "const"):
+                missing = {"output": index, "expression": _text(node), "value": str(value)}
+    return {"inputs": {n: str(v) for n, v in env.items()}, "initial_registers": {k: str(v) for k, v in initial.items()},
+            **({"initial_flags": dict(states[0][1])} if x86 else {}), "entry": shown(states[0])["registers"],
+            "trace": trace, "results": results, "spec_subterms": subterms, "first_missing_subterm": missing}

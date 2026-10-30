@@ -392,7 +392,8 @@ def execute(target, code, registers, flags=None):
     return r, f
 
 
-def _state(target, arguments, initial, flags):
+def entry_state(target, arguments, initial=None, flags=None):
+    """Whole entry state from positional arguments; omitted scratch registers and flags are zero."""
     _require(type(arguments) is list and 1 <= len(arguments) <= len(ARGUMENTS[target]), "ArgumentsMustBe1To6Words")
     for value in arguments:
         _require(type(value) is int and 0 <= value <= MASK, "InputMustBeU64")
@@ -415,7 +416,7 @@ def run_concrete(target, code, arguments, initial=None, flags=None, results=1):
     """Concrete sample; omitted scratch registers and flags default to zero ONLY for this sample."""
     _require(type(results) is int and results in (1, 2), "ResultsMustBe1Or2")
     _require(type(target) is str and target in REGISTERS, "UnsupportedTarget")
-    registers, entry_flags = _state(target, arguments, initial, flags)
+    registers, entry_flags = entry_state(target, arguments, initial, flags)
     final, _ = execute(target, code, registers, entry_flags)
     return [final[name] for name in RESULTS[target][:results]]
 

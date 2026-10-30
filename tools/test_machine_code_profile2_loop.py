@@ -8,7 +8,7 @@ import struct
 import tempfile
 import unittest
 
-from machine_code import model, profile2, session, targets
+from machine_code import model, profile2, session, targets, verify2
 from machine_code.run import main
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,6 +53,18 @@ class Profile2LoopTests(unittest.TestCase):
         packet = session.packet(self.directory)
         self.assertEqual(packet["problem"]["schema"], profile2.SCHEMA)
         self.assertEqual([row["verification"]["status"] for row in packet["feedback"]], ["counterexample", "equivalent"])
+        diagnosis = packet["feedback"][0]["diagnosis"]
+        self.assertEqual((diagnosis["available"], diagnosis["authority"]), (True, "none"))
+        self.assertEqual(diagnosis["first_missing_subterm"],
+                         {"output": 1, "expression": "(ult (add a_lo b_lo) a_lo)", "value": "1"})
+        generic = diagnosis["generic_failure"]
+        self.assertEqual([row["register"] for row in generic["results"]], ["rax", "rdx"])
+        self.assertEqual(generic["results"][0]["expected"], generic["results"][0]["actual"])
+        self.assertEqual(int(generic["results"][1]["expected"]) - int(generic["results"][1]["actual"]), 1)
+        self.assertEqual([row["instruction"] for row in generic["trace"]],
+                         ["mov rax, rdi", "add rax, rdx", "mov rdx, rsi", "add rdx, rcx"])
+        self.assertEqual(generic["trace"][1]["flags"]["cf"], 1, "the lost carry is visible in the trace")
+        self.assertNotIn("diagnosis", packet["feedback"][1])
         replayed = session.resume(self.directory)
         self.assertEqual((replayed["status"], replayed["code_hex"]), ("replayed", "4889f84801d04889f24811cac3"))
         self.assertFalse(replayed["global_optimality"])
@@ -97,6 +109,18 @@ class Profile2LoopTests(unittest.TestCase):
         offset, size = struct.unpack_from("<QQ", obj, section + 24)
         self.assertEqual(obj[offset:offset + size], (out / "kernel.bin").read_bytes())
         self.assertEqual(session.replay_artifact(out)["status"], "replayed")
+
+    def test_rv64i_diagnosis_has_registers_and_results_but_no_flags(self):
+        self.opened("add128-rv64i.json")
+        session.submit(self.directory, self.proposal(
+            [["add", "a0", "a0", "a2"], ["add", "a1", "a1", "a3"]], RV64))
+        diagnosis = session.packet(self.directory)["feedback"][0]["diagnosis"]
+        self.assertTrue(diagnosis["available"])
+        report = diagnosis["generic_failure"]
+        self.assertNotIn("flags", report["trace"][0])
+        self.assertNotIn("initial_flags", report)
+        self.assertEqual(set(report["trace"][0]["registers"]), set(verify2.REGISTERS[RV64]))
+        self.assertEqual(diagnosis["first_missing_subterm"]["expression"], "(ult (add a_lo b_lo) a_lo)")
 
     def test_rv64i_two_result_search_object_and_replay(self):
         self.opened("add128-rv64i.json")
