@@ -530,6 +530,51 @@ Example: the searched 64-bit sum (`lea rax,[rdi+rsi]; ret`, 5 bytes) against GCC
 0.97. At this size the call dominates, and the 4 saved bytes buy no measurable time. Results hold for that
 machine, load and call ABI only. They are not a portable speedup claim.
 
+### Calling-convention qualification
+
+`tools/machine_qualification/abi.py` checks that a register-profile kernel is a
+correct leaf function. It covers obligations A-01 to A-07 of the qualification
+design, for the profiles `linux-x86_64-sysv-u64-leaf/1` and
+`linux-rv64-lp64-u64-leaf/1`:
+
+| Obligation | Check | Evidence |
+| --- | --- | --- |
+| A-01 decoding | the whole callable decodes, ends in the exact return (`c3`, or `jalr x0, 0(ra)`), with at most 16 body instructions | closed decoder |
+| A-02 result | the word query is unsat | solver, relative to the generated model |
+| A-03 frame | every register a body instruction may write is caller-saved (flags are scratch) | footprints from the checker's own semantics |
+| A-04 return | the return transition gives `RIP = [S]`, `RSP = S + 8` (x86) or `pc = ra & ~1` with `ra`, `sp` unchanged (RV64) | solver over the return rule, given A-03 |
+| A-05 termination | straight-line, with no admitted operation that faults in the model | admitted operation set |
+| A-06 coverage | the mismatch query has exactly one assertion and no premise; an entry layout chosen independently of the inputs | recorded query |
+| A-07 model | the evidence kind: GNU `as` and CPU conformance (x86); GNU `as` and QEMU in CI (RV64I) | stated, not proved |
+
+The native harness (x86 only) calls each kernel through a trampoline generated
+at run time. Before the call, it seeds distinct canaries in `rbx`, `rbp` and
+`r12` to `r15`, and in the 16 words below the return slot. Immediately after
+the return, it captures the results, those registers, the stack pointer, the
+canaries and DF.
+
+Five planted fixtures outside every palette each return normally, and each is
+reported as exactly its fault:
+- a callee-saved write;
+- a stack write;
+- DF left set;
+- a wrong stack delta;
+- a wrong result.
+
+```sh
+python3 -B -m tools.machine_qualification.abi --dir test-data/machine-code/kernels
+```
+
+On 2026-10-30 all 13 library kernels met A-01 to A-07. The 11 x86 kernels
+conformed natively on 512 vectors each; RV64I kernels are not run here.
+
+The CET profile `linux-x86_64-sysv-u64-leaf-cet/1` prefixes the legacy fragment
+with `ENDBR64`. The fragment's obligations are checked, and the prefixed
+callable runs natively. Active IBT and shadow-stack modes are reported
+unsupported: this processor lacks `ibt` and `user_shstk`, and no active-mode
+harness exists yet. LP64D, which needs a different object ABI and a D-capable
+environment, is not claimed; the emitted RV64 object keeps `e_flags = 0`.
+
 ### Analysing supplied paired measurements
 
 `tools/machine_qualification/performance.py` implements the qualification design's frozen paired-ratio analysis
