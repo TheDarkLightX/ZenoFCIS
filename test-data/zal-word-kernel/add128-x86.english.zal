@@ -1,0 +1,10 @@
+ZAL word kernel profile 2.
+Kernel add128.
+Target x86_64-sysv-register/2.
+Inputs a_lo, a_hi, b_lo and b_hi are unsigned 64-bit words.
+Return first (a_lo plus b_lo) with wraparound modulo 2^64.
+Return second ((a_hi plus b_hi) plus ((a_lo plus b_lo) is below a_lo (unsigned))) with wraparound modulo 2^64.
+Instruction palette: [["mov","rax","rdi"],["add","rax","rdx"],["mov","rdx","rsi"],["adc","rdx","rcx"]].
+Use at most 4 body instructions.
+Minimize bytes.
+Search limits: candidates 2000, checks 16, deadline 20000 ms, solver 1000 ms.

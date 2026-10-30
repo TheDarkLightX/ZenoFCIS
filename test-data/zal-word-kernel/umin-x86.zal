@@ -1,0 +1,9 @@
+profile zal/word-kernel/2;
+kernel umin;
+target x86_64-sysv-register/2;
+inputs x:u64,y:u64;
+result (ite (ule x y) x y) modulo 2^64;
+palette [["mov","rax","rdi"],["mov","rax","rsi"],["cmp","rdi","rsi"],["cmova","rax","rsi"],["cmovb","rax","rdi"],["nop"]];
+max-body 3;
+objective bytes;
+limits candidates=1000 checks=16 deadline-ms=20000 solver-ms=1000;
