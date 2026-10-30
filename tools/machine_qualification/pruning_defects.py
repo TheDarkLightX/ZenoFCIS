@@ -1,7 +1,7 @@
 """Planted defects in the search pruning, each judged by the pruning exactness control.
 
 Each defect is one named edit to `tools/machine_code/footprint.py`, applied to an isolated specimen: a copy of the
-checker package and of this qualification package. The exactness control (`pruning_exactness run`) then runs inside
+checker package, of this qualification package and of the profile-3 memory kernels. The exactness control (`pruning_exactness run`) then runs inside
 the specimen, under `python3 -B` and `python3 -O -B`, against the specimen's own footprint module. Outcomes:
 
 - `detected`: the control completed and reported at least one removal without a proved twin or checker refutation;
@@ -88,7 +88,11 @@ DEFECTS = (
     Defect("input-required-without-query",
            'if solver.check() == z.sat:',
            'if True:',
-           "Every input is taken as required by the specification, so overwriting an unused input loses it."),
+           "Every argument register is taken as required, so overwriting an unused input loses it."),
+    Defect("input-required-syntactically",
+           'if solver.check() == z.sat:',
+           'if repr(["input", name]) in repr(outputs):',
+           "An input is required when the specification mentions it, as in (x ^ x) ^ y, not when it depends on it."),
     Defect("copied-input-forgotten",
            'parent.get(source, {source})',
            'parent.get(source, frozenset())',
@@ -101,6 +105,8 @@ def build(directory: Path, defect: Defect | None) -> dict:
     tools = directory / "tools"
     for package in ("machine_code", "machine_qualification"):
         shutil.copytree(ROOT / "tools" / package, tools / package, ignore=shutil.ignore_patterns("__pycache__"))
+    kernels = "test-data/machine-code/memory-kernels"  # the profile-3 exactness cases
+    shutil.copytree(ROOT / kernels, directory / kernels)
     if defect is None:
         return {}
     target = tools / "machine_code/footprint.py"
