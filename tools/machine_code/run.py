@@ -29,6 +29,8 @@ def main(argv=None):
             sub.add_argument("--max-candidates", type=int, default=10_000)
             sub.add_argument("--max-checks", type=int, default=64)
             sub.add_argument("--deadline-ms", type=int, default=5000)
+            sub.add_argument("--no-prune", action="store_true",
+                             help="enumerate every sequence (the exact footprint pruning is on by default)")
     bench = commands.add_parser("bench", help="paired timing of a replayed x86 artifact against gcc -O2 for the same expression")
     bench.add_argument("--artifact", required=True, type=Path)
     bench.add_argument("--out", required=True, type=Path)
@@ -83,7 +85,7 @@ def main(argv=None):
             result = session.submit(args.session, args.proposal, args.solver_ms)
         elif args.command == "search":
             result = session.search(args.session, args.max_candidates, args.max_checks,
-                                    args.deadline_ms, args.solver_ms)
+                                    args.deadline_ms, args.solver_ms, prune=not args.no_prune)
         elif args.command == "resume":
             result = session.resume(args.session, args.solver_ms)
         elif args.command == "emit":

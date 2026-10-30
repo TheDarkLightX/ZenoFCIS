@@ -71,15 +71,29 @@ class MachineLoopTests(unittest.TestCase):
 
     def test_search_selects_a_checked_machine_program_without_an_llm_dependency(self):
         self.opened()
-        result = session.search(self.directory, max_candidates=156, deadline_ms=8000)
+        result = session.search(self.directory, max_candidates=156, deadline_ms=8000, prune=False)
         self.assertEqual(result["status"], "checked-candidate", result)
         self.assertEqual(result["stop_reason"], "grammar-exhausted", result)
-        self.assertEqual(result["proposed"], 156)
+        self.assertEqual((result["proposed"], result["pruning"]), (156, "off"))
         self.assertEqual(result["cost"], {"bytes": 5, "instructions": 1})
         self.assertGreater(result["concrete_refutations"], 0)
         self.assertEqual(result["solver_checks"], 1)
         self.assertGreater(result["objective_pruned"], 0)
         self.assertEqual(session.resume(self.directory)["status"], "replayed")
+
+    def test_exact_pruning_skips_sequences_but_keeps_the_same_optimum(self):
+        unpruned = self.root / "unpruned"
+        session.open_session(self.problem_path, unpruned)
+        session.search(unpruned, max_candidates=156, deadline_ms=8000, prune=False)
+        self.opened()
+        result = session.search(self.directory, max_candidates=156, deadline_ms=8000)
+        self.assertEqual((result["status"], result["stop_reason"]), ("checked-candidate", "grammar-exhausted"), result)
+        self.assertEqual(result["pruning"], "exact-footprint/1")
+        # Every one of the 156 sequences is proposed or skipped exactly once.
+        self.assertEqual(result["proposed"] + result["dead_pruned"] + result["order_pruned"], 156)
+        self.assertLess(result["proposed"], 156 // 4)
+        self.assertGreater(result["dead_pruned"], 0)
+        self.assertEqual(session.resume(self.directory)["code_hex"], session.resume(unpruned)["code_hex"])
 
     def test_stored_incumbent_rechecks_once_within_one_checker_budget(self):
         from machine_code import verify
