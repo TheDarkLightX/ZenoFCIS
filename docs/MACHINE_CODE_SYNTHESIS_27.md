@@ -532,27 +532,39 @@ python3 -B -m tools.machine_qualification.search_bench run --out REPORT.json [--
 python3 -B -m tools.machine_qualification.search_bench compare BEFORE.json AFTER.json
 ```
 
-- **Exactness:** for seven small grammars over both profiles and targets, every sequence is enumerated with the
-  footprint pruning off and on. Each removed sequence needs a kept sequence of no greater cost, in bytes and in
-  instructions, whose observed result registers Z3 proves equal from every entry register and flag state. A removed
-  sequence the checker refuses statically needs none. Any other removal without a witness is an exactness failure.
-- **Planted defects:** six named edits to `footprint.py` run in isolated copies under `-B` and `-O -B`: omitted x86
+- **Exactness:** for ten small grammars with specifications over both profiles and targets, every sequence is
+  enumerated with the footprint pruning off and on. A twin of a removed sequence is a kept sequence of no greater
+  cost, in bytes and in instructions, whose observed result registers Z3 proves equal from every entry register and
+  flag state. With the lost-input rule turned off, every sequence removed as dead, out of order or a duplicate needs
+  a twin. With the full pruning, every sequence removed because a required input is lost must be refuted by the
+  independent checker against the specification; any other removal needs a twin or, when its only twins lose an
+  input, the same refutation. A removed sequence the checker refuses statically needs neither. Any other removal is
+  an exactness failure.
+- **Planted defects:** ten named edits to `footprint.py` run in isolated copies under `-B` and `-O -B`: omitted x86
   flag writes, a conditional move treated as a full overwrite, ignored write-write and write-after-read conflicts in
-  reordering, and an unobserved result register on each profile. Each must leave a removal without a witness.
-  Crashes and timeouts never count as detections.
+  reordering, an unobserved result register on each profile, duplicates accepted without the Z3 proof, every input
+  taken as required, and an input copied to another register forgotten. Each must leave a failing removal. The
+  tenth, a conditional move marked as overwriting its destination while still reading it, is a registered
+  equivalent mutant: the dead rule consults reads before overwrites. It counts as an invalid specimen only when it
+  survives with removal decisions identical to the unmodified pruning on every case. Crashes and timeouts never
+  count as detections.
 - **Measurement:** the benchmark searches every problem in `test-data/machine-code/` and its kernel library at fixed
   budgets (100,000 candidates, 128 checks, 60 s, 1 s solver timeout) and records every counter the search returns,
   wall times, the found cost and the stopping budget. `compare` fails only when a found cost is worse or lost.
 
-With the pruning and cost-bound stop of b7ad132e, the pruning was exact on all seven grammars: 1,358 removals, each
-with a proved witness. All six planted defects were detected in both modes. Over the 18 problems measured at
-dc410214, three repeats each, candidates fell from 107,123 to 25,010, solver checks from 27 to 24, and the summed
-median time from 27.5 s to 8.2 s on one loaded machine. All found costs were identical except signed saturating add.
-It exhausted its grammar and found its 31-byte, 7-instruction library kernel, where the unpruned search stopped at
-the candidate budget with none. The newer `minmax-x86` problem finds its 18-byte, 5-instruction kernel after 438
-proposals and 3 solver checks; unpruned, it reaches the same cost but stops at the 100,000-candidate budget. With
-`--no-prune`, every counter and cost equalled the baseline. The exactness result holds for these grammars and
-lengths under the registered ISA models.
+With the pruning of 05e421ae (scheme `exact-footprint/2`), the pruning was exact on all ten grammars. With the
+lost-input rule off, 2,258 removals (1,517 dead, 590 order, 151 duplicate) each had a proved twin. With the full
+pruning, 1,670 of 2,341 removals had a proved twin, all 604 lost-input removals were refuted by the checker, and the
+other 67 had only twins that lose an input and were refuted too. Nine planted defects were detected in both modes,
+and the equivalent mutant was confirmed in both. Over the 18 problems measured at dc410214, three repeats each,
+candidates fell from 107,123 to 24,886, solver checks from 27 to 24, and the summed median time from 27.5 s to 8.9 s
+on one loaded machine. The lost-input rule skipped 485 sequences on the x86 128-bit add and subtract problems; no
+library grammar has a duplicate entry. All found costs were identical except signed saturating add. It exhausted
+its grammar and found its 31-byte, 7-instruction library kernel, where the unpruned search stopped at the candidate
+budget with none. The newer `minmax-x86` problem finds its 18-byte, 5-instruction kernel after 438 proposals and 3
+solver checks; unpruned, it reaches the same cost but stops at the 100,000-candidate budget. With `--no-prune`,
+every counter and cost equalled the baseline. The exactness result holds for these grammars, lengths and
+specifications under the registered ISA models.
 
 ## Profile 2: flags, carries and comparisons
 
