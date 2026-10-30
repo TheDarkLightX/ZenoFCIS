@@ -161,6 +161,20 @@ class Specialization(unittest.TestCase):
                     outcomes[status] = outcomes.get(status, 0) + 1
         self.assertGreaterEqual(outcomes.get("specialized", 0), 55, outcomes)
 
+    def test_known_operands_and_flags_remove_work(self):
+        # b_lo = 0: the low ADD becomes a copy that clears CF, so ADC becomes ADD and the moves disappear.
+        problem, code = kernel("add128-x86")
+        result = specialize.specialize(problem, ["b_lo=0"], None, code)
+        forms = [i.form() for i in verify2.decode(problem["target"], bytes.fromhex(result["code_hex"]))[:-1]]
+        self.assertEqual(result["status"], "specialized")
+        self.assertNotIn("adc", [form[0] for form in forms])
+        self.assertLess(len(forms), 4, forms)
+        # RV64I: both high words zero leaves the low sum and its carry.
+        problem, code = kernel("add128-rv64i")
+        result = specialize.specialize(problem, ["a_hi=0", "b_hi=0"], None, code)
+        forms = [i.form() for i in verify2.decode(problem["target"], bytes.fromhex(result["code_hex"]))[:-1]]
+        self.assertEqual([form[0] for form in forms], ["add", "sltu"])
+
     def test_problem_identities_simplify_exactly(self):
         x = ["input", "x"]
         cases = [(["add", x, ["const", "0"]], x), (["mul", ["const", "1"], x], x), (["and", x, ["const", "0"]], ["const", "0"]),

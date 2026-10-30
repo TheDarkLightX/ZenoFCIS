@@ -231,55 +231,65 @@ def _copy(target, form):
     return None
 
 
-def _identity(target, form, values, flags_dead):
-    """The value an instruction leaves in its destination when known operands make it a copy or a constant.
+def _identity(target, form, values):
+    """(value, constant flags) an instruction leaves when known operands make it a copy or a constant, or None.
 
-    `values` maps each register operand to ("c", word) or a symbolic value. An x86 instruction qualifies only
-    when the flags it defines are not read afterwards.
+    `values` maps each register operand to ("c", word) or a symbolic value. The constant flags are those the
+    instruction then defines with a fixed value; its other defined flags must not be read afterwards.
     """
     op, constant = form[0], lambda name: values[name][1] if values[name][0] == "c" else None
     if target == verify2.RV64:
         if op in ("slli", "srli", "srai", "addi", "ori", "xori") and form[3] == 0:
-            return values[form[2]]
-        if op == "andi" and form[3] == -1:
-            return values[form[2]]
-        if op == "andi" and form[3] == 0:
-            return ("c", 0)
+            return values[form[2]], {}
+        if op == "andi" and form[3] in (0, -1):
+            return (("c", 0) if form[3] == 0 else values[form[2]]), {}
         if op not in ("add", "sub", "or", "xor", "and") or not isinstance(form[3], str):
             return None
         left, right = constant(form[2]), constant(form[3])
         if op in ("add", "sub", "or", "xor") and right == 0:
-            return values[form[2]]
+            return values[form[2]], {}
         if op in ("add", "or", "xor") and left == 0:
-            return values[form[3]]
+            return values[form[3]], {}
         if op == "and" and 0 in (left, right):
-            return ("c", 0)
+            return ("c", 0), {}
         if op == "and" and MASK in (left, right):
-            return values[form[3]] if left == MASK else values[form[2]]
+            return (values[form[3]] if left == MASK else values[form[2]]), {}
         return None
     if op in ("shl", "shr", "sar") and form[2] == 0:
-        return values[form[1]]
-    if not flags_dead:
-        return None
+        return values[form[1]], {}
     if op == "lea":
         base, index = constant(form[2]), constant(form[3])
         if index == 0:
-            return values[form[2]]
+            return values[form[2]], {}
         if base == 0 and form[4] == 1:
-            return values[form[3]]
+            return values[form[3]], {}
         return None
     if op not in ("add", "sub", "or", "xor", "and", "imul"):
         return None
+    clear = {"cf": 0, "of": 0}  # none of these identities carries or overflows
     destination, source = constant(form[1]), constant(form[2])
+    if op in ("and", "imul") and 0 in (destination, source):
+        return ("c", 0), ({**clear, "zf": 1, "sf": 0} if op == "and" else clear)
     if (op in ("add", "sub", "or", "xor") and source == 0) or (op == "and" and source == MASK) \
             or (op == "imul" and source == 1):
-        return values[form[1]]
+        return values[form[1]], clear
     if (op in ("add", "or", "xor") and destination == 0) or (op == "and" and destination == MASK) \
             or (op == "imul" and destination == 1):
-        return values[form[2]]
-    if op in ("and", "imul") and 0 in (destination, source):
-        return ("c", 0)
+        return values[form[2]], clear
     return None
+
+
+def _known_condition(form, flags):
+    """An x86 ADC, SBB or CMOVcc whose read flags are known, rewritten to an unconditional form."""
+    op = form[0]
+    if op in ("adc", "sbb") and flags["cf"] == ("c", 0) and form[1] != form[2]:
+        return ["add" if op == "adc" else "sub", form[1], form[2]]
+    if op in verify2.CMOVCC:
+        reads = verify2.flag_effects(Instruction(op, tuple(form[1:]), 0, 0))[0]
+        if all(flags[name][0] == "c" for name in reads):
+            values = {name: flags[name][1] if flags[name][0] == "c" else 0 for name in verify2.FLAGS}
+            return ["mov", form[1], form[2]] if verify2._condition(verify2.CMOVCC[op], values) else ["nop"]
+    return form
 
 
 def _operands(target, form):
@@ -369,15 +379,19 @@ def specialize_kernel(problem: dict, code: bytes, fixed: dict, results: int) -> 
     live_after.reverse()
     steps = []
     for index, form in enumerate(body):
+        if target == verify2.X86:
+            form = _known_condition(form, flags)
         reads, writes, flag_reads, defined, undefined = footprint(target, form)
         operands = {name: value[name] for name in form[1:] if isinstance(name, str) and name in value}
         ready = all(value[r][0] == "c" for r in reads) and all(flags[f][0] == "c" for f in flag_reads)
         copy = _copy(target, form)
-        same = None if ready or copy else _identity(target, form, operands, not set(defined) & live_after[index])
+        same = None if ready or copy else _identity(target, form, operands)
+        if same is not None and not set(defined) & live_after[index] <= set(same[1]):
+            same = None  # a flag read later would not have its value
         if same is not None:
-            # The instruction leaves a known operand value or a constant; its flags are never read.
-            out = {writes[0]: same}
-            flag_out = {n: ("u",) for n in defined + undefined}
+            # The instruction leaves a known operand value or a constant; flags read later are constants.
+            out = {writes[0]: same[0]}
+            flag_out = {n: ("c", same[1][n]) if n in same[1] else ("u",) for n in defined + undefined}
             copy = (writes[0], None)
         elif ready:
             words, bits = fold(target, form, {r: value[r][1] for r in reads}, {f: flags[f][1] for f in flag_reads})
@@ -388,6 +402,8 @@ def specialize_kernel(problem: dict, code: bytes, fixed: dict, results: int) -> 
         else:
             out = {name: ("s", f"{index}:{name}") for name in writes}
             flag_out = {**{n: ("s", f"{index}:{n}") for n in defined}, **{n: ("u",) for n in undefined}}
+            if form[0] in ("and", "or", "xor", "test"):
+                flag_out.update(cf=("c", 0), of=("c", 0))  # logic operations always clear CF and OF
         steps.append({"form": form, "operands": operands, "reads": reads, "out": out,
                       "kept": not ready and copy is None})
         value.update(out)
@@ -478,8 +494,16 @@ def specialize_kernel(problem: dict, code: bytes, fixed: dict, results: int) -> 
         protect = {name for name in registers if hw[name] in values}
         choice = None
         if destination is not None:
-            original = form[destination]
-            hint = hint_of.get(step["out"][original])
+            original = written = form[destination]
+            hint = hint_of.get(step["out"][written])
+            if (target == verify2.X86 and modifies and form[0] in ("add", "and", "or", "xor", "imul")
+                    and hint is not None and len(form) == 3
+                    and hw[hint] == step["operands"][form[2]] and hw[hint] != step["operands"][original]):
+                # Commutative: compute in the result register that already holds the other operand.
+                form = [form[0], form[2], form[1]]
+                step = {**step, "form": form}
+                sources, destination, modifies = _operands(target, form)
+                original = form[destination]
             if modifies:
                 item = step["operands"][original]
                 spare = [r for r in holders(item) if r in registers
@@ -500,7 +524,7 @@ def specialize_kernel(problem: dict, code: bytes, fixed: dict, results: int) -> 
                 reserved.add(form[position])
         if destination is not None:
             form[destination] = choice
-            hw[choice] = step["out"][original]
+            hw[choice] = step["out"][written]
         emitted.append(form)
     # The results, including a cycle between result registers through a free temporary.
     results_at = verify2.RESULTS[target][:results]

@@ -743,12 +743,17 @@ kernel's decoded instructions:
    and CF/ZF/SF/OF, through the instructions in their original order.
 2. It folds every instruction whose reads are all known, and every instruction
    that known operands turn into a copy or a constant (for example `x+0` or
-   `x&0`). An x86 instruction is folded this way only when its flags are not
-   read later.
+   `x&0`). An x86 instruction is folded this way only when every flag read
+   later then has a known value. For example, `x+0` clears CF and OF.
+   `ADC`/`SBB` with a known clear CF become `ADD`/`SUB`. A `CMOVcc` with a known
+   condition becomes a copy or is dropped. Logic operations record that they
+   clear CF and OF.
 3. It keeps, to a fixpoint, the instruction that set each flag a kept
    instruction reads.
 4. The kept instructions run in order. Each operand comes from whichever
    register holds its value, so renumbered arguments need no prologue of moves.
+   A value is computed in the register where a later instruction or a result
+   needs it. On x86, a commutative operation may swap its operands to do this.
    A missing constant is set just before it is needed: by `MOV r64, imm64` on
    x86, or by an `ADDI`/`SLLI` chain on RV64I.
 5. Backward register and flag liveness removes dead instructions. On x86, a
@@ -802,8 +807,8 @@ At this checkpoint that last test covers 9 kernels and 61 cases:
 - one RV64I case needs more than 16 instructions for its constants and is
   refused before checking;
 - all 8 fully fixed cases have fewer instructions than the original kernel;
-- of the 52 partly fixed cases, 3 have fewer instructions, 11 the same number
-  and 38 more.
+- of the 52 partly fixed cases, 7 have fewer instructions, 11 the same number
+  and 34 more.
 
 Partly fixed rewrites are often longer because x86 profile 2 has no immediate
 arithmetic, so each needed constant costs a 10-byte load. Finding smaller
