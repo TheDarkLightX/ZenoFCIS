@@ -2788,8 +2788,9 @@ pub enum Error {
     /// store does not run the contract the operation needs.
     Identity,
     /// A history segment was published under a lineage member's contract by
-    /// another ZenoFCIS release: the identities differ only in the trailing
-    /// evaluator digest. Nothing was written.
+    /// a build with a different evaluator, such as another ZenoFCIS release:
+    /// the identities differ only in the trailing evaluator digest. Every
+    /// other mismatch stays `Identity`. Nothing was written.
     OtherRelease,
     /// The library refused to bind a lineage catalog into an Authority.
     Authority,
@@ -2888,7 +2889,7 @@ impl fmt::Display for Error {
                 "this database, or a checkpoint or publication used with it, belongs to a different contract: audit the database with the build that created it, or upgrade it with a build that adopted its contract",
             ),
             Self::OtherRelease => f.write_str(
-                "this database was created by another ZenoFCIS release of this contract, such as 2.6.0, whose evaluator differs from this build's, so nothing was written: keep using the database with the build that created it, or start a new store with this build in a new, empty file",
+                "this database was created for this contract by a build with a different evaluator, for example another ZenoFCIS release such as 2.6.0, so nothing was written: open it with the build that created it, or start a new store with this build in a new, empty file",
             ),
             Self::Authority => f.write_str(
                 "the library refused to bind a contract version of the lineage: regenerate the contract and rebuild the application with the same ZenoFCIS version",
@@ -3120,7 +3121,7 @@ mod message_tests {
             ),
             (
                 Error::OtherRelease,
-                "this database was created by another ZenoFCIS release of this contract, such as 2.6.0, whose evaluator differs from this build's, so nothing was written: keep using the database with the build that created it, or start a new store with this build in a new, empty file",
+                "this database was created for this contract by a build with a different evaluator, for example another ZenoFCIS release such as 2.6.0, so nothing was written: open it with the build that created it, or start a new store with this build in a new, empty file",
             ),
             (
                 Error::Authority,

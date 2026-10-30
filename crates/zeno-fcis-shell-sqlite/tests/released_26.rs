@@ -97,8 +97,8 @@ fn released_stores_are_refused_by_name_and_left_unchanged() {
     }
 }
 
-#[test]
-fn another_contract_is_still_a_different_contract() {
+/// The released genesis identity with one edit applied, stored back.
+fn edited(edit: impl Fn(&mut Vec<u8>)) -> StoreFile {
     let file = StoreFile::released(PENDING);
     let connection = ok(Connection::open(&file.0));
     let mut identity: Vec<u8> = ok(connection.query_row(
@@ -106,14 +106,46 @@ fn another_contract_is_still_a_different_contract() {
         [],
         |row| row.get(0),
     ));
-    // A byte of the contract, before the evaluator digest, differs.
-    let index = identity.len() - 33;
-    identity[index] ^= 1;
+    edit(&mut identity);
     ok(connection.execute(
         "UPDATE v2_genesis SET identity=?1 WHERE singleton=1",
         [identity],
     ));
-    with_lineages(|lineage| {
-        assert!(matches!(lineage.open(&file.0), Err(Error::Identity)));
+    file
+}
+
+/// Only a change confined to the trailing evaluator digest is `OtherRelease`;
+/// every other identity mismatch keeps the `Identity` refusal.
+#[test]
+fn only_an_evaluator_difference_is_another_release() {
+    let digest_only = edited(|identity| {
+        let last = identity.len() - 1;
+        identity[last] ^= 1;
     });
+    with_lineages(|lineage| {
+        assert!(matches!(
+            lineage.open(&digest_only.0),
+            Err(Error::OtherRelease)
+        ));
+    });
+    let edits: [(&str, fn(&mut Vec<u8>)); 4] = [
+        ("first contract byte", |identity| identity[0] ^= 1),
+        ("last byte before the digest", |identity| {
+            let index = identity.len() - 33;
+            identity[index] ^= 1;
+        }),
+        ("one byte shorter", |identity| {
+            identity.pop();
+        }),
+        ("one byte longer", |identity| identity.push(0)),
+    ];
+    for (label, edit) in edits {
+        let file = edited(edit);
+        with_lineages(|lineage| {
+            assert!(
+                matches!(lineage.open(&file.0), Err(Error::Identity)),
+                "{label}"
+            );
+        });
+    }
 }

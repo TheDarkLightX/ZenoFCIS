@@ -2009,10 +2009,11 @@ APP version [--format human|json]
 Every command that reads a store opens it through the contract lineage, as
 `--audit` and `--decide` do, so the Authority of the version the store runs
 decides, and a store of another contract, or of a later version of this one,
-is refused with `Identity`. A store of this contract created by another
-ZenoFCIS release, such as 2.6.0, is refused with `OtherRelease`, because the
-identity binds the release's evaluator; nothing is written. Keep using such a
-store with the build that created it, or start a new store with this build.
+is refused with `Identity`. A store of this contract created by a build with
+a different evaluator, for example another ZenoFCIS release such as 2.6.0, is
+refused with `OtherRelease`, because the identity binds the evaluator; nothing
+is written. Open such a store with the build that created it, or start a new
+store with this build.
 `submit`, `decide`, `pending` and `deliver` need
 a store at the build's own version and name `--upgrade` otherwise; `state`
 and `history` read a store at an earlier version too. The forms without a
