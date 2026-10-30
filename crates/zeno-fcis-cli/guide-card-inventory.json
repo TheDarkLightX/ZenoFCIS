@@ -7,11 +7,32 @@
       "sha256": "cf24a9364962c727f2505bf74ad008c934450f6e221a52e2f408cad168ffe771"
     },
     {
+      "name": "assemble",
+      "commands": [
+        "assemble"
+      ],
+      "sha256": "b4bab70163f798fb1afe382fa6e86245342b63bce9d6285fdeecfaa9409ee215"
+    },
+    {
       "name": "check",
       "commands": [
         "check"
       ],
       "sha256": "e2d00d9beb8cf0f8074a4480bc9bb136c1247bf3b6c0b85a99ea58a18fb6fa5a"
+    },
+    {
+      "name": "contract-check-composition",
+      "commands": [
+        "contract check-composition"
+      ],
+      "sha256": "ba0edc6d15b125895c054ae1a4921851d1c69f28bcce981ce12a7250d5fd7ea6"
+    },
+    {
+      "name": "contract-check-symbolic",
+      "commands": [
+        "contract check-symbolic"
+      ],
+      "sha256": "4fccfebf9425121d13bc863b05104052a997b83c910fa7fc76d8ffadfb3a1dd2"
     },
     {
       "name": "contract-collections",
@@ -21,11 +42,32 @@
       "sha256": "738bc8c7275efa9dbaecda7a6478796c0e68a16b6b1a1afb5f924742eaebd760"
     },
     {
+      "name": "contract-diff",
+      "commands": [
+        "contract diff"
+      ],
+      "sha256": "8f4dab4a96bb432dd929a534fdb2d3d15f2532de87bba8027e05ddab5103e135"
+    },
+    {
       "name": "contract-distribution",
       "commands": [
         "contract distribution"
       ],
       "sha256": "7cebfeefe453628fd97bf1f8c4f4050267a326ddcffaf27be988f4522add6805"
+    },
+    {
+      "name": "contract-draft",
+      "commands": [
+        "contract draft"
+      ],
+      "sha256": "a2a2161877996270552be8450ba67295cb63907e871aed41fd8555ddd3c8b6de"
+    },
+    {
+      "name": "contract-evolve",
+      "commands": [
+        "contract evolve"
+      ],
+      "sha256": "33ab16b4c55eba09332035c20c6a0be8a21d69b3df148719d5851eda3db50ae6"
     },
     {
       "name": "contract-gaps",
@@ -42,11 +84,32 @@
       "sha256": "57f33ad53cb5c95516704788c782f1d5342ec9951431a142dda7825a78695373"
     },
     {
+      "name": "contract-postconditions",
+      "commands": [
+        "contract postconditions"
+      ],
+      "sha256": "4ee380b4a9013b4955491c0572b985da193963a98caa06f89d6ad8e78a6f0424"
+    },
+    {
       "name": "contract-probe",
       "commands": [
         "contract probe"
       ],
       "sha256": "54ab27203be7bf4bacdda05a4c7037b5dee10435ee9783796d026daa9aaa10f9"
+    },
+    {
+      "name": "contract-refine-check",
+      "commands": [
+        "contract refine-check"
+      ],
+      "sha256": "8e2867ddd8aee17d9c6634d976f4d6160a07a427933dccfe2e5319c9dfc833b5"
+    },
+    {
+      "name": "contract-refresh-receipts",
+      "commands": [
+        "contract refresh-receipts"
+      ],
+      "sha256": "9179053df01a2616ea1ab8580050fc48c63869298656c188b8ffcbc6e74d7d0c"
     },
     {
       "name": "contract-review",
@@ -64,11 +127,25 @@
       "sha256": "6a3df506a07affdc3328084ef7ab1c61d7f88438fe5454243f9ef668a0c08f56"
     },
     {
+      "name": "contract-runs",
+      "commands": [
+        "contract runs"
+      ],
+      "sha256": "6153969b32093de8c9f1ff761d3bd02e254543aa70ac1ea6acdc942fec7100e3"
+    },
+    {
       "name": "contract-scenario",
       "commands": [
         "contract scenario"
       ],
       "sha256": "59c2717365c55891ebce03adabca4348156d56c6839360b044043cb696649ca7"
+    },
+    {
+      "name": "contract-two-run",
+      "commands": [
+        "contract two-run"
+      ],
+      "sha256": "746314043733bfc4dba46f635ddd2b82b82251729942e158fe435847b7e499be"
     },
     {
       "name": "generate",
@@ -200,6 +277,13 @@
         "backend verify"
       ],
       "sha256": "23380d3f76bd76699e412dd577f23decea135cd21a35aff8aa29352aa754ad46"
+    },
+    {
+      "name": "purity",
+      "commands": [
+        "purity"
+      ],
+      "sha256": "a6a11e15063bd3e4d28d0565b1dfdd7cbe6fb377505f0312cb9ba65791378ecd"
     },
     {
       "name": "synth",
