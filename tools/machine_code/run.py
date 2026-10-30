@@ -55,9 +55,27 @@ def main(argv=None):
     added.add_argument("--name", required=True)
     added.add_argument("--summary", required=True)
     added.add_argument("--route", required=True, choices=("proposal", "search"))
+    contract = commands.add_parser("contract", help="lower an arithmetic contract to profile 2, or check bytes against it")
+    contract_actions = contract.add_subparsers(dest="action", required=True)
+    lowered = contract_actions.add_parser("lower", help="print the lowering record; refuse with a named missing bridge")
+    lowered.add_argument("--problem-out", type=Path, help="also write the lowered problem; never overwrites")
+    against = contract_actions.add_parser("check", help="check exact bytes against the lowered problem")
+    against.add_argument("--code", required=True, type=Path)
+    against.add_argument("--solver-ms", type=int, default=1000)
+    for sub in (lowered, against):
+        sub.add_argument("--contract", required=True, type=Path)
     args = parser.parse_args(argv)
     try:
-        if args.command == "open":
+        if args.command == "contract":
+            from . import contracts
+            from .model import read_json
+            if args.action == "lower":
+                result = contracts.lower(read_json(args.contract))
+                if args.problem_out is not None and result["status"] == "lowered":
+                    session._json(args.problem_out, result["problem"])
+            else:
+                result = contracts.check(read_json(args.contract), session._code(args.code), args.solver_ms)
+        elif args.command == "open":
             result = session.open_session(args.problem, args.session)
         elif args.command == "packet":
             result = session.packet(args.session)

@@ -21,6 +21,18 @@ and RV64I register kernels. Checked overflow, wider arithmetic, effects, memory
 and other ABIs require an explicit supported profile; do not narrow the task to
 make it fit. Inspect `test-data/machine-code/` for the closed JSON format.
 
+For a 64-bit add, subtract or multiply whose meaning is checked, saturating or
+signed, write a `zeno-fcis/machine-contract/1` contract first (fields `schema,
+target, operation, signedness, bits, meaning, inputs, grammar, max_instructions,
+objective`). `python3 -B -m tools.machine_code.run contract lower --contract
+C.json --problem-out P.json` exits 0 with a profile-2 problem, or exits 1 with a
+named missing bridge (`effectful-overflow`, `multiword`, `high-product`) or an
+unsupported reason. A checked contract lowers to two results: the value modulo
+2^64, then a 0/1 status that is 1 on overflow; read the status first. Open the
+session on P.json. `contract check --contract C.json --code K.bin` checks bytes
+against the lowered problem (exit 0 equivalent, 1 counterexample or refused, 2
+inconclusive). Never hand-write a one-result modular problem for such a task.
+
 Profile 2 (`zeno-fcis/machine-problem/2`, targets `x86_64-sysv-register/2` and
 `rv64i-register/2`) is registered separately for carries, comparisons and
 selects. It declares one to six named u64 `inputs` (x86 `rdi, rsi, rdx, rcx,

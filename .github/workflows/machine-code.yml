@@ -71,6 +71,8 @@ jobs:
         run: python3 -B tools/test_machine_code_profile2_loop.py
       - name: Every checked-library kernel rechecked at its recorded cost
         run: python3 -B tools/test_machine_code_library.py
+      - name: Arithmetic contracts lowered to profile 2, refused by named bridge, or checked
+        run: python3 -B tools/test_machine_code_contracts.py
       - name: Optimized Python keeps the same guards
         run: |
           python3 -O -B tools/test_machine_code_verifier.py
@@ -80,6 +82,7 @@ jobs:
           python3 -O -B tools/test_machine_code_profile2_verifier.py
           python3 -O -B tools/test_machine_code_profile2_loop.py
           python3 -O -B tools/test_machine_code_library.py
+          python3 -O -B tools/test_machine_code_contracts.py
       - name: Actual x86 execution, assembler and RV64I object correspondence
         run: python3 -B tools/test_machine_code_native.py
       - name: Every admitted x86 form against the concrete and SMT models on this CPU
