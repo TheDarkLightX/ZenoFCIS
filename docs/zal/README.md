@@ -1017,6 +1017,8 @@ integers keep their existing refusal for fractions and add the named integer che
 **Readers.**
 
 - **Full policy:**
+  - the generic `zal_notation.core.loads` used by the notation, Lens and ontology tools, with the policy written
+    inline because the category capsule pins its import closure;
   - the `run.py` explain, why-not, what-if and story inputs;
   - `terminal.py` JSON traces;
   - MCP requests;
@@ -1035,7 +1037,6 @@ integers beyond plus or minus 2^53-1. The browser route already receives those a
 
 **Not covered yet.** These readers still parse numbers with plain binary floating point:
 
-- the generic `zal_notation.core.loads`, because the category capsule pins `core.py` and its import closure;
 - `semantic_library.load` and the finite-library documents, because their pins include a component list that has
   no producer;
 - ladder context files, because the standalone relational route copies `ladder.py` without its sibling modules;

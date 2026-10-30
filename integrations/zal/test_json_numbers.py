@@ -35,7 +35,7 @@ import relational_observation  # noqa: E402
 import report_numbers  # noqa: E402
 import terminal  # noqa: E402
 import word_kernel  # noqa: E402
-from zal_notation import normalizer  # noqa: E402
+from zal_notation import core, normalizer  # noqa: E402
 
 # Other modules put directories holding their own run.py first on sys.path, so load this CLI module by path.
 _spec = importlib.util.spec_from_file_location("zal_run_cli", HERE / "run.py")
@@ -70,6 +70,7 @@ def file_reader(read):
 
 # Readers that return the parsed document, and keep every number whose exact value they can represent.
 FULL = {
+    "zal_notation.core.loads": lambda text: core.loads(text)["v"],
     "loop_learn.strict_json": lambda text: loop_learn.strict_json(text)["v"],
     "run.user_json": lambda text: zal_run.user_json(text)["v"],
     "terminal.trace_inputs": lambda text: terminal.trace_inputs("[" + text + "]")[0]["v"],
@@ -91,7 +92,6 @@ REFUSING = {
 # Every other json.load(s) call under integrations/zal, by "path:function", with why it does not use the policy.
 UNCOVERED = {
     # Open: these ingest outside JSON and still use plain number parsing.
-    "zal_notation/core.py:loads": "open: the category capsule pins core.py and its import closure",
     "semantic_library.py:load": "open: finite_library/UPSTREAM.json pins this file and has no producer",
     "finite_library/prototype.py:loads": "open: pinned by the category capsule and finite_library/UPSTREAM.json",
     "finite_library/prototype.py:parse_table": "open: pinned by the category capsule and finite_library/UPSTREAM.json",
@@ -152,8 +152,9 @@ def json_reads(path):
                 inner = child.name if where == "<module>" else where + "." + child.name
             if (isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute) and child.func.attr in ("load", "loads")
                     and isinstance(child.func.value, ast.Name) and child.func.value.id == "json"):
-                covered = any(k.arg == "parse_int" or (k.arg is None and "json_numbers.hooks" in ast.unparse(k.value))
-                              for k in child.keywords)
+                # zal_notation/core.py writes the same policy inline as _number_hooks(); its import closure is pinned.
+                covered = any(k.arg == "parse_int" or (k.arg is None and ast.unparse(k.value).split("(")[0] in
+                                                       ("json_numbers.hooks", "_number_hooks")) for k in child.keywords)
                 found.append((where, covered))
             walk(child, inner)
     walk(ast.parse(path.read_text(encoding="utf-8")), "<module>")

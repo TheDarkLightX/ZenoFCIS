@@ -1,6 +1,7 @@
 """Bounded, declarative syntax and notation admission. No user code execution."""
 from __future__ import annotations
 
+from decimal import Decimal
 import hashlib
 import json
 import math
@@ -71,6 +72,38 @@ def digest(value: Any) -> str:
     return hashlib.sha256(canonical(value).encode("utf-8")).hexdigest()
 
 
+def _number_hooks() -> dict:
+    """Keep each number's exact decimal value or refuse it by name.
+
+    This is the policy and the reason codes of integrations/zal/json_numbers.py, written inline because the
+    category capsule pins this file's import closure. The cross-reader test checks that both agree.
+    """
+    def refuse(reason: str, lexeme: str):
+        raise NotationError(f"{reason}: {lexeme if len(lexeme) <= 40 else lexeme[:40] + '...'}")
+
+    def parse_int(lexeme: str) -> int:
+        if lexeme == "-0":
+            refuse("json-number-negative-zero-integer", lexeme)
+        if len(lexeme) > 4300:
+            refuse("json-number-too-long", lexeme)
+        return int(lexeme)
+
+    def parse_float(lexeme: str) -> float:
+        if len(lexeme) > 4300:
+            refuse("json-number-too-long", lexeme)
+        value = float(lexeme)
+        if not math.isfinite(value):
+            refuse("json-number-nonfinite", lexeme)
+        if Decimal(repr(value)) != Decimal(lexeme):
+            refuse("json-number-inexact-decimal", lexeme)
+        return value
+
+    def parse_constant(lexeme: str):
+        refuse("json-number-nonfinite", lexeme)
+
+    return {"parse_int": parse_int, "parse_float": parse_float, "parse_constant": parse_constant}
+
+
 def loads(source: str) -> dict:
     need(type(source) is str, "JSON input must be text")
     try:
@@ -84,8 +117,7 @@ def loads(source: str) -> dict:
             out[k] = v
         return out
     try:
-        result = json.loads(source, object_pairs_hook=pairs,
-                            parse_constant=lambda value: (_ for _ in ()).throw(NotationError(f"invalid number: {value}")))
+        result = json.loads(source, object_pairs_hook=pairs, **_number_hooks())
         canonical(result)
     except (json.JSONDecodeError, RecursionError, UnicodeError, OverflowError) as exc:
         raise NotationError(f"invalid or over-budget JSON: {exc}") from exc

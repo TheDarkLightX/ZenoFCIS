@@ -28,7 +28,7 @@
     "zal_notation/bridge.py": "f9ec12b775cc4590b818a199e22be8432363b77ba58bfce1699a548bb522c250",
     "zal_notation/builtin.py": "80d00097ce35b2d3fe66b2818d0c444a2f6eda8c56064ed2efa228be7c220d67",
     "zal_notation/clock.py": "e38f37470fad3f00437d10c6bc6e2016da639f1f0523723839db1fb0c8028b68",
-    "zal_notation/core.py": "18ec5d16e564d233dd0a0a942bbef7fd8e04fe207e41f781d2b0882bb5409738",
+    "zal_notation/core.py": "f1e544a8bf53bfe64fca2edecf7c2d8bba2898c6f5731b030cdbfcafde047b22",
     "zal_notation/examples.py": "4785bba7bda34b9adc117ec0d4f7a51332efbf60b17ae510ebcf08d271f328de",
     "zal_notation/exchange.py": "c7540b650266983dbaf304bd5746c0a4d97a7d8db2d92c10f8e44329a172ee5e",
     "zal_notation/lens_assets/app.js": "fd48967a9290e586e3d6550bea498f31cfa7220b43c83299bd9f1db164ed9f65",
