@@ -447,11 +447,57 @@ fact, the others at the method contract. All thirty-seven controls must reach
 their intended semantic failure, and the complete closure has 196 verification
 conditions.
 
+### Signed multiplication, division and narrowing
+
+Write `S` for the signed meaning. Signed division rounds toward the signed
+infinities: `Floor` is `floor(N/D)` and `Ceil` is `ceil(N/D)` for the exact
+rational `N/D`, whatever the signs. The contract defines `floor(N/D)` with
+integer division by the positive divisor `|D|` after moving the sign into the
+numerator, so negative quotients round down rather than toward zero.
+
+| Actual method | Exact result and refusal order |
+| --- | --- |
+| `I256::checked_mul(a, b)` | `S(a)*S(b)` exactly when it is in `[-2^255, 2^255)`; otherwise exactly `Overflow` |
+| `I256::checked_div(n, d, mode)` | `ZeroDivisor` exactly when `S(d) = 0`; then `Inexact` for `Exact` when `S(d)` does not divide `S(n)`; otherwise the signed floor or ceiling, with the exact signed `Overflow` partition (for example `-2^255 / -1`) |
+| `I256::mul_div_positive(a, b, den, mode)` | `Domain` exactly when `S(den) <= 0`; then `Overflow` when `floor(|S(a)*S(b)| / S(den)) >= 2^256`; then `Inexact`; otherwise the signed floor or ceiling of `S(a)*S(b)/S(den)` with the exact signed `Overflow` partition |
+| `I256::nonnegative_mul_div(a, b, den, mode)` | `Domain` when `S(a) < 0` or `S(b) < 0`; otherwise exactly `mul_div_positive` |
+| `I256::mul_unsigned_signed_div(a, b, c, den, mode)` | With `P = S(a)*U(b)*S(c)` and `D = U(den)`: `ZeroDivisor` when `D = 0`; then `Overflow` when `floor(|P|/D) >= 2^256`; then `Inexact`; otherwise the signed floor or ceiling of `P/D` with the exact signed `Overflow` partition |
+| `I256::nonnegative_products_ge(a, b)` | `Domain` when any of the six factors is negative; otherwise whether the first signed triple product is at least the second |
+| `I256::try_i128(x)` | `S(x)` exactly when it is in `[-2^127, 2^127)`; otherwise exactly `Overflow` |
+
+These statements are proved for the actual bodies under the stated assumptions,
+with no added public precondition. Each method computes magnitudes with the
+proved unsigned methods and applies the sign with the proved `from_magnitude`.
+A checked lemma shows that the private magnitude rounding selection realizes
+signed rounding in every sign case, including a zero numerator with either
+sign, and that a remainder test on magnitudes is exactly signed divisibility.
+The magnitude quotient check precedes the inexact check, so an oversized exact
+quotient with a remainder is refused as `Overflow`, as the code does.
+
+Two bodies changed form with unchanged values: the zero test
+`den == Self::ZERO` in `mul_div_positive` compares the same two words, and
+`nonnegative_products_ge` checks the six factors in the same order with an
+indexed loop and builds the bit arrays directly instead of through
+`iter().chain(..)` and `map(..)`. A native test compares both with verbatim
+copies of the previous bodies on boundary and generated inputs in every
+rounding mode, and checks each position of a single negative factor.
+
+The closure growth again unsettled two earlier proofs, the lexicographic order
+lemma and the two-limb subtraction clause, so they now state their steps
+explicitly; their contracts are unchanged apart from compiler-assigned
+identifiers. Seven controls are refused semantically: a product with the wrong
+sign, reversed magnitude rounding, a positive-denominator check that admits
+zero, a nonnegativity check that skips the second factor, a mixed ratio that
+uses raw bits instead of a magnitude, a factor scan that stops one short and
+a narrowing test that ignores sign extension. All forty-four controls must
+reach their intended semantic failure, and the complete closure has 229
+verification conditions. As a development check, the positive closure also
+verified with twelve different solver seeds.
+
 The square-root methods (`U512::sqrt`, `U512::sqrt_ratio` and
-`U256::geometric_mean`), the signed multiply/divide methods, the raw 512-bit
-word views and `I256::try_i128` remain outside this proof scope. So do
-compiler/ghost erasure, physical resource costs, and the Schema2 and factory
-obligations below.
+`U256::geometric_mean`) and the raw 512-bit word views remain outside this
+proof scope. So do compiler/ghost erasure, physical resource costs, and the
+Schema2 and factory obligations below.
 
 ### Earlier schema checkpoint
 

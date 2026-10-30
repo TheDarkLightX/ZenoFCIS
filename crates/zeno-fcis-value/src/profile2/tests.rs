@@ -701,3 +701,89 @@ fn mul_div_family_preserves_the_previous_expression_forms() {
         }
     }
 }
+
+/// Verbatim copies of the previous signed bodies whose expressions changed form.
+mod previous_signed {
+    use super::super::{Failure, I256, Rounding, U256};
+
+    pub(super) fn mul_div_positive(
+        a: I256,
+        b: I256,
+        den: I256,
+        mode: Rounding,
+    ) -> Result<I256, Failure> {
+        if den.is_negative() || den == I256::ZERO {
+            return Err(Failure::Domain);
+        }
+        let negative = a.is_negative() != b.is_negative();
+        let q = a.magnitude().mul_div(
+            b.magnitude(),
+            den.magnitude(),
+            I256::magnitude_round(mode, negative),
+        )?;
+        I256::from_magnitude(q, negative)
+    }
+    pub(super) fn nonnegative_products_ge(a: [I256; 3], b: [I256; 3]) -> Result<bool, Failure> {
+        for x in a.iter().chain(b.iter()) {
+            if x.is_negative() {
+                return Err(Failure::Domain);
+            }
+        }
+        U256::products_ge(a.map(|x| x.0), b.map(|x| x.0))
+    }
+}
+
+#[test]
+fn signed_family_preserves_the_previous_expression_forms() {
+    let values: Vec<I256> = helper_inputs::<2>(0x243f_6a88_85a3_08d3, 60)
+        .into_iter()
+        .map(|words| I256::from_bits(U256::from_words_le(words)))
+        .chain([
+            I256::ZERO,
+            I256::MIN,
+            I256::MAX,
+            I256::from_i128(-1),
+            I256::from_i128(1),
+        ])
+        .collect();
+    let modes = [Rounding::Floor, Rounding::Ceil, Rounding::Exact];
+    let mut count = 0;
+    for (index, a) in values.iter().enumerate() {
+        for b in values.iter().skip(index % 13).step_by(13) {
+            for den in values.iter().skip(index % 17).step_by(17) {
+                let (a, b, den) = (*a, *b, *den);
+                for mode in modes {
+                    assert_eq!(
+                        a.mul_div_positive(b, den, mode),
+                        previous_signed::mul_div_positive(a, b, den, mode)
+                    );
+                }
+                let c = values[(index * 7) % values.len()];
+                let left = [a, b, den];
+                let right = [b, den, c];
+                assert_eq!(
+                    I256::nonnegative_products_ge(left, right),
+                    previous_signed::nonnegative_products_ge(left, right)
+                );
+                count += 1;
+            }
+        }
+    }
+    assert!(count > 1000, "too few compared inputs: {count}");
+    // Every position of a single negative factor is refused as before.
+    let one = I256::from_i128(1);
+    for position in 0..6 {
+        let mut factors = [one; 6];
+        factors[position] = I256::from_i128(-1);
+        let left = [factors[0], factors[1], factors[2]];
+        let right = [factors[3], factors[4], factors[5]];
+        assert_eq!(
+            I256::nonnegative_products_ge(left, right),
+            Err(Failure::Domain)
+        );
+        assert_eq!(
+            previous_signed::nonnegative_products_ge(left, right),
+            Err(Failure::Domain)
+        );
+    }
+}

@@ -44,6 +44,8 @@ MULTIPLICATION = {"U256::full_product", "U256::checked_mul"}
 WIDE = {"U512::checked_add", "U512::multiply_u256", "U512::div_rem", "U768::div_rem"}
 MULDIV = {"U256::mul_add_div_rem", "U256::mul_div", "U256::mul_div_half_up", "U256::mul3_div",
           "U256::products_ge"}
+SIGNED = {"I256::checked_mul", "I256::checked_div", "I256::mul_div_positive", "I256::nonnegative_mul_div",
+          "I256::mul_unsigned_signed_div", "I256::nonnegative_products_ge", "I256::try_i128"}
 # Private module-level helpers whose actual bodies a control may mutate.
 HELPERS = {"divide", "add_word", "multiply"}
 
@@ -118,7 +120,7 @@ def configuration(root, profile, expected=None):
             == CONSTANTS, "constant obligations incomplete")
     stages = {o["stage"] for o in profile["obligations"]}
     require(stages.issubset({"constants", "conversions", "checked", "division", "multiplication", "wide",
-                             "muldiv"}), "unreviewed numeric stage")
+                             "muldiv", "signed"}), "unreviewed numeric stage")
     if "division" in stages:
         require("checked" in stages and
                 {o["member"] for o in profile["obligations"] if o["stage"] == "division"} == DIVISION,
@@ -135,6 +137,10 @@ def configuration(root, profile, expected=None):
         require("wide" in stages and
                 {o["member"] for o in profile["obligations"] if o["stage"] == "muldiv"} == MULDIV,
                 "mul_div obligations incomplete")
+    if "signed" in stages:
+        require("muldiv" in stages and
+                {o["member"] for o in profile["obligations"] if o["stage"] == "signed"} == SIGNED,
+                "signed multiply/divide obligations incomplete")
     if "checked" in stages:
         require("conversions" in stages and
                 {o["member"] for o in profile["obligations"] if o["stage"] == "checked"} == CHECKED,

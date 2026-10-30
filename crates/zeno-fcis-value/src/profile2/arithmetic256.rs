@@ -137,6 +137,9 @@ fn subtract<const N: usize>(a: [u128; N], b: [u128; N]) -> ([u128; N], bool) {
         #[cfg(verus_keep_ghost)]
         proof! {
             if N == 2 {
+                numeric_model::prefix_two(out@, i as nat + 1);
+                numeric_model::prefix_two(a@, i as nat + 1);
+                numeric_model::prefix_two(b@, i as nat + 1);
                 assert(numeric_model::prefix2(out@, i as int + 1)
                     - numeric_model::place2(i as int + 1) * (if borrow { 1int } else { 0int })
                     == numeric_model::prefix2(a@, i as int + 1)
@@ -987,17 +990,28 @@ impl I256 {
             Ok(result)
         }
     }
-}
-
-#[cfg_attr(verus_keep_ghost, verifier::external)]
-impl I256 {
     /// Multiplies two signed values, refusing signed overflow.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::signed_result(result,
+            numeric_model::signed(self) * numeric_model::signed(other)),
+    ))]
     pub fn checked_mul(self, other: Self) -> Result<Self, Failure> {
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            let product = numeric_model::signed(self) * numeric_model::signed(other);
+            numeric_model::signed_product(numeric_model::signed(self), numeric_model::signed(other));
+            if numeric_model::magnitude_of(product) >= numeric_model::modulus() {
+                numeric_model::outside_signed(product);
+            }
+        }
         Self::from_magnitude(
             self.magnitude().checked_mul(other.magnitude())?,
             self.is_negative() != other.is_negative(),
         )
     }
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures result == numeric_model::magnitude_mode(mode, negative),
+    ))]
     fn magnitude_round(mode: Rounding, negative: bool) -> Rounding {
         match (mode, negative) {
             (Rounding::Floor, true) | (Rounding::Ceil, false) => Rounding::Ceil,
@@ -1006,19 +1020,52 @@ impl I256 {
         }
     }
     /// Divides with signed rounding, refusing zero, inexactness or signed overflow.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::signed_div_result(numeric_model::signed(self), numeric_model::signed(den),
+            mode, result),
+    ))]
     pub fn checked_div(self, den: Self, mode: Rounding) -> Result<Self, Failure> {
         let negative = self.is_negative() != den.is_negative();
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            let (n, d) = (numeric_model::signed(self), numeric_model::signed(den));
+            if d != 0 {
+                numeric_model::signed_rounding(n, d, mode, negative);
+                let m = numeric_model::magnitude_of(n);
+                let e = numeric_model::magnitude_of(d);
+                vstd::arithmetic::div_mod::lemma_div_pos_is_pos(m, e);
+                if (mode != Rounding::Exact || m % e == 0) && numeric_model::rounded_value(m / e, m % e,
+                    numeric_model::magnitude_mode(mode, negative)) >= numeric_model::modulus() {
+                    numeric_model::outside_signed(numeric_model::signed_rounded_value(n, d, mode));
+                }
+            }
+        }
         let q = self
             .magnitude()
             .checked_div(den.magnitude(), Self::magnitude_round(mode, negative))?;
         Self::from_magnitude(q, negative)
     }
     /// Divides the full signed product by a positive denominator with checked rounding.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::mul_div_positive_result(self, b, den, mode, result),
+    ))]
     pub fn mul_div_positive(self, b: Self, den: Self, mode: Rounding) -> Result<Self, Failure> {
-        if den.is_negative() || den == Self::ZERO {
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::conversion_representation();
+            numeric_model::zero_words();
+            numeric_model::signed_bounds(den);
+            numeric_model::unsigned_bounds(den.0);
+        }
+        if den.is_negative() || den.0.0 == Self::ZERO.0.0 {
             return Err(Failure::Domain);
         }
         let negative = self.is_negative() != b.is_negative();
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::signed_magnitude_division(numeric_model::signed(self), numeric_model::signed(b),
+                1, numeric_model::signed(den), mode, negative);
+        }
         let q = self.magnitude().mul_div(
             b.magnitude(),
             den.magnitude(),
@@ -1027,6 +1074,13 @@ impl I256 {
         Self::from_magnitude(q, negative)
     }
     /// Requires nonnegative factors and a positive denominator before rounded division.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures if numeric_model::signed(self) < 0 || numeric_model::signed(b) < 0 {
+            result == Err::<I256, Failure>(Failure::Domain)
+        } else {
+            numeric_model::mul_div_positive_result(self, b, den, mode, result)
+        },
+    ))]
     pub fn nonnegative_mul_div(self, b: Self, den: Self, mode: Rounding) -> Result<Self, Failure> {
         if self.is_negative() || b.is_negative() {
             return Err(Failure::Domain);
@@ -1035,6 +1089,11 @@ impl I256 {
     }
     /// Raw signed*unsigned*signed ratio; scale/unit and payer/payee policies
     /// belong to a separately bound consumer, not this arithmetic helper.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::signed_mul_div_result(
+            numeric_model::signed(self) * numeric_model::unsigned(b) * numeric_model::signed(c),
+            numeric_model::unsigned(den), mode, result),
+    ))]
     pub fn mul_unsigned_signed_div(
         self,
         b: U256,
@@ -1043,6 +1102,13 @@ impl I256 {
         mode: Rounding,
     ) -> Result<Self, Failure> {
         let negative = self.is_negative() != c.is_negative();
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            numeric_model::unsigned_bounds(b);
+            numeric_model::unsigned_bounds(den);
+            numeric_model::signed_magnitude_division(numeric_model::signed(self), numeric_model::signed(c),
+                numeric_model::unsigned(b), numeric_model::unsigned(den), mode, negative);
+        }
         let q = self.magnitude().mul3_div(
             b,
             c.magnitude(),
@@ -1052,16 +1118,39 @@ impl I256 {
         Self::from_magnitude(q, negative)
     }
     /// Compares two triple products after refusing any negative factor.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures result == if numeric_model::any_negative(a, b) {
+            Err::<bool, Failure>(Failure::Domain)
+        } else {
+            Ok::<bool, Failure>(numeric_model::signed_triple(a) >= numeric_model::signed_triple(b))
+        },
+    ))]
     pub fn nonnegative_products_ge(a: [Self; 3], b: [Self; 3]) -> Result<bool, Failure> {
-        for x in a.iter().chain(b.iter()) {
+        let mut i = 0;
+        #[cfg_attr(verus_keep_ghost, verus_spec(
+            invariant i <= 6,
+                forall|k: int| 0 <= k < 3 && k < i ==> numeric_model::signed(a@[k]) >= 0,
+                forall|k: int| 0 <= k < 3 && k + 3 < i ==> numeric_model::signed(b@[k]) >= 0,
+            decreases 6 - i,
+        ))]
+        while i < 6 {
+            let x = if i < 3 { a[i] } else { b[i - 3] };
             if x.is_negative() {
                 return Err(Failure::Domain);
             }
+            i += 1;
         }
-        U256::products_ge(a.map(|x| x.0), b.map(|x| x.0))
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::nonnegative_triples(a, b); }
+        U256::products_ge([a[0].0, a[1].0, a[2].0], [b[0].0, b[1].0, b[2].0])
     }
     /// Returns the value if its upper word is a valid 128-bit sign extension.
+    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
+        ensures numeric_model::i128_result(result, numeric_model::signed(self)),
+    ))]
     pub fn try_i128(self) -> Result<i128, Failure> {
+        #[cfg(verus_keep_ghost)]
+        proof! { numeric_model::sign_extension(self); }
         let low = self.0.0[0] as i128;
         if self.0.0[1] == if low < 0 { u128::MAX } else { 0 } {
             Ok(low)

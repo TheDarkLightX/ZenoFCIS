@@ -690,6 +690,11 @@ pub(super) proof fn narrow_bounds(words: Seq<u128>)
     place_positive(2);
     if forall|k: int| 2 <= k < words.len() ==> words[k] == 0 {
         upper_zero(words, 2);
+        let u = upper(words, 2);
+        assert(u == 0);
+        lemma_mul_by_zero_is_zero(place(2));
+        assert(place(2) * u == 0);
+        assert(prefix2(words, 2) == words[0] as int + radix() * words[1] as int);
     } else {
         let k = choose|k: int| 2 <= k < words.len() && words[k] != 0;
         value_split(words, (k + 1) as nat);
@@ -899,12 +904,16 @@ proof fn lex_value(a: Seq<u128>, b: Seq<u128>, j: int)
     limbs_bounds(b, j as nat);
     let p = place(j as nat);
     place_positive(j as nat);
-    assert(limbs(a, k) == limbs(a, j as nat) + p * a[j] as int);
-    assert(limbs(b, k) == limbs(b, j as nat) + p * b[j] as int);
-    lemma_mul_inequality(a[j] as int + 1, b[j] as int, p);
-    lemma_mul_is_distributive_add_other_way(p, a[j] as int, 1);
-    lemma_mul_is_commutative(p, a[j] as int + 1);
-    lemma_mul_is_commutative(p, b[j] as int);
+    let (low_a, low_b) = (limbs(a, j as nat), limbs(b, j as nat));
+    let (x, y) = (a[j] as int, b[j] as int);
+    assert(limbs(a, k) == low_a + p * x);
+    assert(limbs(b, k) == low_b + p * y);
+    assert(low_a + p * x < low_b + p * y) by(nonlinear_arith)
+        requires 0 <= low_a < p, 0 <= low_b, x < y, p > 0;
+    let high = place(k) * upper(a, k);
+    assert(place(k) * upper(b, k) == high);
+    assert(value(a) == limbs(a, k) + high);
+    assert(value(b) == limbs(b, k) + high);
 }
 
 // Bits of the limb meaning.
@@ -1193,5 +1202,319 @@ pub(super) proof fn product_row(a: Seq<u128>, b: Seq<u128>, i: nat)
 {
     assert(limbs(a, i + 1) == limbs(a, i) + place(i) * a[i as int] as int);
     lemma_mul_is_distributive_add_other_way(value(b), limbs(a, i), place(i) * a[i as int] as int);
+}
+
+// Signed multiplication and division by magnitudes.
+
+/// The absolute value of an integer.
+pub open spec fn magnitude_of(x: int) -> int {
+    if x < 0 { -x } else { x }
+}
+/// floor(n/d) for nonzero d; integer division by a positive divisor rounds toward
+/// negative infinity, and n/d = (-n)/(-d).
+pub open spec fn floor_div(n: int, d: int) -> int {
+    if d > 0 { n / d } else { (-n) / (-d) }
+}
+/// ceil(n/d) for nonzero d.
+pub open spec fn ceil_div(n: int, d: int) -> int {
+    -floor_div(-n, d)
+}
+/// The signed integer selected by a rounding mode for the exact ratio n/d.
+pub open spec fn signed_rounded_value(n: int, d: int, mode: super::Rounding) -> int {
+    match mode {
+        super::Rounding::Ceil => ceil_div(n, d),
+        _ => floor_div(n, d),
+    }
+}
+/// The unsigned rounding of |n|/|d| that realizes a signed rounding of n/d.
+pub open spec fn magnitude_mode(mode: super::Rounding, negative: bool) -> super::Rounding {
+    if mode == super::Rounding::Exact {
+        super::Rounding::Exact
+    } else if (mode == super::Rounding::Floor) == negative {
+        super::Rounding::Ceil
+    } else {
+        super::Rounding::Floor
+    }
+}
+/// I256::checked_div: ZeroDivisor first, then Inexact for Exact with a remainder,
+/// then the rounded quotient with the exact signed Overflow partition.
+pub open spec fn signed_div_result(n: int, d: int, mode: super::Rounding,
+    result: Result<I256, Failure>) -> bool {
+    if d == 0 {
+        result == Err::<I256, Failure>(Failure::ZeroDivisor)
+    } else if mode == super::Rounding::Exact && floor_div(n, d) * d != n {
+        result == Err::<I256, Failure>(Failure::Inexact)
+    } else {
+        signed_result(result, signed_rounded_value(n, d, mode))
+    }
+}
+
+/// Signed complete-product division by a nonnegative denominator: ZeroDivisor,
+/// then Overflow when the magnitude quotient needs more than 256 bits, then
+/// Inexact for Exact with a remainder, then the rounded quotient with the exact
+/// signed Overflow partition.
+pub open spec fn signed_mul_div_result(p: int, d: int, mode: super::Rounding,
+    result: Result<I256, Failure>) -> bool {
+    if d == 0 {
+        result == Err::<I256, Failure>(Failure::ZeroDivisor)
+    } else if magnitude_of(p) / d >= modulus() {
+        result == Err::<I256, Failure>(Failure::Overflow)
+    } else if mode == super::Rounding::Exact && floor_div(p, d) * d != p {
+        result == Err::<I256, Failure>(Failure::Inexact)
+    } else {
+        signed_result(result, signed_rounded_value(p, d, mode))
+    }
+}
+/// I256::mul_div_positive: Domain unless the denominator is positive, then the
+/// signed complete-product contract for a*b/den.
+pub open spec fn mul_div_positive_result(a: I256, b: I256, den: I256, mode: super::Rounding,
+    result: Result<I256, Failure>) -> bool {
+    if signed(den) <= 0 {
+        result == Err::<I256, Failure>(Failure::Domain)
+    } else {
+        signed_mul_div_result(signed(a) * signed(b), signed(den), mode, result)
+    }
+}
+
+/// Whether any of six signed factors is negative.
+pub open spec fn any_negative(a: [I256; 3], b: [I256; 3]) -> bool {
+    exists|k: int| 0 <= k < 3 && (signed(a@[k]) < 0 || signed(b@[k]) < 0)
+}
+/// The product of three signed factors.
+pub open spec fn signed_triple(x: [I256; 3]) -> int {
+    signed(x@[0]) * signed(x@[1]) * signed(x@[2])
+}
+/// I256::try_i128: the exact value iff it fits i128, otherwise exactly Overflow.
+pub open spec fn i128_result(result: Result<i128, Failure>, value: int) -> bool {
+    match result {
+        Ok(actual) => i128::MIN <= value <= i128::MAX && actual as int == value,
+        Err(error) => error == Failure::Overflow && !(i128::MIN <= value <= i128::MAX),
+    }
+}
+
+/// Integer division of a negated nonnegative value by a positive divisor.
+pub(super) proof fn negated_division(m: int, e: int)
+    requires m >= 0, e > 0,
+    ensures (-m) / e == -(m / e) - (if m % e == 0 { 0int } else { 1int }),
+{
+    lemma_fundamental_div_mod(m, e);
+    lemma_mod_bound(m, e);
+    let (q, r) = (m / e, m % e);
+    if r == 0 {
+        assert(-m == (-q) * e + 0) by(nonlinear_arith) requires m == e * q + r, r == 0;
+        lemma_fundamental_div_mod_converse(-m, e, -q, 0);
+    } else {
+        assert(-m == (-q - 1) * e + (e - r)) by(nonlinear_arith) requires m == e * q + r;
+        lemma_fundamental_div_mod_converse(-m, e, -q - 1, e - r);
+    }
+}
+
+/// Signed rounding of n/d is the signed magnitude rounding of |n|/|d|.
+pub(super) proof fn signed_rounding(n: int, d: int, mode: super::Rounding, negative: bool)
+    requires d != 0, n == 0 || negative == ((n < 0) != (d < 0)),
+    ensures
+        (floor_div(n, d) * d == n) == (magnitude_of(n) % magnitude_of(d) == 0),
+        mode != super::Rounding::Exact || magnitude_of(n) % magnitude_of(d) == 0 ==>
+            signed_rounded_value(n, d, mode) == {
+                let v = rounded_value(magnitude_of(n) / magnitude_of(d), magnitude_of(n) % magnitude_of(d),
+                    magnitude_mode(mode, negative));
+                if negative { -v } else { v }
+            },
+{
+    let (m, e) = (magnitude_of(n), magnitude_of(d));
+    lemma_fundamental_div_mod(m, e);
+    lemma_mod_bound(m, e);
+    let (q, r) = (m / e, m % e);
+    let up = if r == 0 { 0int } else { 1int };
+    negated_division(m, e);
+    if n == 0 {
+        lemma_small_mod(0, e as nat);
+        lemma_basic_div(0, e);
+        assert(q == 0 && r == 0 && up == 0);
+        assert(floor_div(n, d) == 0);
+        assert(floor_div(-n, d) == 0);
+    } else if n > 0 && d > 0 {
+        assert(floor_div(n, d) == q);
+        assert(floor_div(-n, d) == -q - up);
+        assert((q * d == n) == (r == 0)) by(nonlinear_arith)
+            requires n == d * q + r, 0 <= r < d;
+    } else if n < 0 && d > 0 {
+        assert(floor_div(n, d) == -q - up);
+        assert(floor_div(-n, d) == q);
+        assert(((-q - up) * d == n) == (r == 0)) by(nonlinear_arith)
+            requires -n == d * q + r, 0 <= r < d, up == if r == 0 { 0int } else { 1int };
+    } else if n > 0 && d < 0 {
+        assert(floor_div(n, d) == -q - up);
+        assert(floor_div(-n, d) == q);
+        assert(((-q - up) * d == n) == (r == 0)) by(nonlinear_arith)
+            requires n == (-d) * q + r, 0 <= r < -d, up == if r == 0 { 0int } else { 1int };
+    } else {
+        assert(floor_div(n, d) == q);
+        assert(floor_div(-n, d) == -q - up);
+        assert((q * d == n) == (r == 0)) by(nonlinear_arith)
+            requires -n == (-d) * q + r, 0 <= r < -d;
+    }
+    // In every case the two floor quotients are the signed magnitude quotients.
+    assert(negative ==> floor_div(n, d) == -q - up && floor_div(-n, d) == q);
+    assert(!negative ==> floor_div(n, d) == q && floor_div(-n, d) == -q - up);
+    assert(ceil_div(n, d) == -floor_div(-n, d));
+    if mode != super::Rounding::Exact || r == 0 {
+        let mm = magnitude_mode(mode, negative);
+        assert(rounded_value(q, r, super::Rounding::Ceil) == q + up);
+        assert(rounded_value(q, r, super::Rounding::Floor) == q);
+        assert(rounded_value(q, r, super::Rounding::Exact) == q);
+        if mode == super::Rounding::Floor {
+            assert(signed_rounded_value(n, d, mode) == floor_div(n, d));
+            assert(mm == if negative { super::Rounding::Ceil } else { super::Rounding::Floor });
+        } else if mode == super::Rounding::Ceil {
+            assert(signed_rounded_value(n, d, mode) == -floor_div(-n, d));
+            assert(mm == if negative { super::Rounding::Floor } else { super::Rounding::Ceil });
+        } else {
+            assert(r == 0 && up == 0);
+            assert(signed_rounded_value(n, d, mode) == floor_div(n, d));
+            assert(mm == super::Rounding::Exact);
+        }
+    }
+}
+
+/// The magnitude and sign of a product.
+pub(super) proof fn signed_product(x: int, y: int)
+    ensures
+        magnitude_of(x * y) == magnitude_of(x) * magnitude_of(y),
+        x * y != 0 ==> ((x * y < 0) == ((x < 0) != (y < 0))),
+        (x * y == 0) == (x == 0 || y == 0),
+{
+    let (a, b) = (magnitude_of(x), magnitude_of(y));
+    if x < 0 && y < 0 {
+        assert(x * y == a * b) by(nonlinear_arith) requires a == -x, b == -y;
+        lemma_mul_strictly_positive(a, b);
+    } else if x < 0 && y > 0 {
+        assert(x * y == -(a * b)) by(nonlinear_arith) requires a == -x, b == y;
+        lemma_mul_strictly_positive(a, b);
+    } else if x > 0 && y < 0 {
+        assert(x * y == -(a * b)) by(nonlinear_arith) requires a == x, b == -y;
+        lemma_mul_strictly_positive(a, b);
+    } else if x > 0 && y > 0 {
+        lemma_mul_strictly_positive(x, y);
+    } else {
+        assert(x * y == 0 && a * b == 0) by(nonlinear_arith)
+            requires x == 0 || y == 0, a == 0 || b == 0;
+    }
+}
+
+/// The magnitude computation used for x*k*y/d with k, d >= 0 and the sign of x and y.
+pub(super) proof fn signed_magnitude_division(x: int, y: int, k: int, d: int, mode: super::Rounding,
+    negative: bool)
+    requires k >= 0, d >= 0, negative == ((x < 0) != (y < 0)),
+    ensures
+        magnitude_of(x * k * y) == magnitude_of(x) * k * magnitude_of(y),
+        magnitude_of(x) * k * magnitude_of(y) >= 0,
+        d > 0 ==> (floor_div(x * k * y, d) * d == x * k * y)
+            == ((magnitude_of(x) * k * magnitude_of(y)) % d == 0),
+        d > 0 && (mode != super::Rounding::Exact || (magnitude_of(x) * k * magnitude_of(y)) % d == 0) ==>
+            signed_rounded_value(x * k * y, d, mode) == {
+                let p = magnitude_of(x) * k * magnitude_of(y);
+                let v = rounded_value(p / d, p % d, magnitude_mode(mode, negative));
+                if negative { -v } else { v }
+            },
+        d > 0 && (mode != super::Rounding::Exact || (magnitude_of(x) * k * magnitude_of(y)) % d == 0)
+            && rounded_value((magnitude_of(x) * k * magnitude_of(y)) / d,
+                (magnitude_of(x) * k * magnitude_of(y)) % d, magnitude_mode(mode, negative)) >= modulus()
+            ==> !(-half() <= signed_rounded_value(x * k * y, d, mode) < half()),
+{
+    signed_product(x, k);
+    signed_product(x * k, y);
+    assert(magnitude_of(k) == k);
+    lemma_mul_nonnegative(magnitude_of(x), k);
+    lemma_mul_nonnegative(magnitude_of(x) * k, magnitude_of(y));
+    let p = x * k * y;
+    if d > 0 {
+        // The product's sign is the factors' sign whenever it is nonzero.
+        if p != 0 {
+            assert(x * k != 0 && y != 0);
+            assert((x * k < 0) == (x < 0)) by {
+                signed_product(x, k);
+                assert(k != 0);
+            }
+        }
+        signed_rounding(p, d, mode, negative);
+        assert(magnitude_of(d) == d);
+        let v = rounded_value((magnitude_of(x) * k * magnitude_of(y)) / d,
+            (magnitude_of(x) * k * magnitude_of(y)) % d, magnitude_mode(mode, negative));
+        if (mode != super::Rounding::Exact || (magnitude_of(x) * k * magnitude_of(y)) % d == 0)
+            && v >= modulus() {
+            outside_signed(signed_rounded_value(p, d, mode));
+        }
+    }
+}
+
+/// Six nonnegative signed factors have the unsigned meanings of their bits.
+pub(super) proof fn nonnegative_triples(a: [I256; 3], b: [I256; 3])
+    requires
+        forall|k: int| 0 <= k < 3 ==> signed(a@[k]) >= 0,
+        forall|k: int| 0 <= k < 3 ==> signed(b@[k]) >= 0,
+    ensures
+        !any_negative(a, b),
+        signed_triple(a) == unsigned(a@[0].0) * unsigned(a@[1].0) * unsigned(a@[2].0),
+        signed_triple(b) == unsigned(b@[0].0) * unsigned(b@[1].0) * unsigned(b@[2].0),
+{
+    conversion_representation();
+    assert forall|x: I256| signed(x) >= 0 implies #[trigger] signed(x) == unsigned(x.0) by {
+        signed_bounds(x);
+        unsigned_bounds(x.0);
+    }
+    assert(signed(a@[0]) >= 0 && signed(a@[1]) >= 0 && signed(a@[2]) >= 0);
+    assert(signed(b@[0]) >= 0 && signed(b@[1]) >= 0 && signed(b@[2]) >= 0);
+}
+
+/// The two-complement sign extension test used by try_i128.
+pub(super) proof fn sign_extension(x: I256)
+    ensures
+        ((x.0.0@[0] as i128) as int)
+            == if x.0.0@[0] < 170141183460469231731687303715884105728u128 { x.0.0@[0] as int }
+               else { x.0.0@[0] as int - 340282366920938463463374607431768211456int },
+        ((x.0.0@[0] as i128) < 0) == (x.0.0@[0] >= 170141183460469231731687303715884105728u128),
+        (x.0.0@[1] == if (x.0.0@[0] as i128) < 0 { u128::MAX } else { 0u128 })
+            == (i128::MIN <= signed(x) <= i128::MAX),
+        i128::MIN <= signed(x) <= i128::MAX ==> signed(x) == ((x.0.0@[0] as i128) as int),
+{
+    conversion_representation();
+    radix_power();
+    let (lo, hi) = (x.0.0@[0], x.0.0@[1]);
+    assert(((lo as i128) as int) == if lo < 170141183460469231731687303715884105728u128 { lo as int }
+        else { lo as int - 340282366920938463463374607431768211456int }) by(bit_vector);
+    let r = radix();
+    let u = lo as int + r * hi as int;
+    assert(unsigned(x.0) == u);
+    assert(modulus() == r * r);
+    assert(half() == r * 170141183460469231731687303715884105728int);
+    if hi == 0 {
+        assert(u == lo as int);
+    } else if hi == u128::MAX {
+        assert(u == lo as int + r * r - r) by(nonlinear_arith)
+            requires u == lo as int + r * hi as int, hi as int == r - 1;
+    } else if hi < 170141183460469231731687303715884105728u128 {
+        assert(u >= r) by(nonlinear_arith) requires u == lo as int + r * hi as int, hi >= 1, r > 0, lo >= 0;
+        assert(u < half()) by(nonlinear_arith)
+            requires u == lo as int + r * hi as int, (hi as int) <= 170141183460469231731687303715884105727int,
+                (lo as int) < r, r == 340282366920938463463374607431768211456int,
+                half() == r * 170141183460469231731687303715884105728int;
+    } else {
+        assert(u >= half()) by(nonlinear_arith)
+            requires u == lo as int + r * hi as int, hi as int >= 170141183460469231731687303715884105728int,
+                lo >= 0, r > 0, half() == r * 170141183460469231731687303715884105728int;
+        assert(u - modulus() <= -r - 1) by(nonlinear_arith)
+            requires u == lo as int + r * hi as int, (hi as int) <= r - 2, (lo as int) <= r - 1,
+                modulus() == r * r;
+    }
+}
+
+/// A magnitude at least 2^256 is outside the signed range.
+pub(super) proof fn outside_signed(value: int)
+    requires magnitude_of(value) >= modulus(),
+    ensures !(-half() <= value < half()),
+{
+    radix_power();
+    assert(half() == modulus() / 2);
 }
 }

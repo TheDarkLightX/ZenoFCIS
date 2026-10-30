@@ -309,6 +309,68 @@ def include_muldiv(profile):
         "multiplier whenever its output has room for the product). U256 has no checked_neg method. "
         "The root and signed multiply/divide families, the raw wide word views, other arithmetic and "
         "compiler/ghost-erasure correspondence are not proved.")
+    if any(o["stage"] == "signed" for o in profile["obligations"]):
+        include_signed(profile)
+
+
+def include_signed(profile):
+    """Reviewed exact signed multiplication, division and narrowing statements."""
+    statements = [
+        ("I256::checked_mul", ["I256", "I256"], "Result<I256,Failure>",
+         "Exact signed product iff in [-2^255,2^255); otherwise exactly Overflow."),
+        ("I256::checked_div", ["I256", "I256", "Rounding"], "Result<I256,Failure>",
+         "ZeroDivisor iff D = 0; otherwise Inexact iff Exact and D does not divide N; otherwise floor(N/D), "
+         "or ceil(N/D) for Ceil, toward the signed infinities, with the exact signed Overflow partition."),
+        ("I256::mul_div_positive", ["I256", "I256", "I256", "Rounding"], "Result<I256,Failure>",
+         "Domain iff D <= 0; then Overflow iff floor(|a*b|/D) >= 2^256; then Inexact iff Exact and D does not "
+         "divide a*b; otherwise the signed floor or ceiling of a*b/D with the exact signed Overflow partition."),
+        ("I256::nonnegative_mul_div", ["I256", "I256", "I256", "Rounding"], "Result<I256,Failure>",
+         "Domain iff a < 0 or b < 0; otherwise exactly mul_div_positive."),
+        ("I256::mul_unsigned_signed_div", ["I256", "U256", "I256", "U256", "Rounding"], "Result<I256,Failure>",
+         "For P = a*U(b)*c and D = U(den): ZeroDivisor iff D = 0; then Overflow iff floor(|P|/D) >= 2^256; "
+         "then Inexact iff Exact and D does not divide P; otherwise the signed floor or ceiling of P/D with "
+         "the exact signed Overflow partition."),
+        ("I256::nonnegative_products_ge", ["[I256;3]", "[I256;3]"], "Result<bool,Failure>",
+         "Domain iff any of the six factors is negative; otherwise whether the first triple product is at "
+         "least the second."),
+        ("I256::try_i128", ["I256"], "Result<i128,Failure>",
+         "Exact value iff it is in [-2^127,2^127); otherwise exactly Overflow."),
+    ]
+    profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != "signed"] + [
+        {"stage": "signed", "member": member, "parameters": parameters, "result": result,
+         "meaning": meaning, "refinement_display": gate.NAMESPACE + "arithmetic256::" + member}
+        for member, parameters, result, meaning in statements]
+    defects = [
+        ("signed_mul_wrong_sign", "I256::checked_mul",
+         "self.is_negative() != other.is_negative(),", "self.is_negative() == other.is_negative(),"),
+        ("signed_div_reversed_magnitude_rounding", "I256::checked_div",
+         "Self::magnitude_round(mode, negative)", "Self::magnitude_round(mode, !negative)"),
+        ("positive_mul_div_accepts_zero_denominator", "I256::mul_div_positive",
+         "if den.is_negative() || den.0.0 == Self::ZERO.0.0 {", "if den.is_negative() {"),
+        ("nonnegative_mul_div_skips_second_factor", "I256::nonnegative_mul_div",
+         "if self.is_negative() || b.is_negative() {", "if self.is_negative() {"),
+        ("mixed_ratio_uses_raw_bits", "I256::mul_unsigned_signed_div", "c.magnitude(),", "c.0,"),
+        ("signed_products_skip_last_factor", "I256::nonnegative_products_ge", "while i < 6 {", "while i < 5 {"),
+        ("signed_narrow_ignores_sign_extension", "I256::try_i128",
+         "if self.0.0[1] == if low < 0 { u128::MAX } else { 0 } {", "if self.0.0[1] == 0 {"),
+    ]
+    profile["controls"] = [c for c in profile["controls"] if c["stage"] != "signed"] + [
+        {"stage": "signed", "name": name, "member": member, "old": old, "new": new,
+         "error_source": str(gate.SUBJECT)} for name, member, old, new in defects]
+    profile["scope"] = (
+        "The eight actual associated constants, eleven public conversions and five checked 256-bit "
+        "add/subtract/negation methods with exact integer values and exact Overflow partitions; "
+        "U256::div_rem and U256::checked_div with exact canonical quotient, rounding and refusal "
+        "contracts; U256::full_product and U256::checked_mul with exact product contracts; the "
+        "U512::checked_add, U512::multiply_u256, U512::div_rem and U768::div_rem wrappers; "
+        "U256::mul_add_div_rem, mul_div, mul_div_half_up, mul3_div and products_ge over complete "
+        "512/768-bit products with exact refusal order; and the seven signed I256 multiply, divide, "
+        "complete-product division, comparison and i128 narrowing methods with exact signed rounding "
+        "and refusal contracts, all without public input preconditions. The actual negative_bits "
+        "dependency, the add/subtract carry and borrow helpers, the private divider, word insertion "
+        "and schoolbook multiplier are refined at every limb width (the multiplier whenever its output "
+        "has room for the product). U256 has no checked_neg method. The square-root family, the raw "
+        "wide word views, other arithmetic and compiler/ghost-erasure correspondence are not proved.")
 
 
 def arithmetic_exceptions(root):
@@ -335,7 +397,7 @@ def arithmetic_exceptions(root):
             {"text": "#[cfg_attr(verus_keep_ghost, verus_verify)]", "following": f"impl {kind} {{",
              "reason": "Verifies only the selected actual numeric constants and methods in this impl block."},
         ])
-    for item in ("impl U256 {", "impl I256 {", "impl U512 {"):
+    for item in ("impl U256 {", "impl U512 {"):
         entries.append({"text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
                         "following": item,
                         "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."})
@@ -344,7 +406,7 @@ def arithmetic_exceptions(root):
 
 
 def record(root, out, cache, refresh_ordering, previous_source=None, conversions=False, checked=False,
-           division=False, multiplication=False, wide=False, muldiv=False):
+           division=False, multiplication=False, wide=False, muldiv=False, signed=False):
     profile = json.loads(gate.read(root, gate.PROFILE))
     if conversions or checked:
         include_conversions(profile)
@@ -358,6 +420,8 @@ def record(root, out, cache, refresh_ordering, previous_source=None, conversions
         include_wide(profile)
     if muldiv:
         include_muldiv(profile)
+    if signed:
+        include_signed(profile)
     previous = json.loads(gate.read(root, Path("verification/verus/ordering_types256_profile.json")))
     exceptions = {key: entries for key, entries in previous["native_configuration_exceptions"].items()
                   if key != str(gate.SUBJECT) and key != str(Path("verification/verus/ordering256_types_harness.rs"))}
@@ -502,12 +566,14 @@ def main():
                         help="Add the reviewed 512/768-bit add, product and division wrapper stage")
     parser.add_argument("--include-muldiv", action="store_true",
                         help="Add the reviewed complete-product division, rounding and comparison stage")
+    parser.add_argument("--include-signed", action="store_true",
+                        help="Add the reviewed signed multiply/divide and i128 narrowing stage")
     parser.add_argument("--previous-source", type=Path,
                         help="Exact previous profile sources, required only for a compiler-ID migration review")
     args = parser.parse_args()
     record(gate.ROOT, args.out.absolute(), args.cache, args.refresh_ordering_bindings,
            args.previous_source, args.include_conversions, args.include_checked, args.include_division,
-           args.include_multiplication, args.include_wide, args.include_muldiv)
+           args.include_multiplication, args.include_wide, args.include_muldiv, args.include_signed)
 
 
 if __name__ == "__main__":

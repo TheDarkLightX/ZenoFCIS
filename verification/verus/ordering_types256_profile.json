@@ -7,7 +7,7 @@
     "crates/zeno-fcis-value/src/profile2/ordering_types_model.rs": "a4760c2561e903ee726c2a7489cdfdc2c46483f28861e955e27c32b58d8536a9",
     "crates/zeno-fcis-value/src/profile2/ordering256.rs": "eab89dfe7e5ed2feeb391b567d0a3efb43e5d5d41ea23aa45a77aa61d3a92825",
     "crates/zeno-fcis-value/src/profile2/ordering_model.rs": "d02708ccbae41434efc8acb8e8bcd7bd30f2abc04b7256bd32d15421c3f1544a",
-    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "667bbab2a3898ee6528cb4ee9770a29fb839e7aa46551a5b85a1b2d540a9b415",
+    "crates/zeno-fcis-value/src/profile2/arithmetic256.rs": "d84a36c43a734731cbae38dfd63f5c9a6fa3f472d466e76cfbd4829bbcd6262b",
     "crates/zeno-fcis-value/src/profile2/reference/legacy_wide.rs": "4db8c554f26546e2fa1995f393508ab56c22fad3401a88407b241409f229f1b8",
     "crates/zeno-fcis-value/src/profile2/reference/legacy_wide_model.rs": "98eac195ee436806f7b3d201543400287635e0a3613dafe0ec128a5e3b2409e9",
     "verification/verus/ordering256_types_harness.rs": "3f249c152d982104cb2712b462cf4038fa87da68f0aa1a69d8cc695af09ffecc"
@@ -133,11 +133,6 @@
       {
         "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
         "following": "impl U256 {",
-        "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
-      },
-      {
-        "text": "#[cfg_attr(verus_keep_ghost, verifier::external)]",
-        "following": "impl I256 {",
         "reason": "Unproved arithmetic outside this selected closure; excluded items supply no callable specification."
       },
       {

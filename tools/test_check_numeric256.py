@@ -157,6 +157,20 @@ class SourceAdmission(unittest.TestCase):
             with self.subTest(mode=mode), self.assertRaises(ValueError):
                 gate.configuration(self.root, profile)
 
+    def test_signed_stage_is_complete_and_retains_the_muldiv_stage(self):
+        complete = copy.deepcopy(self.profile)
+        producer.include_signed(complete)
+        gate.configuration(self.root, complete)
+        for mode in ("method", "muldiv"):
+            profile = copy.deepcopy(complete)
+            if mode == "method":
+                profile["obligations"].pop(next(i for i, o in enumerate(profile["obligations"])
+                                                if o["member"] == "I256::try_i128"))
+            else:
+                profile["obligations"] = [o for o in profile["obligations"] if o["stage"] != "muldiv"]
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                gate.configuration(self.root, profile)
+
     def test_fixed_array_parameters_bind_their_element_type_and_length(self):
         self.assertEqual(gate.expected_type("[U256;3]"),
                          ["Typ", "Primitive", ["Primitive", "Array"],
