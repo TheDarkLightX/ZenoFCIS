@@ -1406,6 +1406,55 @@ class InventoryRunnerTests(unittest.TestCase):
         self.assertIn("c-blocked", self.executed())
         self.assertTrue(output.getvalue().endswith("atdd: complete PASS (3 scenarios)\n"))
 
+    def test_scenarios_declare_the_host_tools_their_commands_resolve(self):
+        """Read from the scenario argv: the scripts below stop or error without these tools."""
+        needs = {
+            "tools/test_machine_code_native.py": {tool.name for tool in atdd.GNU_X86_TOOLS},
+            "tools/test_machine_code_conformance.py": {tool.name for tool in atdd.GNU_X86_TOOLS},
+            "tools/test_machine_code_verifier.py": {atdd.PYTHON_Z3.name},
+            "tools/test_machine_code_profile2_verifier.py": {atdd.PYTHON_Z3.name},
+            "tools/check_probity.py": {atdd.NODE_EXACT.name},
+        }
+        for name, scenario in atdd.SCENARIOS.items():
+            declared = {tool.name for tool in scenario.requires}
+            for command in scenario.commands:
+                for script in command:
+                    for required in needs.get(script, ()):
+                        with self.subTest(scenario=name, script=script, tool=required):
+                            self.assertIn(required, declared)
+            whole_cli_crate = any(
+                command[:1] == ("cargo",) and "test" in command and "zeno-fcis-cli" in command
+                and not any(part in ("--test", "--bin", "--lib") or part.startswith(("rc3_cli_", "cli_"))
+                            for part in command)
+                for command in scenario.commands)
+            if whole_cli_crate:
+                with self.subTest(scenario=name, tool="systemd"):
+                    self.assertIn(atdd.SYSTEMD_USER_MANAGER.name, declared,
+                                  "the whole CLI test crate runs the physical systemd stage test")
+
+    def test_planted_absent_python_module_and_user_manager_block(self):
+        """A host without z3 or a user manager must block, never pass, the scenarios that need them."""
+        with mock.patch.dict(os.environ, {"PATH": str(self.root)}):
+            fake = self.root / "python3"
+            fake.write_text("#!/bin/sh\necho 'ModuleNotFoundError: No module named z3' >&2\nexit 1\n")
+            fake.chmod(0o755)
+            self.assertEqual(atdd.missing_tool(atdd.PYTHON_Z3),
+                             f"{atdd.PYTHON_Z3.name}: python3 reports ModuleNotFoundError: No module named z3")
+            fake.write_text("#!/bin/sh\necho 4.15.4\n")
+            self.assertIsNone(atdd.missing_tool(atdd.PYTHON_Z3))
+        script = self.root / "systemctl"
+        manager = atdd.HostTool("systemd user manager", executable=str(script),
+                                version=atdd.SYSTEMD_USER_MANAGER.version,
+                                version_pattern=atdd.SYSTEMD_USER_MANAGER.version_pattern)
+        script.write_text("#!/bin/sh\necho 'Failed to connect to bus: No medium found' >&2\nexit 1\n")
+        script.chmod(0o755)
+        self.assertEqual(atdd.missing_tool(manager),
+                         f"systemd user manager: {script} reports Failed to connect to bus: No medium found")
+        script.write_text("#!/bin/sh\necho Version=255.4\n")
+        self.assertIsNone(atdd.missing_tool(manager))
+        for tool in atdd.GNU_X86_TOOLS:
+            self.assertTrue(tool.executable.startswith("/usr/bin/"), "resolved exactly as the tests resolve them")
+
     def test_missing_tools_name_the_variable_path_executable_or_version(self):
         script = self.root / "fake-node"
         script.write_text("#!/bin/sh\necho v20.19.2\n")

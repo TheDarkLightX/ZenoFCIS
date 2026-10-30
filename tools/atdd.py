@@ -68,6 +68,19 @@ class AcceptanceScenario:
 
 
 NODE = HostTool("Node.js (node on PATH)", executable="node")
+# The probity guardrail compares `node --version` with the exact pinned release (tools/check_probity.py).
+NODE_EXACT = HostTool("Node.js 22.23.1 (NODE_BIN or node)", executable="node", executable_env="NODE_BIN",
+                      version=("--version",), version_pattern=r"v22\.23\.1")
+# The native machine-code tests resolve these five on /usr/bin:/bin and stop with an error without them.
+GNU_X86_TOOLS = tuple(HostTool(f"GNU {name} (/usr/bin/{name})", executable=f"/usr/bin/{name}")
+                      for name in ("gcc", "as", "objcopy", "readelf", "nm"))
+# The verifier tests import z3 directly; without the module they error instead of refuting.
+PYTHON_Z3 = HostTool("Python z3 module (python3 -c 'import z3')", executable="python3",
+                     version=("-c", "import z3; print(z3.get_version_string())"),
+                     version_pattern=r"\d+\.\d+\.\d+(\.\d+)?")
+# `cargo test -p zeno-fcis-cli` runs the physical systemd stage test, which needs a reachable user manager.
+SYSTEMD_USER_MANAGER = HostTool("systemd user manager (systemctl --user)", executable="/usr/bin/systemctl",
+                                version=("--user", "show", "--property=Version"), version_pattern=r"Version=.+")
 
 
 def historical_oracle(test_filter: str, *, exact: bool = False) -> tuple[str, ...]:
@@ -142,6 +155,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "-B", "tools/test_machine_code_conformance.py"),
          ("python3", "-B", "tools/test_machine_code_profile2_native.py"),
          ("python3", "-B", "tools/test_machine_code_profile2_conformance.py")),
+        requires=(*GNU_X86_TOOLS, PYTHON_Z3),
     ),
     "app-factory-journey": AcceptanceScenario(
         "Generate and run the checked core, shell, ingress and UI together",
@@ -361,7 +375,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "synthesis_javascript", "--locked", "--", "--ignored"),
          ("python3", "tools/check_synthesis.py")),
         requires=(HostTool("Node.js 22 (NODE_BIN or node)", executable="node", executable_env="NODE_BIN",
-                           version=("--version",), version_pattern=r"v22\.\d+\.\d+"),),
+                           version=("--version",), version_pattern=r"v22\.\d+\.\d+"),
+                  SYSTEMD_USER_MANAGER),
     ),
     "zal-dialogue": AcceptanceScenario(
         "Review finite behavior through deterministic language help and exact revisions",
@@ -1143,6 +1158,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     "probity-guardrails": AcceptanceScenario(
         "Reject unsafe agent workflow actions deterministically",
         (("python3", "tools/check_probity.py"),),
+        requires=(NODE_EXACT,),
     ),
     "verus-integration": AcceptanceScenario(
         "Check Verus evidence admission and shared runtime arithmetic boundaries",
