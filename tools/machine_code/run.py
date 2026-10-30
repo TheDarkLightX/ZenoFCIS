@@ -58,6 +58,16 @@ def main(argv=None):
     added.add_argument("--name", required=True)
     added.add_argument("--summary", required=True)
     added.add_argument("--route", required=True, choices=("proposal", "search"))
+    realized = commands.add_parser("realize", help="ask whether any admitted program with cost below a bound exists")
+    source = realized.add_mutually_exclusive_group(required=True)
+    source.add_argument("--problem", type=Path)
+    source.add_argument("--session", type=Path, help="ask below the session's rechecked best candidate")
+    realized.add_argument("--below", type=int, help="cost bound on the problem's objective; omitted: no bound")
+    realized.add_argument("--replay", type=Path, help="rebuild and re-solve a record's unrealizable queries")
+    realized.add_argument("--out", type=Path, help="also write the record; never overwrites")
+    realized.add_argument("--solver-ms", type=int, default=2000)
+    realized.add_argument("--max-rounds", type=int, default=64)
+    realized.add_argument("--deadline-ms", type=int, default=60_000)
     contract = commands.add_parser("contract", help="lower an arithmetic contract to profile 2, or check bytes against it")
     contract_actions = contract.add_subparsers(dest="action", required=True)
     lowered = contract_actions.add_parser("lower", help="print the lowering record; refuse with a named missing bridge")
@@ -78,6 +88,20 @@ def main(argv=None):
                     session._json(args.problem_out, result["problem"])
             else:
                 result = contracts.check(read_json(args.contract), session._code(args.code), args.solver_ms)
+        elif args.command == "realize":
+            from . import realize
+            from .model import read_json
+            if args.session is not None:
+                if args.below is not None or args.replay is not None:
+                    raise ValueError("--session takes its bound from the session; --below and --replay need --problem")
+                result = realize.realize_session(args.session, args.solver_ms, args.max_rounds, args.deadline_ms)
+            elif args.replay is not None:
+                result = realize.replay(read_json(args.problem), read_json(args.replay), args.solver_ms)
+            else:
+                result = realize.realize(read_json(args.problem), args.below, args.solver_ms, args.max_rounds,
+                                         args.deadline_ms)
+            if args.out is not None:
+                session._json(args.out, result)
         elif args.command == "open":
             result = session.open_session(args.problem, args.session)
         elif args.command == "packet":
