@@ -326,6 +326,9 @@ bound:
   entry must carry the exact statement for its length and bound.
 - **Queries:** each query is rebuilt from its examples. It must have the recorded
   hash and stay unsat.
+- **Coverage:** a partitioned unsat entry fails unless its subspaces cover the
+  palette space exactly once. This is checked for the entry itself, so an entry
+  with an empty subspace list fails, although it has no query to replay.
 - **Bytes:** a realizable entry's bytes must recheck equivalent, at that length
   and below the bound.
 
@@ -398,6 +401,10 @@ picks one group, so a length k has G^k subspaces. Together they cover every
 candidate exactly once. Each subspace has its own query: its slots range only
 over their group's forms. `--workers W` (at most 4) decides the subspaces in W
 processes, each with its own Z3 context, and all work shares one deadline.
+Subspaces are generated only as they are needed, at most 2W jobs are
+outstanding, and none starts after the deadline. A length with subspaces left
+unvisited at the deadline is `inconclusive`, and every eligible length is still
+recorded. The remaining time is read again before every solver and checker call.
 
 ```sh
 python3 -B -m tools.machine_code.run realize --problem test-data/machine-code/umin-x86.json \
@@ -426,6 +433,13 @@ the same 29 problems, and all agree. With a 1 ms probe, which splits nearly
 everything, it is cross-checked and replayed on three problems. Two more planted
 defects are detected under both modes: a partition that omits its last group,
 and an undecided subspace counted as unsat.
+
+Three more come from the third independent review: a replay that ignores failed
+coverage (shown with an empty subspace list), sequential partitioned synthesis
+that keeps visiting subspaces after its deadline, and a worker pool that submits
+every subspace. The realize tests give each query 20 s and each run 600 s. These
+budgets keep a loaded host from turning answers into timeouts. An unloaded host
+answers these queries in well under a second.
 
 Measured wall times are below. They come from paired runs, one mode after
 another, on an AMD Ryzen Threadripper 1950X shared with other work (load average
