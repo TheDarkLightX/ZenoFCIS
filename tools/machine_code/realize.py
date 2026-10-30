@@ -132,11 +132,12 @@ def _profile(z, context, problem):
     raise ValueError("realize supports profiles 1 and 2 only")
 
 
-def _select(z, selector, values):
-    """values[i] when the selector is i; the range constraint keeps the selector inside the palette."""
+def _select(z, selector, values, indices=None):
+    """values[i] when the selector is indices[i]; range constraints keep the selector inside its forms."""
+    indices = range(len(values)) if indices is None else indices
     term = values[-1]
-    for index in range(len(values) - 2, -1, -1):
-        term = z.If(selector == index, values[index], term)
+    for position in range(len(values) - 2, -1, -1):
+        term = z.If(selector == indices[position], values[position], term)
     return term
 
 
@@ -153,8 +154,11 @@ def _example(value):
             None if flags is None else {k: int(v) for k, v in flags.items()})
 
 
-def query(z, problem, length, bound, examples):
-    """(solver, selectors) for one length; deterministic in its inputs, so its SMT-LIB text replays."""
+def query(z, problem, length, bound, examples, ranges=None):
+    """(solver, selectors, profile) for one length; deterministic in its inputs, so its SMT-LIB text replays.
+
+    `ranges`, one (low, high) per slot, restricts each slot to forms low..high-1 of the palette: the query of one
+    subspace of a partition. Without it every slot ranges over the whole palette."""
     context = z.Context()
     profile = _profile(z, context, problem)
     grammar = problem["grammar"]
@@ -165,33 +169,41 @@ def query(z, problem, length, bound, examples):
     palette = len(grammar)
     for selector in selectors:
         solver.add(selector >= 0, selector < palette)
-    total = terminal + sum((_select(z, s, [z.IntVal(n, ctx=context) for n in sizes]) for s in selectors),
-                           z.IntVal(0, ctx=context))
+    if ranges is None:
+        slots = [list(range(palette))] * length
+    else:
+        if len(ranges) != length or not all(0 <= low < high <= palette for low, high in ranges):
+            raise ValueError("subspace ranges must give one nonempty palette range per slot")
+        slots = [list(range(low, high)) for low, high in ranges]
+        for selector, (low, high) in zip(selectors, ranges):
+            solver.add(selector >= low, selector < high)
+    total = terminal + sum((_select(z, s, [z.IntVal(sizes[i], ctx=context) for i in forms], forms)
+                            for s, forms in zip(selectors, slots)), z.IntVal(0, ctx=context))
     solver.add(total <= 256)
     if problem["objective"] == "bytes" and bound is not None:
         solver.add(total < bound)
     if profile.flags:
         defined = {name: z.BoolVal(True, ctx=context) for name in profile.flags}
-        for selector in selectors:
-            for index in range(palette):
+        for selector, forms in zip(selectors, slots):
+            for index in forms:
                 reads = profile.flag_effects(index)[0]
                 if reads:
                     solver.add(z.Implies(selector == index, z.And([defined[name] for name in reads])))
             after = {}
             for name in profile.flags:
                 options = []
-                for index in range(palette):
+                for index in forms:
                     _, written, undefined = profile.flag_effects(index)
                     options.append(z.BoolVal(False, ctx=context) if name in undefined
                                    else z.BoolVal(True, ctx=context) if name in written else defined[name])
-                after[name] = _select(z, selector, options)
+                after[name] = _select(z, selector, options, forms)
             defined = after
     for example in examples:
         registers, flags = profile.start(z, context, example)
-        for selector in selectors:
-            steps = [profile.step(z, context, index, registers, flags) for index in range(palette)]
-            registers = {name: _select(z, selector, [s[0][name] for s in steps]) for name in profile.locations}
-            flags = {name: _select(z, selector, [s[1][name] for s in steps]) for name in profile.flags}
+        for selector, forms in zip(selectors, slots):
+            steps = [profile.step(z, context, index, registers, flags) for index in forms]
+            registers = {name: _select(z, selector, [s[0][name] for s in steps], forms) for name in profile.locations}
+            flags = {name: _select(z, selector, [s[1][name] for s in steps], forms) for name in profile.flags}
         for actual, value in zip(profile.results(registers), profile.expected(example)):
             solver.add(actual == z.BitVecVal(value, 64, ctx=context))
     return solver, selectors, profile
@@ -215,11 +227,139 @@ def _query_hash(solver):
     return digest(solver.to_smt2().encode())
 
 
-def realize(problem, bound=None, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadline_ms=60_000, seeds=None):
-    """One record: for every length whose cost can be below `bound` (None = no bound), unrealizable, realizable or
-    inconclusive. A realizable length carries checked bytes; the first one found stops the run."""
+def _groups(palette, count):
+    """Contiguous palette ranges that cover forms 0..palette-1 exactly once."""
+    bounds = [palette * g // count for g in range(count + 1)]
+    return [(bounds[g], bounds[g + 1]) for g in range(count)]
+
+
+def _cegis(problem, length, bound, examples, ranges, timeout_ms, max_rounds, deadline, probe_ms=None):
+    """Decide one length, or one subspace of it, before the wall-clock `deadline` (a time.time() value).
+
+    With `probe_ms`, a query that does not answer within it returns status `split`, carrying the examples found so
+    far, so that the caller can halve the subspace instead of waiting."""
     import z3 as z
-    from .session import _agrees, _checker, _seeds, _validated, _witness
+    from .session import _agrees, _checker, _witness
+    check = _checker(problem).check
+    examples = list(examples)
+    entry = {"rounds": 0}
+    while True:
+        remaining = int((deadline - time.time()) * 1000)
+        if remaining <= 0 or entry["rounds"] >= max_rounds:
+            entry.update(status="inconclusive", reason="budget-exhausted")
+            return entry
+        entry["rounds"] += 1
+        solver, selectors, _ = query(z, problem, length, bound, examples, ranges)
+        solver.set(timeout=min(timeout_ms if probe_ms is None else probe_ms, remaining))
+        answer = solver.check()
+        if answer == z.unsat:
+            entry.update(status="unrealizable", query_sha256=_query_hash(solver),
+                         examples=[_example_json(e) for e in examples])
+            return entry
+        if answer != z.sat:
+            if probe_ms is not None and remaining > probe_ms:
+                entry.update(status="split", carry=examples)
+            else:
+                entry.update(status="inconclusive", reason="SolverUnknown:" + solver.reason_unknown())
+            return entry
+        model = solver.model()
+        choice = [model.eval(s, model_completion=True).as_long() for s in selectors]
+        code = encode_program(problem["target"], [problem["grammar"][i] for i in choice])
+        if not all(_agrees(problem, code, e) for e in examples):
+            raise ValueError("encoding disagrees with the checker's concrete model on an example state")
+        verification = check(problem, code, timeout_ms=max(1, min(timeout_ms, remaining)))
+        if verification["status"] == "counterexample":
+            examples.append(_witness(problem, verification))
+            continue
+        if verification["status"] == "refused":
+            raise ValueError("encoding admitted a program the checker refuses: " + verification["reason"])
+        if verification["status"] == "equivalent":
+            entry.update(status="realizable", code_hex=code.hex(), forms=choice, verification=verification)
+        else:
+            entry.update(status="inconclusive", reason="check:" + verification.get("reason", "inconclusive"))
+        return entry
+
+
+def _decide(job):
+    """Worker entry point: one subspace in this process, with its own Z3 context."""
+    problem, length, bound, ranges, examples, timeout_ms, probe_ms, max_rounds, deadline = job
+    entry = _cegis(problem, length, bound, examples, ranges, timeout_ms, max_rounds, deadline, probe_ms)
+    entry["ranges"] = [list(r) for r in ranges]
+    return entry
+
+
+def _halve(ranges):
+    """Two subspaces that partition `ranges`: the widest slot's range split in the middle."""
+    slot = max(range(len(ranges)), key=lambda j: (ranges[j][1] - ranges[j][0], -j))
+    low, high = ranges[slot]
+    middle = (low + high) // 2
+    return [ranges[:slot] + [(low, middle)] + ranges[slot + 1:], ranges[:slot] + [(middle, high)] + ranges[slot + 1:]]
+
+
+def _partitioned(problem, length, bound, examples, initial, timeout_ms, split_ms, max_rounds, deadline, pool):
+    """Decide every subspace of one length. `initial` partitions the space; with `split_ms`, a subspace whose query
+    does not answer in time is halved and its two children replace it. Unsat needs every final subspace unsat; any
+    checked solution makes the length realizable; anything undecided makes it inconclusive."""
+    def job(ranges, known):
+        probe = split_ms if split_ms is not None and any(high - low > 1 for low, high in ranges) else None
+        return (problem, length, bound, [tuple(r) for r in ranges], known, timeout_ms, probe, max_rounds, deadline)
+
+    leaves, undecided, found, splits, rounds = [], [], [], 0, 0
+
+    def settle(result):
+        nonlocal splits, rounds
+        rounds += result["rounds"]
+        if result["status"] == "split":
+            splits += 1
+            return [job(child, result["carry"]) for child in _halve([tuple(r) for r in result["ranges"]])]
+        (found if result["status"] == "realizable" else leaves if result["status"] == "unrealizable"
+         else undecided).append(result)
+        return []
+
+    queue = [job(ranges, examples) for ranges in initial]
+    if pool is None:
+        while queue and not found:
+            queue = settle(_decide(queue.pop(0))) + queue
+    else:
+        from concurrent.futures import FIRST_COMPLETED, wait
+        from concurrent.futures.process import BrokenProcessPool
+        running = {pool.submit(_decide, item) for item in queue}
+        try:
+            while running and not found:
+                done, running = wait(running, return_when=FIRST_COMPLETED)
+                for future in done:
+                    running |= {pool.submit(_decide, item) for item in settle(future.result())}
+        except BrokenProcessPool:
+            # A worker that died decided nothing; the length cannot be unsat without every subspace.
+            undecided.append({"status": "inconclusive", "reason": "WorkerProcessFailed", "rounds": 0})
+        for future in running:
+            future.cancel()
+    entry = {"length": length, "subspace_count": len(leaves) + len(undecided) + len(found), "splits": splits,
+             "rounds": rounds}
+    if found:
+        best = min(found, key=lambda r: r["ranges"])
+        entry.update(status="realizable", code_hex=best["code_hex"], forms=best["forms"],
+                     verification=best["verification"], subspace=best["ranges"])
+    elif not undecided:
+        entry.update(status="unrealizable",
+                     subspaces=[{key: r.get(key) for key in ("ranges", "status", "query_sha256", "examples", "rounds")}
+                                for r in sorted(leaves, key=lambda r: r["ranges"])])
+    else:
+        entry.update(status="inconclusive", reason=sorted({r.get("reason", "") for r in undecided}))
+    return entry
+
+
+def realize(problem, bound=None, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadline_ms=60_000, seeds=None,
+            groups=1, workers=1, split_ms=None):
+    """One record: for every length whose cost can be below `bound` (None = no bound), unrealizable, realizable or
+    inconclusive. A realizable length carries checked bytes; the first one found stops the run.
+
+    With `groups` > 1 each slot's palette is split into that many contiguous groups, and every combination of groups
+    over the slots is one subspace, decided by its own query; `workers` > 1 decides them in that many processes.
+    With `split_ms`, a subspace whose query does not answer within it is halved, as many times as needed (adaptive,
+    hierarchical decomposition). All work shares one deadline."""
+    import z3 as z
+    from .session import _seeds, _validated
     problem = _validated(problem)
     if problem["schema"] not in (profile2.SCHEMA, "zeno-fcis/machine-problem/1"):
         raise ValueError("realize supports profiles 1 and 2 only")
@@ -228,60 +368,70 @@ def realize(problem, bound=None, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadlin
     integer(timeout_ms, 1, 60_000, "solver timeout")
     integer(max_rounds, 1, 1024, "round budget")
     integer(deadline_ms, 1, 3_600_000, "deadline")
-    check = _checker(problem).check
-    began = time.monotonic()
+    integer(groups, 1, 32, "groups per slot")
+    integer(workers, 1, 4, "worker processes")
+    if split_ms is not None:
+        integer(split_ms, 1, 60_000, "split probe")
+    partitioned = groups > 1 or split_ms is not None
+    began, deadline = time.monotonic(), time.time() + deadline_ms / 1000
     asked, excluded = _lengths(problem, bound)
+    palette_groups = _groups(len(problem["grammar"]), min(groups, len(problem["grammar"])))
+    pool = None
+    if partitioned and workers > 1:
+        import multiprocessing
+        from concurrent.futures import ProcessPoolExecutor
+        pool = ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn"))
     lengths, status = [], "unrealizable"
-    for length in asked:
-        examples = list(_seeds(problem) if seeds is None else seeds)
-        entry = {"length": length, "rounds": 0}
-        while True:
-            if time.monotonic() - began > deadline_ms / 1000 or entry["rounds"] >= max_rounds:
-                entry.update(status="inconclusive", reason="budget-exhausted")
-                break
-            entry["rounds"] += 1
-            solver, selectors, _ = query(z, problem, length, bound, examples)
-            solver.set(timeout=timeout_ms)
-            answer = solver.check()
-            if answer == z.unsat:
-                entry.update(status="unrealizable", query_sha256=_query_hash(solver),
-                             examples=[_example_json(e) for e in examples],
-                             statement=STATEMENT.format(length=length, objective=problem["objective"],
-                                                        bound="infinity" if bound is None else bound))
-                break
-            if answer != z.sat:
-                entry.update(status="inconclusive", reason="SolverUnknown:" + solver.reason_unknown())
-                break
-            model = solver.model()
-            choice = [model.eval(s, model_completion=True).as_long() for s in selectors]
-            code = encode_program(problem["target"], [problem["grammar"][i] for i in choice])
-            if not all(_agrees(problem, code, e) for e in examples):
-                raise ValueError("encoding disagrees with the checker's concrete model on an example state")
-            verification = check(problem, code, timeout_ms=timeout_ms)
-            if verification["status"] == "counterexample":
-                examples.append(_witness(problem, verification))
-                continue
-            if verification["status"] == "refused":
-                raise ValueError("encoding admitted a program the checker refuses: " + verification["reason"])
-            if verification["status"] == "equivalent":
-                entry.update(status="realizable", code_hex=code.hex(), forms=choice, verification=verification)
+    try:
+        for length in asked:
+            examples = list(_seeds(problem) if seeds is None else seeds)
+            if partitioned:
+                from itertools import product
+                initial = [[palette_groups[g] for g in combo]
+                           for combo in product(range(len(palette_groups)), repeat=length)]
+                entry = _partitioned(problem, length, bound, examples, initial, timeout_ms, split_ms, max_rounds,
+                                     deadline, pool)
             else:
-                entry.update(status="inconclusive", reason="check:" + verification.get("reason", "inconclusive"))
-            break
-        lengths.append(entry)
-        if entry["status"] == "realizable":
-            status = "realizable"
-            break
-        if entry["status"] == "inconclusive":
-            status = "inconclusive"
-    return {"schema": SCHEMA, "status": status, "problem_sha256": digest(canonical(problem)),
-            "objective": problem["objective"], "bound": bound, "lengths": lengths,
-            "excluded_by_cost": excluded, "z3_version": z.get_version_string(),
-            "elapsed_seconds": time.monotonic() - began, "global_optimality": False, "authority": "none"}
+                entry = {"length": length, **_cegis(problem, length, bound, examples, None, timeout_ms, max_rounds,
+                                                    deadline)}
+            if entry["status"] == "unrealizable":
+                entry["statement"] = STATEMENT.format(length=length, objective=problem["objective"],
+                                                      bound="infinity" if bound is None else bound)
+            lengths.append(entry)
+            if entry["status"] == "realizable":
+                status = "realizable"
+                break
+            if entry["status"] == "inconclusive":
+                status = "inconclusive"
+    finally:
+        if pool is not None:
+            pool.shutdown(wait=True, cancel_futures=True)
+    record = {"schema": SCHEMA, "status": status, "problem_sha256": digest(canonical(problem)),
+              "objective": problem["objective"], "bound": bound, "lengths": lengths,
+              "excluded_by_cost": excluded, "z3_version": z.get_version_string(),
+              "elapsed_seconds": time.monotonic() - began, "global_optimality": False, "authority": "none"}
+    if partitioned:
+        record["partition"] = {"groups_per_slot": len(palette_groups), "palette_groups": [list(g) for g in palette_groups],
+                               "workers": workers, "split_ms": split_ms}
+    return record
+
+
+def _covers(entry, palette):
+    """Independently of how they were made: the recorded subspaces lie in the palette, are pairwise disjoint and
+    their sizes add up to the whole space, so they cover every candidate exactly once."""
+    from math import prod
+    boxes = [[tuple(r) for r in s["ranges"]] for s in entry["subspaces"]]
+    if any(len(b) != entry["length"] or not all(0 <= low < high <= palette for low, high in b) for b in boxes):
+        return False
+    if sum(prod(high - low for low, high in b) for b in boxes) != palette ** entry["length"]:
+        return False
+    return not any(all(a[0] < b[1] and b[0] < a[1] for a, b in zip(boxes[i], boxes[j]))
+                   for i in range(len(boxes)) for j in range(i + 1, len(boxes)))
 
 
 def replay(problem, record, timeout_ms=10_000):
-    """Rebuild each recorded unrealizable query from its examples; its hash must match and it must stay unsat."""
+    """Rebuild each recorded unrealizable query from its examples; its hash must match and it must stay unsat.
+    A partitioned length must also show subspaces that exactly cover the palette product."""
     import z3 as z
     from .session import _validated
     problem = _validated(problem)
@@ -291,17 +441,27 @@ def replay(problem, record, timeout_ms=10_000):
     for entry in record["lengths"]:
         if entry["status"] != "unrealizable":
             continue
-        solver, _, _ = query(z, problem, entry["length"], record["bound"], [_example(e) for e in entry["examples"]])
-        same = _query_hash(solver) == entry["query_sha256"]
-        solver.set(timeout=timeout_ms)
-        answer = solver.check()
-        replayed.append({"length": entry["length"], "query_hash_matches": same, "answer": str(answer)})
-    ok = all(r["query_hash_matches"] and r["answer"] == "unsat" for r in replayed)
+        if "subspaces" not in entry:
+            parts = [(None, entry["examples"], entry["query_sha256"])]
+            covered = True
+        else:
+            parts = [(s["ranges"], s["examples"], s["query_sha256"]) for s in entry["subspaces"]]
+            covered = _covers(entry, len(problem["grammar"]))
+        for ranges, examples, recorded in parts:
+            solver, _, _ = query(z, problem, entry["length"], record["bound"], [_example(e) for e in examples],
+                                 None if ranges is None else [tuple(r) for r in ranges])
+            same = _query_hash(solver) == recorded
+            solver.set(timeout=timeout_ms)
+            answer = solver.check()
+            replayed.append({"length": entry["length"], "ranges": ranges, "coverage": covered,
+                             "query_hash_matches": same, "answer": str(answer)})
+    ok = all(r["coverage"] and r["query_hash_matches"] and r["answer"] == "unsat" for r in replayed)
     return {"schema": SCHEMA, "status": "replayed" if ok else "failed", "replayed": replayed,
             "z3_version": z.get_version_string(), "authority": "none"}
 
 
-def realize_session(directory, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadline_ms=60_000):
+def realize_session(directory, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadline_ms=60_000, groups=1, workers=1,
+                    split_ms=None):
     """Ask below the session's best checked candidate, after rechecking it now."""
     from .session import _best, _checker, _load, _locked, _rank
     with _locked(directory):
@@ -314,6 +474,7 @@ def realize_session(directory, timeout_ms=1000, max_rounds=MAX_ROUNDS, deadline_
     if fresh["status"] != "equivalent" or fresh != receipt["verification"]:
         return {"status": "inconclusive", "reason": "session incumbent did not recheck", "authority": "none"}
     bound = _rank(problem, fresh, code)[0]
-    record = realize(problem, bound, timeout_ms, max_rounds, deadline_ms)
+    record = realize(problem, bound, timeout_ms, max_rounds, deadline_ms, groups=groups, workers=workers,
+                     split_ms=split_ms)
     record["incumbent"] = {"code_hex": code.hex(), "cost": fresh["cost"], "recheck": "equivalent"}
     return record
