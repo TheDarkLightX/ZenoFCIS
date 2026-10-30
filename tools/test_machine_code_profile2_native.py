@@ -218,6 +218,32 @@ class NativeProfile2Tests(unittest.TestCase):
                 self.results.append(row)
                 print("MACHINE_NATIVE2_RESULT " + json.dumps(row, sort_keys=True), flush=True)
 
+    def test_paired_timing_of_a_two_result_kernel_against_gcc(self):
+        from machine_code.bench import bench
+        out = self.root / "bench"; out.mkdir()
+        name, inputs, outputs, body, _ = KERNELS[0]
+        artifact = self.emitted(out, inputs, outputs, body)
+        report = bench(artifact, out / "timing", iterations=20_000, repeats=5)
+        self.assertEqual(report["status"], "measured", report)
+        self.assertTrue(report["baseline_c"].startswith("(pair){(in_a_lo + in_b_lo), "), report["baseline_c"])
+        self.assertTrue(all(value > 0 for value in report["ticks_per_call"].values()))
+        self.assertIn("Not a portable speedup claim", report["scope"])
+        rv = self.root / "bench-rv"; rv.mkdir()
+        problem = {"schema": profile2.SCHEMA, "target": profile2.TARGETS[1], "inputs": ["x", "y"],
+                   "outputs": [["add", i("x"), i("y")]], "grammar": [["add", "a0", "a0", "a1"]],
+                   "max_instructions": 1, "objective": "bytes"}
+        (rv / "problem.json").write_bytes(model.canonical(problem))
+        session.open_session(rv / "problem.json", rv / "session")
+        (rv / "proposal.json").write_bytes(model.canonical({
+            "schema": "zeno-fcis/machine-proposal/1", "code_hex": "3305b50067800000",
+            "provenance": {"kind": "human", "name": "native-test", "note": "RV64I sum"}}))
+        self.assertEqual(session.submit(rv / "session", rv / "proposal.json")["status"], "equivalent")
+        session.emit(rv / "session", rv / "artifact")
+        refused = bench(rv / "artifact", rv / "timing", iterations=20_000, repeats=5)
+        self.assertEqual((refused["status"], refused["reason"]),
+                         ("inconclusive", "only x86-64 kernels can be executed on this host"))
+        self.assertFalse((rv / "timing").exists())
+
     def test_rv64i_two_result_object_has_independent_elf_identification(self):
         out = self.root / "rv64i"; out.mkdir()
         code = targets.encode_program(profile2.TARGETS[1], [["add", "a0", "a0", "a2"], ["sltu", "t0", "a0", "a2"],
