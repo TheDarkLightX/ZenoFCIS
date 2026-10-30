@@ -3,8 +3,8 @@
 Each defect is one named source edit to `tools/machine_code/verify.py` or `verify2.py`. The edit is applied to an
 isolated specimen: a fresh copy of the checker package, the test modules that hold the controls, and the kernel
 library. Its checker identity is computed from the specimen's own sources, so it is consistent with the edit. The
-defect names the control that should expose it, and only that control is judged. Each run of a control records one
-outcome:
+defect names the control that should expose it, and optionally a second control that must also expose it; only
+those controls are judged. Each run of a control records one outcome:
 
 - `detected`: the intended control failed on a test assertion, raised in the test module or `unittest` itself;
 - `survived`: the intended control passed on the defective specimen;
@@ -65,7 +65,12 @@ POSITIVE = (
 
 @dataclass(frozen=True)
 class Defect:
-    """One planted edit: `anchor` must occur exactly once in `file` and becomes `replacement`."""
+    """One planted edit: `anchor` must occur exactly once in `file` and becomes `replacement`.
+
+    `control` is the intended control. `second`, when given, is a further registered control that must also detect
+    the edit; it is run and reported separately, and a survival or inconclusive run there counts like one of the
+    intended control.
+    """
 
     name: str
     file: str
@@ -74,6 +79,7 @@ class Defect:
     replacement: str
     control: str
     why: str
+    second: str | None = None
 
 
 DEFECTS = (
@@ -163,8 +169,15 @@ DEFECTS = (
     Defect("v2-rv-sra-count-five-bits", "verify2.py", "shift count",
            'elif op == "sra": value = _signed(left) >> (right & 63)',
            'elif op == "sra": value = _signed(left) >> (right & 31)',
-           CONFORMANCE2 + "HostIndependentModelChecks.test_rv64i_concrete_and_smt_models_agree_on_sampled_states",
-           "The concrete SRA masks its register count to five bits; the SMT model does not."),
+           V2 + "test_rv_sra_uses_six_count_bits_on_negative_values",
+           "The concrete SRA masks its register count to five bits; the SMT model does not.",
+           CONFORMANCE2 + "HostIndependentModelChecks.test_rv64i_concrete_and_smt_models_agree_on_sampled_states"),
+    Defect("v2-rv-sra-count-five-bits-in-smt", "verify2.py", "shift count",
+           'elif op == "sra": value = left >> (right & word(63))',
+           'elif op == "sra": value = left >> (right & word(31))',
+           V2 + "test_rv_sra_uses_six_count_bits_on_negative_values",
+           "The symbolic SRA masks its register count to five bits; the concrete model does not.",
+           CONFORMANCE2 + "HostIndependentModelChecks.test_rv64i_concrete_and_smt_models_agree_on_sampled_states"),
     Defect("v2-x86-shl-carry-off-by-one", "verify2.py", "flag rule CF",
            'result, carry = (value << count) & MASK, (value >> (64 - count)) & 1',
            'result, carry = (value << count) & MASK, (value >> (63 - count)) & 1',
@@ -188,12 +201,25 @@ DEFECTS = (
     Defect("v2-x86-sign-flag-bit-62", "verify2.py", "flag rule SF",
            'f.update(zf=int(result == 0), sf=result >> 63)',
            'f.update(zf=int(result == 0), sf=(result >> 62) & 1)',
-           CONFORMANCE2 + "X86FlagModelConformance.test_hardware_matches_concrete_registers_and_flags",
-           "The concrete SF reads bit 62."),
+           V2 + "test_x86_sign_flag_is_bit_63_of_the_result",
+           "The concrete SF reads bit 62.",
+           CONFORMANCE2 + "X86FlagModelConformance.test_hardware_matches_concrete_registers_and_flags"),
+    Defect("v2-x86-sign-flag-bit-62-in-smt", "verify2.py", "flag rule SF",
+           'f.update(zf=result == word(0), sf=bit(result, 63))',
+           'f.update(zf=result == word(0), sf=bit(result, 62))',
+           V2 + "test_x86_sign_flag_is_bit_63_of_the_result",
+           "The symbolic SF reads bit 62.",
+           CONFORMANCE2 + "X86FlagModelConformance.test_hardware_matches_smt_registers_and_flags"),
     Defect("v2-x86-le-ignores-zero-flag-in-smt", "verify2.py", "condition rule",
            '"le": lambda: z.Or(zf, sf != of)', '"le": lambda: sf != of',
-           CONFORMANCE2 + "X86FlagModelConformance.test_hardware_matches_smt_registers_and_flags",
-           "The symbolic CMOVLE and SETLE ignore ZF."),
+           V2 + "test_x86_le_holds_on_equal_values_through_the_zero_flag",
+           "The symbolic CMOVLE and SETLE ignore ZF.",
+           CONFORMANCE2 + "X86FlagModelConformance.test_hardware_matches_smt_registers_and_flags"),
+    Defect("v2-x86-le-ignores-zero-flag-in-concrete", "verify2.py", "condition rule",
+           '"le": zf or sf != of', '"le": sf != of',
+           V2 + "test_x86_le_holds_on_equal_values_through_the_zero_flag",
+           "The concrete CMOVLE and SETLE ignore ZF.",
+           CONFORMANCE2 + "X86FlagModelConformance.test_hardware_matches_concrete_registers_and_flags"),
     Defect("v2-rv-zero-register-writable", "verify2.py", "zero register",
            '        _require(rd != 0, "ZeroWriteHintRefused")\n', '',
            V2 + "test_rv_unadmitted_shift_and_word_forms_refuse",
@@ -347,9 +373,10 @@ def campaign(defects: tuple[Defect, ...], modes=MODES, timeout: int = TIMEOUT, p
         base = Path(temporary) / "base"
         build_specimen(base, None)
         controls = [(label, name) for label, name in positive]
-        controls += [(f"intended control of {d.name} on the unmodified checker", d.control)
-                     for d in defects if d.control not in {name for _, name in positive}
-                     and not any(d.control.startswith(name + ".") for _, name in positive)]
+        controls += [(f"control of {d.name} on the unmodified checker", name)
+                     for d in defects for name in (d.control, d.second) if name is not None
+                     and name not in {module for _, module in positive}
+                     and not any(name.startswith(module + ".") for _, module in positive)]
         seen = set()
         for label, name in controls:
             if name in seen:
@@ -364,15 +391,18 @@ def campaign(defects: tuple[Defect, ...], modes=MODES, timeout: int = TIMEOUT, p
             specimen = Path(temporary) / f"defect-{index:02d}"
             binding = build_specimen(specimen, defect)
             row = {"defect": defect.name, "file": defect.file, "kind": defect.kind, "control": defect.control,
-                   "why": defect.why, "binding": binding, "outcomes": {}}
-            for mode in modes:
-                outcome = {} if "invalid" in binding else run_control(specimen, defect.control, mode, timeout)
-                status, evidence = classify(outcome, specimen, binding)
-                row["outcomes"][mode_name(mode)] = {"outcome": status, "evidence": evidence,
-                                                    "seconds": outcome.get("seconds")}
+                   "second": defect.second, "why": defect.why, "binding": binding, "outcomes": {},
+                   "second_outcomes": {}}
+            for key, control in (("outcomes", defect.control), ("second_outcomes", defect.second)):
+                for mode in modes if control is not None else ():
+                    outcome = {} if "invalid" in binding else run_control(specimen, control, mode, timeout)
+                    status, evidence = classify(outcome, specimen, binding)
+                    row[key][mode_name(mode)] = {"outcome": status, "evidence": evidence,
+                                                 "seconds": outcome.get("seconds")}
             report["defects"].append(row)
             shutil.rmtree(specimen)
-    outcomes = [o["outcome"] for row in report["defects"] for o in row["outcomes"].values()]
+    outcomes = [o["outcome"] for row in report["defects"]
+                for o in (*row["outcomes"].values(), *row["second_outcomes"].values())]
     if any(p["status"] != "pass" for p in report["positive"]) or "survived" in outcomes:
         report["status"] = "failed"
     elif any(o != "detected" for o in outcomes):
@@ -384,10 +414,14 @@ def campaign(defects: tuple[Defect, ...], modes=MODES, timeout: int = TIMEOUT, p
 
 def table(report: dict) -> str:
     modes = list(report["defects"][0]["outcomes"]) if report["defects"] else []
-    lines = ["defect | kind | intended control | " + " | ".join(modes)]
+    lines = ["defect | kind | intended control | " + " | ".join(modes) + " | second control | "
+             + " | ".join(modes)]
     for row in report["defects"]:
+        second = row["second_outcomes"]
         lines.append(" | ".join([row["defect"], row["kind"], row["control"].rsplit(".", 1)[-1],
-                                 *(row["outcomes"][m]["outcome"] for m in modes)]))
+                                 *(row["outcomes"][m]["outcome"] for m in modes),
+                                 row["second"].rsplit(".", 1)[-1] if row["second"] else "-",
+                                 *(second[m]["outcome"] if m in second else "-" for m in modes)]))
     failed = [p for p in report["positive"] if p["status"] != "pass"]
     lines.append(f"positive controls: {len(report['positive']) - len(failed)} of {len(report['positive'])} passed"
                  + "".join(f"\n  FAIL {p['control']} ({p['mode']}): {p['evidence']}" for p in failed))
@@ -405,7 +439,7 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.command == "list":
         for d in DEFECTS:
-            print(f"{d.name}\t{d.file}\t{d.kind}\t{d.control}")
+            print(f"{d.name}\t{d.file}\t{d.kind}\t{d.control}" + (f"\t{d.second}" if d.second else ""))
         return 0
     selected = tuple(d for d in DEFECTS if not args.defect or d.name in args.defect)
     report = campaign(selected)

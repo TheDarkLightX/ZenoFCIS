@@ -46,6 +46,27 @@ def problem(target, inputs, outputs, grammar, bound=16):
             "outputs": outputs, "grammar": grammar, "max_instructions": bound, "objective": "bytes"}
 
 
+def signed(value):
+    return value - (1 << 64) if value >> 63 else value
+
+
+def smt_point(target, raw, registers, flags=None):
+    """The SMT model at one constant state: each register and flag simplifies to a value; undefined stays None."""
+    import z3
+    context = z3.Context()
+    symbolic = {name: z3.BitVecVal(value, 64, context) for name, value in registers.items()}
+    truth = {name: z3.BoolVal(bool(value), context) for name, value in (flags or {}).items()}
+    after, after_flags = v.machine_smt(z3, target, v.decode(target, code(raw)), symbolic, truth, context)
+    return ({name: z3.simplify(value).as_long() for name, value in after.items()},
+            {name: None if value is None else int(z3.is_true(z3.simplify(value))) for name, value in after_flags.items()})
+
+
+def state(target, **values):
+    registers = dict.fromkeys(v.REGISTERS[target], 0)
+    registers.update(values)
+    return registers
+
+
 ADD128 = [["add", i("a_lo"), i("b_lo")],
           ["add", ["add", i("a_hi"), i("b_hi")], ["ult", ["add", i("a_lo"), i("b_lo")], i("a_lo")]]]
 SUB128 = [["sub", i("a_lo"), i("b_lo")],
@@ -154,6 +175,29 @@ class Profile2VerifierTests(unittest.TestCase):
                                  {"cf": 1, "zf": 0, "sf": 1, "of": 0})
         self.assertEqual((final["rcx"], flags), (5, {"cf": 1, "zf": 0, "sf": 1, "of": 0}))
 
+    def test_x86_sign_flag_is_bit_63_of_the_result(self):
+        # add rax, rcx. The first result has bit 63 set and bit 62 clear, the second the reverse.
+        raw = "4801c8c3"
+        flags = dict.fromkeys(v.FLAGS, 0)
+        for left, right, sign in ((MIN, 0, 1), (1 << 62, 0, 0), (MAX, 1, 1), (MASK, 1, 0), (3 << 62, 0, 1)):
+            registers = state(X, rax=left, rcx=right)
+            with self.subTest(left=hex(left), right=right):
+                self.assertEqual(v.execute(X, code(raw), registers, flags)[1]["sf"], sign)
+                self.assertEqual(smt_point(X, raw, registers, flags)[1]["sf"], sign)
+
+    def test_x86_le_holds_on_equal_values_through_the_zero_flag(self):
+        # cmp rdi, rsi on equal values gives ZF=1 and SF=OF=0, so LE holds only because of ZF.
+        move = "4839f7480f4ec2c3"  # cmp rdi, rsi; cmovle rax, rdx
+        flags = dict.fromkeys(v.FLAGS, 0)
+        for value in (0, 5, MIN, MASK):
+            registers = state(X, rdi=value, rsi=value, rax=1, rdx=2)
+            with self.subTest(value=hex(value)):
+                final, after = v.execute(X, code(move), registers, flags)
+                self.assertEqual((final["rax"], after["zf"], after["sf"], after["of"]), (2, 1, 0, 0))
+                self.assertEqual(smt_point(X, move, registers, flags)[0]["rax"], 2)
+        # cmp rdi, rsi; setle al; movzx rax, al computes x <= y, equal values included.
+        self.equivalent(X, ["x", "y"], [["sle", i("x"), i("y")]], "4839f70f9ec0480fb6c0c3")
+
     def test_x86_two_results_quantify_the_free_second_register(self):
         witness = self.counterexample(X, ["x", "y"], [["input", "x"], ["input", "y"]], "4889f8c3")
         self.assertEqual(set(witness["initial_registers"]), {"rax", "rcx", "rdx", "r8", "r9", "r10", "r11"})
@@ -183,6 +227,16 @@ class Profile2VerifierTests(unittest.TestCase):
         sra = code(rtype(0x20, "a0", "a0", "a1", 5) + ret)
         self.assertEqual(v.run_concrete(R, sra, [MIN, 64 + 1]), [MIN | (MIN >> 1)])
         self.counterexample(R, ["x"], [["lshr", i("x"), 1]], itype((0x10 << 6) | 1, "a0", "a0", 5) + ret)
+
+    def test_rv_sra_uses_six_count_bits_on_negative_values(self):
+        # Counts 32 to 63 need the sixth count bit; a five-bit count would shift by count - 32.
+        raw = rtype(0x20, "a0", "a0", "a1", 5) + RET_R
+        value = MIN | 0x0123456789ABCDEF
+        for count in (32, 40, 63, 64 + 40):
+            expected = (signed(value) >> (count & 63)) & MASK
+            with self.subTest(count=count):
+                self.assertEqual(v.run_concrete(R, code(raw), [value, count]), [expected])
+                self.assertEqual(smt_point(R, raw, state(R, a0=value, a1=count))[0]["a0"], expected)
 
     def test_rv_two_results_and_abs_without_branches(self):
         add128 = (rtype(0, "a0", "a0", "a2", 0) + rtype(0, "t0", "a0", "a2", 3)

@@ -390,15 +390,19 @@ python3 -B -m tools.machine_qualification.controls run [--defect NAME]... [--out
   import, or the control is missing). Only `detected` counts as a detection.
 - **Positive controls:** both verifier suites, every kernel in `test-data/machine-code/kernels` and every intended
   control must pass on an unmodified specimen first. Each control runs under `python3 -B` and `python3 -O -B`.
-- **Exit:** 0 when every defect is detected in both modes, 1 when a positive control fails or a defect survives,
-  and 2 otherwise.
+- **Exit:** 0 when every defect is detected by each of its controls in both modes, 1 when a positive control fails
+  or a defect survives, and 2 otherwise.
 
-At 0dd0dce1 all 29 registered defects were detected by their intended control in both modes. Three of them, a
-concrete SRA that masks its count to five bits, a concrete SF read from bit 62 and a symbolic LE that ignores ZF,
-pass the profile-2 verifier suite and the kernel library. Only the x86 hardware conformance run, or for SRA the
-host-independent comparison of the RV64I concrete and SMT models, detects them. A detected defect shows that one control
-distinguishes one edit. It does not show that the checker is complete. `tools/test_machine_qualification_controls.py`
-checks the outcome classes on small real specimens.
+A defect may also name a second control that must detect it, run and reported in the same way.
+
+At 0dd0dce1 the first 29 defects were detected in both modes. Three of them, a concrete SRA that masks its count to
+five bits, a concrete SF read from bit 62 and a symbolic LE that ignores ZF, passed the profile-2 verifier suite and
+the kernel library then, so only the hardware conformance runs and the RV64I model comparison detected them. Unit
+tests in `tools/test_machine_code_profile2_verifier.py` now check both models without native execution: an SRA by
+32 to 63 of a negative value, SF on results whose bits 63 and 62 differ, and LE on equal values. They are the intended
+controls of those three defects and of their mirror defects in the other model, with conformance kept as the second
+control. A detected defect shows that one control distinguishes one edit. It does not show that the checker is
+complete. `tools/test_machine_qualification_controls.py` checks the outcome classes on small real specimens.
 
 ## Profile 2: flags, carries and comparisons
 

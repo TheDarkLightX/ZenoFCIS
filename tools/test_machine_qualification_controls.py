@@ -50,9 +50,21 @@ class Registry(unittest.TestCase):
                 self.assertEqual(source.count(d.anchor), 1)
                 self.assertNotEqual(d.anchor, d.replacement)
                 self.assertIn(d.control, methods)
+                if d.second is not None:
+                    self.assertIn(d.second, methods)
+                    self.assertNotEqual(d.second, d.control)
         kinds = {d.kind for d in controls.DEFECTS}
         self.assertLessEqual(BRIEF_KINDS | FLAG_KINDS, kinds)
         self.assertEqual({d.file for d in controls.DEFECTS}, {"verify.py", "verify2.py"})
+
+    def test_defects_once_left_to_hardware_conformance_have_a_unit_control_first(self):
+        # These three edits pass the verifier suites as they were before their unit controls; conformance stays
+        # registered as their second control.
+        for name in ("v2-rv-sra-count-five-bits", "v2-x86-sign-flag-bit-62", "v2-x86-le-ignores-zero-flag-in-smt"):
+            d = next(d for d in controls.DEFECTS if d.name == name)
+            with self.subTest(defect=name):
+                self.assertTrue(d.control.startswith(controls.V2), d.control)
+                self.assertTrue(d.second and d.second.startswith(controls.CONFORMANCE2), d.second)
 
     def test_positive_controls_include_every_library_kernel_and_both_verifier_suites(self):
         self.assertEqual({name for _, name in controls.POSITIVE},
