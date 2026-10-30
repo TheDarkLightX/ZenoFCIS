@@ -1,7 +1,9 @@
-"""Explicit ZAL word-kernel/1 authoring, source binding and checked machine sessions.
+"""Explicit ZAL word-kernel/1 and /2 authoring, source binding and checked machine sessions.
 
 This profile does not change ZAL's other abstraction profiles. The existing
 machine-byte decoder/checker decides candidates; no user or LLM grants authority.
+A `profile zal/word-kernel/2` line selects the profile-2 syntax in
+`word_kernel2.py`; binding, sessions and artifacts stay here for both profiles.
 """
 from __future__ import annotations
 
@@ -17,7 +19,9 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from tools.machine_code import model as mm, session as ms, targets as mt, verify as mv
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from tools.machine_code import model as mm, profile2 as mp2, session as ms, targets as mt, verify as mv
+import word_kernel2 as w2
 
 PROFILE = "zal/word-kernel/1"
 LIMIT_NAMES = ("max_candidates", "max_checks", "deadline_ms", "timeout_ms")
@@ -205,6 +209,9 @@ def parse(source, syntax="symbolic"):
         if raw.strip():
             lines.append((raw.strip(), offset + len(raw) - len(raw.lstrip())))
         offset += len(raw)
+    if lines and lines[0][0] == w2.PROFILE_LINE[syntax]:
+        kernel, spans = w2.parse(lines, syntax, LIMIT_NAMES, LIMIT_BOUNDS)
+        return Document(kernel, source, syntax, spans)
     need(len(lines) == 9, "word profile requires exactly nine declarations; unsupported requirements refuse")
     symbolic = syntax == "symbolic"
     patterns = ([r"profile zal/word-kernel/1;", r"kernel ([A-Za-z][A-Za-z0-9_]{0,63});",
@@ -245,19 +252,26 @@ def same_typed(left, right):
 
 
 def parsed_document(document):
-    need(type(document) is Document and type(document.kernel) is Kernel
+    need(type(document) is Document and type(document.kernel) in (Kernel, w2.Kernel2)
          and type(document.syntax) is str, "parsed word document required")
     reparsed = parse(document.source, document.syntax)
-    need(all(same_typed(getattr(reparsed.kernel, name), getattr(document.kernel, name))
-             for name in Kernel.__dataclass_fields__) and same_typed(reparsed.spans, document.spans),
+    need(type(reparsed.kernel) is type(document.kernel)
+         and all(same_typed(getattr(reparsed.kernel, name), getattr(document.kernel, name))
+                 for name in type(document.kernel).__dataclass_fields__) and same_typed(reparsed.spans, document.spans),
          "document differs from exact source parsing")
     return reparsed
+
+
+def is_profile2(document):
+    return type(document.kernel) is w2.Kernel2
 
 
 def render(document, syntax):
     document = parsed_document(document)
     need(syntax in ("symbolic", "english"), "unsupported syntax")
     k = document.kernel
+    if is_profile2(document):
+        return w2.render(k, syntax)
     def expression(node):
         op = node[0]
         if op == "input": return node[1]
@@ -288,15 +302,19 @@ def render(document, syntax):
 def lower(document):
     document = parsed_document(document)
     k = document.kernel
-    p = problem(k)
+    second = is_profile2(document)
+    p = w2.problem(k) if second else problem(k)
+    profile, observation = (w2.PROFILE, w2.OBSERVATION) if second else (PROFILE, OBSERVATION)
     limits = dict(zip(LIMIT_NAMES, k.limits))
-    meaning = {"profile": PROFILE, "kernel": k.name, "problem": p, "loop_limits": limits, "observation_contract": OBSERVATION}
+    meaning = {"profile": profile, "kernel": k.name, "problem": p, "loop_limits": limits, "observation_contract": observation}
     spans = [{"id": name, "start": start, "end": end, "line": document.source.count("\n", 0, start) + 1,
               "column": start - document.source.rfind("\n", 0, start)} for name, start, end in document.spans]
-    binding = {"schema": "zal/word-kernel-binding/1", "profile": PROFILE, "syntax": document.syntax,
+    binding = {"schema": "zal/word-kernel-binding/1", "profile": profile, "syntax": document.syntax,
         "revision": digest(canon(meaning)), "source_sha256": digest(document.source.encode("ascii")),
         "problem_sha256": digest(canon(p)), "bridge_sha256": digest(read_bytes(__file__, 131072)),
-        "machine_sources": source_identity(), "loop_limits": limits, "source_map": spans, "observation_contract": OBSERVATION}
+        "machine_sources": source_identity(), "loop_limits": limits, "source_map": spans, "observation_contract": observation}
+    if second:
+        binding["profile_syntax_sha256"] = digest(read_bytes(w2.__file__, 131072))
     return {"schema": "zal/word-kernel-lowering/1", "status": "lowered", "problem": p, "binding": binding,
             "authority": "none", "scope": "Exact declared modular word profile only; lowering is not checking or compilation"}
 
@@ -307,8 +325,16 @@ def subject(document, revision):
     return lowered
 
 
+def answered(topic, revision, lowered, answer):
+    return {"schema": "zal/word-kernel-answer/1", "status": "answered", "topic": topic,
+            "revision": revision, "source_sha256": lowered["binding"]["source_sha256"],
+            "problem_sha256": lowered["binding"]["problem_sha256"], "answer": answer, "authority": "none"}
+
+
 def explain(document, revision, topic):
     lowered = subject(document, revision)
+    if is_profile2(document):
+        return answered(topic, revision, lowered, w2.explain(document.kernel, lowered, topic))
     target = document.kernel.target
     scratch = list(mv._SCRATCH[target])
     if topic == "overflow":
@@ -332,18 +358,29 @@ def explain(document, revision, topic):
         answer = {"contract": OBSERVATION, "note": "Equal words do not establish stuttering equivalence of a complete machine or shell. Entry scratch, admitted clobbers, flags and implicit return effects retain the declared assumptions. Byte/body-instruction costs and search/check charges remain separate. The admitted straight-line body has bounded steps, not general external progress; temporal next/within requirements are unsupported."}
     else:
         raise ValueError("unsupported question topic")
-    return {"schema": "zal/word-kernel-answer/1", "status": "answered", "topic": topic,
-            "revision": revision, "source_sha256": lowered["binding"]["source_sha256"],
-            "problem_sha256": lowered["binding"]["problem_sha256"], "answer": answer, "authority": "none"}
+    return answered(topic, revision, lowered, answer)
 
 
 def what_if(document, revision, x, y):
     lowered = subject(document, revision)
+    need(not is_profile2(document), "what-if: profile zal/word-kernel/2 takes --input NAME=VALUE for each declared input")
     values = {"x": mm.word(x), "y": mm.word(y)}
     return {"schema": "zal/word-kernel-example/1", "status": "answered", "revision": revision,
             "source_sha256": lowered["binding"]["source_sha256"], "problem_sha256": lowered["binding"]["problem_sha256"],
             "inputs": {k: str(v) for k, v in values.items()},
             "expected": str(mm.evaluate(lowered["problem"]["expression"], values["x"], values["y"])),
+            "scope": "One specification example; no candidate execution or full-word qualification", "authority": "none"}
+
+
+def what_if_inputs(document, revision, values):
+    """Profile-2 example: expected results for one value of every declared input."""
+    lowered = subject(document, revision)
+    need(is_profile2(document), "what-if: profile zal/word-kernel/1 takes --x and --y")
+    words, expected = w2.example(document.kernel, values)
+    return {"schema": "zal/word-kernel-example/1", "status": "answered", "revision": revision,
+            "source_sha256": lowered["binding"]["source_sha256"], "problem_sha256": lowered["binding"]["problem_sha256"],
+            "inputs": {k: str(v) for k, v in words.items()}, "expected": [str(v) for v in expected],
+            "result_registers": list(w2.mv2.RESULTS[document.kernel.target][:len(expected)]),
             "scope": "One specification example; no candidate execution or full-word qualification", "authority": "none"}
 
 
@@ -359,6 +396,10 @@ def question(document, revision, text):
              "Does it access memory?": "memory", "What are the limits?": "limits", "How is a candidate checked?": "checking", "What is observed?": "observation"}
     if text in names:
         return explain(document, revision, names[text])
+    if is_profile2(document):
+        values = w2.question_values(document.kernel, text)
+        need(values is not None, "unsupported controlled question; use exact profile questions")
+        return what_if_inputs(document, revision, values)
     match = re.fullmatch(r"What if x is ([0-9]+) and y is ([0-9]+)\?", text)
     need(match is not None, "unsupported controlled question; use exact profile questions")
     return what_if(document, revision, *match.groups())
@@ -388,7 +429,7 @@ def load_bound(directory, revision, artifact=False):
     doc = parse(read_bytes(directory / "source.zal").decode("ascii"), binding["syntax"])
     lowered = subject(doc, revision)
     need(same_typed(binding, lowered["binding"]), "source/bridge/checker/limits/map binding changed")
-    actual = mm.validate_problem(read_json(directory / "machine/problem.json"))
+    actual = (mp2 if is_profile2(doc) else mm).validate_problem(read_json(directory / "machine/problem.json"))
     need(actual == lowered["problem"], "machine problem differs from exact ZAL lowering")
     return directory, doc, lowered
 
@@ -414,7 +455,9 @@ def feedback(document, lowered, result):
     answer = {"status": result["status"], "revision": lowered["binding"]["revision"],
               "source_sha256": lowered["binding"]["source_sha256"], "problem_sha256": lowered["binding"]["problem_sha256"],
               "machine": result, "authority": "none"}
-    if verification.get("status") == "counterexample":
+    if verification.get("status") == "counterexample" and is_profile2(document):
+        answer["human_question"] = w2.counterexample(document.kernel, lowered["problem"], verification)
+    elif verification.get("status") == "counterexample":
         inputs, scratch = verification.get("inputs"), verification.get("initial_registers")
         need(type(inputs) is dict and set(inputs) == {"x", "y"}, "counterexample inputs")
         need(type(scratch) is dict and set(scratch) == set(mv._SCRATCH[document.kernel.target]), "counterexample scratch must be complete")
@@ -450,6 +493,10 @@ def search(directory, revision):
     return feedback(doc, lowered, ms.search(directory / "machine", **dict(zip(LIMIT_NAMES, doc.kernel.limits))))
 
 
+def artifact_profile(document):
+    return (w2.PROFILE, w2.ASSURANCE) if is_profile2(document) else (PROFILE, ASSURANCE)
+
+
 def emit(directory, revision, output):
     directory, doc, lowered = load_bound(directory, revision)
     output = new_directory(output)
@@ -458,10 +505,11 @@ def emit(directory, revision, output):
     result = ms.emit(directory / "machine", output / "machine", doc.kernel.limits[3])
     if result["status"] != "emitted":
         return {"status": "inconclusive", "machine": result, "authority": "none"}
-    manifest = {"schema": "zal/word-kernel-artifact/1", "profile": PROFILE, "revision": revision,
+    profile, assurance = artifact_profile(doc)
+    manifest = {"schema": "zal/word-kernel-artifact/1", "profile": profile, "revision": revision,
         "source_sha256": lowered["binding"]["source_sha256"], "problem_sha256": lowered["binding"]["problem_sha256"],
         "files": {n: {"sha256": digest(read_bytes(output / n)), "bytes": (output / n).stat().st_size} for n in ("source.zal", "binding.json")},
-        "machine_manifest_sha256": digest(read_bytes(output / "machine/manifest.json")), "assurance": ASSURANCE, "authority": "none"}
+        "machine_manifest_sha256": digest(read_bytes(output / "machine/manifest.json")), "assurance": assurance, "authority": "none"}
     write_json(output / "manifest.json", manifest)
     return {"status": "emitted", "revision": revision, "problem_sha256": lowered["binding"]["problem_sha256"], "authority": "none"}
 
@@ -469,10 +517,11 @@ def emit(directory, revision, output):
 def replay(directory, revision):
     directory, doc, lowered = load_bound(directory, revision, True)
     manifest = read_json(directory / "manifest.json")
-    expected = {"schema": "zal/word-kernel-artifact/1", "profile": PROFILE, "revision": revision,
+    profile, assurance = artifact_profile(doc)
+    expected = {"schema": "zal/word-kernel-artifact/1", "profile": profile, "revision": revision,
         "source_sha256": lowered["binding"]["source_sha256"], "problem_sha256": lowered["binding"]["problem_sha256"],
         "files": {n: {"sha256": digest(read_bytes(directory / n)), "bytes": (directory / n).stat().st_size} for n in ("source.zal", "binding.json")},
-        "machine_manifest_sha256": digest(read_bytes(directory / "machine/manifest.json")), "assurance": ASSURANCE, "authority": "none"}
+        "machine_manifest_sha256": digest(read_bytes(directory / "machine/manifest.json")), "assurance": assurance, "authority": "none"}
     need(manifest == expected, "artifact/source/assurance binding changed")
     return feedback(doc, lowered, ms.replay_artifact(directory / "machine", doc.kernel.limits[3]))
 
@@ -489,7 +538,8 @@ def main(argv=None):
         if name == "open": p.add_argument("--session", type=Path, required=True)
         if name == "question": p.add_argument("--text", required=True)
         if name == "what-if":
-            p.add_argument("--x", required=True); p.add_argument("--y", required=True)
+            p.add_argument("--x", help="profile 1 x"); p.add_argument("--y", help="profile 1 y")
+            p.add_argument("--input", action="append", metavar="NAME=VALUE", help="profile 2: one per declared input")
     for name in ("packet", "candidate", "search", "emit", "replay"):
         p = subs.add_parser(name)
         p.add_argument("--artifact" if name == "replay" else "--session", type=Path, required=True)
@@ -497,6 +547,9 @@ def main(argv=None):
         if name == "candidate": p.add_argument("--proposal", type=Path, required=True)
         if name == "emit": p.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
+    if args.command == "what-if" and not args.input and (args.x is None or args.y is None):
+        subs.choices["what-if"].error("the following arguments are required: "
+                                      + ", ".join(f for f, v in (("--x", args.x), ("--y", args.y)) if v is None))
     try:
         if hasattr(args, "source"):
             source = read_bytes(args.source).decode("ascii")
@@ -510,7 +563,15 @@ def main(argv=None):
                 if args.command == "lower": result = lower(doc)
                 elif args.command == "show": result = show(doc, args.revision)
                 elif args.command == "question": result = question(doc, args.revision, args.text)
-                else: result = what_if(doc, args.revision, args.x, args.y)
+                elif is_profile2(doc):
+                    need(args.x is None and args.y is None, "what-if: profile zal/word-kernel/2 takes --input NAME=VALUE, not --x/--y")
+                    pairs = [item.split("=", 1) for item in args.input or []]
+                    need(all(len(pair) == 2 for pair in pairs), "what-if: --input takes NAME=VALUE")
+                    need(len({name for name, _ in pairs}) == len(pairs), "what-if: an input is given twice")
+                    result = what_if_inputs(doc, args.revision, dict(pairs))
+                else:
+                    need(not args.input, "what-if: profile zal/word-kernel/1 takes --x and --y, not --input")
+                    result = what_if(doc, args.revision, args.x, args.y)
         elif args.command == "packet": result = packet(args.session, args.revision)
         elif args.command == "candidate": result = candidate(args.session, args.revision, args.proposal)
         elif args.command == "search": result = search(args.session, args.revision)

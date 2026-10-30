@@ -9,6 +9,7 @@ on:
       - 'tools/test_zal_word_kernel.py'
       - 'integrations/zal/run.py'
       - 'integrations/zal/word_kernel.py'
+      - 'integrations/zal/word_kernel2.py'
       - 'tools/machine_code_requirements.txt'
       - 'test-data/machine-code/**'
       - 'test-data/zal-word-kernel/**'
@@ -21,6 +22,7 @@ on:
       - 'tools/test_zal_word_kernel.py'
       - 'integrations/zal/run.py'
       - 'integrations/zal/word_kernel.py'
+      - 'integrations/zal/word_kernel2.py'
       - 'tools/machine_code_requirements.txt'
       - 'test-data/machine-code/**'
       - 'test-data/zal-word-kernel/**'
@@ -51,6 +53,8 @@ jobs:
         run: python3 -B tools/test_machine_code_loop.py
       - name: ZAL source, human feedback and independent machine replay
         run: python3 -B tools/test_zal_word_kernel.py
+      - name: ZAL word-kernel profile 2, library-equal lowering and profile-2 replay
+        run: python3 -B tools/test_zal_word_kernel2.py
       - name: Profile-2 decoder, flag model and counterexample controls
         run: python3 -B tools/test_machine_code_profile2_verifier.py
       - name: Profile-2 proposal, search, emission and replay
@@ -62,6 +66,7 @@ jobs:
           python3 -O -B tools/test_machine_code_verifier.py
           python3 -O -B tools/test_machine_code_loop.py
           python3 -O -B tools/test_zal_word_kernel.py
+          python3 -O -B tools/test_zal_word_kernel2.py
           python3 -O -B tools/test_machine_code_profile2_verifier.py
           python3 -O -B tools/test_machine_code_profile2_loop.py
           python3 -O -B tools/test_machine_code_library.py

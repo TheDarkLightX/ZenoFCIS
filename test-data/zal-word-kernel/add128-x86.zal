@@ -1,0 +1,10 @@
+profile zal/word-kernel/2;
+kernel add128;
+target x86_64-sysv-register/2;
+inputs a_lo:u64,a_hi:u64,b_lo:u64,b_hi:u64;
+result 1 (add a_lo b_lo) modulo 2^64;
+result 2 (add (add a_hi b_hi) (ult (add a_lo b_lo) a_lo)) modulo 2^64;
+palette [["mov","rax","rdi"],["add","rax","rdx"],["mov","rdx","rsi"],["adc","rdx","rcx"]];
+max-body 4;
+objective bytes;
+limits candidates=2000 checks=16 deadline-ms=20000 solver-ms=1000;
