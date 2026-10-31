@@ -81,11 +81,13 @@ python3 tools/atdd.py run --resume RUN_DIR
   `nm` under `/usr/bin` and the Python `z3` module, which the native and
   verifier machine-code tests resolve themselves (`machine-code-synthesis`),
   the published 2.6.0 executable and checkout (`released-26-compatibility`),
-  and `/usr/bin/bwrap`, `/usr/bin/prlimit` and `cc` (`native-worker-host`).
-  Lean and QEMU are not declared because no scenario executes them: the Lean
-  gate tests run against recorded output, and RV64I execution under QEMU runs
-  only in the machine-code workflow, which requires it explicitly. Ordinary
-  runs do not check prerequisites.
+  `/usr/bin/bwrap`, `/usr/bin/prlimit` and `cc` (`native-worker-host`), and
+  `elan` with the installed Lean 4.28.0 and 4.32.0 toolchains
+  (`lean-proof-tools`). A toolchain is probed with its own `lean --version`
+  under `ELAN_HOME`, never through `elan run`, which downloads a missing
+  toolchain. QEMU is not declared because no scenario executes it: RV64I
+  execution under QEMU runs only in the machine-code workflow, which requires
+  it explicitly. Ordinary runs do not check prerequisites.
 - `RUN_DIR/receipts/ID.json` (`zeno-fcis/atdd-receipt/1`) records the
   scenario's status, the commit, its tree, whether tracked files differ from
   it (`dirty`) and the SHA-256 of those differences, each command's argv,

@@ -78,6 +78,17 @@ GNU_X86_TOOLS = tuple(HostTool(f"GNU {name} (/usr/bin/{name})", executable=f"/us
 PYTHON_Z3 = HostTool("Python z3 module (python3 -c 'import z3')", executable="python3",
                      version=("-c", "import z3; print(z3.get_version_string())"),
                      version_pattern=r"\d+\.\d+\.\d+(\.\d+)?")
+# tools/test_check_lean_proofs.py runs `elan run leanprover/lean4:vX lean` for each version in
+# check_lean_proofs.VERSIONS. That command downloads a missing toolchain, so these probes run elan and
+# each installed toolchain's own `lean --version` instead, and a probe never downloads.
+ELAN_HOME = Path(os.environ.get("ELAN_HOME") or Path.home() / ".elan")
+ELAN = HostTool("elan (elan on PATH)", executable="elan", version=("--version",),
+                version_pattern=r"elan \d+\.\d+\.\d+( .*)?")
+LEAN_TOOLCHAINS = tuple(
+    HostTool(f"Lean {version} toolchain (installed in ELAN_HOME)",
+             executable=str(ELAN_HOME / "toolchains" / f"leanprover--lean4---v{version}" / "bin" / "lean"),
+             version=("--version",), version_pattern=rf"Lean \(version {re.escape(version)}, .*\)")
+    for version in ("4.28.0", "4.32.0"))
 # `cargo test -p zeno-fcis-cli` runs the physical systemd stage test, which needs a reachable user manager.
 SYSTEMD_USER_MANAGER = HostTool("systemd user manager (systemctl --user)", executable="/usr/bin/systemctl",
                                 version=("--user", "show", "--property=Version"), version_pattern=r"Version=.+")
@@ -1172,6 +1183,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     "lean-proof-tools": AcceptanceScenario(
         "Check Lean source closure, axiom auditing and proof-gate controls",
         (("python3", "tools/test_check_lean_proofs.py"),),
+        requires=(ELAN, *LEAN_TOOLCHAINS),
     ),
     "effect-policy-tools": AcceptanceScenario(
         "Check complete effect control spaces and payment policy products",

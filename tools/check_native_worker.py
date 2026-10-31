@@ -220,6 +220,29 @@ def exact(stream, count):
     return bytes(out)
 
 
+# The helper's launch environment. native_worker.rs clears the environment, and the
+# bootstrap and startup cases set no locale variable, so Python coerces the C locale
+# to C.UTF-8 and glibc maps its locale files. The runtime inventory must describe
+# that process: pins taken under the controller's LANG map other locale files and the
+# helper refuses its runtime closure.
+LAUNCH_ENV={}
+REGRESSION_LOCALE={'LANG':'en_US.UTF-8'}
+
+
+def runtime_pins(work, label, optimized, controller_env):
+    """Describe the runtime in the launch environment, whatever the controller's locale."""
+    command=['/usr/bin/python3','-I','-S','-B',*(['-O'] if optimized else []),str(HELPER),'--describe-runtime']
+    del controller_env  # The inventory never inherits the controller's environment.
+    return run(command,work,label,LAUNCH_ENV)
+
+
+def locale_environment(env):
+    """The controller environment with every locale variable replaced by REGRESSION_LOCALE."""
+    out={key:value for key,value in env.items() if key!='LANGUAGE' and key!='LANG' and not key.startswith('LC_')}
+    out.update(REGRESSION_LOCALE)
+    return out
+
+
 def bootstrap_case(work, rows, image, optimized, label, mutation=None, secret=b'private-A'):
     canary=work/'canary.txt';canary.write_bytes(secret)
     try:
@@ -501,9 +524,21 @@ def self_test():
         except Refusal:
             continue
         raise Refusal('self-test accepted '+name)
+    recorded=[]
+    global run
+    original_run=run
+    try:
+        run=lambda command,work,label,env,**options:recorded.append(dict(env)) or ''
+        runtime_pins(Path('/nonexistent'),'locale-runtime',False,locale_environment(dict(os.environ)))
+        runtime_pins(Path('/nonexistent'),'locale-runtime',True,{'LANG':'en_US.UTF-8','LC_ALL':'en_US.UTF-8'})
+    finally:
+        run=original_run
+    if recorded!=[LAUNCH_ENV,LAUNCH_ENV] or LAUNCH_ENV:
+        raise Refusal('runtime inventory inherits the controller environment')
     snapshot_refusals = snapshot_self_test()
     print(f'native-worker-host self-test: PASS ({len(cases)} refusals; 3 positive inputs; '
-          f'{snapshot_refusals} snapshot refusals; source drift and restoration)')
+          f'{snapshot_refusals} snapshot refusals; source drift and restoration; '
+          f'runtime inventory in the launch environment)')
     return 0
 
 
@@ -538,11 +573,21 @@ def main():
     failures=[]
     for optimized in (False,True):
         prefix='optimized' if optimized else 'normal'
-        command=['/usr/bin/python3','-I','-S','-B',*(['-O'] if optimized else []),str(HELPER),'--describe-runtime']
-        output=run(command,work,prefix+'-runtime',env)
+        output=runtime_pins(work,prefix+'-runtime',optimized,env)
         rows=runtime_rows(output)
         (work/(prefix+'-runtime-pins.tsv')).write_text(output)
         if not optimized:(work/'runtime-pins.tsv').write_text(output)
+        # Regression: a controller under LANG=en_US.UTF-8 must produce the same pins,
+        # and those pins must admit a positive bootstrap.
+        localized=runtime_pins(work,prefix+'-locale-runtime',optimized,locale_environment(env))
+        if localized!=output:
+            failures.append({'case':prefix+'-locale-runtime','error':'runtime pins depend on the controller locale'})
+        else:
+            try:
+                bootstrap.append(bootstrap_case(work,runtime_rows(localized),image,optimized,
+                                                prefix+'-locale-positive',None,b'private-A'))
+            except (OSError,ValueError,subprocess.SubprocessError) as error:
+                failures.append({'case':prefix+'-locale-positive','error':str(error)})
         paired=[]
         cases=[(prefix+'-positive-A',None,b'private-A'),(prefix+'-positive-B',None,b'private-B')]
         cases += [(prefix+'-'+kind,kind,b'private-A') for kind in

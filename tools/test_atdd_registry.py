@@ -19,6 +19,10 @@ from pathlib import Path
 from unittest import mock
 
 import atdd
+
+# The real registry. InventoryRunnerTests patches atdd.SCENARIOS with planted scenarios, so a check of
+# the registered scenarios must read this copy, taken before any patch.
+REGISTERED_SCENARIOS = dict(atdd.SCENARIOS)
 import miri_exclusions
 from miri_shards import logical_rows
 
@@ -1414,12 +1418,15 @@ class InventoryRunnerTests(unittest.TestCase):
             "tools/test_machine_code_verifier.py": {atdd.PYTHON_Z3.name},
             "tools/test_machine_code_profile2_verifier.py": {atdd.PYTHON_Z3.name},
             "tools/check_probity.py": {atdd.NODE_EXACT.name},
+            "tools/test_check_lean_proofs.py": {atdd.ELAN.name, *(tool.name for tool in atdd.LEAN_TOOLCHAINS)},
         }
-        for name, scenario in atdd.SCENARIOS.items():
+        checked = set()
+        for name, scenario in REGISTERED_SCENARIOS.items():
             declared = {tool.name for tool in scenario.requires}
             for command in scenario.commands:
                 for script in command:
                     for required in needs.get(script, ()):
+                        checked.add(script)
                         with self.subTest(scenario=name, script=script, tool=required):
                             self.assertIn(required, declared)
             whole_cli_crate = any(
@@ -1431,6 +1438,8 @@ class InventoryRunnerTests(unittest.TestCase):
                 with self.subTest(scenario=name, tool="systemd"):
                     self.assertIn(atdd.SYSTEMD_USER_MANAGER.name, declared,
                                   "the whole CLI test crate runs the physical systemd stage test")
+        # Every listed script is run by some registered scenario, so no entry passes vacuously.
+        self.assertEqual(checked, set(needs))
 
     def test_planted_absent_python_module_and_user_manager_block(self):
         """A host without z3 or a user manager must block, never pass, the scenarios that need them."""
@@ -1454,6 +1463,37 @@ class InventoryRunnerTests(unittest.TestCase):
         self.assertIsNone(atdd.missing_tool(manager))
         for tool in atdd.GNU_X86_TOOLS:
             self.assertTrue(tool.executable.startswith("/usr/bin/"), "resolved exactly as the tests resolve them")
+
+    def test_planted_absent_elan_and_lean_toolchains_block(self):
+        """A host without elan or a pinned Lean toolchain must block, never fail or pass, lean-proof-tools."""
+        sys.path.insert(0, str(atdd.ROOT / "tools"))
+        import check_lean_proofs
+        self.assertEqual(sorted(tool.name for tool in atdd.LEAN_TOOLCHAINS),
+                         sorted(f"Lean {version} toolchain (installed in ELAN_HOME)"
+                                for version in check_lean_proofs.VERSIONS),
+                         "one declared toolchain per version the Lean test runs")
+        with mock.patch.dict(os.environ, {"PATH": str(self.root)}):
+            self.assertEqual(atdd.missing_tool(atdd.ELAN), f"{atdd.ELAN.name}: elan not found")
+            fake = self.root / "elan"
+            fake.write_text("#!/bin/sh\necho 'elan 4.1.2 (58e8d545e 2025-05-26)'\n")
+            fake.chmod(0o755)
+            self.assertIsNone(atdd.missing_tool(atdd.ELAN))
+        for tool in atdd.LEAN_TOOLCHAINS:
+            version = tool.name.split()[1]
+            planted = self.root / "toolchains" / version / "lean"
+            probe = atdd.HostTool(tool.name, executable=str(planted), version=tool.version,
+                                  version_pattern=tool.version_pattern)
+            self.assertEqual(atdd.missing_tool(probe), f"{tool.name}: {planted} not found")
+            planted.parent.mkdir(parents=True)
+            planted.write_text("#!/bin/sh\necho 'Lean (version 4.99.0, x86_64-unknown-linux-gnu, commit 0, Release)'\n")
+            planted.chmod(0o755)
+            self.assertEqual(atdd.missing_tool(probe), f"{tool.name}: {planted} reports Lean (version 4.99.0, "
+                                                       "x86_64-unknown-linux-gnu, commit 0, Release)")
+            planted.write_text(f"#!/bin/sh\necho 'Lean (version {version}, x86_64-unknown-linux-gnu, commit 0, Release)'\n")
+            self.assertIsNone(atdd.missing_tool(probe))
+            self.assertTrue(tool.executable.endswith(f"/toolchains/leanprover--lean4---v{version}/bin/lean"),
+                            "the probe runs the installed binary, never `elan run`, which downloads")
+        self.assertEqual(REGISTERED_SCENARIOS["lean-proof-tools"].requires, (atdd.ELAN, *atdd.LEAN_TOOLCHAINS))
 
     def test_missing_tools_name_the_variable_path_executable_or_version(self):
         script = self.root / "fake-node"
