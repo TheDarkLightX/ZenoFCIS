@@ -73,11 +73,14 @@ embedded in ZenoFCIS values.
   the measuring machine only. The library holds register and memory kernels
   for both targets, plus four 256-bit kernels over four-limb regions (add,
   subtract, unsigned and signed less-than) that were proposed rather than
-  searched. Its entries include six LLM-proposed x86-64 kernels, each checked
-  at its recorded cost: signed saturating add and signed saturating subtract,
-  each at 22 bytes and 6 instructions and at 25 bytes and 5 instructions;
-  unsigned difference-or-zero at 11 bytes and 3 instructions; and an exact
-  zero-byte mask at 30 bytes and 7 instructions.
+  searched. Its entries include seven LLM-proposed x86-64 kernels, each
+  checked at its recorded cost: signed saturating add and signed saturating
+  subtract, each at 22 bytes and 6 instructions and at 25 bytes and 5
+  instructions; unsigned difference-or-zero at 11 bytes and 3 instructions;
+  an exact zero-byte mask at 30 bytes and 7 instructions; and packed unsigned
+  16-bit addition across four lanes, each lane modulo 2^16 with no carry
+  between lanes, at 42 bytes and 9 instructions. The packed addition is a
+  known SWAR (SIMD within a register) technique (Dietz, 1997).
 - `second-solver` gives the query of each library `equivalent` verdict to the
   pinned cvc5 1.3.3, and counts the verdict as confirmed only when cvc5 also
   answers unsat. Both solvers read the same formula, so this does not check

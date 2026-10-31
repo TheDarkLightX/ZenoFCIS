@@ -1,7 +1,7 @@
 # ZenoFCIS 2.7 factory gap register
 
-ZenoFCIS 2.7.0 is released with the open rows of this register. Rows F27-24
-and F27-29 record no remaining 2.7 work; the other twenty-nine rows remain open.
+2.7.0 ships with twenty-nine of the thirty-one rows open; F27-24 and F27-29
+have no open item for 2.7. The open rows are the development backlog after 2.7.0.
 Implementation, focused tests, native qualification, proof and release readiness
 have separate requirements. See the [continuation guide](DEVELOPMENT_27.md) for
 source locations and reproduction commands; bind results to the actual commit.

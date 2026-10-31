@@ -34,10 +34,12 @@ supports. See [installation](INSTALLATION.md) for the published downloads.
   kernel with its problem, bytes and cost and rechecks every entry; a second
   solver confirms `equivalent` verdicts, and a calling-convention gate checks
   kernels as leaf functions at stated evidence levels. The entries include
-  six LLM-proposed x86-64 kernels: signed saturating add and subtract, each at
-  22 bytes and 6 instructions or 25 bytes and 5 instructions, unsigned
-  difference-or-zero at 11 bytes and 3 instructions, and an exact zero-byte
-  mask at 30 bytes and 7 instructions. See
+  seven LLM-proposed x86-64 kernels: signed saturating add and subtract, each
+  at 22 bytes and 6 instructions or 25 bytes and 5 instructions, unsigned
+  difference-or-zero at 11 bytes and 3 instructions, an exact zero-byte mask
+  at 30 bytes and 7 instructions, and packed unsigned 16-bit addition across
+  four lanes at 42 bytes and 9 instructions, a known SWAR technique (Dietz,
+  1997). See
   [machine-code synthesis](MACHINE_CODE_SYNTHESIS_27.md).
 - **Full-width numbers.** Default-off `Value2`, codec2 and Schema2 carry
   `U256` and `I256` values. Verus proofs of the actual Rust bodies, under

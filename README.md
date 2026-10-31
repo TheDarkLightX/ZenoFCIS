@@ -75,7 +75,8 @@ the imperative shell. A passing stage check is not a release receipt.
 ## Release status
 
 This checkout is version **2.7.0**, the current release source. The
-[changelog](CHANGELOG.md) states what 2.7 adds and what it does not qualify.
+[release notes](docs/RELEASE_NOTES.md) summarize 2.7.0 and the
+[changelog](CHANGELOG.md) lists each change and what is not qualified.
 The [gap register](docs/FACTORY_GAPS_27.md) records the open requirements, and
 the [continuation guide](docs/DEVELOPMENT_27.md) explains how to continue
 them.
@@ -156,7 +157,7 @@ The [documentation index](docs/INDEX.md) lists every guide by task. Common
 starting points:
 
 - **Build an application:** the [installation guide](docs/INSTALLATION.md),
-  [quickstart](docs/QUICKSTART.md), [2.6.0 release notes](docs/RELEASE_NOTES.md),
+  [quickstart](docs/QUICKSTART.md), [release notes](docs/RELEASE_NOTES.md),
   [API reference](docs/API_REFERENCE.md), [crate map](docs/CRATE_MAP.md) and
   [feature matrix](docs/FEATURE_MATRIX.md). The
   [CLI reference](docs/CLI_REFERENCE.md) describes the supported generation,
