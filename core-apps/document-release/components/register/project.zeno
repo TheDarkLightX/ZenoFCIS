@@ -34,5 +34,5 @@ law 541 acceptance_eligibility on accept = (((true) && !(context.102.130 == 0)) 
 law 542 no_committed_failure on failure = false;
 // Core seed versioned-register/1; parameters {"C": 2}.
 // Instance source-set SHA256 3c1ba2480d016a696da5f015922d2b3fdd0c5a09232606f150c3246d138f0c0d.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/versioned-register.json SHA256 689c05dc2803f291b6fb8e6df03991618db6a0e68f1dcccad67be5f2bd385dbc; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/versioned-register.json SHA256 0e7a9cbbb3e1ebc4ddccc06be7a394575d4028d359ec956f6d2286a5728e0515; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

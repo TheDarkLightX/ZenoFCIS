@@ -49,6 +49,8 @@ def certificate_fields(root: Path, base: str, name: str, old_pin: str | None) ->
     changed = sorted(k for k in set(old) | set(new) if old.get(k) != new.get(k))
     if "sources" in changed and source_moves(root, base, name, old.get("sources"), new.get("sources")):
         changed.remove("sources")
+    if "instances" in changed and identity_moves(root, base, name, old.get("instances"), new.get("instances")):
+        changed.remove("instances")
     if not set(changed) <= CERTIFICATE_FIELDS:
         raise pins.Refusal(f"{name}: change outside the declared closure (fields {changed})")
 
@@ -69,6 +71,31 @@ def source_moves(root: Path, base: str, name: str, old, new) -> bool:
             raise pins.Refusal(f"{name}: source digest moved for an unreadable file: {path}") from None
         if current == old[path] or current != new[path]:
             raise pins.Refusal(f"{name}: source digest moved for an unchanged or mismatched file: {path}")
+    return True
+
+
+EVALUATOR = "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/evaluator.rs"
+
+
+def identity_moves(root: Path, base: str, name: str, old, new) -> bool:
+    """Whether the instances differ only in each authority identity, after the evaluator itself changed.
+
+    A release changes the evaluator digest, which every instance's authority identity includes. Each instance must
+    otherwise equal its declared one, in the same order, and the evaluator's bytes must differ from base.
+    """
+    if not isinstance(old, list) or not isinstance(new, list) or len(old) != len(new):
+        raise pins.Refusal(f"{name}: the certificate's instance list changed")
+    for before, after in zip(old, new):
+        if not isinstance(before, dict) or not isinstance(after, dict) or set(before) != set(after):
+            raise pins.Refusal(f"{name}: an instance changed its fields")
+        if any(before[k] != after[k] for k in before if k != "authority_identity_sha256"):
+            raise pins.Refusal(f"{name}: an instance changed outside its authority identity")
+    try:
+        evaluator_changed = pins.at_base(root, base, EVALUATOR) != pins.read(root, EVALUATOR)
+    except (OSError, ValueError):
+        raise pins.Refusal(f"{name}: the evaluator source is unreadable") from None
+    if not evaluator_changed:
+        raise pins.Refusal(f"{name}: authority identities moved but the evaluator did not change since {base}")
     return True
 
 

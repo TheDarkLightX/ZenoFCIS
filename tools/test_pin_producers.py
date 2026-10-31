@@ -287,7 +287,7 @@ class CoreAppReferences(ProducerContract, unittest.TestCase):
                                 *(f"core-apps/{app}/composition.json" for app in self.apps),
                                 *(f"core-apps/{app}/components" for app in self.apps)],
                                cwd=ROOT, capture_output=True, text=True, check=True).stdout.split()
-        return names
+        return [*names, references.EVALUATOR]
 
     def referencing(self, fixture, certificate):
         found = []
@@ -355,6 +355,29 @@ class CoreAppReferences(ProducerContract, unittest.TestCase):
         fixture = self.fixture()
         fixture.edit_json(self.planted_name, lambda c: c["sources"].update({bound: "0" * 64}), certificate_layout)
         self.refused(fixture, "source digest moved for an unreadable file")
+
+    def test_authority_identities_move_only_with_the_evaluator(self):
+        def planted(certificate):
+            certificate.update(cli_sha256="1" * 64)
+            certificate["instances"][0]["authority_identity_sha256"] = "2" * 64
+        # Accepted: the evaluator changed since base, and only the authority identities moved.
+        fixture = self.fixture()
+        fixture.append(references.EVALUATOR, b"\n// planted release identity\n")
+        fixture.edit_json(self.planted_name, planted, certificate_layout)
+        code, output = self.check(fixture)
+        self.assertEqual(code, 1, output)  # stale pins listed, nothing refused
+        self.assertNotIn("refused", output)
+        self.assertIn(self.planted_name, output)
+        # Refused: the identities moved, but the evaluator did not change.
+        fixture = self.fixture()
+        fixture.edit_json(self.planted_name, planted, certificate_layout)
+        self.refused(fixture, "authority identities moved but the evaluator did not change")
+        # Refused: another instance field moved with the identity.
+        fixture = self.fixture()
+        fixture.append(references.EVALUATOR, b"\n// planted release identity\n")
+        fixture.edit_json(self.planted_name, lambda c: (planted(c), c["instances"][0].update(tuples=0)),
+                          certificate_layout)
+        self.refused(fixture, "an instance changed outside its authority identity")
 
 
 if __name__ == "__main__":
