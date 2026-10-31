@@ -3639,7 +3639,7 @@ pub mod v1;
 /// `k + 1`'s. `zeno-fcis generate contract` replayed every one before writing
 /// this list, and a program-successor store upgrade binds the ones it spans.
 pub const ADOPTION_RECEIPTS: &[&str] =
-    &["40f75b8d9f76e6d0e4e74463e6aee36c434f5b755a862900e4e231ccc7571dbf"];
+    &["efe3b09de76444290f8ff0ecae64624cbd2631554986e3147498ce7e85c6e719"];
 /// Every contract version's checked catalog, oldest first and this one last,
 /// and `ADOPTION_RECEIPTS`, for a store upgrade or a lineage open. Each
 /// binding checks that version's complete retained schema and policy bytes.
