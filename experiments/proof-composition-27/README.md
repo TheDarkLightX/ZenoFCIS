@@ -233,7 +233,7 @@ an oversized connected dependency component returns `inconclusive`/a proposal
 refusal, not a silently partial claimed proof.
 
 This is a bounded seed for future CEGAR/PDR/CHC, abstraction libraries and
-Crucible search. It is not a general invariant synthesizer, and the proposal
+proposal search. It is not a general invariant synthesizer, and the proposal
 algorithm itself is neither verified nor trusted.
 
 ## Separately frozen safety goals

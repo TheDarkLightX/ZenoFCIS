@@ -348,7 +348,7 @@
   "upstream_reference_comparison": {
     "reason": "Optional reference packages are absent; no installation performed.",
     "root_replayed": false,
-    "source": "https://github.com/TheDarkLightX/Zeno-Crucible/blob/b799b1f69a8ebe6942e66b8a850ff41017e66c46/experiments/zal-notation-library/validation/ontology-reference.json"
+    "source": "private upstream research repository, commit b799b1f69a8ebe6942e66b8a850ff41017e66c46, experiments/zal-notation-library/validation/ontology-reference.json"
   },
   "validation": {
     "normal": {

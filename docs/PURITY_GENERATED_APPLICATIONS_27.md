@@ -1,6 +1,6 @@
 # Purity check on generated applications (design, F27-30)
 
-Status: design only, proposed for 2.7.1. Nothing here changes `purity` yet.
+Status: design only, not implemented in 2.7.0. Nothing here changes `purity` yet.
 
 ## The journey that fails today
 

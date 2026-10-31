@@ -546,7 +546,7 @@ query; a control interleaves two calls to show this.
 This narrows the trust placed in one solver on the positive `equivalent`
 verdict only. It does not check the instruction models, the encoding, the
 pruning rules, a `realize` unsat, the calling-convention gate or any optimality
-claim, since cvc5 receives the same formula Z3 built. On 2026-10-30 every kernel in `kernels/` (13) and
+claim, since cvc5 receives the same formula Z3 built. On 2026-10-31 every kernel in `kernels/` (20) and
 `memory-kernels/` (6) was confirmed. `tools/test_machine_code_second_solver.py`
 runs only when `ZENO_FCIS_CVC5` names that cvc5. A planted disagreement, where
 the query loses its assertions, is reported `inconclusive`.
@@ -576,9 +576,30 @@ A developer who needs a branch-free 128-bit add, a saturating add or an
 absolute value should not have to rerun a search or trust old output. The
 library in `test-data/machine-code/kernels/` keeps each checked kernel as one
 entry: the problem it was checked against, the exact bytes, the cost and how the
-bytes were found (`proposal` or `search`). It holds 12 kernels across both
+bytes were found (`proposal` or `search`). It holds 20 kernels across both
 profiles and both targets, such as `add128-x86`, `add128-rv64i`, `sub128-x86`,
 `umin-x86`, `signed-saturating-add-x86` and `abs-x86`.
+
+Seven entries were proposed by LLMs and checked by the checker against
+specifications written from their meaning:
+
+| Entry | Meaning | Size |
+| --- | --- | --- |
+| `signed-saturating-add-adc-x86` | signed `x + y`, saturating to the sign of `x` on overflow | 22 bytes, 6 instructions |
+| `signed-saturating-add-sbb-x86` | the same | 25 bytes, 5 instructions |
+| `signed-saturating-sub-adc-x86` | signed `x - y`, saturating to the sign of `x` on overflow | 22 bytes, 6 instructions |
+| `signed-saturating-sub-sbb-x86` | the same | 25 bytes, 5 instructions |
+| `unsigned-difference-or-zero-x86` | `0` when `x < y` unsigned, otherwise `x - y` | 11 bytes, 3 instructions |
+| `zero-byte-mask-x86` | bit `8i+7` set exactly when byte `i` of `x` is zero, every other bit clear | 30 bytes, 7 instructions |
+| `packed-u16x4-add-x86` | each 16-bit lane `i` is `(x_i + y_i) mod 65536`, with no carry between lanes | 42 bytes, 9 instructions |
+
+The two signed saturating adds use the same specification as the 31-byte,
+7-instruction `signed-saturating-add-x86`, which stays: the contract lowering
+reproduces its problem and the search benchmark measures it. The packed add
+follows the construction in Warren, *Hacker's Delight*, 2nd edition (2013),
+section 2-18 ("Multibyte Add, Subtract, Absolute Value"); it is not a new
+method.
+Sizes are the checked costs; no speed is claimed.
 
 ```text
 python3 -B -m tools.machine_code.run library check --dir test-data/machine-code/kernels
@@ -628,8 +649,8 @@ with gcc.
 - **Failure:** a mismatch or a runner error fails the library (exit 1), and
   reports the first mismatching arguments with their expected and actual
   results. This happens even when the model check passed.
-- **Result:** on an AMD Ryzen Threadripper 1950X, the 10 x86 entries in the
-  repository agreed on 49,608 vectors. The 2 RV64I entries were not run.
+- **Result:** on an AMD Ryzen Threadripper 1950X, the 18 x86 entries in the
+  repository agreed on 82,832 vectors. The 2 RV64I entries were not run.
 
 Native agreement covers the vectors run on that processor only.
 
@@ -769,9 +790,9 @@ The five that return normally:
 python3 -B -m tools.machine_qualification.abi --dir test-data/machine-code/kernels
 ```
 
-On 2026-10-30 all 13 library kernels passed the A-01 to A-07 checks as the
+On 2026-10-31 all 20 library kernels passed the A-01 to A-07 checks as the
 table states them: modelled checks for A-01 to A-06, and a stated evidence kind
-for A-07, not the design's full obligations. The 11 x86 kernels conformed
+for A-07, not the design's full obligations. The 18 x86 kernels conformed
 natively on 512 vectors each; RV64I kernels are not run here. A result belongs
 to the harness revision that produced it; a later harness change needs a rerun.
 
@@ -1627,14 +1648,14 @@ own.
   rewrite either checks equivalent or is refused for its size before checking;
   none may produce a counterexample.
 
-At this checkpoint that last test covers 10 kernels and 64 cases:
+At this checkpoint that last test covers 17 kernels and 83 cases:
 
-- the checker accepts 63 rewrites;
+- the checker accepts 82 rewrites;
 - one case needs more than 16 instructions for its constants and is refused
   before checking;
-- all 9 fully fixed cases have fewer instructions than the original kernel;
-- of the 54 partly fixed cases, 10 have fewer instructions, 24 the same number
-  and 20 more. On average a partly fixed rewrite is 8.6 bytes longer than the
+- all 16 fully fixed cases have fewer instructions than the original kernel;
+- of the 66 partly fixed cases, 11 have fewer instructions, 26 the same number
+  and 29 more. On average a partly fixed rewrite is 8.5 bytes longer than the
   original kernel.
 
 On x86, a constant that fits a sign-extended 32-bit immediate goes directly

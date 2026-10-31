@@ -3,8 +3,8 @@
 **Development status: in progress; proposal [#150](https://github.com/TheDarkLightX/ZenoFCIS/pull/150).**
 The [proposal](RUNTIME_ISOLATION_27_PROPOSAL.md) defines the intended guarantees.
 Checked implementation items below identify source and test coverage present in
-this development checkpoint. They do not record a fresh pass on the final
-checkpoint, qualify an installed application or establish deployment safety.
+2.7.0. They do not record a fresh pass on the release source, qualify an
+installed application or establish deployment safety.
 Exact-head native checks and the remaining I5–I9 work are pending.
 
 ## Source and claim boundary
@@ -175,6 +175,20 @@ The ordinary owner target leaves the explicitly ignored host tests unexecuted.
 Its passing summary would not supply native-worker qualification. Fencing tests
 use a local fixture receiver and trusted fence administration; they do not
 provide a deployed receiver-fencing protocol or physical-action evidence.
+
+The supervisor launches the bootstrap with an empty environment. A runtime
+inventory must therefore be proposed in that environment too. Under a caller's
+`LANG` or `LC_*`, glibc maps other locale files, and the bootstrap refuses its
+runtime closure. Propose the pins for `ZENO_NATIVE_RUNTIME_PINS` with:
+
+```sh
+env -i /usr/bin/python3 -I -S -B crates/zeno-fcis-shell-sqlite/src/effects/native_worker.py --describe-runtime > runtime-pins.tsv
+```
+
+The output is a proposal for review, not authorization to replace reviewed pins.
+`tools/check_native_worker.py` generates its own pins the same way. Its host gate
+also derives pins under `LANG=en_US.UTF-8`, requires them to be byte-identical,
+and requires them to admit a positive bootstrap in each Python mode.
 
 After separate review of the exact host, tool/runtime identities, owned output
 paths, budgets and cleanup protocol, run the development host gate:

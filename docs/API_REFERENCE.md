@@ -1,8 +1,8 @@
 # API reference
 
-The workspace development version is `2.7.0-rc.1`; full qualification is
-incomplete. See the [continuation guide](DEVELOPMENT_27.md) and
-[open requirements](FACTORY_GAPS_27.md). This guide retains the `2.6.0` API
+The workspace version is `2.7.0`, the current release source. The
+[gap register](FACTORY_GAPS_27.md) records its open requirements, and the
+[continuation guide](DEVELOPMENT_27.md) explains how to continue them. This guide retains the `2.6.0` API
 baseline and historical V1 protocol guidance; [the earlier release notes](RELEASE_NOTES.md)
 state that baseline's assurance boundaries.
 

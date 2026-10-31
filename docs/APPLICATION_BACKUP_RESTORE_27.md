@@ -1,6 +1,6 @@
 # Application backup and verified restore (design, F27-28)
 
-Status: design only, proposed for 2.7.1. Nothing here adds a command yet.
+Status: design only, not implemented in 2.7.0. Nothing here adds a command yet.
 
 ## What exists and what is missing
 

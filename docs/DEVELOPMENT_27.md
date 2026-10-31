@@ -1,8 +1,9 @@
-# Continuing the ZenoFCIS 2.7 development checkpoint
+# Continuing ZenoFCIS 2.7 development
 
-This branch preserves the implementation under development so another developer
-can review and continue it from a clean checkout. Full 2.7 qualification remains
-incomplete. Development version strings do not establish a qualified release.
+ZenoFCIS 2.7.0 is released with the open rows of the
+[gap register](FACTORY_GAPS_27.md). This guide explains how another developer
+can review and continue that work from a clean checkout. A version string does
+not by itself establish that a requirement is qualified.
 
 The factory checkpoint is stacked on
 [the composition research PR](https://github.com/TheDarkLightX/ZenoFCIS/pull/152).
@@ -146,8 +147,8 @@ scenario names its missing host tool and leaves its claim open; see
 [acceptance testing](ACCEPTANCE_TESTING.md#inventory-receipts-shards-and-resume).
 
 Complete the affected proofs, platform, artifact, privacy and package checks on
-that same assembly. This development handoff leaves those release obligations
-open and requests no merge, deployment or release.
+that same assembly. This guide itself requests no merge, deployment or
+release.
 
 ### Release assembly checklist
 

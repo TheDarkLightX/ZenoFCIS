@@ -1,5 +1,102 @@
 # ZenoFCIS release notes
 
+## 2.7.0
+
+ZenoFCIS 2.7.0 adds checked machine-code synthesis, default-off full-width
+numbers with proofs of their Rust arithmetic, checked parsing, and new ZAL
+tools for meaning, numbers and relational reasoning. Much of it is
+experimental. The [gap register](FACTORY_GAPS_27.md) records thirty-one 2.7
+requirements; twenty-nine remain open, and [Not in 2.7](#not-in-27) names the
+main ones. The [changelog](../CHANGELOG.md) lists every change.
+
+People author the semantic layer: the requirements, design decisions and
+semantic contracts, in plain language or ZAL, chosen from proposals and
+reviewed. Much of the formal specification, code and documentation below that
+layer is LLM-generated; the specification's meaning comes from the people who
+review it, in a loop they oversee. Parts called synthesized are produced by
+ZenoFCIS's own program synthesis, such as machine-code kernels found by the
+bounded search; the kernel library records whether each entry was proposed
+or searched. Each part is checked by the judges, tests and proofs named in
+its section, and each claim below is stated at the strength its evidence
+supports.
+
+The published CLI has Linux x86_64 GNU and Apple-silicon macOS downloads,
+listed in one signed `DOWNLOADS.sha256`. No Windows executable is published
+for 2.7.0; the 2.6.0 Windows download keeps its 2.6.0 scope. See
+[installation](INSTALLATION.md) for checksums and scope.
+
+### 2.7 highlights
+
+- **Machine-code synthesis.** For straight-line x86-64 and RV64I kernels over
+  64-bit words, an LLM or another proposer supplies raw bytes, or a bounded
+  search walks a declared instruction palette. A separate decoder and a
+  full-word SMT check decide the declared property for every admitted input,
+  and each counterexample is replayed concretely. Three profiles cover register words,
+  flags and comparisons, and declared memory regions. Search skips only
+  candidates that exact rules show are never needed; `realize` asks whether
+  any cheaper program exists in the palette, and its "no program" answers
+  hold for that palette and machine model only. A checked library keeps each
+  kernel with its problem, bytes and cost and rechecks every entry; a second
+  solver confirms `equivalent` verdicts, and a calling-convention gate checks
+  kernels as leaf functions at stated evidence levels. The entries include
+  seven LLM-proposed x86-64 kernels: signed saturating add and subtract, each
+  at 22 bytes and 6 instructions or 25 bytes and 5 instructions, unsigned
+  difference-or-zero at 11 bytes and 3 instructions, an exact zero-byte mask
+  at 30 bytes and 7 instructions, and packed unsigned 16-bit addition across
+  four lanes at 42 bytes and 9 instructions, the known construction of
+  Warren, *Hacker's Delight*, 2nd edition (2013), section 2-18. See
+  [machine-code synthesis](MACHINE_CODE_SYNTHESIS_27.md).
+- **Full-width numbers.** Default-off `Value2`, codec2 and Schema2 carry
+  `U256` and `I256` values. Verus proofs of the actual Rust bodies, under
+  stated assumptions, cover comparison, construction, constants, conversions,
+  checked addition, subtraction and negation, and the multiply and divide
+  methods. Square roots, Schema2 refinement and full-width programs and
+  applications remain open. See
+  [full-width numeric foundations](NUMERIC_256_FOUNDATIONS_27.md).
+- **Checked parsing.** Syntax certificates are accepted by a checker with
+  Verus soundness contracts, and diagnostic-free lexing is proved to keep the
+  original source tokens. Refinement from the parser to the native checker
+  remains open.
+- **ZAL.** Python readers of outside ZAL JSON keep every number's exact value
+  or refuse it with a named reason. Explained ontology classification, a finite semantic
+  library, notation and Lenses, word-kernel profiles that lower controlled
+  English to machine-code problems, and observation contracts are added. The
+  optional relational profile's current files are compared with an
+  independent oracle by `qualify.py`; an independent review of that
+  comparison remains open. See
+  [ZAL](zal/README.md).
+- **Tools for agents and release checks.** `zeno-fcis guide list` has 41
+  cards. A binding register lists every tracked source pin with its
+  producer. The acceptance runner records a pass, fail and blocked inventory
+  with one receipt per scenario, and a missing host tool blocks a scenario
+  instead of passing it.
+
+### Upgrading from 2.6.0
+
+**Breaking change for stores and adopted contracts.** A store's contract
+identity ends with the evaluator digest, and the digest covers the release
+version. A 2.7.0 build therefore refuses a store created by a 2.6.0 build of
+the same contract with the named refusal `OtherRelease`, and writes nothing.
+Keep such a store on its 2.6.0 build or start a new store. Contracts adopted
+with 2.6.0 refuse to generate until `zeno-fcis contract refresh-receipts DIR`
+runs once. Stores created by 2.4.0 applications remain upgradable. Until the
+release-independent evaluator identity planned for 2.8 exists, every release
+has this effect.
+
+### Not in 2.7
+
+The open P0 rows are native-checker refinement, worker isolation and
+installed routing, durable effect authority, publication and fencing,
+current-program subjects across consumers, release, platform and evidence
+closure (which closes only with the release commit's recorded evidence), and
+released 2.6.0 compatibility (see the break above). Also open:
+machine-code frame, fault and ISA-refinement obligations, embedded execution,
+performance comparisons and application integration; RV64I execution on
+hardware; Schema2 refinement and full-width applications; the purity step in
+generated applications; verified backup and restore; payload-carrying
+variants in contracts; the Rust readers of ZAL JSON, planned for 2.8; and a
+Windows executable.
+
 ## 2.6.0
 
 ZenoFCIS 2.6.0 turns a checked contract into a running application and widens

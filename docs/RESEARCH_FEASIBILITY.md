@@ -5,8 +5,8 @@ independent axes before a practical improvement is claimed. A proof of correctne
 a better asymptotic bound, fewer IR nodes and a measured speedup are different
 results. No weighted score may hide a failed or unknown component.
 
-This complements Crucible's proposal, falsification and independent replay
-discipline. It applies to new algorithm experiments and performance claims, not
+This complements a separate discipline of proposal, falsification and
+independent replay. It applies to new algorithm experiments and performance claims, not
 to ordinary documentation, routing or correctness repairs. It does not replace
 the existing source-bound acceptance, proof, privacy or release gates.
 

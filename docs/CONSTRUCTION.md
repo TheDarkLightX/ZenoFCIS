@@ -74,7 +74,7 @@ map alpha sends each raw state to its abstract state, or null for an invalid
 encoding. Each layout has 45 valid states; T has 102 invalid states and I has 330.
 Genesis corresponds, and every abstract state has a concrete representative.
 
-For every raw state and command, [contract refinement](CLI_REFERENCE.md#contract-representation-refinement-26-unreleased)
+For every raw state and command, [contract refinement](CLI_REFERENCE.md#contract-representation-refinement-26)
 executes the actual native Authorities. Valid encodings must agree exactly on
 class, reason, successor abstraction and all ordered effects and event fields.
 Rejection preserves the concrete state. A null encoding must refuse with the

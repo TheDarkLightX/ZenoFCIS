@@ -112,5 +112,5 @@
   "scope": "Source provenance only; local validation and reported upstream evidence remain distinct. No mathematical proof, receipt authenticity, human agreement, deployment or release authority inferred.",
   "upstream_commit": "b799b1f69a8ebe6942e66b8a850ff41017e66c46",
   "upstream_pr": 44,
-  "upstream_repository": "TheDarkLightX/Zeno-Crucible"
+  "upstream_repository": "a private upstream research repository (not published)"
 }
