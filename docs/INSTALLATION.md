@@ -261,7 +261,7 @@ dependency in the graph bound to the same release source.
 
 ## Contained checker runtime
 
-### Backend selection in the 2.5 integration source
+### Backend selection in the 2.7.0 source
 
 Automatic mode uses direct POSIX children for `finite-data/1` and never selects
 systemd. Commands requiring `python-reference/1` (capture open/whole) or
@@ -417,4 +417,4 @@ python3 tools/check_probity.py
 
 Probity is not a Rust, runtime, protocol, or published-crate dependency. The
 [deterministic developer guardrails](DEVELOPER_GUARDRAILS.md) guide covers the
-opt-in Codex hook setup and its explicit nonclaims.
+opt-in coding-agent hook setup and its explicit nonclaims.

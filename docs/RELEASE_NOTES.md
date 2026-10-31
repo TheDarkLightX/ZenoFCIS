@@ -3,11 +3,12 @@
 ## 2.7.0
 
 ZenoFCIS 2.7.0 adds checked machine-code synthesis, default-off full-width
-numbers with proofs of their Rust arithmetic, checked parsing, and new ZAL
-tools for meaning, numbers and relational reasoning. Much of it is
-experimental. The [gap register](FACTORY_GAPS_27.md) records thirty-one 2.7
-requirements; twenty-nine remain open, and [Not in 2.7](#not-in-27) names the
-main ones. The [changelog](../CHANGELOG.md) lists every change.
+numbers with proofs of their Rust arithmetic (other than square roots, under
+stated assumptions), checked parsing, and new ZAL tools for meaning, numbers
+and relational reasoning. Much of it is experimental. The
+[gap register](FACTORY_GAPS_27.md) records thirty-one 2.7 requirements;
+twenty-nine remain open, and [Not in 2.7](#not-in-27) names the main ones. The
+[changelog](../CHANGELOG.md) lists every change.
 
 People author the semantic layer: the requirements, design decisions and
 semantic contracts, in plain language or ZAL, chosen from proposals and
@@ -32,19 +33,22 @@ for 2.7.0; the 2.6.0 Windows download keeps its 2.6.0 scope. See
   search walks a declared instruction palette. A separate decoder and a
   full-word SMT check decide the declared property for every admitted input,
   and each counterexample is replayed concretely. Three profiles cover register words,
-  flags and comparisons, and declared memory regions. Search skips only
-  candidates that exact rules show are never needed; `realize` asks whether
+  flags and comparisons, and declared memory regions. Search skips
+  candidates that footprint rules classify as never needed (checked on
+  eighteen small cases, not proved in general); `realize` asks whether
   any cheaper program exists in the palette, and its "no program" answers
   hold for that palette and machine model only. A checked library keeps each
-  kernel with its problem, bytes and cost and rechecks every entry; a second
-  solver confirms `equivalent` verdicts, and a calling-convention gate checks
-  kernels as leaf functions at stated evidence levels. The entries include
-  seven LLM-proposed x86-64 kernels: signed saturating add and subtract, each
-  at 22 bytes and 6 instructions or 25 bytes and 5 instructions, unsigned
-  difference-or-zero at 11 bytes and 3 instructions, an exact zero-byte mask
-  at 30 bytes and 7 instructions, and packed unsigned 16-bit addition across
-  four lanes at 42 bytes and 9 instructions, the known construction of
-  Warren, *Hacker's Delight*, 2nd edition (2013), section 2-18. See
+  kernel with its problem, bytes and cost and rechecks every entry. An
+  optional second solver can confirm `equivalent` verdicts on the same formula
+  as the first, so it does not check the instruction models or the encoding. A
+  calling-convention gate checks kernels as leaf functions at stated evidence
+  levels. The entries include seven LLM-proposed x86-64 kernels: signed
+  saturating add and subtract, each at 22 bytes and 6 instructions or 25 bytes
+  and 5 instructions, unsigned difference-or-zero at 11 bytes and 3
+  instructions, an exact zero-byte mask at 30 bytes and 7 instructions, and
+  packed unsigned 16-bit addition across four lanes at 42 bytes and 9
+  instructions, the known construction of Warren, *Hacker's Delight*, 2nd
+  edition (2013), section 2-18. See
   [machine-code synthesis](MACHINE_CODE_SYNTHESIS_27.md).
 - **Full-width numbers.** Default-off `Value2`, codec2 and Schema2 carry
   `U256` and `I256` values. Verus proofs of the actual Rust bodies, under
@@ -57,19 +61,21 @@ for 2.7.0; the 2.6.0 Windows download keeps its 2.6.0 scope. See
   Verus soundness contracts, and diagnostic-free lexing is proved to keep the
   original source tokens. Refinement from the parser to the native checker
   remains open.
-- **ZAL.** Python readers of outside ZAL JSON keep every number's exact value
-  or refuse it with a named reason. Explained ontology classification, a finite semantic
-  library, notation and Lenses, word-kernel profiles that lower controlled
-  English to machine-code problems, and observation contracts are added. The
-  optional relational profile's current files are compared with an
-  independent oracle by `qualify.py`; an independent review of that
-  comparison remains open. See
-  [ZAL](zal/README.md).
+- **ZAL.** The Python readers of outside ZAL JSON that the
+  [changelog](../CHANGELOG.md) names keep every number's exact value or refuse
+  it with a named reason; some readers in the optional category and relational
+  profiles still use plain number parsing. Explained ontology classification,
+  a finite semantic library, notation and Lenses, word-kernel profiles that
+  lower controlled English to machine-code problems, and observation contracts
+  are added. The optional relational profile's current files are compared with
+  an independent oracle by `qualify.py`; an independent review of that
+  comparison remains open. See [ZAL](zal/README.md).
 - **Tools for agents and release checks.** `zeno-fcis guide list` has 41
-  cards. A binding register lists every tracked source pin with its
-  producer. The acceptance runner records a pass, fail and blocked inventory
-  with one receipt per scenario, and a missing host tool blocks a scenario
-  instead of passing it.
+  cards. A binding register lists every tracked source binding with the
+  producer that rewrites it or the reason it has none. With `--keep-going` or
+  `--resume`, the acceptance runner records a pass, fail and blocked inventory
+  with one receipt per scenario, and a missing declared host prerequisite
+  blocks a scenario instead of passing it.
 
 ### Upgrading from 2.6.0
 

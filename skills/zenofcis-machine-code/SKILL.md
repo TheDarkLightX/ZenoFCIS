@@ -31,33 +31,35 @@ unsupported reason. A checked contract lowers to two results: the value modulo
 2^64, then a 0/1 status that is 1 on overflow; read the status first. Open the
 session on P.json. `contract check --contract C.json --code K.bin` checks bytes
 against the lowered problem (exit 0 equivalent, 1 counterexample or refused, 2
-inconclusive). Never hand-write a one-result modular problem for such a task.
+inconclusive). Never write a one-result modular problem directly for such a
+task.
 
 Profile 2 (`zeno-fcis/machine-problem/2`, targets `x86_64-sysv-register/2` and
 `rv64i-register/2`) is registered separately for carries, comparisons and
-selects. It declares one to six named u64 `inputs` (x86 `rdi, rsi, rdx, rcx,
-r8, r9`; RV64I `a0`..`a5`) and one or two `outputs` (x86 `rax, rdx`; RV64I
-`a0, a1`). Expressions add `ashr`, `ult`, `ule`, `slt`, `sle`, `eq` (each 0/1)
-and `["ite", c, a, b]` (a when c is not 0). x86 adds ADC, SBB, CMP, TEST, NEG,
-SAR, SETcc, MOVZX and CMOVcc; RV64I adds SLT, SRA, SLTI, SLTIU, XORI, ORI, ANDI
-and SRAI. Only CF/ZF/SF/OF are modelled: parity conditions refuse, and reading a
-flag left undefined (ZF/SF after IMUL, OF after a shift by 2 or more) refuses
-with `ReadsUndefinedFlag`. Entry flags are arbitrary and quantified. SETcc
-writes only the low byte, so zero the register before the flag-setting
-instruction or MOVZX afterwards. Examples: `add128-x86.json`, `umin-x86.json`,
-`add128-rv64i.json`. Counterexamples give named inputs, entry registers, entry
-flags and expected/actual result lists. The same `open/packet/candidate/search/
-resume/emit/replay` commands apply; `open` selects the checker from the schema.
-The packet `diagnosis` covers profile 2 (flags in the trace, per-result
-expected/actual, `first_missing_subterm` with its result index; comparisons
-often live only in flags). `run bench` times profile-2 x86 artifacts against
-GCC's code for the same outputs and refuses RV64I artifacts.
-ZAL sources reach profile 2 with a `profile zal/word-kernel/2;` line (English
-`ZAL word kernel profile 2.`): `inputs a_lo:u64,...;`, `result 1 ... modulo 2^64;`
-and `result 2 ...` (English `Return first/second ...`). Comparisons are written
-`(a is below b (unsigned))`, `(a is at most b (signed))`, `(a equals b)` and
-`(if c then a else b)`. `what-if` takes `--input NAME=VALUE` per input. The
-examples are `test-data/zal-word-kernel/add128-x86*.zal` and `umin-x86*.zal`.
+selects. It declares zero to six named u64 `inputs` (zero for a constant
+problem; x86 `rdi, rsi, rdx, rcx, r8, r9`; RV64I `a0`..`a5`) and one or two
+`outputs` (x86 `rax, rdx`; RV64I `a0, a1`). Expressions add `ashr`, `ult`,
+`ule`, `slt`, `sle`, `eq` (each 0/1) and `["ite", c, a, b]` (a when c is not 0).
+x86 adds ADC, SBB, CMP, TEST, NEG, SAR, SETcc, MOVZX and CMOVcc; RV64I adds SLT,
+SRA, SLTI, SLTIU, XORI, ORI, ANDI and SRAI. Only CF/ZF/SF/OF are modelled:
+parity conditions refuse, and reading a flag left undefined (ZF/SF after IMUL,
+OF after a shift by 2 or more) refuses with `ReadsUndefinedFlag`. Entry flags
+are arbitrary and quantified. SETcc writes only the low byte, so zero the
+register before the flag-setting instruction or MOVZX afterwards. Examples:
+`add128-x86.json`, `umin-x86.json`, `add128-rv64i.json`. Counterexamples give
+named inputs, entry registers, entry flags and expected/actual result lists. The
+same `open/packet/candidate/search/resume/emit/replay` commands apply; `open`
+selects the checker from the schema. The packet `diagnosis` covers profile 2
+(flags in the trace, per-result expected/actual, `first_missing_subterm` with
+its result index; comparisons often live only in flags). `run bench` times
+profile-2 x86 artifacts against GCC's code for the same outputs and refuses
+RV64I artifacts. ZAL sources reach profile 2 with a `profile zal/word-kernel/2;`
+line (English `ZAL word kernel profile 2.`): `inputs a_lo:u64,...;`,
+`result 1 ... modulo 2^64;` and `result 2 ...` (English
+`Return first/second ...`). Comparisons are written `(a is below b (unsigned))`,
+`(a is at most b (signed))`, `(a equals b)` and `(if c then a else b)`.
+`what-if` takes `--input NAME=VALUE` per input. The examples are
+`test-data/zal-word-kernel/add128-x86*.zal` and `umin-x86*.zal`.
 
 ## Connect human ZAL requirements
 
@@ -133,13 +135,13 @@ python3 -B -m tools.machine_code.run emit --session SESSION --out NEW_ARTIFACT
 python3 -B -m tools.machine_code.run replay --artifact ARTIFACT
 ```
 
-Search skips only candidates that exact footprints show are never needed. Its JSON
-reports `dead_pruned`, `order_pruned` and `bound_skipped`, and `--no-prune`
-restores the full enumeration for comparison. For a two-result profile-2
-problem, run `split-search --session SESSION` first. It joins single-result parts
-whose footprints cannot interfere, and its checked kernel becomes the incumbent
-that bounds a following `search`. Split search on a one-result problem exits 1
-with `not-applicable`.
+Search skips only candidates that exact footprints show are never needed. Its
+JSON reports `duplicate_pruned`, `order_pruned`, `lost_pruned`, `dead_pruned` and
+`bound_skipped`, and `--no-prune` restores the full enumeration for comparison.
+For a two-result profile-2 problem, run `split-search --session SESSION` first.
+It joins single-result parts whose footprints cannot interfere, and its checked
+kernel becomes the incumbent that bounds a following `search`. Split search on a
+one-result problem exits 1 with `not-applicable`.
 
 When search exhausts a palette without a kernel, or you need to know whether a
 cheaper kernel exists in it, run `realize --session SESSION`. Each length below

@@ -150,9 +150,10 @@ graph or production authority.
 
 ## Common selections
 
-These are alternative dependency declarations against a checkout of
-`v2.6.0` at `../ZenoFCIS`. Select the one declaration whose features your
-application needs. `version = "=1.1.0"` does not supply the current API.
+These are alternative dependency declarations against a checkout of the
+matching release tag (`v2.7.0` for the 2.7.0 CLI) at `../ZenoFCIS`. Select
+the one declaration whose features your application needs.
+`version = "=1.1.0"` does not supply the current API.
 
 ```toml
 # Project-neutral semantic values and reference semantics
@@ -184,7 +185,7 @@ commutativity and sequential-versus-composed parity. Its external evidence
 verifier is a named trust boundary. Native domain and composed-program execution
 are retired; the normal route evaluates one complete checked program.
 
-ZenoFCIS does not yet ship a production parallel component runtime. The 2.6.0
+ZenoFCIS does not yet ship a production parallel component runtime. The 2.7.0
 source includes an offline parallel exhaustive checker whose qualification is
 bound to its release-source checks. That checker is separate from parallel
 application execution. Component composition needs its own coupled

@@ -22,7 +22,8 @@ Every qualification in that sentence matters.
 **The compiler is out of the trusted path for the checked bytes, but these remain trusted:**
 
 - the byte decoder;
-- the instruction semantics, checked against the executing CPU on sampled states but not proved;
+- the instruction semantics, not proved: the x86 model is checked against the executing CPU on
+  sampled states; the RV64I model has no execution evidence until the QEMU job in CI passes;
 - the SMT checker and Z3;
 - loading and linking;
 - the calling convention;
@@ -69,7 +70,7 @@ overflow, U256/I256 values and multi-result error ABIs require their own explici
 profile; narrowing those tasks to this profile would change their requirements.
 
 The decoder and its concrete/SMT semantics do not import the proposal encoder or
-search implementation. Z3, the authored instruction model, Python and the
+search implementation. Z3, the generated instruction model, Python and the
 host remain trusted premises. An SMT result here is not a kernel proof of the
 complete ISA or physical processor.
 
@@ -267,11 +268,12 @@ input, through each problem's full length. Planted defects fail these tests:
 - copies not counted as holding an input;
 - a store's region-word write omitted, which fails all six memory problems.
 
-An independent review also checked the footprints of the 59,322 enumerated
-profile-1 and profile-2 test forms symbolically, and checked dead and order
-preservation with full-word Z3 queries on 1,245 sequences. The enumerated forms
-cover every register form but sample the large immediate values, so they are not
-every admitted encoding. These checks are bounded evidence, not a general proof.
+An independent review (record not kept in this repository) also symbolically
+checked the footprints of 59,322 profile-1 and profile-2 forms it enumerated,
+and checked dead and order preservation with full-word Z3 queries on 1,245
+sequences. The enumerated forms cover every register form but sample the large
+immediate values, so they are not every admitted encoding. These checks are
+bounded evidence, not a general proof.
 
 These are the semantic pruning and decomposition ideas of McSynth and McSynth++
 ([Srinivasan 2017](https://research.cs.wisc.edu/wpis/papers/tr1844.pdf);
@@ -363,7 +365,7 @@ enumerator runs with the four pruning rules on and must exhaust its grammar with
 every checker verdict decided; its agreement with unpruned enumeration is the
 separate control [below](#search-pruning-exactness-planted-defects-and-measurement). The suite covers
 every test, library and memory-kernel problem with at most 20,000 candidate
-sequences (23 problems on all three profiles, many sharing a specification with
+sequences (26 problems on all three profiles, many sharing a specification with
 the library), plus six built for the test.
 - one whose only short program uses the palette's last form;
 - one with no program at all;
@@ -377,8 +379,9 @@ must prove every length unsat. `realize` below the least cost plus one must
 return checked bytes of exactly that cost. With no program, `realize` without a
 bound must prove every length unsat, apart from those an empty palette leaves
 without candidates; the no-program and empty-palette cases have no least-cost-plus-one
-check. The retained cross-check record lists 27 of the 29 configured cases, all
-agreeing in both directions; the two remaining cases have no retained record.
+check. The retained cross-check record, made before three of the library kernels
+were added, lists 27 of the 32 configured cases, all agreeing in both
+directions; the other five have no retained record.
 
 A second control checks the admission constraints directly. With no examples
 and no bound, the set of selector sequences the query admits must equal the set
@@ -430,15 +433,15 @@ The tests compare the constrained query, with no examples and no bound, against
 `Pruner.judge` on every selector sequence of four palettes up to length 3, run
 the exhaustive cross-check above with the rules on, and plant four generator
 defects (a symmetric order table, unobserved results, an extra dominated form,
-footprints without reads), each caught. Two source edits are registered with
-the checker controls. Measured on the padded 32-form Hacker's Delight x86
-problems at length 4 (300 s per query, shared machine), the constrained query
-decided six lengths the unchanged query left undecided and matched it on the
-rest; it is off by default because the gain is not uniform. Stating a
-search's normal form as constraints of the synthesis query is equivalence
-reduction ([Smith and Albarghouthi, *Program Synthesis with Equivalence
-Reduction*, VMCAI 2019](https://doi.org/10.1007/978-3-030-11245-5_2)); the
-normal form here is the footprint rules above.
+footprints without reads), each caught. Three source edits are registered with
+the checker controls. Measured on padded 32-form Hacker's Delight x86 problems
+at length 4 (300 s per query, shared machine; record not kept in this
+repository), the constrained query decided six lengths the unchanged query left
+undecided and matched it on the rest; it is off by default because the gain is
+not uniform. Stating a search's normal form as constraints of the synthesis
+query is equivalence reduction ([Smith and Albarghouthi, *Program Synthesis with
+Equivalence Reduction*, VMCAI 2019](https://doi.org/10.1007/978-3-030-11245-5_2));
+the normal form here is the footprint rules above.
 
 #### Partitioned subspaces
 
@@ -697,11 +700,11 @@ It runs on Linux x86-64 with GNU `gcc`, `as`, `objcopy` and `nm`.
   model on a subset, and every other admitted register must be unchanged.
 - **Controls:** two planted model defects, a wrong LEA scale and an arithmetic right shift, must be detected.
 
-A 64-state run on an AMD Ryzen Threadripper 1950X compared 300,736 executions with the concrete model and
-28,194 with the SMT model, with no disagreement. Agreement covers the sampled states on the executing processor.
-It is not a proof of the ISA or of other processors. Hand-written x86 semantics are known to be error-prone:
-stratified synthesis found errors in 58 manually specified instruction variants (Heule et al., PLDI 2016).
-The RV64I model has not yet been compared with any RISC-V execution environment.
+A 64-state run on an AMD Ryzen Threadripper 1950X compared 300,736 executions with the concrete model and 9,398
+(two states per form) with the SMT model, with no disagreement. Agreement covers the sampled states on the
+executing processor. It is not a proof of the ISA or of other processors. x86 semantics written by people are
+known to be error-prone: stratified synthesis found errors in 58 manually specified instruction variants (Heule et
+al., PLDI 2016). The RV64I model has not yet been compared with any RISC-V execution environment.
 
 The separate native gate requires a Linux x86-64 host with GNU `gcc`, `as`,
 `objcopy`, `readelf` and `nm`. It checks x86 bytes against GNU assembler and actual linked
@@ -890,7 +893,7 @@ installed isolation, full-width DeFi, arbitrary embedded apps or release gates.
 
 ### Planted-defect controls for the checkers
 
-`tools/machine_qualification/controls.py` registers named planted defects in the two independent checkers, after
+`tools/machine_qualification/controls.py` registers named planted defects in the independent checkers, after
 mutation analysis (DeMillo, Lipton and Sayward, IEEE Computer 1978):
 
 ```sh
@@ -898,14 +901,14 @@ python3 -B -m tools.machine_qualification.controls list
 python3 -B -m tools.machine_qualification.controls run [--defect NAME]... [--out REPORT.json]
 ```
 
-- **Defects:** each one is a single source edit to `verify.py`, `verify2.py` or `verify3.py`. Examples are a 32-bit immediate,
-  unextended RISC-V immediates, scratch registers or entry flags fixed instead of quantified, a dropped symbolic
-  instruction, five-bit shift counts, wrong CF, ZF, SF and OF rules, a writable x0, an unknown solver answer read
-  as equivalence, and a counterexample reported without its concrete replay. The fourteen profile-3 defects
-  include a byte displacement used as a word index, an RV64I store offset cut to five bits, an admitted 32-bit
-  access or load into x0, an admitted store to a read-only region, a misaligned or
-  out-of-region access, a redefined base, a store dropped from the symbolic run, and a region word, base pointer
-  or scratch register fixed instead of quantified. Each defect names the control expected to expose it.
+- **Defects:** each one is a single source edit to `verify.py`, `verify2.py`, `verify3.py`, `realize.py` or
+  `realize_rules.py`. Examples are a 32-bit immediate, unextended RISC-V immediates, scratch registers or entry
+  flags fixed instead of quantified, a dropped symbolic instruction, five-bit shift counts, wrong CF, ZF, SF and OF
+  rules, a writable x0, an unknown solver answer read as equivalence, and a counterexample reported without its
+  concrete replay. The fourteen profile-3 defects include a byte displacement used as a word index, an RV64I store
+  offset cut to five bits, an admitted 32-bit access or load into x0, an admitted store to a read-only region, a
+  misaligned or out-of-region access, a redefined base, a store dropped from the symbolic run, and a region word,
+  base pointer or scratch register fixed instead of quantified. Each defect names the control expected to expose it.
 - **Specimens:** each edit is applied to its own copy of the checker package, the control modules and the kernel
   library. The specimen's checker identity is computed from its own sources, and the run checks that the control
   imported that copy.
@@ -967,8 +970,8 @@ python3 -B -m tools.machine_qualification.search_bench compare BEFORE.json AFTER
   every argument register taken as required, an input taken as required because the specification mentions it, an
   input copied to another register forgotten, and the byte tie-break reversed in the duplicate and in the order rule.
   Each must leave a failing removal. The two tie-break edits keep equal-cost code that ranks later on the hex
-  tie-break; only the rank condition on twins detects them. The syntactic edit is caught
-  only by the two cases that specify (x ^ x) ^ y, where x occurs but is irrelevant. The eleventh, a conditional move
+  tie-break; only the rank condition on twins detects them. The syntactic edit is caught only by
+  the two cases that specify (x ^ x) ^ y, where x occurs but is irrelevant. The remaining edit, a conditional move
   marked as overwriting its destination while still reading it, is a registered equivalent mutant: the dead rule
   consults reads before overwrites. It counts as an invalid specimen only when it survives with removal decisions
   identical to the unmodified pruning on every case. Crashes and timeouts never count as detections.
@@ -984,7 +987,9 @@ full pruning, 8,286 removals had a proved twin, all 604 lost-input removals were
 removals whose only twins lose an input were refuted too. The lost-input rule never fires on profile 3: its required
 inputs are not derived there, which only prunes less. Ten planted defects were detected in both modes and the
 equivalent mutant was confirmed in both; the syntactic edit was caught only by the (x ^ x) ^ y cases, and the
-ignored write-after-read conflict also on the memory kernels. Over the 18 problems measured at dc410214, three
+ignored write-after-read conflict also on the memory kernels. The two tie-break edits and the rank condition on
+twins were added later, at efc97edd. At that revision both tie-break edits were detected under both modes, and the
+pruning stayed exact on every case under the rank condition. Over the 18 problems measured at dc410214, three
 repeats each, candidates fell from 107,123 to 24,886, solver checks from 27 to 24, and the summed median time from
 27.5 s to 9.1 s on one loaded machine. The lost-input rule skipped 485 sequences on the x86 128-bit add and subtract
 problems; no library grammar has a duplicate entry. All found costs were identical except signed saturating add. It
@@ -1130,9 +1135,9 @@ python3 -B -m tools.machine_code.run emit --session "$machine_work/session" --ou
 python3 -B -m tools.machine_code.run replay --artifact "$machine_work/artifact"
 ```
 
-This search proposes 259 candidates. It selects `cmp rdi, rsi; mov rax, rsi;
-cmovb rax, rdi`, which is 11 bytes. The artifact files and replay checks are those
-of profile 1.
+With the default pruning this search proposes 43 of the grammar's 259 sequences.
+It selects `cmp rdi, rsi; mov rax, rsi; cmovb rax, rdi`, which is 11 bytes. The
+artifact files and replay checks are those of profile 1.
 
 The packet's advisory `diagnosis` covers profile 2 as well. It traces every
 admitted register, and on x86 CF, ZF, SF and OF, with null for a flag left
@@ -1494,11 +1499,11 @@ use. For each kernel:
 - The calling-convention gate qualifies it, and the native trampoline reports
   no fault.
 
-`realize` showed that no program of at most 11 instructions in the add
-palette, or at most 5 in the unsigned-compare palette, meets the problem.
-Longer lengths were inconclusive at a 30-second solver limit, so minimality
-is not claimed. A planted dropped carry and a planted unsigned flag in the
-signed compare are both refuted.
+`realize` (record not kept in this repository) showed that no program of at
+most 11 instructions in the add palette, or at most 5 in the unsigned-compare
+palette, meets the problem. Longer lengths were inconclusive at a 30-second
+solver limit, so minimality is not claimed. A planted dropped carry and a
+planted unsigned flag in the signed compare are both refuted.
 
 A benchmark outside the tree linked these kernels next to the Rust `U256` of
 `zeno-fcis-value`: `checked_add`, `checked_sub`, `U256::cmp` and `I256::cmp`.

@@ -53,35 +53,39 @@ embedded in ZenoFCIS values.
   targets. Arithmetic contracts name the meaning (modular, checked or
   saturating) before a problem exists, and ZAL word-kernel profiles 1 and 2
   state a kernel in controlled English and lower it to a problem.
-- Search skips only candidates that exact footprint rules show are never
-  needed (duplicates, reorderings, lost inputs and dead instructions), stops
-  at the incumbent's cost bound and offers a split search for two-result
-  kernels. When no solver answer is unknown, an exhausted search reports the
-  same optimum as full enumeration, which `--no-prune` restores. `realize`
-  asks the solver whether any admitted program below a cost bound exists in
-  the palette, in one query per length or in partitioned and adaptive
-  subspaces, and `--replay` re-establishes the whole record. `--rules`, off by
-  default, adds the search rules as selector constraints. A "no program"
-  answer holds for the stated palette, machine model and bound only; a test
-  compares `realize` with exhaustive enumeration on every test and library
-  problem small enough to enumerate. Exact specialization and per-result
-  slices are checked like any other kernel.
+- Search skips candidates that footprint rules classify as never needed
+  (duplicates, reorderings, lost inputs and dead instructions), stops at the
+  incumbent's cost bound and offers a split search for two-result kernels. The
+  rules are designed so that, when no solver answer is unknown, an exhausted
+  search reports the same optimum as full enumeration (which `--no-prune`
+  restores); this was checked by enumeration on eighteen small cases under the
+  registered instruction models, not proved in general. `realize` asks the
+  solver whether any admitted program below a cost bound exists in the
+  palette, in one query per length or in partitioned and adaptive subspaces,
+  and `--replay` re-establishes the whole record. `--rules`, off by default,
+  adds the duplicate, reordering and dead-instruction rules as selector
+  constraints; the lost-input rule is not encoded. A "no program" answer holds
+  for the stated palette, machine model and bound only; a test compares
+  `realize` with exhaustive enumeration on every test and library problem
+  small enough to enumerate. Exact specialization and per-result slices are
+  checked like any other kernel.
 - Add a checked kernel library. `library check` rechecks every entry with the
   current checker at its recorded cost and rebuilds its object; `--native`
   also runs each x86 entry against its reference on edge and pseudo-random
-  vectors, and `library bench` times x86 entries against GCC `-O2` code on
-  the measuring machine only. The library holds register and memory kernels
-  for both targets, plus four 256-bit kernels over four-limb regions (add,
-  subtract, unsigned and signed less-than) that were proposed rather than
-  searched. Its entries include seven LLM-proposed x86-64 kernels, each
-  checked at its recorded cost: signed saturating add and signed saturating
-  subtract, each at 22 bytes and 6 instructions and at 25 bytes and 5
-  instructions; unsigned difference-or-zero at 11 bytes and 3 instructions;
-  an exact zero-byte mask at 30 bytes and 7 instructions; and packed unsigned
-  16-bit addition across four lanes, each lane modulo 2^16 with no carry
-  between lanes, at 42 bytes and 9 instructions. The packed addition is the
-  known construction of Warren, *Hacker's Delight*, 2nd edition (2013),
-  section 2-18 ("Multibyte Add, Subtract, Absolute Value").
+  vectors, and `library bench` times x86 register-kernel entries against GCC
+  `-O2` code on the measuring machine only; memory and 256-bit entries are not
+  timed. The library holds register and memory kernels for both targets, plus
+  four 256-bit kernels over four-limb regions (add, subtract, unsigned and
+  signed less-than) that were proposed rather than searched. Its entries
+  include seven LLM-proposed x86-64 kernels, each checked at its recorded
+  cost: signed saturating add and signed saturating subtract, each at 22 bytes
+  and 6 instructions and at 25 bytes and 5 instructions; unsigned
+  difference-or-zero at 11 bytes and 3 instructions; an exact zero-byte mask
+  at 30 bytes and 7 instructions; and packed unsigned 16-bit addition across
+  four lanes, each lane modulo 2^16 with no carry between lanes, at 42 bytes
+  and 9 instructions. The packed addition is the known construction of Warren,
+  *Hacker's Delight*, 2nd edition (2013), section 2-18 ("Multibyte Add,
+  Subtract, Absolute Value").
 - `second-solver` gives the query of each library `equivalent` verdict to the
   pinned cvc5 1.3.3, and counts the verdict as confirmed only when cvc5 also
   answers unsat. Both solvers read the same formula, so this does not check
@@ -97,22 +101,25 @@ embedded in ZenoFCIS values.
 - Not qualified for machine code: the full-state frame, fault and
   ISA-refinement obligations; active CET and LP64D; loaded-code and
   source/artifact correspondence; qualified embedded execution and measured
-  performance comparisons; and application integration. The RV64I forms were
-  checked against the Sail RISC-V source by transcription, not by Isla
-  traces. RV64I instruction forms run only in the machine-code CI job under
-  QEMU user mode, which is evidence about the emulator rather than RISC-V
-  hardware, and RV64I library entries report `native: not-run`. Optimality
-  claims are relative to a palette and the stated model.
+  performance comparisons; and application integration. The RV64I instruction
+  models were generated, not derived from vendor specifications. A
+  machine-code CI job compares the RV64I forms with GNU `as` and runs them
+  under QEMU user mode, which is evidence about the emulator rather than
+  RISC-V hardware; RV64I library entries report `native: not-run`. A check
+  against the Sail RISC-V model is future work.
+  Optimality claims are relative to a palette and the stated model.
 
-- Python readers of outside ZAL JSON keep each number's exact decimal value
-  or refuse it with a named reason, through one policy
+- The named Python readers of outside ZAL JSON keep each number's exact
+  decimal value or refuse it with a named reason, through one policy
   (`integrations/zal/json_numbers.py`). It covers the generic reader, the
   semantic and finite libraries, ladder contexts, command inputs, traces, MCP
   and browser requests, the local agent transport and the learn, binding,
-  strategy, ladder-statement and idiom readers. Contract policy JSON admits
-  integers within i128 only, as the Rust reader does. A test fails on any
-  unlisted `json.load(s)` call. The Rust readers of ZAL JSON are targeted at
-  2.8.
+  strategy, ladder-statement and idiom readers. Some readers in the optional
+  category and relational profiles still use plain number parsing and are
+  listed as open in `integrations/zal/test_json_numbers.py`. Contract policy
+  JSON admits integers within i128 only, as the Rust reader does. A test fails
+  on any unlisted `json.load(s)` call. The Rust readers of ZAL JSON are
+  targeted at 2.8.
 - Add the optional ZAL relational profile for finite C2 and C2mod formulas.
   It keeps a 32-file capsule of its Haskell backend, bound to the upstream
   revision. `qualify.py` runs an equivalent of the omitted upstream harness

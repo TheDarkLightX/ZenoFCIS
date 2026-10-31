@@ -229,10 +229,10 @@ This checkout is version `2.7.0`, the current release source. The
 the [gap register](FACTORY_GAPS_27.md) records the open requirements, and the
 [continuation guide](DEVELOPMENT_27.md) explains how to continue them.
 
-The released `2.6.0` API follows the first stable V2 line, 2.3.0.
-It differs from the historical crates.io `1.1.0` API and is used from the matching `v2.6.0` source tag; see
+The released `2.7.0` API follows the first stable V2 line, 2.3.0.
+It differs from the historical crates.io `1.1.0` API and is used from the matching `v2.7.0` source tag; see
 [installation](INSTALLATION.md) and the
-[2.6.0 release notes](RELEASE_NOTES.md). The earlier public candidates
+[release notes](RELEASE_NOTES.md). The earlier public candidates
 `v2.2.0-rc.1` and `v2.3.0-rc.1` were prereleases; their
 [candidate record](RELEASE_CANDIDATES.md) keeps their sources and limits.
 
