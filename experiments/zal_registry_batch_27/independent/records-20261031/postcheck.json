@@ -1,0 +1,10 @@
+{
+  "schema": "zal/independent-source-postcheck/1",
+  "descriptor_sha256": "792bc59e5de927b9fc1a4f1a8087088d6ad58ddd6eeea1d37b9da5152012121a",
+  "pass": true,
+  "source_roots_clean": true,
+  "pinned_files_each": {
+    "baseline": 239,
+    "candidate": 239
+  }
+}

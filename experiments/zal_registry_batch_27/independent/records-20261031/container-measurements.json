@@ -1,0 +1,208 @@
+{
+  "original_host_protocol": "blocked: PID 1 is not systemd",
+  "ownership_helper_sha256": "f4267f9718ea2c6f7cdd9461513d7a860892e2fdeba0e8ddda913ddbd4dd7d9c",
+  "pass": true,
+  "pid1": "supervisord",
+  "pins_sha256": "792bc59e5de927b9fc1a4f1a8087088d6ad58ddd6eeea1d37b9da5152012121a",
+  "runner_sha256": "f3335e293bf099c5fc8e0fbbd4b61de251faa486e49035395f82c259d6c52691",
+  "schema": "zal/independent-container-measurements/1",
+  "source_commits": {
+    "baseline": "8de5a6543f93353d2f4563b17badfde285ce46a2",
+    "candidate": "48358c98fabbd8bc03edc972c077aef945cd2f16"
+  },
+  "source_inputs_stable": true,
+  "workers": [
+    {
+      "backend": "baseline",
+      "case": "baseline-01",
+      "cleanup": {
+        "identities": [
+          {
+            "depth": 0,
+            "namespace_pid": 48,
+            "ppid": 1175,
+            "proc_pid": 1218,
+            "start_ticks": 161566,
+            "state": "R"
+          }
+        ],
+        "signals": [],
+        "survivors": []
+      },
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "-I",
+        "-B",
+        "/workspace/scratch/e6af3ba2da19/qualification-evidence/published-recipe/worker.py",
+        "--bounded",
+        "--root",
+        "/workspace/scratch/e6af3ba2da19/zeno-baseline",
+        "--case",
+        "baseline-01"
+      ],
+      "exit": 0,
+      "result_sha256": "549b96fcb43a5ff43f6c51b746fab1c3ac72fd95224a06c414b468c80310ddd7",
+      "wall_with_startup_seconds": 33.611056468000015
+    },
+    {
+      "backend": "candidate",
+      "case": "candidate-02",
+      "cleanup": {
+        "identities": [
+          {
+            "depth": 0,
+            "namespace_pid": 89,
+            "ppid": 1175,
+            "proc_pid": 1341,
+            "start_ticks": 164940,
+            "state": "R"
+          }
+        ],
+        "signals": [],
+        "survivors": []
+      },
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "-I",
+        "-B",
+        "/workspace/scratch/e6af3ba2da19/qualification-evidence/published-recipe/worker.py",
+        "--bounded",
+        "--root",
+        "/workspace/scratch/e6af3ba2da19/zeno-qualification",
+        "--case",
+        "candidate-02"
+      ],
+      "exit": 0,
+      "result_sha256": "1d16c4789a098d839786f42565fcdf4a96dc6aa60bc4e48a3ce4928f95da51ea",
+      "wall_with_startup_seconds": 11.705893735000018
+    },
+    {
+      "backend": "candidate",
+      "case": "candidate-03",
+      "cleanup": {
+        "identities": [
+          {
+            "depth": 0,
+            "namespace_pid": 130,
+            "ppid": 1175,
+            "proc_pid": 1398,
+            "start_ticks": 166125,
+            "state": "R"
+          }
+        ],
+        "signals": [],
+        "survivors": []
+      },
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "-I",
+        "-B",
+        "/workspace/scratch/e6af3ba2da19/qualification-evidence/published-recipe/worker.py",
+        "--bounded",
+        "--root",
+        "/workspace/scratch/e6af3ba2da19/zeno-qualification",
+        "--case",
+        "candidate-03"
+      ],
+      "exit": 0,
+      "result_sha256": "1471aef8190b06026acbee965548ef65ec2779442f8d7567db7e322e42198661",
+      "wall_with_startup_seconds": 12.10758871400003
+    },
+    {
+      "backend": "baseline",
+      "case": "baseline-04",
+      "cleanup": {
+        "identities": [
+          {
+            "depth": 0,
+            "namespace_pid": 171,
+            "ppid": 1175,
+            "proc_pid": 1457,
+            "start_ticks": 167351,
+            "state": "R"
+          }
+        ],
+        "signals": [],
+        "survivors": []
+      },
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "-I",
+        "-B",
+        "/workspace/scratch/e6af3ba2da19/qualification-evidence/published-recipe/worker.py",
+        "--bounded",
+        "--root",
+        "/workspace/scratch/e6af3ba2da19/zeno-baseline",
+        "--case",
+        "baseline-04"
+      ],
+      "exit": 0,
+      "result_sha256": "44a6157ea5b47b99f79dfa6906d1bdb744d45c1e09843232f8ab9c0067878974",
+      "wall_with_startup_seconds": 32.15938404899998
+    },
+    {
+      "backend": "baseline",
+      "case": "baseline-05",
+      "cleanup": {
+        "identities": [
+          {
+            "depth": 0,
+            "namespace_pid": 212,
+            "ppid": 1175,
+            "proc_pid": 1535,
+            "start_ticks": 170580,
+            "state": "R"
+          }
+        ],
+        "signals": [],
+        "survivors": []
+      },
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "-I",
+        "-B",
+        "/workspace/scratch/e6af3ba2da19/qualification-evidence/published-recipe/worker.py",
+        "--bounded",
+        "--root",
+        "/workspace/scratch/e6af3ba2da19/zeno-baseline",
+        "--case",
+        "baseline-05"
+      ],
+      "exit": 0,
+      "result_sha256": "a239c77e6fd18f3afc07c8443afdde3c8b407154ae7d0db4d49f8f76f5fb70f6",
+      "wall_with_startup_seconds": 31.96324825800002
+    },
+    {
+      "backend": "candidate",
+      "case": "candidate-06",
+      "cleanup": {
+        "identities": [
+          {
+            "depth": 0,
+            "namespace_pid": 253,
+            "ppid": 1175,
+            "proc_pid": 1630,
+            "start_ticks": 173790,
+            "state": "R"
+          }
+        ],
+        "signals": [],
+        "survivors": []
+      },
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "-I",
+        "-B",
+        "/workspace/scratch/e6af3ba2da19/qualification-evidence/published-recipe/worker.py",
+        "--bounded",
+        "--root",
+        "/workspace/scratch/e6af3ba2da19/zeno-qualification",
+        "--case",
+        "candidate-06"
+      ],
+      "exit": 0,
+      "result_sha256": "c457acdf9d5945449411777c69b083681c59dfe8c91336f1fcbcc8dc2b6e00ce",
+      "wall_with_startup_seconds": 11.900311856999906
+    }
+  ]
+}

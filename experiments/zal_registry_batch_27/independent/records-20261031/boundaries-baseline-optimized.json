@@ -1,0 +1,9 @@
+{
+  "errors": 0,
+  "failure_details": [],
+  "failures": 0,
+  "pass": true,
+  "python_optimize": 1,
+  "schema": "zal/independent-catalog-boundary-tests/1",
+  "tests_run": 12
+}

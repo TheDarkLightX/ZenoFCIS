@@ -1,0 +1,36 @@
+{
+  "address_space_limit_bytes": 1073741824,
+  "affinity": [
+    0
+  ],
+  "cleanup": {
+    "identities": [
+      {
+        "depth": 0,
+        "namespace_pid": 6,
+        "ppid": 2100,
+        "proc_pid": 2101,
+        "start_ticks": 211202,
+        "state": "R"
+      }
+    ],
+    "signals": [],
+    "survivors": []
+  },
+  "command": [
+    "python3",
+    "-I",
+    "-B",
+    "check_initial_state.py",
+    "--root",
+    "../zeno-baseline",
+    "--output",
+    "initial-state-baseline.json"
+  ],
+  "cpu_limit_seconds": 90,
+  "exit": 1,
+  "pass": false,
+  "schema": "zal/independent-bounded-command/1",
+  "wall_limit_seconds": 120,
+  "wall_seconds": 0.10309588700010863
+}

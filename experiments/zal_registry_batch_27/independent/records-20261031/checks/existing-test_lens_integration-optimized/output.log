@@ -1,0 +1,17 @@
+test_all_algebra_views_declare_full_operational_loss (zal_notation.tests.test_lens_integration.LensIntegrationTests.test_all_algebra_views_declare_full_operational_loss) ... ok
+test_bad_lens_ids_are_structured_unsupported (zal_notation.tests.test_lens_integration.LensIntegrationTests.test_bad_lens_ids_are_structured_unsupported) ... ok
+test_boolean_image_is_not_equal_to_integer_image (zal_notation.tests.test_lens_integration.LensIntegrationTests.test_boolean_image_is_not_equal_to_integer_image) ... ok
+test_fixed_sibling_import_does_not_use_ambient_prototype (zal_notation.tests.test_lens_integration.LensIntegrationTests.test_fixed_sibling_import_does_not_use_ambient_prototype) ... ok
+test_full_effect_group_can_pass_for_invertible_commands (zal_notation.tests.test_lens_integration.LensIntegrationTests.test_full_effect_group_can_pass_for_invertible_commands) ... ok
+test_invalid_budget_never_runs_unbounded_work (zal_notation.tests.test_lens_integration.LensIntegrationTests.test_invalid_budget_never_runs_unbounded_work) ... ok
+test_malformed_bounded_values_return_unsupported (zal_notation.tests.test_lens_integration.LensIntegrationTests.test_malformed_bounded_values_return_unsupported) ... ok
+test_native_toolkit_exposes_closed_lens_actions (zal_notation.tests.test_lens_integration.LensIntegrationTests.test_native_toolkit_exposes_closed_lens_actions) ... ok
+test_non_json_source_does_not_escape_check (zal_notation.tests.test_lens_integration.LensIntegrationTests.test_non_json_source_does_not_escape_check) ... ok
+test_public_apply_exhaustion_stays_incomplete (zal_notation.tests.test_lens_integration.LensIntegrationTests.test_public_apply_exhaustion_stays_incomplete) ... ok
+test_receipt_float_and_boolean_are_not_integer_evidence (zal_notation.tests.test_lens_integration.LensIntegrationTests.test_receipt_float_and_boolean_are_not_integer_evidence) ... ok
+test_refuted_quotient_receipt_survives_json_roundtrip (zal_notation.tests.test_lens_integration.LensIntegrationTests.test_refuted_quotient_receipt_survives_json_roundtrip) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.664s
+
+OK

@@ -1,0 +1,32 @@
+{
+  "address_space_limit_bytes": 1073741824,
+  "affinity": [
+    0
+  ],
+  "cleanup": {
+    "identities": [
+      {
+        "depth": 0,
+        "namespace_pid": 55,
+        "ppid": 2062,
+        "proc_pid": 2063,
+        "start_ticks": 204950,
+        "state": "R"
+      }
+    ],
+    "signals": [],
+    "survivors": []
+  },
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-B",
+    "/workspace/scratch/e6af3ba2da19/zeno-qualification/tools/check_authority_v2.py",
+    "--check-sources"
+  ],
+  "cpu_limit_seconds": 90,
+  "exit": 1,
+  "pass": false,
+  "schema": "zal/independent-bounded-command/1",
+  "wall_limit_seconds": 120,
+  "wall_seconds": 0.20424630100023933
+}

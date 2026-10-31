@@ -1,0 +1,16 @@
+{
+  "schema": "zal/independent-registry-qualification-plan/1",
+  "baseline_commit": "8de5a6543f93353d2f4563b17badfde285ce46a2",
+  "candidate_commit": "48358c98fabbd8bc03edc972c077aef945cd2f16",
+  "completion": "Retain every attempted run, source bindings, raw timings, differential outcomes and unresolved failures. Never relabel original evidence as independent evidence.",
+  "original_supervisor": "Run check-only and ordinary launch unchanged. Retain unsupported actual-host failure; do not remove or spoof its gate.",
+  "supplemental_measurements": "Unmodified --bounded worker under separate Linux pidfd supervisor. Same 1GiB AS, 90 CPU seconds, one-CPU affinity and 120-second wall deadline. Container and Python 3.12.14 differ from original environment.",
+  "schedule": ["baseline", "candidate", "candidate", "baseline", "baseline", "candidate"],
+  "full_workloads_per_backend": 3,
+  "warm_catalog_observations_per_backend": 75,
+  "comparison": "Compare canonical catalog, fallback catalog, all public refusals and adapter admission, every semantic projection, request pin, artifact count and size. Require fresh replay. Only the declared producer file may differ among producer pins.",
+  "size_sweep": {"sizes": [1, 2, 3, 4, 8, 15, 16, 32, 64], "samples_per_backend_per_size": 30, "round_order": "AB BA alternating", "scope": "Actual default_registry function with scoped test replacements of fixed structural and finite spec suppliers; no production source edits. Minimum 1 because typed-category is unconditional. Sizes are synthetic supplier fixtures, not a public configurable API. No empty-catalog speed claim."},
+  "negative_tests": "Malformed or duplicate fixed definitions; 64/65 registry boundary; optional adapter ImportError/ValueError; unexpected import failure propagation; public refusal precedence, no mutation on refusal, registration isolation and all mutable-field aliases. Validate source-specific replay and reject cross-source artifacts and tampering.",
+  "suite": "Existing Lens library, integration and browser tests in normal and optimized Python; preserve each exit and log. New tests outside source-bound modules.",
+  "claims": "Local measured improvements or regressions only. No mathematical novelty, universal speedup, whole-factory acceleration, production qualification or browser execution claim. Crossovers only among the tested fixtures and sizes."
+}

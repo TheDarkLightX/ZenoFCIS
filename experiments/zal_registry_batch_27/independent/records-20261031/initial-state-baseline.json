@@ -1,0 +1,8 @@
+{
+  "negative_initial": "latched",
+  "positive_initial": "unseen",
+  "reason": "unsupported machine layout or initial state",
+  "schema": "zal/initial-name-restriction-control/1",
+  "scope": "Native finite adapter restriction reproduced; no performance regression or general ZAL authoring restriction inferred.",
+  "status": "refused"
+}

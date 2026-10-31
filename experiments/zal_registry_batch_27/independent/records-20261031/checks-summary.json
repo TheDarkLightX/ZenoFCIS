@@ -1,0 +1,139 @@
+{
+  "checks": [
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "existing-test_lens_library-normal",
+      "log_sha256": "1f72a042c099412b94c5fc5861bc52c5be187084e0b4385bf20296622aa95547"
+    },
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "existing-test_lens_integration-normal",
+      "log_sha256": "9c6ea84cc14a5a2f983c0e1dd5da472cbb4e7f0413cf6e5514ad759113a66fc5"
+    },
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "existing-test_library_lens_browser-normal",
+      "log_sha256": "b482052d285a8f01f6fe6161c26d4b0dc538caadd5b993a996bb99a333151261"
+    },
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "boundaries-baseline-normal",
+      "log_sha256": "bf61a7da8a165e766c8c50b5c874d4f5dcb00d6d2b0b74776d867200b60f982d"
+    },
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "boundaries-candidate-normal",
+      "log_sha256": "03350e2554fd4fec4d493cac10a026fd5f3d88b528efe2bef65a6500acf7effe"
+    },
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "namespace-ownership-normal",
+      "log_sha256": "7dff3c06b49874ba38d34e64a758093b88601021d6bf69fab27cb4e2c2ccde6b"
+    },
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "existing-test_lens_library-optimized",
+      "log_sha256": "f370a336158026338430069ab1d3d0e882196b5f1738fd709862a4d3773be3d5"
+    },
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "existing-test_lens_integration-optimized",
+      "log_sha256": "9a9bb16dd4fe173544dccc6c18f07fa6127b8dfbc728df2f2a39ef11ea98e6b5"
+    },
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "existing-test_library_lens_browser-optimized",
+      "log_sha256": "175ae3195d8fb8388a429cf4e8ccbf9ab827c822bebc365d505ef7c7def7fc9a"
+    },
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "boundaries-baseline-optimized",
+      "log_sha256": "4bceb7c14bfea0aae23962ef594a66f08c9bff0b5f89e8410ce20cea7514eb20"
+    },
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "boundaries-candidate-optimized",
+      "log_sha256": "028f51c5cd12ba0e02e9f00734f37e5cc80ce136371d40d5767a36b9a629196e"
+    },
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "namespace-ownership-optimized",
+      "log_sha256": "06335d9b418dea043d847068fb578741e01408bd3c0bb60d5ba184381aeb5379"
+    },
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "artifact-identity-baseline",
+      "log_sha256": "596672b5ef7d075c3905e0c46e5c8d968c38327867ebe0de753f1dc68c350d2e"
+    },
+    {
+      "bounded_runner_exit": 1,
+      "exit": 1,
+      "expected_exit": 1,
+      "expected_outcome_reproduced": true,
+      "label": "evaluator-identity-baseline",
+      "log_sha256": "091dabae7022aa8b4dc9eee40861ae6c87b26c8f83337fac8808df984ce457ba"
+    },
+    {
+      "bounded_runner_exit": 0,
+      "exit": 0,
+      "expected_exit": 0,
+      "expected_outcome_reproduced": true,
+      "label": "artifact-identity-candidate",
+      "log_sha256": "596672b5ef7d075c3905e0c46e5c8d968c38327867ebe0de753f1dc68c350d2e"
+    },
+    {
+      "bounded_runner_exit": 1,
+      "exit": 1,
+      "expected_exit": 1,
+      "expected_outcome_reproduced": true,
+      "label": "evaluator-identity-candidate",
+      "log_sha256": "718e8747d41400b1ccb62829823800411b597038cdd59dd001498c13c49c7947"
+    }
+  ],
+  "pass": true,
+  "qualification_failures": [
+    "evaluator-identity-baseline",
+    "evaluator-identity-candidate"
+  ],
+  "schema": "zal/independent-registry-checks/1",
+  "scope": "pass means expected diagnostic outcomes reproduced; qualification_failures remain failures"
+}

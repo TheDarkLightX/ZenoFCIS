@@ -1,0 +1,9 @@
+{"size": 1, "baseline_ms": 0.363891, "candidate_ms": 0.2696375, "ratio": 1.3495563488016318}
+{"size": 2, "baseline_ms": 0.9189495, "candidate_ms": 0.4476345, "ratio": 2.052901418456352}
+{"size": 3, "baseline_ms": 1.709625, "candidate_ms": 0.6313005, "ratio": 2.708100183668475}
+{"size": 4, "baseline_ms": 2.708517, "candidate_ms": 0.83134, "ratio": 3.258013568455746}
+{"size": 8, "baseline_ms": 10.7449355, "candidate_ms": 1.8964855, "ratio": 5.665709281721374}
+{"size": 15, "baseline_ms": 40.017708, "candidate_ms": 4.1289155, "ratio": 9.692062722039237}
+{"size": 16, "baseline_ms": 42.474673, "candidate_ms": 4.247765, "ratio": 9.999299160852825}
+{"size": 32, "baseline_ms": 170.8639505, "candidate_ms": 8.512065, "ratio": 20.073149171205813}
+{"size": 64, "baseline_ms": 700.5143835, "candidate_ms": 17.375523, "ratio": 40.31616104447619}

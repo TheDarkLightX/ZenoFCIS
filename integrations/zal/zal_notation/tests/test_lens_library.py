@@ -27,6 +27,16 @@ class LensLibraryTests(unittest.TestCase):
     def setUp(self):
         self.library, self.identity = library_entry()
 
+    def test_builtin_catalogs_own_their_mutable_fields(self):
+        first = V.default_registry()
+        before = canonical(first)
+        adapter_assumptions = deepcopy(L.ASSUMPTIONS)
+        for row in first["definitions"]:
+            for field in ("assumptions", "preserves", "forgets", "adds", "profile_hints"):
+                row[field].append("Consumer-local edit")
+        self.assertEqual(canonical(V.default_registry()), before)
+        self.assertEqual(L.ASSUMPTIONS, adapter_assumptions)
+
     def test_same_object_has_structural_and_finite_candidates_without_proof_promotion(self):
         report = A.enumerate_lenses(self.library, self.identity)
         self.assertEqual(report["entry_digest"], self.identity)
@@ -177,7 +187,7 @@ class LensLibraryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             shutil.copytree(root, target / "zal_notation", ignore=shutil.ignore_patterns("__pycache__"))
-            code = "from zal_notation import lens_library as V, abstractions as A; from zal_notation.core import digest; e=A.make_entry('draft','Draft',story='An informal object.'); lib=A.register(A.new_library(),e); r=V.discover(lib,digest(e)); assert {x['definition']['id'] for x in r['lenses']}=={'inductive-syntax','relational-graph','sequence-chunks','typed-category'}; assert all(x['status']=='pending' for x in r['lenses'])"
+            code = "import unittest; from zal_notation import lens_library as V, abstractions as A; from zal_notation.core import digest; check=unittest.TestCase(); e=A.make_entry('draft','Draft',story='An informal object.'); lib=A.register(A.new_library(),e); r=V.discover(lib,digest(e)); check.assertEqual({x['definition']['id'] for x in r['lenses']},{'inductive-syntax','relational-graph','sequence-chunks','typed-category'}); check.assertTrue(all(x['status']=='pending' for x in r['lenses']))"
             completed = subprocess.run([sys.executable, "-B", "-c", code], cwd=target, text=True,
                                        capture_output=True, timeout=10)
             self.assertEqual(completed.returncode, 0, completed.stderr)

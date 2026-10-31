@@ -1,0 +1,60 @@
+{
+  "address_space_limit_bytes": 1073741824,
+  "affinity": [
+    0
+  ],
+  "cleanup": {
+    "identities": [
+      {
+        "depth": 0,
+        "namespace_pid": 7,
+        "ppid": 1792,
+        "proc_pid": 1793,
+        "start_ticks": 189699,
+        "state": "R"
+      },
+      {
+        "depth": 1,
+        "namespace_pid": 8,
+        "ppid": 1793,
+        "proc_pid": 1807,
+        "start_ticks": 189990,
+        "state": "R"
+      },
+      {
+        "depth": 1,
+        "namespace_pid": 9,
+        "ppid": 1793,
+        "proc_pid": 1808,
+        "start_ticks": 190005,
+        "state": "R"
+      },
+      {
+        "depth": 1,
+        "namespace_pid": 10,
+        "ppid": 1793,
+        "proc_pid": 1809,
+        "start_ticks": 190016,
+        "state": "R"
+      }
+    ],
+    "signals": [],
+    "survivors": []
+  },
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-I",
+    "-B",
+    "-c",
+    "import runpy,sys;sys.path.insert(0,sys.argv.pop(1));sys.argv[0]='unittest';runpy.run_module('unittest',run_name='__main__')",
+    "/workspace/scratch/e6af3ba2da19/zeno-qualification/integrations/zal",
+    "zal_notation.tests.test_lens_library",
+    "-v"
+  ],
+  "cpu_limit_seconds": 90,
+  "exit": 0,
+  "pass": true,
+  "schema": "zal/independent-bounded-command/1",
+  "wall_limit_seconds": 120,
+  "wall_seconds": 5.248425066999971
+}

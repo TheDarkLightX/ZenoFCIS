@@ -1,0 +1,215 @@
+{
+  "checks": {
+    "initial-state-baseline": {
+      "address_space_limit_bytes": 1073741824,
+      "affinity": [
+        0
+      ],
+      "cleanup": {
+        "identities": [
+          {
+            "depth": 0,
+            "namespace_pid": 6,
+            "ppid": 2100,
+            "proc_pid": 2101,
+            "start_ticks": 211202,
+            "state": "R"
+          }
+        ],
+        "signals": [],
+        "survivors": []
+      },
+      "command": [
+        "python3",
+        "-I",
+        "-B",
+        "check_initial_state.py",
+        "--root",
+        "../zeno-baseline",
+        "--output",
+        "initial-state-baseline.json"
+      ],
+      "cpu_limit_seconds": 90,
+      "exit": 1,
+      "pass": false,
+      "schema": "zal/independent-bounded-command/1",
+      "wall_limit_seconds": 120,
+      "wall_seconds": 0.10309588700010863
+    },
+    "initial-state-baseline-v2": {
+      "address_space_limit_bytes": 1073741824,
+      "affinity": [
+        0
+      ],
+      "cleanup": {
+        "identities": [
+          {
+            "depth": 0,
+            "namespace_pid": 6,
+            "ppid": 2177,
+            "proc_pid": 2178,
+            "start_ticks": 213183,
+            "state": "R"
+          }
+        ],
+        "signals": [],
+        "survivors": []
+      },
+      "command": [
+        "python3",
+        "-I",
+        "-B",
+        "check_initial_state.py",
+        "--root",
+        "../zeno-baseline",
+        "--output",
+        "initial-state-baseline.json"
+      ],
+      "cpu_limit_seconds": 90,
+      "exit": 0,
+      "pass": true,
+      "schema": "zal/independent-bounded-command/1",
+      "wall_limit_seconds": 120,
+      "wall_seconds": 0.10295258700034537
+    },
+    "initial-state-candidate-v2": {
+      "address_space_limit_bytes": 1073741824,
+      "affinity": [
+        0
+      ],
+      "cleanup": {
+        "identities": [
+          {
+            "depth": 0,
+            "namespace_pid": 7,
+            "ppid": 2174,
+            "proc_pid": 2179,
+            "start_ticks": 213197,
+            "state": "R"
+          }
+        ],
+        "signals": [],
+        "survivors": []
+      },
+      "command": [
+        "python3",
+        "-I",
+        "-B",
+        "check_initial_state.py",
+        "--root",
+        "../zeno-qualification",
+        "--output",
+        "initial-state-candidate.json"
+      ],
+      "cpu_limit_seconds": 90,
+      "exit": 0,
+      "pass": true,
+      "schema": "zal/independent-bounded-command/1",
+      "wall_limit_seconds": 120,
+      "wall_seconds": 0.10312992399985887
+    },
+    "measurement-pins-normal": {
+      "address_space_limit_bytes": 1073741824,
+      "affinity": [
+        0
+      ],
+      "cleanup": {
+        "identities": [
+          {
+            "depth": 0,
+            "namespace_pid": 6,
+            "ppid": 2237,
+            "proc_pid": 2238,
+            "start_ticks": 217517,
+            "state": "R"
+          },
+          {
+            "depth": 1,
+            "namespace_pid": 7,
+            "ppid": 2238,
+            "proc_pid": 2239,
+            "start_ticks": 217521,
+            "state": "R"
+          },
+          {
+            "depth": 1,
+            "namespace_pid": 9,
+            "ppid": 2238,
+            "proc_pid": 2241,
+            "start_ticks": 217537,
+            "state": "R"
+          },
+          {
+            "depth": 1,
+            "namespace_pid": 11,
+            "ppid": 2238,
+            "proc_pid": 2243,
+            "start_ticks": 217547,
+            "state": "R"
+          }
+        ],
+        "signals": [],
+        "survivors": []
+      },
+      "command": [
+        "python3",
+        "-I",
+        "-B",
+        "test_measurement_pins.py",
+        "--recipe",
+        "published-recipe"
+      ],
+      "cpu_limit_seconds": 90,
+      "exit": 0,
+      "pass": true,
+      "schema": "zal/independent-bounded-command/1",
+      "wall_limit_seconds": 120,
+      "wall_seconds": 0.40644535299998097
+    },
+    "measurement-pins-optimized": {
+      "address_space_limit_bytes": 1073741824,
+      "affinity": [
+        0
+      ],
+      "cleanup": {
+        "identities": [
+          {
+            "depth": 0,
+            "namespace_pid": 12,
+            "ppid": 2234,
+            "proc_pid": 2244,
+            "start_ticks": 217562,
+            "state": "R"
+          },
+          {
+            "depth": 1,
+            "namespace_pid": 14,
+            "ppid": 2244,
+            "proc_pid": 2246,
+            "start_ticks": 217590,
+            "state": "R"
+          }
+        ],
+        "signals": [],
+        "survivors": []
+      },
+      "command": [
+        "python3",
+        "-O",
+        "-I",
+        "-B",
+        "test_measurement_pins.py",
+        "--recipe",
+        "published-recipe"
+      ],
+      "cpu_limit_seconds": 90,
+      "exit": 0,
+      "pass": true,
+      "schema": "zal/independent-bounded-command/1",
+      "wall_limit_seconds": 120,
+      "wall_seconds": 0.6082514670001729
+    }
+  },
+  "initial_state_fixture_repair": "First attempted enum values were not sorted after renaming unseen to latched; rejected before the intended adapter boundary. Corrected sorted fixture passes the intended refusal control at both revisions. Neither production root changed.",
+  "schema": "zal/independent-supplemental-checks/1"
+}

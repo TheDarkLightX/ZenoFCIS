@@ -1,0 +1,17 @@
+test_annotation_or_claim_edits_never_borrow_builtin_admission (__main__.CatalogBoundaryTests.test_annotation_or_claim_edits_never_borrow_builtin_admission) ... ok
+test_fixed_supplier_duplicate_cannot_escape_final_validation (__main__.CatalogBoundaryTests.test_fixed_supplier_duplicate_cannot_escape_final_validation) ... ok
+test_import_fallback_is_valid_fresh_and_bounded (__main__.CatalogBoundaryTests.test_import_fallback_is_valid_fresh_and_bounded) ... ok
+test_malformed_fixed_supplier_is_refused_without_mutation (__main__.CatalogBoundaryTests.test_malformed_fixed_supplier_is_refused_without_mutation) ... ok
+test_malformed_optional_spec_is_not_treated_as_import_absence (__main__.CatalogBoundaryTests.test_malformed_optional_spec_is_not_treated_as_import_absence) ... ok
+test_no_mutable_alias_between_rows_fields_catalogs_or_adapter_constants (__main__.CatalogBoundaryTests.test_no_mutable_alias_between_rows_fields_catalogs_or_adapter_constants) ... ok
+test_optional_supplier_duplicate_cannot_escape_final_validation (__main__.CatalogBoundaryTests.test_optional_supplier_duplicate_cannot_escape_final_validation) ... ok
+test_register_refusal_preserves_both_inputs_and_registry_error_precedence (__main__.CatalogBoundaryTests.test_register_refusal_preserves_both_inputs_and_registry_error_precedence) ... ok
+test_register_success_owns_registry_and_proposed_fields (__main__.CatalogBoundaryTests.test_register_success_owns_registry_and_proposed_fields) ... ok
+test_registration_refusal_on_duplicate_does_not_mutate_inputs (__main__.CatalogBoundaryTests.test_registration_refusal_on_duplicate_does_not_mutate_inputs) ... ok
+test_registry_boundary_64_succeeds_65_refuses (__main__.CatalogBoundaryTests.test_registry_boundary_64_succeeds_65_refuses) ... ok
+test_unexpected_import_failure_propagates (__main__.CatalogBoundaryTests.test_unexpected_import_failure_propagates) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 5.796s
+
+OK

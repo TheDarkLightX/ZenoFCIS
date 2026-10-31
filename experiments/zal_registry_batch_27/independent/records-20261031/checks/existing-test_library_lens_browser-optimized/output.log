@@ -1,0 +1,17 @@
+test_actual_effect_table_composition_inverse_and_word_loss (zal_notation.tests.test_library_lens_browser.GenericBrowserTests.test_actual_effect_table_composition_inverse_and_word_loss) ... ok
+test_draft_and_authored_proposal_are_usable_without_finite_lowering (zal_notation.tests.test_library_lens_browser.GenericBrowserTests.test_draft_and_authored_proposal_are_usable_without_finite_lowering) ... ok
+test_export_cli_bounds_file_read_and_refuses_before_decode (zal_notation.tests.test_library_lens_browser.GenericBrowserTests.test_export_cli_bounds_file_read_and_refuses_before_decode) ... ok
+test_five_actual_subjects_and_generic_bounds (zal_notation.tests.test_library_lens_browser.GenericBrowserTests.test_five_actual_subjects_and_generic_bounds) ... ok
+test_fractional_presentation_is_allowed_but_semantic_profile_stays_exact (zal_notation.tests.test_library_lens_browser.GenericBrowserTests.test_fractional_presentation_is_allowed_but_semantic_profile_stays_exact) ... ok
+test_packet_source_catalog_target_receipt_and_asset_mutations_are_rejected_even_resealed (zal_notation.tests.test_library_lens_browser.GenericBrowserTests.test_packet_source_catalog_target_receipt_and_asset_mutations_are_rejected_even_resealed) ... ok
+test_quotient_fibers_and_retained_source_are_distinct (zal_notation.tests.test_library_lens_browser.GenericBrowserTests.test_quotient_fibers_and_retained_source_are_distinct) ... ok
+test_refuted_and_incomplete_receipts_keep_their_actual_status (zal_notation.tests.test_library_lens_browser.GenericBrowserTests.test_refuted_and_incomplete_receipts_keep_their_actual_status) ... ok
+test_replay_reconstructs_actual_bytes_deterministically (zal_notation.tests.test_library_lens_browser.GenericBrowserTests.test_replay_reconstructs_actual_bytes_deterministically) ... ok
+test_request_pin_symlinks_inventory_and_fresh_only_exports (zal_notation.tests.test_library_lens_browser.GenericBrowserTests.test_request_pin_symlinks_inventory_and_fresh_only_exports) ... ok
+test_source_type_schema_and_budget_refusals_before_output (zal_notation.tests.test_library_lens_browser.GenericBrowserTests.test_source_type_schema_and_budget_refusals_before_output) ... ok
+test_structure_checked_never_settles_custom_meaning (zal_notation.tests.test_library_lens_browser.GenericBrowserTests.test_structure_checked_never_settles_custom_meaning) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 53.289s
+
+OK

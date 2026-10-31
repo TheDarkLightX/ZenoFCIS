@@ -1,0 +1,64 @@
+{
+  "schema": "zal/independent-source-audit/1",
+  "commits": {
+    "baseline": "8de5a6543f93353d2f4563b17badfde285ce46a2",
+    "candidate": "48358c98fabbd8bc03edc972c077aef945cd2f16"
+  },
+  "producer_sha256": {
+    "baseline": "5c4a4eac6233dff0a8ddf9902d0a4ba7c8147c93c3d84e05a69ee1d2c21bf7a5",
+    "candidate": "2c5c8700834cec172583cf92012fc3b7000659e5233203b05cf8f30b93efc7f8"
+  },
+  "changed_functions": [
+    "default_registry"
+  ],
+  "unchanged_functions": [
+    "definition",
+    "validate_definition",
+    "new_registry",
+    "validate_registry",
+    "register",
+    "_structural_definitions",
+    "_adapter",
+    "_entry",
+    "_availability",
+    "discover",
+    "_bind",
+    "propose",
+    "apply",
+    "check",
+    "verify_receipt",
+    "restore"
+  ],
+  "same_top_level_nodes_except_default_registry": true,
+  "head_tree": "7abbf0cf49b772ff5dd892c5c297685aaa789623",
+  "all_changed_paths": [
+    ".github/workflows/ci.yml",
+    "experiments/zal_registry_batch_27/FROZEN_PLAN_02.json",
+    "experiments/zal_registry_batch_27/README.md",
+    "experiments/zal_registry_batch_27/baseline_lens_library.source.txt",
+    "experiments/zal_registry_batch_27/feasibility.json",
+    "experiments/zal_registry_batch_27/logs/normal-tail.log.gz",
+    "experiments/zal_registry_batch_27/logs/normal.log.gz",
+    "experiments/zal_registry_batch_27/logs/optimized-browser.log.gz",
+    "experiments/zal_registry_batch_27/logs/optimized-integration.log.gz",
+    "experiments/zal_registry_batch_27/logs/optimized-library.log.gz",
+    "experiments/zal_registry_batch_27/measurements/baseline-01.json",
+    "experiments/zal_registry_batch_27/measurements/baseline-04.json",
+    "experiments/zal_registry_batch_27/measurements/baseline-05.json",
+    "experiments/zal_registry_batch_27/measurements/candidate-02.json",
+    "experiments/zal_registry_batch_27/measurements/candidate-03.json",
+    "experiments/zal_registry_batch_27/measurements/candidate-06.json",
+    "experiments/zal_registry_batch_27/owned_process.py",
+    "experiments/zal_registry_batch_27/performance.json",
+    "experiments/zal_registry_batch_27/pins.template.json",
+    "experiments/zal_registry_batch_27/qualification.json",
+    "experiments/zal_registry_batch_27/run_measurements.py",
+    "experiments/zal_registry_batch_27/runtime.json",
+    "experiments/zal_registry_batch_27/worker.py",
+    "experiments/zal_registry_batch_27/workloads/heldout-latch.json",
+    "experiments/zal_registry_batch_27/workloads/representative-five.json",
+    "integrations/zal/zal_notation/lens_library.py",
+    "integrations/zal/zal_notation/tests/test_lens_library.py",
+    "release/public-documents.txt"
+  ]
+}

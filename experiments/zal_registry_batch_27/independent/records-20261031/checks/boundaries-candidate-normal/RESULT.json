@@ -1,0 +1,36 @@
+{
+  "address_space_limit_bytes": 1073741824,
+  "affinity": [
+    0
+  ],
+  "cleanup": {
+    "identities": [
+      {
+        "depth": 0,
+        "namespace_pid": 19,
+        "ppid": 1884,
+        "proc_pid": 1885,
+        "start_ticks": 196371,
+        "state": "R"
+      }
+    ],
+    "signals": [],
+    "survivors": []
+  },
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-I",
+    "-B",
+    "/workspace/scratch/e6af3ba2da19/qualification-evidence/test_catalog_boundaries.py",
+    "--root",
+    "/workspace/scratch/e6af3ba2da19/zeno-qualification",
+    "--record",
+    "/workspace/scratch/e6af3ba2da19/qualification-evidence/boundaries-candidate-normal.json"
+  ],
+  "cpu_limit_seconds": 90,
+  "exit": 0,
+  "pass": true,
+  "schema": "zal/independent-bounded-command/1",
+  "wall_limit_seconds": 120,
+  "wall_seconds": 0.6100606579998384
+}
