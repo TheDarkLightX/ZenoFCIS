@@ -11,7 +11,7 @@
     {
       "family": "reservation-pool",
       "instance": "components/pool/core-instance.json",
-      "instance_sha256": "2b0b3351d5533c7bb177b5034b7ca9d6cafb2879cac4d439d8ac67c0a1a10ed3",
+      "instance_sha256": "8be4ac453860cc447cf6ddc39235f287b127c9a5e55bf4997865470c8fdbc9e3",
       "local_evidence": "Identified; replay required",
       "name": "pool",
       "owns_fields": [
@@ -40,7 +40,7 @@
     {
       "family": "idempotency-slot",
       "instance": "components/memo/core-instance.json",
-      "instance_sha256": "4cead49c22a2c1e45def209f31712a9172c2d3e873b3535bd5be69afcf776f72",
+      "instance_sha256": "dfca65eeca003bc2b382be8db5a5b30e3b78ed67a0dad979cbdb400908ba1f4c",
       "local_evidence": "Identified; replay required",
       "name": "memo",
       "owns_fields": [
@@ -69,7 +69,7 @@
     {
       "family": "finite-phase-machine",
       "instance": "components/phase/core-instance.json",
-      "instance_sha256": "bfa8fb8977759137e9a57f3a18341de07a1d21561aa30723e5e276976de36270",
+      "instance_sha256": "3d011cfc88c99c9d6c32cba0a898a3d93d0586d6ceae2dd5357006b1413fe2d6",
       "local_evidence": "Identified; replay required",
       "name": "phase",
       "owns_fields": [
