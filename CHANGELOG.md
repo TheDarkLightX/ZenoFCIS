@@ -79,8 +79,9 @@ embedded in ZenoFCIS values.
   instructions; unsigned difference-or-zero at 11 bytes and 3 instructions;
   an exact zero-byte mask at 30 bytes and 7 instructions; and packed unsigned
   16-bit addition across four lanes, each lane modulo 2^16 with no carry
-  between lanes, at 42 bytes and 9 instructions. The packed addition is a
-  known SWAR (SIMD within a register) technique (Dietz, 1997).
+  between lanes, at 42 bytes and 9 instructions. The packed addition is the
+  known construction of Warren, *Hacker's Delight*, 2nd edition (2013),
+  section 2-18 ("Multibyte Add, Subtract, Absolute Value").
 - `second-solver` gives the query of each library `equivalent` verdict to the
   pinned cvc5 1.3.3, and counts the verdict as confirmed only when cvc5 also
   answers unsat. Both solvers read the same formula, so this does not check

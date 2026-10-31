@@ -18,7 +18,12 @@ ZenoFCIS's own program synthesis, such as machine-code kernels found by the
 bounded search; the kernel library records whether each entry was proposed
 or searched. Each part is checked by the judges, tests and proofs named in
 its section, and each claim below is stated at the strength its evidence
-supports. See [installation](INSTALLATION.md) for the published downloads.
+supports.
+
+The published CLI has Linux x86_64 GNU and Apple-silicon macOS downloads,
+listed in one signed `DOWNLOADS.sha256`. No Windows executable is published
+for 2.7.0; the 2.6.0 Windows download keeps its 2.6.0 scope. See
+[installation](INSTALLATION.md) for checksums and scope.
 
 ### 2.7 highlights
 
@@ -38,8 +43,8 @@ supports. See [installation](INSTALLATION.md) for the published downloads.
   at 22 bytes and 6 instructions or 25 bytes and 5 instructions, unsigned
   difference-or-zero at 11 bytes and 3 instructions, an exact zero-byte mask
   at 30 bytes and 7 instructions, and packed unsigned 16-bit addition across
-  four lanes at 42 bytes and 9 instructions, a known SWAR technique (Dietz,
-  1997). See
+  four lanes at 42 bytes and 9 instructions, the known construction of
+  Warren, *Hacker's Delight*, 2nd edition (2013), section 2-18. See
   [machine-code synthesis](MACHINE_CODE_SYNTHESIS_27.md).
 - **Full-width numbers.** Default-off `Value2`, codec2 and Schema2 carry
   `U256` and `I256` values. Verus proofs of the actual Rust bodies, under
@@ -89,7 +94,8 @@ machine-code frame, fault and ISA-refinement obligations, embedded execution,
 performance comparisons and application integration; RV64I execution on
 hardware; Schema2 refinement and full-width applications; the purity step in
 generated applications; verified backup and restore; payload-carrying
-variants in contracts; and the Rust readers of ZAL JSON, planned for 2.8.
+variants in contracts; the Rust readers of ZAL JSON, planned for 2.8; and a
+Windows executable.
 
 ## 2.6.0
 

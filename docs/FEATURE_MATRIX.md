@@ -19,11 +19,12 @@ native callback API.
 
 ## Host platforms
 
-The 2.6.0 release has CLI downloads for Linux x86_64 GNU, Windows x64 and
-Apple-silicon macOS. The Mac platform update has a separate source pin and
-checksum file. The evidence below applies to the named host runs, not every
-version of each operating system. These artifacts do not
-qualify 2.7.0.
+2.7.0 publishes CLI downloads for Linux x86_64 GNU and Apple-silicon macOS.
+No Windows executable is published for 2.7.0. The table below records the
+2.6.0 host evidence: 2.6.0 also published a Windows x64 download, and its Mac
+platform update has a separate source pin and checksum file. The evidence
+applies to the named host runs, not every version of each operating system,
+and the 2.6.0 artifacts do not qualify 2.7.0.
 
 | Evidence or capability | Linux x86_64 | macOS arm64 | Windows x64 |
 |---|---|---|---|

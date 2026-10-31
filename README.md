@@ -77,6 +77,9 @@ the imperative shell. A passing stage check is not a release receipt.
 This checkout is version **2.7.0**, the current release source. The
 [release notes](docs/RELEASE_NOTES.md) summarize 2.7.0 and the
 [changelog](CHANGELOG.md) lists each change and what is not qualified.
+2.7.0 publishes CLI downloads for Linux x86_64 GNU and Apple-silicon macOS;
+no Windows executable is published for 2.7.0. See
+[installation](docs/INSTALLATION.md).
 The [gap register](docs/FACTORY_GAPS_27.md) records the open requirements, and
 the [continuation guide](docs/DEVELOPMENT_27.md) explains how to continue
 them.
