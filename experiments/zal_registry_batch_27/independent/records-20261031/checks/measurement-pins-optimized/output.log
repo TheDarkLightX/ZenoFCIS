@@ -1,0 +1,10 @@
+test_exact_bindings_pass_without_launch (__main__.PinTests.test_exact_bindings_pass_without_launch) ... ok
+test_interpreter_digest_drift_refuses_without_launch (__main__.PinTests.test_interpreter_digest_drift_refuses_without_launch) ... ok
+test_worker_recipe_drift_refuses_without_launch (__main__.PinTests.test_worker_recipe_drift_refuses_without_launch) ... ok
+test_workload_drift_refuses_without_launch (__main__.PinTests.test_workload_drift_refuses_without_launch) ... ok
+test_wrong_descriptor_hash_refuses_without_launch (__main__.PinTests.test_wrong_descriptor_hash_refuses_without_launch) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.298s
+
+OK

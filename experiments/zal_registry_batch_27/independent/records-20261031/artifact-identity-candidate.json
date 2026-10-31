@@ -1,0 +1,127 @@
+{
+  "controls": [
+    {
+      "lens": "inductive-syntax",
+      "origin": "own",
+      "reason": null,
+      "status": "checked",
+      "verified": true
+    },
+    {
+      "lens": "definition-expand",
+      "origin": "own",
+      "reason": null,
+      "status": "checked",
+      "verified": true
+    },
+    {
+      "lens": "definition-fold",
+      "origin": "own",
+      "reason": null,
+      "status": "checked",
+      "verified": true
+    },
+    {
+      "lens": "finite-table",
+      "origin": "own",
+      "reason": null,
+      "status": "checked",
+      "verified": true
+    },
+    {
+      "lens": "state-machine",
+      "origin": "own",
+      "reason": null,
+      "status": "checked",
+      "verified": true
+    },
+    {
+      "lens": "transformation-monoid",
+      "origin": "own",
+      "reason": null,
+      "status": "checked",
+      "verified": true
+    },
+    {
+      "lens": "unit-group",
+      "origin": "own",
+      "reason": null,
+      "status": "checked",
+      "verified": true
+    },
+    {
+      "lens": "one-object-category",
+      "origin": "own",
+      "reason": null,
+      "status": "checked",
+      "verified": true
+    },
+    {
+      "origin": "own",
+      "packet_replay": "replayed"
+    },
+    {
+      "lens": "inductive-syntax",
+      "origin": "other",
+      "reason": "entry, library, definition or envelope changed",
+      "status": "unsupported",
+      "verified": false
+    },
+    {
+      "lens": "definition-expand",
+      "origin": "other",
+      "reason": "entry, library, definition or envelope changed",
+      "status": "unsupported",
+      "verified": false
+    },
+    {
+      "lens": "definition-fold",
+      "origin": "other",
+      "reason": "entry, library, definition or envelope changed",
+      "status": "unsupported",
+      "verified": false
+    },
+    {
+      "lens": "finite-table",
+      "origin": "other",
+      "reason": "entry, library, definition or envelope changed",
+      "status": "unsupported",
+      "verified": false
+    },
+    {
+      "lens": "state-machine",
+      "origin": "other",
+      "reason": "entry, library, definition or envelope changed",
+      "status": "unsupported",
+      "verified": false
+    },
+    {
+      "lens": "transformation-monoid",
+      "origin": "other",
+      "reason": "entry, library, definition or envelope changed",
+      "status": "unsupported",
+      "verified": false
+    },
+    {
+      "lens": "unit-group",
+      "origin": "other",
+      "reason": "entry, library, definition or envelope changed",
+      "status": "unsupported",
+      "verified": false
+    },
+    {
+      "lens": "one-object-category",
+      "origin": "other",
+      "reason": "entry, library, definition or envelope changed",
+      "status": "unsupported",
+      "verified": false
+    },
+    {
+      "origin": "other",
+      "packet_replay": "refused",
+      "reason": "reconstructed artifact differs: data/entries/0/inductive-syntax.receipt.json"
+    }
+  ],
+  "pass": true,
+  "schema": "zal/independent-artifact-identity-controls/1"
+}

@@ -1,0 +1,8 @@
+test_completed_worker_uses_no_cleanup_signal (__main__.OwnershipTests.test_completed_worker_uses_no_cleanup_signal) ... ok
+test_deadline_cleans_observed_descendant_and_leaves_unrelated_process_alive (__main__.OwnershipTests.test_deadline_cleans_observed_descendant_and_leaves_unrelated_process_alive) ... ok
+test_mapping_failure_kills_only_the_already_opened_child_pidfd (__main__.OwnershipTests.test_mapping_failure_kills_only_the_already_opened_child_pidfd) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.401s
+
+OK

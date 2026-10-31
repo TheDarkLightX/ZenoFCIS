@@ -1,0 +1,40 @@
+{
+  "address_space_limit_bytes": 1073741824,
+  "affinity": [
+    0
+  ],
+  "cleanup": {
+    "identities": [
+      {
+        "depth": 0,
+        "namespace_pid": 49,
+        "ppid": 2014,
+        "proc_pid": 2015,
+        "start_ticks": 203414,
+        "state": "R"
+      }
+    ],
+    "signals": [],
+    "survivors": []
+  },
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-I",
+    "-B",
+    "/workspace/scratch/e6af3ba2da19/qualification-evidence/check_artifact_identity.py",
+    "--root",
+    "/workspace/scratch/e6af3ba2da19/zeno-baseline",
+    "--own-packet",
+    "/workspace/scratch/e6af3ba2da19/qualification-evidence/published-recipe/measures/baseline-01/heldout-latch",
+    "--other-packet",
+    "/workspace/scratch/e6af3ba2da19/qualification-evidence/published-recipe/measures/candidate-02/heldout-latch",
+    "--output",
+    "/workspace/scratch/e6af3ba2da19/qualification-evidence/artifact-identity-baseline.json"
+  ],
+  "cpu_limit_seconds": 90,
+  "exit": 0,
+  "pass": true,
+  "schema": "zal/independent-bounded-command/1",
+  "wall_limit_seconds": 120,
+  "wall_seconds": 11.208485866000046
+}

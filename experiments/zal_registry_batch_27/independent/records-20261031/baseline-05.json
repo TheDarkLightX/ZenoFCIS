@@ -1,0 +1,780 @@
+{
+  "case": "baseline-05",
+  "catalog_encoded_bytes": 9523,
+  "catalog_median_ns": 40931545,
+  "catalog_sha256": "718d412ef7338523a439141507ff7db0408284d491b817620d816183d3a2689a",
+  "catalog_times_ns": [
+    49866709,
+    58332490,
+    58396986,
+    49186280,
+    37562550,
+    38278374,
+    37674725,
+    38119960,
+    38377841,
+    38329110,
+    38170675,
+    44450280,
+    40386220,
+    42888369,
+    40935421,
+    42045767,
+    41455907,
+    38878288,
+    40931545,
+    41127563,
+    41598819,
+    42089542,
+    40924003,
+    39946834,
+    39879013
+  ],
+  "cpu_seconds": 31.797754323,
+  "definitions": 15,
+  "fallback_sha256": "5752ab1693a66fd23c26e3985f3650632a85e56c66ba52633ed830519efa3e2b",
+  "fresh_ownership": true,
+  "pass": true,
+  "peak_rss_kib": 43028,
+  "producer_sha256": "5c4a4eac6233dff0a8ddf9902d0a4ba7c8147c93c3d84e05a69ee1d2c21bf7a5",
+  "public_results_sha256": "c767ee7ae497d4e606946f5e7ce74a54f35c5a4e2c9299db3170625dea447eb1",
+  "shared_implementation": "f3cca740ad0de14bc0db64cdc9acafcbef1b935ccc0eb364db1313cb4d6617b3",
+  "validation_calls": {
+    "register": 15,
+    "validate_definition": 255,
+    "validate_registry": 30
+  },
+  "wall_seconds": 31.800994344999935,
+  "workloads": {
+    "heldout-latch": {
+      "artifact_bytes": 1489238,
+      "export_seconds": 3.8764653050000106,
+      "files": 32,
+      "producer_source_pins": {
+        "category_profile/DEPENDENCIES.json": "8a1aa3fad07e791bd02962e8a7cd8bd4b250db3ae9bf8ce722b71003a4adfd95",
+        "category_profile/__init__.py": "a71f126645a5abf23a4f3d2fced46706ffde99a4b16e7851a4effba10efeecde",
+        "category_profile/__main__.py": "deb68b65d5df8a1fc0124e9743df1161f99a89ed56319546f5ec9cbfc6de5022",
+        "category_profile/adapter.py": "4cac1609013e5c13c191a1ba57b72f367db4c8be0943c66b8581891eec9d6fad",
+        "category_profile/browser.py": "33340ec2bd2208835c6ded0df57d8c2522dbcb98791e9b17209ed1e875d18916",
+        "category_profile/host.py": "22695b28ba45e76c76b863d1dd34523dc2ba199caa7698a048c3c657c73ae0f0",
+        "category_profile/provider/API.md": "561f16d2d601be4d61d0eb352ef90c5777cb332226c2e199eb4ec6820c49bbc6",
+        "category_profile/provider/SOURCE_MANIFEST.json": "2628e184504a84753b9a775779e9e9660ea3f6947734e96de64aae41e7c91cec",
+        "category_profile/provider/app/Main.hs": "243336c1f8958d7390db716c0d0aa6a1d9f49bb41d127debca67397e595cb030",
+        "category_profile/provider/build.py": "61c32cc3bf17fc341dd5036db712112352429bc12aa907fd5d243fcdb386552b",
+        "category_profile/provider/main.py": "6e0a1acc7c4193e4e6ce7933c29edf037bede64c8a2518168b52c9909ba0ee1c",
+        "category_profile/provider/oracle.py": "8e1f8cb4cff6cf0d7f95aea3d13c15350295409bfabe520b144108d4df9d634a",
+        "category_profile/provider/profile.py": "2f6ac23426afec70e051715b8a4d85043f94018067633b0cf2b59eb64e03a747",
+        "category_profile/provider/src/Zal/Lens/FiniteCategory.hs": "51b586950f9f6c297f5ac6e38c89dc408196776127110011c3e9b65273f8047f",
+        "category_profile/provider/src/Zal/Lens/Typed.hs": "f3c68a583df2287bcdb92520fdfc527b2fa7babaf8a5058d0803613ba82a0b5b",
+        "category_profile/provider/worker_exec.py": "76f92cf428d6f395ee7fe06cda72c0879217cd00dd6b2c813749c9cd1adc1375",
+        "category_profile/tools.py": "0e390efe92f390d92af130602ce48a766a1ccfd7f6994cad6517c77d6cd4b21e",
+        "finite_library/prototype.py": "3ce64a86b737854eab627255a25f0a403fb13d1b257a07c3e21471dc5bcd0ed1",
+        "lens_assets/app.js": "fd48967a9290e586e3d6550bea498f31cfa7220b43c83299bd9f1db164ed9f65",
+        "lens_assets/index.html": "160003535aa2b249de749bc98c351761288ae09b25a096a53bae8a2e7ef18236",
+        "lens_assets/styles.css": "b2f3da8a444e7ec92b8128044be9b9a7bda97445cd8260cfb77c3aceeaa01edc",
+        "reading_assets/LICENSE.txt": "dc1f6c8a850a88ca2999cfd45cd19de0c6d63cfb56127fb61e7bda582a1e7b95",
+        "reading_assets/LinuxLibertine-Regular.otf": "057bbfa1ac76133c8ae596eff0baf1fd662b2b60e830e6d45cfec5d21489eda3",
+        "reading_assets/SOURCE.json": "6fbb2a3d22fa262a0477f7e2b4a89cf5af93656f52dd2c3fd214036916723035",
+        "zal_notation/__init__.py": "767da8f37f88f3d48ef93614e133b777e38d15508549a29d0729c4559845f2fb",
+        "zal_notation/__main__.py": "0398a2529b3203a33048206f06551f9ef5df8d72ce8c60d95afd16c9da772889",
+        "zal_notation/abstractions.py": "94a8ab795b19898d8badbb2144b311ef4c50929638e81bc8f368d2963d768db1",
+        "zal_notation/bridge.py": "f9ec12b775cc4590b818a199e22be8432363b77ba58bfce1699a548bb522c250",
+        "zal_notation/builtin.py": "80d00097ce35b2d3fe66b2818d0c444a2f6eda8c56064ed2efa228be7c220d67",
+        "zal_notation/clock.py": "e38f37470fad3f00437d10c6bc6e2016da639f1f0523723839db1fb0c8028b68",
+        "zal_notation/core.py": "18ec5d16e564d233dd0a0a942bbef7fd8e04fe207e41f781d2b0882bb5409738",
+        "zal_notation/examples.py": "4785bba7bda34b9adc117ec0d4f7a51332efbf60b17ae510ebcf08d271f328de",
+        "zal_notation/exchange.py": "c7540b650266983dbaf304bd5746c0a4d97a7d8db2d92c10f8e44329a172ee5e",
+        "zal_notation/lens_library.py": "5c4a4eac6233dff0a8ddf9902d0a4ba7c8147c93c3d84e05a69ee1d2c21bf7a5",
+        "zal_notation/lenses.py": "80366df040365e2520cc3686a3366a656bbef58155b415fb96930e847b102506",
+        "zal_notation/library_lens_browser.py": "1e7cb170233f99119a4f34b457290b19d4fdfb3db82937d841aa15cc26157811",
+        "zal_notation/normalizer.py": "df8bb7bc6f83ce9947bd0c33afcafed881d72e9fe3e11a2312e1d34cbcc2213a",
+        "zal_notation/ontology.py": "124d8c4d5ae435faf12d8cd53dc2d8e703937a733d17ac581ee7b04e13a237b4",
+        "zal_notation/ontology_browser.py": "fa3ee27633f4ede2d8687438555016bc08a03a2b4a6a8f06886a10ac65778a9e",
+        "zal_notation/ontology_cnl.py": "a86e5325d866dffbe4252e4c28a37cdd943d39b559727e046a2c2c580c8f658d",
+        "zal_notation/ontology_demo.py": "d0c74905a780f6a094fc0569f295430118f02a532820f6a78509f1d7bdc02328",
+        "zal_notation/ontology_rdf.py": "2182e9097adcd7807bd2e72ce387b88390d573b2bcedda58bcb0ed74276b107b",
+        "zal_notation/ontology_records.py": "8952a4a9be3dbc2b86376116864ff38060bbe6d1f87dafa2a934ba1933551011",
+        "zal_notation/ontology_tools.py": "305c41d9aedb7135113e817635a5a8fc702ccaa128492216833d863a9cdabd46",
+        "zal_notation/reading_typography.py": "c6a8e6d77699cab1e37c46b4e7e465593a0b399604e681cff8c09356f9e5a03b",
+        "zal_notation/reasoning.py": "2affaee8f613694bd62b089855634c8692b76dad6caf48307d0f831e0244cf01",
+        "zal_notation/render.py": "3f8cc4bd9441255a4762c8674e70ee42c21d63f7da44825eb6e44e33d309ca08",
+        "zal_notation/semantics.py": "c880ad50f9906a2ad5963b3c65c74322a69ee76328196b0c7e090ec1a357c3e2",
+        "zal_notation/sharing.py": "2a753847be7e356c9ed762b317d9d38d3516893c7d08acd6430bcdcb78f5c9cb",
+        "zal_notation/story.py": "5d295a91a10a827f5a9e8d3529cdab74bcb0aea1c93bdb92f2a0617820c5336e",
+        "zal_notation/syntax.py": "3887c38aa8e0ce88e391eb0c6cd05b556de71e5ced68d8269eca158b32738c5b"
+      },
+      "replay_seconds": 4.09302779199993,
+      "replay_status": "replayed",
+      "request_sha256": "59045fb9caa940edac8c37e4093358fa8a06dc685a484f7d97699a23282ad9a7",
+      "semantic_projection_sha256": "3746b62f1ebe0d8c9a4b467d184f51bb021eee3b9b35f35e6a4152b81ad27f6d",
+      "total_seconds": 7.9694930969999405,
+      "view_statuses": [
+        [
+          "new-latch",
+          "retained-source",
+          "authored"
+        ],
+        [
+          "new-latch",
+          "inductive-syntax",
+          "checked"
+        ],
+        [
+          "new-latch",
+          "relational-graph",
+          "conditional"
+        ],
+        [
+          "new-latch",
+          "sequence-chunks",
+          "pending"
+        ],
+        [
+          "new-latch",
+          "typed-category",
+          "pending"
+        ],
+        [
+          "new-latch",
+          "definition-expand",
+          "checked"
+        ],
+        [
+          "new-latch",
+          "definition-fold",
+          "checked"
+        ],
+        [
+          "new-latch",
+          "finite-table",
+          "checked"
+        ],
+        [
+          "new-latch",
+          "state-machine",
+          "checked"
+        ],
+        [
+          "new-latch",
+          "parity-quotient",
+          "unsupported"
+        ],
+        [
+          "new-latch",
+          "transformation-monoid",
+          "checked"
+        ],
+        [
+          "new-latch",
+          "all-effects-group",
+          "refuted"
+        ],
+        [
+          "new-latch",
+          "unit-group",
+          "checked"
+        ],
+        [
+          "new-latch",
+          "one-object-category",
+          "checked"
+        ],
+        [
+          "new-latch",
+          "execution-tree",
+          "unsupported"
+        ],
+        [
+          "new-latch",
+          "automorphism-group",
+          "unsupported"
+        ],
+        [
+          "new-latch",
+          "throughput-perspective",
+          "analogy"
+        ],
+        [
+          "new-draft",
+          "retained-source",
+          "authored"
+        ],
+        [
+          "new-draft",
+          "inductive-syntax",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "relational-graph",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "sequence-chunks",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "typed-category",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "definition-expand",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "definition-fold",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "finite-table",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "state-machine",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "parity-quotient",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "transformation-monoid",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "all-effects-group",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "unit-group",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "one-object-category",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "execution-tree",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "automorphism-group",
+          "pending"
+        ],
+        [
+          "new-draft",
+          "throughput-perspective",
+          "analogy"
+        ]
+      ]
+    },
+    "representative-five": {
+      "artifact_bytes": 2660741,
+      "export_seconds": 10.416566375999992,
+      "files": 69,
+      "producer_source_pins": {
+        "category_profile/DEPENDENCIES.json": "8a1aa3fad07e791bd02962e8a7cd8bd4b250db3ae9bf8ce722b71003a4adfd95",
+        "category_profile/__init__.py": "a71f126645a5abf23a4f3d2fced46706ffde99a4b16e7851a4effba10efeecde",
+        "category_profile/__main__.py": "deb68b65d5df8a1fc0124e9743df1161f99a89ed56319546f5ec9cbfc6de5022",
+        "category_profile/adapter.py": "4cac1609013e5c13c191a1ba57b72f367db4c8be0943c66b8581891eec9d6fad",
+        "category_profile/browser.py": "33340ec2bd2208835c6ded0df57d8c2522dbcb98791e9b17209ed1e875d18916",
+        "category_profile/host.py": "22695b28ba45e76c76b863d1dd34523dc2ba199caa7698a048c3c657c73ae0f0",
+        "category_profile/provider/API.md": "561f16d2d601be4d61d0eb352ef90c5777cb332226c2e199eb4ec6820c49bbc6",
+        "category_profile/provider/SOURCE_MANIFEST.json": "2628e184504a84753b9a775779e9e9660ea3f6947734e96de64aae41e7c91cec",
+        "category_profile/provider/app/Main.hs": "243336c1f8958d7390db716c0d0aa6a1d9f49bb41d127debca67397e595cb030",
+        "category_profile/provider/build.py": "61c32cc3bf17fc341dd5036db712112352429bc12aa907fd5d243fcdb386552b",
+        "category_profile/provider/main.py": "6e0a1acc7c4193e4e6ce7933c29edf037bede64c8a2518168b52c9909ba0ee1c",
+        "category_profile/provider/oracle.py": "8e1f8cb4cff6cf0d7f95aea3d13c15350295409bfabe520b144108d4df9d634a",
+        "category_profile/provider/profile.py": "2f6ac23426afec70e051715b8a4d85043f94018067633b0cf2b59eb64e03a747",
+        "category_profile/provider/src/Zal/Lens/FiniteCategory.hs": "51b586950f9f6c297f5ac6e38c89dc408196776127110011c3e9b65273f8047f",
+        "category_profile/provider/src/Zal/Lens/Typed.hs": "f3c68a583df2287bcdb92520fdfc527b2fa7babaf8a5058d0803613ba82a0b5b",
+        "category_profile/provider/worker_exec.py": "76f92cf428d6f395ee7fe06cda72c0879217cd00dd6b2c813749c9cd1adc1375",
+        "category_profile/tools.py": "0e390efe92f390d92af130602ce48a766a1ccfd7f6994cad6517c77d6cd4b21e",
+        "finite_library/prototype.py": "3ce64a86b737854eab627255a25f0a403fb13d1b257a07c3e21471dc5bcd0ed1",
+        "lens_assets/app.js": "fd48967a9290e586e3d6550bea498f31cfa7220b43c83299bd9f1db164ed9f65",
+        "lens_assets/index.html": "160003535aa2b249de749bc98c351761288ae09b25a096a53bae8a2e7ef18236",
+        "lens_assets/styles.css": "b2f3da8a444e7ec92b8128044be9b9a7bda97445cd8260cfb77c3aceeaa01edc",
+        "reading_assets/LICENSE.txt": "dc1f6c8a850a88ca2999cfd45cd19de0c6d63cfb56127fb61e7bda582a1e7b95",
+        "reading_assets/LinuxLibertine-Regular.otf": "057bbfa1ac76133c8ae596eff0baf1fd662b2b60e830e6d45cfec5d21489eda3",
+        "reading_assets/SOURCE.json": "6fbb2a3d22fa262a0477f7e2b4a89cf5af93656f52dd2c3fd214036916723035",
+        "zal_notation/__init__.py": "767da8f37f88f3d48ef93614e133b777e38d15508549a29d0729c4559845f2fb",
+        "zal_notation/__main__.py": "0398a2529b3203a33048206f06551f9ef5df8d72ce8c60d95afd16c9da772889",
+        "zal_notation/abstractions.py": "94a8ab795b19898d8badbb2144b311ef4c50929638e81bc8f368d2963d768db1",
+        "zal_notation/bridge.py": "f9ec12b775cc4590b818a199e22be8432363b77ba58bfce1699a548bb522c250",
+        "zal_notation/builtin.py": "80d00097ce35b2d3fe66b2818d0c444a2f6eda8c56064ed2efa228be7c220d67",
+        "zal_notation/clock.py": "e38f37470fad3f00437d10c6bc6e2016da639f1f0523723839db1fb0c8028b68",
+        "zal_notation/core.py": "18ec5d16e564d233dd0a0a942bbef7fd8e04fe207e41f781d2b0882bb5409738",
+        "zal_notation/examples.py": "4785bba7bda34b9adc117ec0d4f7a51332efbf60b17ae510ebcf08d271f328de",
+        "zal_notation/exchange.py": "c7540b650266983dbaf304bd5746c0a4d97a7d8db2d92c10f8e44329a172ee5e",
+        "zal_notation/lens_library.py": "5c4a4eac6233dff0a8ddf9902d0a4ba7c8147c93c3d84e05a69ee1d2c21bf7a5",
+        "zal_notation/lenses.py": "80366df040365e2520cc3686a3366a656bbef58155b415fb96930e847b102506",
+        "zal_notation/library_lens_browser.py": "1e7cb170233f99119a4f34b457290b19d4fdfb3db82937d841aa15cc26157811",
+        "zal_notation/normalizer.py": "df8bb7bc6f83ce9947bd0c33afcafed881d72e9fe3e11a2312e1d34cbcc2213a",
+        "zal_notation/ontology.py": "124d8c4d5ae435faf12d8cd53dc2d8e703937a733d17ac581ee7b04e13a237b4",
+        "zal_notation/ontology_browser.py": "fa3ee27633f4ede2d8687438555016bc08a03a2b4a6a8f06886a10ac65778a9e",
+        "zal_notation/ontology_cnl.py": "a86e5325d866dffbe4252e4c28a37cdd943d39b559727e046a2c2c580c8f658d",
+        "zal_notation/ontology_demo.py": "d0c74905a780f6a094fc0569f295430118f02a532820f6a78509f1d7bdc02328",
+        "zal_notation/ontology_rdf.py": "2182e9097adcd7807bd2e72ce387b88390d573b2bcedda58bcb0ed74276b107b",
+        "zal_notation/ontology_records.py": "8952a4a9be3dbc2b86376116864ff38060bbe6d1f87dafa2a934ba1933551011",
+        "zal_notation/ontology_tools.py": "305c41d9aedb7135113e817635a5a8fc702ccaa128492216833d863a9cdabd46",
+        "zal_notation/reading_typography.py": "c6a8e6d77699cab1e37c46b4e7e465593a0b399604e681cff8c09356f9e5a03b",
+        "zal_notation/reasoning.py": "2affaee8f613694bd62b089855634c8692b76dad6caf48307d0f831e0244cf01",
+        "zal_notation/render.py": "3f8cc4bd9441255a4762c8674e70ee42c21d63f7da44825eb6e44e33d309ca08",
+        "zal_notation/semantics.py": "c880ad50f9906a2ad5963b3c65c74322a69ee76328196b0c7e090ec1a357c3e2",
+        "zal_notation/sharing.py": "2a753847be7e356c9ed762b317d9d38d3516893c7d08acd6430bcdcb78f5c9cb",
+        "zal_notation/story.py": "5d295a91a10a827f5a9e8d3529cdab74bcb0aea1c93bdb92f2a0617820c5336e",
+        "zal_notation/syntax.py": "3887c38aa8e0ce88e391eb0c6cd05b556de71e5ced68d8269eca158b32738c5b"
+      },
+      "replay_seconds": 10.372211894999964,
+      "replay_status": "replayed",
+      "request_sha256": "7236b226d81fd3611a2d18adad30a5c54a5d1ab96d90db47f03ad687db0780d7",
+      "semantic_projection_sha256": "bad419f280e039bebcd8ea575e4e483e6a34554ed93a6579ee84bb5900312624",
+      "total_seconds": 20.788778270999956,
+      "view_statuses": [
+        [
+          "draft",
+          "retained-source",
+          "authored"
+        ],
+        [
+          "draft",
+          "inductive-syntax",
+          "pending"
+        ],
+        [
+          "draft",
+          "relational-graph",
+          "pending"
+        ],
+        [
+          "draft",
+          "sequence-chunks",
+          "pending"
+        ],
+        [
+          "draft",
+          "typed-category",
+          "pending"
+        ],
+        [
+          "draft",
+          "definition-expand",
+          "pending"
+        ],
+        [
+          "draft",
+          "definition-fold",
+          "pending"
+        ],
+        [
+          "draft",
+          "finite-table",
+          "pending"
+        ],
+        [
+          "draft",
+          "state-machine",
+          "pending"
+        ],
+        [
+          "draft",
+          "parity-quotient",
+          "pending"
+        ],
+        [
+          "draft",
+          "transformation-monoid",
+          "pending"
+        ],
+        [
+          "draft",
+          "all-effects-group",
+          "pending"
+        ],
+        [
+          "draft",
+          "unit-group",
+          "pending"
+        ],
+        [
+          "draft",
+          "one-object-category",
+          "pending"
+        ],
+        [
+          "draft",
+          "execution-tree",
+          "pending"
+        ],
+        [
+          "draft",
+          "automorphism-group",
+          "pending"
+        ],
+        [
+          "draft",
+          "category-interpretation",
+          "analogy"
+        ],
+        [
+          "draft",
+          "authored-proposal-0",
+          "proposed"
+        ],
+        [
+          "custom-term",
+          "retained-source",
+          "authored"
+        ],
+        [
+          "custom-term",
+          "inductive-syntax",
+          "checked"
+        ],
+        [
+          "custom-term",
+          "relational-graph",
+          "conditional"
+        ],
+        [
+          "custom-term",
+          "sequence-chunks",
+          "pending"
+        ],
+        [
+          "custom-term",
+          "typed-category",
+          "pending"
+        ],
+        [
+          "custom-term",
+          "definition-expand",
+          "unsupported"
+        ],
+        [
+          "custom-term",
+          "definition-fold",
+          "unsupported"
+        ],
+        [
+          "custom-term",
+          "finite-table",
+          "unsupported"
+        ],
+        [
+          "custom-term",
+          "state-machine",
+          "unsupported"
+        ],
+        [
+          "custom-term",
+          "parity-quotient",
+          "unsupported"
+        ],
+        [
+          "custom-term",
+          "transformation-monoid",
+          "unsupported"
+        ],
+        [
+          "custom-term",
+          "all-effects-group",
+          "unsupported"
+        ],
+        [
+          "custom-term",
+          "unit-group",
+          "unsupported"
+        ],
+        [
+          "custom-term",
+          "one-object-category",
+          "unsupported"
+        ],
+        [
+          "custom-term",
+          "execution-tree",
+          "unsupported"
+        ],
+        [
+          "custom-term",
+          "automorphism-group",
+          "unsupported"
+        ],
+        [
+          "custom-term",
+          "category-interpretation",
+          "analogy"
+        ],
+        [
+          "custom-graph",
+          "retained-source",
+          "authored"
+        ],
+        [
+          "custom-graph",
+          "inductive-syntax",
+          "conditional"
+        ],
+        [
+          "custom-graph",
+          "relational-graph",
+          "checked"
+        ],
+        [
+          "custom-graph",
+          "sequence-chunks",
+          "pending"
+        ],
+        [
+          "custom-graph",
+          "typed-category",
+          "pending"
+        ],
+        [
+          "custom-graph",
+          "definition-expand",
+          "unsupported"
+        ],
+        [
+          "custom-graph",
+          "definition-fold",
+          "unsupported"
+        ],
+        [
+          "custom-graph",
+          "finite-table",
+          "unsupported"
+        ],
+        [
+          "custom-graph",
+          "state-machine",
+          "unsupported"
+        ],
+        [
+          "custom-graph",
+          "parity-quotient",
+          "unsupported"
+        ],
+        [
+          "custom-graph",
+          "transformation-monoid",
+          "unsupported"
+        ],
+        [
+          "custom-graph",
+          "all-effects-group",
+          "unsupported"
+        ],
+        [
+          "custom-graph",
+          "unit-group",
+          "unsupported"
+        ],
+        [
+          "custom-graph",
+          "one-object-category",
+          "unsupported"
+        ],
+        [
+          "custom-graph",
+          "execution-tree",
+          "unsupported"
+        ],
+        [
+          "custom-graph",
+          "automorphism-group",
+          "unsupported"
+        ],
+        [
+          "custom-graph",
+          "category-interpretation",
+          "analogy"
+        ],
+        [
+          "counter",
+          "retained-source",
+          "authored"
+        ],
+        [
+          "counter",
+          "inductive-syntax",
+          "checked"
+        ],
+        [
+          "counter",
+          "relational-graph",
+          "conditional"
+        ],
+        [
+          "counter",
+          "sequence-chunks",
+          "pending"
+        ],
+        [
+          "counter",
+          "typed-category",
+          "pending"
+        ],
+        [
+          "counter",
+          "definition-expand",
+          "checked"
+        ],
+        [
+          "counter",
+          "definition-fold",
+          "checked"
+        ],
+        [
+          "counter",
+          "finite-table",
+          "checked"
+        ],
+        [
+          "counter",
+          "state-machine",
+          "checked"
+        ],
+        [
+          "counter",
+          "parity-quotient",
+          "checked"
+        ],
+        [
+          "counter",
+          "transformation-monoid",
+          "checked"
+        ],
+        [
+          "counter",
+          "all-effects-group",
+          "refuted"
+        ],
+        [
+          "counter",
+          "unit-group",
+          "checked"
+        ],
+        [
+          "counter",
+          "one-object-category",
+          "incomplete"
+        ],
+        [
+          "counter",
+          "execution-tree",
+          "unsupported"
+        ],
+        [
+          "counter",
+          "automorphism-group",
+          "unsupported"
+        ],
+        [
+          "counter",
+          "category-interpretation",
+          "analogy"
+        ],
+        [
+          "phase",
+          "retained-source",
+          "authored"
+        ],
+        [
+          "phase",
+          "inductive-syntax",
+          "checked"
+        ],
+        [
+          "phase",
+          "relational-graph",
+          "conditional"
+        ],
+        [
+          "phase",
+          "sequence-chunks",
+          "pending"
+        ],
+        [
+          "phase",
+          "typed-category",
+          "pending"
+        ],
+        [
+          "phase",
+          "definition-expand",
+          "checked"
+        ],
+        [
+          "phase",
+          "definition-fold",
+          "checked"
+        ],
+        [
+          "phase",
+          "finite-table",
+          "checked"
+        ],
+        [
+          "phase",
+          "state-machine",
+          "checked"
+        ],
+        [
+          "phase",
+          "parity-quotient",
+          "checked"
+        ],
+        [
+          "phase",
+          "transformation-monoid",
+          "checked"
+        ],
+        [
+          "phase",
+          "all-effects-group",
+          "refuted"
+        ],
+        [
+          "phase",
+          "unit-group",
+          "checked"
+        ],
+        [
+          "phase",
+          "one-object-category",
+          "checked"
+        ],
+        [
+          "phase",
+          "execution-tree",
+          "unsupported"
+        ],
+        [
+          "phase",
+          "automorphism-group",
+          "unsupported"
+        ],
+        [
+          "phase",
+          "category-interpretation",
+          "analogy"
+        ]
+      ]
+    }
+  }
+}

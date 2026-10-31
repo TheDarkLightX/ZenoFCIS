@@ -80,6 +80,10 @@ jobs:
         run: |
           python3 -B -m unittest zal_notation.tests.test_lens_library zal_notation.tests.test_lens_integration zal_notation.tests.test_library_lens_browser
           PYTHONOPTIMIZE=1 python3 -O -B -m unittest zal_notation.tests.test_lens_library zal_notation.tests.test_lens_integration zal_notation.tests.test_library_lens_browser
+      - name: Catalog construction boundaries and ownership under both Python modes
+        run: |
+          python3 -I -B experiments/zal_registry_batch_27/independent/test_catalog_boundaries.py --root "$PWD" --record "$RUNNER_TEMP/catalog-boundaries-normal.json"
+          PYTHONOPTIMIZE=1 python3 -O -I -B experiments/zal_registry_batch_27/independent/test_catalog_boundaries.py --root "$PWD" --record "$RUNNER_TEMP/catalog-boundaries-optimized.json"
 
   rust:
     runs-on: ubuntu-24.04

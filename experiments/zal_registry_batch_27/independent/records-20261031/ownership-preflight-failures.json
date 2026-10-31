@@ -1,0 +1,8 @@
+{
+  "pass": false,
+  "attempts": [
+    {"operation": "initial supplemental supervisor with original owned_process helper", "result": "could not pin owned process identity", "details": "attempt-01 retains runner, supervisor log and failure record; no RESULT.json or timing samples were produced"},
+    {"operation": "namespace-aware pidfd preflight using task children enumeration", "result": "descendant tracking failed", "details": "follow-up direct read found /proc/<proc-pid>/task/<tid>/children absent; no benchmark started"}
+  ],
+  "repair": "Enumerate procfs parent links, and admit only descendants of a live retained parent after exact pidfd target/start checks. Signals continue to use pidfds only."
+}

@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/e6af3ba2da19/qualification-evidence/check_initial_state.py", line 18, in <module>
+    inputs = tuple(replace(port, values=tuple(rename(v) if i == 0 else v for v in port.values))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/e6af3ba2da19/qualification-evidence/check_initial_state.py", line 18, in <genexpr>
+    inputs = tuple(replace(port, values=tuple(rename(v) if i == 0 else v for v in port.values))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/dataclasses.py", line 1588, in replace
+    return obj.__class__(**changes)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 7, in __init__
+  File "/workspace/scratch/e6af3ba2da19/zeno-baseline/integrations/zal/finite_library/prototype.py", line 78, in __post_init__
+    need(self.values == tuple(sorted(set(self.values))), "enum must be canonical and distinct")
+  File "/workspace/scratch/e6af3ba2da19/zeno-baseline/integrations/zal/finite_library/prototype.py", line 35, in need
+    raise Refused(message)
+_zal_notation_lens_finite.Refused: enum must be canonical and distinct

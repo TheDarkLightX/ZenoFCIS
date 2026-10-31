@@ -1,0 +1,7 @@
+{
+  "schema": "zal/independent-registry-plan-addendum/1",
+  "reason": "Original helper indexes procfs by caller PID. Here procfs is mounted from an outer PID namespace. Attempt 01 refused before a worker result was produced.",
+  "change": "Separate supplemental helper maps owned pidfds through /proc/self/fdinfo/Pid; binds start ticks, parent and namespace PID before observing descendants. Every signal uses a retained pidfd. Original published recipes stay byte-identical.",
+  "checks_before_measurement": "Verify root and observed descendant tracking, cleanup on deadline, and no signaling of an unrelated sentinel process.",
+  "scope": "Observed descendant cleanup plus original worker resource caps, not general adversarial containment. Same measurement schedule and source/workload hashes."
+}

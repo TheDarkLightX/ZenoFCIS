@@ -1,0 +1,58 @@
+{
+  "address_space_limit_bytes": 1073741824,
+  "affinity": [
+    0
+  ],
+  "cleanup": {
+    "identities": [
+      {
+        "depth": 0,
+        "namespace_pid": 6,
+        "ppid": 2237,
+        "proc_pid": 2238,
+        "start_ticks": 217517,
+        "state": "R"
+      },
+      {
+        "depth": 1,
+        "namespace_pid": 7,
+        "ppid": 2238,
+        "proc_pid": 2239,
+        "start_ticks": 217521,
+        "state": "R"
+      },
+      {
+        "depth": 1,
+        "namespace_pid": 9,
+        "ppid": 2238,
+        "proc_pid": 2241,
+        "start_ticks": 217537,
+        "state": "R"
+      },
+      {
+        "depth": 1,
+        "namespace_pid": 11,
+        "ppid": 2238,
+        "proc_pid": 2243,
+        "start_ticks": 217547,
+        "state": "R"
+      }
+    ],
+    "signals": [],
+    "survivors": []
+  },
+  "command": [
+    "python3",
+    "-I",
+    "-B",
+    "test_measurement_pins.py",
+    "--recipe",
+    "published-recipe"
+  ],
+  "cpu_limit_seconds": 90,
+  "exit": 0,
+  "pass": true,
+  "schema": "zal/independent-bounded-command/1",
+  "wall_limit_seconds": 120,
+  "wall_seconds": 0.40644535299998097
+}

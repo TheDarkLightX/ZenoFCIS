@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/e6af3ba2da19/zeno-qualification/tools/check_authority_v2.py", line 502, in <module>
+    run_cli(_entrypoint)
+  File "/workspace/scratch/e6af3ba2da19/zeno-qualification/tools/telemetry.py", line 112, in run_cli
+    return function()
+           ^^^^^^^^^^
+  File "/workspace/scratch/e6af3ba2da19/zeno-qualification/tools/check_authority_v2.py", line 501, in _entrypoint
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/workspace/scratch/e6af3ba2da19/zeno-qualification/tools/check_authority_v2.py", line 484, in main
+    print(json.dumps(check_generated_sources(),sort_keys=True));return 0
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/e6af3ba2da19/zeno-qualification/tools/check_authority_v2.py", line 166, in check_generated_sources
+    raise ValueError('compiled evaluator digest differs from approved source generation')
+ValueError: compiled evaluator digest differs from approved source generation

@@ -1,0 +1,33 @@
+{
+  "failure": {
+    "message": "could not pin owned process identity",
+    "type": "RuntimeError"
+  },
+  "original_host_protocol": "blocked: PID 1 is not systemd",
+  "pass": false,
+  "pid1": "supervisord",
+  "pins_sha256": "792bc59e5de927b9fc1a4f1a8087088d6ad58ddd6eeea1d37b9da5152012121a",
+  "runner_sha256": "99959bcd7825d1afb64679b3b31acca38b2528f87e1b073e0325bf323448073b",
+  "schema": "zal/independent-container-measurements/1",
+  "source_commits": {
+    "baseline": "8de5a6543f93353d2f4563b17badfde285ce46a2",
+    "candidate": "48358c98fabbd8bc03edc972c077aef945cd2f16"
+  },
+  "workers": [
+    {
+      "backend": "baseline",
+      "case": "baseline-01",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "-I",
+        "-B",
+        "/workspace/scratch/e6af3ba2da19/qualification-evidence/published-recipe/worker.py",
+        "--bounded",
+        "--root",
+        "/workspace/scratch/e6af3ba2da19/zeno-baseline",
+        "--case",
+        "baseline-01"
+      ]
+    }
+  ]
+}

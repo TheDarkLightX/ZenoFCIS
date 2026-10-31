@@ -1,0 +1,35 @@
+{
+  "pass": true,
+  "cleanup": {
+    "identities": [
+      {
+        "proc_pid": 1164,
+        "state": "R",
+        "ppid": 1162,
+        "start_ticks": 161478,
+        "depth": 0,
+        "namespace_pid": 7
+      },
+      {
+        "proc_pid": 1165,
+        "state": "S",
+        "ppid": 1164,
+        "start_ticks": 161480,
+        "namespace_pid": 8,
+        "depth": 1
+      }
+    ],
+    "signals": [
+      {
+        "proc_pid": 1165,
+        "signal": "SIGTERM"
+      },
+      {
+        "proc_pid": 1164,
+        "signal": "SIGTERM"
+      }
+    ],
+    "survivors": []
+  },
+  "sentinel_alive": true
+}

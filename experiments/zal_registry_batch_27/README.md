@@ -1,5 +1,10 @@
 # Built-in Lens catalog construction
 
+An [independent qualification](independent/README.md) reproduces the bounded
+worker measurements on a different environment, adds a catalog-size sweep and
+negative controls, and retains the original supervisor's host requirement and
+the unresolved evaluator qualification failure.
+
 The built-in catalog used to call public registration repeatedly while building
 its private list. Each call validated and copied growing prefixes. It now builds
 fresh definitions locally and validates the complete returned catalog once.

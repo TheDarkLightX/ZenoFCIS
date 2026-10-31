@@ -1,0 +1,64 @@
+{
+  "address_space_limit_bytes": 1073741824,
+  "affinity": [
+    0
+  ],
+  "cleanup": {
+    "identities": [
+      {
+        "depth": 0,
+        "namespace_pid": 21,
+        "ppid": 1886,
+        "proc_pid": 1887,
+        "start_ticks": 196435,
+        "state": "R"
+      },
+      {
+        "depth": 1,
+        "namespace_pid": 22,
+        "ppid": 1887,
+        "proc_pid": 1888,
+        "start_ticks": 196441,
+        "state": "S"
+      },
+      {
+        "depth": 1,
+        "namespace_pid": 23,
+        "ppid": 1887,
+        "proc_pid": 1889,
+        "start_ticks": 196462,
+        "state": "S"
+      },
+      {
+        "depth": 1,
+        "namespace_pid": 24,
+        "ppid": 1887,
+        "proc_pid": 1890,
+        "start_ticks": 196462,
+        "state": "S"
+      },
+      {
+        "depth": 2,
+        "namespace_pid": 25,
+        "ppid": 1890,
+        "proc_pid": 1891,
+        "start_ticks": 196465,
+        "state": "S"
+      }
+    ],
+    "signals": [],
+    "survivors": []
+  },
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-I",
+    "-B",
+    "/workspace/scratch/e6af3ba2da19/qualification-evidence/test_namespace_process.py"
+  ],
+  "cpu_limit_seconds": 90,
+  "exit": 0,
+  "pass": true,
+  "schema": "zal/independent-bounded-command/1",
+  "wall_limit_seconds": 120,
+  "wall_seconds": 0.5072102649999124
+}
