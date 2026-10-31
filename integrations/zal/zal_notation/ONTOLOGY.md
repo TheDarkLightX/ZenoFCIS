@@ -2,7 +2,7 @@
 
 This optional ZAL profile helps a person find shared structure and ask why a
 classification follows. It extends the included semantic and notation libraries
-with the positive ontology fragment from [Crucible PR44](https://github.com/TheDarkLightX/Zeno-Crucible/pull/44).
+with an integrated positive ontology fragment.
 The existing abstraction, story, category and Lens APIs remain available.
 
 For example, the [DeFi arithmetic requirements](../examples/ontology/defi_arithmetic.english.txt)

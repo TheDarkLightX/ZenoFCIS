@@ -3,18 +3,18 @@
 ZenoFCIS is a Rust library family for high-assurance functional-core /
 imperative-shell systems.
 
-Current workspace development version: 2.7.0-rc.1
-Current status: full 2.7 qualification is incomplete; this checkout is not a
-qualified release candidate. docs/DEVELOPMENT_27.md gives continuation commands
-and docs/FACTORY_GAPS_27.md records the open requirements. The earlier 2.6.0
-release scope remains in docs/RELEASE_NOTES.md. crates.io 1.1.0 retains
-the historical V1 API. Use the matching tagged V2 source.
+Current workspace version: 2.7.0
+Current status: 2.7.0 is the current release source. CHANGELOG.md states what
+2.7 adds and what it does not qualify; docs/FACTORY_GAPS_27.md records the open
+requirements and docs/DEVELOPMENT_27.md gives continuation commands.
+docs/RELEASE_NOTES.md states the 2.7.0 and 2.6.0 release scopes. crates.io
+1.1.0 retains the historical V1 API. Use the matching tagged V2 source.
 Rust toolchain: 1.97.1 for repository validation
 
 ## Start here
 
 - docs/INDEX.md: every guide, grouped by task
-- docs/RELEASE_NOTES.md: the 2.6.0 release, its scope and its limits
+- docs/RELEASE_NOTES.md: the 2.7.0 and earlier releases, their scope and limits
 - docs/INSTALLATION.md: exact dependency and source installation
 - docs/QUICKSTART.md: supported project adoption path
 - docs/API_REFERENCE.md: public API entry points and rustdoc

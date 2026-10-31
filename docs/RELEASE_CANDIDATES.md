@@ -1,8 +1,8 @@
 # Public release candidates
 
-This checkout declares development version `2.7.0-rc.1`; full qualification
-is incomplete and it is not a qualified release candidate. See the
-[continuation guide](DEVELOPMENT_27.md) and [open requirements](FACTORY_GAPS_27.md).
+This checkout is version `2.7.0`, the current release source. The
+[gap register](FACTORY_GAPS_27.md) records its open requirements, and the
+[continuation guide](DEVELOPMENT_27.md) explains how to continue them.
 
 This page records the two earlier public V2 prereleases. The earlier 2.6.0
 release scope follows the consolidated V2.2/V2.3 line in 2.3.0; see the

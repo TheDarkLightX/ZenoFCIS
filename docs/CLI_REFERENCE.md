@@ -1,8 +1,8 @@
 # `zeno-fcis` CLI reference
 
-The workspace development version is `2.7.0-rc.1`; full qualification is
-incomplete. See the [continuation guide](DEVELOPMENT_27.md) and
-[open requirements](FACTORY_GAPS_27.md). This guide retains the `2.6.0` command
+The workspace version is `2.7.0`, the current release source. The
+[gap register](FACTORY_GAPS_27.md) records its open requirements, and the
+[continuation guide](DEVELOPMENT_27.md) explains how to continue them. This guide retains the `2.6.0` command
 baseline and historical V1 guidance; [the earlier release notes](RELEASE_NOTES.md)
 state that baseline's assurance boundaries.
 
@@ -1666,7 +1666,7 @@ describes expected-result comparisons; Bryan and Zyp, *JSON Pointer*, RFC 6901,
 IETF (2013), defines the difference locations. This is a scoped replay wrapper
 with explicit nondeterminism declarations; prior-art search pending.
 
-## Contract representation refinement (2.6, unreleased)
+## Contract representation refinement (2.6)
 
 The [construction guide](CONSTRUCTION.md) describes how a frozen requirements reference and different
 implementation layouts use this gate. `construct` runs the supported priority-collection

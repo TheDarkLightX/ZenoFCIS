@@ -1,4 +1,4 @@
-"""The 2.7.1 design documents stay precise: required sections, real repository references, scoped claims."""
+"""The 2.7 design documents (F27-28, F27-30) stay precise: required sections, real repository references, scoped claims."""
 from pathlib import Path
 import re
 import unittest

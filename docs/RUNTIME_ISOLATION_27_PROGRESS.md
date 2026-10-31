@@ -3,8 +3,8 @@
 **Development status: in progress; proposal [#150](https://github.com/TheDarkLightX/ZenoFCIS/pull/150).**
 The [proposal](RUNTIME_ISOLATION_27_PROPOSAL.md) defines the intended guarantees.
 Checked implementation items below identify source and test coverage present in
-this development checkpoint. They do not record a fresh pass on the final
-checkpoint, qualify an installed application or establish deployment safety.
+2.7.0. They do not record a fresh pass on the release source, qualify an
+installed application or establish deployment safety.
 Exact-head native checks and the remaining I5–I9 work are pending.
 
 ## Source and claim boundary

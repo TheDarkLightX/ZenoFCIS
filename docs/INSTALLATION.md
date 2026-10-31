@@ -1,16 +1,17 @@
 # Installation
 
-This checkout declares development version `2.7.0-rc.1`. Full qualification
-is incomplete; it is not a qualified release candidate. See the
-[continuation guide](DEVELOPMENT_27.md) and [open requirements](FACTORY_GAPS_27.md).
+This checkout is version `2.7.0`, the current release source. The
+[gap register](FACTORY_GAPS_27.md) records its open requirements, and the
+[continuation guide](DEVELOPMENT_27.md) explains how to continue them.
 
-ZenoFCIS `2.6.0` is released with CLI downloads for **Linux x86_64 GNU**,
-**Windows x64** and **macOS on Apple silicon**, plus offline Rustdoc. The
-Mac platform update has a separate source pin. The release page provides a
-signed checksum file for each platform addition.
+ZenoFCIS `2.7.0` publishes CLI downloads for **Linux x86_64 GNU** and
+**macOS on Apple silicon**, plus offline Rustdoc and an SBOM. One signed
+`DOWNLOADS.sha256` lists every 2.7.0 download. No Windows executable is
+published for 2.7.0; the 2.6.0 Windows x64 download keeps its own scope, as
+[Windows x64](#windows-x64-260-only) describes.
 [Supported hosts](#supported-hosts) gives each host's requirements and
-qualification boundary. The [2.6.0 release notes](RELEASE_NOTES.md) describe
-the release's scope.
+qualification boundary. The [release notes](RELEASE_NOTES.md) describe each
+release's scope.
 
 Applications use the V2 API from the matching source revision, as
 [Matching source and current library API](#matching-source-and-current-library-api)
@@ -26,18 +27,18 @@ exact source pins, signed checksum assets and qualification limits.
 
 - **Linux x86_64 GNU** needs glibc 2.39 or later. On an older glibc, such as
   Ubuntu 22.04's 2.35, the loader refuses to start the executable.
-- **macOS on Apple silicon** (`aarch64-apple-darwin`) was tested on GitHub's
-  macOS 15 arm64 runner. Its minimum-version field is macOS 11.0; other macOS
-  versions are not qualified. The binary is not Apple-notarized.
-- **Windows x64** was tested on a Windows Server 2025 runner with a generated
-  durable-counter application. It needs the Microsoft Visual C++ runtime;
+- **macOS on Apple silicon** (`aarch64-apple-darwin`) is built and tested on
+  GitHub's macOS 15 arm64 runner. Its minimum-version field is macOS 11.0;
+  other macOS versions are not qualified. The binary is not Apple-notarized.
+- **Windows x64** has no 2.7.0 executable. The 2.6.0 Windows CLI was tested on
+  a Windows Server 2025 runner with a generated durable-counter application;
   `synth verify` execution is unavailable on Windows in 2.6.0.
 - Intel Macs and mobile apps have no published executable.
 
-## Install the 2.6.0 CLI
+## Install the 2.7.0 CLI on Linux
 
 The signed `DOWNLOADS.sha256` lists the Linux archive. In the directory where you
-want to keep the archive and the executable, set `export VERSION=2.6.0`, then
+want to keep the archive and the executable, set `export VERSION=2.7.0`, then
 run:
 
 <!-- installed-journey: x86_64-unknown-linux-gnu -->
@@ -61,9 +62,9 @@ CLI in later sessions.
 
 The exact archive filename must appear in `DOWNLOADS.sha256`; a missing entry
 or checksum mismatch stops installation. Other assets need not be downloaded. Verify
-the published release's [detached checksum signature](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.6.0/DOWNLOADS.sha256.sig)
+the published release's [detached checksum signature](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.7.0/DOWNLOADS.sha256.sig)
 separately, under your trusted signing-key policy. Use the published
-[signing key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.6.0/RELEASE-SIGNING-KEY.pub).
+[signing key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.7.0/RELEASE-SIGNING-KEY.pub).
 Downloading it beside the artifacts does not independently establish trust, so
 confirm its fingerprint through a trusted channel. See
 [Verify downloads](#verify-downloads).
@@ -73,35 +74,8 @@ The older prerelease downloads, source pins and signatures stay in the
 
 ## Install on macOS (Apple silicon)
 
-The published Mac archive includes the launcher fix at source commit
-`e9e381db36de6124d4d2a80861c8666f1583629d`. Its signed checksum and source
-record are separate from the original Linux release files. Set
-`export VERSION=2.6.0` and run:
-
-```bash
-: "${VERSION:?set VERSION to 2.6.0}"
-ARCHIVE="zeno-fcis-$VERSION-macos1-aarch64-apple-darwin"
-DIRECTORY="zeno-fcis-$VERSION-aarch64-apple-darwin"
-curl --fail --location --output "$ARCHIVE.tar.gz" \
-  "https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v$VERSION/$ARCHIVE.tar.gz"
-curl --fail --location --output MACOS.sha256 \
-  "https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v$VERSION/MACOS.sha256"
-awk -v archive="$ARCHIVE.tar.gz" '$2 == archive { print; found=1 } END { if (!found) exit 1 }' \
-  MACOS.sha256 | shasum -a 256 -c -
-tar -xzf "$ARCHIVE.tar.gz"
-export PATH="$PWD/$DIRECTORY:$PATH"
-zeno-fcis describe
-```
-
-Verify `MACOS.sha256.sig` and the signing key separately as described in
-[Verify downloads](#verify-downloads). The signed `MACOS-SOURCE.txt` records
-the build source.
-
-<details>
-<summary>Install a locally built release set</summary>
-
-The local release packaging workflow uses the conventional archive name and
-`DOWNLOADS.sha256`. Its installed-binary check exercises these commands:
+The same signed `DOWNLOADS.sha256` lists the Mac archive. Set
+`export VERSION=2.7.0` and run:
 
 <!-- installed-journey: aarch64-apple-darwin -->
 ```bash
@@ -118,12 +92,15 @@ export PATH="$PWD/$ARCHIVE:$PATH"
 zeno-fcis describe
 ```
 
-</details>
-
 `shasum -a 256 -c -` checks the exact archive filename selected by `awk`;
 a missing entry or checksum mismatch stops installation. The executable is arm64 only, and its
 minimum-version field is macOS 11.0. The release workflow runs it only on the
 macOS 15 arm64 image.
+
+The 2.6.0 Mac download was a later platform addition with its own name
+(`zeno-fcis-2.6.0-macos1-aarch64-apple-darwin.tar.gz`), checksum list
+(`MACOS.sha256`) and recorded build source (`MACOS-SOURCE.txt`) on the
+`v2.6.0` release page.
 
 The released macOS executable is ad-hoc signed, without a Developer ID or
 Apple notarization. macOS may block it. Verify the download and signing-key
@@ -138,7 +115,7 @@ If you already extracted it, use `xattr -dr com.apple.quarantine` on the
 extracted directory instead.
 
 `ssh-keygen -Y verify` is available on macOS and Linux. The Linux and Mac
-checksum files use the same release signing key.
+archives are listed in the same signed checksum file.
 
 Generated applications on macOS need Rust `1.97.1` and the Xcode Command Line
 Tools (`xcode-select --install`), whose C compiler builds the bundled SQLite.
@@ -193,10 +170,13 @@ The OCaml scalar consumer profile, the Tau kit runner and the repository's
 acceptance, proof and packaged-workspace gates are checked only on Linux
 x86-64. They are not part of the macOS evidence.
 
-## Install on Windows x64
+## Windows x64 (2.6.0 only)
 
-In PowerShell, download the archive and its checksum, verify the archive,
-then extract it:
+No Windows executable is published for 2.7.0. The 2.6.0 Windows CLI stays on
+the `v2.6.0` release page with the 2.6.0 scope and source. A 2.7.0 build
+refuses stores created by 2.6.0 builds, so keep each store with the build
+that created it. In PowerShell, download the 2.6.0 archive and its checksum,
+verify the archive, then extract it:
 
 ```powershell
 $Version = "2.6.0"
@@ -222,16 +202,19 @@ as described below.
 
 ## Verify downloads
 
-The original Linux assets use `DOWNLOADS.sha256`; the later Mac and Windows
-downloads use `MACOS.sha256` and `WINDOWS.sha256`. Each has a detached `.sig`
-file. Verify the signature with `RELEASE-SIGNING-KEY.pub`, then compare the
+Every 2.7.0 download is listed in `DOWNLOADS.sha256`, with its detached
+`DOWNLOADS.sha256.sig`. On the `v2.6.0` release page, the original Linux
+assets use `DOWNLOADS.sha256` and the later Mac and Windows downloads use
+`MACOS.sha256` and `WINDOWS.sha256`, each with its own `.sig` file. Verify the
+signature with `RELEASE-SIGNING-KEY.pub`, then compare the
 archive's hash with its entry in the signed file. Confirm the key's fingerprint
 through a trusted channel, because downloading it from the same release does
 not independently establish trust.
 
 The signatures are OpenSSH signatures in the `file` namespace. With the key
-and the checksum list in the current directory, this verifies the Linux list;
-use the Mac or Windows list and its `.sig` the same way:
+and the checksum list in the current directory, this verifies
+`DOWNLOADS.sha256`; verify a 2.6.0 `MACOS.sha256` or `WINDOWS.sha256` and its
+`.sig` the same way:
 
 ```bash
 printf 'release %s\n' "$(cat RELEASE-SIGNING-KEY.pub)" > allowed_signers
@@ -246,22 +229,18 @@ fingerprint. Any other namespace, key or edited list fails.
 
 The current V2 API uses source or path dependencies on the revision matching
 your CLI. The historical `1.1.0` package keeps its own V1 API. For the Linux
-and Windows 2.6.0 binaries, clone the signed release tag:
+and Mac 2.7.0 binaries, clone the signed release tag:
 
 ```bash
-git clone --branch v2.6.0 --depth 1 https://github.com/TheDarkLightX/ZenoFCIS.git ZenoFCIS
+git clone --branch v2.7.0 --depth 1 https://github.com/TheDarkLightX/ZenoFCIS.git ZenoFCIS
 git -C ZenoFCIS rev-parse HEAD
-# Expected: the source commit named on the v2.6.0 release page
+# Expected: the source commit named on the v2.7.0 release page
 zeno-fcis new my-counter --template durable-counter --source "$PWD/ZenoFCIS"
 ```
 
-For the Mac platform update, use its separately recorded build source instead:
-
-```bash
-git clone https://github.com/TheDarkLightX/ZenoFCIS.git ZenoFCIS
-git -C ZenoFCIS checkout --detach e9e381db36de6124d4d2a80861c8666f1583629d
-zeno-fcis new my-counter --template durable-counter --source "$PWD/ZenoFCIS"
-```
+A 2.6.0 binary needs its own source instead: tag `v2.6.0` for the Linux and
+Windows binaries, or the separately recorded build source
+`e9e381db36de6124d4d2a80861c8666f1583629d` for the 2.6.0 Mac platform update.
 
 The installed CLI records no build-directory location, so `new` needs an
 explicit `--source`. The generated application binds its dependencies and
@@ -269,7 +248,7 @@ lockfile to that tree; keep the source and follow the generated README. The
 historical prerelease source and binary-build revisions stay in the
 [release-candidate record](RELEASE_CANDIDATES.md).
 
-An application beside that 2.6.0 source checkout can use:
+An application beside that source checkout can use:
 
 ```toml
 [dependencies]
