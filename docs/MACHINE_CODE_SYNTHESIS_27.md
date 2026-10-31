@@ -595,8 +595,10 @@ specifications written from their meaning:
 
 The two signed saturating adds use the same specification as the 31-byte,
 7-instruction `signed-saturating-add-x86`, which stays: the contract lowering
-reproduces its problem and the search benchmark measures it. The packed add is
-the known SIMD-within-a-register technique (Dietz, 1997), not a new method.
+reproduces its problem and the search benchmark measures it. The packed add
+follows the construction in Warren, *Hacker's Delight*, 2nd edition (2013),
+section 2-18 ("Multibyte Add, Subtract, Absolute Value"); it is not a new
+method.
 Sizes are the checked costs; no speed is claimed.
 
 ```text
@@ -1646,14 +1648,14 @@ own.
   rewrite either checks equivalent or is refused for its size before checking;
   none may produce a counterexample.
 
-At this checkpoint that last test covers 10 kernels and 64 cases:
+At this checkpoint that last test covers 17 kernels and 83 cases:
 
-- the checker accepts 63 rewrites;
+- the checker accepts 82 rewrites;
 - one case needs more than 16 instructions for its constants and is refused
   before checking;
-- all 9 fully fixed cases have fewer instructions than the original kernel;
-- of the 54 partly fixed cases, 10 have fewer instructions, 24 the same number
-  and 20 more. On average a partly fixed rewrite is 8.6 bytes longer than the
+- all 16 fully fixed cases have fewer instructions than the original kernel;
+- of the 66 partly fixed cases, 11 have fewer instructions, 26 the same number
+  and 29 more. On average a partly fixed rewrite is 8.5 bytes longer than the
   original kernel.
 
 On x86, a constant that fits a sign-extended 32-bit immediate goes directly
