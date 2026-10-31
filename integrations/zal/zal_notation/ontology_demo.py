@@ -20,7 +20,7 @@ def evidence_boundary() -> dict:
     """Three independent checks on fixed, explicitly supplied model data.
 
 The small ontology is the fixed typed projection of the record's source field;
-it is not a general RDF importer. The relation checker is Crucible's existing
+it is not a general RDF importer. The relation checker is the existing
 finite one-step checker. No record field can select another checker.
     """
     model = {

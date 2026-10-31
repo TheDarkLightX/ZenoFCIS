@@ -1,4 +1,4 @@
-"""Independent sixteen-case fixture from Crucible PR44, not a native receipt.
+"""Independent sixteen-case fixture from the upstream ontology research, not a native receipt.
 
 Exact guard_fixture body retained; this test helper launches no native program.
 """
