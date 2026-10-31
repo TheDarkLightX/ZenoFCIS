@@ -160,9 +160,11 @@ embedded in ZenoFCIS values.
   `TrustedDispatcher` that dispatches the exact retained bytes of approved
   pending intents, a [runtime refinement pilot](docs/RUNTIME_REFINEMENT.md)
   checked by `contract refine-check`, and native worker isolation source with
-  explicit host checks. ZenoUI source adds grouped command forms and
-  fixed-table bindings; neither is qualified in a complete generated
-  application.
+  explicit host checks. The worker's runtime pins are described in its empty
+  launch environment, and its development-host gate passed on one Linux
+  x86-64 host; that is not installed-release qualification. ZenoUI source
+  adds grouped command forms and fixed-table bindings; neither is qualified
+  in a complete generated application.
 - Add `zeno-fcis contract postconditions`, an opt-in prototype that checks a
   proposed postcondition on the contract's committed decisions and against
   supplied faulty policies.
@@ -176,8 +178,9 @@ embedded in ZenoFCIS values.
 - `tools/atdd.py run --keep-going` records a pass, fail and blocked inventory
   with one receipt per scenario, bound to the commit and tree; `--shard I/N`
   and `--resume RUN_DIR` split and continue a run. Scenarios declare their
-  host prerequisites, and a missing one makes the scenario `blocked`, never
-  `pass`.
+  host prerequisites, such as the pinned solvers, Node.js 22, bubblewrap,
+  GNU binutils and the installed Lean toolchains, and a missing one makes the
+  scenario `blocked`, never `pass`.
 - Contract lemmas, formula probes and the postcondition screen now work on a
   contract whose text holds 4294967295; they previously refused with "has no
   free law ID". `explain --code` refuses an unregistered diagnostic code with
