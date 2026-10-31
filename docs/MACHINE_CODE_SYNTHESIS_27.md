@@ -267,10 +267,11 @@ input, through each problem's full length. Planted defects fail these tests:
 - copies not counted as holding an input;
 - a store's region-word write omitted, which fails all six memory problems.
 
-An independent review also checked every admitted form's footprint symbolically
-(59,322 profile-1 and profile-2 forms) and checked dead and order preservation
-with full-word Z3 queries on 1,245 sequences. These checks are bounded evidence,
-not a general proof.
+An independent review also checked the footprints of the 59,322 enumerated
+profile-1 and profile-2 test forms symbolically, and checked dead and order
+preservation with full-word Z3 queries on 1,245 sequences. The enumerated forms
+cover every register form but sample the large immediate values, so they are not
+every admitted encoding. These checks are bounded evidence, not a general proof.
 
 These are the semantic pruning and decomposition ideas of McSynth and McSynth++
 ([Srinivasan 2017](https://research.cs.wisc.edu/wpis/papers/tr1844.pdf);
@@ -357,9 +358,13 @@ not read a flag an earlier slot left undefined.
 
 An unsat is only as exact as the claim that the query ranges over the
 enumerator's candidate space. `tools/test_machine_code_realize.py` therefore
-checks it against exhaustive exact enumeration, in both directions. It covers
+checks it against the search's own enumerator, in both directions. That
+enumerator runs with the four pruning rules on and must exhaust its grammar with
+every checker verdict decided; its agreement with unpruned enumeration is the
+separate control [below](#search-pruning-exactness-planted-defects-and-measurement). The suite covers
 every test, library and memory-kernel problem with at most 20,000 candidate
-sequences (23 problems on all three profiles), plus six built for the test.
+sequences (23 problems on all three profiles, many sharing a specification with
+the library), plus six built for the test.
 - one whose only short program uses the palette's last form;
 - one with no program at all;
 - one with region-base writes;
@@ -371,7 +376,9 @@ For each, the enumerator must exhaust its grammar. `realize` below its least cos
 must prove every length unsat. `realize` below the least cost plus one must
 return checked bytes of exactly that cost. With no program, `realize` without a
 bound must prove every length unsat, apart from those an empty palette leaves
-without candidates. All 29 agree.
+without candidates; the no-program and empty-palette cases have no least-cost-plus-one
+check. The retained cross-check record lists 27 of the 29 configured cases, all
+agreeing in both directions; the two remaining cases have no retained record.
 
 A second control checks the admission constraints directly. With no examples
 and no bound, the set of selector sequences the query admits must equal the set
@@ -391,8 +398,10 @@ Each is detected by its intended control under `python3 -B` and `python3 -O -B`.
 replay, 2 for `inconclusive`, and 65 for refused input or an existing `--out`.
 The method is component-based synthesis by counterexample-guided refinement
 ([Gulwani, Jha, Tiwari and Venkatesan, PLDI 2011](https://www.microsoft.com/en-us/research/publication/synthesis-loop-free-programs/)),
-used here as unrealizability evidence for a finite palette, as complete
-super-optimizers do ([Lu and Bodík, OOPSLA 2025](https://lsrcz.github.io/files/OOPSLA25.pdf)).
+used here as unrealizability evidence for a finite palette, as the
+partition-based super-optimizer of [Lu and Bodík (OOPSLA 2025)](https://lsrcz.github.io/files/OOPSLA25.pdf)
+does. A time-bounded query is not complete: a spent budget or a solver `unknown`
+is reported `inconclusive`, and only a decided unsat is unrealizability evidence.
 
 #### Rule-constrained queries
 
@@ -466,7 +475,8 @@ check therefore does not assume a grid. It requires every subspace to lie in the
 palette, no two to overlap, and their sizes to add up to the whole space.
 
 The cross-check also runs in partitioned mode, with 2 groups and 4 workers, on
-the same 29 problems, and all agree. With a 1 ms probe, which splits nearly
+the same configured problems; the retained record lists the same 27, all
+agreeing. With a 1 ms probe, which splits nearly
 everything, it is cross-checked and replayed on three problems. Two more planted
 defects are detected under both modes: a partition that omits its last group,
 and an undecided subspace counted as unsat.
@@ -493,7 +503,10 @@ problem's own registers. 32 forms is the profile limit.
 | `minmax-x86` with 24 decoys (32) | 7.8 s | 7.4 s | not run | 9.0 s (probe 10 s, no split) |
 | signed saturating add with 25 decoys (32) | lengths 0 to 4 unsat; 5 to 7 time out (277.7 s) | lengths 0 to 5 unsat; 6 and 7 inconclusive at the deadline | not run | lengths 0 to 5 unsat; 6 and 7 inconclusive at the deadline |
 
-At these palette sizes, splitting does not make a decided question faster.
+At these palette sizes, splitting showed no consistent speed benefit on a
+decided question. The one exception is `minmax-x86` with 24 decoys, 7.80 s for
+the single query against 7.43 s with two groups: one paired observation on a
+loaded machine, not evidence of a reliable gain.
 
 - **Costs:** every subspace pays for building its own query, and repeats the
   counterexample rounds from the filter states. A split also discards the work
@@ -530,8 +543,10 @@ Both solvers read the same SMT-LIB text, Z3's rendering of the checker's query.
 The query is recorded by briefly replacing Z3's solver class. One lock serializes
 every such recording, so overlapping calls in one process each send their own
 query; a control interleaves two calls to show this.
-This narrows the trust placed in one solver. It does not check the instruction
-models or the encoding. On 2026-10-30 every kernel in `kernels/` (13) and
+This narrows the trust placed in one solver on the positive `equivalent`
+verdict only. It does not check the instruction models, the encoding, the
+pruning rules, a `realize` unsat, the calling-convention gate or any optimality
+claim, since cvc5 receives the same formula Z3 built. On 2026-10-30 every kernel in `kernels/` (13) and
 `memory-kernels/` (6) was confirmed. `tools/test_machine_code_second_solver.py`
 runs only when `ZENO_FCIS_CVC5` names that cvc5. A planted disagreement, where
 the query loses its assertions, is reported `inconclusive`.
@@ -651,9 +666,9 @@ python3 -B tools/test_machine_code_conformance.py
 
 It runs on Linux x86-64 with GNU `gcc`, `as`, `objcopy` and `nm`.
 
-- **What it enumerates:** every admitted x86 form. That is the seven register ALU operations over all register
-  pairs, SHL/SHR with every count, MOVABS with edge immediates, LEA over every base, index and scale, and NOP.
-  That is 4,699 forms.
+- **What it enumerates:** 4,699 profile-1 x86 test forms: the seven register ALU operations over all register
+  pairs, SHL/SHR with every count, MOVABS with sampled edge immediates, LEA over every base, index and scale, and
+  NOP. Every register form is enumerated; MOVABS immediates are sampled, so this is not every admitted encoding.
 - **Encoding and decoding:** each encoding is compared with GNU `as`, and each form must round-trip through the
   independent decoder.
 - **Execution:** each form runs from full register states, 16 by default, set with
@@ -754,8 +769,11 @@ The five that return normally:
 python3 -B -m tools.machine_qualification.abi --dir test-data/machine-code/kernels
 ```
 
-On 2026-10-30 all 13 library kernels met A-01 to A-07. The 11 x86 kernels
-conformed natively on 512 vectors each; RV64I kernels are not run here.
+On 2026-10-30 all 13 library kernels passed the A-01 to A-07 checks as the
+table states them: modelled checks for A-01 to A-06, and a stated evidence kind
+for A-07, not the design's full obligations. The 11 x86 kernels conformed
+natively on 512 vectors each; RV64I kernels are not run here. A result belongs
+to the harness revision that produced it; a later harness change needs a rerun.
 
 **Memory kernels.** Profile-3 kernels use the profiles
 `linux-x86_64-sysv-u64-region-leaf/1` and `linux-rv64-lp64-u64-region-leaf/1`.
@@ -792,8 +810,9 @@ A dropped store is reported as a region-word fault.
 python3 -B -m tools.machine_qualification.abi --dir test-data/machine-code/memory-kernels
 ```
 
-On 2026-10-30 all six memory kernels met A-01 to A-07, and the three x86
-kernels conformed natively on 512 vectors each. RV64I is not run here.
+On 2026-10-30 all six memory kernels passed the same A-01 to A-07 checks, at the
+same strength, and the three x86 kernels conformed natively on 512 vectors each.
+RV64I is not run here.
 
 The CET profile `linux-x86_64-sysv-u64-leaf-cet/1` prefixes the legacy fragment
 with `ENDBR64`. The fragment's obligations are checked, and the prefixed
@@ -1135,10 +1154,12 @@ python3 -B tools/test_machine_code_rv64i_conformance.py
   swapped conditions, the partial SETcc write, quantified entry flags, refused
   undefined-flag reads, refused parity, byte-register and width variants, and
   solver-unknown and replay-mismatch mocks.
-- **x86 conformance:** the conformance test enumerates every admitted x86 form,
-  26,254 forms in all. Of these, 19,305 are immediate forms: every 8-bit
-  immediate and ten edge 32-bit immediates for each of the eight ALU operations
-  and nine registers, and 17 edge MOV immediates for each register. Each encoding is compared with GNU `as` and round-trips
+- **x86 conformance:** the conformance test enumerates 26,254 x86 test forms:
+  every register form, and 19,305 immediate forms with every 8-bit
+  immediate, ten sampled edge 32-bit immediates for each of the eight ALU operations
+  and nine registers, and 17 sampled edge MOV immediates for each register. The
+  32-bit and 64-bit immediate domains are sampled, so the enumeration is not every
+  admitted encoding. Each encoding is compared with GNU `as` and round-trips
   through the decoder. Each form then runs on the CPU from full register states
   with CF, ZF, SF, OF, PF and AF loaded by POPFQ. All nine registers and the
   four modelled flags, read back by PUSHFQ, must equal the concrete model on every
@@ -1164,11 +1185,11 @@ python3 -B tools/test_machine_code_rv64i_conformance.py
   - every REX prefix and ModRM byte of `C7 id`, with sampled immediates.
 - **Immediate forms on this CPU:** the default 16-state run passes on an AMD
   Ryzen Threadripper 1950X. It makes 420,064 hardware comparisons with the
-  concrete model over all 26,254 forms, and every GNU `as` encoding matches the
-  encoder.
-- **Measured run:** before the ADC, SBB and MOV immediates, a 64-state run on an AMD Ryzen Threadripper 1950X compared
-  444,736 executions with the concrete model and 13,898 with the SMT model,
-  with no disagreement.
+  concrete model over the 26,254 enumerated forms, and each enumerated form's
+  encoding matches GNU `as`.
+- **Measured run:** before the ADC, SBB and MOV immediates, when the enumeration had 6,949 forms, a 64-state run on
+  an AMD Ryzen Threadripper 1950X compared 444,736 executions with the concrete model and 13,898 with the SMT
+  model, with no disagreement. That run is an earlier campaign than the 26,254-form enumeration above.
 - **Native execution:** eight kernels go through `open`, a proposal or search,
   `emit` and `replay`. Each emitted `kernel.o` is linked with a C runner whose
   expected values use 128-bit arithmetic or GCC overflow builtins. The runner
@@ -1927,7 +1948,7 @@ implementation is reused, and none of its measured results is claimed here.
 | Solver unrealizability (`realize`) | loop-free synthesis by exists-forall queries (Gulwani et al., PLDI 2011); complete space partitions ([Lu and Bodik, OOPSLA 2025](https://lsrcz.github.io/files/OOPSLA25.pdf)) |
 | Admission rules as part of correctness (profile 3) | capability-aware superoptimization ([CapOpt, OOPSLA 2026](https://2026.splashcon.org/details/oopsla-2026/107/CapOpt-Capability-aware-Superoptimization-for-Secure-and-Provably-Faster-Code), abstract); K2 (SIGCOMM 2021) |
 | Memory as word variables with stated assumptions | effect variables in [Arrival (OOPSLA 2025)](https://www.contrib.andrew.cmu.edu/~bparno/papers/arrival.pdf); STOKE's stated stack assumption |
-| Assembler cross-check of every admitted encoding | Arrival's encoding-template validation |
+| Assembler cross-check of every enumerated test form, with sampled immediates | Arrival's encoding-template validation |
 | Verifier in the loop for proposals | LPO ([Xu et al., ASPLOS 2026](https://arxiv.org/abs/2508.16125)) |
 
 **The instruction models.** The models used here were generated, then checked
