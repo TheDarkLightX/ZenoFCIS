@@ -1,8 +1,8 @@
 # ZenoFCIS feature matrix
 
-The workspace declares development version `2.7.0-rc.1`; full qualification
-is incomplete. See the [continuation guide](DEVELOPMENT_27.md) and
-[open requirements](FACTORY_GAPS_27.md). This matrix retains the `2.6.0`
+The workspace declares version `2.7.0`, the current release source. The
+[gap register](FACTORY_GAPS_27.md) records its open requirements, and the
+[continuation guide](DEVELOPMENT_27.md) explains how to continue them. This matrix retains the `2.6.0`
 umbrella API baseline. The breaking V2 API below needs a pinned source
 dependency on the matching tag, as the
 [installation guide](INSTALLATION.md) describes. The historical `1.1.0`
@@ -23,7 +23,7 @@ The 2.6.0 release has CLI downloads for Linux x86_64 GNU, Windows x64 and
 Apple-silicon macOS. The Mac platform update has a separate source pin and
 checksum file. The evidence below applies to the named host runs, not every
 version of each operating system. These artifacts do not
-qualify this 2.7 development checkout.
+qualify 2.7.0.
 
 | Evidence or capability | Linux x86_64 | macOS arm64 | Windows x64 |
 |---|---|---|---|

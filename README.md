@@ -74,10 +74,11 @@ the imperative shell. A passing stage check is not a release receipt.
 
 ## Release status
 
-This checkout declares development version **2.7.0-rc.1**. Full 2.7
-qualification is incomplete; the version string does not establish a qualified
-release candidate. The [continuation guide](docs/DEVELOPMENT_27.md) and
-[gap register](docs/FACTORY_GAPS_27.md) describe the work still required.
+This checkout is version **2.7.0**, the current release source. The
+[changelog](CHANGELOG.md) states what 2.7 adds and what it does not qualify.
+The [gap register](docs/FACTORY_GAPS_27.md) records the open requirements, and
+the [continuation guide](docs/DEVELOPMENT_27.md) explains how to continue
+them.
 
 **2.6.0** is [released](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.6.0).
 The CLI is available for Linux x86_64 GNU, Windows x64 and Apple-silicon macOS.

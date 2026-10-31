@@ -16,7 +16,7 @@ combination works.
 This design was written against main `06a74a7c0b483034c9d607153bd11fb6a95ff096`, with the
 feature inventory inspected at the 2.6 development revision
 [`eb9af7f5cbba320ca2dd172ed6d162b71d163606`](https://github.com/TheDarkLightX/ZenoFCIS/tree/eb9af7f5cbba320ca2dd172ed6d162b71d163606).
-2.6.0 has since been released. This 2.7 development checkout also contains a first experimental
+2.6.0 has since been released. ZenoFCIS 2.7.0 also contains a first experimental
 slice: the closed, offline `zeno-fcis assemble` route for two reviewed local profiles
 ([runtime assembly](RUNTIME_ASSEMBLY.md)) and a finite transport-model refinement prototype
 ([runtime refinement](RUNTIME_REFINEMENT.md)). Those documents state what is implemented and its

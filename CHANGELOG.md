@@ -4,12 +4,14 @@ All notable Rust API and packaging changes are recorded here. Canonical
 protocol compatibility is governed separately by the identifiers and versions
 embedded in ZenoFCIS values.
 
-## 2.7.0-rc.1 - Unreleased development
+## 2.7.0 - 2026-10-31
 
-- Preserve the implementation under development and its
-  [continuation guide](docs/DEVELOPMENT_27.md). Full 2.7 qualification remains
-  incomplete; this version string does not establish a qualified candidate or
-  release. The [gap register](docs/FACTORY_GAPS_27.md) records the remaining work.
+- All workspace packages are version 2.7.0. The release has open
+  requirements: the [gap register](docs/FACTORY_GAPS_27.md) states each open
+  row's current boundary and the evidence it still needs, and the
+  [continuation guide](docs/DEVELOPMENT_27.md) gives the commands to
+  reproduce and continue it. The entries that begin "Not qualified" state
+  what this release does not qualify.
 - Add experimental Python [ZAL observation contracts](docs/zal/OBSERVATION_CONTRACTS.md):
   partial-observation safety through the existing arena checker, bounded
   service and abstract event costs, complete finite paired-history comparisons,
@@ -18,15 +20,15 @@ embedded in ZenoFCIS values.
   unchanged.
 - **Breaking change for stores and adopted contracts:** a store records its
   contract identity, which ends with the evaluator digest, and that digest
-  covers the release version in the workspace and crate manifests. A build
-  from this checkout therefore refuses a store created by a 2.6.0 build of
-  the same contract for `state`, `--audit` and `--upgrade` alike, and writes
-  nothing. The refusal is named `OtherRelease`: the identities differ only in
-  the evaluator. Every other identity mismatch is still refused with
-  `Identity`. Migration steps:
+  covers the release version in the workspace and crate manifests. A 2.7.0
+  build therefore refuses a store created by a 2.6.0 build of the same
+  contract for `state`, `--audit` and `--upgrade` alike, and writes nothing.
+  The refusal is named `OtherRelease`: the identities differ only in the
+  evaluator. Every other identity mismatch is still refused with `Identity`.
+  Migration steps:
   - Keep using such a store with the 2.6.0 build that created it, or start a
-    new store with this build in a new, empty file. Upgrading 2.6.0 stores is
-    not supported.
+    new store with the 2.7.0 build in a new, empty file. Upgrading 2.6.0
+    stores is not supported.
   - A contract adopted with 2.6.0 refuses to generate and names the remedy:
     run `zeno-fcis contract refresh-receipts DIR` once. It checks every
     adoption again and changes only the checker identity in each receipt.
@@ -34,7 +36,176 @@ embedded in ZenoFCIS values.
 
   Stores created by 2.4.0 applications remain upgradable.
   `tools/check_contract_upgrade_26.py` checks both refusals against artifacts
-  made by the 2.6.0 CLI built from tag `v2.6.0`.
+  made by the 2.6.0 CLI built from tag `v2.6.0`. Until the release-independent
+  evaluator identity of gap row F27-31 exists (targeted at 2.8), every release
+  changes every contract identity and transform receipt in this way.
+
+- Add experimental [machine-code synthesis](docs/MACHINE_CODE_SYNTHESIS_27.md)
+  for straight-line x86-64 and RV64I kernels over 64-bit words. An LLM or
+  another proposer supplies raw machine bytes, or a bounded search walks the
+  problem's instruction palette. A separate byte decoder and a full-word SMT
+  check decide the declared property for every admitted input and entry
+  state, and each counterexample is replayed concretely. Emission writes the
+  bytes, a relocatable ELF object and assembly, and replay checks them again.
+  Profile 1 covers register words modulo 2^64. Profile 2 adds the CF, ZF, SF
+  and OF flags, carries, comparisons, selects, sign-extended immediates, up to
+  six inputs and two results. Profile 3 adds declared memory regions on both
+  targets. Arithmetic contracts name the meaning (modular, checked or
+  saturating) before a problem exists, and ZAL word-kernel profiles 1 and 2
+  state a kernel in controlled English and lower it to a problem.
+- Search skips only candidates that exact footprint rules show are never
+  needed (duplicates, reorderings, lost inputs and dead instructions), stops
+  at the incumbent's cost bound and offers a split search for two-result
+  kernels. When no solver answer is unknown, an exhausted search reports the
+  same optimum as full enumeration, which `--no-prune` restores. `realize`
+  asks the solver whether any admitted program below a cost bound exists in
+  the palette, in one query per length or in partitioned and adaptive
+  subspaces, and `--replay` re-establishes the whole record. `--rules`, off by
+  default, adds the search rules as selector constraints. A "no program"
+  answer holds for the stated palette, machine model and bound only; a test
+  compares `realize` with exhaustive enumeration on every test and library
+  problem small enough to enumerate. Exact specialization and per-result
+  slices are checked like any other kernel.
+- Add a checked kernel library. `library check` rechecks every entry with the
+  current checker at its recorded cost and rebuilds its object; `--native`
+  also runs each x86 entry against its reference on edge and pseudo-random
+  vectors, and `library bench` times x86 entries against GCC `-O2` code on
+  the measuring machine only. The library holds register and memory kernels
+  for both targets, plus four 256-bit kernels over four-limb regions (add,
+  subtract, unsigned and signed less-than) that were proposed rather than
+  searched. Its entries include six LLM-proposed x86-64 kernels, each checked
+  at its recorded cost: signed saturating add and signed saturating subtract,
+  each at 22 bytes and 6 instructions and at 25 bytes and 5 instructions;
+  unsigned difference-or-zero at 11 bytes and 3 instructions; and an exact
+  zero-byte mask at 30 bytes and 7 instructions.
+- `second-solver` gives the query of each library `equivalent` verdict to the
+  pinned cvc5 1.3.3, and counts the verdict as confirmed only when cvc5 also
+  answers unsat. Both solvers read the same formula, so this does not check
+  the instruction models, the encoding or the pruning rules. A
+  calling-convention gate checks kernels as leaf functions against
+  obligations A-01 to A-07, each at its stated evidence level, and a native
+  trampoline harness checks x86 kernels for preserved registers, stack,
+  return address and control state. Planted-defect campaigns cover the
+  checkers and the search pruning, and a seeded differential fuzzer covers
+  the machine-code decoders. `tools/machine_qualification/performance.py`
+  analyses supplied paired measurements under a frozen plan; it measures
+  nothing itself.
+- Not qualified for machine code: the full-state frame, fault and
+  ISA-refinement obligations; active CET and LP64D; loaded-code and
+  source/artifact correspondence; qualified embedded execution and measured
+  performance comparisons; and application integration. The RV64I forms were
+  checked against the Sail RISC-V source by transcription, not by Isla
+  traces. RV64I instruction forms run only in the machine-code CI job under
+  QEMU user mode, which is evidence about the emulator rather than RISC-V
+  hardware, and RV64I library entries report `native: not-run`. Optimality
+  claims are relative to a palette and the stated model.
+
+- Python readers of outside ZAL JSON keep each number's exact decimal value
+  or refuse it with a named reason, through one policy
+  (`integrations/zal/json_numbers.py`). It covers the generic reader, the
+  semantic and finite libraries, ladder contexts, command inputs, traces, MCP
+  and browser requests, the local agent transport and the learn, binding,
+  strategy, ladder-statement and idiom readers. Contract policy JSON admits
+  integers within i128 only, as the Rust reader does. A test fails on any
+  unlisted `json.load(s)` call. The Rust readers of ZAL JSON are targeted at
+  2.8.
+- Add the optional ZAL relational profile for finite C2 and C2mod formulas.
+  It keeps a 32-file capsule of its Haskell backend, bound to the upstream
+  revision. `qualify.py` runs an equivalent of the omitted upstream harness
+  on the current files: it builds the worker with GHC 9.4.7, checks exact
+  counts and supplied-model evaluations against an independent oracle and
+  comparisons against independent enumeration, and runs malformed-input,
+  forged-response, interruption, compiled-mutant and replay controls. An
+  independent review of the comparison procedure, the upstream
+  ladder-adapter suite, the FCIS bridge vectors and the Lean arithmetic check
+  remain open.
+- Add optional ZAL packages: a meaning and story package with typed notation
+  and Lenses on retained abstractions; a bounded finite semantic library;
+  explained ontology classification, with controlled-English rules, premise
+  explanations and six read-only operations in the ZAL MCP bridge and the
+  ontology CLI; an optional category Lens host; the finite-FSM3 authoring
+  profile; explicit app input bindings; and a finite eligibility synthesis
+  pilot. Classification does not certify behavioural relations or
+  application lowering, and native app provenance admits finite-FSM2 models
+  only. The
+  [ontology-to-arithmetic handoff](docs/ONTOLOGY_ARITHMETIC_HANDOFF.md) turns
+  DeFi classifications into source-bound U256 and I256 requirements and
+  verification tasks; it changes no production arithmetic.
+
+- Add default-off full-width values: `Value2`, codec2 and Schema2 with `U256`
+  and `I256` leaves (features `value-profile-2` and `schema-profile-2`), with
+  source-bound native tests. Verus proofs of the actual Rust bodies, under
+  stated assumptions, cover the shared limb comparator, construction, views
+  and numeric order, the public constants, conversions, checked addition,
+  subtraction and negation, `try_i128`, and the unsigned and signed multiply
+  and divide methods, including the 512- and 768-bit wrappers and the
+  unsigned `mul_div` family. See
+  [full-width numeric foundations](docs/NUMERIC_256_FOUNDATIONS_27.md). The
+  square-root family, the raw 512-bit word views, Schema2 refinement and
+  full-width programs, laws, Authority, synthesis and applications remain
+  open. Compiler and erasure correspondence is assumed.
+- Integrate checked parsing: syntax certificates whose Rust checker has
+  Verus soundness contracts (acceptance implies a complete grammar derivation
+  with ordered full token coverage), a proved correspondence between
+  diagnostic-free lexing and the original source tokens, resource preflight
+  and iterative scalar parsing. The parser proof gate checks the native
+  configuration of every bound Rust source before preparing proof tools. The
+  version 1 language and public AST APIs are unchanged. Refinement from the
+  parser to the native checker remains open.
+
+- Add experimental [runtime assembly](docs/RUNTIME_ASSEMBLY.md):
+  `zeno-fcis assemble` builds reviewed scalar examples, such as task-status,
+  from a closed, source-bound manifest, runs their journeys and packages the
+  result failure-atomically. It is not a general application framework. Add an opt-in
+  `TrustedDispatcher` that dispatches the exact retained bytes of approved
+  pending intents, a [runtime refinement pilot](docs/RUNTIME_REFINEMENT.md)
+  checked by `contract refine-check`, and native worker isolation source with
+  explicit host checks. ZenoUI source adds grouped command forms and
+  fixed-table bindings; neither is qualified in a complete generated
+  application.
+- Add `zeno-fcis contract postconditions`, an opt-in prototype that checks a
+  proposed postcondition on the contract's committed decisions and against
+  supplied faulty policies.
+- `guide` lists 41 cards; the twelve commands that had none now have cards
+  with exact commands, limits, verdicts and exit codes, and a test fails when
+  a leaf command has neither a card nor a stated exclusion.
+- `tools/binding_register.py` lists every tracked source binding with the
+  producer that rewrites it or the reason it has none, and fails on an
+  unlisted binding, an entry that matches none or a missing producer. Five
+  producers rewrite stale pins with `--write` and report them with `--check`.
+- `tools/atdd.py run --keep-going` records a pass, fail and blocked inventory
+  with one receipt per scenario, bound to the commit and tree; `--shard I/N`
+  and `--resume RUN_DIR` split and continue a run. Scenarios declare their
+  host prerequisites, and a missing one makes the scenario `blocked`, never
+  `pass`.
+- Contract lemmas, formula probes and the postcondition screen now work on a
+  contract whose text holds 4294967295; they previously refused with "has no
+  free law ID". `explain --code` refuses an unregistered diagnostic code with
+  exit 64 instead of exiting 0. Several refusals now name the field, flag,
+  file or variable involved.
+- Add fuzz targets with differential oracles for codec2 envelopes, Schema2
+  envelopes and worker channel frames. CI builds them but does not yet run
+  them for a bounded time.
+- Add designs, without implementation, for a purity check of generated
+  applications, application backup and restore, and a
+  [ZAL application bridge](docs/zal/APPLICATION_BRIDGE.md). Add research
+  prototypes for finite-local compositional safety checking and bounded
+  abstract-machine search, and a
+  [feasibility standard](docs/RESEARCH_FEASIBILITY.md) for algorithm claims.
+  None of these is a production feature.
+
+- Not qualified in 2.7.0: the open P0 rows of the gap register are
+  native-checker refinement (F27-01), worker isolation and installed routing
+  (F27-02), durable effect authority, publication and fencing (F27-03),
+  current-program subjects across consumers (F27-04), release, platform and
+  evidence closure (F27-17), which closes only with the release commit's
+  recorded evidence, and released 2.6.0 compatibility (F27-23), whose
+  documented break is described above. Every P1 and P2 row is open except
+  F27-24 (bindings) and F27-29 (command cards). In particular, the purity
+  step that generated application READMEs describe still refuses (F27-30),
+  generated applications have no verified backup and restore (F27-28), and
+  payload-carrying variants have no contract form (F27-27). Browser and TCP
+  qualification of generated applications remain separate gates.
 
 ## 2.6.0 - 2026-10-24
 

@@ -1,6 +1,6 @@
 # Full-width numeric foundations for 2.7
 
-This development checkpoint adds explicit, default-off `Value2`, codec2 and
+ZenoFCIS 2.7.0 adds explicit, default-off `Value2`, codec2 and
 Schema2 routes. It does not complete the full-width program, proof, Authority or
 application pipeline. The full requirement remains [F27-19](FACTORY_GAPS_27.md).
 

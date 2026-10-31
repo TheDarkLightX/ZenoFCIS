@@ -32,13 +32,13 @@ with [Get started](#get-started), then follow a tutorial.
   and [experiment checklist](ABSTRACT_MACHINE_DISCOVERY_27_PROGRESS.md)
 - [Computational feasibility standard for verification and synthesis research](RESEARCH_FEASIBILITY.md)
 - [Experimental machine-code synthesis and LLM proposal loops](MACHINE_CODE_SYNTHESIS_27.md)
-- 2.7.1 designs: [purity check on generated applications](PURITY_GENERATED_APPLICATIONS_27.md)
+- Designs not implemented in 2.7.0: [purity check on generated applications](PURITY_GENERATED_APPLICATIONS_27.md)
   and [application backup and verified restore](APPLICATION_BACKUP_RESTORE_27.md)
 - [Generated durable application milestone](GENERATED_APPLICATION_MILESTONE.md)
 - [Packaged application qualification](PACKAGED_APPLICATION_QUALIFICATION.md)
 - [Symbolic per-case checks](SYMBOLIC_CHECKS.md)
 - [Bounded completion and preparation](BOUNDED_COMPLETION.md)
-- [Construction from requirements (unreleased pilot)](CONSTRUCTION.md)
+- [Construction from requirements (pilot)](CONSTRUCTION.md)
 - [Wide values and larger decisions](WIDE_VALUE_EXECUTION.md): development
   profile support, capacity and assurance boundaries
 - [Finite trace-game certificates](TRACE_GAME.md)
@@ -224,9 +224,10 @@ supported V2 route.
 
 ## Status
 
-This checkout declares development version `2.7.0-rc.1`; full 2.7
-qualification remains incomplete. See the [development guide](DEVELOPMENT_27.md)
-and [gap register](FACTORY_GAPS_27.md).
+This checkout is version `2.7.0`, the current release source. The
+[changelog](../CHANGELOG.md) states what 2.7 adds and what it does not qualify;
+the [gap register](FACTORY_GAPS_27.md) records the open requirements, and the
+[continuation guide](DEVELOPMENT_27.md) explains how to continue them.
 
 The released `2.6.0` API follows the first stable V2 line, 2.3.0.
 It differs from the historical crates.io `1.1.0` API and is used from the matching `v2.6.0` source tag; see
