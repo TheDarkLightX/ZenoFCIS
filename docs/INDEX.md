@@ -7,7 +7,7 @@ with [Get started](#get-started), then follow a tutorial.
 
 - [Installation](INSTALLATION.md)
 - [Quickstart](QUICKSTART.md)
-- [ZenoFCIS 2.6.0 release notes](RELEASE_NOTES.md)
+- [ZenoFCIS release notes](RELEASE_NOTES.md): 2.7.0 and earlier
 - [Earlier public release candidates](RELEASE_CANDIDATES.md)
 - [V2 normal program API migration](V2_PROGRAM_API_MIGRATION.md)
 
