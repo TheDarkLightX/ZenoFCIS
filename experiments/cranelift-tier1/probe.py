@@ -186,11 +186,87 @@ def run(output: Path) -> dict:
     return catalog
 
 
+
+def validate_catalog_envelope(catalog: dict) -> None:
+    """Reject altered/missing baseline rows, pins or cost comparisons without Z3.
+
+    Semantic verification of every candidate and every embedded solver receipt
+    remains the separate, mandatory replay_catalog() step. Search timings and
+    a historical search stop reason are not themselves an equivalence proof.
+    """
+    if catalog.get("schema") != SCHEMA or catalog.get("authority") != "none":
+        raise ValueError("catalog schema or authority changed")
+    if (catalog.get("zenofcis_base_commit") != ZENO_BASE
+            or catalog.get("wasmtime_upstream_commit") != UPSTREAM):
+        raise ValueError("catalog source revision pins changed")
+    if (catalog.get("experiment_commit") != _git_head()):
+        raise ValueError("catalog experiment revision differs from checkout")
+    expected_sources = {}
+    expected_rows = {}
+    for name in SOURCES:
+        path = SOURCE_DIR / (name + ".json")
+        raw = path.read_bytes()
+        item = json.loads(raw)
+        if item.get("name") != name:
+            raise ValueError("baseline source identity changed")
+        contract = meaning(item["problem"])
+        code = bytes.fromhex(item["code_hex"])
+        expected_sources[name] = {"path": str(path.relative_to(ROOT)),
+                                  "file_sha256": sha(raw)}
+        expected_rows[key(contract, code)] = {
+            "name": name, "path": str(path.relative_to(ROOT)),
+            "semantic": contract, "code_hex": code.hex(),
+            "code_sha256": sha(code), "cost": item["cost"],
+        }
+    if catalog.get("source_files") != expected_sources:
+        raise ValueError("baseline input hashes or paths changed")
+    rows = catalog.get("entries")
+    if not isinstance(rows, list) or len(rows) < len(SOURCES):
+        raise ValueError("missing required baseline catalog entries")
+    rows_by_key = {row.get("key"): row for row in rows if isinstance(row, dict)}
+    if len(rows_by_key) != len(rows):
+        raise ValueError("malformed or duplicate catalog entries")
+    for identity, expected in expected_rows.items():
+        row = rows_by_key.get(identity)
+        if row is None:
+            raise ValueError("pinned source candidate omitted from catalog")
+        for field in ("semantic", "code_hex", "code_sha256", "cost"):
+            if row.get(field) != expected[field]:
+                raise ValueError(f"baseline {expected['name']} {field} changed")
+        if (row.get("verification", {}).get("status") != "equivalent"
+                or row["verification"].get("cost") != expected["cost"]):
+            raise ValueError("baseline checker receipt cost or status altered")
+        provenance = row.get("provenance")
+        if (not isinstance(provenance, list)
+                or {"name": expected["name"], "path": expected["path"]}
+                not in provenance):
+            raise ValueError("baseline provenance missing")
+    original = [json.loads((SOURCE_DIR / (name + ".json")).read_text())
+                for name in SOURCES]
+    old_cost, new_cost = original[0]["cost"], original[1]["cost"]
+    expected_comparison = {
+        "metric": "stand-alone x86 machine-code bytes including ret; NOT Cranelift native CLIF bytes",
+        "old": old_cost, "new": new_cost,
+        "native_byte_difference": old_cost["bytes"] - new_cost["bytes"],
+        "cranelift_emitted_baseline": "not measured by this Python program",
+        "cranelift_optimization": "not attempted",
+    }
+    if catalog.get("comparison") != expected_comparison:
+        raise ValueError("catalog native cost comparison or scope changed")
+    emission = catalog.get("emission")
+    if (not isinstance(emission, dict)
+            or emission.get("status") != "emitted"
+            or emission.get("replay_status") != "replayed"
+            or emission.get("artifact_relative_path") != "artifact"
+            or emission.get("emitted_sha256") not in
+            {row.get("code_sha256") for row in rows}):
+        raise ValueError("catalog emission reference inconsistent with catalog entries")
+
+
 def replay_catalog(catalog: dict) -> None:
     """Recheck every catalog row with current independent checker and source identity."""
     from tools.machine_code import session
-    if catalog.get("schema") != SCHEMA or catalog.get("authority") != "none":
-        raise ValueError("catalog schema or authority changed")
+    validate_catalog_envelope(catalog)
     if catalog["checker_source_solver_identity"] != session.identity():
         raise ValueError("checker or solver sources have changed")
     original = {n: session._validated(read_entry(SOURCE_DIR / (n + ".json")))
