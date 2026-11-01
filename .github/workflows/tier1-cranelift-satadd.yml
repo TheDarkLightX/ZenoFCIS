@@ -26,7 +26,7 @@ jobs:
           "$RUNNER_TEMP/tier1-venv/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
           echo "$RUNNER_TEMP/tier1-venv/bin" >> "$GITHUB_PATH"
       - name: Check catalog envelope and original baseline pins
-        run: python3 -B -m unittest -v experiments/cranelift-tier1/test_probe.py
+        run: python3 -B experiments/cranelift-tier1/test_probe.py
       - name: Independent Zeno profile-2 SMT checks, bounded search, emission, replay and receipt catalog
         shell: bash
         run: |
