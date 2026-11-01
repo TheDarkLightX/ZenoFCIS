@@ -42,3 +42,7 @@ For the last command, use the repository's hash-pinned Z3 wheel, as in `.github/
 4. Verify the rewrite against the relevant CLIF/ISLE semantics and current upstream VeriISLE coverage (or state unproven); compare real emitted bytes and timings with repetitions. No speculative upstream PR without a reliable saving.
 
 We have permission to edit our experimental ZenoFCIS branch only; there is no push access to `bytecodealliance/wasmtime`. Never alter ZenoFCIS `main`, the 2.7 release draft, or upstream in this experiment.
+
+## Parser feedback and reproducibility correction
+
+The earlier targeted [workflow run 41265649598](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41265649598) at source `42498b13` completed the Zeno **independent-profile** job (fresh SMT, bounded search, replay and native finite checks), but its pinned-Cranelift job **failed** with `Unknown opcode: 'icmp_imm'` in the baseline CLIF fixture (line 13). This revision expresses the same signed comparison using `iconst.i64 0` and `icmp slt`, updates the proof-to-fixture binding, and pins both experiment checkouts to the exact PR-head SHA instead of a synthetic GitHub merge commit. A passing pinned-Cranelift execution and actual byte comparison are still required; this edit itself is not evidence of either.

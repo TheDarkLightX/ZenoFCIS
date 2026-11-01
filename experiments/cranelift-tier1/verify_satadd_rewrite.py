@@ -28,10 +28,11 @@ ORIGINAL = (
     "v2, v3 = sadd_overflow v0, v1",
     "v4 = iconst.i64 9223372036854775807",
     "v5 = iconst.i64 -9223372036854775808",
-    "v6 = icmp_imm slt v0, 0",
-    "v7 = select v6, v5, v4",
-    "v8 = select v3, v7, v2",
-    "return v8",
+    "v6 = iconst.i64 0",
+    "v7 = icmp slt v0, v6",
+    "v8 = select v7, v5, v4",
+    "v9 = select v3, v8, v2",
+    "return v9",
 )
 SHIFT = (
     "v2 = iconst.i64 63",
