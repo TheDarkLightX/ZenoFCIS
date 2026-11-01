@@ -1,0 +1,92 @@
+name: tier1-cranelift-satadd-experiment
+
+on:
+  pull_request:
+    paths:
+      - "experiments/cranelift-tier1/**"
+      - ".github/workflows/tier1-cranelift-satadd.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  independent-profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout experimental branch exact PR contents
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Setup hash-pinned model checker
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/tier1-venv"
+          "$RUNNER_TEMP/tier1-venv/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          echo "$RUNNER_TEMP/tier1-venv/bin" >> "$GITHUB_PATH"
+      - name: Check catalog envelope and original baseline pins
+        run: python3 -B -m unittest -v experiments/cranelift-tier1/test_probe.py
+      - name: Independent Zeno profile-2 SMT checks, bounded search, emission, replay and receipt catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/probe.py --out "$RUNNER_TEMP/tier1-profile"
+          python3 -B experiments/cranelift-tier1/probe.py --replay "$RUNNER_TEMP/tier1-profile/catalog.json"
+      - name: Independent native target finite test
+        run: python3 -B experiments/cranelift-tier1/native_check.py --out "$RUNNER_TEMP/tier1-native"
+      - name: Preserve source identities, receipts, candidate bytes, search result and native disassembly
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-zenofcis-probe
+          path: |
+            ${{ runner.temp }}/tier1-profile
+            ${{ runner.temp }}/tier1-native
+          if-no-files-found: warn
+          retention-days: 30
+
+  pinned-cranelift-baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      CARGO_BUILD_JOBS: 4
+    steps:
+      - name: Checkout experimental source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout exact reviewed upstream Wasmtime/Cranelift revision
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Verify source identity and compile CLIF baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          mkdir -p "$RUNNER_TEMP/cranelift-results"
+          {
+            echo "Wasmtime commit: $(git -C upstream rev-parse HEAD)"
+            echo "Experiment commit: $(git rev-parse HEAD)"
+            rustc --version
+            cargo --version
+          } | tee "$RUNNER_TEMP/cranelift-results/pins.txt"
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- test "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif"
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 -D -o "$RUNNER_TEMP/cranelift-results/satadd.o" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif" | tee "$RUNNER_TEMP/cranelift-results/compile-disassembly.txt"
+          objdump -dr -Mintel "$RUNNER_TEMP/cranelift-results/satadd.o" > "$RUNNER_TEMP/cranelift-results/objdump.txt"
+          nm -S --defined-only "$RUNNER_TEMP/cranelift-results/satadd.o" | tee "$RUNNER_TEMP/cranelift-results/symbol-sizes.txt"
+          readelf -SW "$RUNNER_TEMP/cranelift-results/satadd.o" > "$RUNNER_TEMP/cranelift-results/sections.txt"
+          cp experiments/cranelift-tier1/satadd.clif "$RUNNER_TEMP/cranelift-results/satadd.clif"
+          printf '%s\n' "Baseline only: not an A/B compiler optimization and not comparable to raw fixed-register Zeno bytes." > "$RUNNER_TEMP/cranelift-results/measurement-scope.txt"
+      - name: Preserve genuine Cranelift object, target configuration, disassembly and source pin
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-cranelift-baseline
+          path: ${{ runner.temp }}/cranelift-results
+          if-no-files-found: warn
+          retention-days: 30
