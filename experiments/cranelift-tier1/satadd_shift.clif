@@ -1,0 +1,19 @@
+test compile precise-output
+set opt_level=speed_and_size
+target x86_64
+
+; Experimental, semantically equivalent CLIF formulation of signed i64
+; saturation. This does NOT inject raw x86 bytes or assume a scalar sadd_sat.
+; A 64-bit logical shift of x by 63 gives 1 for x < 0, else 0.
+; MAX + 1 wraps to MIN, so the precomputed clamp has the required sign.
+; iadd here is modular; overflow from this iadd is intentionally discarded.
+function %tier1_signed_satadd_shift(i64, i64) -> i64 {
+block0(v0: i64, v1: i64):
+    v2 = iconst.i64 63
+    v3 = ushr v0, v2
+    v4 = iconst.i64 9223372036854775807
+    v5 = iadd v4, v3
+    v6, v7 = sadd_overflow v0, v1
+    v8 = select v7, v5, v6
+    return v8
+}
