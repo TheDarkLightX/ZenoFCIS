@@ -63,7 +63,13 @@ jobs:
           ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
           path: upstream
           persist-credentials: false
-      - name: Verify source identity and compile CLIF baseline
+      - name: Setup hash-pinned independent CLIF proof solver
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/tier1-proof-venv"
+          "$RUNNER_TEMP/tier1-proof-venv/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+      - name: Prove pure-result semantics and compile identical-settings Cranelift A/B
         shell: bash
         run: |
           set -euo pipefail
@@ -74,16 +80,26 @@ jobs:
             echo "Experiment commit: $(git rev-parse HEAD)"
             rustc --version
             cargo --version
+            "$RUNNER_TEMP/tier1-proof-venv/bin/python" -c 'import z3; print("Z3:", z3.get_version_string())'
           } | tee "$RUNNER_TEMP/cranelift-results/pins.txt"
-          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- test "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif"
-          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- test "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd_run.clif"
-          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 -D -o "$RUNNER_TEMP/cranelift-results/satadd.o" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif" | tee "$RUNNER_TEMP/cranelift-results/compile-disassembly.txt"
-          objdump -dr -Mintel "$RUNNER_TEMP/cranelift-results/satadd.o" > "$RUNNER_TEMP/cranelift-results/objdump.txt"
-          nm -S --defined-only "$RUNNER_TEMP/cranelift-results/satadd.o" | tee "$RUNNER_TEMP/cranelift-results/symbol-sizes.txt"
-          readelf -SW "$RUNNER_TEMP/cranelift-results/satadd.o" > "$RUNNER_TEMP/cranelift-results/sections.txt"
-          cp experiments/cranelift-tier1/satadd.clif "$RUNNER_TEMP/cranelift-results/satadd.clif"
-          printf '%s\n' "Baseline only: not an A/B compiler optimization and not comparable to raw fixed-register Zeno bytes." > "$RUNNER_TEMP/cranelift-results/measurement-scope.txt"
-      - name: Preserve genuine Cranelift object, target configuration, disassembly and source pin
+          "$RUNNER_TEMP/tier1-proof-venv/bin/python" -B experiments/cranelift-tier1/verify_satadd_rewrite.py --out "$RUNNER_TEMP/cranelift-results/semantic-proof.json"
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- test "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd_shift.clif" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd_run.clif" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd_shift_run.clif"
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 -D -o "$RUNNER_TEMP/cranelift-results/satadd.o" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif" | tee "$RUNNER_TEMP/cranelift-results/baseline-compile.txt"
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 -D -o "$RUNNER_TEMP/cranelift-results/satadd-shift.o" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd_shift.clif" | tee "$RUNNER_TEMP/cranelift-results/candidate-compile.txt"
+          objdump -dr -Mintel "$RUNNER_TEMP/cranelift-results/satadd.o" > "$RUNNER_TEMP/cranelift-results/baseline-objdump.txt"
+          objdump -dr -Mintel "$RUNNER_TEMP/cranelift-results/satadd-shift.o" > "$RUNNER_TEMP/cranelift-results/candidate-objdump.txt"
+          nm -S --defined-only "$RUNNER_TEMP/cranelift-results/satadd.o" > "$RUNNER_TEMP/cranelift-results/baseline-symbols.txt"
+          nm -S --defined-only "$RUNNER_TEMP/cranelift-results/satadd-shift.o" > "$RUNNER_TEMP/cranelift-results/candidate-symbols.txt"
+          readelf -SW "$RUNNER_TEMP/cranelift-results/satadd.o" > "$RUNNER_TEMP/cranelift-results/baseline-sections.txt"
+          readelf -SW "$RUNNER_TEMP/cranelift-results/satadd-shift.o" > "$RUNNER_TEMP/cranelift-results/candidate-sections.txt"
+          python3 -B experiments/cranelift-tier1/measure_ab.py \
+            --baseline "$RUNNER_TEMP/cranelift-results/satadd.o" \
+            --candidate "$RUNNER_TEMP/cranelift-results/satadd-shift.o" \
+            --proof-receipt "$RUNNER_TEMP/cranelift-results/semantic-proof.json" \
+            --out "$RUNNER_TEMP/cranelift-results/ab.json"
+          cp experiments/cranelift-tier1/satadd.clif experiments/cranelift-tier1/satadd_shift.clif "$RUNNER_TEMP/cranelift-results/"
+          printf '%s\n' "Identical-settings, exact-source CLIF-only IR A/B; NOT an upstream ISLE lowering patch or Zeno raw-byte comparison." > "$RUNNER_TEMP/cranelift-results/measurement-scope.txt"
+      - name: Preserve pinned Cranelift A/B objects, SMT receipt, emitted costs and disassembly
         if: always()
         uses: actions/upload-artifact@v4
         with:
