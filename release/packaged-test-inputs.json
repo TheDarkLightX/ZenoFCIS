@@ -4,6 +4,18 @@
     {
       "package": "zeno-fcis-cli",
       "target": "bin:zeno-fcis",
+      "path": "core-components/bounded-counter/policy.json.in",
+      "sha256": "d5a3cac60bd366733c2b58d28a966133b32ad177c95bac35c2ee20563fbb5368"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "core-components/bounded-counter/project.zeno.in",
+      "sha256": "25e660942bdd6fa20f8f7d8b2df5aa97d1ef30e5322b87b416de2c7094cd4aea"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
       "path": "crates/zeno-fcis-loop-doors/tests/data/aq-k1-explicit-answers.json",
       "sha256": "be45afb7706efe889fdd42063baeb15bcb1dabf6208792111b42bf473f421e33"
     },
@@ -650,6 +662,24 @@
       "sha256": "d62441b38138b1273cace6f1a856162c7519b968a9bf697bf3c514b8d86a2432"
     },
     {
+      "package": "zeno-fcis-schema",
+      "target": "test:ontology_arithmetic_handoff",
+      "path": "test-data/ontology-arithmetic/order.tsv",
+      "sha256": "6fab3a56583246796862416a047108566c55bfab2c9ae404288945725bcddb87"
+    },
+    {
+      "package": "zeno-fcis-schema",
+      "target": "test:ontology_arithmetic_handoff",
+      "path": "test-data/ontology-arithmetic/ranges.tsv",
+      "sha256": "72cbf21c9b52dc8973e2a9487ca8e5c13164da10c038dc87190041f8baadf255"
+    },
+    {
+      "package": "zeno-fcis-schema",
+      "target": "test:ontology_arithmetic_handoff",
+      "path": "test-data/ontology-arithmetic/requirements.tsv",
+      "sha256": "ad337c41620363bf312356910be59aa6c27da2ae61285ede1de95bf949de8f82"
+    },
+    {
       "package": "zeno-fcis-shell-sqlite",
       "target": "lib:zeno_fcis_shell_sqlite",
       "path": "crates/zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs",
@@ -918,6 +948,12 @@
       "target": "test:relay",
       "path": "crates/zeno-fcis-cli/templates/durable-counter/v2/schema.zcve",
       "sha256": "3579f1978d8b6fb85b5b35cb87ce02bbd8e6cf5e843bec86edb24556584257e8"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:released_26",
+      "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted-2.5/src/v2_contract.rs",
+      "sha256": "0ffddff19820b8f2874c48cff449d48ec0b25b188a86dd978a77fe4668f52a6d"
     },
     {
       "package": "zeno-fcis-shell-sqlite",

@@ -1295,6 +1295,13 @@ REPOSITORY_INPUT_FILES = frozenset((
     "test-data/trace-games/escrow-safe/v2/policy.json",
     "tests/fixtures/repair-pre-lemma/project.zeno",
     "tests/fixtures/repair-pre-lemma/v2/policy.json",
+    # 2.7 test targets compile these component templates and ontology tables; each is still listed by target
+    # and SHA-256 in release/packaged-test-inputs.json.
+    "core-components/bounded-counter/policy.json.in",
+    "core-components/bounded-counter/project.zeno.in",
+    "test-data/ontology-arithmetic/order.tsv",
+    "test-data/ontology-arithmetic/ranges.tsv",
+    "test-data/ontology-arithmetic/requirements.tsv",
 ))
 CONSUMER_TARGET_ARGUMENTS = ("--workspace", "--lib", "--bins", "--examples", "--all-features")
 PACKAGED_TEST_ARGUMENTS = ("--workspace", "--all-targets", "--all-features")
