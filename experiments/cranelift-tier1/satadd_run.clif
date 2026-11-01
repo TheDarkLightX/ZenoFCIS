@@ -1,0 +1,28 @@
+test run
+target x86_64
+set opt_level=speed_and_size
+
+; Independently execute Cranelift's *actual* lowering of the scalar contract.
+; These are boundary samples, not a 2^128 proof or a whole-ISA specification.
+function %tier1_signed_satadd_run(i64, i64) -> i64 {
+block0(v0: i64, v1: i64):
+    v2, v3 = sadd_overflow v0, v1
+    v4 = iconst.i64 9223372036854775807
+    v5 = iconst.i64 -9223372036854775808
+    v6 = icmp_imm slt v0, 0
+    v7 = select v6, v5, v4
+    v8 = select v3, v7, v2
+    return v8
+}
+; run: %tier1_signed_satadd_run(0, 0) == 0
+; run: %tier1_signed_satadd_run(1, 2) == 3
+; run: %tier1_signed_satadd_run(-1, 1) == 0
+; run: %tier1_signed_satadd_run(-2, -3) == -5
+; run: %tier1_signed_satadd_run(9223372036854775807, 0) == 9223372036854775807
+; run: %tier1_signed_satadd_run(9223372036854775807, 1) == 9223372036854775807
+; run: %tier1_signed_satadd_run(9223372036854775807, 9223372036854775807) == 9223372036854775807
+; run: %tier1_signed_satadd_run(-9223372036854775808, 0) == -9223372036854775808
+; run: %tier1_signed_satadd_run(-9223372036854775808, -1) == -9223372036854775808
+; run: %tier1_signed_satadd_run(-9223372036854775808, -9223372036854775808) == -9223372036854775808
+; run: %tier1_signed_satadd_run(-9223372036854775808, 9223372036854775807) == -1
+; run: %tier1_signed_satadd_run(9223372036854775807, -9223372036854775808) == -1
