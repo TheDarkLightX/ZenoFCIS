@@ -76,6 +76,7 @@ jobs:
             cargo --version
           } | tee "$RUNNER_TEMP/cranelift-results/pins.txt"
           cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- test "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif"
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- test "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd_run.clif"
           cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 -D -o "$RUNNER_TEMP/cranelift-results/satadd.o" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif" | tee "$RUNNER_TEMP/cranelift-results/compile-disassembly.txt"
           objdump -dr -Mintel "$RUNNER_TEMP/cranelift-results/satadd.o" > "$RUNNER_TEMP/cranelift-results/objdump.txt"
           nm -S --defined-only "$RUNNER_TEMP/cranelift-results/satadd.o" | tee "$RUNNER_TEMP/cranelift-results/symbol-sizes.txt"
