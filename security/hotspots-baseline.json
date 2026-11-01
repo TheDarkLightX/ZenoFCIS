@@ -2623,7 +2623,7 @@
         "host-tool",
         "release-control"
       ],
-      "production_lines": 2037,
+      "production_lines": 2042,
       "rank": 21,
       "score": 91,
       "signals": [
@@ -2631,12 +2631,12 @@
           "id": "ambient-context",
           "lines": [
             686,
-            1502,
-            1724,
-            1839,
-            1894,
-            2157,
-            2187
+            1509,
+            1731,
+            1846,
+            1901,
+            2164,
+            2194
           ]
         },
         {
@@ -2649,7 +2649,7 @@
             798,
             799,
             1145,
-            1365
+            1372
           ]
         },
         {
@@ -2682,7 +2682,7 @@
           "id": "host-process-execution",
           "lines": [
             106,
-            2111
+            2118
           ]
         },
         {
@@ -2690,8 +2690,8 @@
           "lines": [
             134,
             244,
-            1405,
-            2114
+            1412,
+            2121
           ]
         },
         {
@@ -2701,20 +2701,20 @@
             823,
             1139,
             1154,
-            1794,
-            1964,
-            1989
+            1801,
+            1971,
+            1996
           ]
         },
         {
           "id": "release-or-publish",
           "lines": [
-            2022,
-            2023,
-            2095,
-            2096,
-            2101,
-            2102
+            2029,
+            2030,
+            2102,
+            2103,
+            2108,
+            2109
           ]
         }
       ],
@@ -5939,9 +5939,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 21366223,
+    "admitted_bytes": 21366646,
     "admitted_files": 1388,
-    "inventory_sha256": "c4124bdd9c07b63deda636cb95dbaa95091f2f39e07e32ff0125b720f80be116",
+    "inventory_sha256": "54b3c774a7561c89d1915fbd11d3d25f44e987331b554842edf947bfc0359628",
     "ranked_above_minimum": 1203,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
