@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# A newly amended experimental PR must not build stale, superseded A/B results.
+concurrency:
+  group: tier1-cranelift-satadd-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   independent-profile:
     runs-on: ubuntu-24.04
