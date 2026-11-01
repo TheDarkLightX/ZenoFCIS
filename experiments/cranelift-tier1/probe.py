@@ -131,15 +131,15 @@ def run(output: Path) -> dict:
                          "code_hex": code.hex(),
                          "provenance": {"kind": "human", "name": "pre-existing-library-candidate",
                                         "note": "already-published 22-byte proposal; NOT discovered by this search"}})
-    accepted = session.submit(session_dir, proposal_path, timeout_ms=10000)
+    accepted = session.submit(session_dir, proposal_path, timeout_ms=3000)
     if accepted["status"] != "equivalent":
         raise ValueError("previously checked 22-byte proposal failed fresh session")
     searched = session.search(session_dir, max_candidates=1500, max_checks=12,
                               deadline_ms=9000, timeout_ms=500, prune=True)
-    emitted = session.emit(session_dir, output / "artifact", timeout_ms=10000)
+    emitted = session.emit(session_dir, output / "artifact", timeout_ms=3000)
     if emitted.get("status") != "emitted":
         raise ValueError("no emitted artifact available for independent replay")
-    replayed = session.replay_artifact(output / "artifact", timeout_ms=10000)
+    replayed = session.replay_artifact(output / "artifact", timeout_ms=3000)
     if replayed.get("status") != "replayed":
         raise ValueError("artifact did not independently replay")
     emitted_code = (output / "artifact/kernel.bin").read_bytes()
