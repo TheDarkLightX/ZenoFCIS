@@ -9,6 +9,10 @@ on:
         description: Run the complete adopter acceptance portfolio instead of the component replay
         type: boolean
         default: false
+      scenarios:
+        description: With portfolio, run only these space-separated scenario IDs (empty runs every scenario)
+        type: string
+        default: ""
   pull_request:
   push:
     branches:
@@ -116,6 +120,34 @@ jobs:
       - name: Fetch locked crates for offline repository tools
         uses: ./.github/actions/fetch-locked-crates
 
+      - name: Fetch the published 2.6.0 executable and source for released-26-compatibility
+        # The scenario meets stores and an adoption made by the published 2.6.0 CLI. It needs that
+        # executable and an unmodified v2.6.0 checkout, kept outside this checkout, and the crates
+        # locked by 2.6.0 for its offline cargo metadata.
+        if: github.event_name != 'workflow_dispatch' || inputs.portfolio
+        run: |
+          set -euo pipefail
+          base="$RUNNER_TEMP/released-26"
+          mkdir -p "$base/download" "$base/extracted"
+          curl --fail --location --silent --show-error \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/v2.6.0/zeno-fcis-2.6.0-x86_64-unknown-linux-gnu.tar.gz" \
+            --output "$base/download/archive.tar.gz"
+          printf '%s  %s\n' 254640ea741ced298b72058f253edd410706573bed2b0609764b8f0b4a1b4a29 \
+            "$base/download/archive.tar.gz" | sha256sum --check --strict
+          tar -xzf "$base/download/archive.tar.gz" -C "$base/extracted" --no-same-owner --no-same-permissions
+          cli="$base/extracted/zeno-fcis-2.6.0-x86_64-unknown-linux-gnu/zeno-fcis"
+          test -f "$cli" && test ! -L "$cli"
+          printf '%s  %s\n' ce6f0c037c92d9c1c8ec1358e259239f133828e76f583cdc97441ee995f01227 "$cli" \
+            | sha256sum --check --strict
+          chmod 0755 "$cli"
+          git init -q "$base/v260"
+          git -C "$base/v260" fetch -q --no-tags --depth=1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            7d175c47099866939c86acd463ac85219abba882
+          git -C "$base/v260" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$base/v260" rev-parse HEAD)" = 7d175c47099866939c86acd463ac85219abba882
+          cargo +1.97.1 fetch --locked --manifest-path "$base/v260/Cargo.toml"
+          printf 'ZENO_FCIS_RELEASED_26_CLI=%s\nZENO_FCIS_RELEASED_26_SOURCE=%s\n' "$cli" "$base/v260" >> "$GITHUB_ENV"
+
       - name: Install pinned Node
         if: github.event_name != 'workflow_dispatch' || inputs.portfolio
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -207,7 +239,18 @@ jobs:
 
       - name: Run complete adopter acceptance portfolio
         if: github.event_name != 'workflow_dispatch' || inputs.portfolio
-        run: python3 tools/atdd.py run --all
+        env:
+          SCENARIOS: ${{ inputs.scenarios }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SCENARIOS:-}" ]; then
+            python3 tools/atdd.py run --all
+          else
+            # A manual run for a fix head: the listed scenarios only; the registry refuses unknown IDs.
+            for scenario in $SCENARIOS; do
+              python3 tools/atdd.py run --scenario "$scenario"
+            done
+          fi
 
       - name: Replay current component certificates
         if: github.event_name == 'workflow_dispatch' && !inputs.portfolio
