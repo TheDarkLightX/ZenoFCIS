@@ -22,7 +22,7 @@ From the ZenoFCIS checkout at the experimental branch:
 
 ```sh
 python3 -B experiments/cranelift-tier1/native_check.py --out /tmp/tier1-native
-python3 -B -m unittest -v experiments/cranelift-tier1/test_probe.py
+python3 -B experiments/cranelift-tier1/test_probe.py
 python3 -B experiments/cranelift-tier1/probe.py --out /tmp/tier1-probe
 ```
 
