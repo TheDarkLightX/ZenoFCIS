@@ -825,6 +825,42 @@
     },
     {
       "package": "zeno-fcis-shell-sqlite",
+      "target": "test:effects_fencing",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs",
+      "sha256": "77622327cec1e471a949c319d52c6e44dd8086b0ed621d40f0d8338e35ccf577"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:effects_fencing",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/v2/policy.zcve",
+      "sha256": "39651a69fdca9c9c8e48c197bb9cb5b2079bda95ba01f70b11d7f3d031d3fd4b"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:effects_fencing",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/v2/schema.zcve",
+      "sha256": "3579f1978d8b6fb85b5b35cb87ce02bbd8e6cf5e843bec86edb24556584257e8"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:effects_owner",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs",
+      "sha256": "77622327cec1e471a949c319d52c6e44dd8086b0ed621d40f0d8338e35ccf577"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:effects_owner",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/v2/policy.zcve",
+      "sha256": "39651a69fdca9c9c8e48c197bb9cb5b2079bda95ba01f70b11d7f3d031d3fd4b"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:effects_owner",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/v2/schema.zcve",
+      "sha256": "3579f1978d8b6fb85b5b35cb87ce02bbd8e6cf5e843bec86edb24556584257e8"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
       "target": "test:effects_production",
       "path": "crates/zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs",
       "sha256": "77622327cec1e471a949c319d52c6e44dd8086b0ed621d40f0d8338e35ccf577"
@@ -954,6 +990,30 @@
       "target": "test:released_26",
       "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted-2.5/src/v2_contract.rs",
       "sha256": "0ffddff19820b8f2874c48cff449d48ec0b25b188a86dd978a77fe4668f52a6d"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:released_26",
+      "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted-2.5/src/v2_contract_v1.rs",
+      "sha256": "74689a8e3075d82f61f7825bca1036a8484c7e9cfbf900f2c03085c1269309be"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:released_26",
+      "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted-2.5/v2/policy.zcve",
+      "sha256": "389436811327892a6e0bc6951f060304d6a87a8b4d16633a8a264515226e1f78"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:released_26",
+      "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted-2.5/v2/policy_v1.zcve",
+      "sha256": "6aa54c1f37a09d94765da53a2745753dbee0e8190149108ce7ddc0be10b33c39"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:released_26",
+      "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted-2.5/v2/schema.zcve",
+      "sha256": "918d51e8ad89df8d7ef7e43e6e88ace00296e0dae859725acfff6047c387a573"
     },
     {
       "package": "zeno-fcis-shell-sqlite",
