@@ -44,17 +44,35 @@ SHIFT = (
 )
 
 
+# A manual SMT model cannot validate a CLIF program that has a different
+# signature, hidden instructions, extra blocks, or a different compilation policy.
+# Pin the entire executable, non-comment structure rather than a body substring.
+EXPECTED_HEADERS = {
+    BASE: ("test compile precise-output", "set opt_level=speed_and_size",
+           "target x86_64", "function %tier1_signed_satadd(i64, i64) -> i64 {"),
+    VARIANT: ("test compile precise-output", "set opt_level=speed_and_size",
+              "target x86_64", "function %tier1_signed_satadd_shift(i64, i64) -> i64 {"),
+    "satadd_run.clif": ("test run", "target x86_64",
+                        "set opt_level=speed_and_size",
+                        "function %tier1_signed_satadd_run(i64, i64) -> i64 {"),
+    "satadd_shift_run.clif": ("test run", "set opt_level=speed_and_size",
+                              "target x86_64",
+                              "function %tier1_signed_satadd_shift_run(i64, i64) -> i64 {"),
+}
+
+
 def function_body(path: Path) -> tuple[str, ...]:
-    """Refuse any code drift not separately admitted to this semantic proof."""
-    contents = path.read_text()
-    if "target x86_64" not in contents or "set opt_level=speed_and_size" not in contents:
-        raise ValueError(f"{path.name}: target/optimization policy changed")
-    marker = "block0(v0: i64, v1: i64):"
-    if contents.count(marker) != 1:
-        raise ValueError(f"{path.name}: expected one exact two-i64 block")
-    fragment = contents.split(marker, 1)[1].split("}", 1)[0]
-    return tuple(line.strip() for line in fragment.splitlines()
-                 if line.strip() and not line.strip().startswith(";"))
+    """Refuse unmodeled executable CLIF drift, not merely expression drift."""
+    if path.name not in EXPECTED_HEADERS:
+        raise ValueError(f"{path.name}: unregistered CLIF fixture")
+    lines = tuple(line.strip() for line in path.read_text().splitlines()
+                  if line.strip() and not line.lstrip().startswith(";"))
+    expected_header = EXPECTED_HEADERS[path.name]
+    if lines[:4] != expected_header:
+        raise ValueError(f"{path.name}: exact header, function signature or ISA settings changed")
+    if lines[4:5] != ("block0(v0: i64, v1: i64):",) or lines[-1:] != ("}",):
+        raise ValueError(f"{path.name}: CLIF block/terminator or function boundaries changed")
+    return lines[5:-1]
 
 
 def ensure_source_binding() -> dict[str, str]:
