@@ -43,6 +43,14 @@ For the last command, use the repository's hash-pinned Z3 wheel, as in `.github/
 
 We have permission to edit our experimental ZenoFCIS branch only; there is no push access to `bytecodealliance/wasmtime`. Never alter ZenoFCIS `main`, the 2.7 release draft, or upstream in this experiment.
 
+## Catalog replay hardening after independent review (November 1)
+
+The original catalog replay rechecked candidate semantics but did not insist that **both original checked baseline entries** remained present, or independently verify the reported native-cost delta against those baseline inputs. A structurally well-formed but selectively edited catalog could therefore drop the 31-byte baseline or exaggerate its savings while retaining unrelated valid row receipts.
+
+The experimental runner now refuses missing pinned baselines, changed baseline file paths/hashes, altered ZenoFCIS/Wasmtime/experiment revision pins, inconsistent source provenance, tampered verification status or cost, forged native-byte deltas, and emission references that do not match cataloged code. The full replay additionally calls the existing machine-code artifact replay checker again and compares its emitted bytes with the catalog receipt. Two new dependency-free tests include a positive envelope example and six deliberate corruption/refusal controls. These **protect the research ledger**; they do not turn an unmeasured Cranelift result into a speedup.
+
+The search's recorded bounded stop reason is still a historical search observation; it is **not** re-executed deterministically during a catalog replay and is never described as a proof of global optimality. The existing native full-width SMT statements remain qualified only under their declared register-kernel model. Hosted CI for the hardened commit must be checked separately before claiming a new pass.
+
 ## Parser feedback and reproducibility correction
 
 The earlier targeted [workflow run 41265649598](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41265649598) at source `42498b13` completed the Zeno **independent-profile** job (fresh SMT, bounded search, replay and native finite checks), but its pinned-Cranelift job **failed** with `Unknown opcode: 'icmp_imm'` in the baseline CLIF fixture (line 13). This revision expresses the same signed comparison using `iconst.i64 0` and `icmp slt`, updates the proof-to-fixture binding, and pins both experiment checkouts to the exact PR-head SHA instead of a synthetic GitHub merge commit. A passing pinned-Cranelift execution and actual byte comparison are still required; this edit itself is not evidence of either.
