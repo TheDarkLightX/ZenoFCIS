@@ -229,6 +229,150 @@
       "file_sha256": "ce6f0c037c92d9c1c8ec1358e259239f133828e76f583cdc97441ee995f01227",
       "fingerprint_sha256": "e50c605d7ca584aa330f94935904f0036516ae489e0844dc04acff0ccdd3a2e3",
       "reason": "Public knowledge reasoning diagnostics and schema-field names concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "b21b086259708034eb67402793398dea4452b4349b9ab554a36bfec0a1bd5da9",
+      "reason": "Public CLI assessment and task work-budget labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "813bbffd5751d1fc327b1517c679ba797c4da304e8b5dfbdf916a18c477499bd",
+      "reason": "Public CLI knowledge-base task and proposal labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "33dfcdc1c3eac422eb9024911414a01697d4c618ee857c97d7dd480b3b57a695",
+      "reason": "Public CLI strategy task and guardian report labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "afa60c9b6b515e2e248de3ef62b20719dc086cfb5b7a709feb64912a76232813",
+      "reason": "Public CLI knowledge-base task labels (kb-task-*) concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "2c0f37af832671448482def0004fc99a9ca94fbcc8dc3235d481ebb89b6ec339",
+      "reason": "Public CLI knowledge-base task and vocabulary labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "b6aa1730a56ed06096f0a737e866df0df26cffada3e3e058a3a3736adc62aaa2",
+      "reason": "Public CLI strategy mode labels (split-by-cases, ask-when-it-matters) concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "16bd437bad60bb9c4352450ea254b89b4660afc44e2f9b4535d391c02c11c4d9",
+      "reason": "Public CLI knowledge-base task and assessment replay labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "54d404c1e73a45cfe99bceb4521841ec8b58f360ce3d16f65f2fe5ea1a75e684",
+      "reason": "Public CLI knowledge-base task budget labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "98ebfbeb150126f3b82616e2a2a72bef818f634264eae46b5c74f3c92b948146",
+      "reason": "Public CLI knowledge-base task receipt labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "2fc9968d0705f85921b5b8033d1df925b4f52b858355f811d0711791ef10d3f6",
+      "reason": "Public CLI strategy task manifest and knowledge example labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "60f072435ae0293a343efd23c36a003a04e185e8998b725d96fa878bd7d7a868",
+      "reason": "Public CLI bound task request and private-layer labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "3f0e91904233bf60b3b68b4e9a9a4247db4b84f9ef0a12ca704be2e3f2a6a7cf",
+      "reason": "Public CLI knowledge-base task subject and lesson labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.7.0-rc-bundle.zip!binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "b21b086259708034eb67402793398dea4452b4349b9ab554a36bfec0a1bd5da9",
+      "reason": "Public CLI assessment and task work-budget labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.7.0-rc-bundle.zip!binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "813bbffd5751d1fc327b1517c679ba797c4da304e8b5dfbdf916a18c477499bd",
+      "reason": "Public CLI knowledge-base task and proposal labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.7.0-rc-bundle.zip!binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "33dfcdc1c3eac422eb9024911414a01697d4c618ee857c97d7dd480b3b57a695",
+      "reason": "Public CLI strategy task and guardian report labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.7.0-rc-bundle.zip!binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "afa60c9b6b515e2e248de3ef62b20719dc086cfb5b7a709feb64912a76232813",
+      "reason": "Public CLI knowledge-base task labels (kb-task-*) concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.7.0-rc-bundle.zip!binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "2c0f37af832671448482def0004fc99a9ca94fbcc8dc3235d481ebb89b6ec339",
+      "reason": "Public CLI knowledge-base task and vocabulary labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.7.0-rc-bundle.zip!binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "b6aa1730a56ed06096f0a737e866df0df26cffada3e3e058a3a3736adc62aaa2",
+      "reason": "Public CLI strategy mode labels (split-by-cases, ask-when-it-matters) concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.7.0-rc-bundle.zip!binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "16bd437bad60bb9c4352450ea254b89b4660afc44e2f9b4535d391c02c11c4d9",
+      "reason": "Public CLI knowledge-base task and assessment replay labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.7.0-rc-bundle.zip!binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "54d404c1e73a45cfe99bceb4521841ec8b58f360ce3d16f65f2fe5ea1a75e684",
+      "reason": "Public CLI knowledge-base task budget labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.7.0-rc-bundle.zip!binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "98ebfbeb150126f3b82616e2a2a72bef818f634264eae46b5c74f3c92b948146",
+      "reason": "Public CLI knowledge-base task receipt labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.7.0-rc-bundle.zip!binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "2fc9968d0705f85921b5b8033d1df925b4f52b858355f811d0711791ef10d3f6",
+      "reason": "Public CLI strategy task manifest and knowledge example labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.7.0-rc-bundle.zip!binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "60f072435ae0293a343efd23c36a003a04e185e8998b725d96fa878bd7d7a868",
+      "reason": "Public CLI bound task request and private-layer labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.7.0-rc-bundle.zip!binaries/zeno-fcis-2.7.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.7.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "73415c4f2cead5d00814cbae89ead784413f98a1eb702c5d541cbcda51da9e45",
+      "fingerprint_sha256": "3f0e91904233bf60b3b68b4e9a9a4247db4b84f9ef0a12ca704be2e3f2a6a7cf",
+      "reason": "Public CLI knowledge-base task subject and lesson labels concatenated by the linker."
     }
   ]
 }

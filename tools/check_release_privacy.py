@@ -20,9 +20,11 @@ import check_knowledge_files as knowledge_files
 # END public knowledge example release guard.
 
 ROOT = Path(__file__).resolve().parents[1]
-MAX_FILE_BYTES = 128 * 1024 * 1024
+MAX_FILE_BYTES = 256 * 1024 * 1024
 # Resource bounds on one release-set scan. The 2.6.0 Linux set holds about 24,000 files and 331 MiB of unique
 # bytes (its bundle repeats the set); these keep about twice that headroom and still bound an archive bomb.
+# The largest single member is the uncompressed source tar: 132.9 MiB for 2.7.0, above the earlier 128 MiB file
+# bound, so the file bound now keeps about twice that.
 MAX_TOTAL_BYTES = 768 * 1024 * 1024
 MAX_FILES = 50_000
 MAX_DEPTH = 4
