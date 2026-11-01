@@ -16,6 +16,12 @@ The upstream `cranelift/codegen/src/isa/x64/lower.isle` already lowers `sadd_ove
 
 In particular, native x86 bytes, CLIF operation counts, ISLE pattern cost, and whole-function emitted byte counts are **different** metrics. The project records them separately and refuses claims of upstream savings until a real Cranelift A/B exists.
 
+## Pinned upstream VeriISLE coverage (do not overstate)
+
+At upstream commit `b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49`, the [VeriISLE README](https://github.com/bytecodealliance/wasmtime/blob/b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49/cranelift/isle/veri/README.md) expressly says x86-64 backend coverage is *not complete*; individual named x64 lowering rules may be checked by `cargo run -p cranelift-isle-veri --bin veri -- --name x64 --rule <name>`. The `opt` mid-end verifier checks named `simplify` rules but not `simplify_skeleton`. Its successful examples are evidence for *their* rule chains, not verification of the tentative multi-instruction CLIF saturating-add rewrite.
+
+Thus this checkpoint first runs a separately pinned QF_BV proof of the two **specific CLIF expression bodies** and exact Cranelift filetests. A future ISLE rewrite must be a concrete actual rule whose own VeriISLE run (if its terms are supported) is recorded, including expansion coverage, unknowns, and any unsupported predicates. The current CLIF-only A/B cannot be promoted to an ISLE soundness proof by implication.
+
 ## Reproduction
 
 From the ZenoFCIS checkout at the experimental branch:
