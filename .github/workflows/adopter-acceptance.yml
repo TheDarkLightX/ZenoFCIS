@@ -170,6 +170,26 @@ jobs:
           gcc --version | head -n 1
           ld --version | head -n 1
 
+      - name: Install pinned bubblewrap for the native worker host check
+        # native-worker-host pins /usr/bin/bwrap as a core runtime file; the image does not ship it.
+        # Ubuntu 24.04 may restrict unprivileged user namespaces. The stock bwrap profile from
+        # apparmor-profiles (disabled by default) lets bwrap create its namespaces while its children
+        # keep no capabilities; it is loaded only when the restriction is enforced.
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          sudo apt-get install --yes --no-install-recommends \
+            bubblewrap=0.9.0-1ubuntu0.3 apparmor-profiles=4.0.1really4.0.1-0ubuntu0.24.04.9
+          sha256sum --check --strict <<'SUMS'
+          e318903862396f96de3df57264e0158682b952fd3fb53ac23d876413e7b30f71  /usr/bin/bwrap
+          11d39094f044f0cda0febb3ad517b830301da6b2ce929664af09ee9e4dd264f9  /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+          SUMS
+          if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = 1 ]; then
+            sudo install -m 0644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/bwrap-userns-restrict
+            sudo apparmor_parser --replace /etc/apparmor.d/bwrap-userns-restrict
+          fi
+          /usr/bin/bwrap --version
+
       - name: Install the hash-pinned experimental machine-code checker
         if: github.event_name != 'workflow_dispatch'
         shell: bash

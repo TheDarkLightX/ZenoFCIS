@@ -307,15 +307,32 @@ def build_bounds():
     resource.setrlimit(resource.RLIMIT_AS,(6*1024**3,6*1024**3))
 
 
+def log_text(label, data, path):
+    """Decode a step log; the helper's binary end record or other non-UTF-8 output is a named refusal."""
+    try:
+        return data.decode('utf-8')
+    except UnicodeDecodeError as error:
+        if data[:8]==b'ZFNEND01' and len(data)>=20:
+            reason=data[8];code=struct.unpack_from('<i',data,12)[0]
+            raise Refusal(f'{label}: the helper wrote its binary end record (reason {reason}, exit {code}) '
+                          'instead of text; for a runtime description this means a core runtime file is '
+                          f'missing, not root-owned, writable by group or others, or over its size bound; see {path}') from error
+        raise Refusal(f'{label} wrote non-UTF-8 output at byte {error.start}; see {path}') from error
+
+
 def run(command, work, label, env, timeout=600, bounded_build=False, inherited=()):
     start=time.monotonic()
-    with (work/(label+'.log')).open('w') as log:
+    path=work/(label+'.log')
+    with path.open('w') as log:
         result=subprocess.run(command,cwd=ROOT,env=env,stdout=log,stderr=subprocess.STDOUT,
                               timeout=timeout,preexec_fn=build_bounds if bounded_build else None,pass_fds=inherited)
-    output=(work/(label+'.log')).read_text()
+    data=path.read_bytes()
     (work/(label+'.json')).write_text(json.dumps({'command':command,'exit':result.returncode,
-        'elapsed_seconds':time.monotonic()-start,'log_sha256':sha(output.encode())},indent=2)+'\n')
-    if result.returncode:raise Refusal(f'{label} failed; see {work/(label+".log")}')
+        'elapsed_seconds':time.monotonic()-start,'log_sha256':sha(data)},indent=2)+'\n')
+    output=log_text(label,data,path)
+    if result.returncode:
+        # The tail goes into the refusal so a remote run's log shows the cause.
+        raise Refusal(f'{label} failed (exit {result.returncode}): {output[-300:]!r}; see {path}')
     return output
 
 
@@ -502,7 +519,12 @@ def self_test():
     check_inventory(inventory)
     summary=f'test result: ok. {len(TESTS)} passed; 0 failed; 0 ignored;'
     check_summary(summary)
+    if log_text('text log',b'ok\n',Path('text.log'))!='ok\n':
+        raise Refusal('self-test changed a text log')
+    end_record=b'ZFNEND01'+bytes([6,0,0,0])+struct.pack('<iI',78,0)+hashlib.sha256(b'').digest()+bytes(12)
     cases=[
+        ('helper end record as a log',lambda data:log_text('runtime',data,Path('runtime.log')),end_record),
+        ('non-UTF-8 log',lambda data:log_text('runtime',data,Path('runtime.log')),b'runtime\xff'),
         ('empty runtime',runtime_rows,''),('missing runtime role',runtime_rows,'\n'.join(rows[1:])),
         ('duplicate runtime',runtime_rows,runtime+'\n'+rows[-1]),
         ('relative runtime path',runtime_rows,runtime.replace('/synthetic/python','relative')),
@@ -618,7 +640,9 @@ def main():
             failures.append({'case':prefix+'-canaries','error':'declared observations differ'})
     if failures:
         (work/'bootstrap-failures.json').write_text(json.dumps(failures,indent=2)+'\n')
-        raise Refusal(f'bootstrap corpus failed; inspect {work/"bootstrap-failures.json"}')
+        summary='; '.join(f"{failure['case']}: {failure['error'][:200]}" for failure in failures[:6])
+        raise Refusal(f'bootstrap corpus failed in {len(failures)} cases ({summary}); '
+                      f'inspect {work/"bootstrap-failures.json"}')
     base=['nice','-n','19','ionice','-c','3','cargo','+1.97.1','test','--profile','dev','--locked','--offline',
           '--jobs','1','--target','x86_64-unknown-linux-gnu','--target-dir',str(target),'-p','zeno-fcis-shell-sqlite',
           '--features','crash-injection','--test','effects_owner','native_worker_process::']
