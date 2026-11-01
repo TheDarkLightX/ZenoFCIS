@@ -170,6 +170,15 @@ jobs:
           gcc --version | head -n 1
           ld --version | head -n 1
 
+      - name: Install the hash-pinned experimental machine-code checker
+        if: github.event_name != 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv --system-site-packages "$RUNNER_TEMP/machine-code-venv"
+          "$RUNNER_TEMP/machine-code-venv/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          printf '%s\n' "$RUNNER_TEMP/machine-code-venv/bin" >> "$GITHUB_PATH"
+
       - name: Run complete adopter acceptance portfolio
         if: github.event_name != 'workflow_dispatch'
         run: python3 tools/atdd.py run --all
