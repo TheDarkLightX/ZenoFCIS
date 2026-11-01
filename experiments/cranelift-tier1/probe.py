@@ -182,7 +182,7 @@ def run(output: Path) -> dict:
                       "No claim of global optimality", "SMT under modeled profile differs from native finite tests"]
     }
     store(output / "catalog.json", catalog)
-    replay_catalog(catalog)
+    replay_catalog(catalog, output / "artifact")
     return catalog
 
 
@@ -263,7 +263,7 @@ def validate_catalog_envelope(catalog: dict) -> None:
         raise ValueError("catalog emission reference inconsistent with catalog entries")
 
 
-def replay_catalog(catalog: dict) -> None:
+def replay_catalog(catalog: dict, artifact_dir: Path | None = None) -> None:
     """Recheck every catalog row with current independent checker and source identity."""
     from tools.machine_code import session
     validate_catalog_envelope(catalog)
@@ -286,6 +286,13 @@ def replay_catalog(catalog: dict) -> None:
         verdict = session._checker(matching[0]).check(matching[0], raw, timeout_ms=10000)
         if verdict != entry["verification"] or verdict["cost"] != entry["cost"]:
             raise ValueError("fresh verification differs from receipt")
+    if artifact_dir is not None:
+        replayed = session.replay_artifact(artifact_dir, timeout_ms=3000)
+        if replayed.get("status") != "replayed":
+            raise ValueError("emitted artifact no longer independently replays")
+        code = (artifact_dir / "kernel.bin").read_bytes()
+        if sha(code) != catalog["emission"]["emitted_sha256"]:
+            raise ValueError("emitted artifact bytes differ from catalog")
 
 
 def read_entry(path: Path) -> dict:
@@ -302,7 +309,7 @@ def main() -> None:
         parser.error("choose exactly one of --out or --replay")
     try:
         if args.replay:
-            replay_catalog(json.loads(args.replay.read_text()))
+            replay_catalog(json.loads(args.replay.read_text()), args.replay.parent / "artifact")
             print(json.dumps({"status": "replayed", "catalog": str(args.replay)}))
         else:
             result = run(args.out)
