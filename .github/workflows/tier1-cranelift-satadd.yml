@@ -80,12 +80,14 @@ jobs:
             echo "Experiment commit: $(git rev-parse HEAD)"
             rustc --version
             cargo --version
+            echo 'Target: x86_64 (baseline ISA; no per-host feature selection)'
+            echo 'Compile settings: opt_level=speed_and_size (explicit CLI --set)'
             "$RUNNER_TEMP/tier1-proof-venv/bin/python" -c 'import z3; print("Z3:", z3.get_version_string())'
           } | tee "$RUNNER_TEMP/cranelift-results/pins.txt"
           "$RUNNER_TEMP/tier1-proof-venv/bin/python" -B experiments/cranelift-tier1/verify_satadd_rewrite.py --out "$RUNNER_TEMP/cranelift-results/semantic-proof.json"
           cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- test "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd_shift.clif" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd_run.clif" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd_shift_run.clif"
-          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 -D -o "$RUNNER_TEMP/cranelift-results/satadd.o" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif" | tee "$RUNNER_TEMP/cranelift-results/baseline-compile.txt"
-          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 -D -o "$RUNNER_TEMP/cranelift-results/satadd-shift.o" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd_shift.clif" | tee "$RUNNER_TEMP/cranelift-results/candidate-compile.txt"
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 --set opt_level=speed_and_size -D -o "$RUNNER_TEMP/cranelift-results/satadd.o" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif" | tee "$RUNNER_TEMP/cranelift-results/baseline-compile.txt"
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 --set opt_level=speed_and_size -D -o "$RUNNER_TEMP/cranelift-results/satadd-shift.o" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd_shift.clif" | tee "$RUNNER_TEMP/cranelift-results/candidate-compile.txt"
           objdump -dr -Mintel "$RUNNER_TEMP/cranelift-results/satadd.o" > "$RUNNER_TEMP/cranelift-results/baseline-objdump.txt"
           objdump -dr -Mintel "$RUNNER_TEMP/cranelift-results/satadd-shift.o" > "$RUNNER_TEMP/cranelift-results/candidate-objdump.txt"
           nm -S --defined-only "$RUNNER_TEMP/cranelift-results/satadd.o" > "$RUNNER_TEMP/cranelift-results/baseline-symbols.txt"
