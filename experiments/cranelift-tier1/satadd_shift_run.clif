@@ -1,0 +1,28 @@
+test run
+set opt_level=speed_and_size
+target x86_64
+
+; Boundary execution of the exact CLIF candidate; exhaustive 64-bit
+; equivalence is separately checked on its mathematical representation.
+function %tier1_signed_satadd_shift_run(i64, i64) -> i64 {
+block0(v0: i64, v1: i64):
+    v2 = iconst.i64 63
+    v3 = ushr v0, v2
+    v4 = iconst.i64 9223372036854775807
+    v5 = iadd v4, v3
+    v6, v7 = sadd_overflow v0, v1
+    v8 = select v7, v5, v6
+    return v8
+}
+; run: %tier1_signed_satadd_shift_run(0, 0) == 0
+; run: %tier1_signed_satadd_shift_run(1, 2) == 3
+; run: %tier1_signed_satadd_shift_run(-1, 1) == 0
+; run: %tier1_signed_satadd_shift_run(-2, -3) == -5
+; run: %tier1_signed_satadd_shift_run(9223372036854775807, 0) == 9223372036854775807
+; run: %tier1_signed_satadd_shift_run(9223372036854775807, 1) == 9223372036854775807
+; run: %tier1_signed_satadd_shift_run(9223372036854775807, 9223372036854775807) == 9223372036854775807
+; run: %tier1_signed_satadd_shift_run(-9223372036854775808, 0) == -9223372036854775808
+; run: %tier1_signed_satadd_shift_run(-9223372036854775808, -1) == -9223372036854775808
+; run: %tier1_signed_satadd_shift_run(-9223372036854775808, -9223372036854775808) == -9223372036854775808
+; run: %tier1_signed_satadd_shift_run(-9223372036854775808, 9223372036854775807) == -1
+; run: %tier1_signed_satadd_shift_run(9223372036854775807, -9223372036854775808) == -1

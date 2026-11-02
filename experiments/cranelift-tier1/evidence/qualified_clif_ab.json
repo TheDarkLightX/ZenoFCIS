@@ -1,0 +1,60 @@
+{
+  "schema": "zeno-fcis/cranelift-tier1-qualification-checkpoint/1",
+  "qualification_status": "qualified-measured-clif-only",
+  "date_utc": "2026-11-02",
+  "experiment_commit": "fe8a737ebdb1f9a786c318ac191505ec573d331f",
+  "zenofcis_base": "31afaef8d9fb723b44918f430e10d63f0cb93ccf",
+  "wasmtime_pin": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "ci_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41380989705",
+  "artifact_id": 13113631554,
+  "contract": "signed i64 saturating addition, two pure-result scalar CLIF expressions",
+  "target": "x86_64 baseline ISA with identical opt_level=speed_and_size",
+  "smt": {
+    "status": "unsat-counterexample-query",
+    "solver": {
+      "name": "Z3",
+      "version": "4.15.4",
+      "logic": "QF_BV",
+      "timeout_ms": 30000
+    },
+    "finite_oracle_checks": 10100,
+    "receipt_sha256": "fe7b337d9011f41ba96a42e39bf016f50c5ebbb224fa881aeaebab93e72f51f4"
+  },
+  "native_cranelift_object_execution": {
+    "status": "pass",
+    "finite_input_pairs_per_object": 250361,
+    "oracle": "unbounded Python integer clamp at signed i64 min/max"
+  },
+  "results": {
+    "baseline": {
+      "object_sha256": "fd23bd8da2b5b758112bdab485a1cd1b1f45251f7705af2cc5239fb793dff107",
+      "source_sha256": "579244793d801ad907d3edc611b156103379e4d91c68d44c6ad4226ea85312e",
+      "straight_line_code_prefix_through_ret_bytes": 46,
+      "symbol_bytes": 56,
+      "symbol_tail_bytes_after_ret": 10
+    },
+    "candidate": {
+      "object_sha256": "8b4e6f7fc04a4d028861cfcffff3b5652a6871ca7b09546dd4e4f77045605d17",
+      "source_sha256": "49c3082e64e40205d086f668f0ee43a07f708f83ecd1d3160187ce672b3f8097",
+      "straight_line_code_prefix_through_ret_bytes": 39,
+      "symbol_bytes": 39,
+      "symbol_tail_bytes_after_ret": 0
+    }
+  },
+  "delta": {
+    "whole_symbol_bytes_baseline_minus_candidate": 17,
+    "straight_line_code_bytes_baseline_minus_candidate": 7,
+    "literal_or_padding_tail_baseline_minus_candidate": 10
+  },
+  "cost_scope": "Same pinned compiler emitted function symbol, including 10 bytes baseline in-symbol tail after ret; code-prefix difference is a first-ret diagnostic for these two single-block fixtures only.",
+  "source_receipt_files": {
+    "ab_json_sha256": "f1a2a703a442e6dfe2c16f776568ad4186be166a62e41818902f8bc957ca8f6a",
+    "object_native_recheck_sha256": "2cec94c42f4b1e1cbb00e31ca7ae84a327fa8795726b0570bae76a1409169a86"
+  },
+  "nonclaims": [
+    "No compiler rewrite/ISLE patch has been implemented",
+    "CLIF form comparison alone is not a general optimizer result",
+    "No throughput or cross-target speedup",
+    "Finite binary execution is not a whole-ABI or ISA proof"
+  ]
+}

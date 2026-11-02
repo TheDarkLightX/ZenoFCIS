@@ -1,0 +1,18 @@
+test verifier
+set opt_level=speed_and_size
+target x86_64
+
+; Scalar signed i64 saturating add expressed without assuming a scalar
+; sadd_sat CLIF opcode. The 64-bit wrap result of sadd_overflow is used only
+; if its overflow flag is false.
+function %tier1_signed_satadd(i64, i64) -> i64 {
+block0(v0: i64, v1: i64):
+    v2, v3 = sadd_overflow v0, v1
+    v4 = iconst.i64 9223372036854775807
+    v5 = iconst.i64 -9223372036854775808
+    v6 = iconst.i64 0
+    v7 = icmp slt v0, v6
+    v8 = select v7, v5, v4
+    v9 = select v3, v8, v2
+    return v9
+}

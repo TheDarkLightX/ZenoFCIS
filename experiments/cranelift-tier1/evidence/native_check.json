@@ -1,0 +1,31 @@
+{
+  "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
+  "environment": {
+    "architecture": "x86_64",
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41"
+  },
+  "failures": {
+    "gcc_baseline": [],
+    "zeno_new": [],
+    "zeno_old": []
+  },
+  "input_cases": 20289,
+  "limits": "Finite native test, not a universal equivalence proof; compares to independent Python unlimited integer clamp; no claim of Cranelift emitted savings",
+  "new": {
+    "bytes": 22,
+    "sha256": "823ee5322b076a7b0a04997c0b1404e33645d58b29822a5d76cd58efad4b6425"
+  },
+  "old": {
+    "bytes": 31,
+    "sha256": "214c51e666af6d4b9370537a3a66f1a40035c3bbb0b0d3ed3430b721afd25c15"
+  },
+  "release_head": "31afaef8d9fb723b44918f430e10d63f0cb93ccf",
+  "source": "ZenoFCIS test-data/machine-code/kernels/signed-saturating-add-{,adc-}x86.json",
+  "status": "pass",
+  "target": "x86_64-sysv-register/2",
+  "vectors": {
+    "deterministic_uniform": 20000,
+    "edges": 289,
+    "seed": "0xc0ffee"
+  }
+}
