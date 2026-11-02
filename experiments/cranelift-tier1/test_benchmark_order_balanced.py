@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Positive and adversarial controls for balanced timing-row validation."""
 import copy
+import json
 import gzip
 import hashlib
-import json
 import unittest
 from pathlib import Path
 
