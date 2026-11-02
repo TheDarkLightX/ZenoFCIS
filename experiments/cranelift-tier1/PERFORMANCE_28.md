@@ -100,3 +100,38 @@ python3 -B experiments/cranelift-tier1/benchmark_order_balanced.py \
 ~~~
 
 The output is a **new host-specific screening**, not expected to reproduce the archived timing values. The original code and object SHA-256 evidence, source and solver pins, CLIF size comparisons, and unqualified ISLE status remain intact. No upstream PR, 2.7 release mutation, or broad CI run was initiated.
+
+
+## Balanced v2 cost-catalog replay (Nov 2 continuation)
+
+The earlier cost qualifier consumed **v1** timing, whose order confounding was
+subsequently established. The isolated 2.8 branch now also includes
+qualify_balanced_v2.py and test_qualify_balanced_v2.py to replay the *v2*
+ABBA/BAAB receipt as the preferred performance **observation**. It validates
+the exact uncompressed timing-file SHA-256, all 192 source-bound samples and
+block positions, the complete recorded summaries, the benchmark-source
+SHA-256 identities, the pinned host CPU and clock, original ELF-object hashes,
+the qualified Cranelift size record, and both original ELF files. It refuses
+forged performance qualification rather than inferring a speed winner.
+
+Replay using only the already committed evidence:
+
+~~~sh
+python3 -B -m unittest discover \
+  -s experiments/cranelift-tier1 \
+  -p 'test_qualify_balanced_v2.py'
+python3 -B experiments/cranelift-tier1/qualify_balanced_v2.py \
+  --size experiments/cranelift-tier1/evidence/qualified_clif_ab.json \
+  --timing experiments/cranelift-tier1/evidence/performance_balanced_v2.json.gz \
+  --objects experiments/cranelift-tier1/evidence/objects \
+  --out /tmp/tier1-v2-cost-qualification.json
+~~~
+
+In independent local execution, **11/11 new tests passed**; the existing seven
+order-replay tests also passed. The generated report preserves the *first-half*
+and *second-half* medians to expose time dependence: approximately 0.984 vs
+1.020 (non-overflow chain), 1.126 vs 0.973 (saturating chain), and 0.908 vs
+0.977 (eight chains). These are **exploratory call-level ratios**, not CPU
+latency or throughput claims; no runtime winner, Pareto dominance, or
+production-compiler improvement is qualified. The source files were committed
+to this isolated branch, not to the 2.7 release or the upstream Wasmtime repo.
