@@ -58,3 +58,45 @@ For a candidate to be called *dominant*, every objective used in the comparison 
 Before proposing an upstream rewrite, qualify the actual **same-CLIF-before/after-patched-Cranelift** path. The existing proposed mid-end ISLE rule still needs a completed, pinned compiler build/measurement and all applicable VeriISLE coverage or explicit unsupported-rule limitations. Performance work must then include carefully isolated dependency/independent-stream microbenchmarks, target CPU identification, representative Wasmtime use cases, repeated measurements with uncertainty, flags/ABI/liveness and cross-target checks. The existing [PR #175](https://github.com/TheDarkLightX/ZenoFCIS/pull/175) remains draft; no upstream Wasmtime PR or generic speed claim is justified.
 
 This continuation intentionally has **no new PR or broad CI trigger**, avoiding another repository-wide CI fan-out while the 2.8 integration destination and research workflow isolation are established.
+
+
+## Correction: prior AB/BA order bias and locally executed balanced follow-up (Nov 2)
+
+The original v1 timing harness' comment called its two-position alternating comparisons "ABBA," but its executable loop actually emits one **AB or BA pair** per round/mode. Reanalysis of the existing 17-round raw receipt, partitioning by whether the candidate ran first or second, gives the following **descriptive ratios** of candidate-time / baseline-time (NOT measured performance benefits):
+
+| Mode | Candidate first, median | Candidate second, median |
+|---|---:|---:|
+| chain_nonoverflow | 0.676 | 1.321 |
+| chain_saturating | 0.915 | 1.158 |
+| parallel8 | 0.918 | 1.065 |
+
+The massive order sensitivity for the non-overflow chain invalidates treating the former aggregate ratio of 1.116 as a stable slowdown. The existing size and pure-result equivalence proofs are unaffected.
+
+To address the methodological flaw without mutating old evidence, this separate 2.8 research branch adds:
+
+- benchmark_order_balanced.c: executable, four-position **ABBA/BAAB** alternating blocks, rotating the three workloads, no printing inside timed blocks, reuse of the exact v1 semantic oracle and workloads.
+- benchmark_order_balanced.py: rechecks the **unchanged** pinned ELF object SHA-256 values, compiles the harness, runs original Cranelift objects after symbol-name-only renaming, checks checksums and source identities, and records every position-tagged observation.
+- test_benchmark_order_balanced.py: seven locally exercised positive/tamper tests, rejecting incomplete records, incorrect candidate order, altered checksums, reordered positions, invalid times and schemas.
+- evidence/performance_balanced_v2.json.gz: the *complete*, compressed raw receipt, not merely derived medians; exact uncompressed SHA-256 2b760abd2567fa96d2c60bd51438dcb0605cb9927d3e61a7aae4d96e860da4c8, original gzip Git blob b6da9267e328a0a7712384fa8e956717eb1825f7.
+
+A **local** exploratory run on AMD EPYC 9V74 with the original pinned objects, 16 rounds and 1,600,000 calls per timed sample, generated 192 position-tagged timed samples and passed all seven new tampering checks. Its within-block balanced median candidate/baseline ratios were:
+
+| Mode | Median within-block candidate / baseline | Range of 16 block ratios |
+|---|---:|---:|
+| chain_nonoverflow | 0.993 | 0.882–1.184 |
+| chain_saturating | 1.030 | 0.727–1.842 |
+| parallel8 | 0.969 | 0.800–1.046 |
+
+The large sample ranges and uncontrolled virtualized CPU frequency/environment **still do not justify a speedup or a slowdown claim**. Neither v1 nor v2 measured pure instruction latency, peak throughput, realistic Wasmtime workload performance, or the **same-CLIF patched-vs-unpatched** compiler rewrite.
+
+To replay the recorded source, restore both exact object files under the already existing evidence/objects directory, then run:
+
+~~~sh
+python3 -B experiments/cranelift-tier1/test_benchmark_order_balanced.py
+python3 -B experiments/cranelift-tier1/benchmark_order_balanced.py \
+  --objects experiments/cranelift-tier1/evidence/objects \
+  --out /tmp/tier1-balanced-reproduction.json \
+  --calls 1600000 --rounds 16 --pin-cpu
+~~~
+
+The output is a **new host-specific screening**, not expected to reproduce the archived timing values. The original code and object SHA-256 evidence, source and solver pins, CLIF size comparisons, and unqualified ISLE status remain intact. No upstream PR, 2.7 release mutation, or broad CI run was initiated.
