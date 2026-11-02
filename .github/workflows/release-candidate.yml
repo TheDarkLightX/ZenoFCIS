@@ -83,6 +83,12 @@ jobs:
         python3 tools/rc_package.py build-host-binary --output "$RUNNER_TEMP/host" 2>&1 | tee "$RUNNER_TEMP/macos-host-build.log"
 
         '
+    - name: Record the native installed-binary journey for independent review
+      if: always()
+      run: "set -euo pipefail\ntest -f \"$RUNNER_TEMP/host/HOST-BINARY.json\"\nmkdir \"$RUNNER_TEMP/source\"\ngit\
+        \ archive --format=tar HEAD | tar -xf - -C \"$RUNNER_TEMP/source\"\npython3 tools/check_installed_cli.py\
+        \ --release \"$RUNNER_TEMP/host\" \\\n  --source \"$RUNNER_TEMP/source\" --work-dir \"$RUNNER_TEMP/journey\"\
+        \ \\\n  --report \"$RUNNER_TEMP/host/INSTALLED-JOURNEY.json\"\n"
     - name: Encrypt the diagnostic before any artifact upload
       if: always()
       env:
@@ -149,8 +155,12 @@ jobs:
         \ not a release qualification',\n        'source_commit':'4160086fb9d19f3ebe25047e69b1caa467aa74fd',\n \
         \       'tag_object':'92f6cb07c7c920d7684be772507961602e29df15',\n        'controller_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],\n\
         \        'cipher':'CMS AES-256-GCM; RSA-OAEP SHA256',\n        'certificate_sha256':sha(root/'review-recipient.crt'),\n\
-        \        'ciphertext_sha256':sha(root/'macos-review.cms'),\n        'plaintext_tar_sha256':sha(root/'macos-review.tar')}\n\
-        (root/'CAPTURE.json').write_text(json.dumps(record,indent=2)+chr(10))\nprint(json.dumps(record))\nPY\n"
+        \        'ciphertext_sha256':sha(root/'macos-review.cms'),\n        'plaintext_tar_sha256':sha(root/'macos-review.tar'),\n\
+        \        'host_bindings':{'archive':json.loads((root/'host/HOST-BINARY.json').read_text())['archive']['name'],\n\
+        \                         'archive_sha256':sha(root/'host/binaries/zeno-fcis-2.7.0-aarch64-apple-darwin.tar.gz'),\n\
+        \                         'record_sha256':sha(root/'host/HOST-BINARY.json'),\n                         'inputs_sha256':sha(root/'host/COMPILED-INPUTS-aarch64-apple-darwin.json'),\n\
+        \                         'journey_sha256':sha(root/'host/INSTALLED-JOURNEY.json')}}\n(root/'CAPTURE.json').write_text(json.dumps(record,indent=2)+chr(10))\n\
+        print(json.dumps(record))\nPY\n"
     - name: Upload only encrypted evidence and its hash record
       if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
