@@ -1,368 +1,163 @@
 name: release-candidate
-
-on:
+'on':
   workflow_dispatch:
     inputs:
       include_macos:
-        description: Add the macOS binary after native platform qualification
+        description: Capture encrypted macOS evidence from the unchanged signed 2.7.0 source
         type: boolean
         default: false
-  pull_request:
-  push:
-    branches:
-      - main
-      - "agent/**"
-    tags:
-      - "v1.0.0-rc.*"
-      - "v1.0.0"
-      - "v1.1.0"
-      - "v2.2.*"
-      - "v2.3.*"
-      - "v2.7.*"
-
 permissions:
   contents: read
-
 concurrency:
-  group: zeno-fcis-release-candidate-${{ github.ref }}
-  cancel-in-progress: true
-
+  group: zeno-fcis-macos-review-${{ github.ref }}
+  cancel-in-progress: false
 env:
-  CARGO_PROFILE_DEV_DEBUG: "0"
-  CARGO_PROFILE_TEST_DEBUG: "0"
-
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  CARGO_PROFILE_TEST_DEBUG: '0'
 jobs:
-  assemble:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    outputs:
-      checksums_sha256: ${{ steps.checksums.outputs.checksums_sha256 }}
-      archive: ${{ steps.checksums.outputs.archive }}
-      archive_sha256: ${{ steps.checksums.outputs.archive_sha256 }}
-      record_sha256: ${{ steps.checksums.outputs.record_sha256 }}
-      inputs_sha256: ${{ steps.checksums.outputs.inputs_sha256 }}
-    steps:
-      - name: Checkout exact source
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
-
-      - name: Install pinned Rust
-        run: |
-          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
-          rustup target add wasm32-unknown-unknown --toolchain 1.97.1
-
-      - name: Require tag and package version to agree
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          python3 - <<'PY'
-          import os, tomllib
-          from pathlib import Path
-          version = tomllib.loads(Path('Cargo.toml').read_text())['workspace']['package']['version']
-          expected = 'v' + version
-          actual = os.environ['GITHUB_REF_NAME']
-          if actual != expected:
-              raise SystemExit(f'release tag {actual!r} does not match package version {expected!r}')
-          PY
-
-      - name: Fetch locked crates for offline repository tools
-        uses: ./.github/actions/fetch-locked-crates
-
-      - name: Install pinned Node for JavaScript conformance
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version-file: .node-version
-
-      - name: Check hostile package mutations
-        run: |
-          python3 tools/rc_package.py self-test
-          python3 tools/test_generated_application.py
-
-      - name: Check package authority and documentation
-        run: |
-          python3 tools/rc_package.py check
-          python3 tools/check_library_docs.py
-
-      - name: Assemble exact release-candidate artifacts
-        run: python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc
-
-      - name: Verify retained checksums
-        id: checksums
-        working-directory: /tmp/zeno-fcis-rc
-        run: |
-          sha256sum --check --strict SHA256SUMS
-          echo "checksums_sha256=$(sha256sum SHA256SUMS | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
-          python3 - hosts/x86_64-unknown-linux-gnu >> "$GITHUB_OUTPUT" <<'PY'
-          import hashlib, json, sys
-          from pathlib import Path
-          folder = Path(sys.argv[1])
-          sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
-          record = json.loads((folder / 'HOST-BINARY.json').read_text())
-          archive = record['archive']['name']
-          if sha(Path('binaries') / archive) != record['archive']['sha256']:
-              raise SystemExit('the Linux archive differs from its host record')
-          print(f'archive={archive}')
-          print(f"archive_sha256={record['archive']['sha256']}")
-          print(f"record_sha256={sha(folder / 'HOST-BINARY.json')}")
-          print(f"inputs_sha256={sha(folder / 'COMPILED-INPUTS-x86_64-unknown-linux-gnu.json')}")
-          PY
-
-      - name: Upload review artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: zeno-fcis-release-candidate-${{ github.sha }}
-          path: /tmp/zeno-fcis-rc
-          if-no-files-found: error
-          retention-days: 30
-
-  macos-host-binary:
-    name: macos-host-binary (aarch64-apple-darwin)
+  macos-review:
+    name: Encrypted macOS evidence at signed v2.7.0
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.include_macos }}
     runs-on: macos-15
-    timeout-minutes: 120
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash
     env:
-      MACOSX_DEPLOYMENT_TARGET: "11.0"
-    outputs:
-      archive: ${{ steps.host.outputs.archive }}
-      archive_sha256: ${{ steps.host.outputs.archive_sha256 }}
-      record_sha256: ${{ steps.host.outputs.record_sha256 }}
-      inputs_sha256: ${{ steps.host.outputs.inputs_sha256 }}
-      journey_sha256: ${{ steps.journey.outputs.journey_sha256 }}
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
     steps:
-      - name: Checkout exact source
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
+    - name: Checkout unchanged signed release source
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      with:
+        ref: 4160086fb9d19f3ebe25047e69b1caa467aa74fd
+        persist-credentials: false
+    - name: Require exact source and published tag
+      run: 'set -euo pipefail
 
-      - name: Require and record the qualified host
-        run: |
-          test "$(uname -s)/$(uname -m)" = Darwin/arm64
-          sw_vers
-          xcodebuild -version
-          xcrun --sdk macosx --show-sdk-version
-          python3 -c 'import sys; assert sys.version_info >= (3, 11), sys.version; print(sys.version)'
+        python3 - <<''PY''
 
-      - name: Install pinned Rust
-        run: |
-          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
-          rustc +1.97.1 -vV
-          test "$(rustc +1.97.1 -vV | sed -n 's/^host: //p')" = aarch64-apple-darwin
+        import subprocess
 
-      - name: Require tag and package version to agree
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          python3 - <<'PY'
-          import os, tomllib
-          from pathlib import Path
-          version = tomllib.loads(Path('Cargo.toml').read_text())['workspace']['package']['version']
-          expected = 'v' + version
-          actual = os.environ['GITHUB_REF_NAME']
-          if actual != expected:
-              raise SystemExit(f'release tag {actual!r} does not match package version {expected!r}')
-          PY
+        expected=''4160086fb9d19f3ebe25047e69b1caa467aa74fd''
 
-      - name: Fetch locked crates for offline repository tools
-        uses: ./.github/actions/fetch-locked-crates
+        assert subprocess.check_output([''git'',''rev-parse'',''HEAD''],text=True).strip()==expected
 
-      - name: Build, archive and record the host executable
-        id: host
-        run: |
-          python3 tools/rc_package.py build-host-binary --output "$RUNNER_TEMP/host"
-          python3 - "$RUNNER_TEMP/host" >> "$GITHUB_OUTPUT" <<'PY'
-          import hashlib, json, sys
-          from pathlib import Path
-          folder = Path(sys.argv[1])
-          sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
-          record = json.loads((folder / 'HOST-BINARY.json').read_text())
-          archive = record['archive']['name']
-          if sha(folder / 'binaries' / archive) != record['archive']['sha256']:
-              raise SystemExit('the macOS archive differs from its host record')
-          print(f'archive={archive}')
-          print(f"archive_sha256={record['archive']['sha256']}")
-          print(f"record_sha256={sha(folder / 'HOST-BINARY.json')}")
-          print(f"inputs_sha256={sha(folder / 'COMPILED-INPUTS-aarch64-apple-darwin.json')}")
-          PY
+        assert not subprocess.check_output([''git'',''status'',''--porcelain=v1''],text=True)
 
-      - name: Run the installed-binary journey
-        id: journey
-        run: |
-          mkdir "$RUNNER_TEMP/source"
-          git archive --format=tar HEAD | tar -x -f - -C "$RUNNER_TEMP/source"
-          python3 tools/check_installed_cli.py \
-            --release "$RUNNER_TEMP/host" \
-            --source "$RUNNER_TEMP/source" \
-            --work-dir "$RUNNER_TEMP/journey" \
-            --report "$RUNNER_TEMP/host/INSTALLED-JOURNEY.json"
-          echo "journey_sha256=$(shasum -a 256 "$RUNNER_TEMP/host/INSTALLED-JOURNEY.json" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+        raw=subprocess.check_output([''git'',''ls-remote'',''--tags'',''origin'',''refs/tags/v2.7.0'',''refs/tags/v2.7.0^{}''],text=True)
 
-      - name: Upload host evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: zeno-fcis-host-aarch64-apple-darwin-${{ github.sha }}
-          path: ${{ runner.temp }}/host
-          if-no-files-found: error
-          retention-days: 30
+        refs={row.split()[1]:row.split()[0] for row in raw.splitlines()}
 
-      # Also after a failure, so a refused build or journey leaves its records. The attempt in the name
-      # keeps a re-run from colliding with this run's earlier upload.
-      - name: Upload the host build and journey records
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: zeno-fcis-host-records-aarch64-apple-darwin-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/host/*.json
-          if-no-files-found: warn
-          retention-days: 30
+        assert refs=={''refs/tags/v2.7.0'':''92f6cb07c7c920d7684be772507961602e29df15'',''refs/tags/v2.7.0^{}'':expected},refs
 
-  release-set:
-    needs: [assemble, macos-host-binary]
-    # A skipped, unrequested host must not block Linux. A failed requested host must.
-    if: ${{ !cancelled() && needs.assemble.result == 'success' && (needs.macos-host-binary.result == 'success' || (needs.macos-host-binary.result == 'skipped' && !(github.event_name == 'workflow_dispatch' && inputs.include_macos))) }}
-    env:
-      MAC_INCLUDED: ${{ needs.macos-host-binary.result == 'success' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout exact source
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
+        print(''Source and published signed-tag object match the frozen 2.7.0 release'')
 
-      - name: Require the checked-out commit to be the run's commit
-        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+        PY
 
-      - name: Establish contained checker runtime
-        uses: ./.github/actions/checker-containment
+        '
+    - name: Record the native qualified host
+      run: 'test "$(uname -s)/$(uname -m)" = Darwin/arm64
 
-      - name: Install pinned Rust
-        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+        sw_vers
 
-      - name: Fetch locked crates for offline repository tools
-        uses: ./.github/actions/fetch-locked-crates
+        xcodebuild -version
 
-      - name: Download the Linux release set
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: zeno-fcis-release-candidate-${{ github.sha }}
-          path: ${{ runner.temp }}/release
+        xcrun --sdk macosx --show-sdk-version
 
-      - name: Download the macOS host evidence
-        if: ${{ needs.macos-host-binary.result == 'success' }}
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: zeno-fcis-host-aarch64-apple-darwin-${{ github.sha }}
-          path: ${{ runner.temp }}/hosts/aarch64-apple-darwin
+        python3 -c "import sys; assert sys.version_info >= (3, 11); print(sys.version)"
 
-      - name: Bind downloads to the jobs that produced them
-        env:
-          LINUX_SUMS: ${{ needs.assemble.outputs.checksums_sha256 }}
-          LINUX_ARCHIVE: ${{ needs.assemble.outputs.archive }}
-          LINUX_ARCHIVE_SHA256: ${{ needs.assemble.outputs.archive_sha256 }}
-          LINUX_RECORD_SHA256: ${{ needs.assemble.outputs.record_sha256 }}
-          LINUX_INPUTS_SHA256: ${{ needs.assemble.outputs.inputs_sha256 }}
-          MAC_ARCHIVE: ${{ needs.macos-host-binary.outputs.archive }}
-          MAC_ARCHIVE_SHA256: ${{ needs.macos-host-binary.outputs.archive_sha256 }}
-          MAC_RECORD_SHA256: ${{ needs.macos-host-binary.outputs.record_sha256 }}
-          MAC_INPUTS_SHA256: ${{ needs.macos-host-binary.outputs.inputs_sha256 }}
-          MAC_JOURNEY_SHA256: ${{ needs.macos-host-binary.outputs.journey_sha256 }}
-        run: |
-          cd "$RUNNER_TEMP/release"
-          printf '%s  SHA256SUMS\n' "$LINUX_SUMS" | sha256sum --check --strict
-          sha256sum --check --strict SHA256SUMS
-          printf '%s  %s\n' \
-            "$LINUX_ARCHIVE_SHA256" "binaries/$LINUX_ARCHIVE" \
-            "$LINUX_RECORD_SHA256" hosts/x86_64-unknown-linux-gnu/HOST-BINARY.json \
-            "$LINUX_INPUTS_SHA256" hosts/x86_64-unknown-linux-gnu/COMPILED-INPUTS-x86_64-unknown-linux-gnu.json \
-            | sha256sum --check --strict
-          if [[ "$MAC_INCLUDED" == true ]]; then
-            cd "$RUNNER_TEMP/hosts/aarch64-apple-darwin"
-            printf '%s  %s\n' \
-              "$MAC_ARCHIVE_SHA256" "binaries/$MAC_ARCHIVE" \
-              "$MAC_RECORD_SHA256" HOST-BINARY.json \
-              "$MAC_INPUTS_SHA256" COMPILED-INPUTS-aarch64-apple-darwin.json \
-              "$MAC_JOURNEY_SHA256" INSTALLED-JOURNEY.json | sha256sum --check --strict
-          fi
+        '
+    - name: Install pinned Rust
+      run: 'rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
 
-      - name: Run the Linux installed-binary journey
-        id: journey
-        run: |
-          python3 tools/check_installed_cli.py \
-            --release "$RUNNER_TEMP/release" \
-            --work-dir "$RUNNER_TEMP/journey" \
-            --report "$RUNNER_TEMP/INSTALLED-JOURNEY-x86_64-unknown-linux-gnu.json"
-          echo "journey_sha256=$(sha256sum "$RUNNER_TEMP/INSTALLED-JOURNEY-x86_64-unknown-linux-gnu.json" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+        rustc +1.97.1 -vV
 
-      - name: Assemble the checked hosts into one release set
-        run: |
-          host=()
-          if [[ "$MAC_INCLUDED" == true ]]; then
-            host=(--host "$RUNNER_TEMP/hosts/aarch64-apple-darwin")
-          fi
-          python3 tools/rc_package.py merge-hosts \
-            --release "$RUNNER_TEMP/release" \
-            "${host[@]}" \
-            --journey "x86_64-unknown-linux-gnu=$RUNNER_TEMP/INSTALLED-JOURNEY-x86_64-unknown-linux-gnu.json"
+        test "$(rustc +1.97.1 -vV | sed -n ''s/^host: //p'')" = aarch64-apple-darwin
 
-      - name: Check archive-member and source custody
-        env:
-          LINUX_ARCHIVE: ${{ needs.assemble.outputs.archive }}
-          LINUX_ARCHIVE_SHA256: ${{ needs.assemble.outputs.archive_sha256 }}
-          LINUX_RECORD_SHA256: ${{ needs.assemble.outputs.record_sha256 }}
-          LINUX_INPUTS_SHA256: ${{ needs.assemble.outputs.inputs_sha256 }}
-          LINUX_JOURNEY_SHA256: ${{ steps.journey.outputs.journey_sha256 }}
-          MAC_ARCHIVE: ${{ needs.macos-host-binary.outputs.archive }}
-          MAC_ARCHIVE_SHA256: ${{ needs.macos-host-binary.outputs.archive_sha256 }}
-          MAC_RECORD_SHA256: ${{ needs.macos-host-binary.outputs.record_sha256 }}
-          MAC_INPUTS_SHA256: ${{ needs.macos-host-binary.outputs.inputs_sha256 }}
-          MAC_JOURNEY_SHA256: ${{ needs.macos-host-binary.outputs.journey_sha256 }}
-        run: |
-          mkdir "$RUNNER_TEMP/evidence"
-          python3 tools/rc_package.py downloads-list \
-            --release "$RUNNER_TEMP/release" --out "$RUNNER_TEMP/evidence/DOWNLOADS.sha256"
-          python3 - "$RUNNER_TEMP/evidence/JOB-OUTPUTS.json" <<'PY'
-          import json, os, sys
-          from pathlib import Path
-          hosts = {'x86_64-unknown-linux-gnu': 'LINUX'}
-          if os.environ['MAC_INCLUDED'] == 'true':
-              hosts['aarch64-apple-darwin'] = 'MAC'
-          fields = ('archive', 'archive_sha256', 'record_sha256', 'inputs_sha256', 'journey_sha256')
-          bindings = {host: {field: os.environ[f'{prefix}_{field.upper()}'] for field in fields}
-                      for host, prefix in hosts.items()}
-          Path(sys.argv[1]).write_text(json.dumps(bindings, indent=2, sort_keys=True) + '\n')
-          PY
-          tag=()
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then tag=(--tag "$GITHUB_REF_NAME"); fi
-          python3 tools/check_release_custody.py \
-            --release "$RUNNER_TEMP/release" \
-            --report "$RUNNER_TEMP/evidence/CUSTODY.json" \
-            --bindings "$RUNNER_TEMP/evidence/JOB-OUTPUTS.json" \
-            --downloads "$RUNNER_TEMP/evidence/DOWNLOADS.sha256" \
-            "${tag[@]}"
+        '
+    - name: Fetch locked crates from the unchanged release action
+      uses: ./.github/actions/fetch-locked-crates
+    - name: Run the unchanged host builder and retain its refusal
+      run: 'set -euo pipefail
 
-      - name: Upload the release set and its checks
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: zeno-fcis-release-set-${{ github.sha }}
-          path: |
-            ${{ runner.temp }}/release
-            ${{ runner.temp }}/evidence
-          if-no-files-found: error
-          retention-days: 30
+        python3 tools/rc_package.py build-host-binary --output "$RUNNER_TEMP/host" 2>&1 | tee "$RUNNER_TEMP/macos-host-build.log"
 
-      # Also after a failure, so a failed journey or custody check leaves its report.
-      - name: Upload the journey and custody records
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: zeno-fcis-release-records-${{ github.sha }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/INSTALLED-JOURNEY-x86_64-unknown-linux-gnu.json
-            ${{ runner.temp }}/evidence
-          if-no-files-found: warn
-          retention-days: 30
+        '
+    - name: Encrypt the diagnostic before any artifact upload
+      if: always()
+      env:
+        EVIDENCE_CERTIFICATE: '-----BEGIN CERTIFICATE-----
+
+          MIIEOTCCAqGgAwIBAgIUGK4vH1Zv1NcZliBSF9w+gMjHsMMwDQYJKoZIhvcNAQEL
+
+          BQAwLDEqMCgGA1UEAwwhWmVub0ZDSVMgbWFjT1MgZGlhZ25vc3RpYyBjYXB0dXJl
+
+          MB4XDTI2MTEwMjA1MDY0OVoXDTI2MTEwNTA1MDY0OVowLDEqMCgGA1UEAwwhWmVu
+
+          b0ZDSVMgbWFjT1MgZGlhZ25vc3RpYyBjYXB0dXJlMIIBojANBgkqhkiG9w0BAQEF
+
+          AAOCAY8AMIIBigKCAYEAs+O/Y2B/+Ac4fQ/VdubdeXrFR7CRYfHcTtSbFTfz8JZm
+
+          oLTHGsGw4SeGzDMdTOOylT5cS7bUkXLibniI7LAikdUeVD8/c5qkCXatM3nU2iy/
+
+          A79kMAz03r57spdM/ksifNVzxHfic6fdK5lOkIzjmsCgcqkvY3E3Zc4q+mdkVVfi
+
+          JkDnJLTxeREChy+bWFeCfewAE4PRzOwUbeX+8zb9Log7U4d404f4yPySJMeb7mz1
+
+          xyqv+M5sIblo+GT5DeRWMLlQov3LwoW4T2vprU0EjNginHuXTRk34tYEBWl9AQBr
+
+          eyUXaiQLCz/I+4Ko9i52pxZbOfUIPYthDEd4GelTTRySax3VfM88c9zr/gMPDUYz
+
+          qXSr712xRUJVJPk31fidb5rjuyQXP2Dz0Gtydu1xn0rWUF/4ipOUO2tIS2ESVOAC
+
+          FB4Wa1S4eb9w6aJkIEXdG89cTRAAsYArU0VXDBp9vf+ounNvpnfTcJnA2e/ydEyl
+
+          DuYcBhBSG5laDhKPIoqrAgMBAAGjUzBRMB0GA1UdDgQWBBR+tR4Ayl77yhTNTdQ5
+
+          mQgOp0XvczAfBgNVHSMEGDAWgBR+tR4Ayl77yhTNTdQ5mQgOp0XvczAPBgNVHRMB
+
+          Af8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBgQBKH6VqtHxWosxmXtvXCIPGlA9Z
+
+          OuXY9PhTVEOBIydPd/m8YAK6UpaEDX0flRlpwfXP4iYrfEjsnXlteDArSAqoocl+
+
+          LrI2xd48hm4V3bLGJoDDmAWi+qu6OddC5nLGLJqF0WSmQln/SOOyqKJ8RvzxCERT
+
+          E/DJDxlvlGX/f9hDy7dJeB2zBlpUW61LBvKp5+B21ijZ47EYPXqE0+M3sg4nMDEW
+
+          zVtSEFR1e9f4LnfLelDsjB3Bd0FKFS1oB/xUl5sqLfQk9QeUYQVAXqSzLzYEzcee
+
+          /b45S2z/1b/ioq932UhpZOiNZ2yG8Yu8H7DzHkYVWXnRssG3YVMWgftZv9uY04By
+
+          v7PX53A0grDd2vgl//pBN09FOBb3yEaR4KAdv16JM+DGCjedy9oBHG6OtIImpKHe
+
+          QnBMJ3oFlQQyVkiPk6Dp6f73jnjBtGB5BjHu/pq7rWKfzthuzwjLv96jIh7ErwmZ
+
+          0V6VKyw3Q38a7dBrbDTy+IVS8GxT0/S/ZU0El6w=
+
+          -----END CERTIFICATE-----
+
+          '
+      run: "set -euo pipefail\ntest -f \"$RUNNER_TEMP/host/HOST-BINARY.json\"\ntest -f \"$RUNNER_TEMP/host/binaries/zeno-fcis-2.7.0-aarch64-apple-darwin.tar.gz\"\
+        \ncrypto=\"$(brew --prefix openssl@3)/bin/openssl\"\ntest -x \"$crypto\"\n\"$crypto\" version\npython3 -\
+        \ <<'PY'\nimport hashlib, os\nfrom pathlib import Path\npath=Path(os.environ['RUNNER_TEMP'])/'review-recipient.crt'\n\
+        path.write_text(os.environ['EVIDENCE_CERTIFICATE'])\nassert hashlib.sha256(path.read_bytes()).hexdigest()=='a5bbc5734967ddf5627a4841cadb8a09963f876b9d031a823e50da2d38502f5c'\n\
+        PY\ntar -cf \"$RUNNER_TEMP/macos-review.tar\" -C \"$RUNNER_TEMP\" host macos-host-build.log\n\"$crypto\"\
+        \ cms -encrypt -binary -aes-256-gcm -in \"$RUNNER_TEMP/macos-review.tar\"   -outform DER -out \"$RUNNER_TEMP/macos-review.cms\"\
+        \ -recip \"$RUNNER_TEMP/review-recipient.crt\"   -keyopt rsa_padding_mode:oaep -keyopt rsa_oaep_md:sha256\
+        \ -keyopt rsa_mgf1_md:sha256\npython3 - <<'PY'\nimport hashlib, json, os\nfrom pathlib import Path\nroot=Path(os.environ['RUNNER_TEMP'])\n\
+        sha=lambda p: hashlib.sha256(p.read_bytes()).hexdigest()\nrecord={'purpose':'encrypted diagnostic capture;\
+        \ not a release qualification',\n        'source_commit':'4160086fb9d19f3ebe25047e69b1caa467aa74fd',\n \
+        \       'tag_object':'92f6cb07c7c920d7684be772507961602e29df15',\n        'controller_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],\n\
+        \        'cipher':'CMS AES-256-GCM; RSA-OAEP SHA256',\n        'certificate_sha256':sha(root/'review-recipient.crt'),\n\
+        \        'ciphertext_sha256':sha(root/'macos-review.cms'),\n        'plaintext_tar_sha256':sha(root/'macos-review.tar')}\n\
+        (root/'CAPTURE.json').write_text(json.dumps(record,indent=2)+chr(10))\nprint(json.dumps(record))\nPY\n"
+    - name: Upload only encrypted evidence and its hash record
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: zeno-fcis-macos-review-encrypted-${{ github.run_id }}
+        path: '${{ runner.temp }}/macos-review.cms
+
+          ${{ runner.temp }}/CAPTURE.json'
+        if-no-files-found: error
+        retention-days: 7
