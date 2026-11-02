@@ -1,0 +1,82 @@
+{
+  "schema": "zeno-fcis/2.8-target-cost-qualification/1",
+  "status": "code-size-qualified; runtime-exploratory-inconclusive",
+  "automatic_compiler_optimization": "not demonstrated",
+  "upstream_wasmtime_revision": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "semantic_contract": "signed i64 saturating addition, two pure-result scalar CLIF expressions",
+  "proof_scope": "pure-result QF_BV CLIF expressions; not flag, poison, ABI, ISLE-chain or machine-code proof",
+  "size_source_receipt_sha256": "6491a4a572474a0f37729d187555dd4a096650cae5fdde9f04147cdff0b30e68",
+  "timing_source_receipt_sha256": "1d9042862ae4389760f6836b415d433faff633fce9524924d6ec5710488c0527",
+  "target": "x86_64 baseline ISA with identical opt_level=speed_and_size",
+  "host": {
+    "allowed_cpu_set_before_pinning": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "kernel": "6.18.57",
+    "pinned_cpu": 0,
+    "system": "Linux"
+  },
+  "cost_dimensions": {
+    "symbol_size_bytes": "independently measured against same pinned Cranelift configuration",
+    "instruction_prefix_bytes": "single-block function prefix through first ret; diagnostic only",
+    "dependency_chain_call_ns": "exploratory wall-clock measurement; includes call and loop overhead",
+    "parallel8_call_ns": "exploratory independent-chain measurement; not peak instruction throughput"
+  },
+  "entries": [
+    {
+      "name": "baseline",
+      "object_sha256": "fd23bd8da2b5b758112bdab485a1cd1b1f45251f7705af2cc5239fb793dff107",
+      "symbol_bytes": 56,
+      "straight_line_code_prefix_bytes": 46,
+      "semantic_proof": "qualified-on-declared-CLIF-model",
+      "runtime_performance_status": "unknown"
+    },
+    {
+      "name": "candidate",
+      "object_sha256": "8b4e6f7fc04a4d028861cfcffff3b5652a6871ca7b09546dd4e4f77045605d17",
+      "symbol_bytes": 39,
+      "straight_line_code_prefix_bytes": 39,
+      "semantic_proof": "qualified-on-declared-CLIF-model",
+      "runtime_performance_status": "unknown"
+    }
+  ],
+  "size_comparison": {
+    "winner": "candidate",
+    "symbol_byte_saving": 17,
+    "prefix_byte_saving": 7
+  },
+  "runtime_observations": {
+    "chain_nonoverflow": {
+      "median_baseline_call_ns": 1.9464420833333334,
+      "median_candidate_call_ns": 2.1725854166666667,
+      "candidate_over_baseline_median_ratio": 1.1161829243570696,
+      "qualification": "exploratory-not-an-instruction-or-application-performance-claim"
+    },
+    "chain_saturating": {
+      "median_baseline_call_ns": 2.02179125,
+      "median_candidate_call_ns": 2.0758004166666666,
+      "candidate_over_baseline_median_ratio": 1.0267135228064057,
+      "qualification": "exploratory-not-an-instruction-or-application-performance-claim"
+    },
+    "parallel8": {
+      "median_baseline_call_ns": 2.2400983333333335,
+      "median_candidate_call_ns": 2.2790516666666667,
+      "candidate_over_baseline_median_ratio": 1.01738911759082,
+      "qualification": "exploratory-not-an-instruction-or-application-performance-claim"
+    }
+  },
+  "pareto_relation": "incomparable-until-application-relevant-performance-cost-is-qualified",
+  "nonclaims": [
+    "no proof of speedup",
+    "no measured hardware instruction latency",
+    "no qualified peak throughput",
+    "no verified generic ISLE rewrite",
+    "no extrapolation beyond this target or workload",
+    "no unique Pareto optimum"
+  ]
+}
