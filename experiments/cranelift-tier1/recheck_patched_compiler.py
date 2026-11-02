@@ -35,27 +35,31 @@ RANDOM_SEED = 0xC0FFEEFEB2026
 def sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
+def refuse(condition: bool, message: str) -> None:
+    if not condition:
+        raise ValueError(message)
+
 def check_artifact_identity(folder: Path) -> dict:
     report = json.loads((folder/'patched-cost.json').read_text())
     patch = json.loads((folder/'patch-receipt.json').read_text())
     proof = json.loads((folder/'rule-proof.json').read_text())
-    assert report['schema'] == 'zeno-fcis/cranelift-tier1-patched-compiler-cost/1'
-    assert report['status'] == 'measured-patched-compiler-a-b'
-    assert report['upstream_commit'] == patch['upstream_commit'] == proof['upstream_commit'] == UPSTREAM
-    assert report['rule_sha256'] == patch['rule_sha256'] == proof['rule_sha256']
-    assert patch['status'] == 'source-pinned-patch-applied'
-    assert proof['status'] == 'unsat-counterexample-query'
-    assert report['patch_receipt_sha256'] == sha((folder/'patch-receipt.json').read_bytes())
-    assert report['qf_bv_proof_sha256'] == sha((folder/'rule-proof.json').read_bytes())
-    assert report['whole_symbol_delta_old_minus_patched'] == 17
+    refuse(report['schema'] == 'zeno-fcis/cranelift-tier1-patched-compiler-cost/1', "artifact evidence identity")
+    refuse(report['status'] == 'measured-patched-compiler-a-b', "artifact evidence identity")
+    refuse(report['upstream_commit'] == patch['upstream_commit'] == proof['upstream_commit'] == UPSTREAM, "artifact evidence identity")
+    refuse(report['rule_sha256'] == patch['rule_sha256'] == proof['rule_sha256'], "artifact evidence identity")
+    refuse(patch['status'] == 'source-pinned-patch-applied', "artifact evidence identity")
+    refuse(proof['status'] == 'unsat-counterexample-query', "artifact evidence identity")
+    refuse(report['patch_receipt_sha256'] == sha((folder/'patch-receipt.json').read_bytes()), "artifact evidence identity")
+    refuse(report['qf_bv_proof_sha256'] == sha((folder/'rule-proof.json').read_bytes()), "artifact evidence identity")
+    refuse(report['whole_symbol_delta_old_minus_patched'] == 17, "artifact evidence identity")
     for name, key, sz in [('original.o','baseline',56),('patched.o','patched',39)]:
-        assert sha((folder/name).read_bytes()) == OBJECT_HASHES[name]
-        assert report[key]['object_sha256'] == OBJECT_HASHES[name]
-        assert report[key]['function']['bytes'] == sz
+        refuse(sha((folder/name).read_bytes()) == OBJECT_HASHES[name], "artifact evidence identity")
+        refuse(report[key]['object_sha256'] == OBJECT_HASHES[name], "artifact evidence identity")
+        refuse(report[key]['function']['bytes'] == sz, "artifact evidence identity")
         nm = subprocess.run(['nm','-S','--defined-only',str(folder/name)],
                             check=True,text=True,capture_output=True).stdout
         size = int(next(line.split()[1] for line in nm.splitlines() if SYMBOL in line),16)
-        assert size == sz
+        refuse(size == sz, "artifact evidence identity")
     return {'upstream_commit':UPSTREAM,'source_experiment_commit':SOURCE_EXPERIMENT,
             'rule_sha256': report['rule_sha256'], 'object_sha256':OBJECT_HASHES,
             'rule_receipt_sha256':sha((folder/'rule-proof.json').read_bytes()),
