@@ -1,0 +1,201 @@
+{
+  "schema": "zeno-fcis/macos-privacy-review/1",
+  "source_commit": "4160086fb9d19f3ebe25047e69b1caa467aa74fd",
+  "source_tree": "41871c8c2d8675b2b0cff8b87be4586a03144d4d",
+  "executable_sha256": "3ea5df333fa4fb46d436a15cd2f69ea16179223ecada3ff07702405e02a390dd",
+  "capture_run": 41393248258,
+  "capture_job": 125108985672,
+  "capture_controller": "10cf9f715f8c02dd54dcc678cd9e714eb1a18782",
+  "native_journey": "passed",
+  "reviewer": "Codex Root, authorized release operator",
+  "assessment": "All eleven matches are non-secret public task/ask, CLI effect, knowledge replay or strategy field labels concatenated by the linker. Matched bytes were inspected at the reported offsets. Exact source decompositions assisted review; they are not a semantic or ISA proof.",
+  "findings": [
+    {
+      "match_sha256": "bb93e6c016df78b960827fc270b6789c26feb512330bba2ef5f128868a205637",
+      "offset": 15763394,
+      "length": 258,
+      "source_locations": [
+        "core-components/proofs/runtime-source.json:1",
+        "crates/zeno-fcis-cli/guide-cards/program-search.txt:34",
+        "crates/zeno-fcis-cli/source-snapshots/repository/tools/runtime_assembler.py.txt:33",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/examples/strategy-example.kb.txt:164",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/examples/strategy-example.kb.txt:191",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/examples/strategy-example.kb.txt:204",
+        "crates/zeno-fcis-cli/src/knowledge_evidence.rs:124",
+        "crates/zeno-fcis-cli/src/knowledge_metrics.rs:291",
+        "crates/zeno-fcis-cli/src/knowledge_metrics.rs:293",
+        "crates/zeno-fcis-cli/src/knowledge_metrics.rs:295",
+        "crates/zeno-fcis-cli/src/knowledge_metrics.rs:322",
+        "crates/zeno-fcis-cli/src/knowledge_metrics.rs:326",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:414",
+        "crates/zeno-fcis-cli/src/knowledge_workflow.rs:75",
+        "crates/zeno-fcis-cli/src/transform_command.rs:382"
+      ]
+    },
+    {
+      "match_sha256": "11f0efc6887647bf3f3a1ecedf98f5c0dcf379ca595a0676f046452f9da5bc1a",
+      "offset": 16145632,
+      "length": 95,
+      "source_locations": [
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/repair.rs.txt:286",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:115",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:199",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:260",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:275",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:358"
+      ]
+    },
+    {
+      "match_sha256": "e67acd45546980a26c20df770095ed37c6f15dd65f1f3ee4a1b0e300e062b88d",
+      "offset": 16156034,
+      "length": 77,
+      "source_locations": [
+        ".gitattributes:1",
+        ".github/miri-exclusions.json:417",
+        "CHANGELOG.md:1391",
+        "CHANGELOG.md:520",
+        "acceptance/features/loop_doors.feature:36",
+        "crates/zeno-fcis-cli/src/knowledge_store.rs:81",
+        "crates/zeno-fcis-cli/src/loop_doors_command.rs:2888",
+        "crates/zeno-fcis-cli/src/loop_doors_command.rs:699"
+      ]
+    },
+    {
+      "match_sha256": "93d47224f8595214751be7957d9bc705fe077c697ec4dc061172fdb6d179aa9e",
+      "offset": 16157629,
+      "length": 138,
+      "source_locations": [
+        "CHANGELOG.md:59",
+        "acceptance/features/typed_loop_strategies.feature:34",
+        "crates/zeno-fcis-cli/guide-cards/loop-strategy.txt:19",
+        "crates/zeno-fcis-cli/guide-cards/loop-strategy.txt:36",
+        "crates/zeno-fcis-cli/src/loop_strategy_profiles.rs:115",
+        "crates/zeno-fcis-cli/src/loop_strategy_profiles.rs:33",
+        "crates/zeno-fcis-cli/src/loop_strategy_profiles.rs:342",
+        "integrations/zal/loop_composable.py:148",
+        "tools/check_public_docs.py:12",
+        "tools/loop_strategy_reference.py:280",
+        "tools/quantity_arithmetic_reference.py:48"
+      ]
+    },
+    {
+      "match_sha256": "8ecd520b23c92020b082656ef48d0246f0e17df31581acd299ac0c85c7975a9d",
+      "offset": 20709155,
+      "length": 258,
+      "source_locations": [
+        ".gitattributes:2",
+        ".github/workflows/adopter-acceptance.yml:226",
+        "core-apps/zenodex-spot/proofs/ExactValue.lean:411",
+        "core-apps/zusd-v1/tools/check_command_refinement.py:102",
+        "crates/zeno-fcis-cli/src/knowledge_growth_tests.rs:54",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:231",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:234",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:289",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:295",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:379",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:613",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:675",
+        "release/privacy-allowlist.json:255",
+        "tools/check_kb_assessment.py:44",
+        "tools/loop_completion_controls.py:236",
+        "verification/lean/CollectionsAggregate.lean:73"
+      ]
+    },
+    {
+      "match_sha256": "849968fcae529fb92430858a587f144f44b76bf696a97e919398233fc449040a",
+      "offset": 20709592,
+      "length": 52,
+      "source_locations": [
+        ".github/miri-exclusions.json:2",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:162",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:204",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:218"
+      ]
+    },
+    {
+      "match_sha256": "063cc17e3b63daf8cd2359872506df54cb5456c3bb3eb26cd66c65900260f02d",
+      "offset": 20709670,
+      "length": 129,
+      "source_locations": [
+        ".github/workflows/miri.yml:18",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:128",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:172",
+        "crates/zeno-fcis-cli/src/knowledge_replay.rs:189",
+        "crates/zeno-fcis-cli/src/optimize_command.rs:191",
+        "crates/zeno-fcis-cli/src/optimize_command.rs:219",
+        "crates/zeno-fcis-cli/src/optimize_command.rs:232",
+        "crates/zeno-fcis-cli/src/optimize_command.rs:234",
+        "crates/zeno-fcis-cli/src/optimize_command.rs:240"
+      ]
+    },
+    {
+      "match_sha256": "4de2e8b485b4ffe28994066918e288c5e6386b0fb2ea85b7160057eabcddd26e",
+      "offset": 23807358,
+      "length": 258,
+      "source_locations": [
+        "crates/zeno-fcis-cli/src/effects.rs:663",
+        "crates/zeno-fcis-cli/src/effects.rs:666",
+        "crates/zeno-fcis-cli/src/effects.rs:672",
+        "crates/zeno-fcis-cli/src/effects.rs:673",
+        "crates/zeno-fcis-cli/src/effects.rs:675",
+        "crates/zeno-fcis-cli/src/effects.rs:676",
+        "crates/zeno-fcis-cli/src/effects.rs:679",
+        "crates/zeno-fcis-cli/src/effects.rs:680",
+        "crates/zeno-fcis-cli/src/effects.rs:684",
+        "crates/zeno-fcis-cli/src/effects.rs:814",
+        "security/reviews/v1/workspace-final.log:81"
+      ]
+    },
+    {
+      "match_sha256": "a493e042ee9533cd11272fcfdce52b87b8ee05b8d1df7a7ae108a0d136409844",
+      "offset": 23807966,
+      "length": 258,
+      "source_locations": [
+        "crates/zeno-fcis-cli/src/effects.rs:954",
+        "crates/zeno-fcis-cli/src/effects.rs:956",
+        "crates/zeno-fcis-cli/src/effects.rs:957",
+        "crates/zeno-fcis-cli/src/effects.rs:960",
+        "crates/zeno-fcis-cli/src/effects.rs:961",
+        "crates/zeno-fcis-cli/src/effects.rs:962",
+        "crates/zeno-fcis-cli/src/effects.rs:963",
+        "crates/zeno-fcis-cli/src/effects.rs:964",
+        "crates/zeno-fcis-cli/src/effects.rs:965",
+        "crates/zeno-fcis-cli/src/effects.rs:969"
+      ]
+    },
+    {
+      "match_sha256": "e2fb839213b97eb42de760d475c9cefa7d9b685c9a0e9f0364fa287909d569e7",
+      "offset": 25294629,
+      "length": 75,
+      "source_locations": [
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:238",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:270",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:354",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:494",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:570"
+      ]
+    },
+    {
+      "match_sha256": "4d88c75425e5375207b3744cff980c1d8775df123063ef172065e7948eb37170",
+      "offset": 25301266,
+      "length": 258,
+      "source_locations": [
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:315",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:326",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:329",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:391",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:397",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:515",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:516",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:517",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:527",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:530",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:547",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:558",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:566",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:580",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt:8"
+      ]
+    }
+  ]
+}

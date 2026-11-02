@@ -3,171 +3,80 @@ name: release-candidate
   workflow_dispatch:
     inputs:
       include_macos:
-        description: Capture encrypted macOS evidence from the unchanged signed 2.7.0 source
+        description: Assemble the reviewed Linux and natively qualified macOS artifacts at signed v2.7.0
         type: boolean
         default: false
 permissions:
   contents: read
+  actions: read
 concurrency:
-  group: zeno-fcis-macos-review-${{ github.ref }}
+  group: zeno-fcis-release-recovery-${{ github.ref }}
   cancel-in-progress: false
 env:
   CARGO_PROFILE_DEV_DEBUG: '0'
   CARGO_PROFILE_TEST_DEBUG: '0'
 jobs:
-  macos-review:
-    name: Encrypted macOS evidence at signed v2.7.0
+  release-set:
+    name: Qualify reviewed Linux and native macOS release set
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.include_macos }}
-    runs-on: macos-15
-    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
     defaults:
       run:
         shell: bash
-    env:
-      MACOSX_DEPLOYMENT_TARGET: '11.0'
     steps:
     - name: Checkout unchanged signed release source
       uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
       with:
         ref: 4160086fb9d19f3ebe25047e69b1caa467aa74fd
         persist-credentials: false
-    - name: Require exact source and published tag
-      run: 'set -euo pipefail
-
-        python3 - <<''PY''
-
-        import subprocess
-
-        expected=''4160086fb9d19f3ebe25047e69b1caa467aa74fd''
-
-        assert subprocess.check_output([''git'',''rev-parse'',''HEAD''],text=True).strip()==expected
-
-        assert not subprocess.check_output([''git'',''status'',''--porcelain=v1''],text=True)
-
-        raw=subprocess.check_output([''git'',''ls-remote'',''--tags'',''origin'',''refs/tags/v2.7.0'',''refs/tags/v2.7.0^{}''],text=True)
-
-        refs={row.split()[1]:row.split()[0] for row in raw.splitlines()}
-
-        assert refs=={''refs/tags/v2.7.0'':''92f6cb07c7c920d7684be772507961602e29df15'',''refs/tags/v2.7.0^{}'':expected},refs
-
-        print(''Source and published signed-tag object match the frozen 2.7.0 release'')
-
-        PY
-
-        '
-    - name: Record the native qualified host
-      run: 'test "$(uname -s)/$(uname -m)" = Darwin/arm64
-
-        sw_vers
-
-        xcodebuild -version
-
-        xcrun --sdk macosx --show-sdk-version
-
-        python3 -c "import sys; assert sys.version_info >= (3, 11); print(sys.version)"
-
-        '
-    - name: Install pinned Rust
-      run: 'rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
-
-        rustc +1.97.1 -vV
-
-        test "$(rustc +1.97.1 -vV | sed -n ''s/^host: //p'')" = aarch64-apple-darwin
-
-        '
-    - name: Fetch locked crates from the unchanged release action
+    - name: Pin the signed source and load the separate recovery controller
+      run: "set -euo pipefail\ntest \"$(git rev-parse HEAD)\" = 4160086fb9d19f3ebe25047e69b1caa467aa74fd\ngit fetch\
+        \ --no-tags --depth=1 origin refs/tags/v2.7.0:refs/tags/v2.7.0\ntest \"$(git rev-parse refs/tags/v2.7.0)\"\
+        \ = 92f6cb07c7c920d7684be772507961602e29df15\ntest \"$(git rev-parse 'v2.7.0^{}')\" = 4160086fb9d19f3ebe25047e69b1caa467aa74fd\n\
+        git fetch --no-tags --depth=1 origin \"$GITHUB_SHA\"\nmkdir \"$RUNNER_TEMP/recovery\"\nfor item in recover.py\
+        \ privacy-allowlist.json MACOS-PRIVACY-REVIEW.json recipient.crt; do\n  git show \"$GITHUB_SHA:ci/release270/$item\"\
+        \ > \"$RUNNER_TEMP/recovery/$item\"\ndone\ntest \"$(git rev-parse HEAD)\" = 4160086fb9d19f3ebe25047e69b1caa467aa74fd\n"
+    - name: Establish contained checker runtime
+      uses: ./.github/actions/checker-containment
+    - name: Install pinned Rust for custody metadata
+      run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+    - name: Fetch locked crate archives for compiled-input custody
       uses: ./.github/actions/fetch-locked-crates
-    - name: Run the unchanged host builder and retain its refusal
-      run: 'set -euo pipefail
-
-        python3 tools/rc_package.py build-host-binary --output "$RUNNER_TEMP/host" 2>&1 | tee "$RUNNER_TEMP/macos-host-build.log"
-
-        '
-    - name: Record the native installed-binary journey for independent review
-      if: always()
-      run: "set -euo pipefail\ntest -f \"$RUNNER_TEMP/host/HOST-BINARY.json\"\nmkdir \"$RUNNER_TEMP/source\"\ngit\
-        \ archive --format=tar HEAD | tar -xf - -C \"$RUNNER_TEMP/source\"\npython3 tools/check_installed_cli.py\
-        \ --release \"$RUNNER_TEMP/host\" \\\n  --source \"$RUNNER_TEMP/source\" --work-dir \"$RUNNER_TEMP/journey\"\
-        \ \\\n  --report \"$RUNNER_TEMP/host/INSTALLED-JOURNEY.json\"\n"
-    - name: Encrypt the diagnostic before any artifact upload
-      if: always()
+    - name: Download the qualified Linux set at the release commit
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        name: zeno-fcis-release-set-4160086fb9d19f3ebe25047e69b1caa467aa74fd
+        run-id: 41384803560
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path: ${{ runner.temp }}/linux-qualified
+    - name: Download the encrypted native macOS evidence
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        name: zeno-fcis-macos-review-encrypted-41393248258
+        run-id: 41393248258
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path: ${{ runner.temp }}/macos-capture
+    - name: Verify native receipts, apply reviewed exact exceptions and require all eleven custody checks
       env:
-        EVIDENCE_CERTIFICATE: '-----BEGIN CERTIFICATE-----
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CAPTURE_DECRYPTION_KEY: ${{ secrets.ZENOFCIS_270_MACOS_CAPTURE_A5BBC573 }}
+      run: python3 -B "$RUNNER_TEMP/recovery/recover.py" --linux "$RUNNER_TEMP/linux-qualified" --capture "$RUNNER_TEMP/macos-capture"
+        --output "$RUNNER_TEMP/joined"
+    - name: Upload the checked two-host release set
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: zeno-fcis-release-set-4160086fb9d19f3ebe25047e69b1caa467aa74fd
+        path: '${{ runner.temp }}/joined/release
 
-          MIIEOTCCAqGgAwIBAgIUGK4vH1Zv1NcZliBSF9w+gMjHsMMwDQYJKoZIhvcNAQEL
-
-          BQAwLDEqMCgGA1UEAwwhWmVub0ZDSVMgbWFjT1MgZGlhZ25vc3RpYyBjYXB0dXJl
-
-          MB4XDTI2MTEwMjA1MDY0OVoXDTI2MTEwNTA1MDY0OVowLDEqMCgGA1UEAwwhWmVu
-
-          b0ZDSVMgbWFjT1MgZGlhZ25vc3RpYyBjYXB0dXJlMIIBojANBgkqhkiG9w0BAQEF
-
-          AAOCAY8AMIIBigKCAYEAs+O/Y2B/+Ac4fQ/VdubdeXrFR7CRYfHcTtSbFTfz8JZm
-
-          oLTHGsGw4SeGzDMdTOOylT5cS7bUkXLibniI7LAikdUeVD8/c5qkCXatM3nU2iy/
-
-          A79kMAz03r57spdM/ksifNVzxHfic6fdK5lOkIzjmsCgcqkvY3E3Zc4q+mdkVVfi
-
-          JkDnJLTxeREChy+bWFeCfewAE4PRzOwUbeX+8zb9Log7U4d404f4yPySJMeb7mz1
-
-          xyqv+M5sIblo+GT5DeRWMLlQov3LwoW4T2vprU0EjNginHuXTRk34tYEBWl9AQBr
-
-          eyUXaiQLCz/I+4Ko9i52pxZbOfUIPYthDEd4GelTTRySax3VfM88c9zr/gMPDUYz
-
-          qXSr712xRUJVJPk31fidb5rjuyQXP2Dz0Gtydu1xn0rWUF/4ipOUO2tIS2ESVOAC
-
-          FB4Wa1S4eb9w6aJkIEXdG89cTRAAsYArU0VXDBp9vf+ounNvpnfTcJnA2e/ydEyl
-
-          DuYcBhBSG5laDhKPIoqrAgMBAAGjUzBRMB0GA1UdDgQWBBR+tR4Ayl77yhTNTdQ5
-
-          mQgOp0XvczAfBgNVHSMEGDAWgBR+tR4Ayl77yhTNTdQ5mQgOp0XvczAPBgNVHRMB
-
-          Af8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBgQBKH6VqtHxWosxmXtvXCIPGlA9Z
-
-          OuXY9PhTVEOBIydPd/m8YAK6UpaEDX0flRlpwfXP4iYrfEjsnXlteDArSAqoocl+
-
-          LrI2xd48hm4V3bLGJoDDmAWi+qu6OddC5nLGLJqF0WSmQln/SOOyqKJ8RvzxCERT
-
-          E/DJDxlvlGX/f9hDy7dJeB2zBlpUW61LBvKp5+B21ijZ47EYPXqE0+M3sg4nMDEW
-
-          zVtSEFR1e9f4LnfLelDsjB3Bd0FKFS1oB/xUl5sqLfQk9QeUYQVAXqSzLzYEzcee
-
-          /b45S2z/1b/ioq932UhpZOiNZ2yG8Yu8H7DzHkYVWXnRssG3YVMWgftZv9uY04By
-
-          v7PX53A0grDd2vgl//pBN09FOBb3yEaR4KAdv16JM+DGCjedy9oBHG6OtIImpKHe
-
-          QnBMJ3oFlQQyVkiPk6Dp6f73jnjBtGB5BjHu/pq7rWKfzthuzwjLv96jIh7ErwmZ
-
-          0V6VKyw3Q38a7dBrbDTy+IVS8GxT0/S/ZU0El6w=
-
-          -----END CERTIFICATE-----
-
-          '
-      run: "set -euo pipefail\ntest -f \"$RUNNER_TEMP/host/HOST-BINARY.json\"\ntest -f \"$RUNNER_TEMP/host/binaries/zeno-fcis-2.7.0-aarch64-apple-darwin.tar.gz\"\
-        \ncrypto=\"$(brew --prefix openssl@3)/bin/openssl\"\ntest -x \"$crypto\"\n\"$crypto\" version\npython3 -\
-        \ <<'PY'\nimport hashlib, os\nfrom pathlib import Path\npath=Path(os.environ['RUNNER_TEMP'])/'review-recipient.crt'\n\
-        path.write_text(os.environ['EVIDENCE_CERTIFICATE'])\nassert hashlib.sha256(path.read_bytes()).hexdigest()=='a5bbc5734967ddf5627a4841cadb8a09963f876b9d031a823e50da2d38502f5c'\n\
-        PY\ntar -cf \"$RUNNER_TEMP/macos-review.tar\" -C \"$RUNNER_TEMP\" host macos-host-build.log\n\"$crypto\"\
-        \ cms -encrypt -binary -aes-256-gcm -in \"$RUNNER_TEMP/macos-review.tar\"   -outform DER -out \"$RUNNER_TEMP/macos-review.cms\"\
-        \ -recip \"$RUNNER_TEMP/review-recipient.crt\"   -keyopt rsa_padding_mode:oaep -keyopt rsa_oaep_md:sha256\
-        \ -keyopt rsa_mgf1_md:sha256\npython3 - <<'PY'\nimport hashlib, json, os\nfrom pathlib import Path\nroot=Path(os.environ['RUNNER_TEMP'])\n\
-        sha=lambda p: hashlib.sha256(p.read_bytes()).hexdigest()\nrecord={'purpose':'encrypted diagnostic capture;\
-        \ not a release qualification',\n        'source_commit':'4160086fb9d19f3ebe25047e69b1caa467aa74fd',\n \
-        \       'tag_object':'92f6cb07c7c920d7684be772507961602e29df15',\n        'controller_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],\n\
-        \        'cipher':'CMS AES-256-GCM; RSA-OAEP SHA256',\n        'certificate_sha256':sha(root/'review-recipient.crt'),\n\
-        \        'ciphertext_sha256':sha(root/'macos-review.cms'),\n        'plaintext_tar_sha256':sha(root/'macos-review.tar'),\n\
-        \        'host_bindings':{'archive':json.loads((root/'host/HOST-BINARY.json').read_text())['archive']['name'],\n\
-        \                         'archive_sha256':sha(root/'host/binaries/zeno-fcis-2.7.0-aarch64-apple-darwin.tar.gz'),\n\
-        \                         'record_sha256':sha(root/'host/HOST-BINARY.json'),\n                         'inputs_sha256':sha(root/'host/COMPILED-INPUTS-aarch64-apple-darwin.json'),\n\
-        \                         'journey_sha256':sha(root/'host/INSTALLED-JOURNEY.json')}}\n(root/'CAPTURE.json').write_text(json.dumps(record,indent=2)+chr(10))\n\
-        print(json.dumps(record))\nPY\n"
-    - name: Upload only encrypted evidence and its hash record
+          ${{ runner.temp }}/joined/evidence'
+        if-no-files-found: error
+        retention-days: 30
+    - name: Retain custody and privacy diagnostics
       if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
-        name: zeno-fcis-macos-review-encrypted-${{ github.run_id }}
-        path: '${{ runner.temp }}/macos-review.cms
-
-          ${{ runner.temp }}/CAPTURE.json'
-        if-no-files-found: error
-        retention-days: 7
+        name: zeno-fcis-release-recovery-records-${{ github.run_id }}
+        path: ${{ runner.temp }}/joined/evidence/*.json
+        if-no-files-found: warn
+        retention-days: 30
