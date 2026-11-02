@@ -1,6 +1,6 @@
 test run
-target x86_64
 set opt_level=speed_and_size
+target x86_64
 
 ; Independently execute Cranelift's *actual* lowering of the scalar contract.
 ; These are boundary samples, not a 2^128 proof or a whole-ISA specification.

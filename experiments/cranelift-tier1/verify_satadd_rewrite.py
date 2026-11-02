@@ -49,12 +49,12 @@ SHIFT = (
 # signature, hidden instructions, extra blocks, or a different compilation policy.
 # Pin the entire executable, non-comment structure rather than a body substring.
 EXPECTED_HEADERS = {
-    BASE: ("test compile precise-output", "set opt_level=speed_and_size",
+    BASE: ("test verifier", "set opt_level=speed_and_size",
            "target x86_64", "function %tier1_signed_satadd(i64, i64) -> i64 {"),
-    VARIANT: ("test compile precise-output", "set opt_level=speed_and_size",
+    VARIANT: ("test verifier", "set opt_level=speed_and_size",
               "target x86_64", "function %tier1_signed_satadd_shift(i64, i64) -> i64 {"),
-    "satadd_run.clif": ("test run", "target x86_64",
-                        "set opt_level=speed_and_size",
+    "satadd_run.clif": ("test run", "set opt_level=speed_and_size",
+                        "target x86_64",
                         "function %tier1_signed_satadd_run(i64, i64) -> i64 {"),
     "satadd_shift_run.clif": ("test run", "set opt_level=speed_and_size",
                               "target x86_64",
