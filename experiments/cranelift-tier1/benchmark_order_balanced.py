@@ -14,6 +14,7 @@ import json
 import os
 import platform
 import statistics
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -129,9 +130,7 @@ def main() -> None:
         "measurement_order": "ABBA / BAAB alternating; rotated workload mode order; no I/O within timed blocks",
         "clock": "CLOCK_MONOTONIC_RAW",
         "raw_samples": rows, "summary": summary,
-        "nonclaims": ["not ISLE-patched compiler evidence", "not a speed claim",
-                      "not an instruction-latency or throughput measurement",
-                      "no multi-architecture performance guarantee", "no whole application workload"],
+        "nonclaims": ["not ISLE-patched compiler evidence", "not a speed claim", "not an instruction-latency or throughput measurement", "no multi-architecture performance guarantee", "no whole application workload"],
     }
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(json.dumps(data, sort_keys=True, indent=2) + "\n")
