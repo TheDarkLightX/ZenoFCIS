@@ -10,7 +10,7 @@ from pathlib import Path
 from install_isle_candidate import UPSTREAM, SOURCE, ORIGINAL_GIT_BLOB, RULE, RULE_NAME
 
 HERE = Path(__file__).resolve().parent
-CLIF_SHA = "579244793d801ad907d3edc611b156103379e4d91c68d44c6ad4226ea85312e"
+CLIF_SHA = "579244793d801ad907d3ed3c611b156103379e4d91c68d44c6ad4226ea85312e"
 TARGETS = {"x86_64": "Advanced Micro Devices X86-64", "aarch64": "AArch64"}
 MODES = ("speed", "speed_and_size")
 PHASES = ("baseline", "patched")

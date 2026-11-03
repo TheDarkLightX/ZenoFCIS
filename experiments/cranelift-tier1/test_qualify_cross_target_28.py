@@ -2,7 +2,7 @@
 """Fail-closed parser and cross-target matrix regression tests."""
 import unittest
 from qualify_cross_target_28 import (
-    parse_header, parse_symbol, parse_text_size, summarize, expected_commands,
+    parse_header, parse_symbol, parse_text_size, summarize, expected_commands, digest, CLIF_SHA, HERE,
 )
 
 def row(target, mode, a=56, b=39):
@@ -12,6 +12,9 @@ def row(target, mode, a=56, b=39):
             "symbol_delta_baseline_minus_patched": a-b}
 
 class CrossTargetTests(unittest.TestCase):
+    def test_exact_clif_source_pin(self):
+        self.assertEqual(digest((HERE / 'satadd.clif').read_bytes()), CLIF_SHA)
+
     def test_elf_machine(self):
         parse_header(" Class: ELF64\n Machine: AArch64\n", "aarch64")
         with self.assertRaisesRegex(ValueError, "architecture"):
