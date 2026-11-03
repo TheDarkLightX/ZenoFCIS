@@ -1,0 +1,98 @@
+name: tier1-cross-target-28-emitted-code
+
+on:
+  push:
+    branches:
+      - research/2.8-tier1-cranelift-performance-20261102
+    paths:
+      - ".github/workflows/tier1-cross-target-28.yml"
+      - "experiments/cranelift-tier1/qualify_cross_target_28.py"
+      - "experiments/cranelift-tier1/test_qualify_cross_target_28.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tier1-cross-target-28
+  cancel-in-progress: true
+
+jobs:
+  cross-target-same-clif:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: "3"
+      RUSTUP_TOOLCHAIN: "1.97.1"
+    steps:
+      - name: Checkout exact isolated ZenoFCIS research source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout pinned upstream Cranelift
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Install pinned Rust and independent proof solver
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal
+          python3 -m venv "$RUNNER_TEMP/tier1-cross-venv"
+          "$RUNNER_TEMP/tier1-cross-venv/bin/python" -m pip install \
+            --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          echo "$RUNNER_TEMP/tier1-cross-venv/bin" >> "$GITHUB_PATH"
+      - name: Validate matrix parser with deliberate negative controls
+        run: python3 -B experiments/cranelift-tier1/test_qualify_cross_target_28.py
+      - name: Prove rule and compile same CLIF with old/new compilers on two targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/tier1-cross-results"
+          mkdir -p "$out"
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          {
+            git rev-parse HEAD
+            git -C upstream rev-parse HEAD
+            cargo --version
+            rustc --version
+            readelf --version | head -1
+            nm --version | head -1
+            python3 --version
+          } > "$out/tool-versions.txt"
+          python3 -B experiments/cranelift-tier1/verify_clamp_rule.py --out "$out/rule-proof.json"
+          : > "$out/commands.txt"
+          for phase in baseline patched; do
+            if [ "$phase" = patched ]; then
+              python3 -B experiments/cranelift-tier1/install_isle_candidate.py \
+                --upstream upstream --out "$out/patch-receipt.json"
+              git -C upstream diff -- cranelift/codegen/src/opts/selects.isle > "$out/exact-rule.patch"
+            fi
+            for target in x86_64 aarch64; do
+              for mode in speed speed_and_size; do
+                mkdir -p "$out/$target/$mode"
+                printf 'phase=%s target=%s opt_level=%s source=experiments/cranelift-tier1/satadd.clif\n' \
+                  "$phase" "$target" "$mode" >> "$out/commands.txt"
+                cargo run --locked --manifest-path upstream/cranelift/Cargo.toml \
+                  --bin clif-util -- compile --target "$target" \
+                  --set "opt_level=$mode" \
+                  -o "$out/$target/$mode/$phase.o" \
+                  "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif" \
+                  > "$out/$target/$mode/$phase-compile.txt" 2>&1
+              done
+            done
+          done
+          python3 -B experiments/cranelift-tier1/qualify_cross_target_28.py \
+            --root "$out" --upstream upstream --out "$out/cross-target-cost.json"
+          cp experiments/cranelift-tier1/satadd.clif "$out/satadd.clif"
+      - name: Preserve all objects and compilation receipts even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-cross-target-28-all-objs
+          path: tier1-cross-results
+          if-no-files-found: warn
+          retention-days: 30
