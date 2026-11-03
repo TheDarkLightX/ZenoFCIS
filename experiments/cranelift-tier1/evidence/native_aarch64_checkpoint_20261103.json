@@ -1,0 +1,56 @@
+{
+  "schema": "zeno-fcis/tier1-native-aarch64-checkpoint/1",
+  "observed_at_utc": "2026-11-03",
+  "status": "passed-native-finite-for-both-pinned-objects",
+  "producer_experiment_commit": "85011e3b53c3551cf67f6331af6df3b6b9001825",
+  "upstream_commit": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "native_replay_commit": "16aeffdc8fff6878a2ee5181efec76b58c1db15d",
+  "compiler_matrix_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41647685920",
+  "native_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41661994261",
+  "native_artifact_id": 13241303531,
+  "native_artifact_zip_sha256": "9ad7ca5022993a21e621e839d400df8a2871ef25cf6649d6693ea451e1797851",
+  "native_raw_receipt_sha256": "9dc8807b135f4bc3f7f9bc724a9e2fc2645fbdbc9514d18fe9571168553a3086",
+  "native_versions_sha256": "b7b090b1e3c2664d008e4ba9fd3932447f0c081339439fc41c499172891efc07",
+  "reference_c_sha256": "0c922cedf77f96d5aabde57d1a2939abe13c7279aee4046f07d1e8f27d546374",
+  "native_binary_sha256": "c42c4d71e073bdbdc3ffaabc459ce405977c8f4eb5894884853027ac775f72c8",
+  "verified_native_runner": "ubuntu-24.04-arm (native aarch64)",
+  "compiler": "gcc 13.3.0",
+  "binutils": "GNU binutils 2.42",
+  "python": "Python 3.12.3",
+  "tests": {
+    "exact_signed_saturating_add_result": true,
+    "edge_inputs": 24,
+    "edge_pairs": 576,
+    "seed": "0x9e3779b97f4a7c15",
+    "random_pairs": 250000,
+    "total_input_pairs": 250576,
+    "compared": "baseline and patched each vs independent int128 reference"
+  },
+  "baseline": {
+    "elf_object_sha256": "2daaba4e7a7f5efb303ef19bab9943e76ed2aacf5871d1d4c6d0724932091a7e",
+    "symbol_bytes": 36,
+    "decoded_arm64_instructions": 9,
+    "disassembly_sha256": "0aec8b9c1385b0617b1c18033ffac3ab809ee65d16958f1ed7a6c23a4f990745"
+  },
+  "patched": {
+    "elf_object_sha256": "02f539e0a4137a89c369eb4d1815750264c3a2bc3a1c0e7de14e1dd6233a2b9e",
+    "symbol_bytes": 32,
+    "decoded_arm64_instructions": 8,
+    "disassembly_sha256": "e3676fc0cbd124c3b35ed953691d74de80de0e09dfffd7f2f6453c1744d0bc66"
+  },
+  "cost_savings": {
+    "architecture": "aarch64",
+    "bytes": 4,
+    "decoded_instructions": 1,
+    "whole_function_only": true,
+    "runtime_speedup_qualified": false
+  },
+  "verifier_scope": "separate QF_BV pure clamp proof; named VeriISLE rule passes only relative to provisional select model; finite ARM native checks cover sampled defined input pairs",
+  "nonclaims": [
+    "not exhaustive over 2^128 signed 64-bit operand pairs",
+    "no AArch64 speed/throughput/power improvement established",
+    "not an authoritative upstream VeriISLE model",
+    "not proof of all flags/poison/undefined/ABI contexts",
+    "not a whole-Wasmtime or general optimizer code-size claim"
+  ]
+}
