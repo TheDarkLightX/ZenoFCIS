@@ -1,0 +1,98 @@
+name: tier1-wasmtime-frontend-28-aot-reachability
+
+on:
+  push:
+    branches:
+      - research/2.8-tier1-cranelift-performance-20261102
+    paths:
+      - ".github/workflows/tier1-wasmtime-frontend-28.yml"
+      - "experiments/cranelift-tier1/satadd_wasmtime_28.wat"
+      - "experiments/cranelift-tier1/qualify_wasmtime_frontend_28.py"
+      - "experiments/cranelift-tier1/test_qualify_wasmtime_frontend_28.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tier1-wasmtime-frontend-28
+  cancel-in-progress: true
+
+jobs:
+  same-wasm-baseline-patched:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 105
+    env:
+      CARGO_BUILD_JOBS: "3"
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      RUSTUP_TOOLCHAIN: "1.97.1"
+    steps:
+      - name: Checkout isolated exact ZenoFCIS research branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout detached pinned Wasmtime
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Install pinned Rust and execute source/oracle negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal
+          python3 -B experiments/cranelift-tier1/test_qualify_wasmtime_frontend_28.py
+      - name: Build two same-configuration Wasmtime binaries, changing only one ISLE rule
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-wasmtime-results
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          {
+            git rev-parse HEAD
+            git -C upstream rev-parse HEAD
+            rustc --version
+            cargo --version
+            uname -a
+          } > tier1-wasmtime-results/versions.txt
+          cargo build --locked --manifest-path upstream/Cargo.toml \
+            -p wasmtime-cli --bin wasmtime --no-default-features \
+            --features run,compile,wat,objdump \
+            > tier1-wasmtime-results/baseline-build.out 2> tier1-wasmtime-results/baseline-build.err
+          cp upstream/target/debug/wasmtime tier1-wasmtime-results/wasmtime-baseline
+          python3 -B experiments/cranelift-tier1/install_isle_candidate.py \
+            --upstream upstream --out tier1-wasmtime-results/patch-receipt.json
+          git -C upstream diff -- cranelift/codegen/src/opts/selects.isle \
+            > tier1-wasmtime-results/experimental-rule.patch
+          cargo build --locked --manifest-path upstream/Cargo.toml \
+            -p wasmtime-cli --bin wasmtime --no-default-features \
+            --features run,compile,wat,objdump \
+            > tier1-wasmtime-results/patched-build.out 2> tier1-wasmtime-results/patched-build.err
+          cp upstream/target/debug/wasmtime tier1-wasmtime-results/wasmtime-patched
+      - name: Qualify actual Wasm frontend AOT outputs and exploratory whole-process timings
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/qualify_wasmtime_frontend_28.py \
+            --upstream upstream \
+            --baseline-bin tier1-wasmtime-results/wasmtime-baseline \
+            --patched-bin tier1-wasmtime-results/wasmtime-patched \
+            --out tier1-wasmtime-results/wasm-check \
+            --blocks 6 --loops 2000000
+      - name: Archive build logs, exact Wasm/CLIF/AOT and independent finite oracle receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-wasmtime-frontend-28-actual-aot
+          path: |
+            tier1-wasmtime-results/wasm-check
+            tier1-wasmtime-results/patch-receipt.json
+            tier1-wasmtime-results/experimental-rule.patch
+            tier1-wasmtime-results/versions.txt
+            tier1-wasmtime-results/*.out
+            tier1-wasmtime-results/*.err
+          if-no-files-found: warn
+          retention-days: 30
