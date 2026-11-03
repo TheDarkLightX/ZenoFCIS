@@ -18,7 +18,7 @@ VALUE = "cranelift/interpreter/src/value.rs"
 
 def sources():
     return {
-        META: "\n".join([OPERAND_C, OPERAND_TRUE, OPERAND_FALSE]),
+        META: "\n".join([OPERAND_C, OPERAND_TRUE, OPERAND_FALSE] * 2),
         STEP: SELECT_INTERPRETER,
         VALUE: BOOL_CONVERSION,
     }
