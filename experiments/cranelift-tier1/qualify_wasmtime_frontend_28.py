@@ -95,7 +95,7 @@ def compile_wat(binary, out, name):
                            for p in clif_files]}
 
 def invoke(binary, obj, name, *args):
-    return numeric_result(run([str(binary), "run", "--invoke", name, str(obj),
+    return numeric_result(run([str(binary), "run", "--allow-precompiled", "--invoke", name, str(obj),
                                *[str(a) for a in args]], timeout=120).stdout)
 
 def check_finite(bins, out):
