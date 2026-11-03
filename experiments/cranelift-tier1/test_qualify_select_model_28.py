@@ -19,9 +19,9 @@ VALUE = "cranelift/interpreter/src/value.rs"
 def sources():
     return {
         META: (
-            'Inst::new(\\n            "select",\\n'
-            + "\\n".join([OPERAND_C, OPERAND_TRUE, OPERAND_FALSE])
-            + '\\nInst::new(\\n            "select_spectre_guard",'
+            'Inst::new(\n            "select",\n'
+            + "\n".join([OPERAND_C, OPERAND_TRUE, OPERAND_FALSE])
+            + '\nInst::new(\n            "select_spectre_guard",'
         ),
         STEP: SELECT_INTERPRETER,
         VALUE: BOOL_CONVERSION,
