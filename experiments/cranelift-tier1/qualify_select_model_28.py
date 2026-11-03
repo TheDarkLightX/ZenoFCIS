@@ -45,9 +45,13 @@ def sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def exact_once(source: str, needle: str, label: str) -> None:
-    if source.count(needle) != 1:
+def exact_count(source: str, needle: str, count: int, label: str) -> None:
+    if source.count(needle) != count:
         raise ValueError(f"missing or ambiguous pinned {label}")
+
+
+def exact_once(source: str, needle: str, label: str) -> None:
+    exact_count(source, needle, 1, label)
 
 
 def check_semantic_anchors(texts: dict[str, str], spec: str = SPEC) -> None:
@@ -55,9 +59,9 @@ def check_semantic_anchors(texts: dict[str, str], spec: str = SPEC) -> None:
     meta = texts["cranelift/codegen/meta/src/shared/instructions.rs"]
     step = texts["cranelift/interpreter/src/step.rs"]
     value = texts["cranelift/interpreter/src/value.rs"]
-    exact_once(meta, OPERAND_C, "scalar truthy select operand")
-    exact_once(meta, OPERAND_TRUE, "true select arm")
-    exact_once(meta, OPERAND_FALSE, "false select arm")
+    exact_count(meta, OPERAND_C, 2, "scalar truthy select operand")
+    exact_count(meta, OPERAND_TRUE, 2, "true select arm")
+    exact_count(meta, OPERAND_FALSE, 2, "false select arm")
     exact_once(step, SELECT_INTERPRETER, "interpreter select operation")
     exact_once(value, BOOL_CONVERSION, "i8 nonzero truth conversion")
     exact_once(spec, SELECT_SPEC, "provisional i64 select specification")
