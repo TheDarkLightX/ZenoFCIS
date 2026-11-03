@@ -1,0 +1,13 @@
+[package]
+name = "tier1-wasmtime-inprocess-28"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Avoid accidentally inheriting the large ZenoFCIS workspace.
+[workspace]
+
+[dependencies]
+# Required exact repository checkout: upstream @ b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+# Deserialization and execution only; do not compile Wasm inside the timed region.
+wasmtime = { path = "../../../upstream/crates/wasmtime", default-features = false, features = ["runtime", "std"] }

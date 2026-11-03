@@ -1,0 +1,99 @@
+name: tier1-wasmtime-inprocess-28-measure
+
+on:
+  push:
+    branches:
+      - research/2.8-tier1-cranelift-performance-20261102
+    paths:
+      - ".github/workflows/tier1-wasmtime-inprocess-28.yml"
+      - "experiments/cranelift-tier1/inprocess_bench_28/**"
+      - "experiments/cranelift-tier1/qualify_wasmtime_inprocess_28.py"
+      - "experiments/cranelift-tier1/test_qualify_wasmtime_inprocess_28.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: tier1-wasmtime-inprocess-28
+  cancel-in-progress: true
+
+jobs:
+  inprocess-guest-loops:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    env:
+      CARGO_BUILD_JOBS: "3"
+      CARGO_INCREMENTAL: "0"
+      RUSTUP_TOOLCHAIN: "1.97.1"
+    steps:
+      - name: Checkout exact isolated research revision
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout exact upstream Wasmtime runtime source (for binding/compilation only)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Fetch two EXACT previously-qualified pinned AOT modules
+        uses: actions/download-artifact@v4
+        with:
+          name: tier1-wasmtime-frontend-28-actual-aot
+          run-id: 41724158745
+          github-token: ${{ github.token }}
+          path: tier1-wasmtime-inprocess-source
+      - name: Validate original binary identities and negative controls before execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          printf '6bf661feb593fe40ee3a8058613100902783f9f244856c0bc68de5142843afa6  tier1-wasmtime-inprocess-source/wasm-check/baseline/satadd.cwasm\n' | sha256sum -c -
+          printf '16f6350d308b36641df4cc41052b8dab394d286fb7e3837ba78d085650006f75  tier1-wasmtime-inprocess-source/wasm-check/patched/satadd.cwasm\n' | sha256sum -c -
+          python3 -B experiments/cranelift-tier1/test_qualify_wasmtime_inprocess_28.py
+      - name: Compile runtime-only in-process benchmark using exact pinned Wasmtime source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-wasmtime-inprocess-results
+          rustup toolchain install 1.97.1 --profile minimal
+          cargo generate-lockfile --manifest-path experiments/cranelift-tier1/inprocess_bench_28/Cargo.toml
+          cargo build --locked --release --manifest-path experiments/cranelift-tier1/inprocess_bench_28/Cargo.toml \
+            > tier1-wasmtime-inprocess-results/build.stdout \
+            2> tier1-wasmtime-inprocess-results/build.stderr
+          cp experiments/cranelift-tier1/inprocess_bench_28/Cargo.lock tier1-wasmtime-inprocess-results/Cargo.lock
+          {
+            git rev-parse HEAD
+            git -C upstream rev-parse HEAD
+            rustc --version
+            cargo --version
+            uname -a
+            lscpu
+          } > tier1-wasmtime-inprocess-results/host-tools.txt
+      - name: Recheck guest results and run balanced in-process guest-loop timing
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin=experiments/cranelift-tier1/inprocess_bench_28/target/release/tier1-wasmtime-inprocess-28
+          "$bin" \
+            tier1-wasmtime-inprocess-source/wasm-check/baseline/satadd.cwasm \
+            tier1-wasmtime-inprocess-source/wasm-check/patched/satadd.cwasm \
+            250000 6 16 > tier1-wasmtime-inprocess-results/raw.csv
+          python3 -B experiments/cranelift-tier1/qualify_wasmtime_inprocess_28.py \
+            --raw tier1-wasmtime-inprocess-results/raw.csv \
+            --source-root tier1-wasmtime-inprocess-source \
+            --cargo-lock tier1-wasmtime-inprocess-results/Cargo.lock \
+            --loops 250000 --reps 6 --blocks 16 \
+            --out tier1-wasmtime-inprocess-results/qualified.json
+      - name: Preserve raw timing samples, rust source+lock pins, original AOT IDs and build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-wasmtime-inprocess-28-exploratory
+          path: |
+            tier1-wasmtime-inprocess-results
+          if-no-files-found: warn
+          retention-days: 30
