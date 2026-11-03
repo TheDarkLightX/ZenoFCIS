@@ -86,7 +86,7 @@ def qualify(upstream: Path, output: Path) -> dict:
     command = ['cargo', 'run', '--locked', '--manifest-path', str(upstream/'Cargo.toml'),
                '-p', 'cranelift-isle-veri', '--bin', 'veri', '--',
                '--name', 'opt', '--rule', RULE_NAME, '--num-threads', '2', '--timeout', '60']
-    result = subprocess.run(command, text=True, capture_output=True, timeout=1200)
+    result = subprocess.run(command, cwd=upstream, text=True, capture_output=True, timeout=1200)
     output.parent.mkdir(parents=True, exist_ok=True)
     stdout, stderr = output.with_suffix('.stdout.txt'), output.with_suffix('.stderr.txt')
     if stdout.exists() or stderr.exists():
