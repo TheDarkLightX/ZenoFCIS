@@ -14,6 +14,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from install_isle_candidate import UPSTREAM, SOURCE, ORIGINAL_GIT_BLOB, RULE, RULE_NAME
+from install_veriisle_select_spec_28 import SPEC, SPEC_PATH, SPEC_BLOB
 
 COUNTS = ('Total expansions', 'In scope expansions', 'Expansion errors',
           'Type instantiations', 'Applicable', 'Verification passed',
@@ -42,12 +43,20 @@ def check_source(upstream: Path) -> dict:
     source = (upstream / SOURCE).read_text()
     if source != expected:
         raise ValueError('not exactly the one reviewed ISLE rule patch')
+    if run_cmd(['git', '-C', str(upstream), 'rev-parse', f'HEAD:{SPEC_PATH}']) != SPEC_BLOB:
+        raise ValueError('unreviewed original verifier spec blob')
+    original_spec = run_cmd(['git', '-C', str(upstream), 'show', f'HEAD:{SPEC_PATH}'])
+    spec_source = (upstream / SPEC_PATH).read_text()
+    if spec_source != original_spec.rstrip('\n') + '\n' + SPEC:
+        raise ValueError('unexpected experimental select-spec content')
     modified = run_cmd(['git', '-C', str(upstream), 'diff', '--name-only'])
-    if modified.splitlines() != [SOURCE]:
+    if set(modified.splitlines()) != {SOURCE, SPEC_PATH}:
         raise ValueError('unexpected tracked modifications in compiler checkout')
     return {'upstream_commit': actual, 'original_blob': blob,
             'patched_source_sha256': sha(source.encode()),
-            'rule_sha256': sha(RULE.encode()), 'source_path': SOURCE}
+            'rule_sha256': sha(RULE.encode()), 'source_path': SOURCE,
+            'experimental_select_spec_sha256': sha(SPEC.encode()),
+            'experimental_select_spec_path': SPEC_PATH}
 
 
 def parse_summary(output: str, *, returncode: int = 0) -> dict:
@@ -95,11 +104,12 @@ def qualify(upstream: Path, output: Path) -> dict:
     stderr.write_text(result.stderr)
     counts = parse_summary(result.stdout, returncode=result.returncode)
     receipt = {'schema': 'zeno-fcis/tier1-veriisle-named-rule/1',
-               'status': 'passed-named-opt-rule-applicable-expansions',
+               'status': 'passed-under-local-experimental-select-spec',
                'pin': pin, 'tools': tools, 'command': command, 'counts': counts,
                'stdout_sha256': sha(result.stdout.encode()),
                'stderr_sha256': sha(result.stderr.encode()),
-               'nonclaims': ['not full x86 ISA, ABI, poison or flag-liveness proof',
+               'nonclaims': ['verification assumes a locally supplied, unreviewed scalar select spec',
+                             'not full x86 ISA, ABI, poison or flag-liveness proof',
                              'not speed or throughput proof',
                              'not cross-target optimizer performance qualification']}
     output.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')

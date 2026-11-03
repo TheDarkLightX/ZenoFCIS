@@ -9,6 +9,7 @@ on:
       - "experiments/cranelift-tier1/verify_isle_rule_28.py"
       - "experiments/cranelift-tier1/test_verify_isle_rule_28.py"
       - "experiments/cranelift-tier1/install_isle_candidate.py"
+      - "experiments/cranelift-tier1/install_veriisle_select_spec_28.py"
   workflow_dispatch:
 
 permissions:
@@ -60,7 +61,11 @@ jobs:
         run: |
           python3 -B experiments/cranelift-tier1/install_isle_candidate.py \
             --upstream upstream --out "$RUNNER_TEMP/tier1-veriisle/patch-receipt.json"
-      - name: Check actual pinned VeriISLE named opt rule (fail closed)
+      - name: Install explicitly provisional select extractor spec
+        run: |
+          python3 -B experiments/cranelift-tier1/install_veriisle_select_spec_28.py \
+            --upstream upstream --out "$RUNNER_TEMP/tier1-veriisle/experimental-select-spec.json"
+      - name: Check named VeriISLE rule under recorded experimental spec (fail closed)
         run: |
           python3 -B experiments/cranelift-tier1/verify_isle_rule_28.py \
             --upstream upstream --out "$RUNNER_TEMP/tier1-veriisle/veriisle.json"

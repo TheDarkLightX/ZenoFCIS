@@ -154,3 +154,10 @@ From a checkout of this isolated 2.8 research branch, on a host with Rust/Cargo 
       --upstream /tmp/tier1-veriisle-wasmtime --out /tmp/tier1-veriisle.json
 
 The runner writes raw logs alongside the requested receipt; **absence of a receipt means no successful qualification**. The execution must still happen on a qualified build host. For the exact invocation and coverage limits see pinned [VeriISLE documentation](https://github.com/bytecodealliance/wasmtime/blob/b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49/cranelift/isle/veri/README.md). Even a clean named opt verification will not establish x86 flag/ABI/poison coverage, an application speedup, all-target suitability, or upstream acceptance. No new PR, merge, or broad CI trigger was initiated here.
+
+
+### Explicit verifier-coverage limitation and experimental follow-up
+
+The isolated [VeriISLE check #41571642965](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41571642965) reached the actual named-rule checker, which rejected the rule with **one expansion error and zero applicable cases**: the pinned mid-end model has **no spec for the scalar CLIF select extractor**. This is **not a discovered semantic counterexample**; neither is it a VeriISLE proof.
+
+A subsequent isolated experiment adds a deliberately provisional scalar-i64 select spec to the detached pinned checkout. Its source is [install_veriisle_select_spec_28.py](install_veriisle_select_spec_28.py). The [VeriISLE runner](verify_isle_rule_28.py) now requires the exact original upstream spec blob and exact experimental addendum, reports the added spec as an assumption, and refuses other source drift. The condition and branch semantics follow [Cranelift's documented select operation](https://docs.wasmtime.dev/api/cranelift_codegen/ir/trait.InstBuilder.html), but the handwritten verifier spec is *not* an independently validated authoritative definition. Even if a later named-rule run passes, the result must be labeled **verified relative to the provisional select spec**, not unconditionally VeriISLE-proven. A fully authoritative select-model qualification remains a separate gate.
