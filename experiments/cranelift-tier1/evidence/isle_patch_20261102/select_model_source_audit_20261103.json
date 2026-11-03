@@ -1,0 +1,35 @@
+{
+  "schema": "zeno-fcis/2.8-tier1-select-model-source-audit-checkpoint/1",
+  "date_utc": "2026-11-03",
+  "status": "passed-source-bound-independent-interpreter-consistency",
+  "experimental_commit": "3d0f9edbb9b5f0afa0a68f437c40ec26b5fdcae2",
+  "wasmtime_pin": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "ci_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41613550610",
+  "ci_job_id": 125841240557,
+  "artifact": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41613550610/artifacts/13219952662",
+  "artifact_id": 13219952662,
+  "artifact_zip_sha256": "18a0dadfaf2a82864a8247927e70c1f935fad04c3764889e633d14be4fe9d3be",
+  "validated_sources": {
+    "cranelift/codegen/meta/src/shared/instructions.rs": "d7122622a292c0300d4b6816c0424c0c25761f25",
+    "cranelift/interpreter/src/step.rs": "cad9149b32edb08781bd7666953312762a4e64ae",
+    "cranelift/interpreter/src/value.rs": "f79d21fe331084226b3ab70b8d18ffaff68625ee",
+    "cranelift/codegen/src/spec/inst_specs.isle": "654839e3833334c80c7116c0bcbbe0f8eb269169"
+  },
+  "scope": "Pinned Cranelift select instruction's ScalarTruthy condition, true/false operands, interpreter Opcode::Select choice, and DataValue::I8 nonzero truth conversion agree with the separately supplied local VeriISLE i64 select model.",
+  "evidence": {
+    "independent_definition_source": "Pinned Cranelift interpreter and instruction metadata, not the provisional VeriISLE spec itself",
+    "i8_conditions_exhaustive": 256,
+    "branch_values_symbolic": "x/y arm selection independent of the defined 64-bit branch data values",
+    "finite_edge_value_pairs": 6400,
+    "negative_control_tests_passed": 5,
+    "workflow_status": "completed",
+    "workflow_conclusion": "success"
+  },
+  "relationship_to_previous": "Strengthens but does not replace conditional named VeriISLE check #41572121953 (one applicable rule expansion passed under the provisional model); separately recorded pure QF_BV proof, finite native tests, and size A/B remain unchanged.",
+  "limitations": [
+    "Source-backed semantic agreement is not equivalent to accepted upstream VeriISLE semantics or a full independent compiler proof.",
+    "Defined scalar i8 conditions and i64 branch values only; no vector, poison, undefined, traps, flags, ABI or machine-target modeling.",
+    "No broader compiler-opt rule chaining, cross-target cost, runtime acceleration, or upstream adoption qualified.",
+    "No changes to Wasmtime upstream, ZenoFCIS main or the release/2.7.0 branch."
+  ]
+}
