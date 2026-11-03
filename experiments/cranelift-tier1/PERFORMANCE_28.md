@@ -135,3 +135,22 @@ and *second-half* medians to expose time dependence: approximately 0.984 vs
 latency or throughput claims; no runtime winner, Pareto dominance, or
 production-compiler improvement is qualified. The source files were committed
 to this isolated branch, not to the 2.7 release or the upstream Wasmtime repo.
+
+
+## Current rule-verification checkpoint (November 2)
+
+The earlier [pinned same-CLIF compiler-patch run #41382217051](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41382217051) now reports success. It emitted **56 versus 39 function-symbol bytes** after installing the single experimental mid-end rule. The later [2.8 patched-object audit](recheck_patched_compiler.py) checked the original/patched objects against a finite native oracle; the balanced call timings are still exploratory and show no qualified speedup.
+
+**New pending assurance gate:** [verify_isle_rule_28.py](verify_isle_rule_28.py) runs the pinned upstream VeriISLE checker on the **actual named opt simplify rule**, not merely the separate hand-written QF_BV clamp identity. It refuses an incorrect upstream SHA or ISLE file blob, extra tracked source changes, an altered rule body, nonzero verifier exit status, zero applicable expansions, failed/unknown checks, expansion errors, or ambiguous/incomplete counters. A successful result is recorded only with the full verifier stdout/stderr hashes, tool versions, source/rule hashes, and applicable instantiation counts. [Parser refusal tests](test_verify_isle_rule_28.py) do **not** establish a successful actual VeriISLE run.
+
+From a checkout of this isolated 2.8 research branch, on a host with Rust/Cargo and the cvc5/z3 executables installed:
+
+    git clone https://github.com/bytecodealliance/wasmtime.git /tmp/tier1-veriisle-wasmtime
+    git -C /tmp/tier1-veriisle-wasmtime checkout --detach b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+    python3 -B experiments/cranelift-tier1/test_verify_isle_rule_28.py
+    python3 -B experiments/cranelift-tier1/install_isle_candidate.py \
+      --upstream /tmp/tier1-veriisle-wasmtime --out /tmp/tier1-install-receipt.json
+    python3 -B experiments/cranelift-tier1/verify_isle_rule_28.py \
+      --upstream /tmp/tier1-veriisle-wasmtime --out /tmp/tier1-veriisle.json
+
+The runner writes raw logs alongside the requested receipt; **absence of a receipt means no successful qualification**. The execution must still happen on a qualified build host. For the exact invocation and coverage limits see pinned [VeriISLE documentation](https://github.com/bytecodealliance/wasmtime/blob/b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49/cranelift/isle/veri/README.md). Even a clean named opt verification will not establish x86 flag/ABI/poison coverage, an application speedup, all-target suitability, or upstream acceptance. No new PR, merge, or broad CI trigger was initiated here.
