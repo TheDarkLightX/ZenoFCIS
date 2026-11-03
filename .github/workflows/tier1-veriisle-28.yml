@@ -1,0 +1,74 @@
+name: tier1-veriisle-28-isolated
+
+on:
+  push:
+    branches:
+      - research/2.8-tier1-cranelift-performance-20261102
+    paths:
+      - ".github/workflows/tier1-veriisle-28.yml"
+      - "experiments/cranelift-tier1/verify_isle_rule_28.py"
+      - "experiments/cranelift-tier1/test_verify_isle_rule_28.py"
+      - "experiments/cranelift-tier1/install_isle_candidate.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tier1-veriisle-28-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-named-opt-rule:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      CARGO_BUILD_JOBS: "2"
+      RUSTUP_TOOLCHAIN: "1.97.1"
+    steps:
+      - name: Checkout exact isolated 2.8 research source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Checkout exact upstream code for detached experimental patch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Install recorded verifier toolchain
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cvc5 z3
+          rustup toolchain install 1.97.1 --profile minimal
+          mkdir -p "$RUNNER_TEMP/tier1-veriisle"
+          {
+            git rev-parse HEAD
+            git -C upstream rev-parse HEAD
+            dpkg-query -W -f='${Package} ${Version}\n' cvc5 z3
+            cargo --version
+            rustc --version
+            cvc5 --version
+            z3 --version
+          } > "$RUNNER_TEMP/tier1-veriisle/toolchain.txt"
+      - name: Source-independent parser/refusal controls
+        run: python3 -B experiments/cranelift-tier1/test_verify_isle_rule_28.py
+      - name: Install reviewed rule in detached upstream checkout
+        run: |
+          python3 -B experiments/cranelift-tier1/install_isle_candidate.py \
+            --upstream upstream --out "$RUNNER_TEMP/tier1-veriisle/patch-receipt.json"
+      - name: Check actual pinned VeriISLE named opt rule (fail closed)
+        run: |
+          python3 -B experiments/cranelift-tier1/verify_isle_rule_28.py \
+            --upstream upstream --out "$RUNNER_TEMP/tier1-veriisle/veriisle.json"
+      - name: Preserve complete source pins, patch receipt and solver output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-veriisle-28-actual-named-rule
+          path: ${{ runner.temp }}/tier1-veriisle
+          if-no-files-found: warn
+          retention-days: 30
