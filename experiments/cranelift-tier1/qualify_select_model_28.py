@@ -61,8 +61,8 @@ def check_semantic_anchors(texts: dict[str, str], spec: str = SPEC) -> None:
     value = texts["cranelift/interpreter/src/value.rs"]
     # Restrict evidence to the select definition, not select_spectre_guard,
     # bitselect or unrelated instructions that reuse the same operand docs.
-    begin = 'Inst::new(\\n            "select",'
-    end = 'Inst::new(\\n            "select_spectre_guard",'
+    begin = 'Inst::new(\n            "select",'
+    end = 'Inst::new(\n            "select_spectre_guard",'
     exact_once(meta, begin, "select instruction definition")
     exact_once(meta, end, "next instruction definition")
     select_block = meta.split(begin, 1)[1].split(end, 1)[0]
