@@ -1,0 +1,56 @@
+name: tier1-select-model-28-source-audit
+
+on:
+  push:
+    branches:
+      - research/2.8-tier1-cranelift-performance-20261102
+    paths:
+      - ".github/workflows/tier1-select-model-28.yml"
+      - "experiments/cranelift-tier1/qualify_select_model_28.py"
+      - "experiments/cranelift-tier1/test_qualify_select_model_28.py"
+      - "experiments/cranelift-tier1/install_veriisle_select_spec_28.py"
+      - "experiments/cranelift-tier1/install_isle_candidate.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tier1-select-source-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-bound-select-assumption:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact isolated ZenoFCIS experiment
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Checkout exact pinned Cranelift interpreter and instruction definitions
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Negative controls for truth condition, branch polarity and type
+        run: python3 -B experiments/cranelift-tier1/test_qualify_select_model_28.py
+      - name: Check exact source and exhaustive defined scalar-i8 condition semantics
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/select-model"
+          python3 -B experiments/cranelift-tier1/qualify_select_model_28.py \
+            --upstream upstream --out "$RUNNER_TEMP/select-model/select-audit.json"
+          git rev-parse HEAD > "$RUNNER_TEMP/select-model/experiment-revision.txt"
+          git -C upstream rev-parse HEAD > "$RUNNER_TEMP/select-model/upstream-revision.txt"
+      - name: Preserve source-bound receipt (not authoritative verifier proof)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-select-model-28-source-audit
+          path: ${{ runner.temp }}/select-model
+          if-no-files-found: warn
+          retention-days: 30
