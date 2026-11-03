@@ -1,0 +1,38 @@
+{
+  "schema": "zeno-fcis/2.8-tier1-provisional-veriisle-checkpoint/1",
+  "status": "one-applicable-expansion-passed-only-with-locally-supplied-select-spec",
+  "date_utc": "2026-11-03",
+  "zfcis_experimental_commit": "96da0de9d924420b630f85d042285177dadff84a",
+  "upstream_wasmtime_commit": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "rule": "tier1_i64_signed_saturation_clamp",
+  "workflow_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41572121953",
+  "artifact": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41572121953/artifacts/13201368995",
+  "artifact_id": 13201368995,
+  "exact_receipt_sha256": "eee75013bb975bfe5d4e5877bf147b6722e387482b254808b81f360848da9330",
+  "stdout_sha256": "413dc563a1598b9d4bccc91a36f439a5f0647d84252c0df95a152f8095d8fc2e",
+  "stderr_sha256": "75fc310c7cb407bbaa0f7673d148007026c94c84caca3422c1cac30da8441a96",
+  "rule_sha256": "f3ef723b7578f3b848f06f5882cb89eb85b1f37c6478405a74bb53627ea4342a",
+  "local_select_spec_sha256": "08d0f93daebb103740bb46c8046400b595ea5345dad734c42aa3d3b87c3ffcc0",
+  "verifier_counts": {
+    "total_expansions": 1559,
+    "in_scope_expansions": 1,
+    "type_instantiations": 1,
+    "applicable": 1,
+    "verification_passed": 1,
+    "verification_failed": 0,
+    "verification_unknown": 0,
+    "expansion_errors": 0
+  },
+  "tools": {
+    "rustc": "1.97.1",
+    "cargo": "1.97.1",
+    "cvc5": "1.1.2",
+    "z3": "4.8.12"
+  },
+  "qualified_statement": "The named scalar i64 opt rewrite passes one VeriISLE expansion conditional on an explicitly local, unreviewed scalar select specification.",
+  "nonclaims": [
+    "Not a proof with the unmodified upstream VeriISLE specification set; the named-rule attempt without the addendum returned 1 expansion error and 0 applicable cases.",
+    "Not a proof of x86 flags, ABI, poison/undefined states, cross-target cost, or speed.",
+    "Does not demonstrate upstream acceptance or qualify the rewrite for all opt levels."
+  ]
+}
