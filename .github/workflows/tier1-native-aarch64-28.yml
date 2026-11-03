@@ -1,0 +1,54 @@
+name: tier1-native-aarch64-28-pinned-objects
+
+on:
+  push:
+    branches:
+      - research/2.8-tier1-cranelift-performance-20261102
+    paths:
+      - ".github/workflows/tier1-native-aarch64-28.yml"
+      - "experiments/cranelift-tier1/native_aarch64_harness_28.c"
+      - "experiments/cranelift-tier1/replay_native_aarch64_28.py"
+      - "experiments/cranelift-tier1/evidence/objects/aarch64_baseline_20261103.o"
+      - "experiments/cranelift-tier1/evidence/objects/aarch64_patched_20261103.o"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tier1-native-aarch64-28
+  cancel-in-progress: true
+
+jobs:
+  native-arm-oracle:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact objects from isolated research branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Run signed-128 reference against actual ARM64 machine instructions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          mkdir -p tier1-aarch64-native
+          {
+            git rev-parse HEAD
+            uname -m
+            gcc --version | head -1
+            objcopy --version | head -1
+            objdump --version | head -1
+            python3 --version
+          } > tier1-aarch64-native/versions.txt
+          python3 -B experiments/cranelift-tier1/replay_native_aarch64_28.py \
+            --out tier1-aarch64-native/finite-native-check.json
+      - name: Preserve full native execution receipt, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-native-aarch64-28-qualified
+          path: tier1-aarch64-native
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,65 @@
+{
+  "schema": "zeno-fcis/tier1-cross-target-checkpoint/1",
+  "qualification": "compiled-and-measured-same-clif-not-speed",
+  "measured_at_utc": "2026-11-03",
+  "experiment_commit": "85011e3b53c3551cf67f6331af6df3b6b9001825",
+  "upstream_commit": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41647685920",
+  "artifact_id": 13236720408,
+  "artifact_zip_sha256": "ef0e87d10ef0cf2b6796b2ec1824fcbafb38d9bbbf0072b1438dca4d43b33cd1",
+  "original_cost_receipt_sha256": "10453a547417a9653b6aea02438df983a0e761ac615bf76d73c0e0a0672aae34",
+  "clif_sha256": "579244793d801ad907d3ed3c611b156103379e4d91c68d44c6ad4226ea85312e",
+  "proof_receipt_sha256": "0cb675ff40313538406600a13629ffd901d1ab7ab0be79e996e27b9508697c84",
+  "patch_receipt_sha256": "9df4d33e144529ae5130d50911727d7052e2d6ef899cefa67e05f46f81cf9c43",
+  "rule_sha256": "f3ef723b7578f3b848f06f5882cb89eb85b1f37c6478405a74bb53627ea4342a",
+  "comparison": "exact same CLIF signed-i64-saturating-add function before/after one ISLE mid-end rewrite, within each mode and target",
+  "pairs": [
+    {
+      "target": "x86_64",
+      "mode": "speed",
+      "baseline_symbol_bytes": 56,
+      "patched_symbol_bytes": 39,
+      "delta_bytes": 17,
+      "baseline_sha256": "ed19f9d3093ffe7f42e275e4fbab220ee7734c81cd8172d65675f98685c32aeb",
+      "patched_sha256": "affc09034d1bfcbff3c8c2c69913dc2da8935f39009daa97842d18ef0db53d90"
+    },
+    {
+      "target": "x86_64",
+      "mode": "speed_and_size",
+      "baseline_symbol_bytes": 56,
+      "patched_symbol_bytes": 39,
+      "delta_bytes": 17,
+      "baseline_sha256": "ed19f9d3093ffe7f42e275e4fbab220ee7734c81cd8172d65675f98685c32aeb",
+      "patched_sha256": "affc09034d1bfcbff3c8c2c69913dc2da8935f39009daa97842d18ef0db53d90"
+    },
+    {
+      "target": "aarch64",
+      "mode": "speed",
+      "baseline_symbol_bytes": 36,
+      "patched_symbol_bytes": 32,
+      "delta_bytes": 4,
+      "baseline_sha256": "2daaba4e7a7f5efb303ef19bab9943e76ed2aacf5871d1d4c6d0724932091a7e",
+      "patched_sha256": "02f539e0a4137a89c369eb4d1815750264c3a2bc3a1c0e7de14e1dd6233a2b9e"
+    },
+    {
+      "target": "aarch64",
+      "mode": "speed_and_size",
+      "baseline_symbol_bytes": 36,
+      "patched_symbol_bytes": 32,
+      "delta_bytes": 4,
+      "baseline_sha256": "2daaba4e7a7f5efb303ef19bab9943e76ed2aacf5871d1d4c6d0724932091a7e",
+      "patched_sha256": "02f539e0a4137a89c369eb4d1815750264c3a2bc3a1c0e7de14e1dd6233a2b9e"
+    }
+  ],
+  "disassembly_observations": {
+    "x86_64": "Original 56-byte symbol includes a literal pool and padding; 17-byte symbol reduction is not equivalent to 17 executed instruction bytes.",
+    "aarch64": "Raw AArch64 disassembly: baseline 9 four-byte instructions (36 bytes), patched 8 four-byte instructions (32 bytes); relocations absent."
+  },
+  "proof_scope": "Pure signed-i64 clamp bitvector identity, independent Z3 QF_BV unsatisfiable counterexample query. VeriISLE named rule passed only with local provisional select model (1 applicable/1 passed).",
+  "nonclaims": [
+    "No ARM native execution in the cross-target producer run; a separate ARM native checker is required",
+    "No CPU latency, throughput, energy, production workload or whole-program speedup",
+    "No optimizer-wide poison, undefined behavior, target ABI or flags liveness proof",
+    "Changes are confined to isolated ZenoFCIS research branch, not upstream Wasmtime."
+  ]
+}
