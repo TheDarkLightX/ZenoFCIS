@@ -37,3 +37,40 @@ fixture does not demonstrate real Wasm frontend reachability. A changed output
 must pass the finite oracle and be separately cost-qualified and assessed for
 performance regressions. No upstream PR should be opened solely on this
 single fixture.
+
+## Real Wasmtime AOT checkpoint (November 3, 2026)
+
+The [targeted Wasmtime AOT workflow run #41724158745](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41724158745)
+**passed** at research source `75506dd85f1ac0b34dfdde30d072e5c3e09ad6ae`.
+The genuine Wasm frontend emitted different CLIF for `wasm[0]::function[0]::sat`,
+and an ISLE-patched full Wasmtime binary emitted different AOT machine code
+from its same-source unpatched binary. Both AOT modules passed finite
+independent tests: 12 signed saturation vectors and 8 loop counts **per
+variant**. The emitted-function and whole-module costs must be kept separate:
+
+| Pinned x86-64 Wasmtime AOT scope | Unmodified | ISLE-patched |
+| --- | ---: | ---: |
+| `sat` function symbol | **64 bytes** | **52 bytes** |
+| Straight-line executed prefix through `ret` | **56 bytes** | **52 bytes** |
+| Post-`ret` literal/padding bytes | 8 | 0 |
+| Other Wasm `workload` function symbol | 160 | 160 |
+| Whole-module page-aligned `.text` section | 4096 | 4096 |
+| Whole serialized `.cwasm` file | 13,912 | 13,912 |
+
+Thus the actual WebAssembly function has **12 fewer symbol bytes (18.75%)**
+and **4 fewer executed instruction-prefix bytes**. In this case there is
+**no whole-module binary-size saving** because of alignment and metadata.
+The recorded whole-process candidate/baseline timing median was approximately
+1.001×, which establishes **neither a speedup nor a slowdown**.
+The [original AOT artifact #13273568497](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41724158745/artifacts/13273568497)
+contains the two compiled ELF modules, emitted CLIF, disassemblies, compiler
+pins and raw timing samples. The additional source-bound function-size
+qualifier is `qualify_wasmtime_symbols_28.py`; it rejects changed objects,
+incorrect target, other changed function sizes, source-provenance drift and
+misreported post-return bytes. Its own hosted run must be checked independently
+rather than assuming this new validator has already passed.
+
+**Open qualification:** the named VeriISLE rule proof remains conditional on a
+provisional scalar select model; production breadth, poison/flags/ABI
+conditions, and realistic runtime benefits are not established. No upstream
+Wasmtime PR is justified solely by this small example.
