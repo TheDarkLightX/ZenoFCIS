@@ -33,6 +33,47 @@ def independent_elf_text_size(p: Path) -> int:
     return size
 
 
+def independently_count_function_bytes(raw: str, count: int) -> dict:
+    """Reparse per-function bytes from archived objdump without producer parser."""
+    lines = raw.splitlines()
+    ix = [i for i, ln in enumerate(lines) if ln.startswith("wasm[0]::function[")]
+    if len(ix) != count:
+        raise ValueError("independent exported-symbol count mismatch")
+    result = {"symbol_region_bytes": 0, "bytes_through_first_return": 0,
+              "post_return_region_bytes": 0}
+    representative = []
+    for number, at in enumerate(ix):
+        if lines[at] != f"wasm[0]::function[{number}]::sat{number}:":
+            raise ValueError("independent symbol name mismatch")
+        limit = ix[number + 1] if number + 1 < len(ix) else len(lines)
+        total = 0
+        returned = None
+        for ln in lines[at+1:limit]:
+            if not ln.strip():
+                continue
+            if not ln.startswith("            "):
+                raise ValueError("unexpected noninstruction in disassembly")
+            match = re.fullmatch(r" {12}([0-9a-f]{2}(?: [0-9a-f]{2})*)(?: {2,}(.*)|$)", ln)
+            if not match:
+                raise ValueError("invalid machine-code byte rendering")
+            total += len(match.group(1).split(" "))
+            asm = (match.group(2) or "").strip()
+            if asm == "retq" or asm.startswith("retq "):
+                if returned is not None:
+                    raise ValueError("duplicate function return")
+                returned = total
+        if returned is None or total == 0 or returned > total:
+            raise ValueError("no valid first-return prefix")
+        result["symbol_region_bytes"] += total
+        result["bytes_through_first_return"] += returned
+        result["post_return_region_bytes"] += total - returned
+        if number in (0, count // 2, count - 1):
+            representative.append({"function": number, "through_ret": returned,
+                                   "region": total})
+    return dict(result, qualified_function_count=count,
+                inspected_representative_functions=representative)
+
+
 def validate(path: Path) -> dict:
     root = path.parent
     doc = json.loads(path.read_bytes())
@@ -72,11 +113,17 @@ def validate(path: Path) -> dict:
             actual_text = independent_elf_text_size(binary)
             if actual_text != entry.get("aot_elf_text_bytes"):
                 raise ValueError("AOT ELF text measurement disagrees")
+            parsed_cost = independently_count_function_bytes(disassembly.decode("utf-8"), count)
+            if parsed_cost != entry.get("sum_function_costs"):
+                raise ValueError("independent aggregate code-byte measurement disagrees")
             measured[variant] = {"text_bytes": actual_text, "serialized_bytes": len(data),
+                                 "function_costs": parsed_cost,
                                  "aot_sha256": sha(data)}
         a, b = measured["baseline"], measured["patched"]
         deltas = {"aot_elf_text_bytes": a["text_bytes"] - b["text_bytes"],
-                  "whole_cwasm_bytes": a["serialized_bytes"] - b["serialized_bytes"]}
+                  "whole_cwasm_bytes": a["serialized_bytes"] - b["serialized_bytes"],
+                  "sum_function_symbol_region_bytes": a["function_costs"]["symbol_region_bytes"] - b["function_costs"]["symbol_region_bytes"],
+                  "sum_function_bytes_through_first_return": a["function_costs"]["bytes_through_first_return"] - b["function_costs"]["bytes_through_first_return"]}
         if deltas != item.get("baseline_minus_candidate"):
             raise ValueError("reported baseline/candidate delta is false")
         output.append({"copies": count, "verified_deltas": deltas, "bytes": measured,

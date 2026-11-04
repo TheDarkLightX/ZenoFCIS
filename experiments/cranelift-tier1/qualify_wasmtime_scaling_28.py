@@ -14,11 +14,12 @@ import re
 from pathlib import Path
 import qualify_wasmtime_frontend_28 as prior
 from install_isle_candidate import UPSTREAM, RULE
+from qualify_wasmtime_function_bytes_28 import BYTE_LINE
 
 HERE = Path(__file__).resolve().parent
 SOURCE_WAT = HERE / "satadd_wasmtime_28.wat"
 SOURCE_SHA256 = "dec49849bab1062369523d26fc30f9871aeca1c2cb2ea0670f590dcd8f0cf144"
-COUNTS = (1, 16, 64, 256)
+COUNTS = (1, 16, 64, 256, 1024)
 TARGET = "x86_64-unknown-linux"
 SCHEMA = "zeno-fcis/tier1-wasmtime-code-size-scaling/1"
 HEADER_RE = re.compile(r"(?m)^wasm\[0\]::function\[(\d+)\](?:::|:)")
@@ -66,6 +67,50 @@ def function_headers(disassembly: str, count: int) -> None:
             raise ValueError("required exported function missing or duplicated: " + exact)
 
 
+def all_function_byte_costs(disassembly: str, count: int) -> dict:
+    """Aggregate observed disassembly bytes across each distinct exported function.
+
+    "Through first return" is not a dynamic CPU-time or throughput metric.
+    Padding after return belongs only to the disassembler function region.
+    """
+    lines = disassembly.splitlines()
+    headers = [(pos, line) for pos, line in enumerate(lines)
+               if line.startswith("wasm[0]::function[")]
+    if len(headers) != count:
+        raise ValueError("unexpected function disassembly header cardinality")
+    totals = {"symbol_region_bytes": 0, "bytes_through_first_return": 0,
+              "post_return_region_bytes": 0}
+    first = []
+    for i, (at, title) in enumerate(headers):
+        if title != f"wasm[0]::function[{i}]::sat{i}:":
+            raise ValueError("unexpected or missing exact function name")
+        end = headers[i + 1][0] if i + 1 < len(headers) else len(lines)
+        byte_count = 0
+        ret_end = None
+        for line in lines[at + 1:end]:
+            if not line.strip():
+                continue
+            m = BYTE_LINE.fullmatch(line)
+            if not m:
+                raise ValueError("unrecognized disassembly byte line")
+            byte_count += len(m.group(1).split(" "))
+            mnemonic = (m.group(2) or "").strip()
+            if re.match(r"^retq(?:\s|$)", mnemonic):
+                if ret_end is not None:
+                    raise ValueError("more than one function return")
+                ret_end = byte_count
+        if ret_end is None or not byte_count or byte_count < ret_end:
+            raise ValueError("unqualified function return or empty emitted code")
+        totals["symbol_region_bytes"] += byte_count
+        totals["bytes_through_first_return"] += ret_end
+        totals["post_return_region_bytes"] += byte_count - ret_end
+        if i in (0, count // 2, count - 1):
+            first.append({"function": i, "through_ret": ret_end,
+                          "region": byte_count})
+    return dict(totals, qualified_function_count=count,
+                inspected_representative_functions=first)
+
+
 def compile_case(bin_path: Path, folder: Path, wat: Path, count: int) -> dict:
     folder.mkdir(parents=True)
     module = folder / "functions.cwasm"
@@ -79,12 +124,14 @@ def compile_case(bin_path: Path, folder: Path, wat: Path, count: int) -> dict:
     dis = prior.run([str(bin_path), "objdump", "--funcs", "wasm",
                      "--bytes", str(module)], timeout=120).stdout
     function_headers(dis, count)
+    cost = all_function_byte_costs(dis, count)
     (folder / "disassembly.txt").write_text(dis)
     return {"aot_sha256": digest(module.read_bytes()),
             "aot_bytes": module.stat().st_size,
             "aot_elf_text_bytes": prior.text_size(module),
             "disassembly_sha256": digest(dis.encode()),
             "function_headers_checked": count,
+            "sum_function_costs": cost,
             "tool_command": run_args}
 
 
@@ -130,6 +177,8 @@ def qualify(upstream: Path, bins: dict, output: Path) -> dict:
             "baseline_minus_candidate": {
                 "aot_elf_text_bytes": base["aot_elf_text_bytes"] - candidate["aot_elf_text_bytes"],
                 "whole_cwasm_bytes": base["aot_bytes"] - candidate["aot_bytes"],
+                "sum_function_symbol_region_bytes": base["sum_function_costs"]["symbol_region_bytes"] - candidate["sum_function_costs"]["symbol_region_bytes"],
+                "sum_function_bytes_through_first_return": base["sum_function_costs"]["bytes_through_first_return"] - candidate["sum_function_costs"]["bytes_through_first_return"],
             },
         })
     return {"schema": SCHEMA,
