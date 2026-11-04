@@ -205,6 +205,7 @@ def qualify(upstream: Path, compilers: dict, out: Path) -> dict:
     return {
         "schema": SCHEMA, "status": "real-aot-heterogeneous-microkernels-finite-checked",
         "source": pins, "upstream_commit": UPSTREAM,
+        "producer_script_sha256": digest(Path(__file__).read_bytes()),
         "original_fixture_sha256": scaling.SOURCE_SHA256,
         "rule_sha256": digest(RULE.encode()), "target": scaling.TARGET,
         "cases": rows,
