@@ -84,3 +84,58 @@ changed. No upstream optimization PR is authorized by this suite alone.
 **Next gate:** representative externally sourced Wasm programs,
 independent authoritative select-spec qualification, and targeted
 cross-target/runtime regression checks before upstream consideration.
+
+
+## Executed first heterogeneous result — November 4, 2026 UTC
+
+The exact pinned [GitHub Actions run #41863329060](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41863329060)
+on [source commit `aa611fed9265`](https://github.com/TheDarkLightX/ZenoFCIS/commit/aa611fed92658aa889670c5e372468448d5a9311)
+**completed successfully**. The 7 source/oracle/refusal controls passed,
+as did both real baseline/patch compiler builds, all finite Wasm witness
+checks, the separately executed rechecker, and artifact preservation.
+[Raw AOT artifacts, WAT, patch and receipts](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41863329060/artifacts/13339949452)
+are saved by GitHub Actions.
+
+**Measured *baseline minus patched*, exact identical WAT within each case:**
+
+| Case | Emitted executable-prefix bytes | Function-region bytes | Actual ELF `.text` | Whole `.cwasm` |
+|---|---:|---:|---:|---:|
+| mixed32 | 52 saved | 194 saved | **4,096 saved** | **4,096 saved** |
+| mixed128 | 208 saved | 758 saved | **4,096 saved** | **4,096 saved** |
+| controls32 | 0 | 0 | **0** | **0** |
+
+The full binary sizes independently recorded from the archived outputs
+are `30,448 → 26,352` bytes for mixed32, `77,464 → 73,368` for
+mixed128, and `22,256 → 22,256` for controls32.
+The actual ELF `.text` sizes were `12,288 → 8,192`,
+`36,864 → 32,768`, and `8,192 → 8,192` bytes respectively.
+The equal 4 KiB savings in mixed32 and mixed128 do **not** imply constant
+savings per function; page and function alignment make the whole-artifact
+cost discontinuous.
+
+The producer checked **192 output/input pairs per compiler** in each
+mixed case and **96 per compiler** in the controls-only case.
+The separately executed independent oracle checked an additional 48
+pairs per compiler in each mixed case and 24 per compiler in controls32.
+These are finite executions on selected functions, not all possible
+64-bit input pairs or all exported functions.
+
+I also downloaded the original artifact and separately invoked GNU
+`readelf -SW` on all six archived `.cwasm` files, confirming the reported
+ELF `.text` sizes and calculating actual whole-file byte lengths directly.
+Each archived AOT object's SHA-256 agreed with the pinned producer receipt.
+The independent rechecker receipt SHA-256 reference to the complete
+producer record also matched. This extra inspection is a separate local
+read-only source/object audit, not a new hosted test or full semantic proof.
+
+**Interpretation:** unlike the identical-function no-footprint case,
+these three constructed mixed/control modules provide positive evidence
+that the rewrite can lower a real heterogeneous ELF/AOT allocation,
+while leaving the unrelated-only suite's exact AOT bytes unchanged.
+This remains **synthetic** and does not establish a realistic application
+frequency, sustained performance advantage, or unconditional VeriISLE proof.
+
+An additional per-function byte-selectivity script and targeted CI replay
+were added after the first successful run. Their results must be inspected
+separately before claiming that each unrelated control function's bytes
+are unchanged in a mixed module. No upstream PR is justified yet.
