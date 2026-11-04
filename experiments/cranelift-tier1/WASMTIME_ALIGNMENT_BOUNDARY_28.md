@@ -94,3 +94,53 @@ the experiment succeeded.
 All changes are isolated to
 `research/2.8-tier1-cranelift-performance-20261102`; no push or merge
 to ZenoFCIS main/release or upstream Wasmtime.
+
+## Executed result — November 4, 2026 UTC
+
+The exact [GitHub Actions run #41856852872](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41856852872)
+**completed successfully**, producing and independently rechecking all eight
+real Wasmtime AOT comparisons. Source commit
+[`f85ae333d745`](https://github.com/TheDarkLightX/ZenoFCIS/commit/f85ae333d7457905d55a122e8962e70596852eed).
+The negative-control tests (five new + five previously qualified scaling
+controls) passed before building source-pinned baseline and one-rule-patched
+Wasmtime. Every reported variant passed finite signed-output checks.
+The [retained artifact](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41856852872/artifacts/13337816985)
+contains the original emitted objects, hashed WAT, disassemblies, build
+logs, all per-case measurements, independent recheck receipt and exact
+rule patch.
+
+**Measured baseline minus experimental candidate, in bytes:**
+
+| Contract | Exported copies | Sum executable prefixes through return | Sum disassembler function-region bytes | ELF `.text` | Whole `.cwasm` |
+|---|---:|---:|---:|---:|---:|
+| signed saturation alone | 1 | 4 | 10 | 0 | 0 |
+| signed saturation alone | 16 | 64 | 160 | 0 | 0 |
+| signed saturation alone | 256 | 1,024 | 2,560 | 0 | 0 |
+| signed saturation alone | 1,024 | 4,096 | 10,240 | 0 | 0 |
+| saturation then XOR 1 | 1 | 4 | 14 | 0 | 0 |
+| saturation then XOR 1 | 16 | 64 | 224 | 0 | 0 |
+| saturation then XOR 1 | 256 | 1,024 | 3,584 | **8,192** | **8,272** |
+| saturation then XOR 1 | 1,024 | 4,096 | 14,336 | **32,768** | **32,848** |
+
+**New result:** an otherwise similar 4-byte-per-function executed-prefix
+improvement produces *zero* full-object benefit in the original fixture,
+but the live-XOR contract produces a **32-byte average ELF `.text`
+benefit per exported function** at 256 and 1,024 copies. This is
+quantized by actual layout: executable symbol bytes, function allocation
+boundaries and page-aligned AOT sections do **not** have interchangeable
+marginal costs. The extra 80-byte full-`.cwasm` reduction relative to
+`.text` in the larger cases is an observed object delta, **not**
+automatically attributable to instruction bytes.
+
+This positively establishes an **actual AOT-footprint reduction in a
+controlled synthetic program**, overcoming the narrower original
+negative result. It does **not** establish the rewrite benefits ordinary
+Wasm programs, is faster, or is upstream-ready. The named VeriISLE
+proof's provisional `select` semantics remain an important
+qualification. Do not upstream on this result alone.
+
+**Decision:** retain both cases (including original zeros) in the
+evidence catalog and make measured aligned allocation / actual module
+size an explicit cost objective alongside raw machine-code bytes.
+Continue with representative real programs, independent semantic proof,
+regression studies across targets, and controlled speed measurement.
