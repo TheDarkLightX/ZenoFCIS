@@ -9,6 +9,7 @@ on:
       - "experiments/cranelift-tier1/qualify_wasmtime_mixed_contexts_28.py"
       - "experiments/cranelift-tier1/independent_recheck_mixed_contexts_28.py"
       - "experiments/cranelift-tier1/test_mixed_contexts_28.py"
+      - "experiments/cranelift-tier1/audit_mixed_code_selectivity_28.py"
   workflow_dispatch:
 
 permissions:
@@ -94,6 +95,23 @@ jobs:
             --baseline-bin tier1-mixed-results/wasmtime-baseline \
             --patched-bin tier1-mixed-results/wasmtime-patched \
             --out tier1-mixed-results/independent-recheck.json
+      - name: Offline audit which exact emitted functions changed and preserve controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          root = Path("tier1-mixed-results")
+          with ZipFile(root / "selectivity-input.zip", "w", ZIP_DEFLATED) as out:
+              for entry in sorted((root / "cases").rglob("*")):
+                  if entry.is_file():
+                      out.write(entry, entry.relative_to(root).as_posix())
+              out.write(root / "independent-recheck.json", "independent-recheck.json")
+          PY
+          python3 -B experiments/cranelift-tier1/audit_mixed_code_selectivity_28.py \
+            --artifact tier1-mixed-results/selectivity-input.zip \
+            --out tier1-mixed-results/independent-selectivity.json
       - name: Preserve actual unmodified AOT objects and separate proof/cost receipts
         if: always()
         uses: actions/upload-artifact@v4
@@ -102,6 +120,7 @@ jobs:
           path: |
             tier1-mixed-results/cases
             tier1-mixed-results/independent-recheck.json
+            tier1-mixed-results/independent-selectivity.json
             tier1-mixed-results/patch-receipt.json
             tier1-mixed-results/one-rule.patch
             tier1-mixed-results/source-and-host.txt
