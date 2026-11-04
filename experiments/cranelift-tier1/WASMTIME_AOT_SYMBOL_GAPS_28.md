@@ -51,3 +51,55 @@ measurements, with substantive verification of exact CLIF/ISLE semantics.
 `tier1-wasmtime-aot-symbol-gaps-28` GitHub Actions run before describing
 the attribution as executed or proven. No changes to ZenoFCIS main/release,
 Bytecode Alliance upstream or any production compiler.
+
+## Pinned source-and-real-ELF result — November 4, 2026
+
+The targeted [Actions run #41803963706](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41803963706)
+**passed** on research commit
+[`75c7cefaffe2`](https://github.com/TheDarkLightX/ZenoFCIS/commit/75c7cefaffe2abee3cd15b22762a9a3e0fc7ca60).
+It downloaded the existing qualified AOT objects from run #41769602461,
+checked the pinned upstream Git commit and exact three source blobs, passed
+**five independent parser/refusal controls**, and independently recomputed
+the complete ELF binary/source receipts before comparing symbol spacings.
+
+For all 16, 64, 256 and 1,024-export test cases, **each exported function's
+ELF symbol start offset was identical** between the two compiler versions.
+The signed-saturating function body symbol was 12 bytes shorter with the
+experimental rule, while every measurable interval to its next named
+function grew by exactly 12 bytes. Therefore function-size savings were
+absorbed by extra *inter-symbol gap bytes* rather than shifting subsequent
+function starts:
+
+| Copies | Symbol-body reduction | Measured extra gap bytes | Measurable adjacent pairs |
+|---:|---:|---:|---:|
+| 1 | 12 | 0 | 0 (no next symbol; inconclusive) |
+| 16 | 192 | 180 | 15 of 15 |
+| 64 | 768 | 756 | 63 of 63 |
+| 256 | 3,072 | 3,060 | 255 of 255 |
+| 1,024 | 12,288 | 12,276 | 1,023 of 1,023 |
+
+The final function in each module has no following named function, so its
+remaining 12 bytes cannot be attributed by this particular pairwise
+measurement. The existing independent audit separately confirms unchanged
+`.text` size and unchanged full `.cwasm` size for all cases.
+
+This is now an **observed cause of the lost between-function size reduction**,
+not merely a guessed explanation from identical aggregate section lengths.
+The pinned source's 32-byte preferred function alignment and explicit
+`align_to` call supply a direct plausible mechanism; the audit does not
+prove the provenance of each gap byte or conclusively separate all
+allocator/veneer/page-alignment contributions.
+
+**Engineering decision:** a Tier-1 cost objective must distinguish raw
+machine-code bytes, actual function-symbol bytes, **the inter-function
+aligned allocation**, whole executable `.text`, and complete AOT file
+size. Prioritize candidates that actually cross an allocation boundary,
+reduce executable-section pages, or have independently reproducible speed
+benefits, rather than optimizing symbolic bytes alone. Do not propose
+disabling preferred alignment as an optimization: it may harm branch
+prediction or cache alignment. The existing clamp rule remains a valid
+bounded semantics/code-size research result but is not yet a defensible
+upstream application performance improvement.
+
+The [raw qualified source/ELF audit artifact](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41803963706/artifacts/13308522856)
+retains exact identities and case-level observations.
