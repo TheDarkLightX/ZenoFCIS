@@ -26,7 +26,12 @@ impl Guest {
     fn load(engine: &Engine, module_path: &str) -> Result<Self, E> {
         // SAFETY: the caller must verify the archived .cwasm SHA-256 against
         // the pinned CI-generated object; never deserialize untrusted modules.
-        let module = unsafe { Module::deserialize_file(engine, module_path)? };
+        let module = unsafe { Module::deserialize_file(engine, module_path) }.map_err(|err| {
+            // Preserve chained Wasmtime compatibility diagnostics. The outer
+            // "failed deserialization" message by itself is not actionable.
+            let message = format!("AOT deserialization failed for {module_path}: {err:#}");
+            std::io::Error::new(std::io::ErrorKind::InvalidData, message)
+        })?;
         let mut store = Store::new(engine, ());
         let instance = Instance::new(&mut store, &module, &[])?;
         let sat = instance.get_typed_func::<(i64, i64), i64>(&mut store, "sat")?;
