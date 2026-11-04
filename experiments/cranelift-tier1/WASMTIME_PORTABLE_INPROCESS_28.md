@@ -26,3 +26,7 @@ Neither workflow changes an upstream branch or ZenoFCIS main. No upstream PR is 
 ### Source-evidence correction
 
 The first portable attempt [run 41766350827](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41766350827) rebuilt both CLI binaries and passed finite Wasm oracle checks, but its Python qualifier wrongly treated byte-identical **post-optimization emitted CLIF** as a prerequisite. This is not an input equivalence condition: a correct mid-end ISLE rule may change emitted CLIF while the source Wasm, target, toolchain and configuration remain identical. The revised qualifier preserves both CLIF sets, independently rehashes every emitted CLIF file, checks the equality boolean for consistency, and does not demand identical optimized output. This is not evidence of a semantic mismatch.
+
+### Runtime configuration compatibility
+
+The second portable run [41766982512](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41766982512) passed baseline/patched portable compilation and finite Wasm CLI checks, then built the runtime-only harness. Deserialization was correctly refused because the CLI producer enabled *concurrency support* while the minimal Rust harness lacked that feature. In the pinned Wasmtime source, the `concurrency_support` tunable defaults to `cfg!(feature = "component-model-async")`. The harness now requests precisely that supported runtime capability, without enabling an extra Wasm compiler or bypassing compatibility checks. This is a Wasmtime configuration matter, not a signed-add counterexample or evidence of a speedup.

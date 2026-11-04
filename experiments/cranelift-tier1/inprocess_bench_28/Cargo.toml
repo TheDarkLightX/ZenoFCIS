@@ -10,4 +10,7 @@ publish = false
 [dependencies]
 # Required exact repository checkout: upstream @ b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
 # Deserialization and execution only; do not compile Wasm inside the timed region.
-wasmtime = { path = "../../../upstream/crates/wasmtime", default-features = false, features = ["runtime", "std"] }
+# The pinned CLI producer enables component-model-async/concurrency support by
+# default; its precompiled artifacts retain that tunable even for core Wasm.
+# Match the producer's runtime capability rather than bypassing AOT admission.
+wasmtime = { path = "../../../upstream/crates/wasmtime", default-features = false, features = ["runtime", "std", "component-model-async"] }

@@ -1,14 +1,9 @@
 name: tier1-wasmtime-inprocess-28-measure
 
+# Historical host-specialized cross-run AOT experiment: GitHub runners can
+# differ in AVX512 support. Superseded by portable same-run AOT qualification.
+# Intentionally not run on every research-branch push.
 on:
-  push:
-    branches:
-      - research/2.8-tier1-cranelift-performance-20261102
-    paths:
-      - ".github/workflows/tier1-wasmtime-inprocess-28.yml"
-      - "experiments/cranelift-tier1/inprocess_bench_28/**"
-      - "experiments/cranelift-tier1/qualify_wasmtime_inprocess_28.py"
-      - "experiments/cranelift-tier1/test_qualify_wasmtime_inprocess_28.py"
   workflow_dispatch:
 
 permissions:

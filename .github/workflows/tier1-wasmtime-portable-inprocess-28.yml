@@ -8,6 +8,7 @@ on:
       - ".github/workflows/tier1-wasmtime-portable-inprocess-28.yml"
       - "experiments/cranelift-tier1/qualify_wasmtime_portable_28.py"
       - "experiments/cranelift-tier1/qualify_wasmtime_portable_inprocess_28.py"
+      - "experiments/cranelift-tier1/inprocess_bench_28/**"
   workflow_dispatch:
 
 permissions:
