@@ -139,3 +139,43 @@ An additional per-function byte-selectivity script and targeted CI replay
 were added after the first successful run. Their results must be inspected
 separately before claiming that each unrelated control function's bytes
 are unchanged in a mixed module. No upstream PR is justified yet.
+
+
+## Exact emitted-code selectivity audit — November 4, 2026 UTC
+
+The second, targeted [Actions run #41919592018](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41919592018)
+at [source commit `6b61b82bbf74`](https://github.com/TheDarkLightX/ZenoFCIS/commit/6b61b82bbf74c4c0a4ec883916123468f925ebd7)
+**passed all jobs**, now additionally running
+`audit_mixed_code_selectivity_28.py` *on the archived real native code*.
+[Full source/ELF/WAT/disassembly/independent selectivity artifacts](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41919592018/artifacts/13365943081)
+are retained.
+
+The CI-created audit ZIP includes the original binaries, generated WAT,
+producer cost receipt and separate independently executed ELF/finite-result
+recheck. The new offline audit rejects missing, duplicated, reordered or
+corrupt per-function emitted code, checks the receipt and binary hashes,
+sums every function's recorded byte lengths, then compares exact instruction
+byte sequences *for every exported function*.
+
+| Case | Signed-saturation-containing functions with changed code | Unrelated control functions with changed code | Whole `.cwasm` saved |
+|---|---:|---:|---:|
+| mixed32 | 16 of 16 | **0 of 16** | 4,096 B |
+| mixed128 | 64 of 64 | **0 of 64** | 4,096 B |
+| controls32 | 0 | **0 of 32** | 0 B |
+
+Among the four saturation-containing function shapes, the observed
+**executable-prefix savings per function** were **4, 4, 1, and 4 bytes**,
+respectively. This demonstrates context-dependent *machine instruction*
+cost, rather than assigning a constant four-byte cost credit to every
+instance. The unrelated controls are machine-byte-identical within the
+tested compiled functions, even in mixed modules where the complete
+AOT files differed. This is an independently **replayed archived-byte
+comparison**, not a statement that arbitrary unrelated IR always remains
+unchanged.
+
+The source-pinned compiler A/B, finite oracles, independently recomputed
+ELF and full-AOT sizes, and new per-function checks all passed. There is
+still no qualified runtime-speed comparison for this heterogeneous suite,
+no empirical evidence of broad real-application occurrence, and no
+unconditional named-rule VeriISLE proof. Do not propose the rule
+upstream solely on these constructed data.
