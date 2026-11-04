@@ -34,7 +34,6 @@ def validate_provenance(source_root: Path) -> tuple[dict, dict]:
         or s.get("rule_sha256") != original.digest(original.RULE.encode())
         or s.get("requested_target") != TARGET
         or s.get("host_architecture") not in ("x86_64", "AMD64")
-        or receipt.get("clif_same_file_and_content") is not True
         or set(receipt.get("compiled", {})) != {"baseline", "patched"}
         or set(receipt.get("finite_checks", {})) != {"baseline", "patched"}
         or set(s.get("compiler_binaries", {})) != {"baseline", "patched"}):
@@ -53,6 +52,19 @@ def validate_provenance(source_root: Path) -> tuple[dict, dict]:
             or len(binary) != rec.get("aot_bytes")
             or sha(disasm) != rec.get("disassembly_sha256")):
             raise ValueError("portable AOT binary or disassembly hash differs")
+        # Independently rehash every produced post-optimization CLIF snapshot.
+        for entry in rec.get("clif_files", []):
+            relative = entry.get("path")
+            if not isinstance(relative, str) or not relative or relative.startswith("/"):
+                raise ValueError("invalid emitted CLIF relative path")
+            root = (p / "clif").resolve()
+            file = (root / relative).resolve()
+            if not file.is_relative_to(root) or not file.is_file():
+                raise ValueError("missing or escaping CLIF file")
+            if sha(file.read_bytes()) != entry.get("sha256"):
+                raise ValueError("emitted optimized CLIF checksum mismatch")
+        if not rec.get("clif_files"):
+            raise ValueError("no emitted CLIF source evidence")
         independent = parse_function(disasm.decode("utf-8"))
         if independent != rec.get("function_disassembly"):
             raise ValueError("independent function-byte parse differs from producer")
@@ -62,6 +74,9 @@ def validate_provenance(source_root: Path) -> tuple[dict, dict]:
             or finite.get("loop_counts") != list(original.COUNTS)):
             raise ValueError("missing/altered producer finite oracle inputs")
     c = receipt["compiled"]
+    same_clif = c["baseline"]["clif_files"] == c["patched"]["clif_files"]
+    if receipt.get("clif_same_file_and_content") is not same_clif:
+        raise ValueError("emitted CLIF equality claim is inconsistent")
     for cost_key, computed in {
         "function_symbol_byte_delta":
         (c["baseline"]["function_disassembly"]["x86_bytes_in_disassembler_function_region"] -
