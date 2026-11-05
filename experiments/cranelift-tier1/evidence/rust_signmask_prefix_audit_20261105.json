@@ -1,0 +1,62 @@
+{
+  "schema": "zeno-fcis/tier1-rust-signmask-prefix-audit/1",
+  "date_utc": "2026-11-05",
+  "status": "read-only-archived-AOT-and-disassembly-rechecked",
+  "source_commit": "fa170af0d9edc35985f6a04a1dfdb7e5520342c1",
+  "upstream_commit": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "workflow": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42054592441",
+  "artifact_id": 13429206078,
+  "artifact_zip_sha256": "d030a958c25eeef58623ccb9cf26c8dce697c6d76e6d7e107c7c5504fbf06a90",
+  "producer_receipt_sha256": "aadc37f03c22fce58e1d737c65fffc3e65f86680dcdf1d9629ee62285caa5dc4",
+  "independent_receipt_sha256": "927a7771910c050aa065e490dc8460378a0b2d79a4c552b983260573c7379233",
+  "tool": "read-only ZIP source/byte-line replay and five positive/tamper tests; original CI independently checked native binary/ELF and finite output behavior",
+  "candidate_original": "ashr(s,63) XOR MIN_I64",
+  "candidate_add": "ashr(s,63) ADD MIN_I64 modulo 2^64",
+  "candidate_sub": "MIN_I64 SUB lshr(s,63) modulo 2^64",
+  "target": "x86_64-unknown-linux",
+  "definitions": {
+    "prefix": "static concatenated decoded byte strings through first retq, NOT dynamic execution or a complete function/ABI proof",
+    "region": "all decoded bytes in a Wasmtime disassembly function region, including post-return padding/data",
+    "AOT": "actual complete serialized .cwasm bytes",
+    "text": "actual ELF .text section length; not inferred from prefix or region"
+  },
+  "profiles": [
+    {
+      "name": "optimized",
+      "rust_opt_level": 3,
+      "first_return_prefix_bytes_original": {"sat_add":51,"sat_add_mix":58,"sat_add_xor":54,"sign_clamp":23,"wrap_add":13},
+      "first_return_prefix_bytes_add": {"sat_add":56,"sat_add_mix":64,"sat_add_xor":60,"sign_clamp":23,"wrap_add":13},
+      "add_extra_prefix_bytes_in_three_sat_exports": 17,
+      "function_region_bytes_original": {"sat_add":63,"sat_add_mix":70,"sat_add_xor":62},
+      "function_region_bytes_add": {"sat_add":56,"sat_add_mix":64,"sat_add_xor":60},
+      "elf_text_bytes_original_add_sub": [4096,4096,4096],
+      "entire_cwasm_bytes_original_add_sub": [14472,14472,14472]
+    },
+    {
+      "name": "debug",
+      "rust_opt_level": 0,
+      "first_return_prefix_bytes_original": {"sat_add":65,"sat_add_mix":178,"sat_add_xor":69,"sign_clamp":88,"wrap_add":13},
+      "first_return_prefix_bytes_add": {"sat_add":71,"sat_add_mix":184,"sat_add_xor":75,"sign_clamp":88,"wrap_add":13},
+      "add_extra_prefix_bytes_in_three_sat_exports": 18,
+      "function_region_bytes_original": {"sat_add":79,"sat_add_mix":190,"sat_add_xor":79},
+      "function_region_bytes_add": {"sat_add":71,"sat_add_mix":186,"sat_add_xor":75},
+      "elf_text_bytes_original_add_sub": [28672,28672,28672],
+      "entire_cwasm_bytes_original_add_sub": [66016,66016,66016]
+    }
+  ],
+  "inspection": {
+    "observed_original_signmask_lowering": "arithmetic shift plus RIP-relative literal-memory XOR of 0x8000000000000000",
+    "observed_add_signmask_lowering": "arithmetic shift plus movabs 0x8000000000000000 and integer ADD",
+    "add_AOT_byte_identical": false,
+    "sub_AOT_byte_identical": true,
+    "all_AOT_and_text_deltas": 0,
+    "interpretation": "ADD changes native code and lengthens the first-return prefix in three observed saturation functions; less post-return padding/literal region bytes do not produce smaller .text or .cwasm. SUB is a no-op in compiled AOT on both tested profiles."
+  },
+  "evidence_limits": [
+    "The archived ZIP and two source receipts were inspected in this run; only the earlier hosted CI executed patched Wasmtime and SMT.",
+    "Static first-return prefixes do not establish actual latency, throughput or power and do not cover all debug branch paths.",
+    "A QF_BV proof of pure value expressions is not VeriISLE verification of an installed rule, generic x86 machine-state correctness or poison/ABI flags.",
+    "Single pinned upstream and x86-64 architecture; not all targets or applications.",
+    "Human-proposed palette, not a proved optimal synthesized code sequence."
+  ]
+}
