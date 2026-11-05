@@ -85,3 +85,19 @@ Its exact status/results must be checked before claiming any effect.
 an external, realistic compiled application; authoritative select
 semantics; current-upstream compatibility and performance tradeoffs
 where a benefit is observed. Do not upstream speculative rules.
+
+
+## Executed result — November 5, 2026 UTC
+
+The [exact-source GitHub Actions run #41964211060](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41964211060) at source commit [a44c291a7dfb](https://github.com/TheDarkLightX/ZenoFCIS/commit/a44c291a7dfb13e3ff9ef1bd8f1de36010def15f) **PASSED**. All four source/reference/refusal tests, the pinned Rust 1.97.1 wasm32-unknown-unknown target, both original/one-rule-patched pinned Wasmtime builds, both opt profile Wasm builds, finite native output witnesses and the independently executed full-object cost rechecker completed successfully. [Retained original Rust/Wasm/native-AOT/patch/cost artifact #13386632486](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41964211060/artifacts/13386632486).
+
+**Measured baseline-minus-patched results:**
+
+| Rust compilation profile | Exact generated Wasm compared under baseline versus patched Cranelift | ELF .text saving | Complete .cwasm saving |
+|---|---|---:|---:|
+| Rust opt-level=0 | byte-identical native AOT | 0 bytes | 0 bytes |
+| Rust opt-level=3 | byte-identical native AOT | 0 bytes | 0 bytes |
+
+The source producer reported binary identity and zero measured native ELF .text and complete .cwasm delta in both cases. The **separately executed rechecker confirmed both exact identities and zero deltas**. Independent native arithmetic oracle checks passed across all exported functions on finite boundary cases. The result is **not a counterexample to the rewrite's correctness**, nor proof that common Rust apps never use this pattern. It does mean this exact ordinary Rust i64 saturating-add family, under these two LLVM optimization settings, obtained **no benefit at all** from the single experimental Cranelift rule.
+
+Combined with the preceding unchanged 12/12 external Wasmtime WAT regression tests, the current evidence favors **investigating pattern reachability and prevalence rather than upstreaming this narrow rewrite**. Do not describe the successful synthetic multi-export AOT reductions as real-world application benefits. The actual condition-chain match vs LLVM output is not established by native cost equality alone; an exact Cranelift IR-source audit or search of representative external applications is needed. No speed or broader semantics claim, no upstream/protected branch mutation.
