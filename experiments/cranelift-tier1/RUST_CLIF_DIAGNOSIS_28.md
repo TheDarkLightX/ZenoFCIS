@@ -102,3 +102,20 @@ The Rust optimized `sign_clamp` also already uses a shift/XOR algebraic form rat
 **Assurance boundary:** emitted CLIF is a stage-specific representation, not a verifier-certified negative ISLE match count or a whole-compiler reachability theorem. These outputs do not establish which optimizer stage did/did not attempt the rule. The existing named VeriISLE check remains conditional on a provisional select spec. The test still establishes **zero realized compiler benefit for the specific pinned idiomatic Rust inputs**, along with a source-backed mismatch to guide a distinct candidate vocabulary.
 
 **Next practical search/verification direction:** formalize the LLVM-emitted modulo/signed overflow and sign-mask contract above, compare proposed equivalent constructions under a bounded, pinned search or targeted lowering experiment, and require independent SMT proof and actual baseline-vs-patch native AOT cost before selecting a new rule. Do **not** widen the old `select(x < 0, MIN, MAX)` rewrite from its synthetic evidence alone; no upstream submission is justified.
+
+## Independent all-input semantics qualification (2026-11-05 UTC)
+
+The separate [pinned GitHub Actions #42005719011](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42005719011) **passed** at source commit [`001c8bb3`](https://github.com/TheDarkLightX/ZenoFCIS/commit/001c8bb3bddc25251d08dfae0088da580be3a607). The new
+[`verify_rust_llvm_clamp_28.py`](https://github.com/TheDarkLightX/ZenoFCIS/blob/001c8bb3bddc25251d08dfae0088da580be3a607/experiments/cranelift-tier1/verify_rust_llvm_clamp_28.py)
+ran using the repo's hash-pinned Z3 4.15.4 wheel with explicit `QF_BV` logic. It models *all* pairs of signed 64-bit inputs through the four observed LLVM/CLIF arithmetic operations and compares them with an **independent 65-bit sign-extended mathematical-saturation reference**. Two separate counterexample queries returned **UNSAT**:
+
+1. The observed LLVM/CLIF core `select( (y<0) XOR ((x+y)<x), ( (x+y) >>arithmetic 63 ) XOR MIN, x+y)` is equivalent on **all 2^128 signed-i64 input pairs** to mathematical signed-i64 saturating addition, under the admitted total bitvector semantics.
+2. The two exact sign-mask clamps `MIN XOR (sum >>arithmetic 63)` and `MIN ADD (sum >>arithmetic 63)` are equivalent for all signed 64-bit sums, **only as semantic expressions**; neither has a demonstrated lower native cost.
+
+Two deliberately wrong constructions (substituting logical for arithmetic right shift, and using an incorrect AND-based overflow predicate) both produced genuine **SAT counterexamples**, checking the solver harness's ability to refute non-equivalent candidates. No `unknown` was accepted.
+
+[Original raw solver artifact #13404527967](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42005719011/artifacts/13404527967) includes full counterexample query texts, solver version, SAT witnesses, source hashes and verdicts. Independently downloaded `receipt.json` SHA-256:
+`3987a0a0a5a6d0994048a3c2e0f1f072a06d740230c3d135697092b645a2107e`.
+The proof source SHA-256 in the receipt is `8103e9241253549e3f91deaf0c9989edf8ee1933779367fa3c6f121761dbc35a`.
+
+**This closes the pure i64 value-equivalence gap for the *observed Rust/LLVM computation graph***, not the named ISLE rule's provisional `select` specification or arbitrary compiler passes. The exact CLIF/source linkage remains a hash-bound human structural audit; we did not prove that Rust/LLVM emits this graph for all programs. No x86 flag/ABI/poison state, native rewrite, general machine ISA, power or throughput proof follows. An `ADD` replacement is a semantic search candidate, **not a verified cheaper code sequence** until independent same-CLIF baseline/patched costs are measured. Existing negative application-cost screens remain in force.
