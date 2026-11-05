@@ -93,3 +93,77 @@ All changes are on isolated
 research/2.8-tier1-cranelift-performance-20261102.
 Do not merge to ZenoFCIS main, retarget release/2.7, or push to Bytecode
 Alliance Wasmtime. The existing draft research PR #175 is the ledger.
+
+
+## Executed three-candidate AOT result and independent first-return audit — 2026-11-05 UTC
+
+**The genuine pinned compiler experiment has now completed.** Exact
+[Actions run #42054592441](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42054592441)
+passed all stages at source commit
+[fa170af0](https://github.com/TheDarkLightX/ZenoFCIS/commit/fa170af0d9edc35985f6a04a1dfdb7e5520342c1):
+independent QF_BV UNSAT proofs for both pure-value alternatives,
+a deliberate SAT counterexample control, three separate source-pinned
+Wasmtime compiler builds, finite execution of original Rust opt-0/opt-3
+Wasm against independent oracles, and actual emitted disassembly/ELF/
+complete .cwasm measurement with a separate read-only rechecker.
+[Raw AOT artifact #13429206078](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42054592441/artifacts/13429206078)
+has downloaded ZIP SHA-256
+d030a958c25eeef58623ccb9cf26c8dce697c6d76e6d7e107c7c5504fbf06a90.
+
+| Rust Wasm profile | Baseline whole AOT | Baseline ELF .text | ADD: whole AOT / .text delta | SUB: whole AOT / .text delta |
+| --- | ---: | ---: | ---: | ---: |
+| opt 0 (debug) | 66,016 B | 28,672 B | 0 / 0 B | 0 / 0 B |
+| opt 3 (optimized) | 14,472 B | 4,096 B | 0 / 0 B | 0 / 0 B |
+
+**Important distinction:** SUB compiled to byte-identical AOT and
+disassembly as the original (it is a target-cost tie). ADD **did**
+change actual AOT machine code in both profiles but did not save a
+single byte of either ELF .text or the complete .cwasm artifact.
+Neither result is a qualified performance improvement.
+
+The separate [read-only independent archived-byte audit #42112089725](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42112089725)
+**passed** at source commit
+[6b9b2b8](https://github.com/TheDarkLightX/ZenoFCIS/commit/6b9b2b875991281a7cb664eb38163e80aecc48c8).
+It downloaded the *same* archived AOT binary ZIP, verified the
+complete original SHA-256, passed **five positive/refusal controls**,
+recounted source/hash-pinned disassembly bytes for the five relevant
+Rust-exported functions, and checked independently recorded signed
+AOT cost comparisons. [Audit receipt artifact #13453577693](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42112089725/artifacts/13453577693).
+Reproducible code:
+[audit_rust_signmask_bytes_28.py](audit_rust_signmask_bytes_28.py),
+[test_audit_rust_signmask_bytes_28.py](test_audit_rust_signmask_bytes_28.py);
+pinned summary:
+[evidence/rust_signmask_prefix_audit_20261105.json](evidence/rust_signmask_prefix_audit_20261105.json).
+
+**What actually changed on x86-64:** the original clamp commonly
+uses an arithmetic shift and a 7-byte RIP-relative XOR with the sign-bit
+constant. ADD instead selects a 10-byte MOVABS of the 64-bit constant
+plus integer ADD. For the three saturation exports
+sat_add/sat_add_mix/sat_add_xor, first-ret-prefix lengths are:
+
+| Profile | Original three first-ret prefixes | ADD three first-ret prefixes | Extra ADD prefix bytes |
+| --- | --- | --- | ---: |
+| opt 0 | 65, 178, 69 | 71, 184, 75 | +18 total |
+| opt 3 | 51, 58, 54 | 56, 64, 60 | +17 total |
+
+The compiler reallocated registers and post-return padding/literal
+bytes. Thus the *shorter total disassembly regions* for ADD are **not**
+an improvement in straight-line first-return code, ELF .text or
+serialized AOT footprint. The latter two costs are empirically zero
+delta at both opt levels. A first-ret prefix is a static byte measure,
+**not** the number of dynamically executed instructions (especially
+in the debug functions with branches/traps). None of these results
+establishes latency, throughput, energy, generic target dominance,
+flags/ABI/poison coverage or an upstream rule proof.
+
+**Decision:** retain both refuted-cost/tie results in the deduplicated
+catalog and do not submit either substitute upstream. The next
+candidate vocabulary should operate at the *entire signed-overflow
+predicate and conditional-clamp dataflow* (or a target-specific lowering)
+rather than swapping algebraic encodings for one 64-bit constant.
+Require explicit QF_BV semantics for the complete rule, authoritative
+select/overflow specification, applicable named-rule coverage,
+and actual benefit over the already efficient original in real Rust
+or Wasm applications before an upstream PR. The existing research
+branch remains isolated and the original synthetic gains remain
+separately scoped.
