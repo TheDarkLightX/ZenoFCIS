@@ -1,0 +1,67 @@
+name: tier1-rust-signmask-archived-prefix-audit-28
+
+on:
+  push:
+    branches:
+      - research/2.8-tier1-cranelift-performance-20261102
+    paths:
+      - ".github/workflows/tier1-rust-signmask-archived-prefix-audit-28.yml"
+      - "experiments/cranelift-tier1/audit_rust_signmask_bytes_28.py"
+      - "experiments/cranelift-tier1/test_audit_rust_signmask_bytes_28.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: tier1-rust-signmask-archived-prefix-audit-28
+  cancel-in-progress: true
+
+jobs:
+  replay-real-archived-machine-bytes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact isolated research source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Download prior exact passing CI artifact rather than rebuild compilers
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -o "$RUNNER_TEMP/tier1-rust-signmask-28.zip" \
+            "https://api.github.com/repos/TheDarkLightX/ZenoFCIS/actions/artifacts/13429206078/zip"
+          echo "d030a958c25eeef58623ccb9cf26c8dce697c6d76e6d7e107c7c5504fbf06a90  $RUNNER_TEMP/tier1-rust-signmask-28.zip" | sha256sum -c -
+      - name: Independently count native byte prefixes and refuse cost tampering
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/test_audit_rust_signmask_bytes_28.py \
+            --zip "$RUNNER_TEMP/tier1-rust-signmask-28.zip"
+          python3 -B experiments/cranelift-tier1/audit_rust_signmask_bytes_28.py \
+            --zip "$RUNNER_TEMP/tier1-rust-signmask-28.zip" \
+            --out "$RUNNER_TEMP/tier1-rust-signmask-prefix-audit.json"
+          python3 - "$RUNNER_TEMP/tier1-rust-signmask-prefix-audit.json" <<'PY'
+          import json,sys
+          doc=json.load(open(sys.argv[1]))
+          rows={r['profile']:r for r in doc['profiles']}
+          assert rows['debug']['sum_extra_prefix_bytes_for_three_saturation_exports']==18
+          assert rows['optimized']['sum_extra_prefix_bytes_for_three_saturation_exports']==17
+          assert all(r['zero_complete_aot_savings'] and r['zero_elf_text_savings'] for r in rows.values())
+          print('QUALIFIED: +18 debug / +17 optimized first-ret prefix bytes (ADD), zero AOT savings')
+          PY
+      - name: Preserve independent read-only byte-cost receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-rust-signmask-first-ret-independent-recheck-28
+          path: ${{ runner.temp }}/tier1-rust-signmask-prefix-audit.json
+          retention-days: 30
+          if-no-files-found: warn
