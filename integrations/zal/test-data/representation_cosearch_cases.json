@@ -1,0 +1,21 @@
+{
+  "schema": "zeno-fcis/representation-cosearch-cases/1",
+  "roles": {
+    "development": "Grammar and selection examples; all rows visible to bounded checker",
+    "evaluation": "Frozen before transfer experiment; reused feature grammar is not adapted to these labels",
+    "negative": "Known bounded-grammar limitation; retain negative result"
+  },
+  "development": [
+    {"id": "xor", "kind": "xor", "domain": "boolean2"},
+    {"id": "radial", "kind": "radial", "domain": "grid2", "low": -2, "high": 2, "cutoff": 4},
+    {"id": "oblique", "kind": "oblique", "domain": "grid2", "low": -2, "high": 2, "cutoff": 4}
+  ],
+  "evaluation": [
+    {"id": "xnor", "kind": "xnor", "domain": "boolean2", "source": "xor"},
+    {"id": "radial_shift", "kind": "radial", "domain": "grid2", "low": -3, "high": 3, "cutoff": 9, "source": "radial"},
+    {"id": "oblique_shift", "kind": "oblique", "domain": "grid2", "low": -3, "high": 3, "cutoff": 9, "source": "oblique"}
+  ],
+  "negative": [
+    {"id": "parity3", "kind": "parity", "domain": "boolean3"}
+  ]
+}
