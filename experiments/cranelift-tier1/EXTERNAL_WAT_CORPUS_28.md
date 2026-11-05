@@ -84,3 +84,22 @@ branch was modified; no upstream PR was opened by this experiment.
 actually exercises the precise rewrite with independently verified
 benefit; stronger authoritative select semantics, cross-target
 correctness and controlled runtime checks before any upstream proposal.
+
+
+## Executed qualification — November 5, 2026 UTC
+
+**Exact-head [CI run #41963407858](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41963407858) PASSED**, at experiment commit [158af1cf7b4a](https://github.com/TheDarkLightX/ZenoFCIS/commit/158af1cf7b4aebc220878177fa9ec4fda1cbeab1). The [raw archive](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/41963407858/artifacts/13386776114) contains all twelve unchanged upstream WAT sources, baseline/patched native AOT binaries, disassemblies, original Git blob pins, one-rule patch, compiler logs, producer receipt and independently executed recheck.
+
+All five manifest/oracle/refusal controls passed. Both pinned Wasmtime CLI builds passed. Every one of the twelve external upstream WAT fixtures compiled successfully with the identical source under original versus patched compiler. The independent recheck and extra finite bswap/simple export executions passed.
+
+**Measured result: no code or artifact change for this external test corpus.**
+
+| Exact source population | Count | Native disassembly changed | ELF .text saving | Complete .cwasm saving |
+|---|---:|---:|---:|---:|
+| Pinned upstream Wasmtime compiler WAT fixtures | 12 | **0** | **0 bytes** | **0 bytes** |
+
+The producer reported complete AOT binary identity for **all 12/12** baseline-patched pairs, and zero actual ELF .text and complete .cwasm size difference per pair. The separately executed independent verifier reported 0 changed disassemblies, 12 successful audits, and a 0-byte summed complete-AOT delta. Every exact pair's entire native AOT bytes agreed, not merely its file length.
+
+This is **not an optimization regression or a rule counterexample**. The fixtures do not establish the target pattern's application prevalence; equally, this negative control does not invalidate the previous synthetic 4,096-byte mixed-module saving. It does prevent treating that earlier artificial saving as evidence of a general application benefit. Retain both positive and negative cases in the source/proof/cost catalog. The rule has **not** earned a general-purpose upstream optimization PR.
+
+Remaining gates: test idiomatic compiler output (for example Rust i64 signed saturating_add lowered to real Wasm); source real external application modules that include the target arithmetic; independently qualify pattern frequency and actual ELF/whole AOT costs; validate authoritative select semantics and the named VeriISLE rule; and measure runtime if an application saving emerges. No throughput/power/all-target claim or protected/upstream branch edit.
