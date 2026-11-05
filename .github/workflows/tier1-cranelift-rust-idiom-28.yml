@@ -10,6 +10,8 @@ on:
       - "experiments/cranelift-tier1/qualify_rust_idiom_wasm_28.py"
       - "experiments/cranelift-tier1/independent_recheck_rust_idiom_28.py"
       - "experiments/cranelift-tier1/test_rust_idiom_28.py"
+      - "experiments/cranelift-tier1/diagnose_rust_clif_shape_28.py"
+      - "experiments/cranelift-tier1/test_diagnose_rust_clif_28.py"
   workflow_dispatch:
 
 permissions:
@@ -49,6 +51,7 @@ jobs:
           rustup target add wasm32-unknown-unknown --toolchain 1.97.1
           rustc --version
           python3 -B experiments/cranelift-tier1/test_rust_idiom_28.py -v
+          python3 -B experiments/cranelift-tier1/test_diagnose_rust_clif_28.py -v
       - name: Build original and patched pinned Wasmtime compiler
         shell: bash
         run: |
@@ -99,6 +102,16 @@ jobs:
             --patched-bin tier1-rust-results/wasmtime-patched \
             --source-receipt tier1-rust-results/cases/qualification.json \
             --out tier1-rust-results/independent-recheck.json
+      - name: Capture actual Rust and positive-control Cranelift IR for rule reachability diagnosis
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/diagnose_rust_clif_shape_28.py \
+            --upstream upstream \
+            --baseline-bin tier1-rust-results/wasmtime-baseline \
+            --patched-bin tier1-rust-results/wasmtime-patched \
+            --source-receipt tier1-rust-results/cases/qualification.json \
+            --out tier1-rust-results/clif-diagnostics
       - name: Preserve original Rust/Wasm, actual native AOT, disassembly and receipts
         if: always()
         uses: actions/upload-artifact@v4
@@ -107,6 +120,7 @@ jobs:
           path: |
             tier1-rust-results/cases
             tier1-rust-results/independent-recheck.json
+            tier1-rust-results/clif-diagnostics
             tier1-rust-results/patch-receipt.json
             tier1-rust-results/one-rule.patch
             tier1-rust-results/source-and-host.txt
