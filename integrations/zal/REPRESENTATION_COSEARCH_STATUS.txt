@@ -1,1 +1,0 @@
-Research staging note: local prototype includes additional Python test and transport modules not yet committed. No production authority.
