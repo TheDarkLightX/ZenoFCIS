@@ -1,0 +1,112 @@
+name: tier1-cranelift-external-wat-aot-28
+
+on:
+  push:
+    branches:
+      - research/2.8-tier1-cranelift-performance-20261102
+    paths:
+      - ".github/workflows/tier1-cranelift-external-wat-28.yml"
+      - "experiments/cranelift-tier1/qualify_external_wat_corpus_28.py"
+      - "experiments/cranelift-tier1/independent_recheck_external_wat_28.py"
+      - "experiments/cranelift-tier1/test_external_wat_28.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tier1-cranelift-external-wat-aot-28
+  cancel-in-progress: true
+
+jobs:
+  external-pinned-corpus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    env:
+      RUSTUP_TOOLCHAIN: "1.97.1"
+      CARGO_BUILD_JOBS: "3"
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+    steps:
+      - name: Checkout isolated source HEAD
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout pinned external original WAT and Wasmtime compiler source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Validate fixed external corpus identities and independent oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          rustup toolchain install 1.97.1 --profile minimal
+          python3 -B experiments/cranelift-tier1/test_external_wat_28.py -v
+      - name: Build original and one-rule experimental Wasmtime CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-external-results
+          {
+            echo "ZenoFCIS revision $(git rev-parse HEAD)"
+            echo "Pinned Wasmtime $(git -C upstream rev-parse HEAD)"
+            rustc --version
+            cargo --version
+            uname -a
+            sha256sum experiments/cranelift-tier1/qualify_external_wat_corpus_28.py
+            sha256sum experiments/cranelift-tier1/independent_recheck_external_wat_28.py
+          } > tier1-external-results/source-and-host.txt
+          cargo build --locked --manifest-path upstream/Cargo.toml \
+            -p wasmtime-cli --bin wasmtime --no-default-features \
+            --features run,compile,wat,objdump \
+            > tier1-external-results/baseline-build.stdout \
+            2> tier1-external-results/baseline-build.stderr
+          cp upstream/target/debug/wasmtime tier1-external-results/wasmtime-baseline
+          python3 -B experiments/cranelift-tier1/install_isle_candidate.py \
+            --upstream upstream --out tier1-external-results/patch-receipt.json
+          git -C upstream diff -- cranelift/codegen/src/opts/selects.isle \
+            > tier1-external-results/one-rule.patch
+          cargo build --locked --manifest-path upstream/Cargo.toml \
+            -p wasmtime-cli --bin wasmtime --no-default-features \
+            --features run,compile,wat,objdump \
+            > tier1-external-results/patched-build.stdout \
+            2> tier1-external-results/patched-build.stderr
+          cp upstream/target/debug/wasmtime tier1-external-results/wasmtime-patched
+      - name: Compile exact upstream fixture corpus with both compilers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/qualify_external_wat_corpus_28.py \
+            --upstream upstream \
+            --baseline-bin tier1-external-results/wasmtime-baseline \
+            --patched-bin tier1-external-results/wasmtime-patched \
+            --out tier1-external-results/cases
+      - name: Independently audit Git source, native emitted ELF/AOT, costs and finite results
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/independent_recheck_external_wat_28.py \
+            --upstream upstream \
+            --baseline-bin tier1-external-results/wasmtime-baseline \
+            --patched-bin tier1-external-results/wasmtime-patched \
+            --source-receipt tier1-external-results/cases/qualification.json \
+            --out tier1-external-results/independent-recheck.json
+      - name: Preserve original sources, ELF/AOT files, independent receipts and compile logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-external-wasmtime-wat-aot-original-patched-28
+          path: |
+            tier1-external-results/cases
+            tier1-external-results/independent-recheck.json
+            tier1-external-results/patch-receipt.json
+            tier1-external-results/one-rule.patch
+            tier1-external-results/source-and-host.txt
+            tier1-external-results/*.stdout
+            tier1-external-results/*.stderr
+          retention-days: 30
+          if-no-files-found: warn
