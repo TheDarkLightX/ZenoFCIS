@@ -1,0 +1,116 @@
+name: tier1-overflow-matcher-canary-28
+
+on:
+  push:
+    branches:
+      - research/2.8-tier1-cranelift-performance-20261102
+    paths:
+      - ".github/workflows/tier1-overflow-matcher-canary-28.yml"
+      - "experiments/cranelift-tier1/install_overflow_match_canary_28.py"
+      - "experiments/cranelift-tier1/qualify_overflow_match_canary_28.py"
+      - "experiments/cranelift-tier1/independent_recheck_overflow_match_canary_28.py"
+      - "experiments/cranelift-tier1/test_overflow_match_canary_28.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tier1-overflow-matcher-canary-28
+  cancel-in-progress: true
+
+jobs:
+  intentionally-unsafe-matcher-diagnostic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 115
+    env:
+      CARGO_BUILD_JOBS: "3"
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      RUSTUP_TOOLCHAIN: "1.97.1"
+    steps:
+      - name: Checkout isolated ZenoFCIS exact research source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout pinned detached upstream Wasmtime
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Test intentional-unsound diagnostic contracts and independent finite oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal --target wasm32-unknown-unknown
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          python3 -B experiments/cranelift-tier1/test_overflow_match_canary_28.py -v
+      - name: Build original and exactly two intentional-invalid canary compilers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-canary-results
+          {
+            echo "ZenoFCIS $(git rev-parse HEAD)"
+            echo "Wasmtime $(git -C upstream rev-parse HEAD)"
+            rustc --version
+            cargo --version
+            sha256sum experiments/cranelift-tier1/install_overflow_match_canary_28.py
+            sha256sum experiments/cranelift-tier1/qualify_overflow_match_canary_28.py
+            sha256sum experiments/cranelift-tier1/independent_recheck_overflow_match_canary_28.py
+          } > tier1-canary-results/source-and-toolchain.txt
+          for mode in baseline exact_canary broad_canary; do
+            python3 -B experiments/cranelift-tier1/install_overflow_match_canary_28.py \
+              --upstream upstream --mode "$mode" \
+              --out "tier1-canary-results/$mode-source.json"
+            git -C upstream diff -- cranelift/codegen/src/opts/selects.isle \
+              > "tier1-canary-results/$mode.patch"
+            cargo build --locked --manifest-path upstream/Cargo.toml \
+              -p wasmtime-cli --bin wasmtime --no-default-features \
+              --features run,compile,wat,objdump \
+              > "tier1-canary-results/$mode-build.stdout" \
+              2> "tier1-canary-results/$mode-build.stderr"
+            cp upstream/target/debug/wasmtime "tier1-canary-results/wasmtime-$mode"
+            sha256sum "tier1-canary-results/wasmtime-$mode" \
+              >> tier1-canary-results/source-and-toolchain.txt
+          done
+      - name: Generate same Rust Wasm and inspect actual emitted canary AOT and wrong-output witnesses
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/qualify_overflow_match_canary_28.py \
+            --upstream upstream \
+            --baseline-bin tier1-canary-results/wasmtime-baseline \
+            --exact-canary-bin tier1-canary-results/wasmtime-exact_canary \
+            --broad-canary-bin tier1-canary-results/wasmtime-broad_canary \
+            --baseline-receipt tier1-canary-results/baseline-source.json \
+            --exact-canary-receipt tier1-canary-results/exact_canary-source.json \
+            --broad-canary-receipt tier1-canary-results/broad_canary-source.json \
+            --out tier1-canary-results/cases
+      - name: Independently remeasure AOT, replay second-oracle outputs and recompute diagnostic
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/independent_recheck_overflow_match_canary_28.py \
+            --source-receipt tier1-canary-results/cases/qualification.json \
+            --baseline-bin tier1-canary-results/wasmtime-baseline \
+            --exact-canary-bin tier1-canary-results/wasmtime-exact_canary \
+            --broad-canary-bin tier1-canary-results/wasmtime-broad_canary \
+            --out tier1-canary-results/independent-recheck.json
+      - name: Archive only diagnostic objects and receipts, NOT invalid compiler binaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-overflow-invalid-canary-diagnostic-28
+          path: |
+            tier1-canary-results/cases
+            tier1-canary-results/independent-recheck.json
+            tier1-canary-results/source-and-toolchain.txt
+            tier1-canary-results/*-source.json
+            tier1-canary-results/*.patch
+            tier1-canary-results/*.stdout
+            tier1-canary-results/*.stderr
+          retention-days: 30
+          if-no-files-found: warn
