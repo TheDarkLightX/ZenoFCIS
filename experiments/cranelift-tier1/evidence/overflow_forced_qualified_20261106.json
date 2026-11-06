@@ -1,0 +1,140 @@
+{
+  "schema": "zeno-fcis/tier1-overflow-forced-qualified-checkpoint/1",
+  "date_utc": "2026-11-06",
+  "status": "verified-no-size-win-forced-equivalent-code-has-longer-executable-prefix",
+  "experiment_source_commit": "26627fa770e4f74d7ddc67aea53e84b8d0ac91d1",
+  "upstream_wasmtime_sha": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "toolchain": "rustc 1.97.1 wasm32-unknown-unknown, Cranelift x86_64-unknown-linux",
+  "workflow": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42292776837",
+  "original_artifact": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42292776837/artifacts/13540437568",
+  "original_artifact_zip_sha256": "e89f305a6306d5dcccfe1312be9b6bc51319f3ed5d0bdba29f6d3e0c27820506",
+  "original_producer_receipt_sha256": "62cc44f76eef7aded2703d52e04909852e5f6d6ae7fcc9c7b87cda6e1c52eb31",
+  "independent_recheck_receipt_sha256": "4b15a2dea54d37eee3ed20e1aef4312fb9de10cc7a03676cce8609b6e8930268",
+  "pure_qfbv_receipt_sha256": "9775012538804accb9c19799cb203d2f86c4eefb3ce8b6bdae169c2204e2a0dd",
+  "forced_rule_patch_sha256": "df979df664e3ea7a55c50e3874bf53b2234975e9756987d9b784a30e7cb858fc",
+  "named_veriisle": {
+    "artifact": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42292776837/artifacts/13539499948",
+    "status": "proved-relative-to-unchanged-upstream-spec",
+    "applicable": 1,
+    "passed": 1,
+    "failed": 0,
+    "unknown": 0,
+    "expansion_errors": 0
+  },
+  "semantic_assurance": {
+    "pure_bitvector": "four all-i64-pair QF_BV UNSAT equivalences, one deliberately SAT invalid comparison",
+    "native_execution": "finite Rust-generated Wasm witnesses for all three compiler variants, reexecuted with independent oracle",
+    "undefined_or_poison": "total admitted i64 scalar expressions only; no full machine-state proof",
+    "flags_abi": "not verified for arbitrary contexts or ISA states"
+  },
+  "catalog": [
+    {
+      "profile": "debug",
+      "source_wasm_sha256": "ed0862b7932d7e5d1308f2bc72b3ddb5808a89c31112f18f4fdbf80af5774528",
+      "content_key": "989320a84478d9ea18ed2f31d8ecbfb43008cba304293cfcd71f7b491a9be87e",
+      "aot_sha256": "1f635fc95b40c0a11d2979297ddced454fa852c2e9d2a6ce9e91a0629c7c6a4c",
+      "modes": [
+        "baseline",
+        "unforced"
+      ],
+      "aot_bytes": 66016,
+      "elf_text_bytes": 28672
+    },
+    {
+      "profile": "debug",
+      "source_wasm_sha256": "ed0862b7932d7e5d1308f2bc72b3ddb5808a89c31112f18f4fdbf80af5774528",
+      "content_key": "dd2ed43a823644c09a71d6bc693f3c453fabc2c554861aee28e37a3143632ccf",
+      "aot_sha256": "462e96c96bdb438c8e0026dd1efe6f90e6e66f9ebbd41f12736c6802e5e68feb",
+      "modes": [
+        "forced"
+      ],
+      "aot_bytes": 66016,
+      "elf_text_bytes": 28672
+    },
+    {
+      "profile": "optimized",
+      "source_wasm_sha256": "351dd71eb10ab7c7c6a962cea8fd88c9fd95800ac9d191d25854aa77582727fb",
+      "content_key": "e5e53760b434a867f333c4f5d1d5165fe939c17a403b92aa935d066d0181c9f2",
+      "aot_sha256": "44f5c429d8e1e903b0b24546e638a835d945e7f019a4061fc962fdc19544deb9",
+      "modes": [
+        "baseline",
+        "unforced"
+      ],
+      "aot_bytes": 14472,
+      "elf_text_bytes": 4096
+    },
+    {
+      "profile": "optimized",
+      "source_wasm_sha256": "351dd71eb10ab7c7c6a962cea8fd88c9fd95800ac9d191d25854aa77582727fb",
+      "content_key": "bad2142cd1b01b6e5f5b77b5cd82166634ec75b8a4b1fc61ee1570e8fe37a105",
+      "aot_sha256": "4c0a16fbab46e2a96956e105fcd14ea9a561dfd8fbd98fe3dc55d3e25a18e9f8",
+      "modes": [
+        "forced"
+      ],
+      "aot_bytes": 14472,
+      "elf_text_bytes": 4096
+    }
+  ],
+  "executable_prefix_cost": {
+    "interpretation": "manually parsed archived disassembly through first retq; per exported function, not whole AOT, not performance",
+    "debug": {
+      "sat_add": {
+        "baseline_bytes": 65,
+        "forced_bytes": 72,
+        "baseline_instructions": 20,
+        "forced_instructions": 22
+      },
+      "sat_add_mix": {
+        "baseline_bytes": 178,
+        "forced_bytes": 189,
+        "baseline_instructions": 47,
+        "forced_instructions": 51
+      },
+      "sat_add_xor": {
+        "baseline_bytes": 69,
+        "forced_bytes": 76,
+        "baseline_instructions": 21,
+        "forced_instructions": 23
+      },
+      "total": {
+        "baseline_bytes": 312,
+        "forced_bytes": 337,
+        "baseline_instructions": 88,
+        "forced_instructions": 96
+      }
+    },
+    "optimized": {
+      "sat_add": {
+        "baseline_bytes": 51,
+        "forced_bytes": 57,
+        "baseline_instructions": 16,
+        "forced_instructions": 18
+      },
+      "sat_add_mix": {
+        "baseline_bytes": 58,
+        "forced_bytes": 65,
+        "baseline_instructions": 18,
+        "forced_instructions": 20
+      },
+      "sat_add_xor": {
+        "baseline_bytes": 54,
+        "forced_bytes": 61,
+        "baseline_instructions": 17,
+        "forced_instructions": 19
+      },
+      "total": {
+        "baseline_bytes": 163,
+        "forced_bytes": 183,
+        "baseline_instructions": 51,
+        "forced_instructions": 57
+      }
+    }
+  },
+  "limits": [
+    "not a faster instruction sequence or an upstream optimization",
+    "whole .cwasm and ELF .text baseline-minus-forced differences zero in both Rust profiles",
+    "forced exact matcher impact established in two pinned Rust profiles, not a universal match count",
+    "no runtime throughput, other-target cost or generic ABI/flags/poison assurance"
+  ],
+  "upstream_submission": "none; research branch only"
+}
