@@ -1,0 +1,87 @@
+{
+  "schema": "zeno-fcis/tier1-rust-llvm-overflow-qualification/1",
+  "qualification_date_utc": "2026-11-06",
+  "experiment": "tier1_rust_llvm_i64_overflow_xorand",
+  "scope": "source-pinned selected Rust i64 saturating-add Wasm only; no generic speed or target correctness claim",
+  "source": {
+    "zenofcis_ci_source": "369d19e1b07ffb04591eee580843967cf6242e20",
+    "zenofcis_veriisle_source": "a6548bc227b05da2ae97f1ba00ac9513d353adda",
+    "isolated_branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "upstream_wasmtime": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "upstream_selects_isle_blob": "6a6a9129f382d5cd45ae0919ae18683973b31db2",
+    "rule_sha256": "18e2b71647f3206caa151d82fb3511bd6bcae8b0b41d8ab729fa0acdb612353d",
+    "rule_name": "tier1_rust_llvm_i64_overflow_xorand"
+  },
+  "semantic": {
+    "domain": "all pairs of signed 64-bit bitvectors with modular addition; no assumed machine flags/ABI, no poison/undefined in admitted pure integer expressions",
+    "baseline": "(y <signed 0) XOR (signed_lt((x+y) mod 2^64, x))",
+    "candidate": "signed_lt(((sum XOR x) AND (sum XOR y)),0), sum=(x+y) mod 2^64",
+    "independent_reference": "65-bit sign-extended mathematical saturating addition",
+    "proof": "QF_BV SMT UNSAT for four required counterexample queries; one deliberately incorrect formula SAT",
+    "solver": "Z3 4.15.4",
+    "receipt_sha256": "9775012538804accb9c19799cb203d2f86c4eefb3ce8b6bdae169c2204e2a0dd"
+  },
+  "named_veriisle": {
+    "status": "passed-relative-to-unchanged-upstream-specifications",
+    "verifier": "pinned upstream cranelift-isle-veri --name opt --rule tier1_rust_llvm_i64_overflow_xorand",
+    "supplemental_spec_changes": 0,
+    "applicable": 1,
+    "passed": 1,
+    "failed": 0,
+    "unknown": 0,
+    "expansion_errors": 0,
+    "receipt_sha256": "a96af4e869d3c656cc6691a854482d33da070b5c9b8ba7fe30a56f058665602e"
+  },
+  "native_aot": {
+    "target": "x86_64-unknown-linux",
+    "rustc": "1.97.1",
+    "measurements": [
+      {
+        "profile": "debug",
+        "baseline_cwasm_bytes": 66016,
+        "candidate_cwasm_bytes": 66016,
+        "baseline_elf_text_bytes": 28672,
+        "candidate_elf_text_bytes": 28672,
+        "baseline_aot_sha256": "1f635fc95b40c0a11d2979297ddced454fa852c2e9d2a6ce9e91a0629c7c6a4c",
+        "candidate_aot_sha256": "1f635fc95b40c0a11d2979297ddced454fa852c2e9d2a6ce9e91a0629c7c6a4c",
+        "disassembly_identical": true
+      },
+      {
+        "profile": "optimized",
+        "baseline_cwasm_bytes": 14472,
+        "candidate_cwasm_bytes": 14472,
+        "baseline_elf_text_bytes": 4096,
+        "candidate_elf_text_bytes": 4096,
+        "baseline_aot_sha256": "44f5c429d8e1e903b0b24546e638a835d945e7f019a4061fc962fdc19544deb9",
+        "candidate_aot_sha256": "44f5c429d8e1e903b0b24546e638a835d945e7f019a4061fc962fdc19544deb9",
+        "disassembly_identical": true
+      }
+    ],
+    "qualified_cost_delta_bytes": 0,
+    "runtime": "not measured",
+    "finite_execution": "passed for both compilers and both optimization profiles; not exhaustive machine semantics",
+    "deduplicated_aot_catalog_entries": 2,
+    "producer_receipt_sha256": "ff3721bca6381ae3ae7e1dcba3b288ed28bfca78320d5c9e8d527319305d9a34",
+    "independent_receipt_sha256": "6a43f0a37a2fdf3410203f2cac933299a83137ef8a9021f550a5b0df06f19905"
+  },
+  "artifacts": [
+    {
+      "run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42153504030",
+      "id": 13476297121,
+      "zip_sha256": "cd02d65b646869282e4e95a8564fdd6943f5d5fafa7a30427846b640431f1f23"
+    },
+    {
+      "run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42153664266",
+      "id": 13476302260,
+      "zip_sha256": "7b5cf3d8ac80d7009106cf1a207199441d743fa528b78b9bc04fa81ad901c946"
+    }
+  ],
+  "qualification": "semantically qualified under stated models, but NOT a demonstrated target-relevant cheaper sequence for tested Rust workloads",
+  "limitations": [
+    "Named-rule VeriISLE checks one applicable expansion; not a whole-pass, flags, ABI, target ISA or poison proof",
+    "Wasm finite executable tests are not exhaustiveness or SMT proofs of native code",
+    "No instruction-, ELF-, or complete-AOT size win on either pinned Rust profile",
+    "No production workload prevalence, throughput, latency or energy benefit measured",
+    "No upstream Bytecode Alliance PR recommended based on this candidate"
+  ]
+}
