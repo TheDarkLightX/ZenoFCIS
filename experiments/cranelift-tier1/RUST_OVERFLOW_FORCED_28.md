@@ -78,3 +78,28 @@ test outcome MUST be checked independently before claiming any new saving.
 This remains research-only on the separate ZenoFCIS branch. It must not
 change the main or release branches, or submit/merge any Wasmtime upstream
 PR. No user action required.
+
+
+## Completed source-pinned cost and semantic qualification — November 6, 2026
+
+The exact [GitHub Actions run #42292776837](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42292776837), ZenoFCIS source **\`26627fa770e4f74d7ddc67aea53e84b8d0ac91d1\`**, **passed both jobs**. The actual unchanged-spec forced-rule VeriISLE verdict is **1 applicable / 1 passed / 0 failed / 0 unknown / 0 expansion errors**; original [proof logs #13539499948](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42292776837/artifacts/13539499948). The full native job independently completed fresh four all-input QF_BV UNSAT checks, its deliberate SAT negative control, all finite Rust-generated Wasm executions, actual ELF/complete AOT cost measurement and the independent second-oracle and artifact catalog replay; original [AOT/raw receipt artifact #13540437568](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42292776837/artifacts/13540437568) (ZIP SHA-256 \`e89f305a6306d5dcccfe1312be9b6bc51319f3ed5d0bdba29f6d3e0c27820506\`).
+
+**Observed codegen result:** The ordinary value-equivalent xor-and rewrite still emitted **byte-identical AOT** to baseline in both Rust profiles. The explicitly \`subsume\`-forced, identically proven expression **changed native instructions and binary hashes**, while remaining correct on all executed finite witnesses. Independently recomputed full \`.cwasm\` and ELF \`.text\` sizes still **saved zero bytes**. This is a controlled counterexample to treating a verified ISLE identity as an automatically cheaper lowering.
+
+| Rust profile | Baseline/unforced/forced complete AOT | Baseline/unforced/forced ELF .text |
+|---|---|---|
+| Debug | 66,016 / 66,016 / 66,016 bytes | 28,672 / 28,672 / 28,672 bytes |
+| Optimized | 14,472 / 14,472 / 14,472 bytes | 4,096 / 4,096 / 4,096 bytes |
+
+I additionally downloaded the original CI-produced archive, checked SHA-256, and decoded the retained per-function disassembly **through each function's first return instruction**. These are target code prefix lengths, **not** whole-object costs, static symbol sizes or benchmarked runtime throughput. No code was regenerated to produce this supplemental inspection.
+
+| Function | Debug baseline → forced bytes / instructions | Optimized baseline → forced bytes / instructions |
+|---|---|---|
+| \`sat_add\` | 65 → 72 B / 20 → 22 | 51 → 57 B / 16 → 18 |
+| \`sat_add_mix\` | 178 → 189 B / 47 → 51 | 58 → 65 B / 18 → 20 |
+| \`sat_add_xor\` | 69 → 76 B / 21 → 23 | 54 → 61 B / 17 → 19 |
+| **Three-function sum** | **312 → 337 B / 88 → 96** | **163 → 183 B / 51 → 57** |
+
+The source-linked disassembly concretely shows additional materialization/zero-extension and wider \`testl\` in the forced path in the measured x86-64 output. **This candidate makes these three executed instruction prefixes longer by 25 bytes (debug) and 20 bytes (optimized)**, even though full AOT lengths are absorbed by object layout and alignment.
+
+**Decision:** This precise equivalent predicate transformation is **not a Tier-1 code-size optimization** on these workloads. Do not submit it upstream. The canary and forced-equivalent experiments now establish that the matcher is observably reachable when forced, but forcing this mathematically equivalent rewrite selects a more costly native instruction form, not a cheaper one. Keep the valid negative receipt in the catalog, and switch attention to a genuinely target-cost-aware whole lowering/overflow predicate or another prevalent compiler idiom. The named VeriISLE proof is limited to its admitted IR semantics; none of this proves general ISA flag/ABI/poison correctness or any speed advantage. No protected or upstream branch mutation.
