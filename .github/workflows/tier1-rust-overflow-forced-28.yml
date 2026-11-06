@@ -1,0 +1,184 @@
+name: tier1-rust-overflow-forced-28
+
+on:
+  push:
+    branches:
+      - research/2.8-tier1-cranelift-performance-20261102
+    paths:
+      - ".github/workflows/tier1-rust-overflow-forced-28.yml"
+      - "experiments/cranelift-tier1/install_overflow_forced_28.py"
+      - "experiments/cranelift-tier1/qualify_overflow_forced_28.py"
+      - "experiments/cranelift-tier1/independent_recheck_overflow_forced_28.py"
+      - "experiments/cranelift-tier1/verify_overflow_forced_veriisle_28.py"
+      - "experiments/cranelift-tier1/test_overflow_forced_28.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tier1-rust-overflow-forced-28
+  cancel-in-progress: true
+
+jobs:
+  pinned-three-way-rust-wasm-aot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 115
+    env:
+      CARGO_BUILD_JOBS: "3"
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      RUSTUP_TOOLCHAIN: "1.97.1"
+    steps:
+      - name: Checkout exact ZenoFCIS isolated research source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout pinned Wasmtime in detached experimental workspace
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Guard closed grammar and run independent finite and fresh QF_BV controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          rustup toolchain install 1.97.1 --profile minimal --target wasm32-unknown-unknown
+          python3 -B experiments/cranelift-tier1/test_overflow_forced_28.py -v
+          python3 -B experiments/cranelift-tier1/test_rust_overflow_predicate_28.py -v
+          mkdir -p tier1-forced-results
+          {
+            git rev-parse HEAD
+            git -C upstream rev-parse HEAD
+            rustc --version
+            cargo --version
+            sha256sum experiments/cranelift-tier1/install_overflow_forced_28.py
+            sha256sum experiments/cranelift-tier1/qualify_overflow_forced_28.py
+            sha256sum experiments/cranelift-tier1/independent_recheck_overflow_forced_28.py
+          } > tier1-forced-results/source-toolchain.txt
+          python3 -m venv "$RUNNER_TEMP/tier1-forced-venv"
+          "$RUNNER_TEMP/tier1-forced-venv/bin/python" -m pip install \
+            --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          "$RUNNER_TEMP/tier1-forced-venv/bin/python" -B \
+            experiments/cranelift-tier1/verify_rust_overflow_predicate_28.py \
+            --out tier1-forced-results/pure-i64-qfbv-proof.json
+      - name: Build exactly original, ordinary and forced-equivalent Wasmtime compilers
+        shell: bash
+        run: |
+          set -euo pipefail
+          for mode in baseline unforced forced; do
+            python3 -B experiments/cranelift-tier1/install_overflow_forced_28.py \
+              --upstream upstream --mode "$mode" \
+              --out "tier1-forced-results/$mode-source-receipt.json"
+            git -C upstream diff -- cranelift/codegen/src/opts/selects.isle \
+              > "tier1-forced-results/$mode.patch"
+            cargo build --locked --manifest-path upstream/Cargo.toml \
+              -p wasmtime-cli --bin wasmtime --no-default-features \
+              --features run,compile,wat,objdump \
+              > "tier1-forced-results/$mode-build.stdout" \
+              2> "tier1-forced-results/$mode-build.stderr"
+            cp upstream/target/debug/wasmtime "tier1-forced-results/wasmtime-$mode"
+            sha256sum "tier1-forced-results/wasmtime-$mode" \
+              >> tier1-forced-results/source-toolchain.txt
+          done
+      - name: Qualify same-Rust-Wasm native AOT cost and finite semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/qualify_overflow_forced_28.py \
+            --upstream upstream \
+            --baseline-bin tier1-forced-results/wasmtime-baseline \
+            --unforced-bin tier1-forced-results/wasmtime-unforced \
+            --forced-bin tier1-forced-results/wasmtime-forced \
+            --baseline-receipt tier1-forced-results/baseline-source-receipt.json \
+            --unforced-receipt tier1-forced-results/unforced-source-receipt.json \
+            --forced-receipt tier1-forced-results/forced-source-receipt.json \
+            --out tier1-forced-results/cases
+      - name: Independent actual ELF and complete AOT byte audit, second-oracle reexecution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/independent_recheck_overflow_forced_28.py \
+            --source-receipt tier1-forced-results/cases/qualification.json \
+            --baseline-bin tier1-forced-results/wasmtime-baseline \
+            --unforced-bin tier1-forced-results/wasmtime-unforced \
+            --forced-bin tier1-forced-results/wasmtime-forced \
+            --out tier1-forced-results/independent-recheck.json
+      - name: Preserve native AOT files, source-pinned costs, catalogs and finite proofs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-rust-overflow-forced-correct-native-aot-28
+          path: |
+            tier1-forced-results/cases
+            tier1-forced-results/independent-recheck.json
+            tier1-forced-results/pure-i64-qfbv-proof.json
+            tier1-forced-results/*-source-receipt.json
+            tier1-forced-results/*.patch
+            tier1-forced-results/source-toolchain.txt
+            tier1-forced-results/*.stdout
+            tier1-forced-results/*.stderr
+          retention-days: 30
+          if-no-files-found: warn
+
+  pinned-unchanged-spec-veriisle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      CARGO_BUILD_JOBS: "2"
+      RUSTUP_TOOLCHAIN: "1.97.1"
+    steps:
+      - name: Checkout exact isolated research source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout detached pinned upstream Wasmtime
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Install solver dependencies and exact Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cvc5 z3
+          rustup toolchain install 1.97.1 --profile minimal
+          mkdir -p tier1-forced-veriisle
+          {
+            git rev-parse HEAD
+            git -C upstream rev-parse HEAD
+            rustc --version
+            cargo --version
+            cvc5 --version
+            z3 --version
+          } > tier1-forced-veriisle/toolchain.txt
+      - name: Install only the forced *correct* rule
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/install_overflow_forced_28.py \
+            --upstream upstream --mode forced \
+            --out tier1-forced-veriisle/source-receipt.json
+          git -C upstream diff -- cranelift/codegen/src/opts/selects.isle \
+            > tier1-forced-veriisle/exact-forced.patch
+      - name: Independently verify exact named rule under unchanged upstream specs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/verify_overflow_forced_veriisle_28.py \
+            --upstream upstream \
+            --out tier1-forced-veriisle/qualification.json
+      - name: Preserve full verifier counts, raw logs and exact rule diff
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-rust-overflow-forced-unchanged-spec-veriisle-28
+          path: tier1-forced-veriisle
+          retention-days: 30
+          if-no-files-found: warn
