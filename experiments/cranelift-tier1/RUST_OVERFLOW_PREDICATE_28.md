@@ -78,3 +78,24 @@ positive instruction-size result.
 
 No protected ZenoFCIS branch, release branch or Bytecode Alliance repo
 is changed. Draft research PR #175 remains the existing checkpoint.
+
+
+## Qualification completed — November 6, 2026 UTC
+
+Two exact source-pinned GitHub Actions runs completed **successfully**:
+
+- [Real native AOT and QF_BV proof #42153504030](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42153504030), ZenoFCIS source `369d19e1b07ffb04591eee580843967cf6242e20`: QF_BV gave four `unsat` equivalence checks over the declared complete 64-bit input domain and a real `sat` negative control, Z3 4.15.4. Both original and one-rule-patched Wasmtime CLIs built from pinned upstream; independently rechecked executable finite tests, hashed objects, and byte comparisons all passed.
+- [Named unchanged-spec VeriISLE #42153664266](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42153664266), experimental source `a6548bc227b05da2ae97f1ba00ac9513d353adda`: the **actual named mid-end rule** passed **1/1 applicable** VeriISLE expansion, **0 failed, 0 unknown, 0 expansion errors**, without any locally supplied or changed verifier specifications. This advances the proof state beyond the prior *different* clamp rule's provisional `select`-spec limitation. It is not a whole-backend or machine-flag/ABI/poison proof.
+
+**Measured real costs:** both compiled Rust Wasm profiles produced byte-identical original/candidate AOT binaries and native disassemblies:
+
+| Rust profile | Baseline/candidate complete `.cwasm` | Baseline/candidate ELF `.text` | Savings |
+|---|---:|---:|---:|
+| debug | 66,016 / 66,016 B | 28,672 / 28,672 B | **0 B** |
+| optimized | 14,472 / 14,472 B | 4,096 / 4,096 B | **0 B** |
+
+The compiler binaries themselves have **different** hashes (the experimental compiler was rebuilt), but their emitted objects for these inputs are identical. The result is **semantic verification without a measured optimization**. It cannot establish whether the intended rule actually matched, or whether a matched rule was later canonicalized away. A compiler-side match trace or exact post-opt CLIF audit is needed to distinguish those explanations. No throughput/latency claim or upstream submission is justified.
+
+A durable machine-readable [source, proof, cost and artifact-hash checkpoint](evidence/rust_overflow_predicate_qualified_20261106.json) records the complete AOT SHA-256 identities, QF_BV receipt, 1/1 VeriISLE coverage, actual 0-byte deltas, independent audit, artifact ZIP hashes, and nonclaims. Original [AOT/raw proof artifact](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42153504030/artifacts/13476297121) and [VeriISLE raw logs](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42153664266/artifacts/13476302260) remain available subject to artifact retention.
+
+**Next direction:** avoid submitting an x86 target-size optimization until a source-pinned reachable rule is observed to change code and independently lower actual emitted cost. Trace rule application/optimizer-stage IR on the actual Rust CLIF, or pursue a distinct target-aware lowering with an explicit cost case. Preserve current honest negative catalog result.
