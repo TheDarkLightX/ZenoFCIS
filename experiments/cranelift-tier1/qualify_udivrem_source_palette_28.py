@@ -61,7 +61,7 @@ WATS = {
 """,
 }
 ASM_LINE = re.compile(r"^ {12}([0-9a-f]{2}(?: [0-9a-f]{2})*)(?: {2,}(.*)|$)")
-HEADER = "wasm[0]::function[0]::work:"
+HEADERS = ("wasm[0]::function[0]:", "wasm[0]::function[0]::work:")
 VECTORS = tuple((x, y) for x, y in frontend.VECTORS if y != 0)
 
 
@@ -97,11 +97,11 @@ def disasm_cost(source: str) -> dict:
     """Static machine-code costs, NOT a dynamically executed instruction trace."""
     rows = source.splitlines()
     headers = [i for i, row in enumerate(rows) if row.startswith("wasm[0]::function[")]
-    if len(headers) != 1 or rows[headers[0]] != HEADER:
+    if len(headers) != 1 or rows[headers[0]] not in HEADERS:
         raise ValueError("missing or surplus exact Wasm function")
     region, thru_ret, instructions, ndiv, ret_count = 0, None, 0, 0, 0
     for line in rows[headers[0] + 1:]:
-        if not line.strip():
+        if not line.strip() or line.strip() == "╰─╼ trap: Normal(IntegerDivisionByZero)":
             continue
         match = ASM_LINE.fullmatch(line)
         if not match:

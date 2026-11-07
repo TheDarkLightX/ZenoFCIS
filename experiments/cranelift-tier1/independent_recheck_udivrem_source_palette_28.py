@@ -23,11 +23,11 @@ import qualify_wasmtime_frontend_28 as frontend
 def independent_static_cost(raw: str) -> dict:
     lines = raw.splitlines()
     labels = [i for i, line in enumerate(lines) if line.startswith("wasm[0]::function[")]
-    if len(labels) != 1 or lines[labels[0]] != "wasm[0]::function[0]::work:":
+    if len(labels) != 1 or lines[labels[0]] not in ("wasm[0]::function[0]:", "wasm[0]::function[0]::work:"):
         raise ValueError("cannot identify unique exported function")
     total_bytes, ret_bytes, op_count, divs, ret_count = 0, None, 0, 0, 0
     for line in lines[labels[0] + 1:]:
-        if not line.strip():
+        if not line.strip() or line.strip() == "╰─╼ trap: Normal(IntegerDivisionByZero)":
             continue
         if not line.startswith("            "):
             raise ValueError("not an expected instruction rendering")

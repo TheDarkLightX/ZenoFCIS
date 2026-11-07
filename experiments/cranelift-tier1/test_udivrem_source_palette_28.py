@@ -59,6 +59,12 @@ class TestUdivRemPalette(unittest.TestCase):
         self.assertEqual(record["static_div_instructions"], 1)
         self.assertEqual(record["decoded_instruction_lines"], 3)
         self.assertTrue(record["not_dynamic"])
+        actual_header = fake.replace("::work:", ":")
+        actual_trap = actual_header.replace(
+            "            c3  retq\n",
+            "                                          ╰─╼ trap: Normal(IntegerDivisionByZero)\n"
+            "            c3  retq\n")
+        self.assertEqual(disasm_cost(actual_trap), record)
         with self.assertRaises(ValueError):
             disasm_cost(fake.replace("retq", "nop"))
         with self.assertRaises(ValueError):
