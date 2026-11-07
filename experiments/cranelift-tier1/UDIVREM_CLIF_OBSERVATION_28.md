@@ -32,3 +32,19 @@ patched-compiler test, codegen replay, other-target handling and real
 performance measurement. If no pair appears, diagnose the emit phase before
 assuming the egraph cannot see the original pattern. No Bytecode Alliance
 repository is modified by this diagnostic.
+
+## Confirmed pinned executable outcome (2026-11-07 UTC)
+
+**Exact-head [CI #42385675790](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42385675790) passed** both the six-test source scanner job and real unchanged pinned Wasmtime compiler build/CLIF capture. Its [raw artifact #13579406740](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42385675790/artifacts/13579406740) was independently downloaded; archive SHA-256 `44f6bef898e5bdba674957c4254ba0d90871300c7cd56b74dac90eb38c52331d` matches GitHub's declared digest.
+
+The captured *unmodified* direct-WAT Cranelift file `wasm[0]--function[0].clif` (SHA-256 `95a0ab4f6cff3f98e1d75b4be969565a0d3f786aac6c612d0eee59f91b56d7a9`) contains this exact same-block pair:
+
+```text
+block0(v0: i64, v1: i64, v2: i64, v3: i64):
+@0028                               v4 = udiv v2, v3
+@002d                               v5 = urem v2, v3
+```
+
+The source-pinned scanner records **one** same-block identical-operand pair, and archived native disassembly shows **two static `divq`** instructions. This is a concrete compiler opportunity, **not** a compiler optimization. The original observation job [#42385101549](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42385101549) reported zero scanner matches because the initial lexical regex failed to admit the `@0028` CLIF source offsets. The scanner and six controls were corrected and requalified in the later exact-head run. See the [machine-readable qualification](evidence/udivrem_emitted_clif_qualified_20261107.json) with exact source pins, input/output hashes, receipts, static instruction count, and explicit proof limits.
+
+Still required: a genuine trap-preserving SSA/CFG-aware Cranelift change, independently verified semantics, identical input-Wasm A/B against original compiler, register-liveness/cost qualification, and cross-target cases. The egraph's additive extraction cost and multi-result accounting require design attention; upstream [issue #5623](https://github.com/bytecodealliance/wasmtime/issues/5623) identifies these as unsolved implementation questions. No source branch outside this experiment was changed.
