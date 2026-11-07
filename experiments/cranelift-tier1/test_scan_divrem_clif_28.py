@@ -13,6 +13,20 @@ block0(v0: i64, v1: i64):
 ''')
         self.assertEqual(out['candidate_pair_count'], 1)
         self.assertEqual(out['candidate_pairs'][0]['operands'], ['v0', 'v1'])
+    def test_real_pinned_emit_clif_shape(self):
+        # Exact syntax from CI run 42385101549, not a native-cost conclusion.
+        data = """function u0:0(i64 vmctx, i64, i64, i64) -> i64 tail {
+                                block0(v0: i64, v1: i64, v2: i64, v3: i64):
+@0028                               v4 = udiv v2, v3
+@002d                               v5 = urem v2, v3
+@0032                               jump block1
+                                block1:
+@002e                               v6 = iconst.i64 17
+}"""
+        got = inspect(data)
+        self.assertEqual(got['candidate_pair_count'], 1)
+        self.assertEqual(got['candidate_pairs'][0]['operands'], ['v2', 'v3'])
+        self.assertEqual(got['candidate_pairs'][0]['first']['line'], 3)
     def test_reversed_order(self):
         self.assertEqual(inspect('block0(v0: i64, v1: i64):\n v2 = urem v0, v1\n v3 = udiv v0, v1')['candidate_pair_count'],1)
     def test_different_operands_and_block(self):
