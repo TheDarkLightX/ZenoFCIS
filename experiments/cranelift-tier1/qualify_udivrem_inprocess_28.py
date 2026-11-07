@@ -11,7 +11,7 @@ from pathlib import Path
 from install_isle_candidate import UPSTREAM
 
 SCHEMA = "zeno-fcis/udivrem-source-palette-call-timing/1"
-SOURCE_SCHEMA = "zeno-fcis/tier1-udivrem-source-palette/1"
+SOURCE_SCHEMA = "zeno-fcis/tier1-udiv-urem-source-palette/1"
 EXPECTED_SOURCE_SHA256 = "47d6b0bb6bc2b2c4254ad78ac7959d3d79638b92155f34f9e7dc17237d72c61a"
 AOT = {
     "direct": "f105ac2a7440cc0a8223376cd5c9bdcd7417abc67a89c0ef0c65c4f118bca191",

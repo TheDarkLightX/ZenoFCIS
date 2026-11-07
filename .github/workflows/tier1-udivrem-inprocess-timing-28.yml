@@ -82,6 +82,11 @@ jobs:
             sha256sum experiments/cranelift-tier1/inprocess_divrem_28/src/main.rs
             sha256sum experiments/cranelift-tier1/qualify_udivrem_inprocess_28.py
           } > tier1-div-runtime/source-host.txt
+      - name: Check producer/consumer schema pin before native timing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest discover -s experiments/cranelift-tier1 -p 'test_udivrem_inprocess_28.py' -v
       - name: Build pinned Wasmtime runtime-only harness
         shell: bash
         run: |
