@@ -1,0 +1,65 @@
+{
+  "schema": "zeno-fcis/tier1-udivrem-actual-clif-qualified/1",
+  "date_utc": "2026-11-07",
+  "status": "pinned-emitted-clif-same-block-udiv-urem-pair-observed-no-compiler-patch",
+  "source": {
+    "zenofcis_commit": "5d3118fa3271b7853c9d169d790ef453baafe267",
+    "branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "wasmtime_commit": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "rust_toolchain": "1.97.1",
+    "target": "x86_64-unknown-linux",
+    "test": "original direct division-and-remainder WAT under unchanged compiler"
+  },
+  "ci": {
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42385675790",
+    "status": "success",
+    "source_scanner": "success",
+    "emitted_pinned_clif": "success",
+    "artifact_id": 13579406740,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42385675790/artifacts/13579406740",
+    "zip_sha256": "44f6bef898e5bdba674957c4254ba0d90871300c7cd56b74dac90eb38c52331d"
+  },
+  "artifacts": {
+    "direct_wat_sha256": "28498a86ecb6e00bd5968ee94ee001f3fa42cfa2b0a5cc9f43342c0a5c7231c3",
+    "direct_aot_sha256": "f105ac2a7440cc0a8223376cd5c9bdcd7417abc67a89c0ef0c65c4f118bca191",
+    "direct_aot_bytes": 13608,
+    "clif_file": "clif/wasm[0]--function[0].clif",
+    "clif_sha256": "95a0ab4f6cff3f98e1d75b4be969565a0d3f786aac6c612d0eee59f91b56d7a9",
+    "observation_json_sha256": "2f3eec2d9d0f91bf65a54f83e37b1a4206cea7031041d4cae6557ea902dd6a4d"
+  },
+  "observation": {
+    "same_block_pairs": 1,
+    "block": "block0",
+    "operands": [
+      "v2",
+      "v3"
+    ],
+    "first": {
+      "line": 11,
+      "instruction": "v4 = udiv v2, v3",
+      "source_offset": "0028"
+    },
+    "second": {
+      "line": 12,
+      "instruction": "v5 = urem v2, v3",
+      "source_offset": "002d"
+    },
+    "native_static_divq_count": 2,
+    "native_static_divq_classification": "disassembly-static-count-not-retired-execution-count"
+  },
+  "checks": [
+    "six source-scanner tests passed including offset-prefixed CLIF positive case and false-match controls",
+    "unchanged pinned Wasmtime compiler rebuilt; CI captured genuine CLIF and AOT",
+    "downloaded ZIP SHA-256 matches GitHub archived artifact digest",
+    "independently recomputed file SHA-256 and inspected emitted CLIF and disassembly",
+    "zero matches from earlier source scanner at run 42385101549 was a regex false negative on @offset prefixes, not compiler absence"
+  ],
+  "limits": [
+    "lexical same-block SSA operand observation is not an independent equivalence proof or safe compiler transformation",
+    "mid-end may see different phase; downstream compilation, GVN, dominance, traps and liveness not proved",
+    "no same-Wasm baseline-versus-patched compiler A/B; no native savings from a compiler patch",
+    "two distinct source formulations remain an earlier separate comparison",
+    "no speedup, power, throughput, general ABI/flag/poison or cross-target claim"
+  ],
+  "next": "Design a compiler-level trap-preserving dividend/divisor result-reuse transformation with explicit multi-result/target costs; build separate patched Wasmtime, verify, compare identical input Wasm against this pinned baseline and test other targets."
+}
