@@ -1,0 +1,114 @@
+name: tier1-udivrem-inprocess-timing-28
+
+on:
+  push:
+    branches:
+      - research/2.8-tier1-cranelift-performance-20261102
+    paths:
+      - ".github/workflows/tier1-udivrem-inprocess-timing-28.yml"
+      - "experiments/cranelift-tier1/inprocess_divrem_28/**"
+      - "experiments/cranelift-tier1/qualify_udivrem_inprocess_28.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: tier1-udivrem-inprocess-timing-28
+  cancel-in-progress: true
+
+jobs:
+  pinned-archived-AOT-call-timing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 105
+    env:
+      CARGO_BUILD_JOBS: "3"
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      RUSTUP_TOOLCHAIN: "1.97.1"
+    steps:
+      - name: Checkout exact isolated ZenoFCIS research source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout exact pinned upstream runtime source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Retrieve original qualified source AOT objects
+        uses: actions/download-artifact@v4
+        with:
+          repository: TheDarkLightX/ZenoFCIS
+          run-id: 42334392214
+          github-token: ${{ github.token }}
+          name: tier1-udivrem-source-palette-aot-28
+          path: tier1-div-runtime/original
+      - name: Verify artifact identity and source hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          rustup toolchain install 1.97.1 --profile minimal
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          root=Path("tier1-div-runtime/original")
+          receipt=(root/"cases/qualification.json").read_bytes()
+          assert hashlib.sha256(receipt).hexdigest()=="47d6b0bb6bc2b2c4254ad78ac7959d3d79638b92155f34f9e7dc17237d72c61a"
+          j=json.loads(receipt)
+          assert j["pins"]["upstream_commit"]=="b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49"
+          expected={
+              "direct":"f105ac2a7440cc0a8223376cd5c9bdcd7417abc67a89c0ef0c65c4f118bca191",
+              "quotient_reuse":"feba0e3ff9503ae41f3c30cdfc83b76ef5936937e602818e11349a51bae0968b",
+          }
+          for mode,digest in expected.items():
+              obj=(root/"cases"/mode/"functions.cwasm").read_bytes()
+              assert hashlib.sha256(obj).hexdigest()==digest
+              assert j["results"][mode]["binary_sha256"]==digest
+          assert (root/"independent-recheck.json").is_file()
+          print("Pinned source and AOT identities verified")
+          PY
+          {
+            git rev-parse HEAD
+            git -C upstream rev-parse HEAD
+            rustc --version
+            cargo --version
+            uname -a
+            lscpu
+            sha256sum experiments/cranelift-tier1/inprocess_divrem_28/src/main.rs
+            sha256sum experiments/cranelift-tier1/qualify_udivrem_inprocess_28.py
+          } > tier1-div-runtime/source-host.txt
+      - name: Build pinned Wasmtime runtime-only harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo generate-lockfile --manifest-path experiments/cranelift-tier1/inprocess_divrem_28/Cargo.toml
+          cargo build --locked --release             --manifest-path experiments/cranelift-tier1/inprocess_divrem_28/Cargo.toml             > tier1-div-runtime/harness-build.stdout 2> tier1-div-runtime/harness-build.stderr
+          cp experiments/cranelift-tier1/inprocess_divrem_28/Cargo.lock             tier1-div-runtime/runtime-harness-Cargo.lock
+      - name: Re-execute arithmetic and record balanced ABBA BAAB inprocess calls
+        shell: bash
+        run: |
+          set -euo pipefail
+          exe=experiments/cranelift-tier1/inprocess_divrem_28/target/release/tier1-udivrem-inprocess-28
+          "$exe"             tier1-div-runtime/original/cases/direct/functions.cwasm             tier1-div-runtime/original/cases/quotient_reuse/functions.cwasm             100000 16 5623 > tier1-div-runtime/raw-timing.csv
+          python3 -B experiments/cranelift-tier1/qualify_udivrem_inprocess_28.py             --source-root tier1-div-runtime/original/cases             --raw tier1-div-runtime/raw-timing.csv             --cargo-lock tier1-div-runtime/runtime-harness-Cargo.lock             --calls 100000 --blocks 16             --out tier1-div-runtime/timing-qualification.json
+      - name: Archive exact provenance and raw paired timing samples
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-udivrem-inprocess-balanced-28
+          path: |
+            tier1-div-runtime/original/cases/qualification.json
+            tier1-div-runtime/original/independent-recheck.json
+            tier1-div-runtime/source-host.txt
+            tier1-div-runtime/runtime-harness-Cargo.lock
+            tier1-div-runtime/harness-build.stdout
+            tier1-div-runtime/harness-build.stderr
+            tier1-div-runtime/raw-timing.csv
+            tier1-div-runtime/timing-qualification.json
+          retention-days: 30
+          if-no-files-found: warn
