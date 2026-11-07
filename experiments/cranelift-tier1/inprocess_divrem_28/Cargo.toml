@@ -1,0 +1,11 @@
+[package]
+name = "tier1-udivrem-inprocess-28"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+# Source pin enforced by the workflow, matching the AOT producer's Wasmtime.
+wasmtime = { path = "../../../upstream/crates/wasmtime", default-features = false, features = ["runtime", "std", "component-model-async"] }
