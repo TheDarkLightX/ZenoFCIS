@@ -16,7 +16,7 @@ UPSTREAM = 'b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49'
 MAX_FILES = 200
 MAX_BYTES = 2_000_000
 BLOCK = re.compile(r'^\s*(block\d+)(?:\([^;]*\))?:\s*(?:;.*)?$')
-OP = re.compile(r'^\s*(?:@[0-9a-fA-F]+\s+)?(v\d+)\s*=\s*(udiv|urem)\s+(v\d+),\s*(v\d+)\s*(?:;.*)?
+OP = re.compile(r'^\s*(?:@[0-9a-fA-F]+\s+)?(v\d+)\s*=\s*(udiv|urem)\s+(v\d+),\s*(v\d+)\s*(?:;.*)?$')
 
 
 def digest(raw: bytes) -> str:
