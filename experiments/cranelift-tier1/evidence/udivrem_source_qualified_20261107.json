@@ -1,0 +1,82 @@
+{
+  "schema": "zeno-fcis/tier1-udivrem-source-qualified-checkpoint/1",
+  "date_utc": "2026-11-07",
+  "status": "real-unchanged-Cranelift-two-source-formulation-native-cost-qualified-not-upstream-optimization",
+  "upstream_issue": "https://github.com/bytecodealliance/wasmtime/issues/5623",
+  "experiment_source_commit": "5e1f0dc0408b56fa13749754a6d276242bfb3198",
+  "upstream_wasmtime_sha": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "verified_workflow": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42334392214",
+  "binary_and_independent_receipt_artifact": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42334392214/artifacts/13559221335",
+  "binary_and_independent_receipt_zip_sha256": "b629c4e2902a3cfb54778a0b86a1e38b4179d8dc70270fca614a6db030a29d95",
+  "original_producer_receipt_sha256": "47d6b0bb6bc2b2c4254ad78ac7959d3d79638b92155f34f9e7dc17237d72c61a",
+  "proof_workflow": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42334392214",
+  "proof_artifact": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42334392214/artifacts/13558478944",
+  "legacy_initial_proof_artifact_zip_sha256": "dc9a61b3209e18bd42990775ef7bed76e5b9fd909dc0539c3d9a40912ad195dc",
+  "target": "x86_64-unknown-linux",
+  "compiler_version": "wasmtime 51.0.0-dev (b1f81d2ad 2026-10-31)",
+  "compiler_binary_sha256": "a2dd8ba4b12fd86bf0c4aeca76d543bc4f57ae067a215749a6ef5350aeb41c3c",
+  "two_distinct_source_formulations": {
+    "direct": "(unsigned x / unsigned y) XOR rotl64(unsigned x % unsigned y,17)",
+    "quotient_reuse": "q=(unsigned x / unsigned y); r=x-q*y modulo 2^64; q XOR rotl64(r,17)",
+    "guard": "y!=0 for value; each Wasm source traps at y=0"
+  },
+  "independent_semantics": {
+    "exhaustive_u8_nonzero_divisor_pairs": 65280,
+    "direct_qfbv": {
+      "width8": "unsat",
+      "width16": "unknown-timeout",
+      "width64": "unknown-timeout"
+    },
+    "conditional_euclidean_qfbv_64": "unsat conditional on x=q*y+r and y!=0",
+    "positive_native_finite_pairs_per_binary": 51,
+    "independent_native_additional_pairs_per_binary": 6,
+    "zero_divisor_trap": "checked by both producer and independent replay per module",
+    "signedness": "i64 inputs are raw 64-bit words; div/rem unsigned, output formatted as signed bit pattern",
+    "overflow": "wrapping bitvector arithmetic in x-q*y; total only on y!=0",
+    "flags_and_poison": "not observable in admitted guest Wasm contract; no general x86 ISA/ABI or poison proof"
+  },
+  "measured": {
+    "direct": {
+      "source_wat_sha256": "28498a86ecb6e00bd5968ee94ee001f3fa42cfa2b0a5cc9f43342c0a276ad39b7fc",
+      "native_cwasm_sha256": "f105ac2a7440cc0a8223376cd5c9bdcd7417abc67a89c0ef0c65c4f118bca191",
+      "static_divq_count": 2,
+      "static_instructions": 16,
+      "first_ret_prefix_bytes": 43,
+      "elf_text_bytes": 4096,
+      "whole_cwasm_bytes": 13608
+    },
+    "quotient_reuse": {
+      "source_wat_sha256": "b86250c716e84530ebc3196af6406986b9f88449add6769c22a3115a041ea191",
+      "native_cwasm_sha256": "feba0e3ff9503ae41f3c30cdfc83b76ef5936937e602818e11349a51bae0968b",
+      "static_divq_count": 1,
+      "static_instructions": 15,
+      "first_ret_prefix_bytes": 41,
+      "elf_text_bytes": 4096,
+      "whole_cwasm_bytes": 13608
+    },
+    "baseline_minus_candidate": {
+      "static_divq_count": 1,
+      "static_instructions": 1,
+      "first_ret_prefix_bytes": 2,
+      "elf_text_bytes": 0,
+      "whole_cwasm_bytes": 0
+    }
+  },
+  "original_dedup_catalog_content_keys": {
+    "direct": "ef9b0b0e13b15df1a46ae3ae3feeca75d50065d713064f00a9839fec6b347e20",
+    "quotient_reuse": "6175b90fbfc1b509bb31ecc8cc1e04a8f2e00db437f993399c7041bc79f9b8bb"
+  },
+  "continuation": {
+    "runtime_harness_source_checkpoint": "https://github.com/TheDarkLightX/ZenoFCIS/commit/6075cfddeea76576907075f95de62455235c1600",
+    "runtime_job_status": "not yet qualified; check targeted workflow first; no speedup claimed",
+    "next_gates": "inspect actual inprocess runtime controls and samples; then build same-Wasm Cranelift fusion with independent semantic proof and cross-target regressions"
+  },
+  "nonclaims": [
+    "no compiler rewrite or upstream PR",
+    "two different WATs under one unchanged compiler",
+    "no complete AOT or ELF .text savings",
+    "no observed speedup, retired-instruction, CPU latency, throughput or power result",
+    "no unconditional 64-bit direct division solver proof",
+    "no generic ABI/ISA/poison proof or global cost optimum"
+  ]
+}
