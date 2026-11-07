@@ -1,0 +1,109 @@
+name: tier1-udivrem-clif-observation-28
+
+on:
+  push:
+    branches:
+      - research/2.8-tier1-cranelift-performance-20261102
+    paths:
+      - '.github/workflows/tier1-udivrem-clif-observation-28.yml'
+      - 'experiments/cranelift-tier1/scan_divrem_clif_28.py'
+      - 'experiments/cranelift-tier1/test_scan_divrem_clif_28.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tier1-udivrem-clif-observation-28
+  cancel-in-progress: true
+
+jobs:
+  source-scanner:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Check lexical match, false positive controls and fail-closed provenance
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/test_scan_divrem_clif_28.py -v
+
+  emitted-pinned-clif:
+    needs: [source-scanner]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - name: Checkout isolated research branch without write credentials
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout unchanged upstream Cranelift/Wasmtime revision
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Build unchanged pinned compiler and emit original direct-div-rem WAT as CLIF
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          test -z "$(git -C upstream status --porcelain)"
+          rustup toolchain install 1.97.1 --profile minimal
+          mkdir -p tier1-clif-observation/clif
+          {
+            git rev-parse HEAD
+            git -C upstream rev-parse HEAD
+            rustc --version
+            cargo --version
+            uname -a
+            sha256sum experiments/cranelift-tier1/scan_divrem_clif_28.py
+          } > tier1-clif-observation/pins.txt
+          python3 -B - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, 'experiments/cranelift-tier1')
+          from qualify_udivrem_source_palette_28 import WATS
+          Path('tier1-clif-observation/direct.wat').write_text(WATS['direct'])
+          PY
+          cargo build --locked --manifest-path upstream/Cargo.toml \
+            -p wasmtime-cli --bin wasmtime --no-default-features \
+            --features run,compile,wat,objdump \
+            > tier1-clif-observation/build.stdout 2> tier1-clif-observation/build.stderr
+          sha256sum upstream/target/debug/wasmtime >> tier1-clif-observation/pins.txt
+          upstream/target/debug/wasmtime compile \
+            --target x86_64-unknown-linux \
+            --emit-clif tier1-clif-observation/clif \
+            -o tier1-clif-observation/direct.cwasm \
+            tier1-clif-observation/direct.wat \
+            > tier1-clif-observation/compile.stdout 2> tier1-clif-observation/compile.stderr
+          upstream/target/debug/wasmtime objdump --funcs wasm --bytes \
+            tier1-clif-observation/direct.cwasm \
+            > tier1-clif-observation/disassembly.txt
+          test -s tier1-clif-observation/direct.cwasm
+      - name: Observe same-block, exact-SSA udiv/urem candidates only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/scan_divrem_clif_28.py \
+            --clif-root tier1-clif-observation/clif \
+            --wat tier1-clif-observation/direct.wat \
+            --aot tier1-clif-observation/direct.cwasm \
+            --upstream-sha "$(git -C upstream rev-parse HEAD)" \
+            --out tier1-clif-observation/observation.json
+      - name: Retain untouched emitted CLIF, source and binary evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-udivrem-unmodified-cranelift-clif-28
+          path: tier1-clif-observation
+          retention-days: 30
+          if-no-files-found: warn
