@@ -1,0 +1,106 @@
+name: tier1-udivrem-same-wasm-patched-compiler-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-udivrem-same-wasm-patched-compiler-28.yml'
+      - 'experiments/cranelift-tier1/install_udivrem_compiler_patch_28.py'
+      - 'experiments/cranelift-tier1/qualify_same_wasm_udivrem_compiler_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tier1-udivrem-same-wasm-patched-compiler-28
+  cancel-in-progress: true
+jobs:
+  source-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Syntax and negative-source tests
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/install_udivrem_compiler_patch_28.py experiments/cranelift-tier1/qualify_same_wasm_udivrem_compiler_28.py
+          python3 -B - <<'PY'
+          import sys
+          sys.path.insert(0,'experiments/cranelift-tier1')
+          from install_udivrem_compiler_patch_28 import patch,ANCHOR,CALL
+          original=ANCHOR+CALL+"}\n"
+          assert "EXPERIMENTAL TIER1 DIVREM" in patch(original)
+          for malformed in [patch(original),original.replace("self.egraph_pass", "self.other_pass"), original+ANCHOR]:
+              try: patch(malformed)
+              except ValueError: continue
+              raise AssertionError("fail-closed negative test was incorrectly accepted")
+          PY
+  same-wasm-aot:
+    needs: [source-controls]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Preserve unchanged upstream baseline compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          test -z "$(git -C upstream status --porcelain)"
+          test "$(git -C upstream hash-object cranelift/codegen/src/context.rs)" = 7d6026c97be09f7680a1829a0afcb2a1534608cf
+          mkdir -p tier1-same-wasm/baseline tier1-same-wasm/patched
+          git rev-parse HEAD >tier1-same-wasm/zenofcis-head.txt
+          git -C upstream rev-parse HEAD >tier1-same-wasm/wasmtime-head.txt
+          python3 -B - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0,'experiments/cranelift-tier1')
+          from qualify_udivrem_source_palette_28 import WATS
+          Path('tier1-same-wasm/input.wat').write_text(WATS['direct'])
+          PY
+          cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump >tier1-same-wasm/baseline-build.stdout 2>tier1-same-wasm/baseline-build.stderr
+          cp upstream/target/debug/wasmtime tier1-same-wasm/baseline/wasmtime
+      - name: Patch only pinned compiler source and retain diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/install_udivrem_compiler_patch_28.py --upstream upstream >tier1-same-wasm/installer.log
+          git -C upstream diff -- cranelift/codegen/src/context.rs >tier1-same-wasm/compiler-patch.diff
+          test -s tier1-same-wasm/compiler-patch.diff
+          cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump >tier1-same-wasm/patched-build.stdout 2>tier1-same-wasm/patched-build.stderr
+          cp upstream/target/debug/wasmtime tier1-same-wasm/patched/wasmtime
+      - name: Compile EXACT SAME WAT under baseline and patched compilers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/qualify_same_wasm_udivrem_compiler_28.py --mode collect --out tier1-same-wasm --source tier1-same-wasm/input.wat
+          python3 -B experiments/cranelift-tier1/qualify_same_wasm_udivrem_compiler_28.py --mode audit --out tier1-same-wasm --source tier1-same-wasm/input.wat
+      - name: Preserve independent algebraic proof and unknowns
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/tier1-z3
+          /tmp/tier1-z3/bin/pip -q install z3-solver==4.15.4.0
+          /tmp/tier1-z3/bin/python experiments/cranelift-tier1/verify_udivrem_source_palette_28.py --out tier1-same-wasm/conditional-arithmetic.json
+      - name: Archive baseline/patched compilers, artifacts and all receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-udivrem-same-wasm-compiler-28
+          path: tier1-same-wasm
+          retention-days: 30
+          if-no-files-found: warn

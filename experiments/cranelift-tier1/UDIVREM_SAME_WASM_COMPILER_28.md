@@ -1,0 +1,9 @@
+# Same-Wasm quotient/remainder compiler experiment (2026-11-07)
+
+**Not an upstream optimization.** Pinned revisions: ZenoFCIS parent d0c34a52d77cd92e10cc0669fa218af2e13c758f; Wasmtime/Cranelift b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49. The actual emitted CLIF from previous qualified CI contains the same-block pair v4=udiv(v2,v3), v5=urem(v2,v3). Prior 2-versus-1 div results compared **different** Wasm source programs.
+
+This experiment edits only a temporary CI checkout of Cranelift, after its egraph pass. It restricts itself to x86-64, optimized i64, an earlier quotient in the same block and exact SSA operands, retaining that quotient and its zero divisor trap. It converts the later remainder to x - (q * y) modulo 2^64, preserving the original result SSA identity. The compiler edit is emphatically **not** an approved upstream patch.
+
+The workflow builds unchanged and experimental compilers, compiles byte-identical WAT and independently measures static division counts, decoded instruction count, bytes through ret, ELF .text, complete AOT, plus two finite arithmetic oracles and divide-by-zero traps. It archives the exact source diff, compiler binary hashes and raw AOT files, and rechecks the cost and output evidence separately. The previous source-formulation proof establishes 8-bit exhaustive / SMT and conditional all-width arithmetic identity, with 16- and 64-bit direct SMT unknowns never promoted to proof.
+
+No soundness of the compiler pass, SSA preservation in every function, cross-target behavior, latency/throughput or profitability claim follows from this experiment. Real CI success and measurement are required before reporting any improvement; a regression or no change is a valid negative result. No upstream PR until these questions and compiler regression checks are resolved.
