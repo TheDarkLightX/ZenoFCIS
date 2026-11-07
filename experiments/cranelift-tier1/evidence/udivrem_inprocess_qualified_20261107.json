@@ -1,0 +1,84 @@
+{
+  "schema": "zeno-fcis/tier1-udivrem-inprocess-qualification/1",
+  "date_utc": "2026-11-07",
+  "classification": "paired-virtualized-Wasmtime-typed-function-call-screen-not-a-speedup-proof",
+  "original_upstream": {
+    "repository": "bytecodealliance/wasmtime",
+    "sha": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49"
+  },
+  "source_comparison": {
+    "run_id": 42334392214,
+    "result": "success",
+    "receipt_sha256": "47d6b0bb6bc2b2c4254ad78ac7959d3d79638b92155f34f9e7dc17237d72c61a",
+    "source_schema": "zeno-fcis/tier1-udiv-urem-source-palette/1",
+    "original_binary_sha256": {
+      "direct": "f105ac2a7440cc0a8223376cd5c9bdcd7417abc67a89c0ef0c65c4f118bca191",
+      "quotient_reuse": "feba0e3ff9503ae41f3c30cdfc83b76ef5936937e602818e11349a51bae0968b"
+    },
+    "native_static_deltas": {
+      "one_fewer_static_divq": true,
+      "decoded_instructions_saved": 1,
+      "bytes_to_first_ret_saved": 2,
+      "elf_text_bytes_saved": 0,
+      "whole_cwasm_bytes_saved": 0
+    }
+  },
+  "exploratory_inprocess": [
+    {
+      "run_id": 42334975767,
+      "head_sha": "6075cfddeea76576907075f95de62455235c1600",
+      "conclusion": "failure",
+      "cause": "audit rejected valid archived receipt because consumer SOURCE_SCHEMA omitted '-urem-'",
+      "status": "independently replayed raw samples, but not a passed CI qualification",
+      "artifact_id": 13559052726,
+      "artifact_zip_sha256": "c8c685923a080be4932f82a982e766422d4c3904d6fba1cb62e38e48d3e3aac7",
+      "raw_sha256": "4b5d0621d54c9cf59746fce2471b3397aa32ed50784a3dbcb120ff431510aa2b",
+      "cpu": "Intel Xeon Platinum 8370C",
+      "calls_per_sample": 100000,
+      "balanced_blocks": 16,
+      "samples": 64,
+      "reuse_over_direct_median_of_block_median_ratios": 1.014015834401599,
+      "ratio_range": [
+        0.9199197846340857,
+        1.1288826578306155
+      ]
+    },
+    {
+      "run_id": 42360584360,
+      "head_sha": "fa04a6326d97f7a783c2486f15f65b0a8f536fbc",
+      "conclusion": "success",
+      "status": "source-pin tests, native finite reexecution, trace-order/checksum audit and balanced-timing CI completed",
+      "artifact_id": 13569157816,
+      "artifact_zip_sha256": "b0dafcd82799780375de449befae127f453c56252271ab095ccdf601651409d8",
+      "raw_sha256": "209eedd900c52a21ffd7c47fdd5b9e98d77feedae9aa91f8be9a379e1e1abffe",
+      "cpu": "AMD EPYC 9V45",
+      "calls_per_sample": 100000,
+      "balanced_blocks": 16,
+      "samples": 64,
+      "finite_pairs_per_binary": 268,
+      "zero_divisor_trap_rechecked": true,
+      "checksum": "6951454329984430120",
+      "reuse_over_direct_median_of_block_median_ratios": 0.9975500656777085,
+      "ratio_range": [
+        0.9761286630161758,
+        1.0053655759064821
+      ]
+    }
+  ],
+  "independent_recheck": "Both original raw timing transcripts and corresponding original archived AOT source identities were read and recomputed offline; checksum, sample block order and ratios matched. Each host run used a distinct CPU model, so cross-run ratios are not pooled.",
+  "semantic_limits": {
+    "unsigned_u64_division": true,
+    "zero_divisor": "both trap",
+    "direct_SMT_8bit": "UNSAT",
+    "direct_SMT_16bit": "UNKNOWN timeout",
+    "direct_SMT_64bit": "UNKNOWN timeout",
+    "conditional_modular_identity": "UNSAT under Euclidean div/rem law",
+    "machine_flags_ABI_poison": "not proved beyond declared Wasm-value domain"
+  },
+  "decision": "No reproducible runtime-speed gain established; continue only with same-Wasm patched Cranelift candidate or representative controlled benchmarks; do not submit an upstream optimization based on the two-WAT test.",
+  "artifact_links": [
+    "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42334392214/artifacts/13559221335",
+    "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42334975767/artifacts/13559052726",
+    "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42360584360/artifacts/13569157816"
+  ]
+}
