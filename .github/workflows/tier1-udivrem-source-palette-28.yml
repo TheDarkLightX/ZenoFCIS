@@ -1,0 +1,136 @@
+name: tier1-udivrem-source-palette-28
+
+on:
+  push:
+    branches:
+      - research/2.8-tier1-cranelift-performance-20261102
+    paths:
+      - ".github/workflows/tier1-udivrem-source-palette-28.yml"
+      - "experiments/cranelift-tier1/qualify_udivrem_source_palette_28.py"
+      - "experiments/cranelift-tier1/verify_udivrem_source_palette_28.py"
+      - "experiments/cranelift-tier1/independent_recheck_udivrem_source_palette_28.py"
+      - "experiments/cranelift-tier1/test_udivrem_source_palette_28.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tier1-udivrem-source-palette-28
+  cancel-in-progress: true
+
+jobs:
+  closed-palette-and-QF_BV:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact isolated research revision
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Check finite unsigned division identity and negative contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/test_udivrem_source_palette_28.py -v
+      - name: Install hash-pinned independent bitvector solver
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/tier1-div-venv"
+          "$RUNNER_TEMP/tier1-div-venv/bin/python" -m pip install \
+            --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+      - name: Preserve exact direct QF_BV results including any unknown
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-div-semantic
+          {
+            git rev-parse HEAD
+            sha256sum experiments/cranelift-tier1/verify_udivrem_source_palette_28.py
+            "$RUNNER_TEMP/tier1-div-venv/bin/python" -c 'import z3; print(z3.get_version_string())'
+          } > tier1-div-semantic/pins.txt
+          "$RUNNER_TEMP/tier1-div-venv/bin/python" -B \
+            experiments/cranelift-tier1/verify_udivrem_source_palette_28.py \
+            --out tier1-div-semantic/receipt.json
+      - name: Retain raw SMT formulas and symbolic verdicts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-udivrem-source-formula-proof-28
+          path: tier1-div-semantic
+          if-no-files-found: warn
+          retention-days: 30
+
+  actual-pinned-Wasmtime-AOT:
+    needs: [closed-palette-and-QF_BV]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    env:
+      CARGO_BUILD_JOBS: "3"
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      RUSTUP_TOOLCHAIN: "1.97.1"
+    steps:
+      - name: Checkout exact experimental source without rewriting release
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout unchanged pinned Wasmtime from Bytecode Alliance
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Rebuild the single untouched pinned Cranelift/Wasmtime binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          rustup toolchain install 1.97.1 --profile minimal
+          mkdir -p tier1-div-aot
+          {
+            git rev-parse HEAD
+            git -C upstream rev-parse HEAD
+            rustc --version
+            cargo --version
+            uname -a
+            sha256sum experiments/cranelift-tier1/qualify_udivrem_source_palette_28.py
+            sha256sum experiments/cranelift-tier1/independent_recheck_udivrem_source_palette_28.py
+          } > tier1-div-aot/pins.txt
+          cargo build --locked --manifest-path upstream/Cargo.toml \
+            -p wasmtime-cli --bin wasmtime --no-default-features \
+            --features run,compile,wat,objdump \
+            > tier1-div-aot/compile.stdout 2> tier1-div-aot/compile.stderr
+          cp upstream/target/debug/wasmtime tier1-div-aot/pinned-wasmtime
+          sha256sum tier1-div-aot/pinned-wasmtime >> tier1-div-aot/pins.txt
+      - name: Qualify two different source formulations under identical compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/qualify_udivrem_source_palette_28.py \
+            --upstream upstream \
+            --bin tier1-div-aot/pinned-wasmtime \
+            --out tier1-div-aot/cases
+      - name: Independently replay exact native ELF/byte costs, witnesses and traps
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/independent_recheck_udivrem_source_palette_28.py \
+            --source-receipt tier1-div-aot/cases/qualification.json \
+            --bin tier1-div-aot/pinned-wasmtime \
+            --out tier1-div-aot/independent-recheck.json
+      - name: Retain all emitted AOT bytes, exact WAT, disassembly and independent receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-udivrem-source-palette-aot-28
+          path: |
+            tier1-div-aot/cases
+            tier1-div-aot/independent-recheck.json
+            tier1-div-aot/pins.txt
+            tier1-div-aot/*.stdout
+            tier1-div-aot/*.stderr
+          if-no-files-found: warn
+          retention-days: 30
