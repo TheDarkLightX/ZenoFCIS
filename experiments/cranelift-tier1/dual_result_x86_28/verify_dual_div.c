@@ -51,8 +51,8 @@ int main(int argc,char**argv){
   uint64_t edges[]={0,1,2,3,7,UINT64_C(0x8000000000000000),UINT64_C(0x7fffffffffffffff),UINT64_MAX,UINT64_MAX-1};
   size_t tested=0;
   for(size_t i=0;i<sizeof(edges)/sizeof(edges[0]);i++)for(size_t j=1;j<sizeof(edges)/sizeof(edges[0]);j++){check_pair(edges[i],edges[j]);tested++;}
-  for(size_t k=0;k<100000;k++){uint64_t x=random64(),y=random64()|1;check_pair(x,y);tested++;}
-  for(size_t j=0;j<256;j++){xs[j]=random64();ys[j]=random64()|1;}
+  for(size_t k=0;k<100000;k++){uint64_t x=random64(),y=random64();if(!y)y=1;check_pair(x,y);tested++;}
+  for(size_t j=0;j<256;j++){xs[j]=random64();ys[j]=random64();if(!ys[j])ys[j]=1;}
   trap();
   puts("schema=zeno-fcis/tier1-x86-dual-div-native-standalone/1");
   printf("finite_nonzero_pairs=%zu\n",tested);
