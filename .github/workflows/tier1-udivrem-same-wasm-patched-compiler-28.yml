@@ -6,6 +6,7 @@ on:
       - '.github/workflows/tier1-udivrem-same-wasm-patched-compiler-28.yml'
       - 'experiments/cranelift-tier1/install_udivrem_compiler_patch_28.py'
       - 'experiments/cranelift-tier1/qualify_same_wasm_udivrem_compiler_28.py'
+      - 'experiments/cranelift-tier1/recheck_same_wasm_archive_28.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,7 +24,7 @@ jobs:
       - name: Syntax and negative-source tests
         run: |
           set -euo pipefail
-          python3 -m py_compile experiments/cranelift-tier1/install_udivrem_compiler_patch_28.py experiments/cranelift-tier1/qualify_same_wasm_udivrem_compiler_28.py
+          python3 -m py_compile experiments/cranelift-tier1/install_udivrem_compiler_patch_28.py experiments/cranelift-tier1/qualify_same_wasm_udivrem_compiler_28.py experiments/cranelift-tier1/recheck_same_wasm_archive_28.py
           python3 -B - <<'PY'
           import sys
           sys.path.insert(0,'experiments/cranelift-tier1')
@@ -89,6 +90,14 @@ jobs:
           set -euo pipefail
           python3 -B experiments/cranelift-tier1/qualify_same_wasm_udivrem_compiler_28.py --mode collect --out tier1-same-wasm --source tier1-same-wasm/input.wat
           python3 -B experiments/cranelift-tier1/qualify_same_wasm_udivrem_compiler_28.py --mode audit --out tier1-same-wasm --source tier1-same-wasm/input.wat
+      - name: Independently replay archived native code and 720 value witnesses
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/recheck_same_wasm_archive_28.py \
+            --archive-dir tier1-same-wasm \
+            --expected-zenofcis "$(git rev-parse HEAD)" \
+            --out tier1-same-wasm/independent_native_recheck.json
       - name: Preserve independent algebraic proof and unknowns
         shell: bash
         run: |
