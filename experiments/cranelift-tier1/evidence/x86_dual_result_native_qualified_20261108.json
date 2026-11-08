@@ -3,22 +3,22 @@
   "date_utc": "2026-11-08",
   "artifact_kind": "standalone native candidate feasibility, NOT a Cranelift transformation",
   "isolated_branch": "research/2.8-tier1-cranelift-performance-20261102",
-  "proof_run_head": "b4f2441cf9f83fdeb4f4cd32f446eac3fe531997",
+  "proof_run_head": "c66c744e338147b189e5eb1413c8b0ca537104f5",
   "upstream_wasmtime_pin": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
   "upstream_x64_lower_isle_blob": "4fde7e22208bb952cb4e998ce2dca3cab4784ec4",
   "upstream_x64_inst_isle_blob": "ec2fe71e0a151b5960d0a5827808b53c549b6ee3",
   "source_blobs": {
     "experiments/cranelift-tier1/dual_result_x86_28/dual_div.S": "77a258bafd4d39156f0f7700a6441963b7df2c9e",
-    "experiments/cranelift-tier1/dual_result_x86_28/verify_dual_div.c": "1f0923d7a4c035468f52409ea7d17f043ba2d047",
+    "experiments/cranelift-tier1/dual_result_x86_28/verify_dual_div.c": "744a160ab0fab988ebe01717bedd032baef934ea",
     "experiments/cranelift-tier1/dual_result_x86_28/qualify_dual_result_28.py": "7608e9c04429041839a01c6f83321755e206a32b"
   },
   "ci": {
-    "run_id": 42524441777,
+    "run_id": 42524717369,
     "status": "success",
-    "job_id": 128864794143,
-    "artifact_id": 13635105811,
-    "artifact_sha256": "26854292ffef2f24b61d9548d04031917f84b9b89767e0c44d93750be8a5d681",
-    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42524441777/artifacts/13635105811"
+    "job_id": 128865664791,
+    "artifact_id": 13634912038,
+    "artifact_sha256": "86f504cfb72bd1d5959d6c1e7674c597a6f0a4a5efe17cb91c9900bf3c93adac",
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42524717369/artifacts/13634912038"
   },
   "contract": {
     "target": "x86-64 SysV ABI unsigned u64",
@@ -48,15 +48,16 @@
     "pairs_per_kernel": 100072,
     "divide_zero_SIGFPE_trap_checks": 2,
     "SMT": "not run for exact assembly; no proof of x86 machine code",
-    "compiled_and_run": true
+    "compiled_and_run": true,
+    "random_nonzero_divisors": "even and odd unsigned values, no forced odd-only bias; see pinned fixture source"
   },
   "benchmark": {
     "host": "GitHub Actions Ubuntu 24.04 x86-64 AMD EPYC 7763 virtualized",
     "compiler": "GitHub Actions system C compiler; exact version and binary hash archived in receipt",
     "paired_design": "16 alternating ABBA/BAAB blocks, 64 timed samples, 100000 calls/sample",
-    "median_one_div_over_two_div_ns_ratio": 0.7114137903161879,
-    "min_block_ratio": 0.5903736273612415,
-    "max_block_ratio": 0.7418217108111917,
+    "median_one_div_over_two_div_ns_ratio": 0.6225297863561557,
+    "min_block_ratio": 0.4379542459972974,
+    "max_block_ratio": 0.76242311223696,
     "blocks_favoring_one_div": 16,
     "classification": "exploratory one-host standalone-assembly microbenchmark; NOT same-Wasm compiler throughput"
   },
