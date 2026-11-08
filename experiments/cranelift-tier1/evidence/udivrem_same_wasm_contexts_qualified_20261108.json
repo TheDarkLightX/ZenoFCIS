@@ -1,0 +1,38 @@
+{
+  "schema": "zeno-fcis/tier1-udivrem-context-matrix-checkpoint/1",
+  "source_commit": "0bb65bf7a4643137166f70372010fd1148e93c47",
+  "upstream_commit": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "source_ci_run": 42468265753,
+  "source_ci_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42468265753",
+  "source_ci_jobs": {
+    "source_controls": "success",
+    "same_wasm_aot": "success"
+  },
+  "archived_artifact": {
+    "id": 13611833968,
+    "zip_sha256": "1198cd90808df9aad28159ed08cd8cd419bf0b14f647578abe7626a0ffce9237"
+  },
+  "verification": {
+    "original_same_wat_720_native_witnesses": "passed",
+    "six_contexts_nontrapping_native_witnesses": 1588,
+    "six_contexts_trap_checks": 16,
+    "negative_matcher_screens": "passed",
+    "conditional_euclidean_identity": "unsat",
+    "direct_8bit": "unsat",
+    "direct_16bit": "unknown",
+    "direct_64bit": "unknown"
+  },
+  "native_cost": {
+    "baseline_static_divq": 2,
+    "patched_static_divq": 1,
+    "baseline_decoded_insns": 16,
+    "patched_decoded_insns": 15,
+    "baseline_prefix_bytes": 43,
+    "patched_prefix_bytes": 41,
+    "whole_aot_bytes_saved": 0,
+    "elf_text_bytes_saved": 0
+  },
+  "status": "finite-same-wasm-compiler-regression-qualified-not-compiler-proof",
+  "next": "balanced in-process same-Wasm runtime measurement; no general speed/ABI/flags/poison proof",
+  "readme": "experiments/cranelift-tier1/UDIVREM_SAME_WASM_COMPILER_28.md"
+}
