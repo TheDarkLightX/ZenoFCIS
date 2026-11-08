@@ -1,0 +1,91 @@
+{
+  "schema": "zeno-fcis/tier1-same-wasm-compiler-qualification/1",
+  "date_utc": "2026-11-07",
+  "status": "qualified-narrow-same-wasm-x86-64-static-optimization-not-upstream-ready",
+  "source_pins": {
+    "zenofcis_tested": "4509f1231706f04821847c559df552d0c9fdd3fb",
+    "wasm_upstream": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "upstream_context_blob": "7d6026c97be09f7680a1829a0afcb2a1534608cf",
+    "rust_toolchain": "1.97.1",
+    "source_wat_sha256": "28498a86ecb6e00bd5968ee94ee001f3fa42cfa2b0a5cc9f43342c0a5c7231c3",
+    "target": "x86_64-unknown-linux",
+    "experiment_branch": "research/2.8-tier1-cranelift-performance-20261102"
+  },
+  "semantics": {
+    "input": "same exact WAT compiled under baseline and patched Cranelift",
+    "operation": "earlier i64 unsigned udiv and later i64 unsigned urem on identical SSA operands in same block",
+    "rewrite": "remainder = x - (quotient * y), modular 2^64 operations",
+    "value_domain": "all 64-bit bit-pattern inputs, y!=0",
+    "trap_domain": "y=0: first unchanged udiv retains WebAssembly integer divide-by-zero trap",
+    "signedness": "unsigned division and remainder; CLI output interpreted as signed i64 bit pattern",
+    "overflow": "multiplication/subtraction modulo 2^64",
+    "undefined_poison_flags": "CLIF pure integer semantics only, no whole-machine poison/flags/ABI proof"
+  },
+  "run": {
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42416620326",
+    "conclusion": "success",
+    "archive_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42416620326/artifacts/13591996218",
+    "archive_sha256": "b5b4960b2b71fae3782cf70f4eba13f6b4ede5c75842b1257303bd97b7cc53a2",
+    "status": "archived two pinned compilers and emitted binaries"
+  },
+  "costs": {
+    "baseline": {
+      "static_divq": 2,
+      "decoded_instructions": 16,
+      "first_ret_bytes": 43,
+      "elf_text_bytes": 4096,
+      "aot_bytes": 13608,
+      "compiler_sha256": "a2dd8ba4b12fd86bf0c4aeca76d543bc4f57ae067a215749a6ef5350aeb41c3c",
+      "aot_sha256": "f105ac2a7440cc0a8223376cd5c9bdcd7417abc67a89c0ef0c65c4f118bca191"
+    },
+    "patched": {
+      "static_divq": 1,
+      "decoded_instructions": 15,
+      "first_ret_bytes": 41,
+      "elf_text_bytes": 4096,
+      "aot_bytes": 13608,
+      "compiler_sha256": "a91c1a0072cfa2116778cf3e9f6e7a9d45913195a27fe5d79cfbd7016f417c40",
+      "aot_sha256": "bb795d4d1932271a381510ae9495dbf86b1e632dfa8dff027ae915679bb843d0"
+    },
+    "delta": {
+      "saved_static_divq": 1,
+      "saved_decoded_instructions": 1,
+      "saved_first_ret_bytes": 2,
+      "saved_elf_text_bytes": 0,
+      "saved_aot_bytes": 0
+    },
+    "warning": "static costs from one compiled exported function; not cycle counts, CLIF cost, whole application cost, or general speedup"
+  },
+  "verification": {
+    "ci_finite": "51 nonzero divisor pairs each compiler plus divide-by-zero traps; independent CI audit passed",
+    "independent_local_replay": "downloaded exact archived binaries, verified archive SHA-256 and compiler/object/disassembly digests; 360 deterministic nonzero pairs per compiler (720 executions), plus two zero-divisor traps, passed",
+    "replay_script": "experiments/cranelift-tier1/recheck_same_wasm_archive_28.py",
+    "replay_script_added_commit": "6514a7940802c94a59360ca9b47c00d1b0f2781a",
+    "smt": {
+      "unconditional_8bit": "unsat counterexample query",
+      "unconditional_16bit": "unknown-timeout",
+      "unconditional_64bit": "unknown-timeout",
+      "conditional_euclidean_64bit": "unsat under explicitly assumed quotient/remainder law",
+      "z3_version": "4.15.4",
+      "limits": "not complete direct 64-bit SMT proof, not whole compiler verification"
+    },
+    "local_negative_guard_screens": {
+      "different_operand_order": "2 divq baseline and patched",
+      "remainder_before_quotient": "2 divq baseline and patched",
+      "signed_pair": "2 idivq baseline and patched",
+      "i32_unsigned_pair": "2 divl baseline and patched",
+      "limits": "offline emitted-instruction screens, not CI-enforced source-level regression tests"
+    },
+    "cross_target": "attempted AArch64 compile; both archived CLI binaries reported target support disabled; NOT checked"
+  },
+  "related": {
+    "upstream_issue": "https://github.com/bytecodealliance/wasmtime/issues/5623",
+    "research_draft_pr": "https://github.com/TheDarkLightX/ZenoFCIS/pull/175"
+  },
+  "blockers_before_upstream": {
+    "1": "Fuzz varied CFGs, widths, i64 signed cases, side effects, SSA dominance, and trap ordering",
+    "2": "Independent proof/VeriISLE coverage of a correct compiler transformation (not just arithmetic law)",
+    "3": "Check target-specific profitability, register pressure, cross-target behavior and version-current upstream",
+    "4": "Benchmark identical workload throughput across controlled hosts; no speed claim yet"
+  }
+}
