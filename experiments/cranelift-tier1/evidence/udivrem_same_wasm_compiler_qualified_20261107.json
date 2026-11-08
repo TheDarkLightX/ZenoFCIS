@@ -76,7 +76,18 @@
       "i32_unsigned_pair": "2 divl baseline and patched",
       "limits": "offline emitted-instruction screens, not CI-enforced source-level regression tests"
     },
-    "cross_target": "attempted AArch64 compile; both archived CLI binaries reported target support disabled; NOT checked"
+    "cross_target": "attempted AArch64 compile; both archived CLI binaries reported target support disabled; NOT checked",
+    "independent_ci_rerun": {
+      "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42442542748",
+      "source_head": "4d006d6e68b2b89ff1c75655c192209451e7f15d",
+      "result": "both jobs passed",
+      "native_witness_executions": 720,
+      "nonzero_pairs_per_compiler": 360,
+      "zero_divisor_trap_checks": 2,
+      "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42442542748/artifacts/13601884272",
+      "artifact_sha256": "025a76d07b08be723835e8635f5b0408ebc9018d32fc9a21fd24e2acc7b07c56",
+      "source": "archived baseline and patched Wasmtime compilers, exact same WAT, source-pinned installer and new independent archive recheck"
+    }
   },
   "related": {
     "upstream_issue": "https://github.com/bytecodealliance/wasmtime/issues/5623",
