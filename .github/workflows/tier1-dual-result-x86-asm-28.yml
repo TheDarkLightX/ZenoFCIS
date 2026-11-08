@@ -1,0 +1,44 @@
+name: tier1-dual-result-x86-asm-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-dual-result-x86-asm-28.yml'
+      - 'experiments/cranelift-tier1/dual_result_x86_28/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tier1-dual-result-x86-asm-28
+  cancel-in-progress: true
+jobs:
+  dual-result-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Compile and execute standalone x86-64 dual-result DIV feasibility fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          ulimit -c 0
+          python3 -B experiments/cranelift-tier1/dual_result_x86_28/qualify_dual_result_28.py \
+            --out tier1-dual-result-native --calls 100000
+          git rev-parse HEAD >tier1-dual-result-native/zenofcis-head.txt
+          git status --porcelain >tier1-dual-result-native/git-status.txt
+          test -s tier1-dual-result-native/receipt.json
+      - name: Archive fixture source and full native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-dual-result-x86-native-28
+          path: |
+            tier1-dual-result-native
+            experiments/cranelift-tier1/dual_result_x86_28/dual_div.S
+            experiments/cranelift-tier1/dual_result_x86_28/verify_dual_div.c
+            experiments/cranelift-tier1/dual_result_x86_28/qualify_dual_result_28.py
+          retention-days: 30
+          if-no-files-found: warn
