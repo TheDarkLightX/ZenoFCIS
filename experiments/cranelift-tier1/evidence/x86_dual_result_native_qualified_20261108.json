@@ -1,0 +1,90 @@
+{
+  "schema": "zeno-fcis/tier1-dual-result-native-checkpoint/1",
+  "date_utc": "2026-11-08",
+  "artifact_kind": "standalone native candidate feasibility, NOT a Cranelift transformation",
+  "isolated_branch": "research/2.8-tier1-cranelift-performance-20261102",
+  "proof_run_head": "b4f2441cf9f83fdeb4f4cd32f446eac3fe531997",
+  "upstream_wasmtime_pin": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "upstream_x64_lower_isle_blob": "4fde7e22208bb952cb4e998ce2dca3cab4784ec4",
+  "upstream_x64_inst_isle_blob": "ec2fe71e0a151b5960d0a5827808b53c549b6ee3",
+  "source_blobs": {
+    "experiments/cranelift-tier1/dual_result_x86_28/dual_div.S": "77a258bafd4d39156f0f7700a6441963b7df2c9e",
+    "experiments/cranelift-tier1/dual_result_x86_28/verify_dual_div.c": "1f0923d7a4c035468f52409ea7d17f043ba2d047",
+    "experiments/cranelift-tier1/dual_result_x86_28/qualify_dual_result_28.py": "7608e9c04429041839a01c6f83321755e206a32b"
+  },
+  "ci": {
+    "run_id": 42524441777,
+    "status": "success",
+    "job_id": 128864794143,
+    "artifact_id": 13635105811,
+    "artifact_sha256": "26854292ffef2f24b61d9548d04031917f84b9b89767e0c44d93750be8a5d681",
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42524441777/artifacts/13635105811"
+  },
+  "contract": {
+    "target": "x86-64 SysV ABI unsigned u64",
+    "function": "(x / y) XOR rotl64(x % y,17)",
+    "admitted_value_domain": "y != 0 (all unsigned 64-bit x and y in that domain)",
+    "zero_divisor": "x86 DIV generates SIGFPE; fork-isolated checks in both variants",
+    "division_overflow": "RDX=0; unsigned 64-bit x / nonzero unsigned 64-bit y; quotient always fits 64 bits",
+    "undef_poison": "not modeled or claimed at CLIF/LLVM level",
+    "flags": "x86 DIV flags undefined and not subsequently read; flags caller-clobbered by ABI",
+    "signed_overflow": "not covered, signed IDIV excluded",
+    "target_assumptions": "x86-64 hardware division, caller-saved RCX/RAX/RDX, input RDI/RSI, output RAX"
+  },
+  "cost": {
+    "scope": "standalone SysV function-symbol executable bytes, not emitted CLIF/Wasmtime AOT",
+    "baseline": "tier1_two_div",
+    "candidate": "tier1_one_div",
+    "baseline_bytes": 30,
+    "candidate_bytes": 16,
+    "baseline_instructions": 11,
+    "candidate_instructions": 6,
+    "baseline_static_divq": 2,
+    "candidate_static_divq": 1,
+    "bytes_saved": 14
+  },
+  "verification": {
+    "technique": "compiled native finite tests against separate C / and % oracle",
+    "pairs_per_kernel": 100072,
+    "divide_zero_SIGFPE_trap_checks": 2,
+    "SMT": "not run for exact assembly; no proof of x86 machine code",
+    "compiled_and_run": true
+  },
+  "benchmark": {
+    "host": "GitHub Actions Ubuntu 24.04 x86-64 AMD EPYC 7763 virtualized",
+    "compiler": "GitHub Actions system C compiler; exact version and binary hash archived in receipt",
+    "paired_design": "16 alternating ABBA/BAAB blocks, 64 timed samples, 100000 calls/sample",
+    "median_one_div_over_two_div_ns_ratio": 0.7114137903161879,
+    "min_block_ratio": 0.5903736273612415,
+    "max_block_ratio": 0.7418217108111917,
+    "blocks_favoring_one_div": 16,
+    "classification": "exploratory one-host standalone-assembly microbenchmark; NOT same-Wasm compiler throughput"
+  },
+  "prior_candidate_warning": {
+    "same_wasm_qmul_compiler": "latest separately qualified patched Cranelift showed ~1.05564 patched/baseline ratio on one Intel hosted runner despite a smaller instruction prefix",
+    "do_not_combine_timings": "different CPUs, different code, different workloads and runtime overhead"
+  },
+  "searchable_library": {
+    "semantic_key": "x86-64|sysv|u64:divrem|xor(rotl(rem,17),quotient)|trap0",
+    "candidates": [
+      {
+        "name": "tier1_two_div",
+        "role": "baseline",
+        "instruction_family": "two unsigned divq"
+      },
+      {
+        "name": "tier1_one_div",
+        "role": "alternative",
+        "instruction_family": "one unsigned divq; RAX and RDX results"
+      }
+    ],
+    "dedup_strategy": "stable contract key plus source/blob pin and archived binary sha256 in receipt",
+    "proposer": "human-crafted assembly; NOT a ZenoFCIS search output"
+  },
+  "next_gate": "Integrate multi-result quotient/remainder reuse into pinned Cranelift lowering (or post-lowering VCode) so identical WAT under unchanged vs patched compilers yields one DIV; verify trap/SSA/regalloc/signedness and cost under register pressure, with independent checks, then benchmark same WAT. No upstream PR yet.",
+  "restrictions": [
+    "No protected branch mutation",
+    "Do not submit assembly-only fixture as upstream optimization",
+    "No general speedup or compiler-pass correctness claim"
+  ]
+}
