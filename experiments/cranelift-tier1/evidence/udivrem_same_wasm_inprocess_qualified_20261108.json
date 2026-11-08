@@ -1,0 +1,63 @@
+{
+  "schema": "zeno-fcis/tier1-udivrem-same-wasm-inprocess-checkpoint/1",
+  "date_utc": "2026-11-08",
+  "pinned_sources": {
+    "zenofcis_head": "9b3ef93e3e4b060ff00e1920bcf6953525691c9e",
+    "wasmtime_cranelift": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "producer_head": "0bb65bf7a4643137166f70372010fd1148e93c47"
+  },
+  "provenance": {
+    "producer_ci_run": 42468265753,
+    "producer_ci_success": true,
+    "producer_artifact_id": 13611833968,
+    "producer_artifact_zip_sha256": "1198cd90808df9aad28159ed08cd8cd419bf0b14f647578abe7626a0ffce9237",
+    "runtime_ci_run": 42496518332,
+    "runtime_ci_success": true,
+    "runtime_job_id": 128779922055,
+    "runtime_artifact_id": 13623716337,
+    "runtime_artifact_zip_sha256": "309b59a9ff6d1b32a7cc69754b915bcdc796fd0d3613b757cf2eb943fbc01589",
+    "runtime_raw_csv_sha256": "988d366aca2782e1b7136eedd30409b32bb5ad6b51043553ee7e161c4a85c2af"
+  },
+  "benchmark": {
+    "same_wat": true,
+    "baseline_vs_patched_compiler": true,
+    "host": "GitHub Actions ubuntu-24.04 x86_64 Intel Xeon 6973P-C virtualized",
+    "pin": "rustc 1.97.1",
+    "calls_per_sample": 100000,
+    "balanced_blocks": 16,
+    "abba_baab_samples": 64,
+    "finite_pairs_per_variant": 268,
+    "raw_checksums_valid": true,
+    "independent_recalculation": {
+      "median_patched_over_baseline_ratio": 1.055636929614394,
+      "min_block_ratio": 1.0086665669932584,
+      "max_block_ratio": 1.0761070733503721,
+      "all_16_blocks_patched_slower": true,
+      "agrees_with_ci": true
+    },
+    "classification": "single-host exploratory timing regression signal, not established cross-host slowdown or speedup"
+  },
+  "cost": {
+    "scope": "function static x86-64 disassembly through first ret; not whole image",
+    "baseline_divq": 2,
+    "patched_divq": 1,
+    "baseline_instruction_count": 16,
+    "patched_instruction_count": 15,
+    "baseline_instruction_prefix_bytes": 43,
+    "patched_instruction_prefix_bytes": 41,
+    "ELF_text_bytes_saved": 0,
+    "whole_cwasm_bytes_saved": 0
+  },
+  "semantic_evidence": {
+    "source_controls": "passed",
+    "same_wasm_720_native_witnesses": "passed",
+    "six_context_native_witnesses": 1588,
+    "six_context_trap_checks": 16,
+    "direct_8bit_SMT": "unsat",
+    "direct_16bit_SMT": "unknown",
+    "direct_64bit_SMT": "unknown",
+    "conditional_Euclidean_identity": "unsat conditional on division axioms"
+  },
+  "decision": "DO NOT submit current x - q*y replacement as profitable Cranelift optimization. The same-Wasm compiler edit reduces static divq and function bytes but shows a slower in-process paired ratio on one hosted CPU. No general speed claim or compiler-pass proof.",
+  "next_direction": "Explore true dual-result x86 div lowering with both quotient and remainder from one instruction, via target-gated multi-result CLIF/egraph or post-lowering deduplication. Independently check trap ordering, SSA dominance, register liveness, flags/poison assumptions, signed overflow, cross-target effects and profitability against same-Wasm patched compiler."
+}
