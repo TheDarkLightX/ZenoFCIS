@@ -39,6 +39,9 @@ jobs:
       - name: Verify archived source receipts and compare IDENTICAL WAT for each pressure context
         run: |
           set -euo pipefail
+          # Artifact ZIP extraction does not retain executable mode.
+          # Validate pinned SHA-256 receipts in the Python runner before invoking either binary.
+          chmod u+x tier1-pressure/source/tier1-dual-same-wasm/{baseline,patched}/wasmtime
           python3 -B experiments/cranelift-tier1/qualify_udivrem_pressure_28.py \
             --archive tier1-pressure/source/tier1-dual-same-wasm \
             --out tier1-pressure/results
