@@ -1,0 +1,94 @@
+{
+  "schema": "zeno-fcis/tier1-udivrem-adjacent-same-clif-compiler-qualified/1",
+  "date_local": "2026-11-08",
+  "classification": "source-pinned exact-CLIF unmodified-versus-experimental-Cranelift compiler comparison",
+  "qualified_zenofcis_commit": "0cd02a2aff0fe37ebeba7503510b2a7e55299e7e",
+  "experiment_branch": "research/2.8-tier1-cranelift-performance-20261102",
+  "unchanged_zenofcis_main_at_inspection": "4160086fb9d19f3ebe25047e69b1caa467aa74fd",
+  "unchanged_zenofcis_release_2_7_0_at_inspection": "5738b7a2a0313b56f71cbc2d3a74b602da4b813e",
+  "upstream_wasmtime_commit": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "current_upstream_main_at_inspection": "31307410b6b909092275e3b9dddf69df7eb9c99f",
+  "ci": {
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42558925610",
+    "conclusion": "success",
+    "source_controls": "success",
+    "identical_clif_compiler_job": "success",
+    "artifact_id": 13649185138,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42558925610/artifacts/13649185138",
+    "artifact_sha256": "c7b6835c34f6e020d09b9bdecd897a70f4f00cc489e84f284b14a4f5c69acd9a"
+  },
+  "rewrite": {
+    "pattern": "immediately adjacent udiv i64 x y followed by urem i64 x y, exact SSA operand identity, same basic block",
+    "new_opcode": "udivrem i64 x y returns (quotient,remainder)",
+    "placement": "after Cranelift egraph_pass and before x64 lowering",
+    "target_gate": "x86_64, opt_level != None",
+    "result_value_handling": "detach two original SSA values and reuse their identities as the two udivrem results",
+    "removed_instructions": "original udiv and urem; no intervening CLIF instruction permitted",
+    "x64_lowering": "one x64_div, quotient RAX, remainder RDX",
+    "source_hash_guards": {
+      "cranelift/codegen/src/context.rs": "7d6026c97be09f7680a1829a0afcb2a1534608cf",
+      "cranelift/codegen/meta/src/shared/instructions.rs": "d7122622a292c0300d4b6816c0424c0c25761f25",
+      "cranelift/codegen/src/isa/x64/lower.isle": "4fde7e22208bb952cb4e998ce2dca3cab4784ec4",
+      "cranelift/interpreter/src/step.rs": "cad9149b32edb08781bd7666953312762a4e64ae"
+    }
+  },
+  "admitted_contract": {
+    "input": "two unsigned i64 values x and y",
+    "output": "(x / y) XOR rotate_left((x % y),17) for y != 0",
+    "trap": "y == 0; initial udiv and fused udivrem both trap",
+    "signedness": "unsigned 64-bit only",
+    "overflow": "x86 DIV high dividend zero, so quotient fits 64 bits for nonzero divisor",
+    "flags": "x86 DIV flags undefined; fixture does not consume flags",
+    "poison": "no LLVM poison model admitted; CLIF semantics only",
+    "target": "x86_64 SysV native ELF on Linux hosted test runner and local verifier",
+    "no_intervening_effects": true
+  },
+  "target_cost": {
+    "metric": "emitted x86_64 ELF function-symbol bytes; straight-line instructions through ret",
+    "original": {
+      "static_divq": 2,
+      "decoded_instructions": 15,
+      "function_bytes": 40,
+      "whole_object_bytes": 640,
+      "sha256": "ba5f6e72efa5675fa7882d3db05043bbeb2440020a17981d5838d6d75fc7e217"
+    },
+    "patched": {
+      "static_divq": 1,
+      "decoded_instructions": 10,
+      "function_bytes": 25,
+      "whole_object_bytes": 632,
+      "sha256": "111548052bfa67b8431373f86ce5fac2cd97ee94ccb9871972fc9e462f382599"
+    },
+    "saved": {
+      "static_divq": 1,
+      "decoded_instructions": 5,
+      "function_bytes": 15
+    },
+    "note": "Function-symbol bytes and ELF object bytes are not complete Wasmtime .cwasm AOT size."
+  },
+  "verification": {
+    "source_installer_positive_and_corruption_guards": "passed in source-controls CI",
+    "pinned_cranelift_clif_run_fixtures": "passed both original and patched compilers, 9 explicit vector comments per file",
+    "separate_independent_audit": "passed on the exact downloadable CI ZIP: checked ZIP and object SHA256, nm and independently decoded objdump, linked exact archived function bytes with symbol-name-only changes, executed against C oracle",
+    "native_nonzero_input_pairs_per_variant": 100240,
+    "total_native_nonzero_function_calls": 200480,
+    "native_zero_divisor_SIGFPE_checks": 2,
+    "qf_bv_proof_of_this_compiler_pass": "not established",
+    "general_compiler_correctness": "not established",
+    "cross_target": "not established"
+  },
+  "rechecker_files": [
+    "experiments/cranelift-tier1/audits/independent_recheck_adjacent_28.py",
+    "experiments/cranelift-tier1/audits/native_witness_adjacent_28.c"
+  ],
+  "next_gate": "same input Wasm with baseline and patched compilers, context and trap regression matrix, actual AOT and in-process throughput, full verifier/ISA review before upstream PR",
+  "nonclaims": [
+    "not identical Wasm yet",
+    "not an upstream optimization submission",
+    "not whole AOT saving",
+    "not proven general compiler pass",
+    "not native throughput or speedup measurement",
+    "not searched by ZenoFCIS in this isolated test"
+  ],
+  "upstream_pr_submitted": false
+}
