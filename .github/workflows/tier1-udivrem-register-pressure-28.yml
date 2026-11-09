@@ -1,0 +1,55 @@
+name: tier1-udivrem-register-pressure-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-udivrem-register-pressure-28.yml'
+      - 'experiments/cranelift-tier1/qualify_udivrem_pressure_28.py'
+      - 'experiments/cranelift-tier1/qualify_dualresult_inprocess_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: tier1-udivrem-register-pressure-28
+  cancel-in-progress: true
+jobs:
+  pressure-same-wasm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Fail-closed source/oracle controls
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/qualify_udivrem_pressure_28.py
+          python3 -B experiments/cranelift-tier1/qualify_udivrem_pressure_28.py --self-test
+          mkdir -p tier1-pressure
+          git rev-parse HEAD >tier1-pressure/zenofcis-head.txt
+      - name: Retrieve previously qualified exact-source baseline and patched compilers
+        uses: actions/download-artifact@v4
+        with:
+          repository: TheDarkLightX/ZenoFCIS
+          run-id: 42596373104
+          github-token: ${{ github.token }}
+          name: tier1-udivrem-same-wasm-dualresult-28
+          path: tier1-pressure/source
+      - name: Verify archived source receipts and compare IDENTICAL WAT for each pressure context
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/qualify_udivrem_pressure_28.py \
+            --archive tier1-pressure/source/tier1-dual-same-wasm \
+            --out tier1-pressure/results
+      - name: Preserve full source, executable outputs, byte records, finite checks and negative controls
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-udivrem-register-pressure-28
+          path: |
+            tier1-pressure/zenofcis-head.txt
+            tier1-pressure/results
+            experiments/cranelift-tier1/qualify_udivrem_pressure_28.py
+          if-no-files-found: warn
+          retention-days: 30
