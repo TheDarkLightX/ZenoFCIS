@@ -12,12 +12,28 @@ import subprocess
 UPSTREAM='b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49'
 META='cranelift/codegen/meta/src/shared/instructions.rs'
 X64='cranelift/codegen/src/isa/x64/lower.isle'
+INTERP='cranelift/interpreter/src/step.rs'
 BLOBS={
  META:'d7122622a292c0300d4b6816c0424c0c25761f25',
  X64:'4fde7e22208bb952cb4e998ce2dca3cab4784ec4',
+ INTERP:'cad9149b32edb08781bd7666953312762a4e64ae',
 }
 META_ANCHOR='    ig.push(\n        Inst::new(\n            "sdiv",\n'
 X64_ANCHOR=';; Rules for `sdiv` ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n'
+INTERP_ANCHOR='        Opcode::Udiv => binary_can_trap(DataValueExt::udiv, arg(0), arg(1))?,\\n'
+INTERP_NEW='''        Opcode::Udivrem => {
+            // This interpreter fallback is part of the disposable opcode pilot.
+            // Preserve the same integer-divide-by-zero trap as Udiv and Urem.
+            let x = arg(0);
+            let y = arg(1);
+            match x.clone().udiv(y.clone()) {
+                Ok(q) => assign_multiple(&[q, x.urem(y)?]),
+                Err(ValueError::IntegerDivisionByZero) => ControlFlow::Trap(
+                    CraneliftTrap::User(TrapCode::INTEGER_DIVISION_BY_ZERO)),
+                Err(e) => return Err(e.into()),
+            }
+        }
+'''
 META_NEW='''    // EXPERIMENTAL TIER1 UDIVREM: scoped x64 i64 feasibility, not upstream.
     ig.push(
         Inst::new(
@@ -44,26 +60,29 @@ X64_NEW=''';; EXPERIMENTAL TIER1 UDIVREM, only i64; other targets are NOT suppor
 
 '''
 
-def patch(meta, lower):
+def patch(meta, lower, interp):
     if (meta.count(META_ANCHOR)!=1 or lower.count(X64_ANCHOR)!=1
+        or interp.count(INTERP_ANCHOR)!=1
         or 'EXPERIMENTAL TIER1 UDIVREM' in meta
-        or 'EXPERIMENTAL TIER1 UDIVREM' in lower):
+        or 'EXPERIMENTAL TIER1 UDIVREM' in lower
+        or 'Opcode::Udivrem' in interp):
         raise ValueError('unpinned, duplicate, or already-patched source')
     return {META:meta.replace(META_ANCHOR, META_NEW+META_ANCHOR,1),
-            X64:lower.replace(X64_ANCHOR,X64_NEW+X64_ANCHOR,1)}
+            X64:lower.replace(X64_ANCHOR,X64_NEW+X64_ANCHOR,1),
+            INTERP:interp.replace(INTERP_ANCHOR,INTERP_NEW+INTERP_ANCHOR,1)}
 
 def self_test():
-    orig=patch('PRE\n'+META_ANCHOR+'POST\n','PRE\n'+X64_ANCHOR+'POST\n')
-    if 'udivrem' not in orig[META] or 'x64_div' not in orig[X64]:
+    orig=patch('PRE\n'+META_ANCHOR+'POST\n','PRE\n'+X64_ANCHOR+'POST\n',INTERP_ANCHOR)
+    if 'udivrem' not in orig[META] or 'x64_div' not in orig[X64] or 'Opcode::Udivrem' not in orig[INTERP]:
         raise AssertionError('missing pilot patch')
-    for m,l in [
+    for m,l,i in [
         (orig[META],orig[X64]),
         ('no anchor','PRE\n'+X64_ANCHOR),
         ('PRE\n'+META_ANCHOR,'missing'),
         (META_ANCHOR+META_ANCHOR,X64_ANCHOR),
         (META_ANCHOR,X64_ANCHOR+X64_ANCHOR)
     ]:
-        try: patch(m,l)
+        try: patch(m,l,i)
         except ValueError: continue
         raise AssertionError('corrupted-source guard failed')
     return True
@@ -92,7 +111,7 @@ def main():
             raise ValueError('upstream source blob mismatch: '+path)
         if not (root/path).is_file() or (root/path).is_symlink():
             raise ValueError('source missing or symlink: '+path)
-    replacement=patch((root/META).read_text(),(root/X64).read_text())
+    replacement=patch((root/META).read_text(),(root/X64).read_text(),(root/INTERP).read_text())
     for path,data in replacement.items():
         (root/path).write_text(data)
     args.out.parent.mkdir(parents=True,exist_ok=True)
