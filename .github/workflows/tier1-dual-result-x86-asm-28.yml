@@ -42,3 +42,36 @@ jobs:
             experiments/cranelift-tier1/dual_result_x86_28/qualify_dual_result_28.py
           retention-days: 30
           if-no-files-found: warn
+  dual-result-qfbv:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Independent modeled 64-bit equivalence with pinned Z3
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          python3 -m venv "$RUNNER_TEMP/tier1-smt-venv"
+          "$RUNNER_TEMP/tier1-smt-venv/bin/python" -m pip install \
+            --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          PY="$RUNNER_TEMP/tier1-smt-venv/bin/python"
+          "$PY" -B experiments/cranelift-tier1/dual_result_x86_28/verify_dual_div_smt_28.py --self-test
+          "$PY" -B experiments/cranelift-tier1/dual_result_x86_28/verify_dual_div_smt_28.py \
+            --out tier1-dual-result-smt/receipt.json
+          git rev-parse HEAD >tier1-dual-result-smt/zenofcis-head.txt
+          test -s tier1-dual-result-smt/receipt.json
+      - name: Archive source-pinned QF_BV receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-dual-result-x86-qfbv-28
+          path: |
+            tier1-dual-result-smt
+            experiments/cranelift-tier1/dual_result_x86_28/dual_div.S
+            experiments/cranelift-tier1/dual_result_x86_28/verify_dual_div_smt_28.py
+            tools/machine_code_requirements.txt
+          retention-days: 30
+          if-no-files-found: warn
