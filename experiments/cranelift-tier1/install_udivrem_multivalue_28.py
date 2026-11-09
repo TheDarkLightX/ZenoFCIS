@@ -76,11 +76,12 @@ def self_test():
     if 'udivrem' not in orig[META] or 'x64_div' not in orig[X64] or 'Opcode::Udivrem' not in orig[INTERP]:
         raise AssertionError('missing pilot patch')
     for m,l,i in [
-        (orig[META],orig[X64]),
-        ('no anchor','PRE\n'+X64_ANCHOR),
-        ('PRE\n'+META_ANCHOR,'missing'),
-        (META_ANCHOR+META_ANCHOR,X64_ANCHOR),
-        (META_ANCHOR,X64_ANCHOR+X64_ANCHOR)
+        (orig[META],orig[X64],orig[INTERP]),
+        ('no anchor',X64_ANCHOR,INTERP_ANCHOR),
+        (META_ANCHOR,'missing',INTERP_ANCHOR),
+        (META_ANCHOR+META_ANCHOR,X64_ANCHOR,INTERP_ANCHOR),
+        (META_ANCHOR,X64_ANCHOR+X64_ANCHOR,INTERP_ANCHOR),
+        (META_ANCHOR,X64_ANCHOR,'missing')
     ]:
         try: patch(m,l,i)
         except ValueError: continue
