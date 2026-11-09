@@ -56,7 +56,9 @@ X64_NEW=''';; EXPERIMENTAL TIER1 UDIVREM, only i64; other targets are NOT suppor
 ;; The existing x64_div emits a physical DIV with two virtual result registers.
 ;; Quotient is result 0, remainder result 1; never split into two DIVs.
 (rule 1 (lower (udivrem _ a @ (value_type $I64) b))
-  (x64_div $I64 a (imm $I64 0) (put_in_gpr b) (TrapCode.INTEGER_DIVISION_BY_ZERO)))
+  (let ((qr ValueRegs (x64_div $I64 a (imm $I64 0) (put_in_gpr b)
+                                (TrapCode.INTEGER_DIVISION_BY_ZERO))))
+    (output_pair (value_regs_get qr 0) (value_regs_get qr 1))))
 
 '''
 
