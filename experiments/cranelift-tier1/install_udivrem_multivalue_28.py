@@ -17,7 +17,7 @@ BLOBS={
  X64:'4fde7e22208bb952cb4e998ce2dca3cab4784ec4',
 }
 META_ANCHOR='    ig.push(\n        Inst::new(\n            "sdiv",\n'
-X64_ANCHOR=';; Rules for \`sdiv\` ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n'
+X64_ANCHOR=';; Rules for `sdiv` ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n'
 META_NEW='''    // EXPERIMENTAL TIER1 UDIVREM: scoped x64 i64 feasibility, not upstream.
     ig.push(
         Inst::new(
