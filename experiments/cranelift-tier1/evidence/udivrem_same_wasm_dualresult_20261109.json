@@ -1,0 +1,115 @@
+{
+  "schema": "zenofcis/tier1-udivrem-same-wasm-independent-checkpoint/1",
+  "date_utc": "2026-11-09",
+  "status": "previous identical-Wasm CI passed and archived bytes re-audited; expanded contexts locally finite-tested; new branch CI pending independent confirmation",
+  "source": {
+    "zenofcis": "70bd29946cc20b8408a6df58d361f0ef51c77c9e",
+    "wasmtime": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "scope": "experimental x86-64 unsigned-i64 adjacent same-SSA udiv/urem only"
+  },
+  "original_ci": {
+    "run_id": 42559671581,
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42559671581",
+    "conclusions": {
+      "source_controls": "success",
+      "identical_wasm_two_compilers": "success"
+    },
+    "artifact_id": 13649231470,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42559671581/artifacts/13649231470",
+    "artifact_zip_sha256": "779f1e72554140c70768df19682a91f6b7f48d6823cd6b0df3163d0e24e46af6",
+    "independent_checks": [
+      "archived WAT SHA-256 against producer receipt",
+      "both AOT SHA-256 values against producer receipt",
+      "both disassembly SHA-256 values against producer receipt",
+      "decoded native instruction lines and static divq count against archived bytes"
+    ]
+  },
+  "native_cost_same_wasm": {
+    "baseline": {
+      "divq": 2,
+      "decoded_instructions": 16,
+      "bytes_through_ret": 43,
+      "whole_aot_bytes": 13608,
+      "elf_text_bytes": 4096
+    },
+    "patched": {
+      "divq": 1,
+      "decoded_instructions": 10,
+      "bytes_through_ret": 25,
+      "whole_aot_bytes": 13608,
+      "elf_text_bytes": 4096
+    },
+    "runtime_speed": "unmeasured"
+  },
+  "original_finite": {
+    "nonzero_pairs_per_compiler": 51,
+    "zero_divisor_trap_check_per_compiler": true,
+    "whole_compiler_proof": false
+  },
+  "local_extended_controls": {
+    "source_description": "independent locally executed 11-case WAT generator and Python mathematical oracle, before GitHub CI integration",
+    "test_vectors_per_compiler_per_case": 40,
+    "total_invocations": 880,
+    "per_case_static_divisions": {
+      "adjacent": [
+        2,
+        1
+      ],
+      "reverse_order": [
+        2,
+        2
+      ],
+      "swapped_rem_inputs": [
+        2,
+        2
+      ],
+      "quotient_only": [
+        1,
+        1
+      ],
+      "remainder_only": [
+        1,
+        1
+      ],
+      "signed_64": [
+        2,
+        2
+      ],
+      "unsigned_32": [
+        2,
+        2
+      ],
+      "signed_32": [
+        2,
+        2
+      ],
+      "intervening_add": [
+        2,
+        1
+      ],
+      "intervening_load": [
+        2,
+        2
+      ],
+      "branch": [
+        4,
+        2
+      ]
+    },
+    "finite_value_and_trap_checks": "all matched Python integer oracle and expected traps",
+    "note": "locally exercised harness was developed before refactoring into the repository's reproducible CI script; identical CI outcomes not yet asserted"
+  },
+  "new_verification_source_commits": [
+    "5cb1e09a5697b602115a7f0f595ee60b2d8e8e06",
+    "5e2d277f956af5fa7e5037d5316032370f59d513"
+  ],
+  "limitations": [
+    "finite sampling is not complete compiler-pass correctness, SMT proof or VeriISLE verification",
+    "the patch adds a new multi-result CLIF opcode, not an upstream approved ISLE-only rewrite",
+    "x86-64 register/flags invariants and cross-target behavior have not been universally proved",
+    "static instruction counts and bytes are not instruction latency, throughput or speedup",
+    "no native whole-AOT size saving",
+    "do not submit upstream or merge until proof, semantics and runtime profitability are sufficiently reviewed"
+  ]
+}
