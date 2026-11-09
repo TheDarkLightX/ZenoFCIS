@@ -6,6 +6,7 @@ on:
       - '.github/workflows/tier1-udivrem-same-wasm-dualresult-28.yml'
       - 'experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py'
       - 'experiments/cranelift-tier1/install_udivrem_combiner_28.py'
+      - 'experiments/cranelift-tier1/qualify_udivrem_contexts_28.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,7 +24,7 @@ jobs:
       - name: Syntax and pinned-source negative controls
         run: |
           set -euo pipefail
-          python3 -m py_compile experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py experiments/cranelift-tier1/install_udivrem_combiner_28.py
+          python3 -m py_compile experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py experiments/cranelift-tier1/install_udivrem_combiner_28.py experiments/cranelift-tier1/qualify_udivrem_contexts_28.py
           python3 -B experiments/cranelift-tier1/install_udivrem_combiner_28.py --self-test
   identical-wasm-two-compilers:
     needs: source-controls
@@ -78,6 +79,14 @@ jobs:
           set -euo pipefail
           python3 -B experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py --mode collect --out tier1-dual-same-wasm --source tier1-dual-same-wasm/input.wat
           python3 -B experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py --mode audit --out tier1-dual-same-wasm --source tier1-dual-same-wasm/input.wat
+      - name: Finite same-Wasm context and out-of-scope negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/qualify_udivrem_contexts_28.py \
+            --baseline-bin tier1-dual-same-wasm/baseline/wasmtime \
+            --patched-bin tier1-dual-same-wasm/patched/wasmtime \
+            --out tier1-dual-same-wasm/context-controls
       - name: Archive exact WAT, binaries, source diff and all receipts even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -87,5 +96,6 @@ jobs:
             tier1-dual-same-wasm
             experiments/cranelift-tier1/install_udivrem_combiner_28.py
             experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py
+            experiments/cranelift-tier1/qualify_udivrem_contexts_28.py
           retention-days: 30
           if-no-files-found: warn
