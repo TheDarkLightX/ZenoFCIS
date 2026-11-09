@@ -1,0 +1,173 @@
+{
+  "schema": "zenofcis/tier1-udivrem-call-live-checkpoint/1",
+  "date_utc": "2026-11-09",
+  "status": "GitHub Actions success and independent ZIP SHA/native-disassembly recheck",
+  "source": {
+    "repo": "TheDarkLightX/ZenoFCIS",
+    "experimental_branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "workflow_commit": "7967adce41243c2c024c025e674f0b14461a6da2",
+    "script": "experiments/cranelift-tier1/qualify_udivrem_live_calls_28.py",
+    "script_sha256": "60076e6e7068e2a22bffc83a53839b0b4f365e04926b723ff3f668fc8660d20e",
+    "upstream_wasmtime": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "original_compiler_sha256": "a2dd8ba4b12fd86bf0c4aeca76d543bc4f57ae067a215749a6ef5350aeb41c3c",
+    "experimental_compiler_sha256": "ab2fbe4db027dc51d9b1c16bba5ea39d1006e94cf5213b099751002e3e0e05eb",
+    "target": "x86_64-unknown-linux"
+  },
+  "evidence": {
+    "workflow": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42708736506",
+    "artifact_id": 13715505924,
+    "artifact_sha256": "49571f8bf77a0ede4f3d002faf7b0626ead3c27839debafee8d622619e6900c5",
+    "qualification_json_sha256": "db2d266d5dd4a96bbe7a992f324330b618d2982dd973d6e0bb5477d22a29e009",
+    "producer_workflow": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42596373104",
+    "finite_value_executions": 1044,
+    "zero_divisor_trap_executions": 108,
+    "cases": {
+      "live_0": {
+        "call_outputs_crossing_division": 0,
+        "divq": [
+          2,
+          1
+        ],
+        "instructions": [
+          16,
+          10
+        ],
+        "function_bytes": [
+          43,
+          25
+        ],
+        "pre_div_stack_stores": [
+          0,
+          0
+        ],
+        "aot_bytes": [
+          13840,
+          13840
+        ]
+      },
+      "live_4": {
+        "call_outputs_crossing_division": 4,
+        "divq": [
+          2,
+          1
+        ],
+        "instructions": [
+          67,
+          62
+        ],
+        "function_bytes": [
+          242,
+          227
+        ],
+        "pre_div_stack_stores": [
+          0,
+          0
+        ],
+        "aot_bytes": [
+          13840,
+          13840
+        ]
+      },
+      "live_12": {
+        "call_outputs_crossing_division": 12,
+        "divq": [
+          2,
+          1
+        ],
+        "instructions": [
+          131,
+          126
+        ],
+        "function_bytes": [
+          515,
+          500
+        ],
+        "pre_div_stack_stores": [
+          7,
+          8
+        ],
+        "aot_bytes": [
+          13840,
+          13840
+        ]
+      },
+      "live_20": {
+        "call_outputs_crossing_division": 20,
+        "divq": [
+          2,
+          1
+        ],
+        "instructions": [
+          195,
+          190
+        ],
+        "function_bytes": [
+          815,
+          800
+        ],
+        "pre_div_stack_stores": [
+          15,
+          16
+        ],
+        "aot_bytes": [
+          13840,
+          13840
+        ]
+      },
+      "live_12_reverse": {
+        "call_outputs_crossing_division": 12,
+        "divq": [
+          2,
+          2
+        ],
+        "instructions": [
+          133,
+          133
+        ],
+        "function_bytes": [
+          521,
+          521
+        ],
+        "pre_div_stack_stores": [
+          7,
+          7
+        ],
+        "aot_bytes": [
+          13840,
+          13840
+        ]
+      },
+      "live_12_quotient_only": {
+        "call_outputs_crossing_division": 12,
+        "divq": [
+          1,
+          1
+        ],
+        "instructions": [
+          124,
+          124
+        ],
+        "function_bytes": [
+          493,
+          493
+        ],
+        "pre_div_stack_stores": [
+          8,
+          8
+        ],
+        "aot_bytes": [
+          13840,
+          13840
+        ]
+      }
+    }
+  },
+  "contract": "Wasm unsigned i64 quotient/remainder on modulo-2^64 bit patterns with divide-by-zero trap; 0/4/12/20 sequential pure helper calls before division with outputs consumed after; identical WAT per baseline/patched; x86-64 fixed pinned Wasmtime compilers.",
+  "classification": "Finite Wasmtime native executable checks plus independent hashes/static-disassembly checks. NOT formal compiler-pass proof, x86 ISA proof, or throughput benchmark.",
+  "nonclaims": [
+    "Call-carried values and stack traffic are a synthetic live-range screen, not general allocator profitability",
+    "The observed extra stack stores at 12 and 20 are measurements of the fixture, not a proof of a fixed register-pressure bound",
+    "Function native bytes are not CLIF costs, whole AOT size, or runtime speed",
+    "32-bit, signed, nonadjacent, flags, undefined/poison, and other targets not admitted to this candidate"
+  ]
+}
