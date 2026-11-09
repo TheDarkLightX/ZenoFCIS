@@ -20,7 +20,7 @@ BLOBS={
 }
 META_ANCHOR='    ig.push(\n        Inst::new(\n            "sdiv",\n'
 X64_ANCHOR=';; Rules for `sdiv` ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n'
-INTERP_ANCHOR='        Opcode::Udiv => binary_can_trap(DataValueExt::udiv, arg(0), arg(1))?,\\n'
+INTERP_ANCHOR='        Opcode::Udiv => binary_can_trap(DataValueExt::udiv, arg(0), arg(1))?,\n'
 INTERP_NEW='''        Opcode::Udivrem => {
             // This interpreter fallback is part of the disposable opcode pilot.
             // Preserve the same integer-divide-by-zero trap as Udiv and Urem.
