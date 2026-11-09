@@ -51,7 +51,7 @@ jobs:
           import sys
           from pathlib import Path
           sys.path.insert(0,'experiments/cranelift-tier1')
-          from qualify_same_wasm_inprocess_28 import validate_producer
+          from qualify_dualresult_inprocess_28 import validate_producer
           p=validate_producer(Path('tier1-dual-result-perf/source/tier1-dual-same-wasm'))
           print('source receipt and binaries verified:',p['input_wat_sha256'])
           PY
