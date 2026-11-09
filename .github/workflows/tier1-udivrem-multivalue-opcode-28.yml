@@ -1,0 +1,91 @@
+name: tier1-udivrem-multivalue-opcode-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-udivrem-multivalue-opcode-28.yml'
+      - 'experiments/cranelift-tier1/install_udivrem_multivalue_28.py'
+      - 'experiments/cranelift-tier1/multivalue_28/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tier1-udivrem-multivalue-opcode-28
+  cancel-in-progress: true
+jobs:
+  source-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Check installer syntax and fail-closed source guards
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/install_udivrem_multivalue_28.py
+          python3 -B experiments/cranelift-tier1/install_udivrem_multivalue_28.py --self-test
+  pinned-x64-multivalue:
+    needs: source-controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Install in a disposable pinned compiler checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal
+          mkdir -p tier1-udivrem-multivalue
+          git rev-parse HEAD >tier1-udivrem-multivalue/zenofcis-head.txt
+          git -C upstream rev-parse HEAD >tier1-udivrem-multivalue/upstream-head.txt
+          python3 -B experiments/cranelift-tier1/install_udivrem_multivalue_28.py \
+            --upstream upstream --out tier1-udivrem-multivalue/installer.json
+          git -C upstream diff -- cranelift/codegen/meta/src/shared/instructions.rs \
+            cranelift/codegen/src/isa/x64/lower.isle >tier1-udivrem-multivalue/compiler.patch
+          test -s tier1-udivrem-multivalue/compiler.patch
+      - name: Compile and execute both distinct CLIF fixture sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          B="$GITHUB_WORKSPACE/experiments/cranelift-tier1/multivalue_28/baseline.clif"
+          C="$GITHUB_WORKSPACE/experiments/cranelift-tier1/multivalue_28/candidate.clif"
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- test "$B" "$C" \
+            >tier1-udivrem-multivalue/test.stdout 2>tier1-udivrem-multivalue/test.stderr
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- \
+            compile --target x86_64 --set opt_level=speed_and_size -o tier1-udivrem-multivalue/baseline.o "$B" \
+            >tier1-udivrem-multivalue/baseline-compile.stdout 2>tier1-udivrem-multivalue/baseline-compile.stderr
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- \
+            compile --target x86_64 --set opt_level=speed_and_size -o tier1-udivrem-multivalue/candidate.o "$C" \
+            >tier1-udivrem-multivalue/candidate-compile.stdout 2>tier1-udivrem-multivalue/candidate-compile.stderr
+          for V in baseline candidate; do
+            objdump -dr "$PWD/tier1-udivrem-multivalue/$V.o" > "tier1-udivrem-multivalue/$V-objdump.txt"
+            nm -S --defined-only "$PWD/tier1-udivrem-multivalue/$V.o" > "tier1-udivrem-multivalue/$V-symbols.txt"
+            sha256sum "tier1-udivrem-multivalue/$V.o" > "tier1-udivrem-multivalue/$V-sha256.txt"
+          done
+          test "$(grep -Ec '[[:space:]]div[[:space:]]' tier1-udivrem-multivalue/baseline-objdump.txt)" = 2
+          test "$(grep -Ec '[[:space:]]div[[:space:]]' tier1-udivrem-multivalue/candidate-objdump.txt)" = 1
+      - name: Preserve complete compiler patch and measurement artifacts even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-udivrem-multivalue-opcode-28
+          path: |
+            tier1-udivrem-multivalue
+            experiments/cranelift-tier1/install_udivrem_multivalue_28.py
+            experiments/cranelift-tier1/multivalue_28
+          retention-days: 30
+          if-no-files-found: warn
