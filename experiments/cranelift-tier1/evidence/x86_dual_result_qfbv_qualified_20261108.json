@@ -1,0 +1,84 @@
+{
+  "schema": "zeno-fcis/tier1-x86-dual-result-qfbv-checkpoint/1",
+  "date_local": "2026-11-08",
+  "branch": "research/2.8-tier1-cranelift-performance-20261102",
+  "source_head": "cccbcab07c276fa16c95b4f2156f88ceac2f4953",
+  "pinned_wasmtime_for_separate_compiler_experiments": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "files": {
+    "assembly": "experiments/cranelift-tier1/dual_result_x86_28/dual_div.S",
+    "assembly_git_blob": "77a258bafd4d39156f0f7700a6441963b7df2c9e",
+    "assembly_sha256": "88278279d047ed505265d181b67f09115c7c8a3e327035a4d8129fc000fb5f24",
+    "verifier": "experiments/cranelift-tier1/dual_result_x86_28/verify_dual_div_smt_28.py",
+    "verifier_git_blob": "d679e754598def263cf2821f66b40b89a247e765",
+    "z3_requirements": "tools/machine_code_requirements.txt"
+  },
+  "ci": {
+    "run_id": 42556526806,
+    "run_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42556526806",
+    "conclusion": "success",
+    "source_commit": "cccbcab07c276fa16c95b4f2156f88ceac2f4953",
+    "solver_job": "dual-result-qfbv: success",
+    "native_job": "dual-result-native: success",
+    "proof_job_id": 128963402396,
+    "artifact_id": 13648010689,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42556526806/artifacts/13648010689",
+    "artifact_zip_digest": "sha256:e14fc147f5cb22f6a9b083e002286f72278d21a8cedacaf6ce60018475bb3d74",
+    "native_artifact_id": 13647810730,
+    "native_artifact_zip_digest": "sha256:80001154add2a35a7f4024ac49ee4883993e4ea042e8c0db63088b28220dd783"
+  },
+  "contract": {
+    "inputs": "RDI=x, RSI=y, unsigned 64-bit integers; return RAX",
+    "admitted_domain": "y != 0",
+    "function": "(x/y) XOR rotl64(x%y,17)",
+    "x86_semantics": "unsigned DIV reads RDX:RAX and writes quotient RAX and remainder RDX; RDX is zero before every division",
+    "zero_divisor": "both exact bodies fault via DIV on y=0; the value equivalence queries exclude y=0",
+    "division_overflow": "impossible for RDX=0 and y!=0",
+    "signed_overflow": "out of scope; only unsigned DIV",
+    "flags": "status flags undefined after DIV; no instruction consumes flags; no caller ABI guarantee",
+    "undef_poison": "not a CLIF/LLVM model; no compiler-pass soundness implied"
+  },
+  "proof": {
+    "solver": "z3-solver 4.15.4.0 (hash-pinned wheel)",
+    "logic": "QF_BV",
+    "width": 64,
+    "timeout_ms_per_check": 20000,
+    "checked_exact_source_instruction_sequences": true,
+    "source_parser_negative_controls": 4,
+    "checks": [
+      {
+        "name": "two-div-versus-independent-reference",
+        "result": "unsat"
+      },
+      {
+        "name": "one-div-versus-independent-reference",
+        "result": "unsat"
+      },
+      {
+        "name": "one-div-versus-two-div",
+        "result": "unsat"
+      }
+    ],
+    "scope": "full-width symbolic proof within explicitly modeled x86-64 instruction semantics, not proof of assembled machine bytes",
+    "results_unknown": 0,
+    "replay": "python3 -m venv /tmp/tier1-z3; /tmp/tier1-z3/bin/python -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt; /tmp/tier1-z3/bin/python -B experiments/cranelift-tier1/dual_result_x86_28/verify_dual_div_smt_28.py --out /tmp/tier1-dual-result-smt/receipt.json"
+  },
+  "prior_cost_receipt": "experiments/cranelift-tier1/evidence/x86_dual_result_native_qualified_20261108.json",
+  "prior_cost_summary": {
+    "cost_scope": "standalone x86-64 SysV function-symbol bytes; not automatic compiler optimization",
+    "baseline_bytes": 30,
+    "candidate_bytes": 16,
+    "baseline_divq": 2,
+    "candidate_divq": 1,
+    "verified_finite_pairs_per_kernel": 100072,
+    "native_y_zero_SIGFPE_checks": 2
+  },
+  "remaining": {
+    "same_wasm_direct_multi_result_compiler_patch": "not implemented",
+    "abi_and_regalloc": "not verified",
+    "cross_target": "not verified for this direct-result candidate",
+    "speed_in_wasmtime": "not established",
+    "source_synthesis": "standalone candidate manually crafted; not discovered by ZenoFCIS",
+    "compiler_PnR_smt": "direct 16/64-bit earlier CLIF identity SMT queries remain unknown and are not resolved by this standalone-assembly proof",
+    "upstream_PR": "none"
+  }
+}
