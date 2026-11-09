@@ -1,0 +1,64 @@
+{
+  "schema": "zenofcis/tier1-udivrem-dualresult-same-wasm-balanced-native-runtime-independent-checkpoint/1",
+  "date_utc": "2026-11-09",
+  "status": "CI succeeded; archived timing samples independently recalculated; exploratory single hosted runner only",
+  "pins": {
+    "producer_zenofcis": "5e2d277f956af5fa7e5037d5316032370f59d513",
+    "benchmark_zenofcis": "225612e45f95e3d7cb27534adc04d560e1a64521",
+    "upstream_wasmtime": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "target": "Linux x86_64"
+  },
+  "original_compiler": {
+    "ci": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42596373104",
+    "artifact": 13664510417,
+    "evidence": "experiments/cranelift-tier1/evidence/udivrem_11_context_ci_20261109.json"
+  },
+  "runtime_ci": {
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42644776727",
+    "run_id": 42644776727,
+    "conclusion": "success",
+    "job": "same-wat-inprocess",
+    "artifact_id": 13686498278,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42644776727/artifacts/13686498278",
+    "artifact_zip_sha256": "95812e5d1120f3e49da651c0bd17ec657c944e9575cd6427eb50e7e65bda1c3c",
+    "qualified_auditor": "experiments/cranelift-tier1/qualify_dualresult_inprocess_28.py"
+  },
+  "runtime_observation": {
+    "design": "alternating 16 ABBA/BAAB balanced blocks, same host, same WAT, baseline and patched AOT; per-block medians; both variants independently validated before timing",
+    "samples": 64,
+    "timed_guest_calls_per_sample": 100000,
+    "balanced_blocks": 16,
+    "finite_oracle_pairs_per_variant": 268,
+    "zero_divisor_trap_per_variant": true,
+    "checksum_unsigned_u64": "6951454329984430120",
+    "patched_over_baseline_median_paired_ratio": 0.9597233871958,
+    "blocks_patched_faster": 14,
+    "block_ratios_min": 0.9026175444133865,
+    "block_ratios_max": 1.0793469038523775,
+    "archived_raw_sha256_matches_audit": true,
+    "raw_per_block_ratio_recomputed_independently": true
+  },
+  "static_cost": {
+    "baseline": {
+      "divq": 2,
+      "decoded_instructions": 16,
+      "bytes_through_ret": 43,
+      "whole_aot_bytes": 13608
+    },
+    "patched": {
+      "divq": 1,
+      "decoded_instructions": 10,
+      "bytes_through_ret": 25,
+      "whole_aot_bytes": 13608
+    }
+  },
+  "limitations": [
+    "descriptive one-host virtualized-runner timing; NOT a reproducible multi-host speedup claim",
+    "includes host loop, Wasmtime typed calls and runtime overhead; not isolated x86 division latency or throughput",
+    "finite values/traps do not prove whole compiler pass including flags, liveness, all control flow or all targets",
+    "patch is an experimental new multi-result CLIF opcode and does not have upstream VeriISLE or full safety review",
+    "whole AOT sizes equal; static instruction-prefix byte saving is scoped to one function",
+    "no upstream submission and no main/release branch change"
+  ],
+  "next": "Repeat across hosts/CPU models and realistic workloads; prove rewrite semantic/liveness conditions and assess current upstream egraph integration before considering upstream proposal"
+}
