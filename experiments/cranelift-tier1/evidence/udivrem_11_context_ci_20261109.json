@@ -1,0 +1,84 @@
+{
+  "schema": "zenofcis/tier1-udivrem-eleven-context-ci-independent-checkpoint/1",
+  "date_utc": "2026-11-09",
+  "status": "GitHub CI succeeded; finite test and static-cost observations only",
+  "source": {
+    "experiment_commit": "5e2d277f956af5fa7e5037d5316032370f59d513",
+    "upstream_wasmtime": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "target": "x86_64-unknown-linux, optimized unsigned i64 adjacent same-SSA division/remainder"
+  },
+  "ci": {
+    "run_id": 42596373104,
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42596373104",
+    "jobs": {
+      "source-controls": "success",
+      "identical-wasm-two-compilers": "success"
+    },
+    "observed_utc": "2026-11-09T09:52:43Z",
+    "artifact_id": 13664510417,
+    "artifact_digest_sha256": "8559f5a97819ae1fed898323800d1e0daa893fa4433d8e18fb5cb5f70c176be5",
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42596373104/artifacts/13664510417"
+  },
+  "contexts": {
+    "distinct_wasm_cases": 11,
+    "distinct_input_pairs_per_case_per_compiler": 38,
+    "compiler_variants": 2,
+    "total_finite_executions_including_expected_traps": 836,
+    "observed_static_div_savings": {
+      "adjacent": 1,
+      "branch": 2,
+      "intervening_add": 1,
+      "intervening_load": 0,
+      "quotient_only": 0,
+      "remainder_only": 0,
+      "reverse_order": 0,
+      "signed_32": 0,
+      "signed_64": 0,
+      "swapped_rem_inputs": 0,
+      "unsigned_32": 0
+    },
+    "negative_controls": [
+      "reverse_order",
+      "swapped_rem_inputs",
+      "quotient_only",
+      "remainder_only",
+      "signed_64",
+      "signed_32",
+      "unsigned_32"
+    ],
+    "native_value_and_trap_checks": "CI finite-context-controls-passed; independent Python integer oracle; host execution"
+  },
+  "same_wasm_main_fixture": {
+    "baseline": {
+      "divq": 2,
+      "decoded_instructions": 16,
+      "bytes_through_ret": 43,
+      "whole_aot_bytes": 13608
+    },
+    "patched": {
+      "divq": 1,
+      "decoded_instructions": 10,
+      "bytes_through_ret": 25,
+      "whole_aot_bytes": 13608
+    },
+    "scope": "one emitted function only; no whole-AOT saving"
+  },
+  "next_step": {
+    "runtime_workflow": "tier1-udivrem-same-wasm-dualresult-inprocess-28",
+    "initial_workflow_commit": "c6d0f2968e94ab5340e6157e30024f04c98f687a",
+    "corrected_workflow_commit": "225612e45f95e3d7cb27534adc04d560e1a64521",
+    "workflow_run_id": 42644776727,
+    "status_at_checkpoint": "running, no runtime outcome asserted",
+    "expected": "balanced ABBA/BAAB 16 blocks x 100000 guest calls per sample, use pinned archived AOT; verify source hashes and finite arithmetic before unsafe AOT deserialize"
+  },
+  "limits": [
+    "not exhaustive over unsigned 64-bit inputs",
+    "not SMT proof or complete compiler-pass proof",
+    "context tests do not prove flags, liveness, traps under every SSA control-flow case",
+    "not yet cross-target",
+    "no reliable runtime speedup measured for the new dual-result compiler",
+    "native x86 static bytes not equivalent to CLIF cost or runtime throughput",
+    "no upstream submission"
+  ]
+}
