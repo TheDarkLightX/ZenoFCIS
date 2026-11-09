@@ -1,0 +1,91 @@
+name: tier1-udivrem-same-wasm-dualresult-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-udivrem-same-wasm-dualresult-28.yml'
+      - 'experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py'
+      - 'experiments/cranelift-tier1/install_udivrem_combiner_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tier1-udivrem-same-wasm-dualresult-28
+  cancel-in-progress: true
+jobs:
+  source-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Syntax and pinned-source negative controls
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py experiments/cranelift-tier1/install_udivrem_combiner_28.py
+          python3 -B experiments/cranelift-tier1/install_udivrem_combiner_28.py --self-test
+  identical-wasm-two-compilers:
+    needs: source-controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Build pristine pinned baseline Wasmtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          test -z "$(git -C upstream status --porcelain)"
+          mkdir -p tier1-dual-same-wasm/baseline tier1-dual-same-wasm/patched
+          git rev-parse HEAD >tier1-dual-same-wasm/zenofcis-head.txt
+          git -C upstream rev-parse HEAD >tier1-dual-same-wasm/wasmtime-head.txt
+          python3 -B - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0,'experiments/cranelift-tier1')
+          from qualify_udivrem_source_palette_28 import WATS
+          Path('tier1-dual-same-wasm/input.wat').write_text(WATS['direct'])
+          PY
+          cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump >tier1-dual-same-wasm/baseline-build.stdout 2>tier1-dual-same-wasm/baseline-build.stderr
+          cp upstream/target/debug/wasmtime tier1-dual-same-wasm/baseline/wasmtime
+      - name: Patch only disposable compiler and build experimental Wasmtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/install_udivrem_combiner_28.py --upstream upstream --out tier1-dual-same-wasm/installer.json
+          git -C upstream diff >tier1-dual-same-wasm/compiler.patch
+          test -s tier1-dual-same-wasm/compiler.patch
+          cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump >tier1-dual-same-wasm/patched-build.stdout 2>tier1-dual-same-wasm/patched-build.stderr
+          cp upstream/target/debug/wasmtime tier1-dual-same-wasm/patched/wasmtime
+      - name: Audit two compilers against identical Wasm, real code bytes, arithmetic and traps
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py --mode collect --out tier1-dual-same-wasm --source tier1-dual-same-wasm/input.wat
+          python3 -B experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py --mode audit --out tier1-dual-same-wasm --source tier1-dual-same-wasm/input.wat
+      - name: Archive exact WAT, binaries, source diff and all receipts even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-udivrem-same-wasm-dualresult-28
+          path: |
+            tier1-dual-same-wasm
+            experiments/cranelift-tier1/install_udivrem_combiner_28.py
+            experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py
+          retention-days: 30
+          if-no-files-found: warn
