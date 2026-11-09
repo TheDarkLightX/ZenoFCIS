@@ -1,0 +1,103 @@
+name: tier1-udivrem-adjacent-combiner-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-udivrem-adjacent-combiner-28.yml'
+      - 'experiments/cranelift-tier1/install_udivrem_combiner_28.py'
+      - 'experiments/cranelift-tier1/install_udivrem_multivalue_28.py'
+      - 'experiments/cranelift-tier1/multivalue_28/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tier1-udivrem-adjacent-combiner-28
+  cancel-in-progress: true
+jobs:
+  source-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Installer compiles and rejects corrupt sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/install_udivrem_combiner_28.py
+          python3 -B experiments/cranelift-tier1/install_udivrem_combiner_28.py --self-test
+  identical-clif-baseline-vs-patched:
+    needs: source-controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: original
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: patched
+          persist-credentials: false
+      - name: Install x64-only experimental compiler rewrite in disposable checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal
+          mkdir -p tier1-udivrem-combiner
+          git rev-parse HEAD >tier1-udivrem-combiner/zenofcis-head.txt
+          git -C original rev-parse HEAD >tier1-udivrem-combiner/original-head.txt
+          git -C patched rev-parse HEAD >tier1-udivrem-combiner/patched-head.txt
+          cmp tier1-udivrem-combiner/original-head.txt tier1-udivrem-combiner/patched-head.txt
+          python3 -B experiments/cranelift-tier1/install_udivrem_combiner_28.py \
+            --upstream patched --out tier1-udivrem-combiner/installer.json
+          git -C patched diff -- cranelift/codegen/src/context.rs \
+            cranelift/codegen/src/isa/x64/lower.isle \
+            cranelift/codegen/meta/src/shared/instructions.rs \
+            cranelift/interpreter/src/step.rs >tier1-udivrem-combiner/compiler.patch
+          test -s tier1-udivrem-combiner/compiler.patch
+      - name: Check identical CLIF semantics under both compilers
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$GITHUB_WORKSPACE/experiments/cranelift-tier1/multivalue_28/baseline.clif"
+          sha256sum "$SRC" >tier1-udivrem-combiner/identical-clif-sha256.txt
+          for VAR in original patched; do
+            cargo run --locked --manifest-path "$VAR/cranelift/Cargo.toml" --bin clif-util -- test "$SRC" \
+              >"tier1-udivrem-combiner/$VAR-test.stdout" 2>"tier1-udivrem-combiner/$VAR-test.stderr"
+            cargo run --locked --manifest-path "$VAR/cranelift/Cargo.toml" --bin clif-util -- \
+              compile --target x86_64 --set opt_level=speed_and_size \
+              -o "tier1-udivrem-combiner/$VAR.o" "$SRC" \
+              >"tier1-udivrem-combiner/$VAR-compile.stdout" 2>"tier1-udivrem-combiner/$VAR-compile.stderr"
+            objdump -dr "tier1-udivrem-combiner/$VAR.o" >"tier1-udivrem-combiner/$VAR-objdump.txt"
+            nm -S --defined-only "tier1-udivrem-combiner/$VAR.o" >"tier1-udivrem-combiner/$VAR-symbols.txt"
+            sha256sum "tier1-udivrem-combiner/$VAR.o" >"tier1-udivrem-combiner/$VAR-object-sha256.txt"
+          done
+          # Fail closed if the rewrite does not actually reach the target fixture.
+          test "$(grep -Ec '[[:space:]]div[[:space:]]' tier1-udivrem-combiner/original-objdump.txt)" = 2
+          test "$(grep -Ec '[[:space:]]div[[:space:]]' tier1-udivrem-combiner/patched-objdump.txt)" = 1
+      - name: Preserve source pins and raw emitted compiler evidence on failure or success
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-udivrem-adjacent-combiner-28
+          path: |
+            tier1-udivrem-combiner
+            experiments/cranelift-tier1/install_udivrem_combiner_28.py
+            experiments/cranelift-tier1/install_udivrem_multivalue_28.py
+            experiments/cranelift-tier1/multivalue_28/baseline.clif
+          retention-days: 30
+          if-no-files-found: warn
