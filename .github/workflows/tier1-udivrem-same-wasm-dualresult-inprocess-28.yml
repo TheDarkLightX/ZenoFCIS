@@ -1,0 +1,87 @@
+name: tier1-udivrem-same-wasm-dualresult-inprocess-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-udivrem-same-wasm-dualresult-inprocess-28.yml'
+      - 'experiments/cranelift-tier1/inprocess_same_wasm_28/**'
+      - 'experiments/cranelift-tier1/qualify_dualresult_inprocess_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: tier1-udivrem-same-wasm-dualresult-inprocess-28
+  cancel-in-progress: true
+jobs:
+  same-wat-inprocess:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 105
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Retrieve successful 11-context dual-result same-Wasm A/B artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: TheDarkLightX/ZenoFCIS
+          run-id: 42596373104
+          github-token: ${{ github.token }}
+          name: tier1-udivrem-same-wasm-dualresult-28
+          path: tier1-dual-result-perf/source
+      - name: Fail closed on receipts and independent native validation BEFORE deserializing AOT
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          python3 -m py_compile experiments/cranelift-tier1/qualify_dualresult_inprocess_28.py
+          python3 -B experiments/cranelift-tier1/qualify_dualresult_inprocess_28.py --self-test
+          python3 -B - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0,'experiments/cranelift-tier1')
+          from qualify_same_wasm_inprocess_28 import validate_producer
+          p=validate_producer(Path('tier1-dual-result-perf/source/tier1-dual-same-wasm'))
+          print('source receipt and binaries verified:',p['input_wat_sha256'])
+          PY
+      - name: Compile pinned Rust Wasmtime runtime harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal
+          cargo generate-lockfile --manifest-path experiments/cranelift-tier1/inprocess_same_wasm_28/Cargo.toml
+          cargo build --locked --release --manifest-path experiments/cranelift-tier1/inprocess_same_wasm_28/Cargo.toml >tier1-dual-result-perf/build.stdout 2>tier1-dual-result-perf/build.stderr
+          cp experiments/cranelift-tier1/inprocess_same_wasm_28/Cargo.lock tier1-dual-result-perf/Cargo.lock
+          { git rev-parse HEAD; git -C upstream rev-parse HEAD; rustc --version; cargo --version; uname -a; lscpu; } >tier1-dual-result-perf/host-tools.txt
+      - name: Balanced ABBA BAAB same-input/identical-WAT in-process call timing
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin=experiments/cranelift-tier1/inprocess_same_wasm_28/target/release/tier1-udivrem-same-wasm-inprocess-28
+          "$bin" tier1-dual-result-perf/source/tier1-dual-same-wasm/baseline/input.cwasm tier1-dual-result-perf/source/tier1-dual-same-wasm/patched/input.cwasm 100000 16 5623 > tier1-dual-result-perf/raw.csv
+          python3 -B experiments/cranelift-tier1/qualify_dualresult_inprocess_28.py --source-root tier1-dual-result-perf/source/tier1-dual-same-wasm --raw tier1-dual-result-perf/raw.csv --cargo-lock tier1-dual-result-perf/Cargo.lock --calls 100000 --blocks 16 --out tier1-dual-result-perf/qualified.json
+      - name: Preserve immutable source receipt and raw timed data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-udivrem-same-wasm-dualresult-inprocess-28
+          path: |
+            tier1-dual-result-perf/host-tools.txt
+            tier1-dual-result-perf/Cargo.lock
+            tier1-dual-result-perf/build.stdout
+            tier1-dual-result-perf/build.stderr
+            tier1-dual-result-perf/raw.csv
+            tier1-dual-result-perf/qualified.json
+          if-no-files-found: warn
+          retention-days: 30
