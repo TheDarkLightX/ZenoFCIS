@@ -27,6 +27,10 @@ jobs:
           persist-credentials: false
       - name: Record Python identity
         run: python3 --version
+      - name: Proof-carrying decision evidence and negative controls
+        run: |
+          python3 -B integrations/zal/test_decision_evidence.py -v
+          python3 -O -B integrations/zal/test_decision_evidence.py
       - name: Finite library source controls
         run: python3 -B -m unittest discover -s integrations/zal/finite_library -t integrations/zal -p 'test_*.py' -v
       - name: Notation and Lens source controls
