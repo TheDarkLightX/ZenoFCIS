@@ -1,0 +1,102 @@
+name: tier1-udivrem-call-live-inprocess-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-udivrem-call-live-inprocess-28.yml'
+      - 'experiments/cranelift-tier1/inprocess_live_pressure_28/**'
+      - 'experiments/cranelift-tier1/audit_call_live_timing_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: tier1-udivrem-call-live-inprocess-28
+  cancel-in-progress: true
+jobs:
+  paired-timing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 105
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          repository: TheDarkLightX/ZenoFCIS
+          run-id: 42708736506
+          github-token: ${{ github.token }}
+          name: tier1-udivrem-call-live-pressure-28
+          path: tier1-live-perf/source
+      - name: Preflight source and hash-check every AOT before unsafe deserialization
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          python3 -m py_compile experiments/cranelift-tier1/audit_call_live_timing_28.py
+          python3 -B experiments/cranelift-tier1/audit_call_live_timing_28.py --self-test
+          python3 -B - <<'PY'
+          import sys,json
+          from pathlib import Path
+          sys.path.insert(0,"experiments/cranelift-tier1")
+          from audit_call_live_timing_28 import sha,CASE,HEAD,UP,SCRIPT_SHA
+          s=Path("tier1-live-perf/source")
+          r=json.loads((s/"results/qualification.json").read_text())
+          assert (s/"zenofcis-head.txt").read_text().strip()==HEAD
+          assert r["upstream"]==UP and r["source_script_sha256"]==SCRIPT_SHA
+          assert set(r["cases"])==set(CASE)
+          for name in CASE:
+              row=r["cases"][name]
+              assert sha(s/"results"/name/"input.wat")==row["wat_sha256"]
+              for v in ("baseline","patched"):
+                  assert sha(s/"results"/name/(v+".cwasm"))==row["compilers"][v]["aot_sha256"]
+          print("12 archived AOT modules independently hash verified")
+          PY
+      - name: Build local pinned Wasmtime runtime
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal
+          mkdir -p tier1-live-perf/results
+          cargo generate-lockfile --manifest-path experiments/cranelift-tier1/inprocess_live_pressure_28/Cargo.toml
+          cargo build --locked --release --manifest-path experiments/cranelift-tier1/inprocess_live_pressure_28/Cargo.toml >tier1-live-perf/build.stdout 2>tier1-live-perf/build.stderr
+          cp experiments/cranelift-tier1/inprocess_live_pressure_28/Cargo.lock tier1-live-perf/Cargo.lock
+          { git rev-parse HEAD; git -C upstream rev-parse HEAD; rustc --version; cargo --version; uname -a; lscpu; } >tier1-live-perf/host.txt
+      - name: ABBA BAAB same-WAT timing with live-call values
+        run: |
+          set -euo pipefail
+          exe=experiments/cranelift-tier1/inprocess_live_pressure_28/target/release/tier1-udivrem-live-perf-28
+          for spec in 'live_0 0 forward' 'live_4 4 forward' 'live_12 12 forward' 'live_20 20 forward' 'live_12_reverse 12 reverse' 'live_12_quotient_only 12 quotient'; do
+            read -r name n mode <<< "$spec"
+            src=tier1-live-perf/source/results/"$name"
+            "$exe" "$name" "$n" "$mode" "$src/baseline.cwasm" "$src/patched.cwasm" 100000 8 5623 >tier1-live-perf/results/"$name".csv
+          done
+          python3 -B experiments/cranelift-tier1/audit_call_live_timing_28.py \
+            --source tier1-live-perf/source --raw tier1-live-perf/results \
+            --lock tier1-live-perf/Cargo.lock --calls 100000 --blocks 8 \
+            --out tier1-live-perf/qualified.json
+      - name: Archive exact source, provenance and raw samples
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-udivrem-call-live-inprocess-28
+          path: |
+            tier1-live-perf/host.txt
+            tier1-live-perf/Cargo.lock
+            tier1-live-perf/build.stdout
+            tier1-live-perf/build.stderr
+            tier1-live-perf/results/*.csv
+            tier1-live-perf/qualified.json
+            experiments/cranelift-tier1/inprocess_live_pressure_28/src/main.rs
+            experiments/cranelift-tier1/audit_call_live_timing_28.py
+          if-no-files-found: warn
+          retention-days: 30

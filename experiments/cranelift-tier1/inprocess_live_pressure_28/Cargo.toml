@@ -1,0 +1,8 @@
+[package]
+name = "tier1-udivrem-live-perf-28"
+version = "0.0.0"
+edition = "2021"
+publish = false
+[workspace]
+[dependencies]
+wasmtime = { path = "../../../upstream/crates/wasmtime", default-features = false, features = ["runtime", "std", "component-model-async"] }
