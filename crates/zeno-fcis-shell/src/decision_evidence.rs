@@ -263,7 +263,9 @@ pub fn verify<R: DecisionRelation>(
     if !trusted.invariant(&result.poststate) {
         return Err(Refusal::AfterInvariant);
     }
-    if evidence.poststate() != result.poststate || evidence.effect() != result.effect {
+    if evidence.poststate() != result.poststate.as_slice()
+        || evidence.effect() != result.effect.as_slice()
+    {
         return Err(Refusal::ResultMismatch);
     }
     Ok(CheckedDecision {
