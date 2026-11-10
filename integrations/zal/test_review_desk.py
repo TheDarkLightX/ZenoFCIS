@@ -4,6 +4,7 @@ and the loopback page answers only itself. No browser, network or provider is us
 import hashlib
 import json
 from pathlib import Path
+import random
 import re
 import tempfile
 import unittest
@@ -11,8 +12,10 @@ from unittest import mock
 
 import behavior
 import behavior2
+import constructs
 import explain
 import explain2
+import ladder
 import review_desk as desk
 from behavior import Refusal
 from workflow import checker_identity
@@ -96,6 +99,32 @@ rule take_payment: placed + pay [true] -> accept paid;
 rule confirm_it: paid + confirm [true] -> accept confirmed;
 require confirmed_only_after_payment: (accepted & state' == confirmed) => state == paid;
 unresolved effects: send a confirmation email when the order is confirmed;
+"""
+# Every operator of the three profiles once, to pin how each is written in symbols. Its liveness properties do not hold.
+TOUR = """zal 3;
+machine symbol_tour;
+states high, low;
+events hold, tune;
+context busy, ready;
+input turn in -1..=1;
+var level in 0..=3 initially 1;
+var spare in 0..=2 initially 0;
+initial low;
+step atomic; frame control_and_variables;
+default reject idle unchanged;
+rule lift: low + tune [(ready | !busy) & level + turn >= 0 & level + turn <= 3 & !(spare != 0)] -> accept high, level += turn;
+rule rest: high + hold [(ready <=> busy) & level >= 1] -> accept low, spare = level - 1;
+rule shed: high + tune [(busy => ready) & level > 1] -> accept high, level -= turn + 1;
+rule stay: low + hold [false] -> reject closed unchanged;
+invariant bounded: level <= 3 & spare >= 0;
+require closed_is_quiet: !accepted => (level' == level & spare' == spare);
+require lift_moves: (accepted & event == tune & state == low) => (state' == high & level' == level + turn);
+fairness tunes: infinitely often (event == tune);
+property calm: never(level' < 0);
+property keeps: always(accepted => until(level >= 0, spare <= 2));
+property rises: always((state == low & ready) => eventually(state' == high | busy));
+property soon: always(accepted => within(2, true));
+property walks: always(state' == high => next(event == tune | event == hold));
 """
 
 
@@ -312,6 +341,226 @@ class ZalResults(unittest.TestCase):
         with mock.patch.object(desk, "MAX_NEAREST_TUPLES", 10):
             table = bundle_of(LIMIT, with_edits=False)[0]["decisions"]
         self.assertEqual((table["status"], table["kept"]["nearest"]), ("complete", [None]))
+
+
+class Symbols(unittest.TestCase):
+    """Each line in symbols is the desk's spelling: the ladder's symbols, ZAL's structure, and ZAL's own checks of both."""
+
+    @staticmethod
+    def read(text):
+        """The model and what a bundle says about its symbols, without the decision table a whole bundle carries."""
+        model, profile = desk.read_statement(text)
+        declared, count = desk.declarations(model, profile), sum(1 for _ in desk.input_tuples(model, profile))
+        return {"declared": declared, "key": desk.reading_key(model, profile, declared),
+                "formal": desk.check_formal(model, profile, count), "count": count}, model, profile
+
+    @staticmethod
+    def spelled(bundle):
+        """{name or concept: (the line without its notes, what the rule leaves unchanged, its notes)}"""
+        return {entry["id"] or (entry["symbolic"].split()[1] if entry["concept"] in ("input", "var") else entry["concept"]):
+                ("".join(s[0] for s in entry["formal"] or [] if s[2:] != ["note"]), desk.plain(entry["more"]),
+                 [s[0] for s in entry["formal"] or [] if s[2:] == ["note"]]) for entry in bundle["declared"]}
+
+    def test_every_operator_is_spelled_with_the_symbol_of_zals_ladder(self):
+        lines = self.spelled(self.read(TOUR)[0])
+        self.assertEqual({name: lines[name] for name in ("states", "events", "facts", "turn", "level", "initial", "frame", "default")}, {
+            "states": ("state ∈ {high, low}", "", []), "events": ("event ∈ {hold, tune}", "", []),
+            "facts": ("busy, ready ∈ {false, true}", "", []), "turn": ("-1 ≤ turn ≤ 1", "", []),
+            "level": ("0 ≤ level ≤ 3, initially level = 1", "", []), "initial": ("initially state = low", "", []),
+            "frame": ("", "", []), "default": ("otherwise ⇒ ¬accepted ∧ unchanged", "", ["reason idle"])})
+        self.assertEqual({name: lines[name] for name in ("lift", "rest", "shed", "stay")}, {
+            "lift": ("state = low ∧ event = tune ∧ level+turn ≤ 3 ∧ level+turn ≥ 0 ∧ ¬(spare ≠ 0) ∧ (ready ∨ ¬busy) "
+                     "⇒ accepted ∧ state′ = high ∧ level′ = level+turn", " ∧ spare′ = spare", []),
+            "rest": ("state = high ∧ event = hold ∧ level ≥ 1 ∧ (ready ⇔ busy) ⇒ accepted ∧ state′ = low ∧ spare′ = level−1",
+                     " ∧ level′ = level", []),
+            "shed": ("state = high ∧ event = tune ∧ level > 1 ∧ (busy ⇒ ready) ⇒ accepted ∧ state′ = high ∧ level′ = level−turn−1",
+                     " ∧ spare′ = spare", []),
+            "stay": ("state = low ∧ event = hold ∧ false ⇒ ¬accepted ∧ state′ = low", " ∧ level′ = level ∧ spare′ = spare", ["reason closed"])})
+        self.assertEqual({name: lines[name][0] for name in ("bounded", "closed_is_quiet", "lift_moves", "tunes", "calm", "keeps", "rises", "soon", "walks")}, {
+            "bounded": "level ≤ 3 ∧ spare ≥ 0", "closed_is_quiet": "¬accepted ⇒ (level′ = level ∧ spare′ = spare)",
+            "lift_moves": "(accepted ∧ event = tune ∧ state = low) ⇒ (level′ = level+turn ∧ state′ = high)",
+            "tunes": "□◇ (event = tune)", "calm": "□(¬(level′ < 0))", "keeps": "□(accepted ⇒ ((level ≥ 0) U (spare ≤ 2)))",
+            "rises": "□((ready ∧ state = low) ⇒ ◇(busy ∨ state′ = high))", "soon": "□(accepted ⇒ ◇[0,2](true))",
+            "walks": "□(state′ = high ⇒ ○(event = hold ∨ event = tune))"})
+        flagged = {entry["id"]: [segment[:2] for segment in entry["formal"] if segment[2:] == ["main"]]
+                   for entry in self.read(TOUR)[0]["declared"] if entry["formal"] and entry["id"]}
+        self.assertEqual({name: flagged[name] for name in ("lift", "bounded", "closed_is_quiet", "lift_moves", "calm")}, {     # the connective that joins the halves of a line
+            "lift": [["⇒", "implies"]], "bounded": [["∧", "and"]], "closed_is_quiet": [["⇒", "implies"]], "lift_moves": [["⇒", "implies"]], "calm": []})
+        order = self.spelled(self.read(example("order.zal"))[0])     # profile 1 has rules and no variables
+        self.assertEqual(order["approve_order"], ("state = pending ∧ event = approve ∧ authorized ⇒ accepted ∧ state′ = approved", "", []))
+
+    def test_the_symbols_and_their_shapes_are_read_from_the_ladder_registry(self):
+        formula, temporal = ladder.REGISTRY["templates"]["formula"], ladder.REGISTRY["temporal_templates"]["formula"]
+        node, p, q = behavior2.Expr, behavior2.Expr("fact", ("p",)), behavior2.Expr("fact", ("q",))
+        value, one = node("var", ("n",)), node("int", (1,))
+        written = lambda formed: desk.plain(desk.spell(formed, desk.FORMAL))
+        for op, name in (("and", "and"), ("or", "or"), ("implies", "=>"), ("iff", "<=>")):
+            self.assertEqual(written(node(op, (p, q))), "(" + formula[name].format(a="p", b="q") + ")", op)
+        for op, name in (("==", "="), ("!=", "!="), ("<", "<"), ("<=", "<="), (">", ">"), (">=", ">=")):
+            self.assertEqual(written(node("cmp", (op, value, one))), formula[name].format(a="n", b="1"), op)
+        self.assertEqual((written(node("add", (value, one))), written(node("sub", (value, one))), written(node("not", (p,)))),
+                         (formula["+"].format(a="n", b="1"), formula["-"].format(a="n", b="1"), formula["not"].format(a="p")))
+        self.assertEqual(written(node("var_next", ("n",))) + "()", formula["prime_call"].format(name="n", args=""))
+        for op in ("always", "eventually", "next"):
+            self.assertEqual(written(node(op, (p,))), temporal[op].format(a="p"), op)
+        self.assertEqual((written(node("until", (p, q))), written(node("within", (3, p)))),
+                         (temporal["until"].format(a="p", b="q"), temporal["within"].format(k=3, a="p")))
+        self.assertEqual(written(node("never", (p,))), temporal["always"].format(a=formula["not"].format(a="(p)")))   # the ladder: never(P) is always(not P)
+        self.assertEqual(desk.OFTEN, "□◇")
+
+    def test_zal_checks_the_spelling_of_every_formula_and_every_rule(self):
+        for name, text in (("tour", TOUR), ("limit", LIMIT), ("refund", REFUND), ("ledger", LEDGER), ("order", example("order.zal")),
+                           ("withdrawal2", example("withdrawal2.zal")), ("keeper2", example("keeper2.zal")),
+                           ("prepared_batch3", example("prepared_batch3.zal")), ("ladder_symmetry2", example("ladder_symmetry2.zal"))):
+            with self.subTest(source=name):
+                told, model, profile = self.read(text)
+                decided = sum(1 for _ in desk.decided_steps(model, profile))
+                goals = sum(len(payload) if isinstance(payload, tuple) else 1 for _, _, _, payload in getattr(model, "games", ()))
+                formulas = (len(model.rules) + len(model.invariants) + goals
+                            + sum(len(getattr(model, part, ())) for part in ("requirements", "fairness", "properties")))
+                self.assertEqual(told["formal"], {"formulas": formulas, "rules": len(model.rules), "rules_parsed": len(model.rules),
+                                                  "inputs": decided, "of": told["count"]})
+                for formula in [rule.guard for rule in model.rules] + [formula for _, formula in model.invariants]:
+                    self.assertEqual(desk.plain(desk.spell(formula, desk.TYPED, exact=True)), formula.render())
+        with mock.patch.object(desk, "MAX_FORMAL_INPUTS", 100):          # a large domain is sampled, and the page says how many
+            told = self.read(example("withdrawal2.zal"))[0]["formal"]
+        self.assertTrue(0 < told["inputs"] <= 100 < told["of"])
+        whole = bundle_of(LEDGER, with_edits=False)[0]                   # a bundle carries the same three parts
+        self.assertEqual((whole["declared"], whole["key"], whole["cross_checks"]["formal"]),
+                         tuple(self.read(LEDGER)[0][part] for part in ("declared", "key", "formal")))
+
+    def test_a_spelling_that_differs_from_zal_refuses_the_statement(self):
+        genuine, node = desk.rule_formula, behavior2.Expr
+        def changed(change):
+            def formula(model, rule):
+                before, then, unchanged = genuine(model, rule)
+                return change(list(before), list(then), list(unchanged), rule)
+            return formula
+        wrong = {
+            "another target": lambda before, then, unchanged, rule: (before, [then[0], node("state_next", ("locked" if rule.target == "unlocked" else "unlocked",)), *then[2:]], unchanged),
+            "the event left out": lambda before, then, unchanged, rule: ([before[0], *before[2:], node("true")], then, unchanged),
+            "an update left out": lambda before, then, unchanged, rule: (before, then[:2], unchanged),
+            "an updated variable called unchanged": lambda before, then, unchanged, rule: (
+                before, then, [node("cmp", ("==", node("var_next", ("used",)), node("var", ("used",))))]),
+            "accepted where it rejects": lambda before, then, unchanged, rule: (before, [node("not", (then[0],)), *then[1:]], unchanged),
+            "a left side that never holds": lambda before, then, unchanged, rule: ([*before, node("false")], then, unchanged),
+        }
+        for label, change in wrong.items():
+            with self.subTest(defect=label), mock.patch.object(desk, "rule_formula", changed(change)):
+                with self.assertRaisesRegex(Refusal, "symbols no longer match ZAL \\(step formula of rule"):
+                    bundle_of(LIMIT, with_edits=False)                  # the statement is refused, not shown with a wrong line
+        with mock.patch.dict(desk.TYPED, {"and": " | "}), self.assertRaisesRegex(Refusal, "typed spelling of"):
+            self.read(LIMIT)
+        genuine_spell = desk.spell
+        def without_parentheses(formula, way, exact=False):            # the plain typed form loses its grouping; the exact form does not
+            segments = genuine_spell(formula, way, exact)
+            return segments if exact or way is not desk.TYPED else [segment for segment in segments if segment[0] not in ("(", ")")]
+        with mock.patch.object(desk, "spell", without_parentheses), self.assertRaisesRegex(Refusal, "grouping of"):
+            self.read(TOUR)
+        with mock.patch.object(desk, "FORCES", ("<<", ">>")), self.assertRaisesRegex(Refusal, "game property refund_in_the_end"):
+            self.read(REFUND)
+
+    def test_what_a_rule_leaves_unchanged_continues_its_line(self):
+        told, model, _ = self.read(example("withdrawal2.zal"))
+        lines = self.spelled(told)
+        names = {variable.name for variable in model.variables}
+        for rule in model.rules:
+            kept = names - {update.variable for update in rule.updates}
+            self.assertEqual({part.split("′")[0] for part in lines[rule.id][1].split(" ∧ ") if part}, kept, rule.id)
+            self.assertEqual(lines[rule.id][2], ["reason " + rule.reason] if rule.reason else [], rule.id)
+        self.assertEqual(lines["pay"], ("state = waiting ∧ event = tick ∧ pause = 0 ∧ (must_serve = 1 ∨ ¬alarm) ⇒ accepted ∧ state′ = idle "
+                                        "∧ balance′ = balance−reserved ∧ must_serve′ = 0 ∧ reserved′ = 0", " ∧ pause′ = pause", []))
+        self.assertEqual(lines["lane_occupied"][0], "state = waiting ∧ event = request ⇒ ¬accepted ∧ state′ = waiting")
+
+    def test_a_game_line_is_zals_own_formula_rung_with_its_goal_respelled(self):
+        cases = {"withdrawal_game2.zal": ("⟨⟨user⟩⟩ □◇ (state = withdrawn)", ["[all fairness assumptions hold infinitely often]"]),
+                 "deadline_game2.zal": ("⟨⟨user⟩⟩ within 1 (state = withdrawn)", ["[the other player (operator) chooses every context]"]),
+                 "recurring_goals_game2.zal": ("⟨⟨user⟩⟩ (□◇ (state = open) ∧ □◇ (state = withdrawn))", [])}
+        for name, (line, notes) in cases.items():
+            bundle, model, _ = self.read(example(name))
+            entry = next(entry for entry in bundle["declared"] if entry["concept"] == "game")
+            self.assertEqual(self.spelled(bundle)[entry["id"]], (line, "", notes), name)
+            self.assertEqual(behavior2.game_readings(model)[0]["formula_rung"], " ".join([line, *notes]), name)   # these goals need no respelling
+        wider = REFUND.replace("eventually (state == refunded)", "eventually (state == refunded | denials >= 2)")
+        bundle, model, _ = self.read(wider)
+        self.assertEqual(self.spelled(bundle)["refund_in_the_end"][0], "⟨⟨customer⟩⟩ ◇ (denials ≥ 2 ∨ state = refunded)")
+        self.assertIn("(denials >= 2 | state = refunded)", behavior2.game_readings(model)[0]["formula_rung"])
+
+    def test_a_line_without_a_formula_form_has_none(self):
+        for name, text in (("ladder_symmetry2", example("ladder_symmetry2.zal")), ("unresolved", UNRESOLVED), ("order", example("order.zal"))):
+            bundle, model, _ = self.read(text)
+            bare = {entry["concept"] for entry in bundle["declared"] if entry["formal"] is None}
+            self.assertEqual(bare, {entry["concept"] for entry in bundle["declared"]} & {"header", "name", "frame", "player", "symmetry", "unresolved", "facts"}
+                             - ({"facts"} if model.facts else set()), name)
+            self.assertTrue(all(entry["more"] is None or entry["concept"] == "rule" for entry in bundle["declared"]))
+
+    def test_the_reading_key_quotes_zals_registries_and_marks_the_desks_own_rows(self):
+        for name, text in (("tour", TOUR), ("refund", REFUND), ("order", example("order.zal")), ("deadline", example("deadline_game2.zal"))):
+            with self.subTest(source=name):
+                bundle, model, profile = self.read(text)
+                key = bundle["key"]
+                used = {segment[1] for entry in bundle["declared"] for segment in (entry["formal"] or []) + (entry["more"] or []) if segment[1:] and segment[1]}
+                self.assertEqual(set(key["entries"]) | {"name:" + name for name in key["names"]}, used)
+                for row, operator in desk.ZAL_OPERATOR.items():
+                    if row in key["entries"]:
+                        read, _, meaning = behavior2.OPERATORS[operator]
+                        self.assertEqual((key["entries"][row]["read"], key["entries"][row]["meaning"], key["entries"][row].get("desk")), (read, meaning, None))
+                self.assertEqual({row for row, told in key["entries"].items() if told.get("desk")}, used & {"in", "otherwise", "unchanged", "infinitely_often"})
+                shown = {segment[1]: segment[0] for entry in bundle["declared"] for segment in entry["formal"] or [] if segment[1:] and segment[1] in key["entries"]}
+                for row in set(shown) - {"within", "within_steps", "can_force"}:
+                    self.assertEqual(key["entries"][row]["symbol"], shown[row], row)
+                kinds = ({concept: told[2] for concept, told in behavior2.CONSTRUCTS.items()} if profile is behavior2 else
+                         {construct.id: construct.meaning for construct in constructs.STATEMENTS})
+                self.assertEqual(key["kinds"], {entry["concept"]: kinds[entry["concept"]] for entry in bundle["declared"]})
+                self.assertEqual(key["spelling"], {op: desk.FORMAL[op] for op in desk.TYPED})
+                self.assertEqual(key["wording"], {concept: note for concept, note in desk.WORDING.items() if concept in key["kinds"]})
+                for variable in getattr(model, "variables", ()):
+                    if variable.name in key["names"]:
+                        self.assertEqual(key["names"][variable.name], {"role": "variable", "english": next(
+                            entry["english"] for entry in bundle["declared"] if entry["symbolic"].startswith(f"var {variable.name} in "))})
+        tour = self.read(TOUR)[0]["key"]
+        self.assertEqual((tour["entries"]["implies"]["symbol"], tour["entries"]["implies"]["typed"], tour["entries"]["within"]["symbol"], tour["entries"]["within"]["typed"]),
+                         ("⇒", "=>", "◇[0,K]", "within(K, P)"))
+        self.assertEqual((tour["names"]["turn"]["role"], tour["names"]["busy"]["role"]), ("input", "context fact"))
+        self.assertNotIn("always", self.read(example("order.zal"))[0]["key"]["entries"])
+        self.assertEqual((set(tour["wording"]), set(self.read(example("order.zal"))[0]["key"]["wording"])), ({"rule", "default", "require"}, {"rule", "default"}))
+
+    def test_generated_statements_keep_the_spelling_and_zal_in_agreement(self):
+        pick = random.Random(20261110)
+        def term():
+            return pick.choice(["n", "m", "x"]) + "".join(pick.choice([" + ", " - "]) + pick.choice(["n", "m", "x", "1", "2", "-1"]) for _ in range(pick.randint(0, 2)))
+        def formula(depth, step):
+            roll = pick.random()
+            if depth > 2 or roll < 0.35:
+                atoms = ["f", "g", "true", "false", f"{term()} {pick.choice(behavior2.COMPARISONS)} {term()}", f"state == {pick.choice('ab')}"]
+                if step:
+                    atoms += ["accepted", f"event == {pick.choice(['go', 'stop'])}", f"state' == {pick.choice('ab')}", f"n' {pick.choice(['==', '>=', '<'])} {term()}"]
+                return pick.choice(atoms)
+            if roll < 0.5:
+                return "!" + formula(depth + 1, step) if roll < 0.42 else "!(" + formula(depth + 1, step) + ")"
+            if roll < 0.75:
+                return "(" + pick.choice([" & ", " | "]).join(formula(depth + 1, step) for _ in range(pick.randint(2, 3))) + ")"
+            return "(" + formula(depth + 1, step) + pick.choice([" => ", " <=> "]) + formula(depth + 1, step) + ")"
+        accepted = 0
+        for _ in range(120):
+            third = pick.random() < 0.7
+            lines = [f"zal {3 if third else 2};", "machine generated;", "states a, b;", "events go, stop;", "context f, g;", "input x in -2..=2;",
+                     "var m in -3..=3 initially 0;", "var n in 0..=5 initially 1;", "initial a;", "step atomic; frame control_and_variables;", "default reject nope unchanged;"]
+            for index in range(pick.randint(1, 3)):
+                update = pick.choice(["", ", n += x - 1", ", m -= n - x + 1", ", n = m + 2", ", m = 0 - x, n += 1"] if third else ["", ", n += x", ", n -= 1", ", m = x, n = 2"])
+                outcome = f"accept {pick.choice('ab')}{update}" if pick.random() < 0.8 else "reject why unchanged"
+                lines.append(f"rule r{index}: {pick.choice('ab')} + {pick.choice(['go', 'stop'])} [{formula(0, False)}] -> {outcome};")
+            lines.append(f"require q0: {formula(0, True)};")
+            lines.append(f"property p0: always({formula(1, True)} => next({formula(1, True)}));")
+            try:
+                model, profile = desk.read_statement("\n".join(lines) + "\n")
+            except Refusal:
+                continue
+            accepted += 1
+            desk.reading_key(model, profile, desk.declarations(model, profile))
+            told = desk.check_formal(model, profile, sum(1 for _ in desk.input_tuples(model, profile)))
+            self.assertEqual((told["rules"], told["rules_parsed"]), (len(model.rules), len(model.rules)))
+        self.assertGreater(accepted, 80)
 
 
 class PlantedEdits(unittest.TestCase):
@@ -638,6 +887,13 @@ class Exchanges(unittest.TestCase):
         self.assertTrue(self.changed())
         failed = self.page_data()
         self.assertEqual((failed["bundles"], failed["error"]["unexpected"], failed["error"]["reason"][:10], self.changed()), ([], True, "TypeError:", False))
+        # A line of the desk's own that no longer agrees with ZAL is the desk's error, not ZAL refusing the source.
+        self.path.write_text(LEDGER, encoding="ascii")
+        with mock.patch.dict(desk.TYPED, {"and": " | "}):
+            own = self.page_data()
+        self.assertEqual((own["bundles"], own["error"].get("unexpected")), ([], True))
+        self.assertIn("The review desk's symbols no longer match ZAL", own["error"]["reason"])
+        self.assertTrue(issubclass(desk.Disagreement, Refusal))
         self.path.unlink()
         self.assertTrue(self.changed())
         self.assertIn("could not be read", self.page_data()["error"]["reason"])

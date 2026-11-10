@@ -8,9 +8,10 @@
 writes one self-contained page with every result computed beforehand. `data` prints what the page reads.
 
 Every status, sentence, decision and comparison on the page comes from the modules run.py dispatches to:
-parse, check, legend, explain, why-not, the counterexample story and the semantic diff. The desk adds three
+parse, check, legend, explain, why-not, the counterexample story and the semantic diff. The desk adds four
 things, and the page labels each as the desk's own: planted rule edits that ZAL re-checks, the breakdown of
-which claim ZAL names for each edit, and a walk of ZAL's decisions from the initial configuration.
+which claim ZAL names for each edit, a walk of ZAL's decisions from the initial configuration, and each line
+of the statement spelled in the symbols of ZAL's ladder, which ZAL's renderer, parser and evaluator check.
 
 The desk never writes a source, a workspace or an agreement, and it has no accept, export or provider route.
 This file and review_desk.html are outside the source closure that workflow.checker_identity hashes.
@@ -28,14 +29,17 @@ import secrets
 import sys
 import threading
 import time
+from types import SimpleNamespace
 from urllib.parse import urlsplit
 
 import behavior
 import behavior2
+import constructs
 import diagnostics
 import explain
 import explain2
 import json_numbers
+import ladder
 from behavior import Refusal
 from workflow import checker_identity
 
@@ -45,6 +49,7 @@ MAX_NEAREST_TUPLES = 600            # and the nearest opposite decision for ever
 MAX_BREAKDOWN_TUPLES = 4096         # above this the planted edits are not broken down by claim
 MAX_WITNESSES = 8                   # distinguishing inputs kept for one compared source
 SENTENCE_SAMPLES = 12               # inputs on which the composed decision sentence is compared with why-not
+MAX_FORMAL_INPUTS = 20000           # declared inputs on which every rule's step formula is evaluated
 PAGE = Path(__file__).with_name("review_desk.html")
 DATA_SLOT, TOKEN_SLOT = "/*__ZAL_REVIEW_DESK_DATA__*/null", "__ZAL_REVIEW_DESK_TOKEN__"
 OTHER_PROFILES = frozenset({"zal effects 1;", "ZAL effects version 1.", "zal typed 1;", "ZAL typed version 1."})
@@ -61,6 +66,10 @@ RESPONSE_HEADERS = (("Cache-Control", "no-store"), ("X-Content-Type-Options", "n
                     ("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
                                                 "connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; "
                                                 "frame-ancestors 'none'"))
+
+
+class Disagreement(Refusal):
+    """A line the desk words or spells itself no longer agrees with ZAL: the desk's own error, never ZAL refusing a source."""
 
 
 # ---- ZAL's own operations, selected the way run.py selects them -----------------------------------------------------
@@ -133,7 +142,7 @@ def check_sentences(model, profile, count, checker):
             continue
         compared += 1
         if decision_sentence(model, profile, given) != expected:
-            raise Refusal("The review desk's decision sentence no longer matches ZAL's why-not answer; "
+            raise Disagreement("The review desk's decision sentence no longer matches ZAL's why-not answer; "
                           "update review_desk.decision_sentence")
     return compared
 
@@ -156,6 +165,367 @@ def counterexample_story(model, report, checker):
     return {key: told.get(key) for key in ("status", "obligation", "english", "symbolic", "method")}
 
 
+# ---- formal symbols: the desk's own spelling of ZAL's lines ---------------------------------------------------------
+# ZAL prints a finite-profile statement in English and in its typed syntax. Its ladder writes formulas with
+# symbols. Here each line of a statement is spelled with those symbols: the symbols come from the ladder's
+# registry, the structure from the formula ZAL parsed, and the reading and meaning of each symbol from ZAL's
+# construct registries. check_formal compares the spelling with ZAL's renderer, parser and evaluator.
+#
+# A spelled line is a list of segments [text], [text, key] or [text, key, flag]. The key names the row of the
+# reading key that explains the text; the flag is "main" for the connective that joins the two halves of a line
+# and "note" for words that are not part of the formula.
+
+TYPED = {"not": "!", "and": " & ", "or": " | ", "implies": " => ", "iff": " <=> ", "==": " == ", "!=": " != ",
+         "<": " < ", "<=": " <= ", ">": " > ", ">=": " >= ", "add": " + ", "sub": " - ", "prime": "'"}
+COMPARISON_KEY = {"==": "eq", "!=": "ne", "<": "lt", "<=": "le", ">": "gt", ">=": "ge"}
+CONNECTIVES = ("and", "or", "implies", "iff")
+ATOMS = ("true", "false", "accepted", "fact")
+MEMBER, FORCES = "∈", ("⟨⟨", "⟩⟩")     # as ZAL's game readings write "can force"
+
+
+def ladder_symbols():
+    """ZAL's operators in the symbols of its ladder: what a formula template writes between or before operands."""
+    formula, temporal = ladder.REGISTRY["templates"]["formula"], ladder.REGISTRY["temporal_legend"]
+    between = {"and": "and", "or": "or", "implies": "=>", "iff": "<=>", "==": "=", "!=": "!=", "<": "<", "<=": "<=",
+               ">": ">", ">=": ">=", "add": "+", "sub": "-"}
+    symbols = {op: formula[name].replace("{a}", "").replace("{b}", "") for op, name in between.items()}
+    symbols["not"] = formula["not"].replace("{a}", "")
+    symbols["prime"] = re.sub(r"\{\w+\}|[()]", "", formula["prime_call"])
+    symbols.update({op: temporal[op][0] for op in ("always", "eventually", "next", "until", "within")})
+    if any(not text.strip() or "{" in text.replace("{k}", "") or "(" in text for text in symbols.values()):
+        raise Disagreement("The ladder's formula templates no longer have the shape the review desk reads")
+    return symbols
+
+
+FORMAL = ladder_symbols()
+OFTEN = FORMAL["always"] + FORMAL["eventually"]                  # "infinitely often", as ZAL's game readings write it
+
+
+def _mark(text, key):
+    """Segments for one operator: its symbol carries the key, the spaces around it do not."""
+    core, lead, trail = text.strip(), text[:len(text) - len(text.lstrip())], text[len(text.rstrip()):]
+    return [*([[lead]] if lead else []), [core, key], *([[trail]] if trail else [])]
+
+
+def _bare(segments):
+    """Without the one pair of parentheses that encloses the whole formula, if there is one, as ZAL renders operands."""
+    depth = 0
+    for index, segment in enumerate(segments):
+        depth += (segment[0] == "(") - (segment[0] == ")")
+        if depth == 0:
+            return segments[1:-1] if index and index == len(segments) - 1 and segments[0][0] == "(" else segments
+    return segments
+
+
+def plain(segments):
+    return "".join(segment[0] for segment in segments or [])
+
+
+def spell(node, way, exact=False):
+    """One formula as segments. With ZAL's typed spelling and exact=True the text is ZAL's own rendering.
+
+    Without exact, a negation stands before its operand with no parentheses around the pair, and a comparison
+    under it is parenthesized. ZAL's grammar reads that form as the same formula; check_formal has ZAL parse it back.
+    """
+    op, args, again = node.op, node.args, lambda child: spell(child, way, exact)
+    if op in ("true", "false", "accepted"):
+        return [[op, op]]
+    if op in ("fact", "var", "input"):
+        return [[args[0], "name:" + args[0]]]
+    if op == "int":
+        return [[str(args[0])]]
+    if op == "var_next":
+        return [[args[0], "name:" + args[0]], [way["prime"], "prime"]]
+    if op in ("state", "state_next", "event"):
+        word = "event" if op == "event" else "state"
+        return [[word, word], *([[way["prime"], "prime"]] if op == "state_next" else []), *_mark(way["=="], "eq"), [args[0]]]
+    if op == "not":
+        inner = again(args[0])
+        if exact:
+            return [["("], [way["not"], "not"], *inner, [")"]]
+        grouped = args[0].op in ATOMS or args[0].op in CONNECTIVES
+        return [[way["not"], "not"], *(inner if grouped else [["("], *inner, [")"]])]
+    if op in CONNECTIVES:
+        out = [["("]]
+        for index, child in enumerate(args):
+            out += (_mark(way[op], op) if index else []) + again(child)
+        return [*out, [")"]]
+    if op == "cmp":
+        return [*again(args[1]), *_mark(way[args[0]], COMPARISON_KEY[args[0]]), *again(args[2])]
+    if op in ("add", "sub"):
+        return [*again(args[0]), *_mark(way[op], op), *again(args[1])]
+    operands = [_bare(again(arg)) for arg in args if not isinstance(arg, int)]
+    if way is TYPED:                                                  # ZAL's own temporal templates
+        if op == "within":
+            return [[op, op], ["("], [str(args[0])], [", "], *operands[0], [")"]]
+        if op == "until":
+            return [[op, op], ["("], *operands[0], [", "], *operands[1], [")"]]
+        return [[op, op], ["("], *operands[0], [")"]]
+    if op == "within":
+        return [[way[op].replace("{k}", str(args[0])), op], ["("], *operands[0], [")"]]
+    if op == "until":
+        return [["("], ["("], *operands[0], [")"], [" "], [way[op], op], [" "], ["("], *operands[1], [")"], [")"]]
+    if op == "never":                                                 # the ladder: never(P) is always(not P)
+        return [[way["always"], "always"], ["("], [way["not"], "not"], ["("], *operands[0], [")"], [")"]]
+    return [[way[op], op], ["("], *operands[0], [")"]]
+
+
+def whole(node, way=None):
+    """One whole formula: no outer parentheses, and its top connective flagged as the main one."""
+    segments, depth = _bare(spell(node, way or FORMAL)), 0
+    for segment in segments:
+        depth += (segment[0] == "(") - (segment[0] == ")")
+        if depth == 0 and node.op in CONNECTIVES and segment[1:] == [node.op]:
+            segment.append("main")
+    return segments
+
+
+def as_expr(formula):
+    """A profile 1 formula as the profile 2 node of the same shape, so one parser and one evaluator read both."""
+    if isinstance(formula, behavior2.Expr):
+        return formula
+    return behavior2.Expr(formula.op, tuple(as_expr(arg) if isinstance(arg, behavior.Formula) else arg for arg in formula.args))
+
+
+def _sum(base, term, adding):
+    """base + term or base - term as ZAL's left-nested sum, whatever shape the term has."""
+    if term.op in ("add", "sub"):
+        return _sum(_sum(base, term.args[0], adding), term.args[1], adding == (term.op == "add"))
+    return behavior2.Expr("add" if adding else "sub", (base, term))
+
+
+def rule_formula(model, rule):
+    """One rule as a step formula: what holds before the step, what the step then is, and what it leaves alone.
+
+    Three lists of formulas. ZAL refuses overlapping rules, so the first list holds on exactly the steps this
+    rule decides, and on those steps the other two hold. check_formal evaluates that on the declared inputs.
+    """
+    node, guard = behavior2.Expr, as_expr(rule.guard)
+    before = [node("state", (rule.source,)), node("event", (rule.event,)),
+              *(guard.args if guard.op == "and" else [] if guard.op == "true" else [guard])]
+    same = lambda name: node("cmp", ("==", node("var_next", (name,)), node("var", (name,))))
+    names, updates = [variable.name for variable in getattr(model, "variables", ())], getattr(rule, "updates", ())
+    if rule.target is None:
+        return before, [node("not", (node("accepted"),)), node("state_next", (rule.source,))], [same(name) for name in names]
+    then = [node("accepted"), node("state_next", (rule.target,))]
+    for update in updates:
+        after = update.term if update.op == "=" else _sum(node("var", (update.variable,)), update.term, update.op == "+=")
+        then.append(node("cmp", ("==", node("var_next", (update.variable,)), after)))
+    return before, then, [same(name) for name in names if name not in {update.variable for update in updates}]
+
+
+def rule_segments(before, then, unchanged, way):
+    """`before => then` as one line, and the conjuncts for what the rule leaves unchanged as its continuation."""
+    group = lambda parts: _bare(spell(behavior2.Expr("and", tuple(parts)), way)) if len(parts) > 1 else spell(parts[0], way)
+    arrow = [[*segment, "main"] if len(segment) > 1 else segment for segment in _mark(way["implies"], "implies")]
+    return [*group(before), *arrow, *group(then)], [*_mark(way["and"], "and"), *group(unchanged)] if unchanged else None
+
+
+def _goal(formula):
+    return [["("], *_bare(spell(formula, FORMAL)), [")"]]
+
+
+def _goal_as_zal_reads_it(formula):
+    """One goal as behavior2.game_readings writes it: the typed rendering with two operators respelled."""
+    return [["("], [formula.render().replace(" == ", " = ").replace(" != ", " ≠ ")], [")"]]
+
+
+def game_segments(player, objective, payload, goal=_goal):
+    """A game property in the form of ZAL's own formula rung; `goal` writes each goal formula."""
+    force = [[FORCES[0], "can_force"], [player], [FORCES[1], "can_force"], [" "]]
+    if objective == "within":
+        return [*force, [f"within {payload.args[0]}", "within_steps"], [" "], *goal(payload.args[1])]
+    if isinstance(payload, tuple):
+        out = [*force, ["("]]
+        for index, formula in enumerate(payload):
+            out += (_mark(FORMAL["and"], "and") if index else []) + [[OFTEN, "infinitely_often"], [" "], *goal(formula)]
+        return [*out, [")"]]
+    symbol = {"eventually": FORMAL["eventually"], "always": FORMAL["always"], "infinitely often": OFTEN}[objective]
+    return [*force, [symbol, objective.replace(" ", "_")], [" "], *goal(payload)]
+
+
+def decided_steps(model, profile):
+    """Every declared input ZAL decides, as the step its evaluator reads. An overlap or a range trap decides nothing."""
+    if profile is behavior2:
+        for state, values, event, context in model.inputs_domain():
+            result = model.outcome(state, values, event, context)
+            if result[0] == "step":
+                yield result[1]
+        return
+    for state, event, context in model.inputs():
+        if len(model.enabled(state, event, context)) > 1:
+            continue
+        told = model.decide(state, event, context)
+        yield SimpleNamespace(state=state, values={}, event=event, context=context, accepted=told["class"] == "Accept",
+                              post_state=told["state"], post_values={}, rule=told["rule"])
+
+
+def formal_lines(model, profile):
+    """Each line of the statement in symbols, keyed (concept, name) like its legend entry, and what a rule line leaves out.
+
+    A line that is absent here has no formula form: the frame, a player, a symmetry and an unresolved obligation.
+    """
+    le, eq = (lambda: _mark(FORMAL["<="], "le")), (lambda: _mark(FORMAL["=="], "eq"))
+    named = lambda name: [name, "name:" + name]
+    listed = lambda names, keyed: [part for index, name in enumerate(names)
+                                   for part in ([[", "]] if index else []) + [named(name) if keyed else [name]]]
+    lines = {("states", None): [["state", "state"], [" "], [MEMBER, "in"], [" {"], *listed(model.states, False), ["}"]],
+             ("events", None): [["event", "event"], [" "], [MEMBER, "in"], [" {"], *listed(model.events, False), ["}"]],
+             ("initial", None): [["initially", "initially"], [" "], ["state", "state"], *eq(), [model.initial]],
+             ("default", None): [["otherwise", "otherwise"], *[[*s, "main"] if len(s) > 1 else s for s in _mark(FORMAL["implies"], "implies")],
+                                 [FORMAL["not"], "not"], ["accepted", "accepted"], *_mark(FORMAL["and"], "and"),
+                                 ["unchanged", "unchanged"], ["reason " + model.default, None, "note"]]}
+    if model.facts:
+        lines["facts", None] = [*listed(model.facts, True), [" "], [MEMBER, "in"], [" {false, true}"]]
+    for item in (model.inputs if profile is behavior2 else ()):
+        lines["input", item.name] = [[str(item.low)], *le(), named(item.name), *le(), [str(item.high)]]
+    for item in getattr(model, "variables", ()):
+        lines["var", item.name] = [[str(item.low)], *le(), named(item.name), *le(), [str(item.high)], [", "],
+                                   ["initially", "initially"], [" "], named(item.name), *eq(), [str(item.initial)]]
+    more = {}
+    for rule in model.rules:
+        before, then, unchanged = rule_formula(model, rule)
+        lines["rule", rule.id], more["rule", rule.id] = rule_segments(before, then, unchanged, FORMAL)
+        if rule.reason:
+            lines["rule", rule.id].append(["reason " + rule.reason, None, "note"])
+    for concept, items in (("invariant", model.invariants), ("require", getattr(model, "requirements", ())),
+                           ("property", getattr(model, "properties", ()))):
+        for name, formula in items:
+            lines[concept, name] = whole(formula)
+    for name, formula in getattr(model, "fairness", ()):
+        lines["fairness", name] = [[OFTEN, "infinitely_often"], [" "], *_goal(formula)]
+    rungs = {reading["property"]: reading["formula_rung"] for reading in (behavior2.game_readings(model) if profile is behavior2 else [])}
+    for name, player, objective, payload in getattr(model, "games", ()):
+        lines["game", name] = game_segments(player, objective, payload)
+        said = rungs[name][len(plain(game_segments(player, objective, payload, _goal_as_zal_reads_it))):].strip()
+        if said:                                                      # ZAL's own qualifiers, in its words
+            lines["game", name].append([said, None, "note"])
+    return lines, more
+
+
+def check_formal(model, profile, count):
+    """Compare the desk's spelling with ZAL's renderer, parser and evaluator; a difference refuses the statement.
+
+    Every formula of the model: the typed spelling is exactly ZAL's rendering, and ZAL parses the form without a
+    negation's parentheses back to the same formula. Every rule: its right side states the outcome, the next
+    state and the next value of every variable; ZAL parses the typed form of the step formula to the formula
+    evaluated here; the left side holds on exactly the declared inputs that rule decides; and the right side
+    holds on those. A game's line starts as ZAL's own formula rung does.
+    """
+    refuse = lambda what: Disagreement(f"The review desk's symbols no longer match ZAL ({what}); update review_desk.spell")
+    names = (model.declarations if profile is behavior2 else
+             {"facts": set(model.facts), "inputs": set(), "variables": set(), "states": set(model.states), "events": set(model.events)})
+    def reparse(text, scope):
+        if profile is behavior2 or scope == "step":
+            return behavior2.parse_formula(text, names, scope).data()
+        return behavior.parse_formula(text, model.facts, model.states, invariant=scope == "invariant").data()
+    formulas = [(rule.guard, "guard") for rule in model.rules] + [(formula, "invariant") for _, formula in model.invariants]
+    if profile is behavior2:
+        formulas += [(formula, "step") for _, formula in (*model.requirements, *model.fairness)]
+        formulas += [(formula, "property") for _, formula in model.properties]
+        for _, _, objective, payload in model.games:
+            formulas += [(goal, "invariant") for goal in (payload if isinstance(payload, tuple) else
+                                                          [payload.args[1] if objective == "within" else payload])]
+    for formula, scope in formulas:
+        if plain(spell(formula, TYPED, exact=True)) != formula.render():
+            raise refuse("typed spelling of " + formula.render()[:80])
+        if reparse(plain(_bare(spell(formula, TYPED))), scope) != formula.data():
+            raise refuse("grouping of " + formula.render()[:80])
+    steps, parsed, variables = [], 0, sorted(variable.name for variable in getattr(model, "variables", ()))
+    for rule in model.rules:
+        before, then, unchanged = rule_formula(model, rule)
+        pinned = sorted(part.args[1].args[0] for part in [*then[2:], *unchanged]
+                        if part.op == "cmp" and part.args[0] == "==" and part.args[1].op == "var_next")
+        if pinned != variables or len(pinned) != len(then) - 2 + len(unchanged) or [part.op for part in then[:2]] != [
+                "accepted" if rule.target else "not", "state_next"]:
+            raise refuse("step formula of rule " + rule.id)             # the right side must fix the whole outcome
+        line, more = rule_segments(before, then, unchanged, TYPED)
+        node, expected = behavior2.Expr, None
+        try:
+            read = reparse(plain(line) + plain(more), "step")
+        except Refusal as error:
+            if "exceeds" not in str(error):                           # ZAL bounds one parsed formula; evaluation still covers this rule
+                raise refuse("step formula of rule " + rule.id) from error
+        else:
+            expected = node("implies", (behavior2.combine("and", before), behavior2.combine("and", [*then, *unchanged])))
+            if read != expected.data():
+                raise refuse("step formula of rule " + rule.id)
+            parsed += 1
+        steps.append((rule.id, node("and", tuple(before)), node("and", (*then, *unchanged))))
+    stride, evaluated = max(1, -(-count // MAX_FORMAL_INPUTS)), 0
+    for step in itertools.islice(decided_steps(model, profile), 0, None, stride):
+        evaluated += 1
+        for rule_id, before, after in steps:
+            decides = behavior2.holds(before, step)
+            if decides != (step.rule == rule_id) or decides and not behavior2.holds(after, step):
+                raise refuse("step formula of rule " + rule_id)
+        if step.rule == "default" and (step.accepted or step.post_state != step.state or step.post_values != step.values):
+            raise refuse("the default line")
+    rungs = {reading["property"]: reading["formula_rung"] for reading in (behavior2.game_readings(model) if profile is behavior2 else [])}
+    for name, player, objective, payload in getattr(model, "games", ()):
+        if not rungs[name].startswith(plain(game_segments(player, objective, payload, _goal_as_zal_reads_it))):
+            raise refuse("game property " + name)
+    return {"formulas": len(formulas), "rules": len(steps), "rules_parsed": parsed, "inputs": evaluated, "of": count}
+
+
+ZAL_OPERATOR = {"not": "!", "and": "&", "or": "|", "implies": "=>", "iff": "<=>", "eq": "==", "ne": "!=", "lt": "<",
+                "le": "<=", "gt": ">", "ge": ">=", "add": "+", "sub": "-", "prime": "'", "accepted": "accepted",
+                "always": "always", "eventually": "eventually", "next": "next", "within": "within", "until": "until"}
+WORDING = {"rule": "In symbols a rule is a step formula: on a step where everything left of the main arrow holds, this rule "
+                   "decides the step and everything right of the arrow holds.",
+           "default": "In symbols, “otherwise” stands for a step on which the left side of no rule holds.",
+           "require": "Which steps the check covered is in its scope sentence, under Evidence. With an invariant declared, "
+                      "that can be fewer than every declared pre-state."}
+
+
+def reading_key(model, profile, declared):
+    """How to read the symbols of one statement: each symbol, kind of line and name with ZAL's own words for it.
+
+    Readings and meanings are quoted from behavior2.OPERATORS and from the construct registry of the statement's
+    profile. A row the desk words itself carries "desk": true, and the page says so. Only what the statement
+    uses is kept.
+    """
+    used = {segment[1] for entry in declared for segment in (entry["formal"] or []) + (entry["more"] or []) if len(segment) > 1 and segment[1]}
+    words = behavior2.CONSTRUCTS
+    entries = {word: {"symbol": word, "typed": word, "read": word, "meaning": constructs.BY_ID[word].meaning} for word in ("true", "false")}
+    for key, operator in ZAL_OPERATOR.items():
+        read, _, meaning = behavior2.OPERATORS[operator]
+        symbol = FORMAL.get({name: op for op, name in COMPARISON_KEY.items()}.get(key, key), key).strip().replace("{k}", "K")
+        typed = behavior2.TEMPORAL_SYMBOLIC[key].format(a="P", b="Q", k="K") if key in behavior2.TEMPORAL_SYMBOLIC else operator
+        entries[key] = {"symbol": symbol, "typed": typed, "read": read, "meaning": meaning}
+    entries.update({
+        "state": {"symbol": "state", "typed": "state", "read": "the control state", "meaning": words["states"][2]},
+        "event": {"symbol": "event", "typed": "event", "read": "the event of this step", "meaning": words["events"][2]},
+        "initially": {"symbol": "initially", "typed": "initial", "read": "initially", "meaning": words["initial"][2]},
+        "can_force": {"symbol": FORCES[0] + "p" + FORCES[1], "typed": "NAME can force", "read": "player p can force", "meaning": words["game"][2]},
+        "within_steps": {"symbol": "within K", "typed": "within K", "read": "to happen within K steps", "meaning": words["game"][2]},
+        "infinitely_often": {"symbol": OFTEN, "typed": "infinitely often (P)", "read": "infinitely often",
+                             "meaning": "Always eventually: P holds at infinitely many steps.", "desk": True},
+        "in": {"symbol": MEMBER, "typed": "", "read": "is one of",
+               "meaning": "The name on the left takes exactly one of the listed values.", "desk": True},
+        "otherwise": {"symbol": "otherwise", "typed": "default", "read": "otherwise",
+                      "meaning": "On a step where the left side of no rule holds.", "desk": True},
+        "unchanged": {"symbol": "unchanged", "typed": "unchanged", "read": "unchanged",
+                      "meaning": "The control state and every variable are the same after the step as before it.", "desk": True}})
+    names = {}
+    for entry in declared:
+        found = re.match(r"(input|var) (\w+) in ", entry["symbolic"])
+        if found:
+            names[found.group(2)] = {"role": "input" if found.group(1) == "input" else "variable", "english": entry["english"]}
+        elif entry["concept"] == "facts":
+            names.update({fact: {"role": "context fact", "english": entry["english"]} for fact in model.facts})
+    if any(key not in entries and key.removeprefix("name:") not in names for key in used):
+        raise Disagreement("The review desk wrote a symbol its reading key does not explain; update review_desk.reading_key")
+    kinds = ({concept: text for concept, (_, _, text) in words.items()} if profile is behavior2 else
+             {construct.id: construct.meaning for construct in constructs.STATEMENTS})
+    concepts = {entry["concept"] for entry in declared}
+    return {"entries": {key: entry for key, entry in entries.items() if key in used},
+            "spelling": {op: text for op, text in FORMAL.items() if op in TYPED},
+            "names": {name: told for name, told in names.items() if "name:" + name in used},
+            "kinds": {concept: text for concept, text in kinds.items() if concept in concepts},
+            "wording": {concept: text for concept, text in WORDING.items() if concept in concepts}}
+
+
 # ---- what the page reads about one statement --------------------------------------------------------------------------
 
 class DistinctValues:
@@ -173,12 +543,18 @@ class DistinctValues:
 
 
 def declarations(model, profile):
-    """ZAL's legend entries, one per rendered line, each with the name its line declares."""
-    out = []
+    """ZAL's legend entries, one per rendered line, each with the name its line declares and the line in symbols."""
+    (lines, more), out, shown = formal_lines(model, profile), [], set()
     for entry in profile.legend(model)["entries"]:
-        found = NAMED.match(entry["symbolic"]) if entry["concept"] not in ("header", "name") else None
-        out.append({"concept": entry["concept"], "symbolic": entry["symbolic"], "english": entry["english"],
-                    "id": found.group(1) if found else None})
+        concept = entry["concept"]
+        found = NAMED.match(entry["symbolic"]) if concept not in ("header", "name") else None
+        named = found or (re.match(r"(?:input|var) (\w+) in ", entry["symbolic"]) if concept in ("input", "var") else None)
+        key = (concept, named.group(1) if named else None)
+        shown.add(key)
+        out.append({"concept": concept, "symbolic": entry["symbolic"], "english": entry["english"],
+                    "id": found.group(1) if found else None, "formal": lines.get(key), "more": more.get(key)})
+    if set(lines) - shown:
+        raise Disagreement("The review desk wrote a line in symbols that ZAL's legend does not list; update review_desk.formal_lines")
     return out
 
 
@@ -451,15 +827,16 @@ def statement_bundle(text, name, with_edits=True):
     data = model.data()
     axes = input_axes(data)
     count = report.get("input_tuples") or sum(1 for _ in input_tuples(model, profile))
-    legend = profile.legend(model)
+    legend, declared = profile.legend(model), declarations(model, profile)
     bundle = {"name": data["name"], "file": name, "profile": data["profile"], "revision": model.revision,
               "comment": [line.lstrip("# ").rstrip() for line in text.splitlines() if line.lstrip().startswith("#")][:6],
               "symbolic": model.render(), "model": data, "axes": axes, "check": report,
-              "declared": declarations(model, profile), "readings": legend.get("readings", []),
+              "declared": declared, "key": reading_key(model, profile, declared), "readings": legend.get("readings", []),
               "checker": checker, "python": sys.version.split()[0]}
     if report["status"] == "counterexample":
         bundle["story"] = counterexample_story(model, report, checker)
     passing = report["status"] in PASSING
+    formal = check_formal(model, profile, count)
     compared = check_sentences(model, profile, count, checker)
     try:
         bundle["decisions"] = decision_table(model, profile, axes, count, checker)
@@ -469,7 +846,8 @@ def statement_bundle(text, name, with_edits=True):
     expected = report.get("reachable_configurations", len(report["reachable_states"]) if "reachable_states" in report else None)
     bundle["reachable"] = walked
     bundle["cross_checks"] = {"tuples": bundle["decisions"].get("count") in (None, count), "sentences_compared": compared,
-                              "reachable": None if walked is None or expected is None else len(walked) == expected}
+                              "reachable": None if walked is None or expected is None else len(walked) == expected,
+                              "formal": formal}
     bundle["edits"] = planted_edits(model, profile, count, checker) if with_edits and passing else None
     return bundle, model, profile
 
@@ -536,6 +914,8 @@ class OpenStatement:
         except OSError as error:
             self.digest = ""
             self.error = {"reason": f"The file could not be read: {error.strerror or error}"}
+        except Disagreement as error:                                  # the desk's own fault, so not shown as ZAL refusing the source
+            self.error = {"reason": str(error), "unexpected": True}
         except ValueError as error:                                    # ZAL refuses the source
             self.error = {"reason": str(error)}
             try:

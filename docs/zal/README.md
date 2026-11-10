@@ -398,8 +398,26 @@ python3 integrations/zal/review_desk.py snapshot integrations/zal/examples/order
 
 Open `http://127.0.0.1:8770/`. The page starts with the check's exact status,
 the counts of the declared domain and every advisory. Beside that, the
-statement is laid out as vocabulary, rules, claims and assumptions, in
-canonical English and in symbols. Three tabs examine it:
+statement is laid out as vocabulary, rules, claims and assumptions. Each line
+has three readings, and the reader chooses which to show:
+
+- **English** is the canonical English line.
+- **Symbols** writes the line in the formula symbols of the
+  [progression ladder](ladder/README.md), for example
+  `□((accepted ∧ event = request) ⇒ ◇(state = waiting ∧ state′ = idle))`.
+  A rule is written as a step formula such as
+  `state = idle ∧ event = deposit ∧ balance+amount ≤ 4 ⇒ accepted ∧ state′ = idle ∧ balance′ = balance+amount`,
+  followed by the variables it leaves unchanged.
+- **Typed** is the line as `render --to symbolic` prints it.
+
+A reading key sits under the statement and follows the line under the pointer
+or the keyboard. It names the kind of line in the construct registry's words
+and lists only the symbols and names of that line, each with the registry's
+reading and meaning. A symbol the reader marks as learned shrinks to one word;
+no symbol is removed. On a narrow screen the key opens inside the line that
+was tapped, and the whole key stands at the foot of the statement.
+
+Three tabs examine the statement:
 
 - **Evidence** shows what each check covers, the advisories and, for a
   counterexample, its story. For a statement that passes it also plants rule
@@ -411,8 +429,10 @@ canonical English and in symbols. Three tabs examine it:
   there, so the other claims are not asked about that edit.
 - **Try an input** explains one input: the decision, the guard truth of each
   rule written for that state and event, every invariant and requirement on
-  that step, and the nearest input that is decided the other way. A step can
-  be taken and the run continued.
+  that step, and the nearest input that is decided the other way. In symbols,
+  each part of a formula shows whether it is true on that input, and each line
+  of the statement says what it does on that input. A step can be taken and
+  the run continued.
 - **Review a change** lists the inputs a change decides differently, with the
   decision sentence before and after. With `serve`, a pasted candidate is
   parsed, checked and compared, and it is not saved.
@@ -422,17 +442,40 @@ file shows its source diagnostic. `snapshot` writes one self-contained page
 with every result computed beforehand. A page holds a decision table for a
 statement of at most 2,500 input tuples and the nearest opposite decision for
 at most 600; above that, `serve` asks the checker on request. The breakdown of
-planted edits by claim stops at 4,096 input tuples. A snapshot cannot check a
-new candidate.
+planted edits by claim stops at 4,096 input tuples. Rule formulas are
+evaluated on at most 20,000 declared inputs; above that an even sample is
+used, and the page says how many. A snapshot cannot check a new candidate.
 
 Statuses, renderings, explanations, why-not answers, stories and semantic
-differences come from the functions `run.py` dispatches to. Three things are
+differences come from the functions `run.py` dispatches to. Four things are
 the desk's own, and the page labels them so: the planted edits, the breakdown
-of which claim the checker names for each edit, and the walk that marks
-unreachable configurations. An unnoticed edit is not a defect in the
-statement. It shows behavior that no stated claim constrains; whether a claim
-is missing is the owner's decision. The three kinds of edit do not cover every
-possible change, so a claim that notices none of them can still matter.
+of which claim the checker names for each edit, the walk that marks
+unreachable configurations, and the lines in symbols. An unnoticed edit is not
+a defect in the statement. It shows behavior that no stated claim constrains;
+whether a claim is missing is the owner's decision. The three kinds of edit do
+not cover every possible change, so a claim that notices none of them can
+still matter.
+
+The symbols are a spelling of the machine statement, not a ladder statement.
+They add no trace binder, scope, horizon or assumption, and the formula ladder
+and the machine profiles stay separate. Each symbol is read from the ladder
+registry, and each reading and meaning from the construct registries; a row
+the desk words itself says so. The spelling is compared with the checker in
+three ways, and a difference is shown as an error of the desk, not as a
+refusal of the source:
+
+- For every formula, the typed form of the spelling is the checker's own
+  rendering, and the checker parses the form without redundant parentheses
+  back to the same formula.
+- For every rule, the right side of its step formula states the outcome, the
+  next state and the next value of every variable. The checker parses the
+  typed form of the step formula, and its evaluator is run on the declared
+  inputs: the left side holds on exactly the inputs that rule decides, and the
+  right side holds on each of those.
+- A game property's line starts as the checker's own formula rung does.
+
+These comparisons establish that a line in symbols denotes the formula the
+checker holds. They add nothing to what the check itself covers.
 
 `review_desk.py` and `review_desk.html` are outside the checker source
 closure, so they leave the checker identity unchanged. The desk records no
