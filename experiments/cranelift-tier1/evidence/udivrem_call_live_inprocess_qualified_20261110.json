@@ -1,0 +1,130 @@
+{
+  "schema": "zenofcis/tier1-udivrem-call-live-runtime-independent-recheck/1",
+  "date_utc": "2026-11-10",
+  "status": "hosted-CI-success-and-independent-raw-ZIP-and-sample-recalculation",
+  "source": {
+    "zenofcis_benchmark_commit": "4cede63f47e851f90f13d9e2914a4548927e46f2",
+    "wasmtime": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "producer_zenofcis": "7967adce41243c2c024c025e674f0b14461a6da2",
+    "producer_ci": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42708736506",
+    "bench": "experiments/cranelift-tier1/inprocess_live_pressure_28/src/main.rs",
+    "auditor": "experiments/cranelift-tier1/audit_call_live_timing_28.py",
+    "target": "x86_64-unknown-linux"
+  },
+  "workflow": {
+    "run_id": 42751309712,
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42751309712",
+    "conclusion": "success",
+    "artifact_id": 13733531984,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42751309712/artifacts/13733531984",
+    "artifact_zip_sha256": "562768e865ea4f6dad241bd8d124300c80e3f6c1802f884908a11b80b910254e",
+    "qualified_json_sha256": "52fc9ff220b741512a9a71a592e84d58022a985d0f2681ac4b6e5cd1b9c6ff0e",
+    "host_cpu": "AMD EPYC 7763 64-Core Processor"
+  },
+  "measurement": {
+    "design": "same archived WAT compiled by unchanged/experimental Cranelift, Rust in-process guest calls; two warmups, balanced ABBA/BAAB blocks; independent unsigned i64 oracle; zero-divisor traps; modulo 2^64 and rotl(17)",
+    "native_values_per_compiler_per_case": 16,
+    "native_zero_divisor_trap_checks_per_compiler_per_case": 1,
+    "timed_calls_per_sample": 100000,
+    "blocks_per_context": 8,
+    "samples_per_context": 32,
+    "total_samples": 192,
+    "total_timed_guest_calls": 19200000,
+    "host_level": "virtualized one-host descriptive, not controlled CPU-frequency microarchitecture throughput",
+    "cases": {
+      "live_0": {
+        "mode": "forward",
+        "call_live_values": 0,
+        "median_patched_over_baseline": 0.9812544331577584,
+        "range": [
+          0.971503133364739,
+          0.99100710056101
+        ],
+        "favorable_blocks": 8,
+        "checksum_u64": "14760456404398421200",
+        "native_bytes_baseline": 43,
+        "native_bytes_patched": 25
+      },
+      "live_4": {
+        "mode": "forward",
+        "call_live_values": 4,
+        "median_patched_over_baseline": 1.0049503937094373,
+        "range": [
+          0.9883294723389681,
+          1.0128874656362281
+        ],
+        "favorable_blocks": 3,
+        "checksum_u64": "14760456404398621200",
+        "native_bytes_baseline": 242,
+        "native_bytes_patched": 227
+      },
+      "live_12": {
+        "mode": "forward",
+        "call_live_values": 12,
+        "median_patched_over_baseline": 0.9969997247381754,
+        "range": [
+          0.9103769221993707,
+          1.057899165251938
+        ],
+        "favorable_blocks": 5,
+        "checksum_u64": "14760456404399621200",
+        "native_bytes_baseline": 515,
+        "native_bytes_patched": 500
+      },
+      "live_20": {
+        "mode": "forward",
+        "call_live_values": 20,
+        "median_patched_over_baseline": 1.0039733429538604,
+        "range": [
+          0.9974627701941312,
+          1.0069348413261106
+        ],
+        "favorable_blocks": 1,
+        "checksum_u64": "14760456404399421200",
+        "native_bytes_baseline": 815,
+        "native_bytes_patched": 800
+      },
+      "live_12_reverse": {
+        "mode": "reverse-negative-control",
+        "call_live_values": 12,
+        "median_patched_over_baseline": 0.9990099718692926,
+        "range": [
+          0.9680930336197139,
+          1.007992058157375
+        ],
+        "favorable_blocks": 6,
+        "checksum_u64": "14760456404399621200",
+        "native_bytes_baseline": 521,
+        "native_bytes_patched": 521
+      },
+      "live_12_quotient_only": {
+        "mode": "quotient-negative-control",
+        "call_live_values": 12,
+        "median_patched_over_baseline": 0.9978220656196021,
+        "range": [
+          0.8223151197180427,
+          1.0517397499633963
+        ],
+        "favorable_blocks": 5,
+        "checksum_u64": "14659310988719927450",
+        "native_bytes_baseline": 493,
+        "native_bytes_patched": 493
+      }
+    }
+  },
+  "independent_recheck": {
+    "procedure": "Downloaded archived ZIP bytes via GitHub, checked archive SHA-256 against GitHub job logs, parsed six raw CSV files, independently evaluated 100,000-call unsigned bitpattern checksums per case, recomputed each eight block ratio and median and checked each against exact audit JSON (absolute difference <1e-12), checked per-CSV hashes",
+    "result": "all six cases match; no independent rebuild of Wasmtime in local analysis environment",
+    "raw_samples_preservation": "Original CSV and qualified JSON archived under GitHub Actions artifact (30-day retention); source + audit procedures remain on isolated branch."
+  },
+  "interpretation": "Static x86 function-byte savings persist in forward cases, but the measured 4/12/20 live-value cases cluster near ratio 1.0 on this host. The experiment does NOT establish general runtime benefit or safe register-pressure profitability. Do not submit upstream on this evidence alone.",
+  "limitations": [
+    "Not an automatically discovered new ZenoFCIS-synthesized instruction sequence; experimental hand-built fusion",
+    "Source-only bounded adjacent pair; no general pass/egraph or cross-target proof",
+    "Synthetic pure callee live ranges rather than real application workload",
+    "No sampling of CPU models, no stable frequency control, no per-instruction latency or uop counts",
+    "Whole AOT sizes remain unchanged in the producer's six contexts",
+    "Signed, 32-bit, reversed and nonadjacent cases excluded from fusion; verified only as negative controls",
+    "ISA flags undefined for DIV and not observed in this Wasm result; arbitrary machine state and poison not modeled"
+  ]
+}
