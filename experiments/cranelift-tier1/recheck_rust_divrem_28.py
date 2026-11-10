@@ -7,6 +7,7 @@ import re
 import subprocess
 from pathlib import Path
 
+from scan_divrem_clif_28 import inspect as inspect_clif
 from qualify_rust_divrem_28 import (
     SCHEMA, PROFILES, EXPORTS, UPSTREAM, TARGET, sha, signed, MASK, text_size
 )
@@ -76,6 +77,10 @@ def recheck(archive:Path,root:Path)->dict:
                 p=clif/source["path"]
                 if sha(p)!=source["sha256"] or p.stat().st_size!=source["bytes"]:
                     raise ValueError("changed exact emitted CLIF")
+            observed = sum(inspect_clif((clif/source["path"]).read_text())["candidate_pair_count"]
+                           for source in item["clif"])
+            if observed != item["clif_lexical_candidate_pairs"]:
+                raise ValueError("emitted CLIF div/rem lexical reachability drift")
             if not item["finite"]["value"] or not item["finite"]["trap_or_panic"]:
                 raise ValueError("producer omitted finite/negative coverage")
             for fn in EXPORTS:
