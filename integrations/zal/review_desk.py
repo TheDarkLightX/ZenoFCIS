@@ -853,8 +853,12 @@ def planted_edits(model, profile, count, checker):
                       "edit. A game's assumption is probed by restating it as the other player's own objective."}
 
 
-def statement_bundle(text, name, with_edits=True):
-    """Everything the page shows about one source; returns the bundle, the model and its profile module."""
+def statement_bundle(text, name, with_edits=True, with_table=True):
+    """Everything the page shows about one source; returns the bundle, the model and its profile module.
+
+    A page that can ask ZAL about each input as it is tried needs no table (with_table=False), and one that asks
+    for the planted edits afterwards leaves them out here (with_edits=False).
+    """
     checker = checker_identity()
     model, profile = read_statement(text)
     report = profile.check(model, checker)
@@ -873,7 +877,8 @@ def statement_bundle(text, name, with_edits=True):
     formal = check_formal(model, profile, count)
     compared = check_sentences(model, profile, count, checker)
     try:
-        bundle["decisions"] = decision_table(model, profile, axes, count, checker)
+        bundle["decisions"] = (decision_table(model, profile, axes, count, checker) if with_table else
+                               {"status": "not-precomputed", "reason": "this page asks ZAL about each input as it is tried"})
     except (ValueError, KeyError, TypeError) as error:                 # a statement with overlapping rules has no table
         bundle["decisions"] = {"status": "not-precomputed", "reason": f"ZAL could not explain every input ({str(error)[:200]})"}
     walked = reachable_configurations(model, profile, axes) if passing and count <= MAX_TABLE_TUPLES else None
@@ -931,6 +936,40 @@ def write_snapshot(sources, out):
 
 # ---- the loopback page for one file ---------------------------------------------------------------------------------
 
+def read_source(data, name, with_edits=True, with_table=True):
+    """ZAL's results for one source given as bytes: (bundle, model, profile, error). The error is None when ZAL accepts it."""
+    text = ""
+    try:
+        text = source_text(data)
+        return (*statement_bundle(text, name, with_edits, with_table), None)
+    except Disagreement as error:                                      # the desk's own fault, so not shown as ZAL refusing the source
+        return None, None, None, {"reason": str(error), "unexpected": True}
+    except ValueError as error:                                        # ZAL refuses the source
+        told = {"reason": str(error)}
+        try:
+            told = diagnostics.describe(error, text, Path(name))
+        except Exception:                                              # the located form is a courtesy
+            pass
+        return None, None, None, told
+    except (KeyError, TypeError) as error:                             # not a refusal: shown as an error, not hidden
+        return None, None, None, {"reason": f"{type(error).__name__}: {error}", "unexpected": True}
+
+
+def ask(model, profile, route, data):
+    """ZAL's answer to one question a page asks about the statement it shows: explain an input, or compare a candidate."""
+    if data.get("revision") != model.revision:
+        raise Refusal("This page shows an older revision; reload")
+    checker = checker_identity()
+    if route == "explain":
+        told = explain_input(model, profile, data["input"], checker)
+        told["sentence"] = decision_sentence(model, profile, data["input"])
+        told["nearest"] = nearest_opposite(model, profile, data["input"], told["outcome"], checker)
+        return told
+    if route == "candidate":
+        return compare_candidate(model, profile, data["source"], checker)[0]
+    raise Refusal("Unknown review desk action")
+
+
 class OpenStatement:
     """One source file as last read from disk, with ZAL's results for it. The file is never written."""
 
@@ -940,25 +979,13 @@ class OpenStatement:
 
     def load(self):
         self.bundle, self.model, self.profile, self.error = None, None, None, None
-        text = ""
         try:
             data = read_bounded(self.path)
-            self.digest = hashlib.sha256(data).hexdigest()             # recorded first, so a refused file is not re-read forever
-            text = source_text(data)
-            self.bundle, self.model, self.profile = statement_bundle(text, self.path.name)
+            self.digest = hashlib.sha256(data).hexdigest()             # recorded whatever ZAL says, so a refused file is not re-read forever
+            self.bundle, self.model, self.profile, self.error = read_source(data, self.path.name)
         except OSError as error:
             self.digest = ""
             self.error = {"reason": f"The file could not be read: {error.strerror or error}"}
-        except Disagreement as error:                                  # the desk's own fault, so not shown as ZAL refusing the source
-            self.error = {"reason": str(error), "unexpected": True}
-        except ValueError as error:                                    # ZAL refuses the source
-            self.error = {"reason": str(error)}
-            try:
-                self.error = diagnostics.describe(error, text, Path(self.path.name))
-            except Exception:                                          # the located form is a courtesy
-                pass
-        except (KeyError, TypeError) as error:                         # not a refusal: shown as an error, not hidden
-            self.error = {"reason": f"{type(error).__name__}: {error}", "unexpected": True}
 
     def changed(self):
         try:
@@ -969,17 +996,7 @@ class OpenStatement:
     def act(self, route, data):
         if self.model is None:
             raise Refusal("ZAL refuses the file on disk; correct it and reload")
-        if data.get("revision") != self.model.revision:
-            raise Refusal("This page shows an older revision; reload")
-        checker = checker_identity()
-        if route == "explain":
-            told = explain_input(self.model, self.profile, data["input"], checker)
-            told["sentence"] = decision_sentence(self.model, self.profile, data["input"])
-            told["nearest"] = nearest_opposite(self.model, self.profile, data["input"], told["outcome"], checker)
-            return told
-        if route == "candidate":
-            return compare_candidate(self.model, self.profile, data["source"], checker)[0]
-        raise Refusal("Unknown review desk action")
+        return ask(self.model, self.profile, route, data)
 
     def view(self):
         base = {"mode": "live", "file": self.path.name}

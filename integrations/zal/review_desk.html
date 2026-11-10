@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ZAL review desk</title>
 <!-- The page of integrations/zal/review_desk.py. It shows ZAL's results and records no agreement.
-     review_desk.py fills the data slot and the token slot; nothing else is loaded. -->
+     review_desk.py fills the data slot and the token slot; nothing else is loaded.
+     portable_desk_build.py makes a third kind of page from this file, in which ZAL runs in the page's own
+     worker. That build places portable_desk.js before this script; here it is reached only when DEVICE is true. -->
 <style>
 /* Layout: the statement lies on the left like a contract; the instruments that examine it stand on the right;
    the verdict sits above both. Three voices: serif is ZAL's own English, mono is ZAL's typed line, sans is this
@@ -403,6 +405,9 @@ textarea.src { width: 100%; min-height: 260px; font: 12.5px/1.55 var(--mono); pa
 const DESK = /*__ZAL_REVIEW_DESK_DATA__*/null;
 const TOKEN = "__ZAL_REVIEW_DESK_TOKEN__";
 const LIVE = DESK && DESK.mode === "live";
+const DEVICE = DESK && DESK.mode === "device";                 /* ZAL runs in this page's own worker; portable_desk.js supplies PORTABLE */
+const ASKS = LIVE || DEVICE;                                   /* ZAL can be asked about an input or a candidate */
+const TABS = ["statement", "evidence", "try", "changes"].concat(DEVICE ? ["write"] : []);
 
 /* ---------- small helpers ---------- */
 const SVGNS = "http://www.w3.org/2000/svg";
@@ -562,13 +567,14 @@ function pickClause(key) { S.sel = S.sel === key ? null : key; if (K.at !== key)
 /* ---------- top, verdict, footer ---------- */
 function renderTop() {
   const top = $("top"); top.replaceChildren();
-  top.append(h("div", { class: "brand" }, h("b", {}, "ZAL"), h("span", {}, "review desk")));
-  if (DESK.bundles.length > 1) {
+  top.append(h("div", { class: "brand" }, h("b", {}, "ZAL"), h("span", {}, DEVICE ? "portable desk" : "review desk")));
+  if (DEVICE) PORTABLE.top(top);
+  else if (DESK.bundles.length > 1) {
     const sel = h("select", { id: "model", onchange: (e) => select(Number(e.target.value)) },
       DESK.bundles.map((b, i) => h("option", { value: i, selected: i === S.i }, `${b.name}  (${b.file})`)));
     top.append(h("div", { class: "pick" }, h("label", { for: "model" }, "Statement"), sel));
   }
-  top.append(h("div", { class: "mode" }, LIVE ? ["Live on this machine, reading ", h("code", {}, DESK.file)] : ["Snapshot: every result here was computed beforehand. ", h("code", {}, "review_desk.py serve"), " asks ZAL directly."]));
+  top.append(h("div", { class: "mode" }, DEVICE ? "ZAL runs on this device. Nothing is sent anywhere." : LIVE ? ["Live on this machine, reading ", h("code", {}, DESK.file)] : ["Snapshot: every result here was computed beforehand. ", h("code", {}, "review_desk.py serve"), " asks ZAL directly."]));
   const dark = document.documentElement.getAttribute("data-theme") === "dark" || (!document.documentElement.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
   top.append(h("button", { class: "btn small", id: "theme", onclick: () => { document.documentElement.setAttribute("data-theme", dark ? "light" : "dark"); store("zal-review-desk-theme", dark ? "light" : "dark"); renderTop(); } }, dark ? "Light" : "Dark"));
 }
@@ -600,13 +606,15 @@ function renderVerdict() {
   (b.edits ? b.edits.probes : []).filter((p) => p.status === "counterexample").forEach((p) =>
     alerts.push(h("button", { class: "alert bad", onclick: () => go("evidence", () => scrollTo("ev-defects")) }, `${p.claimant} can win by starving the assumption ${p.assumption}`)));
   if (f.unresolved.length) alerts.push(h("button", { class: "alert info", onclick: () => go("evidence", () => scrollTo("ev-open")) }, `${plural(f.unresolved.length, "obligation")} not checked`));
+  if (b.pending) alerts.push(h("span", { class: "alert info" }, "ZAL is re-checking the planted edits…"));
   if (alerts.length) v.append(h("div", { class: "v-alerts" }, alerts));
   if (LIVE && S.stale) v.append(h("div", { class: "banner" }, "The file changed on disk. This page still shows the earlier revision.", h("button", { class: "btn small", onclick: () => location.reload() }, "Reload")));
+  if (DEVICE) PORTABLE.verdict(v);
 }
 function renderFoot() {
   const b = B();
   $("foot").replaceChildren(
-    h("span", {}, "authority: none"), h("span", {}, "This page records no agreement."), h("span", {}, LIVE ? "live on 127.0.0.1" : "snapshot: results computed ahead of time"),
+    h("span", {}, "authority: none"), h("span", {}, "This page records no agreement."), h("span", {}, DEVICE ? "ZAL runs on this device; nothing is sent anywhere" : LIVE ? "live on 127.0.0.1" : "snapshot: results computed ahead of time"),
     h("span", {}, "revision ", h("code", {}, b.revision.slice(0, 12))), h("span", {}, "checker ", h("code", {}, b.checker.slice(0, 12))));
 }
 function scrollTo(id) { const el = $(id); if (el) el.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); }
@@ -727,6 +735,10 @@ function clauseMore(b, f, clause, cover, voc) {
     const d = b.decisions, key = Object.keys(d.index).find((k) => d.kept.outcome[d.rows[d.index[k]][0]].rule === clause.id);
     if (key) acts.push(h("button", { class: "btn small", onclick: () => tryInput(parseKey(b, key)) }, "Show a step where it fires"));
     else out.push(h("p", { class: "warn" }, "No declared input makes this rule fire."));
+  }
+  if (clause.concept === "rule" && DEVICE) {                     /* no table in the page: ZAL is asked for a step this rule decides */
+    if (PORTABLE.unfired(clause.id)) out.push(h("p", { class: "warn" }, "No declared input makes this rule fire."));
+    else acts.push(h("button", { class: "btn small", onclick: () => PORTABLE.fires(clause.id) }, "Show a step where it fires"));
   }
   if (clause.concept === "rule" && f.perRule[clause.id]) acts.push(h("button", { class: "btn small", onclick: () => { S.change = f.rows.indexOf(f.perRule[clause.id][0]); go("changes"); } }, "See what editing it would change"));
   if (["require", "property", "game", "invariant"].includes(clause.concept) && b.edits && b.edits.breakdown)
@@ -898,7 +910,7 @@ function evAdvisories(b, f) {
     f.advisories.map((a) => h("div", { class: "adv" }, h("span", { class: "kind" }, a.kind), h("p", { class: "en", style: "font-size:15px" }, a.message), MEANS[a.kind] ? h("p", { class: "means" }, MEANS[a.kind]) : null)));
 }
 function evDefects(b, f) {
-  if (!b.edits) return h("section", { class: "block", id: "ev-defects" }, h("h3", {}, "Could it have failed?"), h("p", { class: "empty" }, "No defects were planted, because the statement itself does not pass."));
+  if (!b.edits) return h("section", { class: "block", id: "ev-defects" }, h("h3", {}, "Could it have failed?"), h("p", { class: "empty" }, unplanted(b)));
   const d = b.edits, cols = d.breakdown ? d.columns.filter((c) => c.usable !== false) : [];
   const head = h("tr", {}, h("th", {}, "Edit, one at a time"), h("th", {}, "Result"), cols.map((c) => h("th", { class: "col" + (S.col === c.id ? " hl" : ""), title: c.label }, c.id)), cols.length ? h("th", { class: "fill" }) : null);
   const body = h("tbody", {});
@@ -922,6 +934,10 @@ function evDefects(b, f) {
     un.length ? h("p", { style: "margin-top:12px;max-width:72ch" }, h("b", {}, `${plural(un.length, "edit")} went unnoticed. `), "Each is behavior that no claim pins down. Either a claim is missing, or the behavior is meant to be free. That is the owner's call.") : null,
     h("p", { class: "note", style: "margin-top:8px" }, d.method));
 }
+function unplanted(b) {                                          /* why a bundle carries no planted edits */
+  return b.pending ? "ZAL is re-checking each planted edit on this device. This part fills in when it has finished."
+    : b.edits_failed ? "The planted edits were not completed: " + b.edits_failed : "No defects were planted, because the statement itself does not pass.";
+}
 function evOpen(b, f) {
   if (!f.unresolved.length) return null;
   return h("section", { class: "block", id: "ev-open" }, h("h3", {}, "Stated but not checked"),
@@ -934,7 +950,7 @@ function evProvenance(b) {
     h("dl", { class: "kv" },
       h("dt", {}, "Revision"), h("dd", {}, h("code", {}, b.revision)),
       h("dt", {}, "Checker"), h("dd", {}, h("code", {}, b.checker), " (this page and review_desk.py are outside that source closure)"),
-      h("dt", {}, "Python"), h("dd", {}, b.python),
+      h("dt", {}, "Python"), h("dd", {}, b.python, DEVICE ? PORTABLE.provenance() : null),
       h("dt", {}, "Authority"), h("dd", {}, "none. Factory: ", h("code", {}, b.check.factory || "not-run"), ". Agreement is the owner's act and is not recorded here."),
       h("dt", {}, "Cross-checks"), h("dd", {}, sc.tuples === true ? "The decision table has exactly the number of input tuples ZAL reports. " : sc.tuples === false ? "The decision table does not have the number of input tuples ZAL reports; trust ZAL's count. " : "", sc.reachable === true ? "The desk's walk from the start reaches exactly the configurations ZAL reports. " : sc.reachable === false ? "The desk's walk from the start disagrees with ZAL's count; trust ZAL's. " : "",
         sc.sentences_compared ? `Each one-line account of a decision is composed with ZAL's phrase functions and matched ZAL's why-not answer on the ${plural(sc.sentences_compared, "input")} compared. ` : "",
@@ -1051,7 +1067,7 @@ function truthLine(b, node, key) {                             /* one formula on
 }
 function renderTry(panel) {
   const b = B(), a = b.axes, sim = S.sim, tabled = b.decisions.status === "complete";
-  if (!tabled && !LIVE) { panel.append(h("section", { class: "block" }, h("h3", {}, "Try an input"), h("p", { class: "empty" }, "This snapshot holds no decision table for this statement: " + b.decisions.reason + ". With review_desk.py serve, ZAL explains any input on request."))); return; }
+  if (!tabled && !ASKS) { panel.append(h("section", { class: "block" }, h("h3", {}, "Try an input"), h("p", { class: "empty" }, "This snapshot holds no decision table for this statement: " + b.decisions.reason + ". With review_desk.py serve, ZAL explains any input on request."))); return; }
   const given = { state: sim.state, variables: { ...sim.variables }, event: sim.event, context: { ...sim.context } }, key = keyOf(b, given);
   const dec = tabled ? decision(b, given) : (S.live && S.live.key === key ? S.live : null);
   if (!tabled && !dec && S.liveKey !== key) explainLive(key, given);          /* asks ZAL; the page renders again when it answers */
@@ -1143,7 +1159,7 @@ function changeDetail(b, f, r, title, own) {
     out.push(h("p", {}, h("b", {}, `${plural(diff.witness_count, "input")}${total ? " of " + num(total) : ""} `), diff.witness_count === 1 ? "is decided differently." : "are decided differently.", diff.witness_count > diff.witnesses.length ? ` ZAL's sentences for the first ${diff.witnesses.length}:` : ""));
     const card = (w) => w.sentences ? h("div", { class: "wit" },
       h("div", {}, h("span", { class: "tag" }, "Before"), h("p", { class: "en" }, w.sentences.before)), h("div", {}, h("span", { class: "tag" }, "After"), h("p", { class: "en" }, w.sentences.after)),
-      b.decisions.status === "complete" || LIVE ? h("div", {}, h("button", { class: "link", onclick: () => tryInput({ state: w.state, variables: w.variables || {}, event: w.event, context: w.context || {} }) }, own ? "Open this input in the current machine" : "Open this input in the unedited machine")) : null)
+      b.decisions.status === "complete" || ASKS ? h("div", {}, h("button", { class: "link", onclick: () => tryInput({ state: w.state, variables: w.variables || {}, event: w.event, context: w.context || {} }) }, own ? "Open this input in the current machine" : "Open this input in the unedited machine")) : null)
       : h("div", { class: "wit" }, h("p", {}, !w.event || !w.before || !w.after ? "The initial configuration differs."
         : [h("code", {}, describe(b, { state: w.state, variables: w.variables || {}, event: w.event, context: w.context || {} })), `: ${w.before.class} by ${w.before.rule} before, ${w.after.class} by ${w.after.rule} after.`]));
     const lead = diff.witnesses.slice(0, 2), rest = diff.witnesses.slice(2);
@@ -1155,25 +1171,27 @@ function renderChanges(panel) {
   const b = B(), f = facts(b);
   panel.append(h("section", { class: "block" }, h("h3", {}, "Review a change"),
     h("p", { class: "lede" }, "Judge an edit by what it does, not by how it reads. ZAL compares the two statements on every declared input and reports each one that is decided differently.")));
-  if (LIVE) {
+  if (DEVICE) PORTABLE.candidate(panel);
+  else if (LIVE) {
     const area = h("textarea", { class: "src", id: "candidate", spellcheck: "false", "aria-label": "Candidate statement" }); area.value = S.draft != null ? S.draft : b.symbolic;
     area.addEventListener("input", () => { S.draft = area.value; });
     panel.append(h("section", { class: "block" }, h("h3", {}, "Your candidate"), h("p", { class: "lede" }, "Edit the statement and ask ZAL what would change. Nothing is saved and nothing is agreed."), area,
       h("div", { class: "rrow", style: "margin-top:8px" }, h("button", { class: "btn primary", disabled: S.busy, onclick: checkCandidate }, S.busy ? "Checking…" : "Check this candidate"),
         h("button", { class: "btn", onclick: () => { S.draft = null; S.candidate = null; render(); } }, "Reset to the current statement"))));
-    if (S.candidate) panel.append(h("section", { class: "block", id: "cand-result", "aria-live": "polite" }, changeDetail(b, f, S.candidate, "What your candidate would change", true)));
   }
+  if (ASKS && S.candidate) panel.append(h("section", { class: "block", id: "cand-result", "aria-live": "polite" }, changeDetail(b, f, S.candidate, "What your candidate would change", true)));
   if (f.rows.length) {
     const list = h("div", { class: "chg-list" }, f.rows.map((r, n) => h("button", { class: "chg", "aria-pressed": String(S.change === n), onclick: () => { S.change = n; render(); scrollTo("chg-detail"); } },
       h("i", { class: "m " + r.class }), h("span", { class: "lab" }, r.label), h("span", { class: "res " + r.class }, CLASS_WORDS[r.class]))));
-    panel.append(h("section", { class: "block" }, h("h3", {}, LIVE ? "Planted edits" : "Edits to examine"), h("p", { class: "lede" }, LIVE ? "The same small edits the Evidence tab plants." : "A snapshot cannot check a new candidate, so these are the planted edits. With review_desk.py serve you can paste your own."), list));
+    panel.append(h("section", { class: "block" }, h("h3", {}, ASKS ? "Planted edits" : "Edits to examine"), h("p", { class: "lede" }, ASKS ? "The same small edits the Evidence tab plants." : "A snapshot cannot check a new candidate, so these are the planted edits. With review_desk.py serve you can paste your own."), list));
     if (S.change != null && f.rows[S.change]) panel.append(h("section", { class: "block", id: "chg-detail" }, changeDetail(b, f, f.rows[S.change], f.rows[S.change].label)));
-  } else if (!LIVE) panel.append(h("p", { class: "empty" }, b.edits ? "This statement has no rules to edit." : "No edits were planted, because the statement itself does not pass."));
+  } else if (!LIVE) panel.append(h("p", { class: "empty" }, b.edits ? "This statement has no rules to edit." : DEVICE ? unplanted(b) : "No edits were planted, because the statement itself does not pass."));
   panel.append(h("p", { class: "note" }, "Agreeing to a change is the owner's act. This page shows consequences and records no agreement."));
 }
 
 /* ---------- live calls ---------- */
 async function api(route, body) {
+  if (DEVICE) return PORTABLE.ask(route, body);
   const res = await fetch("/api/" + route, { method: "POST", headers: { "Content-Type": "application/json", "X-ZAL-Review-Desk": TOKEN }, body: JSON.stringify(body) });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "The desk refused the request");
@@ -1200,7 +1218,7 @@ async function explainLive(key, given) {
 /* ---------- render ---------- */
 function renderTabs() {
   const b = B(), f = facts(b), tabs = $("tabs"); tabs.replaceChildren();
-  const defs = [["statement", "Statement", null], ["evidence", "Evidence", null], ["try", "Try an input", null], ["changes", "Review a change", f.rows.length || null]];
+  const defs = [...(DEVICE ? [["write", "Write", null]] : []), ["statement", "Statement", null], ["evidence", "Evidence", null], ["try", "Try an input", null], ["changes", "Review a change", f.rows.length || null]];
   defs.forEach(([id, label, count]) => tabs.append(h("button", { class: "tab", role: "tab", id: "tab-" + id, "data-tab": id, "aria-selected": String(S.tab === id), "aria-controls": "panel", tabindex: S.tab === id ? 0 : -1,
     onclick: () => go(id), onkeydown: (e) => { const order = defs.map((d) => d[0]).filter((d) => d !== "statement" || !wide.matches), at = order.indexOf(id);
       if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const to = order[(at + (e.key === "ArrowRight" ? 1 : order.length - 1)) % order.length]; go(to, () => $("tab-" + to).focus()); } } },
@@ -1227,6 +1245,7 @@ function renderRefused() {
       : h("p", { class: "empty" }, "No statement is loaded.")));
 }
 function render() {
+  if (DEVICE && !DESK.bundles.length) { PORTABLE.bare(); return; }
   if (!DESK || !DESK.bundles.length) { renderRefused(); return; }
   if (S.tab === "statement" && wide.matches) S.tab = "evidence";
   const mark = focusMark(), same = shown.tab === S.tab && shown.i === S.i, sheet = $("statement"), keepSheet = $("doc") ? $("doc").scrollTop : 0;
@@ -1235,7 +1254,8 @@ function render() {
   if (S.tab === "statement") { const holder = h("div", { class: "statement" }); renderStatement(holder, false); panel.append(holder); }
   else if (S.tab === "evidence") renderEvidence(panel);
   else if (S.tab === "try") renderTry(panel);
-  else renderChanges(panel);
+  else if (S.tab === "changes") renderChanges(panel);
+  if (DEVICE) PORTABLE.sync();                                     /* the Write tab is the portable desk's own and is kept outside this panel */
   panel.scrollTop = keep; $("doc").scrollTop = shown.i === S.i ? keepSheet : 0;
   if (mark && (same || mark.id !== "panel")) refocus(mark);
   shown = { tab: S.tab, i: S.i };
@@ -1247,12 +1267,13 @@ function boot() {
   try { K.known = new Set(JSON.parse(store("zal-review-desk-learned") || "[]")); } catch (e) { K.known = new Set(); }
   K.hidden = store("zal-review-desk-key") === "hidden";
   const wanted = store("zal-review-desk-model"), at = DESK.bundles.findIndex((b) => b.file === wanted); if (at >= 0) S.i = at;
-  const hash = location.hash.replace("#", ""); if (["statement", "evidence", "try", "changes"].includes(hash)) S.tab = hash;
+  const hash = location.hash.replace("#", ""); if (TABS.includes(hash)) S.tab = hash;
   else if (!wide.matches) S.tab = "statement";
   if (DESK.bundles.length) S.sim = startInput(B());
   wide.addEventListener("change", render);
   [$("statement"), $("panel")].forEach((pane) => { pane.addEventListener("mouseover", onPoint); pane.addEventListener("focusin", onPoint); pane.addEventListener("mouseleave", () => light(null)); });
-  window.addEventListener("hashchange", () => { const t = location.hash.replace("#", ""); if (["statement", "evidence", "try", "changes"].includes(t) && t !== S.tab) { S.tab = t; render(); } });
+  window.addEventListener("hashchange", () => { const t = location.hash.replace("#", ""); if (TABS.includes(t) && t !== S.tab) { S.tab = t; render(); } });
+  if (DEVICE) PORTABLE.boot();
   render();
   if (LIVE) setInterval(async () => {                         /* notice when the file on disk moves on */
     try { const r = await fetch("/api/changed", { headers: { "X-ZAL-Review-Desk": TOKEN } }), d = await r.json();
