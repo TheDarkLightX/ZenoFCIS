@@ -7,6 +7,7 @@ on:
       - 'experiments/cranelift-tier1/idiom_divrem_28.rs'
       - 'experiments/cranelift-tier1/qualify_rust_divrem_28.py'
       - 'experiments/cranelift-tier1/recheck_rust_divrem_28.py'
+      - 'experiments/cranelift-tier1/scan_divrem_clif_28.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -29,7 +30,8 @@ jobs:
           set -euo pipefail
           rustup toolchain install 1.97.1 --profile minimal
           rustup target add wasm32-unknown-unknown --toolchain 1.97.1
-          python3 -m py_compile experiments/cranelift-tier1/{qualify_rust_divrem_28,recheck_rust_divrem_28}.py
+          python3 -m py_compile experiments/cranelift-tier1/{scan_divrem_clif_28,qualify_rust_divrem_28,recheck_rust_divrem_28}.py
+          python3 -B -c "import sys; sys.path.insert(0, 'experiments/cranelift-tier1'); from scan_divrem_clif_28 import self_test; self_test()"
           python3 -B experiments/cranelift-tier1/qualify_rust_divrem_28.py --self-test
           python3 -B experiments/cranelift-tier1/recheck_rust_divrem_28.py --self-test
           mkdir -p tier1-rust-divrem
