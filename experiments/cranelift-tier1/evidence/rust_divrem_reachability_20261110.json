@@ -1,0 +1,99 @@
+{
+  "schema": "zenofcis/tier1-rust-divrem-reachability-audit/1",
+  "date_utc": "2026-11-10",
+  "status": "successful CI artifact independently re-inspected; scanner correction committed, new CI not yet checked",
+  "experiment_head": "11df8077792b11a194b335e5863321b3a1b02802",
+  "compiler_source_pin": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "upstream_main_observed": "97e6c1ec8fc266468e0c020f6402a494ec3ac1e7",
+  "rustc": "1.97.1 (8bab26f4f 2026-07-14)",
+  "github_ci": {
+    "run_id": 42794522392,
+    "conclusion": "success",
+    "artifact_id": 13791794174,
+    "artifact_zip_sha256": "c295846ee059f57707350bf15117fd040f2c67251382bcc9dc3313c5dc8867a3",
+    "source": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42794522392/artifacts/13791794174"
+  },
+  "test_evidence": {
+    "producer_executions": 2592,
+    "producer_value": 2276,
+    "producer_trap_or_panic": 316,
+    "independent_fresh_executions": 984,
+    "formal_proof": false
+  },
+  "profiles": {
+    "debug": {
+      "wasm_sha256": "172623d731fb29601a8a2fec85ee757fad6dbe837e469624ad2d849aedea59fd",
+      "baseline": {
+        "static_divq": 9,
+        "elf_text_bytes": 32768,
+        "whole_aot_bytes": 70904
+      },
+      "patched": {
+        "static_divq": 9,
+        "elf_text_bytes": 32768,
+        "whole_aot_bytes": 70904
+      },
+      "same_block_unsigned_udiv_urem_pairs": 0,
+      "cross_block_equal_operand_unsigned_pairs": [
+        "divrem_pair",
+        "divrem_offset",
+        "divrem_reverse"
+      ],
+      "cross_block_equal_operand_signed_pair": [
+        "signed_divrem"
+      ],
+      "operand_mismatch_control": [
+        "divrem_swapped"
+      ],
+      "explanation": "Rust's unoptimized Wasm contains separate division/remainder but inserts Rust panic branches and rotates into other functions. CLIF shows split basic blocks; the narrow adjacent same-block fusion cannot match them."
+    },
+    "optimized": {
+      "wasm_sha256": "050492a09a7531e05d4aea3572589e44d381171d7ffc348f288910c683ef923d",
+      "baseline": {
+        "static_divq": 6,
+        "elf_text_bytes": 28672,
+        "whole_aot_bytes": 66264
+      },
+      "patched": {
+        "static_divq": 6,
+        "elf_text_bytes": 28672,
+        "whole_aot_bytes": 66264
+      },
+      "same_block_unsigned_udiv_urem_pairs": 0,
+      "quotient_multiply_subtract_remainder_reconstructions": [
+        "divrem_pair",
+        "divrem_offset",
+        "divrem_reverse"
+      ],
+      "signed_quotient_multiply_subtract_reconstruction": [
+        "signed_divrem"
+      ],
+      "operand_mismatch_control": [
+        "divrem_swapped"
+      ],
+      "explanation": "Optimized LLVM/Rust lowers same-operand remainder to (x - (x / y) * y); CLIF contains one division, imul and isub, with no urem to fuse. Disassembly similarly uses one divq plus imul/sub. Other swapped operand controls are ineligible."
+    }
+  },
+  "scanner_defect": {
+    "observation": "The earlier emitted-CLIF lexical scanner matched only untyped `udiv`/`urem` and silently skipped the actual `udiv.i64`/`urem.i64` syntax; its earlier zero count was not valid evidence until independently rescanned.",
+    "corrective_commit": "8dec65393d6696d69e026c5ad4c2fa9d9a7e44a8",
+    "after_fix_expected_same_block_pairs": 0,
+    "after_fix_expected_unsigned_op_lines": {
+      "debug": 9,
+      "optimized": 6
+    }
+  },
+  "costs": {
+    "interpretation": "Neither profile yielded any baseline-versus-patched emitted-byte or instruction savings. ELF .text is aligned whole-module cost, not individual function native cost.",
+    "runtime_speed": "not measured"
+  },
+  "next_target": "Separately evaluate (A) control-flow-aware same-operand div/rem fusion that preserves Rust trap order and dominance, and (B) optimized-CLIF quotient/multiply/subtract remainder reconstruction into the x86 two-result division. First test against a confirmed same-Wasm baseline and verify flags, signed overflow, divide-by-zero and liveness. Avoid broad unproved compiler changes.",
+  "limitations": [
+    "No automatic applicability to typical Rust applications established",
+    "No exhaustive finite checker or full machine-code proof of a compiler pass",
+    "The optimizer patch is unsigned i64 and adjacent same-block only",
+    "No same-Wasm savings in this Rust probe",
+    "Source pin is an older pinned upstream, not the latest upstream main",
+    "Tested a generated Rust microfixture, not population-level reachability"
+  ]
+}
