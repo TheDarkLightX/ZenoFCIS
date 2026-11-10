@@ -50,7 +50,7 @@ jobs:
           from pathlib import Path
           sys.path.insert(0,"experiments/cranelift-tier1")
           from audit_call_live_timing_28 import sha,CASE,HEAD,UP,SCRIPT_SHA
-          s=Path("tier1-live-perf/source")
+          s=Path("tier1-live-perf/source/tier1-call-live")
           r=json.loads((s/"results/qualification.json").read_text())
           assert (s/"zenofcis-head.txt").read_text().strip()==HEAD
           assert r["upstream"]==UP and r["source_script_sha256"]==SCRIPT_SHA
@@ -77,11 +77,11 @@ jobs:
           exe=experiments/cranelift-tier1/inprocess_live_pressure_28/target/release/tier1-udivrem-live-perf-28
           for spec in 'live_0 0 forward' 'live_4 4 forward' 'live_12 12 forward' 'live_20 20 forward' 'live_12_reverse 12 reverse' 'live_12_quotient_only 12 quotient'; do
             read -r name n mode <<< "$spec"
-            src=tier1-live-perf/source/results/"$name"
+            src=tier1-live-perf/source/tier1-call-live/results/"$name"
             "$exe" "$name" "$n" "$mode" "$src/baseline.cwasm" "$src/patched.cwasm" 100000 8 5623 >tier1-live-perf/results/"$name".csv
           done
           python3 -B experiments/cranelift-tier1/audit_call_live_timing_28.py \
-            --source tier1-live-perf/source --raw tier1-live-perf/results \
+            --source tier1-live-perf/source/tier1-call-live --raw tier1-live-perf/results \
             --lock tier1-live-perf/Cargo.lock --calls 100000 --blocks 8 \
             --out tier1-live-perf/qualified.json
       - name: Archive exact source, provenance and raw samples
