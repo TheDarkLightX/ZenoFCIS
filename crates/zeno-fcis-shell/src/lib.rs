@@ -9,6 +9,9 @@
 
 extern crate alloc;
 
+/// Optional, untrusted transport for independently replay-checked decisions.
+pub mod decision_evidence;
+
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
