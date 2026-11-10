@@ -16,6 +16,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from scan_divrem_clif_28 import inspect as inspect_clif
+
 HERE = Path(__file__).resolve().parent
 SOURCE = HERE / "idiom_divrem_28.rs"
 UPSTREAM = "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49"
@@ -168,7 +170,14 @@ def qualify(archive: Path, out: Path) -> dict:
             for fn in EXPORTS:
                 for x, y in vectors():
                     finite[execute(compiler,aot,fn,x,y)] += 1
+            lexical = [(p.relative_to(clif).as_posix(), inspect_clif(p.read_text()))
+                       for p in files]
             record["results"][name] = {
+                "clif_lexical_candidate_pairs": sum(z["candidate_pair_count"] for _,z in lexical),
+                "clif_lexical_sample": [
+                    {"file":filename, "pairs":z["candidate_pairs"][:5]}
+                    for filename,z in lexical if z["candidate_pair_count"]
+                ][:8],
                 "compiler_sha256":sha(compiler),
                 "aot_sha256":sha(aot), "whole_aot_bytes":aot.stat().st_size,
                 "elf_text_bytes":text_size(aot),
