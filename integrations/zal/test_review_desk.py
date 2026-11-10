@@ -334,6 +334,7 @@ class ZalResults(unittest.TestCase):
         self.assertEqual(bundle["decisions"]["status"], "not-precomputed")
         self.assertIn("32 input tuples", bundle["decisions"]["reason"])
         self.assertIsNone(bundle["reachable"])
+        self.assertIsNone(bundle["cross_checks"]["tuples"])            # no table, so no claim that a table was compared
         self.assertEqual((bundle["edits"]["breakdown"], bundle["edits"]["columns"][0]["id"]), (False, "allowed_goes_through"))
         self.assertIn("stops at 10", bundle["edits"]["breakdown_note"])
         self.assertTrue(all(row["noticed_by"] == [] for row in bundle["edits"]["rows"]))

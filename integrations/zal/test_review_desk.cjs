@@ -396,6 +396,10 @@ const NOISE = /undefined|NaN|\[object Object\]|\bnull\b/;
   check('a step in a live page asks ZAL about the next input', pending.length === 3 && pending[2].call.body.input.variables.used === 1);
   pending[2].resolve({ status: 400, body: { error: 'This page shows an older revision; reload' } }); await settle();
   check('a refusal from the server is shown as ZAL not answering', asking.text('panel').includes('ZAL did not answer for this input: This page shows an older revision; reload'));
+  await press(asking.get('tab-evidence'));
+  check('a page that holds no table does not say a table was compared', asking.text('panel').includes('Where this came from') && !asking.text('panel').includes('The decision table'));
+  check("a table that disagrees with ZAL's count is said to disagree", (() => { const odd = load(fixture.snapshot, { hash: '#evidence' }), agreed = odd.text('panel').includes('The decision table has exactly the number of input tuples ZAL reports.');
+    odd.run('DESK.bundles[S.i].cross_checks.tuples = false; render()'); return agreed && odd.text('panel').includes("The decision table does not have the number of input tuples ZAL reports; trust ZAL's count."); })());
 
   // ---- live, a file ZAL refuses or that raises an error
   let moved = false;

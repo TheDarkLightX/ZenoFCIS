@@ -61,6 +61,10 @@ DEFECTS = [
      'syntax = "english" if first.startswith("ZAL ") and first.endswith(".") else "symbolic"',
      'syntax = "symbolic"',
      'ZalResults.test_surface_and_profile_are_selected_as_run_py_selects_them'),
+    ('table-comparison-claimed-without-a-table', 'review_desk.py',
+     '"tuples": None if tabled is None else tabled == count,',
+     '"tuples": tabled in (None, count),',
+     'ZalResults.test_large_domains_leave_out_the_table_and_the_breakdown_and_say_why'),
     ('table-built-past-its-bound', 'review_desk.py',
      '    if count > MAX_TABLE_TUPLES:',
      '    if False:',
@@ -300,6 +304,14 @@ DEFECTS = [
 ]
 # (label, original text, defect text, named check of test_review_desk.cjs)
 PAGE_DEFECTS = [
+    ('table-comparison-claimed-whatever-was-compared',
+     'h("dd", {}, sc.tuples === true ? "The decision table has exactly',
+     'h("dd", {}, sc.tuples !== undefined ? "The decision table has exactly',
+     'a page that holds no table does not say a table was compared'),
+    ('table-disagreement-kept-quiet',
+     ': sc.tuples === false ? "The decision table does not have',
+     ': sc.tuples === 0 ? "The decision table does not have',
+     "a table that disagrees with ZAL's count is said to disagree"),
     ('input-key-in-another-order',
      'return [given.state, ...a.variables.map((v) => given.variables[v.name]), given.event,',
      'return [given.event, given.state, ...a.variables.map((v) => given.variables[v.name]),',

@@ -845,7 +845,8 @@ def statement_bundle(text, name, with_edits=True):
     walked = reachable_configurations(model, profile, axes) if passing and count <= MAX_TABLE_TUPLES else None
     expected = report.get("reachable_configurations", len(report["reachable_states"]) if "reachable_states" in report else None)
     bundle["reachable"] = walked
-    bundle["cross_checks"] = {"tuples": bundle["decisions"].get("count") in (None, count), "sentences_compared": compared,
+    tabled = bundle["decisions"].get("count")                          # None when the page holds no table: nothing to compare
+    bundle["cross_checks"] = {"tuples": None if tabled is None else tabled == count, "sentences_compared": compared,
                               "reachable": None if walked is None or expected is None else len(walked) == expected,
                               "formal": formal}
     bundle["edits"] = planted_edits(model, profile, count, checker) if with_edits and passing else None
