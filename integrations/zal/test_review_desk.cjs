@@ -1,0 +1,319 @@
+'use strict';
+// Runs the actual review desk page script against a small DOM double, with fixtures made by the Python domain.
+// No browser, Playwright, network or provider. It does not test native rendering, layout or real focus behavior.
+const vm = require('node:vm');
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+
+const fixture = JSON.parse(process.env.ZAL_REVIEW_DESK_FIXTURES ? fs.readFileSync(process.env.ZAL_REVIEW_DESK_FIXTURES, 'utf8') : execFileSync('python3', ['-c', `
+import json
+from pathlib import Path
+from unittest import mock
+import diagnostics
+import review_desk as desk
+from behavior import Refusal
+from test_review_desk import LIMIT, OVERFLOWS, REFUND, STARVED, LEDGER, UNRESOLVED
+from workflow import checker_identity
+example = lambda name: (Path('examples') / name).read_text()
+sources = [('limit.zal', LIMIT), ('order.zal', example('order.zal')), ('refund.zal', REFUND), ('starved.zal', STARVED),
+           ('ledger.zal', LEDGER), ('unresolved.zal', UNRESOLVED), ('overflows.zal', OVERFLOWS),
+           ('keeper2.zal', example('keeper2.zal')), ('ladder_symmetry2.zal', example('ladder_symmetry2.zal'))]
+bundles = [desk.statement_bundle(text, name)[0] for name, text in sources]
+# A live page whose statement has no table in the page, so every decision is asked of ZAL.
+with mock.patch.object(desk, 'MAX_TABLE_TUPLES', 0):
+    asked = desk.statement_bundle(LIMIT, 'limit.zal')[0]
+model, profile = desk.read_statement(LIMIT)
+checker = checker_identity()
+answers = {}
+for given in desk.input_tuples(model, profile):
+    told = desk.explain_input(model, profile, given, checker)
+    told['sentence'] = desk.decision_sentence(model, profile, given)
+    told['nearest'] = desk.nearest_opposite(model, profile, given, told['outcome'], checker)
+    answers[desk.input_key(asked['axes'], given)] = told
+broken = LIMIT.replace('rule take:', 'rule take now:')
+candidates = {'same': desk.compare_candidate(model, profile, asked['symbolic'], checker)[0],
+              'overflows': desk.compare_candidate(model, profile, asked['symbolic'].replace('[used < 3]', '[true]'), checker)[0],
+              'freer': desk.compare_candidate(model, profile, asked['symbolic'].replace('rule lock_it: unlocked + lock [true] -> accept locked;\\n', ''), checker)[0],
+              'refused': desk.compare_candidate(model, profile, asked['symbolic'].replace('rule take:', 'rule take now:'), checker)[0]}
+try:
+    desk.read_statement(broken)
+except Refusal as error:
+    located = diagnostics.describe(error, broken, Path('limit.zal'))
+page = lambda payload, token='': desk.page(payload, token)
+print(json.dumps({
+    'bundles': bundles, 'asked': asked, 'answers': answers, 'candidates': candidates, 'located': located,
+    'structural': sorted(desk.STRUCTURAL_CHECKS),
+    'snapshot': page({'mode': 'snapshot', 'bundles': bundles}),
+    'live': page({'mode': 'live', 'file': 'limit.zal', 'bundles': [bundles[0]]}, 'page-token'),
+    'live_asked': page({'mode': 'live', 'file': 'limit.zal', 'bundles': [asked]}, 'page-token'),
+    'live_refused': page({'mode': 'live', 'file': 'limit.zal', 'bundles': [], 'error': located}, 'page-token'),
+    'live_error': page({'mode': 'live', 'file': 'limit.zal', 'bundles': [], 'error': {'reason': 'TypeError: planted', 'unexpected': True}}, 'page-token'),
+}))
+`], { cwd: __dirname, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' } }));
+
+// ---- a DOM double: a real tree with text, attributes and listeners; no layout, styles or browser defaults
+class Text { constructor(text) { this.nodeType = 3; this.textContent = String(text); this.parentNode = null; } }
+class Element {
+  constructor(tag, owner) { this.nodeType = 1; this.tagName = tag.toUpperCase(); this.ownerDocument = owner; this.childNodes = []; this.attributes = {}; this.listeners = {}; this.parentNode = null; this.scrollTop = 0; this.clientWidth = 700; this.value = ''; }
+  get children() { return this.childNodes.filter((node) => node.nodeType === 1); }
+  get id() { return this.attributes.id || ''; }
+  get textContent() { return this.childNodes.map((node) => node.textContent).join(''); }
+  set textContent(text) { this.replaceChildren(new Text(text)); }
+  append(...nodes) { for (const node of nodes) { if (node.parentNode) node.parentNode.childNodes = node.parentNode.childNodes.filter((other) => other !== node); node.parentNode = this; this.childNodes.push(node); } }
+  replaceChildren(...nodes) { for (const node of this.childNodes) node.parentNode = null; this.childNodes = []; this.append(...nodes); }
+  setAttribute(name, value) { this.attributes[name] = String(value); if (name === 'value') this.value = String(value); }
+  getAttribute(name) { return name in this.attributes ? this.attributes[name] : null; }
+  addEventListener(type, listener) { (this.listeners[type] = this.listeners[type] || []).push(listener); }
+  contains(node) { for (; node; node = node.parentNode) if (node === this) return true; return false; }
+  focus() { if (this.ownerDocument.body.contains(this)) this.ownerDocument.activeElement = this; }
+  scrollIntoView() { this.ownerDocument.scrolledTo = this.id; }
+}
+const all = (root, test) => { const found = []; (function walk(node) { if (node.nodeType !== 1) return; if (test(node)) found.push(node); node.childNodes.forEach(walk); })(root); return found; };
+const withClass = (root, name) => all(root, (node) => (node.attributes.class || '').split(' ').includes(name));
+const tagged = (root, tag) => all(root, (node) => node.tagName === tag.toUpperCase());
+const fire = (node, type, event = {}) => { assert(node, 'no element to ' + type); const sent = { target: node, preventDefault() {}, stopPropagation() {}, ...event }; return Promise.all((node.listeners[type] || []).map((listener) => listener(sent))); };
+const press = (node) => fire(node, 'click');
+const button = (root, label) => all(root, (node) => node.tagName === 'BUTTON' && node.textContent === label)[0];
+const textOf = (node) => (node ? node.textContent : '');
+const said = (page) => textOf(withClass(page.get('panel'), 'say')[0]);   // the result sentence, or '' while none is shown
+const settle = async () => { for (let turn = 0; turn < 6; turn += 1) await new Promise((resolve) => setImmediate(resolve)); };
+
+function load(html, { wide = true, hash = '', storage = 'works', answer = null } = {}) {
+  const document = { activeElement: null, scrolledTo: null };
+  document.createElement = (tag) => new Element(tag, document);
+  document.createElementNS = (_, tag) => new Element(tag, document);
+  document.createTextNode = (text) => new Text(text);
+  document.documentElement = new Element('html', document);
+  document.body = new Element('body', document);
+  document.documentElement.append(document.body);
+  document.getElementById = (id) => all(document.body, (node) => node.id === id)[0] || null;
+  // The page's own static markup, read from the file between <body> and <script>.
+  const markup = html.slice(html.indexOf('<body>') + 6, html.indexOf('<script>'));
+  const open = [document.body];
+  for (const [, closing, tag, rest] of markup.matchAll(/<(\/?)([a-z]+)([^>]*)>/g)) {
+    if (closing) { open.pop(); continue; }
+    const node = new Element(tag, document);
+    for (const [, name, value] of rest.matchAll(/([a-z-]+)="([^"]*)"/g)) node.setAttribute(name, value);
+    open[open.length - 1].append(node); open.push(node);
+  }
+  assert.equal(open.length, 1, 'page markup is balanced');
+  const kept = {}, calls = [], timers = [], windowEvents = {}, location = { hash, reloads: 0, reload() { this.reloads += 1; } };
+  const localStorage = { getItem(key) { if (storage === 'throws') throw Error('storage is blocked'); return key in kept ? kept[key] : null; }, setItem(key, value) { if (storage === 'throws') throw Error('storage is blocked'); kept[key] = String(value); } };
+  const fetch = (url, options = {}) => { const call = { url, method: options.method || 'GET', headers: options.headers || {}, body: options.body ? JSON.parse(options.body) : null }; calls.push(call);
+    return Promise.resolve(answer ? answer(call) : { status: 500, body: { error: 'No network in this deterministic test' } }).then(({ status = 200, body }) => ({ ok: status === 200, status, json: async () => body })); };
+  const matchMedia = (query) => ({ matches: query.includes('min-width') ? wide : false, addEventListener() {} });
+  const window = { matchMedia, addEventListener(type, listener) { windowEvents[type] = listener; } };
+  const context = vm.createContext({ document, window, localStorage, location, fetch, console, history: { replaceState(_, __, to) { location.hash = to; } }, setInterval(tick) { timers.push(tick); return timers.length; } });
+  const script = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
+  vm.runInContext(script, context, { filename: 'review_desk.html' });
+  const get = (id) => document.getElementById(id);
+  return { context, document, get, calls, timers, kept, location, windowEvents, run: (code) => vm.runInContext(code, context), text: (id) => get(id).textContent };
+}
+
+const checks = [];
+const check = (name, condition) => { assert(condition, name); checks.push(name); };
+const count = (bundle, kind) => bundle.edits.rows.filter((row) => row.class === kind).length;
+const named = (name) => fixture.bundles.findIndex((bundle) => bundle.file === name);
+const NOISE = /undefined|NaN|\[object Object\]|\bnull\b/;
+
+(async () => {
+  // ---- a snapshot, wide layout: the statement beside the instruments
+  const page = load(fixture.snapshot);
+  const pick = (name) => fire(page.get('model'), 'change', { target: { value: String(named(name)) } });
+  const tab = (id) => press(page.get('tab-' + id));
+  check('page and Python agree on which checks are structural', JSON.stringify(Object.keys(page.run('CHECKS')).filter((key) => page.run('CHECKS')[key][1] === 's').sort()) === JSON.stringify(fixture.structural));
+  check('snapshot asks the server nothing and starts no poll', page.calls.length === 0 && page.timers.length === 0);
+  check('page and Python name every input the same way', fixture.bundles.every((bundle, index) => bundle.decisions.status !== 'complete' ||
+    Object.keys(bundle.decisions.index).every((key) => page.run(`keyOf(DESK.bundles[${index}], parseKey(DESK.bundles[${index}], ${JSON.stringify(key)}))`) === key)));
+
+  for (const [index, bundle] of fixture.bundles.entries()) {
+    await fire(page.get('model'), 'change', { target: { value: String(index) } });
+    const verdict = page.text('verdict'), statement = page.text('statement');
+    check(`${bundle.file}: the verdict leads with the machine's name and ZAL's exact status`, verdict.startsWith(bundle.name) && withClass(page.get('verdict'), 'status')[0].textContent === bundle.check.status);
+    check(`${bundle.file}: every declaration is shown in ZAL's English and in its symbols`, bundle.declared.filter((entry) => !['header', 'name'].includes(entry.concept))
+      .every((entry) => statement.includes(entry.symbolic) && (entry.id ? statement.includes(entry.english.slice(entry.english.indexOf(': ') + 2)) : statement.includes(entry.english))));
+    check(`${bundle.file}: footer keeps authority none, no agreement, revision and checker`, ['authority: none', 'This page records no agreement.', bundle.revision.slice(0, 12), bundle.checker.slice(0, 12)].every((text) => page.text('foot').includes(text)));
+    for (const id of ['evidence', 'try', 'changes']) {
+      await tab(id);
+      check(`${bundle.file}: ${id} renders without leaked placeholders`, page.text('panel').length > 40 && !NOISE.test(page.text('panel')) && !NOISE.test(verdict));
+    }
+    if (bundle.edits) {
+      await tab('evidence');
+      const rows = withClass(page.get('panel'), 'row'), summary = withClass(page.get('verdict'), 'alert').map((node) => node.textContent).join(' | ');
+      check(`${bundle.file}: one matrix row for every planted edit`, rows.length === bundle.edits.rows.length);
+      check(`${bundle.file}: the summary counts are the planted edits' classes`, bundle.edits.rows.length === 0 ||
+        summary.includes(`${bundle.edits.rows.length} planted defect${bundle.edits.rows.length === 1 ? '' : 's'}: ${count(bundle, 'claim')} noticed by a claim, ${count(bundle, 'structure')} by structure only, ${count(bundle, 'unnoticed')} unnoticed`));
+      const dots = withClass(page.get('panel'), 'dot').filter((node) => node.parentNode.tagName === 'TD').length;
+      check(`${bundle.file}: one mark for every claim ZAL names on an edit`, dots === (bundle.edits.breakdown ? bundle.edits.rows.reduce((sum, row) => sum + row.noticed_by.length, 0) : 0));
+    }
+    if (bundle.decisions.status === 'complete') {
+      await tab('try');
+      const shown = () => said(page), current = () => page.run('keyOf(B(), { state: S.sim.state, variables: S.sim.variables, event: S.sim.event, context: S.sim.context })');
+      const sentence = (key) => bundle.decisions.kept.sentence[bundle.decisions.rows[bundle.decisions.index[key]][5]];
+      let agreed = shown() === sentence(current()), pressed = 0;
+      for (let at = 0; at < withClass(page.get('panel'), 'opt').length; at += 1) {
+        await press(withClass(page.get('panel'), 'opt')[at]); pressed += 1;
+        agreed = agreed && shown() === sentence(current());
+      }
+      check(`${bundle.file}: every option pressed shows ZAL's sentence for exactly that input (${pressed} pressed)`, agreed && pressed >= 3);
+    }
+  }
+
+  // ---- what a pass covers, said first
+  await pick('order.zal');
+  check('a pass without claims says so in the first line', page.text('verdict').includes('No claim about the application is stated, so nothing about it was checked.'));
+  check('ZAL advisory is raised to the verdict by its own kind', withClass(page.get('verdict'), 'alert').some((node) => node.textContent === 'Advisory: no-application-invariants'));
+  check('a statement without claims is shown as making none', page.text('statement').includes('Claims (0)') && page.text('statement').includes('This statement makes no claim.'));
+  check('verdict tone warns when a pass says little', page.get('verdict').attributes['data-s'] === 'warn');
+  await pick('limit.zal');
+  check('a pass with claims uses ZAL status and the plain gloss', page.text('verdict').includes("Every stated claim passed ZAL's finite check.") && page.get('verdict').attributes['data-s'] === 'pass');
+  await pick('starved.zal');
+  check('an assumption the claimant can starve is raised to the verdict', withClass(page.get('verdict'), 'alert').some((node) => node.textContent === 'customer can win by starving the assumption merchant_returns'));
+  await pick('refund.zal'); await tab('evidence');
+  check('a pass that lost its assumption is named as passing for the wrong reason', page.text('verdict').includes('1 passing for the wrong reason') && withClass(page.get('panel'), 'row').some((row) => row.textContent.includes('Delete the rule') && row.textContent.includes('passes for the wrong reason')));
+  await pick('unresolved.zal');
+  check('unsupported keeps ZAL status and names what is not checked', page.text('verdict').includes('1 obligation is stated but not checked.') && page.text('statement').includes('send a confirmation email when the order is confirmed'));
+
+  // ---- a failing statement: ZAL's own story, no planted edits
+  await pick('overflows.zal'); await tab('evidence');
+  const failing = fixture.bundles[named('overflows.zal')];
+  check('counterexample leads with what failed', page.text('verdict').includes('A check failed: range.') && page.get('verdict').attributes['data-s'] === 'fail');
+  check("counterexample is told in ZAL's sentences, in order", JSON.stringify(tagged(withClass(page.get('panel'), 'story')[0], 'li').map((node) => node.textContent)) === JSON.stringify(failing.story.english));
+  check('no defect is planted in a statement that does not pass', page.text('panel').includes('No defects were planted, because the statement itself does not pass.'));
+
+  // ---- the statement as a document
+  await pick('limit.zal');
+  const clause = (text) => all(page.get('statement'), (node) => node.tagName === 'BUTTON' && (node.attributes.class || '').includes('clause') && node.textContent.includes(text))[0];
+  check('a rule no claim holds is marked free, a held rule is marked held', clause('lock_it').attributes['data-cov'] === 'free' && clause('new_day_open').attributes['data-cov'] === 'free' && clause('rule take:').attributes['data-cov'] === 'held');
+  check('a claim shows how many planted defects it notices', clause('counts_each_one').textContent.includes('notices 1 of 8') && clause('counts_each_one').attributes['data-cov'] === 'teeth');
+  await press(clause('lock_it'));
+  check('an opened rule says what no claim would notice', clause('lock_it').textContent.includes('No claim notices if this rule is deleted.') && clause('lock_it').attributes['aria-pressed'] === 'true');
+  await press(button(clause('lock_it'), 'Show a step where it fires'));
+  check('a rule can be opened on a step where it fires', page.run('S.tab') === 'try' && said(page).includes('rule lock_it accepts and moves to locked'));
+  const views = all(page.get('statement'), (node) => node.tagName === 'BUTTON' && ['English', 'Both', 'Symbols'].includes(node.textContent));
+  await press(views[0]);
+  check('English view leaves out the symbols', !page.text('statement').includes('rule take: unlocked + withdraw [used < 3]') && page.text('statement').includes('when the state is unlocked and the event is withdraw'));
+  await press(button(page.get('statement'), 'Symbols'));
+  check('Symbols view leaves out the English', page.text('statement').includes('rule take: unlocked + withdraw [used < 3]') && !page.text('statement').includes('when the state is unlocked and the event is withdraw') && page.kept['zal-review-desk-view'] === 'symbols');
+  await press(button(page.get('statement'), 'Both'));
+
+  // ---- evidence: which claim ZAL names, and what it was not asked
+  await pick('ledger.zal'); await tab('evidence');
+  const ledgerRow = (group, label) => { const rows = tagged(withClass(page.get('panel'), 'matrix')[0], 'tr'); const start = rows.findIndex((row) => row.textContent === 'rule ' + group); return rows.slice(start + 1).find((row) => row.children[0].textContent === label); };
+  const invariantEdit = ledgerRow('close_ledger', 'Remove its updates'), requirementEdit = ledgerRow('post_entry', 'Remove its updates');
+  check('an edit that breaks an invariant marks the invariants and shows the other claim as not asked', withClass(invariantEdit.children[2], 'dot').length === 1 && invariantEdit.children[3].textContent === '–' && page.text('panel').includes('not asked: an invariant fails first'));
+  check('an edit that breaks a requirement marks that requirement only', withClass(requirementEdit.children[2], 'dot').length === 0 && withClass(requirementEdit.children[3], 'dot').length === 1);
+  check('a claim is not counted against edits it was never asked about', all(page.get('statement'), (node) => (node.attributes.class || '').includes('clause') && node.textContent.includes('posting_counts'))[0].textContent.includes('notices 1 of 3'));
+  await press(invariantEdit);
+  check('a matrix row opens the edit under Review a change', page.run('S.tab') === 'changes' && page.text('panel').includes('Remove the updates of rule close_ledger') && page.text('panel').includes('The invariants fail. ZAL stops there, so no other claim is asked about this edit.'));
+  check('the failed claim is quoted in ZAL English', withClass(page.get('panel'), 'quote').some((node) => node.textContent === fixture.bundles[named('ledger.zal')].declared.find((entry) => entry.id === 'closed_has_nothing_pending').english.split(': ').slice(1).join(': ')));
+
+  // ---- review a change: ZAL's before and after sentences
+  await pick('limit.zal'); await tab('changes');
+  const limit = fixture.bundles[named('limit.zal')], unnoticed = limit.edits.rows.find((row) => row.label === 'Delete rule lock_it');
+  await press(withClass(page.get('panel'), 'chg').find((node) => node.textContent.includes('Delete rule lock_it')));
+  const cards = withClass(page.get('panel'), 'wit');
+  check('a planted edit shows the removed line and ZAL status', withClass(page.get('panel'), 'del')[0].textContent === unnoticed.before && page.text('panel').includes('Every check still passes. No claim notices this edit.'));
+  check('each distinguishing input carries ZAL sentence before and after', cards.length === unnoticed.diff.witnesses.length && unnoticed.diff.witnesses.every((witness, at) => cards[at].textContent.includes(witness.sentences.before) && cards[at].textContent.includes(witness.sentences.after)));
+  check('the number of inputs decided differently is ZAL count', page.text('panel').includes(`${unnoticed.diff.witness_count} inputs of 32 are decided differently.`));
+  await press(button(cards[0], 'Open this input in the unedited machine'));
+  check('a distinguishing input opens in the unedited machine', page.run('S.tab') === 'try' && said(page) === unnoticed.diff.witnesses[0].sentences.before);
+  check('a snapshot offers no candidate box', tagged(page.get('panel'), 'textarea').length === 0);
+
+  // ---- try an input: steps, nearest opposite decision, focus
+  await press(button(page.get('panel'), 'Back to the start') || withClass(page.get('panel'), 'opt')[0]);
+  page.run('S.sim = startInput(B()); render()');
+  const option = (text) => withClass(page.get('panel'), 'opt').find((node) => node.textContent === text);
+  await press(option('withdraw'));
+  for (let step = 1; step <= 3; step += 1) await press(button(page.get('panel'), 'Take this step'));
+  check('taking steps follows ZAL outcomes and keeps the run so far', page.run('S.sim.variables.used') === 3 && tagged(withClass(page.get('panel'), 'trace')[0], 'li').length === 3 && said(page).includes('no rule is enabled, so the default rejects'));
+  check('a rejected input offers no step', all(page.get('panel'), (node) => node.textContent === 'Take this step').length === 0);
+  const nearest = limit.decisions.kept.nearest[limit.decisions.rows[limit.decisions.index['unlocked|3|withdraw']][6]];
+  check("the nearest opposite decision is ZAL's why-not answer", page.text('panel').includes('What would it take to be accepted?') && page.text('panel').includes(`needs ${nearest.distance} change`) && page.text('panel').includes(`${nearest.count} inputs are that near`));
+  await press(button(page.get('panel'), 'Go there'));
+  check('Go there moves to the input ZAL named', page.run('JSON.stringify([S.sim.state, S.sim.variables, S.sim.event])') === JSON.stringify([nearest.first.input.state, nearest.first.input.variables, nearest.first.input.event]));
+  await press(option('locked'));
+  check('an unreached configuration is said to be unreachable but still covered', page.text('panel').includes('This configuration is not reachable from the start.') === !limit.reachable.includes(page.run('configKey(B(), S.sim.state, S.sim.variables)')));
+  const focused = option('reset'); focused.focus(); await press(focused);
+  check('the pressed option keeps the keyboard after the redraw', page.document.activeElement !== focused && page.document.activeElement.textContent === 'reset' && page.document.activeElement.attributes['aria-pressed'] === 'true');
+  await pick('ledger.zal'); await tab('try'); page.run('S.sim.state = "closed"; S.sim.variables.pending = 2; render()');
+  check('a configuration that breaks an invariant is said not to have its requirements checked', page.text('panel').includes('This configuration breaks an invariant, so the requirements are not checked from it.'));
+  check('each invariant is shown as ZAL evaluates it on the step', withClass(page.get('panel'), 'req').some((row) => row.textContent.startsWith('broken here') && row.textContent.includes('closed_has_nothing_pending')));
+  page.run('S.sim.state = "open"; S.sim.variables.pending = 1; S.sim.event = "close"; render()');
+  check('an invariant that holds before and after the step is shown as holding', withClass(page.get('panel'), 'req').some((row) => row.textContent.startsWith('holds') && row.textContent.includes('closed_has_nothing_pending')));
+  await pick('overflows.zal'); await tab('try'); page.run('S.sim.state = "unlocked"; S.sim.variables.used = 3; S.sim.event = "withdraw"; render()');
+  check('an update that leaves its range is shown as the trap ZAL reports, with no step to take', withClass(page.get('panel'), 'oc')[0].textContent === 'Trap' && said(page).includes('would set used to 4, outside 0..=3, so the step is refused') && !button(page.get('panel'), 'Take this step'));
+  check('a long integer range is a bounded number field', (() => { page.run('globalThis.picked = null; globalThis.field = integer("n", 0, 20, 5, (value) => { picked = value; })'); const box = tagged(page.run('field'), 'input')[0]; box.listeners.change[0]({ target: { value: '33' } }); const high = page.run('picked'); box.listeners.change[0]({ target: { value: 'x' } }); return high === 20 && page.run('picked') === 5 && box.attributes.max === '20'; })());
+
+  // ---- narrow layout, blocked storage, deep link
+  let narrow = null;
+  try { narrow = load(fixture.snapshot, { wide: false, storage: 'throws', hash: '#statement' }); } catch (error) { narrow = null; }
+  check('the page starts when the browser blocks storage', narrow !== null);
+  check('narrow layout puts the statement in its own tab', narrow.run('S.tab') === 'statement' && narrow.text('panel').includes('The statement') && narrow.text('panel').includes('rule take: unlocked + withdraw [used < 3]'));
+  await press(narrow.get('tab-evidence'));
+  check('a tab press is kept in the address', narrow.location.hash === '#evidence' && narrow.text('panel').includes('Could it have failed?'));
+  check('a link to a tab opens that tab', load(fixture.snapshot, { hash: '#try' }).run('S.tab') === 'try');
+  const remembered = load(fixture.snapshot); await fire(remembered.get('model'), 'change', { target: { value: String(named('ledger.zal')) } });
+  check('the chosen statement is remembered by its file name only', remembered.kept['zal-review-desk-model'] === 'ledger.zal' && Object.keys(remembered.kept).every((key) => key.startsWith('zal-review-desk-')));
+  await press(remembered.get('theme'));
+  check('the theme choice is the reader own and is kept', remembered.document.documentElement.attributes['data-theme'] === 'dark' && remembered.kept['zal-review-desk-theme'] === 'dark');
+
+  // ---- live, table in the page: candidates go to ZAL through the page's own token
+  const candidateOf = (source) => source.includes('take now') ? fixture.candidates.refused : source.includes('[true] -> accept unlocked, used += 1') ? fixture.candidates.overflows : source.includes('rule lock_it') ? fixture.candidates.same : fixture.candidates.freer;
+  let changed = false;
+  const live = load(fixture.live, { answer: (call) => call.url === '/api/changed' ? { body: { changed } } : call.url === '/api/candidate' ? { body: candidateOf(call.body.source) } : { status: 400, body: { error: 'Unknown review desk action' } } });
+  check('live page says which file it reads and starts one poll', live.text('top').includes('Live on this machine, reading limit.zal') && live.timers.length === 1 && live.text('foot').includes('live on 127.0.0.1'));
+  await press(live.get('tab-changes'));
+  const area = () => tagged(live.get('panel'), 'textarea')[0], send = async (edit) => { const box = area(); box.value = edit(box.value); await fire(box, 'input'); await press(button(live.get('panel'), 'Check this candidate')); await settle(); };
+  check('candidate box starts from the current statement', area().value === limit.symbolic);
+  await send((text) => text);
+  const sent = live.calls[live.calls.length - 1];
+  check('a candidate is sent with the page token, the shown revision and nothing else', sent.url === '/api/candidate' && sent.method === 'POST' && sent.headers['X-ZAL-Review-Desk'] === 'page-token' && JSON.stringify(Object.keys(sent.body).sort()) === '["revision","source"]' && sent.body.revision === limit.revision);
+  check('an unchanged candidate is said to decide every input as before', live.text('panel').includes('Every check passes on your candidate, and it decides every declared input as before.'));
+  await send((text) => text.replace('[used < 3]', '[true]'));
+  check('a candidate that breaks the structure names ZAL check and tells its story', live.text('panel').includes("Your candidate breaks the machine's structure (update_ranges) before any claim is consulted.") && fixture.candidates.overflows.story.english.every((line) => live.text('panel').includes(line)));
+  check('the draft is kept across the redraw', area().value.includes('[true] -> accept unlocked, used += 1'));
+  await send((text) => text.replace('rule take:', 'rule take now:'));
+  check('a refused candidate shows ZAL located diagnostic and suggestion', live.text('panel').includes('ZAL does not accept your candidate.') && live.text('panel').includes(`line ${fixture.candidates.refused.source_diagnostic.location.line}`) && live.text('panel').includes(fixture.candidates.refused.source_diagnostic.reason) && live.text('panel').includes('ZAL suggests: ' + fixture.candidates.refused.source_diagnostic.suggested_fix));
+  await press(button(live.get('panel'), 'Reset to the current statement'));
+  await send((text) => text.replace('rule lock_it: unlocked + lock [true] -> accept locked;\n', ''));
+  check('a passing candidate is judged by the inputs it decides differently', live.text('panel').includes('Every check passes on your candidate.') && live.text('panel').includes('4 inputs of 32 are decided differently.') && live.text('panel').includes('Open this input in the current machine'));
+  check('a live page offers no way to accept, agree or export', tagged(live.document.body, 'button').filter((node) => /\b(btn|link)\b/.test(node.attributes.class || '')).every((node) => !/accept|agree|export|approve/i.test(node.textContent)) && live.text('panel').includes('Nothing is saved and nothing is agreed.') && live.text('panel').includes('This page shows consequences and records no agreement.'));
+  await live.timers[0](); await settle();
+  check('an unchanged file raises nothing', withClass(live.get('verdict'), 'banner').length === 0 && live.calls[live.calls.length - 1].headers['X-ZAL-Review-Desk'] === 'page-token');
+  changed = true; await live.timers[0](); await settle();
+  check('a changed file is announced and the old revision is named as old', textOf(withClass(live.get('verdict'), 'banner')[0]).startsWith('The file changed on disk. This page still shows the earlier revision.') && live.location.reloads === 0);
+  await press(tagged(live.get('verdict'), 'button').find((node) => node.textContent === 'Reload'));
+  check('Reload asks the browser for the page again', live.location.reloads === 1);
+
+  // ---- live, no table in the page: every decision is asked of ZAL
+  const pending = [];
+  const asking = load(fixture.live_asked, { hash: '#try', answer: (call) => call.url === '/api/changed' ? { body: { changed: false } } : new Promise((resolve) => pending.push({ call, resolve })) });
+  const answerFor = (call) => fixture.answers[asking.run(`keyOf(B(), ${JSON.stringify(call.body.input)})`)];
+  check('a statement without a table asks ZAL for the first input and says it is asking', pending.length === 1 && pending[0].call.url === '/api/explain' && pending[0].call.body.revision === fixture.asked.revision && asking.text('panel').includes('Asking ZAL'));
+  await press(withClass(asking.get('panel'), 'opt').find((node) => node.textContent === 'withdraw'));
+  check('a second input is asked while the first is still out', pending.length === 2 && pending[1].call.body.input.event === 'withdraw');
+  pending[1].resolve({ body: answerFor(pending[1].call) }); await settle();
+  const second = answerFor(pending[1].call);
+  check("ZAL's answer for the current input is shown with its sentence and nearest opposite decision", said(asking) === second.sentence && asking.text('panel').includes('What would make it rejected?'));
+  pending[0].resolve({ body: answerFor(pending[0].call) }); await settle();
+  check('a late answer for an earlier input does not replace the current one', said(asking) === second.sentence);
+  await press(button(asking.get('panel'), 'Take this step'));
+  check('a step in a live page asks ZAL about the next input', pending.length === 3 && pending[2].call.body.input.variables.used === 1);
+  pending[2].resolve({ status: 400, body: { error: 'This page shows an older revision; reload' } }); await settle();
+  check('a refusal from the server is shown as ZAL not answering', asking.text('panel').includes('ZAL did not answer for this input: This page shows an older revision; reload'));
+
+  // ---- live, a file ZAL refuses or that raises an error
+  let moved = false;
+  const refused = load(fixture.live_refused, { answer: () => ({ body: { changed: moved } }) });
+  check('a refused file shows ZAL located diagnostic and suggestion, not a dead page', ['ZAL does not accept limit.zal.', `line ${fixture.located.location.line}`, fixture.located.source_line, fixture.located.reason, 'ZAL suggests: ' + fixture.located.suggested_fix, 'This page reloads by itself.'].every((text) => refused.document.body.textContent.includes(text)));
+  await refused.timers[0](); await settle();
+  check('a refused file is not reloaded until it changes', refused.location.reloads === 0);
+  moved = true; await refused.timers[0](); await settle();
+  check('a corrected file reloads the page by itself', refused.location.reloads === 1);
+  check('an error is not presented as a refusal by ZAL', (() => { const failed = load(fixture.live_error).document.body.textContent; return failed.includes('raised an error. This is not a refusal by ZAL, and the source may be fine.') && failed.includes('TypeError: planted') && !failed.includes('ZAL does not accept'); })());
+
+  console.log(`${checks.length} review desk checks passed (DOM double; no browser, network or provider)`);
+})().catch((error) => { console.error(error); process.exit(1); });
