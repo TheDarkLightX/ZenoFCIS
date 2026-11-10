@@ -468,6 +468,38 @@ def check_formal(model, profile, count):
     return {"formulas": len(formulas), "rules": len(steps), "rules_parsed": parsed, "inputs": evaluated, "of": count}
 
 
+SPOKEN = {"not": "not", "and": "and", "or": "or", "implies": "=>", "iff": "<=>", "eq": "=", "ne": "!=", "lt": "<", "le": "<=", "gt": ">",
+          "ge": ">=", "add": "+", "sub": "-"}                      # a row of the reading key and the ladder template that says its operator aloud
+
+
+def formal_readings():
+    """How the formal rung of ZAL's ladder says each operator aloud: its template without the operands and the spoken brackets."""
+    said, timed = ladder.REGISTRY["templates"]["formal"], ladder.REGISTRY["temporal_templates"]["formal"]
+    aloud = lambda template: " ".join(word.replace("{k}", "K") for word in template.split()
+                                      if word not in ("open", "close") and not re.fullmatch(r"\{(?:a|b|name|args)\}", word))
+    readings = {key: aloud(said[name]) for key, name in SPOKEN.items()}
+    readings["prime"] = aloud(said["prime_call"]).removesuffix(" of")     # a ladder prime takes arguments; a machine's takes none
+    readings.update({op: aloud(timed[op]) for op in ("always", "eventually", "next", "until", "within")})
+    if any(not text or "{" in text for text in readings.values()):
+        raise Disagreement("The ladder's formal readings no longer have the shape the review desk reads")
+    return readings
+
+
+READ = formal_readings()
+
+
+def zal_readings(english):
+    """The readings in one entry of ZAL's operator registry: " / " separates two, and the operand letters around one are left out."""
+    out = []
+    for text in english.split(" / "):
+        if text.startswith("A ") and text.endswith(" B"):
+            text = text[2:-2]
+        if text.endswith(" (P)") and " " not in text[:-4]:
+            text = text[:-4]
+        out.append(text)
+    return out
+
+
 ZAL_OPERATOR = {"not": "!", "and": "&", "or": "|", "implies": "=>", "iff": "<=>", "eq": "==", "ne": "!=", "lt": "<",
                 "le": "<=", "gt": ">", "ge": ">=", "add": "+", "sub": "-", "prime": "'", "accepted": "accepted",
                 "always": "always", "eventually": "eventually", "next": "next", "within": "within", "until": "until"}
@@ -481,27 +513,29 @@ WORDING = {"rule": "In symbols a rule is a step formula: on a step where everyth
 def reading_key(model, profile, declared):
     """How to read the symbols of one statement: each symbol, kind of line and name with ZAL's own words for it.
 
-    Readings and meanings are quoted from behavior2.OPERATORS and from the construct registry of the statement's
-    profile. A row the desk words itself carries "desk": true, and the page says so. Only what the statement
-    uses is kept.
+    A symbol's first reading is the one the formal rung of ZAL's ladder gives it, such as "implies". The readings
+    of behavior2.OPERATORS follow where they differ, such as "if A, then B". Names and meanings are quoted from
+    behavior2.OPERATORS and from the construct registry of the statement's profile. A row the desk words itself
+    carries "desk": true, and the page says so. Only what the statement uses is kept.
     """
     used = {segment[1] for entry in declared for segment in (entry["formal"] or []) + (entry["more"] or []) if len(segment) > 1 and segment[1]}
     words = behavior2.CONSTRUCTS
     entries = {word: {"symbol": word, "typed": word, "read": word, "meaning": constructs.BY_ID[word].meaning} for word in ("true", "false")}
     for key, operator in ZAL_OPERATOR.items():
-        read, _, meaning = behavior2.OPERATORS[operator]
+        told, name, meaning = behavior2.OPERATORS[operator]
+        reads = list(dict.fromkeys([*([READ[key]] if key in READ else []), *zal_readings(told)]))    # the formal reading, then ZAL's others
         symbol = FORMAL.get({name: op for op, name in COMPARISON_KEY.items()}.get(key, key), key).strip().replace("{k}", "K")
         typed = behavior2.TEMPORAL_SYMBOLIC[key].format(a="P", b="Q", k="K") if key in behavior2.TEMPORAL_SYMBOLIC else operator
-        entries[key] = {"symbol": symbol, "typed": typed, "read": read, "meaning": meaning}
+        entries[key] = {"symbol": symbol, "typed": typed, "read": reads[0], "also": reads[1:], "name": name, "meaning": meaning}
     entries.update({
         "state": {"symbol": "state", "typed": "state", "read": "the control state", "meaning": words["states"][2]},
         "event": {"symbol": "event", "typed": "event", "read": "the event of this step", "meaning": words["events"][2]},
         "initially": {"symbol": "initially", "typed": "initial", "read": "initially", "meaning": words["initial"][2]},
         "can_force": {"symbol": FORCES[0] + "p" + FORCES[1], "typed": "NAME can force", "read": "player p can force", "meaning": words["game"][2]},
         "within_steps": {"symbol": "within K", "typed": "within K", "read": "to happen within K steps", "meaning": words["game"][2]},
-        "infinitely_often": {"symbol": OFTEN, "typed": "infinitely often (P)", "read": "infinitely often",
+        "infinitely_often": {"symbol": OFTEN, "typed": "infinitely often (P)", "read": f"{READ['always']} {READ['eventually']}", "also": ["infinitely often"],
                              "meaning": "Always eventually: P holds at infinitely many steps.", "desk": True},
-        "in": {"symbol": MEMBER, "typed": "", "read": "is one of",
+        "in": {"symbol": MEMBER, "typed": "", "read": "is an element of", "also": ["is one of"],
                "meaning": "The name on the left takes exactly one of the listed values.", "desk": True},
         "otherwise": {"symbol": "otherwise", "typed": "default", "read": "otherwise",
                       "meaning": "On a step where the left side of no rule holds.", "desk": True},

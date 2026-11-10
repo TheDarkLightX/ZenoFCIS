@@ -504,8 +504,11 @@ class Symbols(unittest.TestCase):
                 self.assertEqual(set(key["entries"]) | {"name:" + name for name in key["names"]}, used)
                 for row, operator in desk.ZAL_OPERATOR.items():
                     if row in key["entries"]:
-                        read, _, meaning = behavior2.OPERATORS[operator]
-                        self.assertEqual((key["entries"][row]["read"], key["entries"][row]["meaning"], key["entries"][row].get("desk")), (read, meaning, None))
+                        said, title, meaning = behavior2.OPERATORS[operator]
+                        told = key["entries"][row]
+                        self.assertEqual((told["name"], told["meaning"], told.get("desk")), (title, meaning, None))
+                        self.assertEqual(told["read"], desk.READ.get(row, said))       # the ladder's formal reading comes first
+                        self.assertTrue(all(text in said for text in told["also"]) and told["read"] not in told["also"], told)   # then ZAL's own other readings
                 self.assertEqual({row for row, told in key["entries"].items() if told.get("desk")}, used & {"in", "otherwise", "unchanged", "infinitely_often"})
                 shown = {segment[1]: segment[0] for entry in bundle["declared"] for segment in entry["formal"] or [] if segment[1:] and segment[1] in key["entries"]}
                 for row in set(shown) - {"within", "within_steps", "can_force"}:
@@ -523,8 +526,29 @@ class Symbols(unittest.TestCase):
         self.assertEqual((tour["entries"]["implies"]["symbol"], tour["entries"]["implies"]["typed"], tour["entries"]["within"]["symbol"], tour["entries"]["within"]["typed"]),
                          ("⇒", "=>", "◇[0,K]", "within(K, P)"))
         self.assertEqual((tour["names"]["turn"]["role"], tour["names"]["busy"]["role"]), ("input", "context fact"))
+        readings = {row: [told["read"], *told.get("also", [])] for row, told in tour["entries"].items()}
+        self.assertEqual([readings[row] for row in ("implies", "iff", "eq", "prime", "next", "always", "in")],
+                         [["implies", "if A, then B"], ["if and only if"], ["equals", "is"], ["prime", "after this event"],
+                          ["next", "at the next event, which must exist, (P)"], ["always"], ["is an element of", "is one of"]])
+        self.assertEqual(readings.get("infinitely_often", ["always eventually", "infinitely often"]), ["always eventually", "infinitely often"])
+
         self.assertNotIn("always", self.read(example("order.zal"))[0]["key"]["entries"])
         self.assertEqual((set(tour["wording"]), set(self.read(example("order.zal"))[0]["key"]["wording"])), ({"rule", "default", "require"}, {"rule", "default"}))
+
+    def test_the_formal_reading_of_each_symbol_is_read_from_the_ladders_formal_rung(self):
+        formal, timed = ladder.REGISTRY["templates"]["formal"], ladder.REGISTRY["temporal_templates"]["formal"]
+        self.assertEqual((formal["=>"], formal["not"], formal["prime_call"], timed["until"], timed["within"]),
+                         ("{a} implies {b}", "not {a}", "{name} prime of {args}", "open open {a} close until open {b} close close",
+                          "eventually within {k} further events open {a} close"))
+        self.assertEqual({row: desk.READ[row] for row in ("implies", "not", "prime", "until", "within", "le")},
+                         {"implies": "implies", "not": "not", "prime": "prime", "until": "until", "within": "eventually within K further events", "le": "is at most"})
+        self.assertEqual(set(desk.READ), set(desk.SPOKEN) | {"prime", "always", "eventually", "next", "until", "within"})
+        self.assertEqual([desk.zal_readings(text) for text in ("if A, then B", "A if and only if B", "equals / is", "always (P)", "(P) holds until (Q) happens, and that must happen")],
+                         [["if A, then B"], ["if and only if"], ["equals", "is"], ["always"], ["(P) holds until (Q) happens, and that must happen"]])
+        unread = {**ladder.REGISTRY, "templates": {**ladder.REGISTRY["templates"], "formal": {**formal, "=>": "{a} {b}"}}}
+        with mock.patch.object(ladder, "REGISTRY", unread), self.assertRaises(desk.Disagreement):
+            desk.formal_readings()
+
 
     def test_generated_statements_keep_the_spelling_and_zal_in_agreement(self):
         pick = random.Random(20261110)

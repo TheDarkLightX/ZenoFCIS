@@ -412,9 +412,12 @@ has three readings, and the reader chooses which to show:
 
 A reading key sits under the statement and follows the line under the pointer
 or the keyboard. It names the kind of line in the construct registry's words
-and lists only the symbols and names of that line, each with the registry's
-reading and meaning. A symbol the reader marks as learned shrinks to one word;
-no symbol is removed. On a narrow screen the key opens inside the line that
+and lists only the symbols and names of that line. A symbol's first reading is
+the one the ladder's formal rung gives it, so `⇒` reads "implies" and `′`
+reads "prime". Where the operator registry of the machine profiles reads it
+another way, that reading follows: "if A, then B", "after this event". Each
+row also carries the registry's name for the operator and its meaning. A
+symbol the reader marks as learned shrinks to one word; no symbol is removed. On a narrow screen the key opens inside the line that
 was tapped, and the whole key stands at the foot of the statement.
 
 Three tabs examine the statement:

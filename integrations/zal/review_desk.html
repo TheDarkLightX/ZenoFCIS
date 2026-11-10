@@ -233,6 +233,8 @@ button.alert:hover { border-color: currentColor; }
 .ks.o { font: 400 20px/1 var(--math); }
 .ks.nm { font-style: italic; font-weight: 400; }
 .kr { font-family: var(--serif); font-size: 14.5px; color: var(--ink); }
+.ka { display: block; font-size: 13.5px; color: var(--ink-2); }                /* another reading of the same symbol */
+.kn { font: 600 12.5px var(--sans); color: var(--ink-2); }                      /* the operator's name in ZAL's registry */
 .km { font-family: var(--serif); font-size: 14px; line-height: 1.4; color: var(--ink-2); }
 .krow.desk .km { font-family: var(--sans); font-size: 13px; }
 .who, .kt { font: 12px var(--sans); color: var(--ink-3); white-space: nowrap; }
@@ -626,8 +628,9 @@ function setReading(id) {
 const known = (k) => K.known.has(k);
 function tip(b, k) {
   if (k.startsWith("name:")) { const n = b.key.names[k.slice(5)]; return n ? `${n.role}. ${n.english}` : null; }
-  const e = b.key.entries[k]; return e ? `${e.read}. ${e.meaning}` : null;
+  const e = b.key.entries[k]; return e ? `${readings(e).join("; or ")}. ${e.meaning}` : null;
 }
+const readings = (e) => [e.read, ...(e.also || [])];             /* the formal reading first, then any other way ZAL reads the symbol */
 const lettering = (text, k) => k.startsWith("name:") ? "nm" : /^[a-z]/.test(text) ? "w" : "o";     /* a declared name, a word of the logic, or a symbol */
 function symbol(b, text, k, extra) {
   const el = h("span", { class: "g " + lettering(text, k) + (extra ? " " + extra : ""), "data-k": k, title: tip(b, k) }, text);
@@ -793,13 +796,13 @@ function keyRow(b, k) {
   const e = b.key.entries[k], is = known(k);
   const row = h("div", { class: "krow" + (e.desk ? " desk" : ""), "data-k": k },
     h("span", { class: "ks " + lettering(e.symbol, k) }, e.symbol),
-    h("span", { class: "kr" }, e.read === e.symbol ? "" : e.read),
-    h("span", { class: "km" }, e.meaning, e.desk ? h("span", { class: "who" }, " The desk's wording.") : null, e.typed && e.typed !== e.symbol ? h("span", { class: "kt" }, " Typed ", h("code", {}, e.typed)) : null),
+    h("span", { class: "kr" }, e.read === e.symbol ? "" : e.read, (e.also || []).map((text) => h("span", { class: "ka" }, "or ", text))),
+    h("span", { class: "km" }, e.name ? h("span", { class: "kn" }, e.name + ". ") : null, e.meaning, e.desk ? h("span", { class: "who" }, " The desk's wording.") : null, e.typed && e.typed !== e.symbol ? h("span", { class: "kt" }, " Typed ", h("code", {}, e.typed)) : null),
     h("button", { class: "btn small", "aria-pressed": String(is), onclick: () => learn(k, !is) }, is ? "Learned" : "I know this"));
   K.marks.push([k, row]); return row;
 }
 function keyChip(b, k) {
-  const e = b.key.entries[k], el = h("button", { class: "kchip" + (known(k) ? " known" : ""), "data-k": k, "aria-expanded": String(K.peek === k), title: `${e.read}. ${e.meaning}`,
+  const e = b.key.entries[k], el = h("button", { class: "kchip" + (known(k) ? " known" : ""), "data-k": k, "aria-expanded": String(K.peek === k), title: tip(b, k),
     onclick: () => { K.peek = K.peek === k ? null : k; refreshKey(); } }, h("span", { class: "ks " + lettering(e.symbol, k) }, e.symbol), e.read === e.symbol ? null : h("span", {}, e.read));
   K.marks.push([k, el]); return el;
 }
@@ -824,6 +827,7 @@ function keyBody(b, clause) {
   if (!S.read.english && clause.formal) out.push(K.said === key ? h("p", { class: "en ksaid" }, clause.english)
     : h("div", {}, h("button", { class: "btn small", onclick: () => { K.said = key; refreshKey(); } }, "Check your reading against ZAL's English")));
   if (fresh.length || rows.names.length) out.push(h("div", { class: "krows" }, fresh.map((k) => keyRow(b, k)), rows.names.map((n) => nameRow(b, n))));
+  if (fresh.some((k) => (b.key.entries[k].also || []).length)) out.push(h("p", { class: "note" }, "A symbol's first reading is the formal one, from ZAL's ladder. A second is another way ZAL says it."));
   if (learned.length) out.push(h("div", { class: "kchips" }, h("span", { class: "note" }, "Learned:"), learned.map((k) => keyChip(b, k))));
   return out;
 }
