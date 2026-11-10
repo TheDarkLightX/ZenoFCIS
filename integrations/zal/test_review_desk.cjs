@@ -119,6 +119,8 @@ function load(html, { wide = true, hash = '', storage = 'works', answer = null, 
 }
 
 const checks = [];
+let finished = false;                                            // a wait that never ends would otherwise end the run quietly, as if it had passed
+process.on('exit', (code) => { if (!finished && code === 0) { console.error('The checks did not run to the end.'); process.exitCode = 1; } });
 const check = (name, condition) => { assert(condition, name); checks.push(name); };
 const count = (bundle, kind) => bundle.edits.rows.filter((row) => row.class === kind).length;
 const named = (name) => fixture.bundles.findIndex((bundle) => bundle.file === name);
@@ -414,5 +416,6 @@ const NOISE = /undefined|NaN|\[object Object\]|\bnull\b/;
   check('a corrected file reloads the page by itself', refused.location.reloads === 1);
   check('an error is not presented as a refusal by ZAL', (() => { const failed = load(fixture.live_error).document.body.textContent; return failed.includes('raised an error. This is not a refusal by ZAL, and the source may be fine.') && failed.includes('TypeError: planted') && !failed.includes('ZAL does not accept'); })());
 
+  finished = true;
   console.log(`${checks.length} review desk checks passed (DOM double; no browser, network or provider)`);
 })().catch((error) => { console.error(error); process.exit(1); });

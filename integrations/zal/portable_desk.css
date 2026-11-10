@@ -1,0 +1,20 @@
+/* The portable desk's own parts: the list of statements and the Write tab. Everything else is styled in
+   review_desk.html, whose colours and faces these rules use. */
+[hidden] { display: none !important; }
+.pick .btn { white-space: nowrap; }
+.writer .name { width: 100%; max-width: 420px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--sheet); font-family: var(--mono); font-size: 13px; }
+.writer .name[disabled] { color: var(--ink-2); background: var(--sheet-2); }
+.writer textarea.src { min-height: 44vh; font-size: 13.5px; line-height: 1.6; }
+.tokens { display: flex; flex-wrap: wrap; gap: 6px; }
+.tokens .opt { min-width: 38px; font-family: var(--mono); }
+.told { display: flex; flex-direction: column; gap: 8px; }
+.alert.bad { font-weight: 600; }
+@media (max-width: 760px) {
+  .writer textarea.src, .writer .name { font-size: 16px; }          /* at 16px a phone does not zoom the page when the field is entered */
+  .writer textarea.src { min-height: 38vh; }
+}
+@media (pointer: coarse) {                                          /* a finger needs more room than a pointer */
+  .btn, .opt, .tab, .seg button, .pick select { min-height: 40px; }
+  .btn.small { min-height: 34px; padding-inline: 12px; }
+  .tokens .opt { min-width: 44px; }
+}

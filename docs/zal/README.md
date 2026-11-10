@@ -485,6 +485,100 @@ closure, so they leave the checker identity unchanged. The desk records no
 agreement and grants no authority; every report it shows keeps
 `authority: none`. It refuses typed and effects sources.
 
+## Portable desk: a phone, a tablet or a browser extension
+
+The portable desk is the review desk with the checker inside the page. No
+server answers it and no Python is installed on the device: a worker of the
+page runs Python as WebAssembly, and the checker's source files travel with
+the page unmodified. It reads the same finite profiles, in either syntax.
+
+It is built, not committed. The build downloads nothing. It takes the
+unpacked runtime that `portable_desk_runtime.json` pins, compares every
+runtime file with its pinned SHA-256 and refuses a runtime that differs:
+
+```sh
+npm pack pyodide@314.0.7 --pack-destination /tmp
+mkdir -p /tmp/zal-runtime && tar -xzf /tmp/pyodide-314.0.7.tgz -C /tmp/zal-runtime --strip-components=1
+python3 integrations/zal/portable_desk_build.py --runtime /tmp/zal-runtime --out /tmp/zal-portable
+```
+
+The pin also records the archive's published integrity value, so the download
+can be compared before it is unpacked. The build writes:
+
+- `web/`: static files. Served over HTTPS they can be installed to a home
+  screen. After the first visit a service worker keeps the files on the
+  device, and the desk starts with no connection. For a local look,
+  `python3 -m http.server --directory /tmp/zal-portable/web 8780` and
+  `http://127.0.0.1:8780/` are enough.
+- `extension/` and `portable-desk-extension.zip`: the same page as a Manifest
+  V3 extension. In Chrome or Brave, load the folder from `chrome://extensions`
+  with developer mode on. In Firefox, load `manifest.json` as a temporary
+  add-on from `about:debugging`. The toolbar button opens the desk in a tab.
+  The extension asks for no permission. Most phone browsers do not load an
+  extension from a folder, so the web folder is the way to a phone.
+- `portable-desk-build.json`: the checker identity, the runtime pin, the
+  SHA-256 of every source that travels and of every file written.
+
+The page is `review_desk.html` with `portable_desk.js` placed before its
+script, and no script stays inline. The web page states a content policy that
+admits only its own files and WebAssembly; the extension states the same in
+its manifest. Neither requests an address outside its own folder.
+
+Which source files travel is not a list kept in the build. The build runs the
+desk in a fresh interpreter and records the files it opens: the checker's
+whole source closure, because the checker identity hashes it, and the modules
+the desk imports. The packed files are then unpacked alone, away from the
+repository, and must give the repository's checker identity and the same
+result for every example the page carries. A build that cannot show this
+writes nothing.
+
+On the device the page adds two things to the review desk:
+
+- A list of statements. The examples under `integrations/zal/examples` that
+  the desk reads are carried. Statements the reader writes, pastes or opens
+  from a file are kept in the browser's storage on that device. Editing an
+  example makes a copy; the example stays as it is.
+- A **Write** tab. `Check` sends the text to the checker in the page, which
+  returns its result or its located diagnostic. While a newer text is refused
+  or not yet checked, the desk keeps showing the last text the checker
+  accepted and says which revision that is. **Review a change** asks the
+  checker which inputs the edit would decide differently before it is checked.
+
+The page builds no decision table: each input is explained by the checker
+when it is tried, and a step where a rule fires is found by asking it. The
+planted edits are computed after the statement is on the screen. Apart from
+that, an opened statement is the bundle `review_desk.py serve` shows, and the
+tests compare the two.
+
+The checker's answers pass through one function, `portable_desk.exchange`,
+which takes one JSON request as text and returns one JSON reply. It holds the
+one statement the page has open, writes no file and opens no socket. The same
+function runs natively in the tests and as WebAssembly in the page. For each
+carried example the build records a digest of the native result, and the page
+compares the digest its own checker returns. A difference is shown as a
+warning on the verdict, and the page says not to rely on that copy.
+
+Bounds and limits:
+
+- A source is at most 64 KiB of ASCII, by the checker's own rule. A request is
+  bounded as the loopback desk bounds it. Typed and effects sources are
+  refused, as on the review desk.
+- The runtime is about 14 MB, fetched once. The checker is slower than native
+  Python; the browser check prints the times it measured. Where a page is not
+  allowed to run WebAssembly, the desk says so and checks nothing.
+- Text is kept unencrypted in the browser's storage for that page. Clearing
+  site data removes it. The page says when a browser will not keep it.
+- There is no workspace, provider, acceptance or export. Every report keeps
+  `authority: none`, and the page records no agreement.
+- `portable_desk.py`, `portable_desk.js` and the build are outside the checker
+  source closure, so the checker identity in the page is the repository's.
+
+Publishing the web folder, or giving the extension to a store, is the owner's
+decision and no part of the build. Two things are open before either: the
+extension's add-on identifier is a placeholder, and the runtime's license
+notices need review. `NOTICES.txt` in the build names the runtime, its
+declared license and its source.
+
 ## File-level export and actual factory qualification
 
 For the shared harness workspace, use the [reviewed export commands](HARNESS_INTEGRATION.md)
@@ -584,6 +678,22 @@ The second command plants defects in an isolated copy of the desk and of its
 page, one at a time, and requires each to fail its named test or page check.
 Neither command is part of the `zal-dialogue` scenario below.
 
+The portable desk has the same two kinds of check. `test_portable_desk.py`
+runs with the Python suite above: it compares the exchange with the loopback
+desk and builds the desk with a stand-in runtime of a few bytes.
+
+```sh
+node integrations/zal/test_portable_desk.cjs
+python3 -B integrations/zal/check_portable_desk.py
+```
+
+The Node command runs the joined page script against a DOM double and a
+worker double. The worker double answers from a table that
+`portable_desk.py` filled natively, so each reply is the checker's own. No
+WebAssembly runs in either command. The worker that runs Python, the offline
+worker and the extension's background script are reached only by the optional
+browser check below.
+
 The repository's registered acceptance scenario runs the Python suite,
 deterministic Node UI checks, pinned CLI build and actual sample-model factory
 replay together:
@@ -604,7 +714,14 @@ http://127.0.0.1:8765/ /tmp/zal-browser`. `CHROMIUM` can select an existing brow
 installs them nor establishes a complete accessibility audit. The review desk
 has its own optional check under the same conditions: start
 `review_desk.py serve`, then run `node integrations/zal/review_desk_browser_smoke.cjs
-http://127.0.0.1:8770/ /tmp/zal-review-desk-browser`. Final repository
+http://127.0.0.1:8770/ /tmp/zal-review-desk-browser`. The portable desk's
+check takes a build made with the pinned runtime: `node
+integrations/zal/portable_desk_browser_smoke.cjs /tmp/zal-portable
+/tmp/zal-portable-browser`. It serves the web folder on loopback, runs the
+checker as WebAssembly, requires each carried example to give the digest the
+build recorded natively, writes and checks a statement, starts again with the
+server stopped, and loads the extension folder. It runs one browser engine and
+emulates a phone by viewport and touch. Final repository
 checks are those in [CONTRIBUTING.md](../../CONTRIBUTING.md), not just these suites.
 
 ## Profile 2: integers, requirements and temporal properties
