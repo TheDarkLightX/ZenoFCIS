@@ -1,0 +1,1267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZAL review desk</title>
+<!-- The page of integrations/zal/review_desk.py. It shows ZAL's results and records no agreement.
+     review_desk.py fills the data slot and the token slot; nothing else is loaded. -->
+<style>
+/* Layout: the statement lies on the left like a contract; the instruments that examine it stand on the right;
+   the verdict sits above both. Three voices: serif is ZAL's own English, mono is ZAL's typed line, sans is this
+   page, and a line in symbols is the page's own spelling, so it is sans with the symbols in a mathematical face.
+   Under the statement sits the reading key, which explains the line being read. */
+:root {
+  --desk: #eceff3; --sheet: #ffffff; --sheet-2: #f5f7fa;
+  --ink: #131a24; --ink-2: #44536a; --ink-3: #5c6b7f;
+  --line: #d0d7e1; --line-2: #e4e9ef;
+  --claim: #4a3aa8; --claim-bg: #eeebfb;          /* claims: what must hold */
+  --assume: #835500; --assume-bg: #fbefd2;        /* assumptions: supplied, never checked */
+  --pass: #17683f; --pass-bg: #dcf2e5;
+  --fail: #a5221b; --fail-bg: #fbe2df;
+  --quiet: #55647a; --quiet-bg: #e5e9ef;          /* neither: refused, unsupported, structure */
+  --focus: #1b66d6; --hot: #d9d2fb;
+  --serif: Charter, "Bitstream Charter", "Sitka Text", Cambria, "Iowan Old Style", Georgia, "DejaVu Serif", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  --math: "STIX Two Math", "Cambria Math", "Latin Modern Math", "Noto Sans Math", "DejaVu Math TeX Gyre", "Apple Symbols", "Segoe UI Symbol", "DejaVu Sans", serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --desk: #0b111a; --sheet: #121a27; --sheet-2: #182232;
+    --ink: #e8edf4; --ink-2: #aab7c8; --ink-3: #8797ab;
+    --line: #2b394d; --line-2: #1f2a3b;
+    --claim: #b9adff; --claim-bg: #251f4f;
+    --assume: #e7bb5e; --assume-bg: #382b0d;
+    --pass: #66d39c; --pass-bg: #10321f;
+    --fail: #ff948b; --fail-bg: #421512;
+    --quiet: #a4b2c3; --quiet-bg: #222e40;
+    --focus: #86b4ff; --hot: #3b3179; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --desk: #0b111a; --sheet: #121a27; --sheet-2: #182232;
+  --ink: #e8edf4; --ink-2: #aab7c8; --ink-3: #8797ab;
+  --line: #2b394d; --line-2: #1f2a3b;
+  --claim: #b9adff; --claim-bg: #251f4f;
+  --assume: #e7bb5e; --assume-bg: #382b0d;
+  --pass: #66d39c; --pass-bg: #10321f;
+  --fail: #ff948b; --fail-bg: #421512;
+  --quiet: #a4b2c3; --quiet-bg: #222e40;
+  --focus: #86b4ff; --hot: #3b3179; color-scheme: dark;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--desk); color: var(--ink); font: 14px/1.5 var(--sans); }
+*, *::before, *::after { box-sizing: border-box; }
+button, select, textarea, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
+p { margin: 0; }
+h1, h2, h3 { margin: 0; font-weight: 650; text-wrap: balance; }
+
+.app { display: flex; flex-direction: column; min-height: 100%; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* top bar */
+.top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-block: 10px; background: var(--sheet); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: baseline; gap: 8px; font-size: 15px; white-space: nowrap; }
+.brand b { font-family: var(--mono); font-weight: 700; letter-spacing: 0.02em; }
+.brand span { color: var(--ink-2); }
+.pick { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 0 1 340px; }
+.pick label { color: var(--ink-3); font-size: 13px; }
+.pick select { width: 100%; min-width: 0; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--sheet); }
+.top .mode { margin-left: auto; color: var(--ink-3); font-size: 12.5px; max-width: 52ch; }
+.top #theme { margin-left: 0; }
+@media (max-width: 760px) { .top .mode { display: none; } .top #theme { margin-left: auto; order: 2; } .pick { order: 3; flex: 1 1 100%; } }
+.btn { padding: 5px 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--sheet); }
+.btn:hover { border-color: var(--ink-3); }
+.btn.primary { background: var(--ink); color: var(--sheet); border-color: var(--ink); font-weight: 600; }
+.btn.small { padding: 2px 8px; font-size: 12.5px; }
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+.link { border: 0; background: none; padding: 0; color: var(--claim); text-decoration: underline; text-underline-offset: 2px; }
+
+/* verdict */
+.verdict { padding-block: 12px 12px; background: var(--sheet); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 7px; box-shadow: inset 0 3px 0 var(--quiet); }
+.verdict[data-s="pass"] { box-shadow: inset 0 3px 0 var(--pass); }
+.verdict[data-s="fail"] { box-shadow: inset 0 3px 0 var(--fail); }
+.verdict[data-s="warn"] { box-shadow: inset 0 3px 0 var(--assume); }
+.v-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.v-name { font-size: 22px; letter-spacing: -0.01em; }
+.v-file { color: var(--ink-3); font-family: var(--mono); font-size: 12.5px; }
+.v-line { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 15.5px; }
+.v-facts { display: flex; flex-wrap: wrap; gap: 4px 18px; color: var(--ink-2); font-size: 13px; }
+.v-facts b { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+.v-alerts { display: flex; flex-wrap: wrap; gap: 8px; }
+.alert { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px; border-radius: 6px; font-size: 13px; border: 1px solid transparent; text-align: left; }
+.alert.warn { background: var(--assume-bg); color: var(--assume); }
+.alert.bad { background: var(--fail-bg); color: var(--fail); }
+.alert.ok { background: var(--pass-bg); color: var(--pass); }
+.alert.info { background: var(--quiet-bg); color: var(--quiet); }
+button.alert:hover { border-color: currentColor; }
+
+.status { display: inline-block; font-family: var(--mono); font-size: 12.5px; font-weight: 600; padding: 2px 8px; border-radius: 5px; white-space: nowrap; }
+.status[data-s="pass"] { background: var(--pass-bg); color: var(--pass); }
+.status[data-s="fail"] { background: var(--fail-bg); color: var(--fail); }
+.status[data-s="quiet"] { background: var(--quiet-bg); color: var(--quiet); }
+
+/* panes */
+.panes { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; }
+.statement, .bench { min-width: 0; }
+.tabs { display: flex; gap: 2px; padding-top: 8px; background: var(--desk); border-bottom: 1px solid var(--line); position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; overflow-x: auto; }
+.tab { padding: 8px 14px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; background: none; color: var(--ink-2); font-weight: 600; white-space: nowrap; }
+.tab[aria-selected="true"] { background: var(--sheet); border-color: var(--line); color: var(--ink); margin-bottom: -1px; padding-bottom: 9px; }
+.tab .count { margin-left: 6px; font-weight: 500; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.panel { padding-block: 18px 40px; background: var(--sheet); min-height: 320px; display: flex; flex-direction: column; gap: 26px; }
+.statement { background: var(--sheet); }
+.doc { padding-block: 18px 40px; container-type: inline-size; }
+.panel .doc { padding-block: 0; }
+@media (min-width: 1060px) {
+  .app { height: 100vh; height: 100dvh; }                   /* the two panes scroll on their own; the verdict stays put */
+  .panes { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); overflow: hidden; }
+  .statement.pane { display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--line); padding: 0; }
+  .statement.pane .doc { flex: 1; min-height: 0; overflow: auto; padding-inline: max(16px, env(safe-area-inset-left, 0px)) 22px; scroll-padding-block: 12px; }
+  .statement.pane .key { flex: none; max-height: 42%; }
+  .statement.pane .key[data-for="line"] { height: clamp(220px, 42%, 400px); }   /* steady while the reader moves from line to line */
+  .statement.pane .key[data-hidden="true"] { height: auto; }
+  .bench { display: flex; flex-direction: column; min-height: 0; background: var(--desk); }
+  .tabs { position: static; padding-left: 14px; }
+  .panel { flex: 1; overflow: auto; padding-left: 22px; }
+  .tab[data-tab="statement"], .only-narrow { display: none; }
+}
+@media (max-width: 1059.98px) {
+  .statement.pane { display: none; }
+}
+
+/* statement */
+.doc-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.doc-head h2 { font-size: 16px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-left: auto; }
+.seg button { border: 0; background: var(--sheet); padding: 3px 10px; font-size: 12.5px; color: var(--ink-2); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--sheet); }
+.preface { color: var(--ink-2); font-size: 13px; margin-bottom: 8px; max-width: 70ch; }
+.sec { margin-top: 20px; }
+.preamble { padding: 10px 2px 4px; display: flex; flex-direction: column; gap: 8px; }
+.preamble .en { max-width: 70ch; }
+.preamble .sy { line-height: 1.6; }
+.sec-h { display: flex; align-items: baseline; gap: 10px; padding-bottom: 5px; border-bottom: 1px solid var(--line); }
+.sec-h h3 { font-size: 13px; letter-spacing: 0.03em; }
+.sec-h span { color: var(--ink-3); font-size: 12.5px; }
+.sec[data-kind="claims"] .sec-h h3 { color: var(--claim); }
+.sec[data-kind="assumptions"] .sec-h h3 { color: var(--assume); }
+.clause { border-left: 4px solid var(--line-2); border-bottom: 1px solid var(--line-2); }
+.clause:hover, .clause.open, .clause.at { background: var(--sheet-2); }
+.clause.at { box-shadow: inset 0 0 0 1px var(--line); }
+.clause[data-now="yes"] { background: var(--sheet-2); box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+.cl-head { display: grid; grid-template-columns: minmax(0, 1fr) 164px; gap: 3px 16px; padding: 9px 8px 9px 11px; border: 0; width: 100%; text-align: left; background: none; align-items: start; }
+.cl-main { display: contents; }
+.cl-id { grid-column: 1; grid-row: 1; }
+.cl-head .en { grid-column: 1; grid-row: 2; }
+.cl-margin { grid-column: 2; grid-row: 1 / span 2; }
+.cl-head .fm { grid-column: 1 / -1; grid-row: 3; }
+.cl-head .sy { grid-column: 1 / -1; grid-row: 4; }
+.cl-head.stacked { grid-template-columns: minmax(0, 1fr); }
+.cl-head.stacked .cl-margin { grid-column: 1; grid-row: 5; padding-top: 2px; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.clause.voc { border-bottom: 0; border-left-color: transparent; }
+.clause.voc .cl-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; padding-block: 2px; }
+.clause.voc .cl-margin { padding-top: 0; }
+.clause[data-cov="held"] { border-left-color: var(--pass); }
+.clause[data-cov="structure"] { border-left-color: var(--quiet); }
+.clause[data-cov="free"] { border-left-color: var(--fail); }
+.clause[data-cov="teeth"] { border-left-color: var(--claim); }
+.clause[data-cov="blunt"], .clause[data-cov="assume"] { border-left-color: var(--assume); }
+.cl-margin { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; font-size: 12.5px; color: var(--ink-2); padding-top: 19px; min-width: 0; }
+.cl-margin .bad { color: var(--fail); font-weight: 600; }
+.cl-margin .warn { color: var(--assume); font-weight: 600; }
+@container (max-width: 560px) {
+  .cl-head { grid-template-columns: minmax(0, 1fr); }
+  .cl-margin { grid-column: 1; grid-row: 5; padding-top: 2px; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+}
+.rail-key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-2); margin: -6px 0 4px; }
+.rail-key span { display: inline-flex; align-items: center; gap: 6px; }
+.rail-key i { width: 4px; height: 14px; border-radius: 1px; display: inline-block; }
+.cl-id { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+.sec[data-kind="claims"] .cl-id { color: var(--claim); }
+.sec[data-kind="assumptions"] .cl-id { color: var(--assume); }
+.en { font-family: var(--serif); font-size: 16px; line-height: 1.5; max-width: 68ch; }
+.sy { display: block; font-size: 12.5px; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cl-more { padding: 0 8px 11px 11px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink-2); }
+.now { font-weight: 600; padding: 1px 7px; border-radius: 4px; }
+.now.yes { background: var(--ink); color: var(--sheet); }
+.now.holds { background: var(--pass-bg); color: var(--pass); }
+.now.fails { background: var(--fail-bg); color: var(--fail); }
+.now.no { padding: 0; font-weight: 500; color: var(--ink-3); }
+
+/* a line in symbols: words of the logic are upright and strong, declared names are italic, labels and numbers are plain */
+.fm { display: block; font: 15px/1.7 var(--sans); color: var(--ink); overflow-wrap: anywhere; }
+.fm-l { display: block; }
+.fm-l.cont { padding-left: 1.3em; text-indent: -1.3em; }           /* a long line breaks before its main connective */
+.g { border-radius: 3px; cursor: help; }
+.g.o { font-family: var(--math); font-size: 1.1em; line-height: 1; }
+.g.o[data-k="add"], .g.o[data-k="sub"] { margin-inline: 0.16em; }     /* the ladder writes sums without spaces; this only sets them apart */
+.g.w { font-weight: 600; }
+.g.nm { font-style: italic; }
+.g.main { margin-right: 0.3em; }
+.g.hot, .krow.hot, .kchip.hot { background: var(--hot); box-shadow: 0 0 0 2px var(--hot); }
+.fm-note { font-size: 12.5px; color: var(--ink-3); margin-left: 12px; white-space: nowrap; }
+.fm-more { display: none; color: var(--ink-3); }                    /* what a rule leaves unchanged: shown for the line being read */
+.fm-fold { font-size: 12px; color: var(--ink-3); margin-left: 8px; white-space: nowrap; border-bottom: 1px dashed var(--ink-3); }
+.clause:hover .fm-more, .clause:focus-within .fm-more, .clause.at .fm-more, .clause.open .fm-more { display: inline; }
+.clause:hover .fm-fold, .clause:focus-within .fm-fold, .clause.at .fm-fold, .clause.open .fm-fold { display: none; }
+.truth .tv { white-space: normal; padding: 1px 4px; }
+.truth .tv[data-v="false"] { text-decoration: none; }
+.truth .g.t { color: var(--pass); }
+.truth .g.f { color: var(--ink-3); }
+.where { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* the reading key */
+.key { container-type: inline-size; display: flex; flex-direction: column; min-height: 0; background: var(--sheet-2); border-top: 1px solid var(--line); }
+.key.inline { border: 1px solid var(--line-2); border-radius: 8px; }
+.key-h { display: flex; align-items: baseline; gap: 10px; padding: 8px 14px 6px max(16px, env(safe-area-inset-left, 0px)); }
+.key.inline .key-h { padding-left: 12px; }
+.key-h h3 { font-size: 13px; letter-spacing: 0.03em; white-space: nowrap; }
+.key-h .for { flex: 1; min-width: 0; color: var(--ink-2); font: 12.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.key-b { overflow: auto; min-height: 0; padding: 0 14px 12px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 8px; }
+.key.inline .key-b { padding-left: 12px; }
+.kkind { font-family: var(--serif); font-size: 14.5px; line-height: 1.45; color: var(--ink); max-width: 78ch; }
+.ksaid { font-size: 15px; }
+.krows { display: grid; grid-template-columns: max-content fit-content(12.5em) minmax(0, 1fr) max-content; column-gap: 14px; }
+.krow { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: baseline; padding: 3px 6px; border-top: 1px solid var(--line-2); border-radius: 4px; }
+.ks { font: 600 15px var(--sans); color: var(--ink); overflow-wrap: anywhere; }
+.ks.o { font: 400 20px/1 var(--math); }
+.ks.nm { font-style: italic; font-weight: 400; }
+.kr { font-family: var(--serif); font-size: 14.5px; color: var(--ink); }
+.ka { display: block; font-size: 13.5px; color: var(--ink-2); }                /* another reading of the same symbol */
+.kn { font: 600 12.5px var(--sans); color: var(--ink-2); }                      /* the operator's name in ZAL's registry */
+.km { font-family: var(--serif); font-size: 14px; line-height: 1.4; color: var(--ink-2); }
+.krow.desk .km { font-family: var(--sans); font-size: 13px; }
+.who, .kt { font: 12px var(--sans); color: var(--ink-3); white-space: nowrap; }
+.kt code { font-size: 12px; }
+.kchips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.kchip { display: inline-flex; align-items: baseline; gap: 7px; padding: 2px 9px; border: 1px solid var(--line); border-radius: 5px; background: var(--sheet); font-size: 13px; color: var(--ink-2); }
+.kchip .ks { font-size: 13.5px; }
+.kchip .ks.o { font-size: 17px; }
+.kchip.known { border-style: dashed; }
+.kchip[aria-expanded="true"] { border-color: var(--ink-3); border-style: solid; }
+@container (max-width: 560px) {
+  .krows { grid-template-columns: max-content minmax(0, 1fr) max-content; }
+  .krow .km { grid-column: 1 / -1; grid-row: 2; }
+  .krow .btn { grid-column: 3; grid-row: 1; }
+}
+.cl-more .reading { font-family: var(--serif); font-size: 15px; color: var(--ink); }
+.marks { display: inline-flex; flex-wrap: wrap; gap: 3px; align-items: center; vertical-align: middle; max-width: 100%; }
+.m { width: 9px; height: 9px; display: inline-block; border: 1.5px solid var(--ink-3); border-radius: 1px; }
+.m.claim { background: var(--pass); border-color: var(--pass); }
+.m.hit { background: var(--claim); border-color: var(--claim); }
+.m.structure { background: var(--quiet); border-color: var(--quiet); opacity: 0.55; }
+.m.unnoticed { border-color: var(--fail); }
+.m.vacuous { border-color: var(--assume); transform: rotate(45deg) scale(0.86); }
+.m.no-change, .m.refused { border-style: dotted; }
+
+/* bench blocks */
+.block { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.block h3 { font-size: 16px; }
+.block > .lede { color: var(--ink-2); max-width: 72ch; margin-top: -6px; }
+.quote { font-family: var(--serif); font-size: 15.5px; line-height: 1.5; padding: 10px 14px; background: var(--sheet-2); border-left: 3px solid var(--line); border-radius: 0 6px 6px 0; max-width: 78ch; }
+.checks { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0; border-top: 1px solid var(--line-2); max-width: 720px; }
+.checks > div { padding: 6px 4px; border-bottom: 1px solid var(--line-2); }
+.checks .k { font-family: var(--mono); font-size: 12px; color: var(--ink-3); display: block; }
+.checks h4 { grid-column: 1 / -1; margin: 0; padding: 10px 4px 4px; font-size: 12.5px; color: var(--ink-3); font-weight: 600; border-bottom: 1px solid var(--line-2); }
+.adv { padding: 10px 14px; border-radius: 6px; background: var(--assume-bg); color: var(--ink); max-width: 78ch; }
+.adv + .adv { margin-top: 8px; }
+.adv .kind { font-family: var(--mono); font-size: 12px; color: var(--assume); font-weight: 600; }
+.adv .means { color: var(--ink-2); font-size: 13px; margin-top: 3px; }
+.story { margin: 0; padding: 0; list-style: none; counter-reset: s; max-width: 78ch; }
+.story li { counter-increment: s; position: relative; padding: 0 0 12px 34px; font-family: var(--serif); font-size: 16px; }
+.story li::before { content: counter(s); position: absolute; left: 0; top: 2px; width: 22px; height: 22px; border-radius: 11px; background: var(--quiet-bg); color: var(--quiet); font: 600 12px/22px var(--sans); text-align: center; }
+.story li:last-child::before { background: var(--fail-bg); color: var(--fail); }
+.story li + li::after { content: ""; position: absolute; left: 10.5px; top: -12px; height: 12px; border-left: 1.5px solid var(--line); }
+.scroll-x { overflow-x: auto; max-width: 100%; }
+table.matrix { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+.matrix th, .matrix td { padding: 6px 8px; border-bottom: 1px solid var(--line-2); text-align: left; vertical-align: middle; }
+.matrix th:first-child, .matrix td:first-child { min-width: 150px; }
+.matrix tr.row td:first-child { padding-left: 20px; }
+.matrix td.res { white-space: nowrap; padding-right: 18px; }
+.matrix .res .sub { display: block; margin-left: 17px; font: 500 11.5px var(--mono); color: var(--ink-3); }
+.matrix .fill { width: 100%; padding: 0; }
+@media (min-width: 620px) { .matrix tr.row td:first-child { white-space: nowrap; } }
+.matrix thead th { font-weight: 600; color: var(--ink-2); font-size: 12px; vertical-align: bottom; border-bottom: 1px solid var(--line); }
+.matrix th.col { font-family: var(--mono); color: var(--claim); font-weight: 600; writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; padding: 8px 4px; text-align: left; }
+.matrix td.cell { text-align: center; width: 30px; }
+.matrix tr.grp td { padding-top: 12px; font-family: var(--mono); font-size: 12px; color: var(--ink-3); border-bottom: 0; }
+.matrix tr.row { cursor: pointer; }
+.matrix tr.row:hover td { background: var(--sheet-2); }
+.matrix th.hl, .matrix td.hl { background: var(--claim-bg); }
+.dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: var(--claim); vertical-align: middle; }
+.skip { color: var(--ink-3); font-weight: 600; }
+.res { font-weight: 600; white-space: nowrap; }
+.res.claim { color: var(--pass); } .res.unnoticed { color: var(--fail); } .res.vacuous { color: var(--assume); } .res.structure, .res.refused, .res.no-change { color: var(--quiet); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); margin: 8px 0 2px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; font-size: 13px; max-width: 760px; }
+.kv dt { color: var(--ink-3); } .kv dd { margin: 0; overflow-wrap: anywhere; }
+.note { color: var(--ink-3); font-size: 12.5px; max-width: 78ch; }
+.empty { padding: 14px 16px; border: 1px dashed var(--line); border-radius: 8px; color: var(--ink-2); max-width: 70ch; }
+
+/* try */
+.map { width: 100%; height: auto; display: block; }
+.map text { font: 12px var(--sans); fill: var(--ink); }
+.map .edge { fill: none; stroke: var(--ink-3); stroke-width: 1.4; }
+.map .edge.on { stroke: var(--pass); stroke-width: 2.4; }
+.map .elabel { font-size: 11px; fill: var(--ink-2); paint-order: stroke; stroke: var(--sheet); stroke-width: 4px; stroke-linejoin: round; }
+.map .node rect { fill: var(--sheet); stroke: var(--ink-3); stroke-width: 1.4; }
+.map .node.unreached rect { stroke-dasharray: 3 3; }
+.map .node.on rect { fill: var(--ink); stroke: var(--ink); }
+.map .node.on text { fill: var(--sheet); font-weight: 600; }
+.map .node { cursor: pointer; }
+.arrowhead { fill: var(--ink-3); }
+.controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+@media (min-width: 620px) { .controls { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.ctl { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 12px; min-width: 0; }
+.ctx { margin-top: 10px; padding: 2px 10px 10px; border: 1px dashed var(--assume); border-radius: 6px; }
+.ctx h5 { margin: 8px 0 0; font-size: 12px; font-weight: 600; color: var(--assume); }
+.ctl h4 { margin: 0 0 8px; font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+.field { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.field > label, .field > .lab { font-family: var(--mono); font-size: 12.5px; min-width: 64px; color: var(--ink-2); }
+.opts { display: flex; flex-wrap: wrap; gap: 4px; }
+.opt { padding: 3px 9px; border: 1px solid var(--line); border-radius: 5px; background: var(--sheet); font-size: 13px; font-variant-numeric: tabular-nums; }
+.opt[aria-pressed="true"] { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
+.opt.assumed[aria-pressed="true"] { background: var(--assume); border-color: var(--assume); color: var(--sheet); }
+.numbox { width: 84px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--sheet); font-variant-numeric: tabular-nums; }
+.numbox.assumed { border-color: var(--assume); }
+.result { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.result[data-c="Accept"] { border-left: 4px solid var(--pass); }
+.result[data-c="Reject"] { border-left: 4px solid var(--quiet); }
+.result[data-c="Trap"] { border-left: 4px solid var(--fail); }
+.result .say { font-family: var(--serif); font-size: 17px; line-height: 1.45; max-width: 70ch; }
+.rrow { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.oc { font-weight: 700; padding: 2px 9px; border-radius: 5px; }
+.oc[data-c="Accept"] { background: var(--pass-bg); color: var(--pass); }
+.oc[data-c="Reject"] { background: var(--quiet-bg); color: var(--quiet); }
+.oc[data-c="Trap"] { background: var(--fail-bg); color: var(--fail); }
+table.why { border-collapse: collapse; width: 100%; font-size: 13px; }
+.why th { text-align: left; font-size: 12px; color: var(--ink-3); font-weight: 600; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); }
+.why td { padding: 7px 8px 7px 0; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+.why tr.fired td { background: var(--pass-bg); }
+.why tr.fired td:first-child { box-shadow: inset 3px 0 0 var(--pass); padding-left: 8px; }
+.tick { font-weight: 700; } .tick.y { color: var(--pass); } .tick.n { color: var(--ink-3); }
+.tv { border-radius: 4px; padding: 0 4px; white-space: nowrap; }
+.tv[data-v="true"] { background: var(--pass-bg); }
+.tv[data-v="false"] { background: var(--quiet-bg); color: var(--ink-2); text-decoration: line-through; text-decoration-color: var(--ink-3); }
+.tree { font-family: var(--mono); font-size: 12.5px; line-height: 1.9; overflow-wrap: anywhere; }
+.tree .op { color: var(--ink-3); padding: 0 3px; }
+.tree .val { color: var(--ink-3); }
+details > summary { cursor: pointer; color: var(--ink-2); font-weight: 600; }
+details[open] > summary { margin-bottom: 8px; }
+.trace { margin: 0; padding-left: 22px; font-family: var(--serif); font-size: 15px; display: flex; flex-direction: column; gap: 4px; }
+.reqs { display: flex; flex-direction: column; gap: 8px; }
+.req { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: baseline; }
+.req .en { font-size: 15px; }
+
+/* changes */
+.chg-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; max-width: 760px; }
+.chg { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border: 0; border-bottom: 1px solid var(--line-2); background: var(--sheet); text-align: left; width: 100%; }
+.chg:last-child { border-bottom: 0; }
+.chg:hover, .chg[aria-pressed="true"] { background: var(--sheet-2); }
+.chg[aria-pressed="true"] { box-shadow: inset 3px 0 0 var(--ink); }
+.chg .lab { flex: 1; min-width: 0; }
+.redline { font-family: var(--mono); font-size: 12.5px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.redline div { padding: 5px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.redline .del { background: var(--fail-bg); color: var(--fail); text-decoration: line-through; }
+.redline .add { background: var(--pass-bg); color: var(--pass); }
+.redline .gone { color: var(--ink-3); font-family: var(--sans); font-style: italic; }
+.wit { border: 1px solid var(--line-2); border-radius: 8px; padding: 10px 14px; display: grid; gap: 6px; max-width: 80ch; }
+.wit + .wit { margin-top: 8px; }
+details.more { margin-top: 8px; }
+details.more > summary { font-weight: 500; font-size: 13px; }
+.wit .en { font-size: 15px; }
+.wit .tag { font: 600 11.5px var(--sans); color: var(--ink-3); display: block; }
+textarea.src { width: 100%; min-height: 260px; font: 12.5px/1.55 var(--mono); padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--sheet-2); resize: vertical; tab-size: 2; }
+.banner { padding: 8px 12px; background: var(--assume-bg); color: var(--assume); border-radius: 6px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.foot { padding-block: 8px 12px; color: var(--ink-3); font-size: 12px; border-top: 1px solid var(--line); background: var(--sheet); display: flex; flex-wrap: wrap; gap: 4px 16px; }
+@media (prefers-reduced-motion: no-preference) { .clause, .chg, .opt, .tab, .g, .krow, .kchip { transition: background-color 120ms, box-shadow 120ms; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top wrap" id="top"></header>
+  <section class="verdict wrap" id="verdict" aria-live="polite"></section>
+  <div class="panes">
+    <article class="statement pane wrap" id="statement" aria-label="The statement"></article>
+    <section class="bench">
+      <nav class="tabs wrap" id="tabs" role="tablist" aria-label="Instruments"></nav>
+      <div class="panel wrap" id="panel" role="tabpanel" tabindex="-1"></div>
+    </section>
+  </div>
+  <footer class="foot wrap" id="foot"></footer>
+</div>
+
+<script>
+"use strict";
+const DESK = /*__ZAL_REVIEW_DESK_DATA__*/null;
+const TOKEN = "__ZAL_REVIEW_DESK_TOKEN__";
+const LIVE = DESK && DESK.mode === "live";
+
+/* ---------- small helpers ---------- */
+const SVGNS = "http://www.w3.org/2000/svg";
+function build(el, attrs, kids) {
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") el.setAttribute("class", v);
+    else if (k === "text") el.textContent = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid == null || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+const h = (tag, attrs, ...kids) => build(document.createElement(tag), attrs, kids);
+const sv = (tag, attrs, ...kids) => build(document.createElementNS(SVGNS, tag), attrs, kids);
+const $ = (id) => document.getElementById(id);
+const num = (n) => typeof n === "number" ? n.toLocaleString("en-US") : String(n);
+const plural = (n, one, many) => `${num(n)} ${n === 1 ? one : (many || one + "s")}`;
+const PASSING = new Set(["pass-with-scope", "CHECKED", "equivalent", "selected"]);
+const FAILING = new Set(["counterexample", "UNREALIZABLE", "COUNTEREXAMPLE"]);
+const tone = (s) => PASSING.has(s) ? "pass" : FAILING.has(s) ? "fail" : "quiet";
+const status = (s) => h("span", { class: "status", "data-s": tone(s), title: "ZAL's own status word" }, s);
+function store(key, value) { try { if (value === undefined) return localStorage.getItem(key); localStorage.setItem(key, value); } catch (e) { return null; } }
+
+/* ---------- state ---------- */
+const S = { i: 0, tab: "evidence", read: { english: true, symbols: true, typed: false }, sel: null, sim: null, change: null, col: null,
+            candidate: null, draft: null, busy: false, stale: false, live: null, liveKey: null };   /* the last five matter only when live */
+/* The reading key: the line it explains, the symbol it shows in full, the symbols this reader has learned, and what the pointer is on. */
+const K = { at: null, peek: null, said: null, hidden: false, known: new Set(), hot: null, lines: [], marks: [] };
+const wide = window.matchMedia("(min-width: 1060px)");
+const B = () => DESK.bundles[S.i];
+
+const CHECKS = {
+  initial_nonempty: ["An initial configuration exists", "s"],
+  typing: ["Every name and comparison is well formed", "s"],
+  determinism: ["No input enables two rules at once", "s"],
+  update_ranges: ["No update leaves its declared range", "s"],
+  coverage_with_explicit_default: ["Every input is decided, by a rule or by the stated default", "s"],
+  reachable_invariants: ["Every invariant holds in every reachable configuration", "c"],
+  invariant_preservation: ["Every accepted step that starts where the invariants hold ends where they hold", "c"],
+  raw_commit_invariants: ["Every accepted step, from any declared state, lands where every invariant holds", "c"],
+  transition_requirements: ["Every requirement holds on every step that starts where the invariants hold", "c"],
+  temporal_properties: ["Every property holds over every execution it ranges over", "c"],
+  game_properties: ["Each game property is won from the start, by two solvers that agree", "c"],
+};
+const MEANS = {
+  "no-application-invariants": "This profile's only claim form is the invariant, and none is declared. The pass covers structure only.",
+  "no-application-claims": "No invariant, requirement or property is declared. The pass covers structure only.",
+  "no-fair-execution": "No execution satisfies the fairness assumptions, so every liveness property passed without being tested.",
+  "invariant-domain-tautology": "This invariant is true of every declared configuration, so it rules nothing out.",
+  "requirement-premise-never-true": "The “if” part of this requirement never happens, so the requirement cannot fail.",
+  "property-trigger-never-reached": "The situation this property talks about is never reached, so the property cannot fail.",
+  "guard-never-true-at-source": "This rule's guard is never true in its source state, so the rule never fires.",
+  "unreachable-source": "This rule's source state is never reached from the start.",
+};
+const CLASS_WORDS = {
+  claim: "noticed by a claim", structure: "noticed by structure only", unnoticed: "unnoticed",
+  vacuous: "passes for the wrong reason", "no-change": "changes no decision", refused: "refused by ZAL",
+};
+const EDIT_WORDS = { delete: "Delete the rule", open: "Replace its guard with true", strip: "Remove its updates" };
+const SECTIONS = [
+  { id: "words", title: "Vocabulary", note: "what exists and what arrives", concepts: ["states", "events", "facts", "input", "var", "initial", "frame", "default"] },
+  { id: "rules", title: "Rules", note: "what the machine does", concepts: ["rule"] },
+  { id: "claims", title: "Claims", note: "what must hold; a pass is about these", concepts: ["invariant", "require", "property", "game"] },
+  { id: "assumptions", title: "Assumptions", note: "taken as given, never checked", concepts: ["fairness"] },
+  { id: "players", title: "Players", note: "who chooses the event in which state", concepts: ["player"] },
+  { id: "symmetry", title: "Symmetries", note: "declared interchangeable, and checked", concepts: ["symmetry"] },
+  { id: "open", title: "Stated but not checked", note: "kept in the statement; no check covers them", concepts: ["unresolved"] },
+];
+
+const READINGS = [["english", "English", "ZAL's own sentence for each line"], ["symbols", "Symbols", "Each line in formal symbols"], ["typed", "Typed", "Each line as ZAL prints and parses it"]];
+const KIND_NAMES = { states: "the control states", events: "the events", facts: "the context facts", initial: "the initial state", frame: "the frame", default: "the default" };
+const CMP = { "==": "eq", "!=": "ne", "<": "lt", "<=": "le", ">": "gt", ">=": "ge" };
+
+/* ---------- derived facts about a bundle ---------- */
+/* When an edit breaks an invariant, ZAL stops there: no other claim is asked about that edit. */
+const stopped = (row, claim) => claim !== "invariants" && (row.noticed_by || []).includes("invariants");
+const memo = new WeakMap();
+function facts(b) {
+  if (memo.has(b)) return memo.get(b);
+  const rows = b.edits ? b.edits.rows : [];
+  const byClass = {}; rows.forEach((r) => { byClass[r.class] = (byClass[r.class] || 0) + 1; });
+  const reach = rows.filter((r) => r.class === "claim" || r.class === "unnoticed" || r.class === "vacuous");   /* edits that get past the structural checks */
+  const perClaim = {}; (b.edits ? b.edits.columns : []).forEach((c) => {
+    const asked = reach.filter((r) => !stopped(r, c.id)), hits = asked.filter((r) => r.noticed_by.includes(c.id));
+    perClaim[c.id] = { usable: c.usable !== false, asked, hits: hits.length, sole: c.id === "invariants" ? 0 : hits.filter((r) => r.noticed_by.length === 1).length };
+  });
+  const perRule = {}; rows.forEach((r) => { (perRule[r.rule] = perRule[r.rule] || []).push(r); });
+  const m = b.model;
+  const claims = (m.invariants || []).length + (m.requirements || []).length + (m.properties || []).length + (m.games || []).length;
+  const f = { rows, byClass, perClaim, perRule, claims, advisories: b.check.advisories || [], unresolved: b.check.unresolved || [] };
+  memo.set(b, f); return f;
+}
+function keyOf(b, given) {
+  const a = b.axes;
+  return [given.state, ...a.variables.map((v) => given.variables[v.name]), given.event,
+          ...a.facts.map((f) => (given.context[f] ? 1 : 0)), ...a.inputs.map((i) => given.context[i.name])].join("|");
+}
+function parseKey(b, key) {
+  const a = b.axes, p = key.split("|"); let i = 0;
+  const given = { state: p[i++], variables: {}, event: null, context: {} };
+  a.variables.forEach((v) => { given.variables[v.name] = Number(p[i++]); });
+  given.event = p[i++];
+  a.facts.forEach((f) => { given.context[f] = p[i++] === "1"; });
+  a.inputs.forEach((x) => { given.context[x.name] = Number(p[i++]); });
+  return given;
+}
+const configKey = (b, state, variables) => [state, ...b.axes.variables.map((v) => variables[v.name])].join("|");
+function decision(b, given) {
+  const d = b.decisions;
+  if (!d || d.status !== "complete") return null;
+  const row = d.rows[d.index[keyOf(b, given)]];
+  if (!row) return null;
+  return { outcome: d.kept.outcome[row[0]], admissible: !!row[1], rules: row[2].map((x, n) => ({ ...d.static.rules[n], ...d.kept.rule[x] })),
+           requirements: row[3].map((x, n) => ({ ...d.static.requirements[n], ...d.kept.claim[x] })),
+           invariants: row[4].map((x, n) => ({ ...d.static.invariants[n], ...d.kept.claim[x] })),
+           sentence: d.kept.sentence[row[5]], nearest: d.kept.nearest[row[6]] };
+}
+function startInput(b) {
+  const a = b.axes, variables = {}, context = {};
+  a.variables.forEach((v) => { variables[v.name] = v.initial; });
+  a.facts.forEach((f) => { context[f] = false; });
+  a.inputs.forEach((x) => { context[x.name] = x.low; });
+  let event = a.events[0];
+  const d = b.decisions;
+  if (d && d.status === "complete") {                       /* open on an input where something happens */
+    for (const e of a.events) for (const key of Object.keys(d.index)) {
+      const g = parseKey(b, key);
+      if (g.state === a.initial && g.event === e && a.variables.every((v) => g.variables[v.name] === v.initial) && d.kept.outcome[d.rows[d.index[key]][0]].class === "Accept")
+        return { state: a.initial, variables, event: e, context: g.context, trace: [] };
+    }
+  }
+  return { state: a.initial, variables, event, context, trace: [] };
+}
+function describe(b, given) {
+  const vs = b.axes.variables.map((v) => `${v.name}=${given.variables[v.name]}`).join(", ");
+  const cs = [...b.axes.facts.map((f) => `${f}=${given.context[f] ? "true" : "false"}`), ...b.axes.inputs.map((x) => `${x.name}=${given.context[x.name]}`)].join(", ");
+  return `${given.state}${vs ? " with " + vs : ""}, event ${given.event}${cs ? " with " + cs : ""}`;
+}
+
+/* ---------- navigation ---------- */
+function go(tab, after) {
+  if (tab === "statement" && wide.matches) tab = "evidence";
+  S.tab = tab;
+  try { history.replaceState(null, "", "#" + tab); } catch (e) { /* the frame may refuse; the tab still switches */ }
+  render();
+  if (after) after();
+}
+function select(i) { S.i = i; S.sel = null; K.at = null; K.peek = null; K.said = null; S.sim = startInput(B()); S.change = null; S.col = null; S.candidate = null; S.draft = null; S.live = null; S.liveKey = null; store("zal-review-desk-model", B().file); render(); }
+function tryInput(given) { S.sim = { ...given, variables: { ...given.variables }, context: { ...given.context }, trace: [] }; go("try"); }
+function pickClause(key) { S.sel = S.sel === key ? null : key; if (K.at !== key) { K.at = key; K.peek = null; K.said = null; } render(); }
+
+/* ---------- top, verdict, footer ---------- */
+function renderTop() {
+  const top = $("top"); top.replaceChildren();
+  top.append(h("div", { class: "brand" }, h("b", {}, "ZAL"), h("span", {}, "review desk")));
+  if (DESK.bundles.length > 1) {
+    const sel = h("select", { id: "model", onchange: (e) => select(Number(e.target.value)) },
+      DESK.bundles.map((b, i) => h("option", { value: i, selected: i === S.i }, `${b.name}  (${b.file})`)));
+    top.append(h("div", { class: "pick" }, h("label", { for: "model" }, "Statement"), sel));
+  }
+  top.append(h("div", { class: "mode" }, LIVE ? ["Live on this machine, reading ", h("code", {}, DESK.file)] : ["Snapshot: every result here was computed beforehand. ", h("code", {}, "review_desk.py serve"), " asks ZAL directly."]));
+  const dark = document.documentElement.getAttribute("data-theme") === "dark" || (!document.documentElement.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  top.append(h("button", { class: "btn small", id: "theme", onclick: () => { document.documentElement.setAttribute("data-theme", dark ? "light" : "dark"); store("zal-review-desk-theme", dark ? "light" : "dark"); renderTop(); } }, dark ? "Light" : "Dark"));
+}
+function gloss(b, f) {
+  const s = b.check.status;
+  if (s === "pass-with-scope") return f.claims === 0 ? "The structural checks passed. No claim about the application is stated, so nothing about it was checked." : "Every stated claim passed ZAL's finite check.";
+  if (s === "unsupported") return `The checks that can run passed. ${plural(f.unresolved.length, "obligation is", "obligations are")} stated but not checked.`;
+  if (s === "counterexample") return `A check failed: ${b.check.obligation}. ZAL's account of it is under Evidence.`;
+  return "ZAL did not complete the check.";
+}
+function renderVerdict() {
+  const b = B(), f = facts(b), c = b.check, v = $("verdict"); v.replaceChildren(); const shaky = c.status === "pass-with-scope" && (f.claims === 0 || f.advisories.length || f.byClass.vacuous || (b.edits ? b.edits.probes : []).some((p) => p.status === "counterexample"));
+  v.setAttribute("data-s", shaky ? "warn" : tone(c.status));
+  v.append(h("div", { class: "v-head" }, h("h1", { class: "v-name" }, b.name), h("span", { class: "v-file" }, b.file), h("span", { class: "v-file" }, b.profile)));
+  v.append(h("p", { class: "v-line" }, status(c.status), h("span", {}, gloss(b, f))));
+  const m = b.model, parts = [];
+  const add = (n, label) => { if (n != null) parts.push(h("span", {}, h("b", {}, num(n)), " " + label)); };
+  add(c.input_tuples, "input tuples"); add(c.configurations, "configurations");
+  add(c.reachable_configurations != null ? c.reachable_configurations : (c.reachable_states || []).length || null, c.reachable_configurations != null ? "reachable" : "reachable states");
+  add(m.rules.length, "rules"); add(f.claims, f.claims === 1 ? "claim" : "claims"); add((m.fairness || []).length || null, "assumed");
+  if (parts.length) v.append(h("div", { class: "v-facts" }, parts));
+  const alerts = [];
+  f.advisories.forEach((a) => alerts.push(h("button", { class: "alert warn", onclick: () => go("evidence", () => scrollTo("ev-adv")) }, "Advisory: ", h("code", {}, a.kind))));
+  if (f.rows.length) {
+    const un = f.byClass.unnoticed || 0, vac = f.byClass.vacuous || 0, noticed = f.byClass.claim || 0, st = f.byClass.structure || 0;
+    const text = `${plural(f.rows.length, "planted defect")}: ${noticed} noticed by a claim, ${st} by structure only, ${un} unnoticed${vac ? `, ${vac} passing for the wrong reason` : ""}`;
+    alerts.push(h("button", { class: "alert " + (vac ? "warn" : un ? "bad" : "ok"), onclick: () => go("evidence", () => scrollTo("ev-defects")) }, text));
+  }
+  (b.edits ? b.edits.probes : []).filter((p) => p.status === "counterexample").forEach((p) =>
+    alerts.push(h("button", { class: "alert bad", onclick: () => go("evidence", () => scrollTo("ev-defects")) }, `${p.claimant} can win by starving the assumption ${p.assumption}`)));
+  if (f.unresolved.length) alerts.push(h("button", { class: "alert info", onclick: () => go("evidence", () => scrollTo("ev-open")) }, `${plural(f.unresolved.length, "obligation")} not checked`));
+  if (alerts.length) v.append(h("div", { class: "v-alerts" }, alerts));
+  if (LIVE && S.stale) v.append(h("div", { class: "banner" }, "The file changed on disk. This page still shows the earlier revision.", h("button", { class: "btn small", onclick: () => location.reload() }, "Reload")));
+}
+function renderFoot() {
+  const b = B();
+  $("foot").replaceChildren(
+    h("span", {}, "authority: none"), h("span", {}, "This page records no agreement."), h("span", {}, LIVE ? "live on 127.0.0.1" : "snapshot: results computed ahead of time"),
+    h("span", {}, "revision ", h("code", {}, b.revision.slice(0, 12))), h("span", {}, "checker ", h("code", {}, b.checker.slice(0, 12))));
+}
+function scrollTo(id) { const el = $(id); if (el) el.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); }
+
+/* ---------- the statement ---------- */
+function marks(rows) { return h("span", { class: "marks" }, rows.map((r) => h("i", { class: "m " + r.class, title: `${r.label}: ${CLASS_WORDS[r.class]}` }))); }
+function splitEnglish(clause) {
+  const text = clause.english, at = text.indexOf(": ");
+  return clause.id && at > 0 && at < 80 ? text.slice(at + 2) : text;
+}
+const lineKey = (b, clause) => `${clause.concept}:${clause.id || b.declared.indexOf(clause)}`;
+function setReading(id) {
+  const next = { ...S.read, [id]: !S.read[id] };
+  if (!READINGS.some(([r]) => next[r])) return;                 /* one reading always stays */
+  S.read = next; store("zal-review-desk-readings", READINGS.filter(([r]) => next[r]).map(([r]) => r).join(" ")); render();
+}
+
+/* A line in symbols. Each symbol and name is its own element, so the reading key can point at it and it can point back. */
+const known = (k) => K.known.has(k);
+function tip(b, k) {
+  if (k.startsWith("name:")) { const n = b.key.names[k.slice(5)]; return n ? `${n.role}. ${n.english}` : null; }
+  const e = b.key.entries[k]; return e ? `${readings(e).join("; or ")}. ${e.meaning}` : null;
+}
+const readings = (e) => [e.read, ...(e.also || [])];             /* the formal reading first, then any other way ZAL reads the symbol */
+const lettering = (text, k) => k.startsWith("name:") ? "nm" : /^[a-z]/.test(text) ? "w" : "o";     /* a declared name, a word of the logic, or a symbol */
+function symbol(b, text, k, extra) {
+  const el = h("span", { class: "g " + lettering(text, k) + (extra ? " " + extra : ""), "data-k": k, title: tip(b, k) }, text);
+  K.marks.push([k, el]); return el;
+}
+const spelled = (b, segments) => segments.map(([text, k, mark]) => k ? symbol(b, text, k, mark) : text);
+function formula(b, clause) {
+  const body = clause.formal.filter((s) => s[2] !== "note"), notes = clause.formal.filter((s) => s[2] === "note"), more = clause.more;
+  const kept = more ? more.filter((s) => s[1] === "prime").length : 0, long = body.reduce((n, s) => n + s[0].length, 0) > 56, lines = [[]];
+  body.forEach((s) => { if (long && s[2] === "main" && lines[lines.length - 1].length) lines.push([]); lines[lines.length - 1].push(s); });   /* a long line breaks before its main connective */
+  const tail = [more ? [h("span", { class: "fm-more" }, spelled(b, more)), h("span", { class: "fm-fold", title: "What this rule leaves unchanged. It shows when you point at the line or open it." }, `∧ ${kept} unchanged`)] : null,
+    notes.map((s) => h("span", { class: "fm-note" }, s[0]))];
+  return h("span", { class: "fm", role: "math", "aria-label": clause.english }, lines.map((part, n) => h("span", { class: "fm-l" + (n ? " cont" : "") }, spelled(b, part), n === lines.length - 1 ? tail : null)));
+}
+
+/* What a line does on the input now on the Try tab, while the statement lies beside it. */
+function liveDecision(b) {
+  if (S.tab !== "try" || !wide.matches || !S.sim) return null;
+  const given = { state: S.sim.state, variables: S.sim.variables, event: S.sim.event, context: S.sim.context };
+  const dec = b.decisions.status === "complete" ? decision(b, given) : (S.live && S.live.key === keyOf(b, given) ? S.live : null);
+  return dec && !dec.error ? dec : null;
+}
+function onThisInput(clause, dec) {
+  if (!dec) return null;
+  const o = dec.outcome, find = (list) => (list || []).find((x) => x.id === clause.id);
+  if (clause.concept === "rule") {
+    const r = find(dec.rules);
+    if (o.rule === clause.id) return o.class === "Accept" ? ["yes", "accepts this input"] : o.class === "Reject" ? ["yes", "rejects this input"] : ["fails", "its update leaves the range here"];
+    return r && r.state_matches && r.event_matches ? ["no", "its guard is false here"] : null;
+  }
+  if (clause.concept === "default") return o.rule === "default" ? ["yes", "rejects this input"] : null;
+  if (clause.concept === "invariant") { const r = find(dec.invariants); return r && "before" in r ? [r.before && r.after ? "holds" : "fails", !r.before ? "broken here" : !r.after ? "broken by this step" : "holds here"] : null; }
+  if (clause.concept === "require") { const r = find(dec.requirements); return r ? [r.value ? "holds" : "fails", r.value ? "holds on this step" : "violated on this step"] : null; }
+  return null;
+}
+function coverage(b, f, clause, dec) {
+  /* cov: the rail colour. margin: short marginal notes. detail: full sentences for the opened clause. now: this line on the input being tried. */
+  const out = { cov: null, now: null, margin: [], detail: [] }, isClaim = ["require", "property", "game", "invariant"].includes(clause.concept), now = onThisInput(clause, dec);
+  if (now) { out.now = now[0]; out.margin.push(h("span", { class: "now " + now[0] }, now[1])); }
+  if (clause.concept === "rule" && f.perRule[clause.id]) {
+    const rows = f.perRule[clause.id], by = [...new Set(rows.flatMap((r) => r.noticed_by || []))];
+    const lost = rows.filter((r) => r.class === "unnoticed" || r.class === "vacuous"), claimed = rows.some((r) => r.class === "claim");
+    out.cov = lost.length ? "free" : claimed ? "held" : "structure";
+    out.margin.push(marks(rows));
+    if (lost.length) out.margin.push(h("span", { class: "bad" }, lost.some((r) => r.kind === "delete") ? "no claim holds it" : `${plural(lost.length, "edit")} unnoticed`));
+    else out.margin.push(h("span", {}, claimed ? `held by ${plural(by.length || 1, "claim")}` : rows.every((r) => r.class === "refused") ? "ZAL refuses each edit" : rows.every((r) => r.class === "no-change") ? "edits change nothing" : "structure only"));
+    if (lost.some((r) => r.kind === "delete")) out.detail.push(h("p", {}, h("b", { style: "color:var(--fail)" }, "No claim notices if this rule is deleted. "), "Either a claim is missing or this behavior is meant to be free."));
+    else if (lost.length) out.detail.push(h("p", {}, h("b", { style: "color:var(--fail)" }, `${plural(lost.length, "edit")} to this rule ${lost.length === 1 ? "goes" : "go"} unnoticed: `), lost.map((r) => r.label).join("; "), "."));
+    if (by.length) out.detail.push(h("p", {}, "Held in place by ", by.map((id, n) => [n ? ", " : "", h("code", { style: "color:var(--claim)" }, id)]), "."));
+    else if (!lost.length && rows.every((r) => r.class === "refused")) out.detail.push(h("p", {}, "ZAL does not accept the statement with any of these edits: ", h("span", { class: "reading" }, rows[0].diagnostic)));
+    else if (!lost.length) out.detail.push(h("p", {}, "Only the structural checks notice an edit to this rule."));
+  }
+  if (isClaim) {
+    const p = (b.check.properties || {})[clause.id];
+    if (p) out.margin.push(h("span", {}, status(p.status), " ", p.kind));
+    const id = clause.concept === "invariant" ? "invariants" : clause.id, stat = b.edits && b.edits.breakdown ? f.perClaim[id] : null;
+    if (stat && stat.usable) {
+      const asked = stat.asked.length, skipped = f.rows.filter((r) => stopped(r, id)).length;
+      out.cov = stat.hits ? "teeth" : "blunt";
+      out.margin.push(h("span", { class: "marks" }, stat.asked.map((r) => h("i", { class: "m " + (r.noticed_by.includes(id) ? "hit" : ""), title: r.label }))));
+      out.margin.push(h("span", { class: stat.hits ? "" : "warn" }, `notices ${stat.hits} of ${asked}`));
+      out.detail.push(h("p", {}, stat.hits ? `ZAL names it as failing on ${stat.hits} of the ${plural(asked, "planted defect")} that reach it${stat.sole ? `, and it is the only claim named for ${stat.sole} of them` : ""}.`
+        : `It notices none of the ${plural(asked, "planted defect")} that reach it. It may still guard against edits this page did not try.`,
+        skipped ? ` ${plural(skipped, "more defect")} break an invariant first. ZAL stops there, so this claim is not asked about ${skipped === 1 ? "it" : "them"}.` : ""));
+    }
+  }
+  if (clause.concept === "fairness") {
+    out.cov = "assume"; out.margin.push(h("span", { class: "warn" }, "assumed"));
+    (b.edits ? b.edits.probes : []).filter((p) => p.assumption === clause.id).forEach((p) => {
+      out.margin.push(p.status === "pass-with-scope" ? h("span", {}, `${p.other} can meet it`) : h("span", { class: "bad" }, "can be starved"));
+      out.detail.push(h("p", {}, p.status === "pass-with-scope" ? `${p.other} can always bring this about, so ${p.claimant}'s claim is about the machine.` : `${p.other} cannot always bring this about. ${p.claimant} can win by starving it, so a pass that leans on it is empty.`));
+    });
+  }
+  const adv = clause.id ? f.advisories.filter((a) => Object.values(a).includes(clause.id)) : [];
+  if (adv.length) { if (isClaim) out.cov = "blunt"; out.margin.push(h("span", { class: "warn" }, "advisory")); }
+  return out;
+}
+function clauseMore(b, f, clause, cover, voc) {
+  const out = [];                                               /* opening a line shows the readings that are switched off */
+  if (!S.read.english || voc) out.push(h("p", { class: "en" }, clause.english));
+  if (!S.read.symbols && clause.formal) out.push(formula(b, clause));
+  if (!S.read.typed && (!S.read.symbols || clause.formal)) out.push(h("code", { class: "sy" }, clause.symbolic));
+  if (S.read.symbols && !wide.matches) out.push(h("div", { class: "key inline" }, h("div", { class: "key-h" }, h("h3", {}, "How to read it")), h("div", { class: "key-b" }, keyBody(b, clause))));
+  else if (S.read.symbols && !K.hidden) out.push(h("div", {}, h("button", { class: "link", onclick: () => { const dock = $("key"), first = dock && all(dock, "BUTTON")[0]; if (first) first.focus(); } }, "Go to the reading key for this line")));
+  out.push(...cover.detail);
+  const reading = b.readings.find((r) => r.property === clause.id);
+  if (reading) out.push(h("div", {}, h("span", { class: "note" }, "ZAL's plain reading"), h("p", { class: "reading" }, reading.plain_rung), h("span", { class: "note" }, "ZAL's own formula rung"), h("code", { class: "sy" }, reading.formula_rung)));
+  const p = (b.check.properties || {})[clause.id];
+  if (p && p.mode) out.push(h("p", {}, "Ranges over ", p.mode, "."));
+  if (p && p.solvers) out.push(h("p", {}, `Won from ${p.winning_configurations} of ${p.configurations} reachable configurations; solvers: ${p.solvers.join(" and ")}.`));
+  f.advisories.filter((a) => clause.id && Object.values(a).includes(clause.id)).forEach((a) => out.push(h("div", {}, h("p", { class: "reading" }, a.message), MEANS[a.kind] ? h("p", {}, MEANS[a.kind]) : null)));
+  const acts = [];
+  if (clause.concept === "rule" && b.decisions.status === "complete") {
+    const d = b.decisions, key = Object.keys(d.index).find((k) => d.kept.outcome[d.rows[d.index[k]][0]].rule === clause.id);
+    if (key) acts.push(h("button", { class: "btn small", onclick: () => tryInput(parseKey(b, key)) }, "Show a step where it fires"));
+    else out.push(h("p", { class: "warn" }, "No declared input makes this rule fire."));
+  }
+  if (clause.concept === "rule" && f.perRule[clause.id]) acts.push(h("button", { class: "btn small", onclick: () => { S.change = f.rows.indexOf(f.perRule[clause.id][0]); go("changes"); } }, "See what editing it would change"));
+  if (["require", "property", "game", "invariant"].includes(clause.concept) && b.edits && b.edits.breakdown)
+    acts.push(h("button", { class: "btn small", onclick: () => { S.col = clause.concept === "invariant" ? "invariants" : clause.id; go("evidence", () => scrollTo("ev-defects")); } }, "See what it notices"));
+  if (acts.length) out.push(h("div", { class: "rrow" }, acts));
+  return out;
+}
+function line(b, f, clause, dec, voc) {                       /* one line of the statement: a button that opens it, then what opening shows */
+  const key = lineKey(b, clause), open = S.sel === key, cover = coverage(b, f, clause, dec), typed = S.read.typed || (S.read.symbols && !clause.formal);
+  const head = h("button", { class: "cl-head" + (S.read.english ? "" : " stacked"), "aria-expanded": String(open), onclick: () => pickClause(key) },
+    h("span", { class: "cl-main" }, clause.id ? h("span", { class: "cl-id" }, clause.id) : null,
+      S.read.english && !voc ? h("span", { class: "en" }, clause.id ? splitEnglish(clause) : clause.english) : null,
+      S.read.symbols && clause.formal ? formula(b, clause) : null,
+      typed ? h("code", { class: "sy" }, clause.symbolic) : null),
+    cover.margin.length ? h("span", { class: "cl-margin" }, cover.margin) : null);
+  const el = h("div", { class: "clause" + (voc ? " voc" : "") + (open ? " open" : "") + (K.at === key ? " at" : ""), "data-clause": key, "data-cov": cover.cov, "data-now": cover.now },
+    head, open ? h("div", { class: "cl-more" }, clauseMore(b, f, clause, cover, voc)) : null);
+  K.lines.push([key, el]); return el;
+}
+function renderStatement(target, docked) {
+  const b = B(), f = facts(b), dec = liveDecision(b), doc = h("div", { class: "doc", id: docked ? "doc" : null });
+  K.lines = []; K.marks = [];
+  doc.append(h("div", { class: "doc-head" }, h("h2", {}, "The statement"),
+    h("div", { class: "seg", role: "group", "aria-label": "Which readings to show" }, READINGS.map(([id, label, what]) =>
+      h("button", { "aria-pressed": String(S.read[id]), title: what, onclick: () => setReading(id) }, label)))));
+  const pre = b.comment.length ? b.comment.join(" ") : "";
+  if (pre) doc.append(h("p", { class: "preface" }, h("span", {}, "The author's note: "), pre));
+  doc.append(h("p", { class: "preface" }, S.read.english ? "Serif text is ZAL's own English. " : null,
+    S.read.symbols ? "The symbols are the desk's spelling of each line, in the symbols of ZAL's ladder, checked against ZAL. " : null,
+    S.read.typed ? "Typed is the line as ZAL prints and parses it. " : null, "Every reading comes from one typed model."));
+  if (f.rows.length) doc.append(h("div", { class: "rail-key" }, h("span", {}, "The bar beside a rule says whether any claim would notice it changing:"),
+    h("span", {}, h("i", { style: "background:var(--pass)" }), "held by a claim"), h("span", {}, h("i", { style: "background:var(--quiet)" }), "structure only"), h("span", {}, h("i", { style: "background:var(--fail)" }), "free")));
+  if (dec) doc.append(h("div", { class: "rail-key" }, h("span", {}, "While you try an input, each line says what it does on that input.")));
+  SECTIONS.forEach((sec) => {
+    const list = b.declared.filter((c) => sec.concepts.includes(c.concept));
+    if (!list.length) return;
+    const voc = sec.id === "words";
+    const box = h("section", { class: "sec", "data-kind": sec.id }, h("div", { class: "sec-h" }, h("h3", {}, `${sec.title}${["rules", "claims", "assumptions"].includes(sec.id) ? " (" + list.length + ")" : ""}`), h("span", {}, sec.note)));
+    if (voc && S.read.english) box.append(h("div", { class: "preamble" }, h("p", { class: "en" }, list.map((c) => c.english).join(" "))));   /* short declarations read best as one paragraph */
+    if (voc && !S.read.symbols) { if (S.read.typed) box.append(h("div", { class: "preamble" }, h("code", { class: "sy" }, list.map((c) => c.symbolic).join("\n")))); }
+    else list.forEach((clause) => box.append(line(b, f, clause, dec, voc)));
+    if (sec.id === "assumptions" || (voc && (b.axes.facts.length || b.axes.inputs.length)))
+      box.append(h("p", { class: "note", style: "margin-top:6px" }, voc ? "Context facts and inputs arrive fresh on every step. They are supplied, not authenticated." : "A claim that leans on an assumption says nothing about runs where the assumption fails."));
+    doc.append(box);
+  });
+  if (f.claims === 0) doc.append(h("section", { class: "sec", "data-kind": "claims" }, h("div", { class: "sec-h" }, h("h3", {}, "Claims (0)"), h("span", {}, "what must hold; a pass is about these")),
+    h("p", { class: "empty", style: "margin-top:10px" }, "This statement makes no claim. It says what the machine does and nothing about what must be true of it, so a pass here is a pass on structure alone.")));
+  if (S.read.symbols && !wide.matches) doc.append(h("section", { class: "sec" }, h("div", { class: "sec-h" }, h("h3", {}, "Reading key"), h("span", {}, "open a line to see how to read it")), h("div", { class: "key inline", style: "margin-top:10px" }, h("div", { class: "key-b", style: "padding-top:10px" }, keyBody(b, null)))));
+  target.replaceChildren(...[doc, docked && S.read.symbols && wide.matches ? h("aside", { class: "key", id: "key", "aria-label": "Reading key" }) : null].filter(Boolean));
+  if (docked) renderKey();
+}
+
+/* ---------- the reading key: how to read the line being read ---------- */
+/* It follows the line under the pointer or the keyboard. Symbols the reader has marked as learned shrink to a
+   word; none is ever removed. On a narrow screen the same key opens inside the line that was tapped. */
+function flag(el, name, on) { const have = (el.getAttribute("class") || "").split(" ").filter((c) => c && c !== name); if (on) have.push(name); el.setAttribute("class", have.join(" ")); }
+function all(root, tag) { const out = []; (function walk(n) { (n.children ? [...n.children] : []).forEach((kid) => { if (kid.tagName === tag) out.push(kid); walk(kid); }); })(root); return out; }
+function nearest(node, attribute) { for (; node; node = node.parentNode) if (node.getAttribute && node.getAttribute(attribute) != null) return node; return null; }
+function keyRows(b, clause) {                                  /* the symbols and names of one line, or the symbols of the whole statement, in reading order */
+  const seen = [];
+  (clause ? [clause] : b.declared).forEach((c) => [...(c.formal || []), ...(c.more || [])].forEach((s) => { if (s[1] && !seen.includes(s[1])) seen.push(s[1]); }));
+  return { symbols: seen.filter((k) => b.key.entries[k]), names: clause ? seen.filter((k) => k.startsWith("name:") && b.key.names[k.slice(5)]).map((k) => k.slice(5)) : [] };
+}
+function learn(k, on) { if (on) K.known.add(k); else K.known.delete(k); K.peek = null; store("zal-review-desk-learned", JSON.stringify([...K.known])); render(); }
+function refreshKey() { if (wide.matches) renderKey(); else render(); }
+function keyRow(b, k) {
+  const e = b.key.entries[k], is = known(k);
+  const row = h("div", { class: "krow" + (e.desk ? " desk" : ""), "data-k": k },
+    h("span", { class: "ks " + lettering(e.symbol, k) }, e.symbol),
+    h("span", { class: "kr" }, e.read === e.symbol ? "" : e.read, (e.also || []).map((text) => h("span", { class: "ka" }, "or ", text))),
+    h("span", { class: "km" }, e.name ? h("span", { class: "kn" }, e.name + ". ") : null, e.meaning, e.desk ? h("span", { class: "who" }, " The desk's wording.") : null, e.typed && e.typed !== e.symbol ? h("span", { class: "kt" }, " Typed ", h("code", {}, e.typed)) : null),
+    h("button", { class: "btn small", "aria-pressed": String(is), onclick: () => learn(k, !is) }, is ? "Learned" : "I know this"));
+  K.marks.push([k, row]); return row;
+}
+function keyChip(b, k) {
+  const e = b.key.entries[k], el = h("button", { class: "kchip" + (known(k) ? " known" : ""), "data-k": k, "aria-expanded": String(K.peek === k), title: tip(b, k),
+    onclick: () => { K.peek = K.peek === k ? null : k; refreshKey(); } }, h("span", { class: "ks " + lettering(e.symbol, k) }, e.symbol), e.read === e.symbol ? null : h("span", {}, e.read));
+  K.marks.push([k, el]); return el;
+}
+function nameRow(b, n) {
+  const told = b.key.names[n], row = h("div", { class: "krow name", "data-k": "name:" + n }, h("span", { class: "ks nm" }, n), h("span", { class: "kr" }, told.role), h("span", { class: "km" }, told.english), h("span", {}));
+  K.marks.push(["name:" + n, row]); return row;
+}
+function keyBody(b, clause) {
+  const out = [], rows = keyRows(b, clause);
+  if (!clause) {
+    out.push(h("p", { class: "note" }, wide.matches ? "Point at a line, or move to it with the keyboard, and this key shows how to read that line. Every symbol in this statement:" : "Every symbol in this statement:"));
+    out.push(h("div", { class: "kchips" }, rows.symbols.map((k) => keyChip(b, k))));
+    if (K.peek && b.key.entries[K.peek]) out.push(h("div", { class: "krows" }, keyRow(b, K.peek)));
+    if (K.known.size) out.push(h("div", {}, h("button", { class: "link", onclick: () => { K.known = new Set(); K.peek = null; store("zal-review-desk-learned", "[]"); render(); } }, "Show every meaning again")));
+    return out;
+  }
+  const key = lineKey(b, clause), kind = b.key.kinds[clause.concept], wording = b.key.wording[clause.concept];
+  const fresh = rows.symbols.filter((k) => !known(k) || K.peek === k), learned = rows.symbols.filter((k) => known(k) && K.peek !== k);
+  if (kind) out.push(h("p", { class: "kkind" }, kind));
+  if (wording && clause.formal) out.push(h("p", { class: "note" }, wording));
+  if (!clause.formal) out.push(h("p", { class: "note" }, "This line has no formula form, so it is shown as ZAL prints it."));
+  if (!S.read.english && clause.formal) out.push(K.said === key ? h("p", { class: "en ksaid" }, clause.english)
+    : h("div", {}, h("button", { class: "btn small", onclick: () => { K.said = key; refreshKey(); } }, "Check your reading against ZAL's English")));
+  if (fresh.length || rows.names.length) out.push(h("div", { class: "krows" }, fresh.map((k) => keyRow(b, k)), rows.names.map((n) => nameRow(b, n))));
+  if (fresh.some((k) => (b.key.entries[k].also || []).length)) out.push(h("p", { class: "note" }, "A symbol's first reading is the formal one, from ZAL's ladder. A second is another way ZAL says it."));
+  if (learned.length) out.push(h("div", { class: "kchips" }, h("span", { class: "note" }, "Learned:"), learned.map((k) => keyChip(b, k))));
+  return out;
+}
+function lineName(clause) {
+  if (clause.id) return `${clause.concept === "require" ? "requirement" : clause.concept === "game" ? "property" : clause.concept} ${clause.id}`;
+  return ["var", "input"].includes(clause.concept) ? `${clause.concept === "var" ? "variable" : "input"} ${clause.symbolic.split(" ")[1]}` : KIND_NAMES[clause.concept] || clause.concept;
+}
+function renderKey() {
+  const dock = $("key"); if (!dock) return;
+  const b = B(), clause = K.at ? b.declared.find((c) => lineKey(b, c) === K.at) : null;
+  K.marks = K.marks.filter(([, el]) => !dock.contains(el));
+  dock.setAttribute("data-hidden", String(K.hidden)); dock.setAttribute("data-for", clause ? "line" : "statement");
+  dock.replaceChildren(...[h("div", { class: "key-h" }, h("h3", {}, "Reading key"), h("span", { class: "for" }, clause ? lineName(clause) : "the whole statement"),
+      clause && !K.hidden ? h("button", { class: "link", onclick: () => attend(null) }, "Whole statement") : null,
+      h("button", { class: "btn small", "aria-expanded": String(!K.hidden), onclick: () => { K.hidden = !K.hidden; store("zal-review-desk-key", K.hidden ? "hidden" : "shown"); renderKey(); } }, K.hidden ? "Show" : "Hide")),
+    K.hidden ? null : h("div", { class: "key-b" }, keyBody(b, clause))].filter(Boolean));
+}
+function attend(key) {                                         /* the line the reader is on */
+  if (K.at === key) return;
+  K.at = key; K.peek = null; K.said = null;
+  K.lines.forEach(([k, el]) => flag(el, "at", k === key));
+  renderKey();
+}
+function light(k, home) {                                      /* the symbol the reader is on: lit in the line being read and in the key, nowhere else */
+  if (K.hot === k && K.home === home) return;
+  K.hot = k; K.home = home;
+  const dock = $("key"), here = (el) => (!!dock && dock.contains(el)) || (!!home && home.contains(el));
+  K.marks.forEach(([mark, el]) => flag(el, "hot", k != null && mark === k && here(el)));
+  const row = k != null && dock ? K.marks.find(([mark, el]) => mark === k && dock.contains(el)) : null;
+  if (row) row[1].scrollIntoView({ block: "nearest" });           /* its row in the key, if the key has scrolled past it */
+}
+function onPoint(e) {
+  const at = nearest(e.target, "data-clause"), on = nearest(e.target, "data-k");     /* the key itself lies in no line, so pointing inside it moves nothing */
+  if (at) attend(at.getAttribute("data-clause"));
+  const read = K.lines.find(([key]) => key === K.at);            /* from inside the key, the line is the one the key explains */
+  light(on ? on.getAttribute("data-k") : null, at || (read ? read[1] : null));
+}
+function showLine(key) {                                       /* bring one line of the statement into view and explain it */
+  if (!wide.matches) { S.sel = key; go("statement"); } else attend(key);
+  const hit = K.lines.find(([k]) => k === key);
+  if (hit) hit[1].scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
+
+/* ---------- evidence ---------- */
+function evStory(b) {
+  if (b.check.status !== "counterexample") return null;
+  const st = b.story || {};
+  return h("section", { class: "block", id: "ev-story" }, h("h3", {}, "What went wrong"),
+    h("p", { class: "lede" }, "ZAL found an input that breaks ", h("code", {}, b.check.obligation), ". This is its own account, sentence by sentence."),
+    st.english ? h("ol", { class: "story" }, st.english.map((line) => h("li", {}, line))) : h("p", { class: "empty" }, "ZAL did not narrate this counterexample" + (st.reason ? `: ${st.reason}` : ".")),
+    b.check.witness && b.check.witness.english ? h("p", { class: "note" }, "The claim that fails: ", h("span", { class: "en", style: "font-size:14.5px" }, b.check.witness.english)) : null);
+}
+function evCovers(b) {
+  const c = b.check, grid = h("div", { class: "checks" });
+  [["s", "Structure: is this a well-formed machine?"], ["c", "Claims: does it do what the statement says must hold?"]].forEach(([group, title]) => {
+    const names = Object.keys(c.checks || {}).filter((k) => (CHECKS[k] ? CHECKS[k][1] : "c") === group);
+    if (!names.length) return;
+    grid.append(h("h4", {}, title));
+    names.forEach((k) => grid.append(h("div", {}, CHECKS[k] ? CHECKS[k][0] : k, h("span", { class: "k" }, k)), h("div", {}, status(c.checks[k]))));
+  });
+  return h("section", { class: "block", id: "ev-covers" }, h("h3", {}, "What the check covers"),
+    c.scope ? h("p", { class: "quote" }, c.scope) : null, h("p", { class: "note", style: "margin:6px 0 10px" }, c.scope ? "ZAL's own statement of scope. A pass means these checks, on this domain, and no more." : "This result carries no scope statement."), grid);
+}
+function evAdvisories(b, f) {
+  if (!f.advisories.length) return null;
+  return h("section", { class: "block", id: "ev-adv" }, h("h3", {}, "Advisories"),
+    h("p", { class: "lede" }, "ZAL raises these when a pass says less than it seems to."),
+    f.advisories.map((a) => h("div", { class: "adv" }, h("span", { class: "kind" }, a.kind), h("p", { class: "en", style: "font-size:15px" }, a.message), MEANS[a.kind] ? h("p", { class: "means" }, MEANS[a.kind]) : null)));
+}
+function evDefects(b, f) {
+  if (!b.edits) return h("section", { class: "block", id: "ev-defects" }, h("h3", {}, "Could it have failed?"), h("p", { class: "empty" }, "No defects were planted, because the statement itself does not pass."));
+  const d = b.edits, cols = d.breakdown ? d.columns.filter((c) => c.usable !== false) : [];
+  const head = h("tr", {}, h("th", {}, "Edit, one at a time"), h("th", {}, "Result"), cols.map((c) => h("th", { class: "col" + (S.col === c.id ? " hl" : ""), title: c.label }, c.id)), cols.length ? h("th", { class: "fill" }) : null);
+  const body = h("tbody", {});
+  Object.entries(f.perRule).forEach(([rule, rows]) => {
+    body.append(h("tr", { class: "grp" }, h("td", { colspan: cols.length + 3 }, "rule " + rule)));
+    rows.forEach((r) => body.append(h("tr", { class: "row", tabindex: 0, onclick: () => { S.change = f.rows.indexOf(r); go("changes"); }, onkeydown: (e) => { if (e.key === "Enter") { S.change = f.rows.indexOf(r); go("changes"); } } },
+      h("td", { title: r.label }, EDIT_WORDS[r.kind] || r.label),
+      h("td", { class: "res " + r.class }, h("i", { class: "m " + r.class }), " ", CLASS_WORDS[r.class], r.class === "structure" ? h("span", { class: "sub" }, r.failed_check) : null),
+      cols.map((c) => h("td", { class: "cell" + (S.col === c.id ? " hl" : "") }, (r.noticed_by || []).includes(c.id) ? h("span", { class: "dot", title: `ZAL names ${c.id} as failing on this edit` })
+        : stopped(r, c.id) ? h("span", { class: "skip", title: "Not asked: ZAL stops at the invariant that fails" }, "–") : null)), cols.length ? h("td", { class: "fill" }) : null)));
+  });
+  const un = f.rows.filter((r) => r.class === "unnoticed" || r.class === "vacuous");
+  return h("section", { class: "block", id: "ev-defects" }, h("h3", {}, "Could it have failed?"),
+    h("p", { class: "lede" }, "A pass means something only if a wrong machine would have failed. So this page breaks the machine on purpose, one small edit at a time, and lets ZAL check each result. ", h("span", { class: "note" }, "This instrument is the desk's, not ZAL's.")),
+    f.rows.length ? h("div", { class: "scroll-x" }, h("table", { class: "matrix" }, h("thead", {}, head), body)) : h("p", { class: "empty" }, "There are no rules to edit."),
+    h("div", { class: "legend" }, ["claim", "structure", "unnoticed", "vacuous", "no-change", "refused"].filter((k) => f.byClass[k]).map((k) => h("span", {}, h("i", { class: "m " + k }), CLASS_WORDS[k])), cols.length ? h("span", {}, h("span", { class: "dot" }), "ZAL names this claim as failing") : null,
+      f.rows.some((r) => cols.some((c) => stopped(r, c.id))) ? h("span", {}, h("span", { class: "skip" }, "–"), "not asked: an invariant fails first") : null),
+    !d.breakdown && d.breakdown_note ? h("p", { class: "note" }, "No columns per claim: " + d.breakdown_note + ".") : null,
+    d.probes.length ? h("div", { style: "margin-top:12px" }, d.probes.map((p) => h("p", { class: p.status === "pass-with-scope" ? "" : "adv" }, "Assumption ", h("code", {}, p.assumption), ": ",
+      p.status === "pass-with-scope" ? `${p.other} can always bring it about, so ${p.claimant}'s claim is about the machine.` : `${p.other} cannot always bring it about. ${p.claimant} can win by starving it, so a pass that leans on it is empty.`))) : null,
+    un.length ? h("p", { style: "margin-top:12px;max-width:72ch" }, h("b", {}, `${plural(un.length, "edit")} went unnoticed. `), "Each is behavior that no claim pins down. Either a claim is missing, or the behavior is meant to be free. That is the owner's call.") : null,
+    h("p", { class: "note", style: "margin-top:8px" }, d.method));
+}
+function evOpen(b, f) {
+  if (!f.unresolved.length) return null;
+  return h("section", { class: "block", id: "ev-open" }, h("h3", {}, "Stated but not checked"),
+    h("p", { class: "lede" }, "These obligations stay in the statement so nobody forgets them. No check here covers them."),
+    h("dl", { class: "kv" }, f.unresolved.map(([kind, text]) => [h("dt", {}, h("code", {}, kind)), h("dd", { class: "en", style: "font-size:15px" }, text)])));
+}
+function evProvenance(b) {
+  const sc = b.cross_checks || {};
+  return h("section", { class: "block" }, h("h3", {}, "Where this came from"),
+    h("dl", { class: "kv" },
+      h("dt", {}, "Revision"), h("dd", {}, h("code", {}, b.revision)),
+      h("dt", {}, "Checker"), h("dd", {}, h("code", {}, b.checker), " (this page and review_desk.py are outside that source closure)"),
+      h("dt", {}, "Python"), h("dd", {}, b.python),
+      h("dt", {}, "Authority"), h("dd", {}, "none. Factory: ", h("code", {}, b.check.factory || "not-run"), ". Agreement is the owner's act and is not recorded here."),
+      h("dt", {}, "Cross-checks"), h("dd", {}, sc.tuples === true ? "The decision table has exactly the number of input tuples ZAL reports. " : sc.tuples === false ? "The decision table does not have the number of input tuples ZAL reports; trust ZAL's count. " : "", sc.reachable === true ? "The desk's walk from the start reaches exactly the configurations ZAL reports. " : sc.reachable === false ? "The desk's walk from the start disagrees with ZAL's count; trust ZAL's. " : "",
+        sc.sentences_compared ? `Each one-line account of a decision is composed with ZAL's phrase functions and matched ZAL's why-not answer on the ${plural(sc.sentences_compared, "input")} compared. ` : "",
+        sc.formal ? `The symbols are the desk's spelling. For each of ${plural(sc.formal.formulas, "formula")}, the typed form of that spelling is ZAL's own rendering and ZAL parses it back to the same formula. Each of ${plural(sc.formal.rules, "rule")}, written as a step formula, was evaluated by ZAL on ${num(sc.formal.inputs)} of the ${num(sc.formal.of)} declared inputs: its left side held on exactly the inputs that rule decides, and its right side held on each of those.` : "")));
+}
+function renderEvidence(panel) {
+  const b = B(), f = facts(b);
+  panel.append(...[evStory(b), evAdvisories(b, f), evDefects(b, f), evCovers(b), evOpen(b, f), evProvenance(b)].filter(Boolean));
+}
+
+/* ---------- try an input ---------- */
+function layoutMap(b) {
+  const states = b.axes.states, rules = b.model.rules.filter((r) => r.target), depth = { [b.axes.initial]: 0 }, queue = [b.axes.initial];
+  while (queue.length) { const s = queue.shift(); rules.filter((r) => r.source === s).forEach((r) => { if (!(r.target in depth)) { depth[r.target] = depth[s] + 1; queue.push(r.target); } }); }
+  const far = Math.max(0, ...Object.values(depth)) + 1; states.forEach((s) => { if (!(s in depth)) depth[s] = far; });
+  const cols = []; states.forEach((s) => { (cols[depth[s]] = cols[depth[s]] || []).push(s); });
+  const W = Math.max(300, Math.min(720, ($("panel").clientWidth || 640) - 44)), colW = W / cols.length, rowsMax = Math.max(...cols.map((c) => (c || []).length));
+  const loops = rules.some((r) => r.source === r.target);
+  const top = loops ? 62 : 34, H = rowsMax * 62 - 32 + top + 40, pos = {}, mid = top + (rowsMax * 62 - 32) / 2;
+  cols.forEach((col, ci) => (col || []).forEach((s, ri) => { pos[s] = { x: colW * ci + colW / 2, y: mid + (ri - ((col.length - 1) / 2)) * 62 }; }));
+  const half = Math.min(46, colW / 2 - 14);
+  return { W, H, pos, rules, half, chars: Math.max(4, Math.floor(half / 3.5)), reached: new Set(Object.keys(depth).filter((s) => depth[s] < far || s === b.axes.initial)) };
+}
+function renderMap(b, lastRule) {
+  const L = layoutMap(b), svg = sv("svg", { class: "map", viewBox: `0 0 ${L.W} ${L.H}`, role: "group", "aria-label": "Control states and the rules that move between them. The same rules are listed in the statement." });
+  svg.append(sv("defs", {}, sv("marker", { id: "ah", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, sv("path", { d: "M0 0 L10 5 L0 10 z", class: "arrowhead" }))));
+  const pairs = {};
+  L.rules.forEach((r) => { const k = r.source + ">" + r.target; (pairs[k] = pairs[k] || []).push(r); });
+  Object.values(pairs).forEach((list) => {                     /* one drawn edge per ordered pair of states */
+    const r = list[0], a = L.pos[r.source], z = L.pos[r.target], on = list.some((x) => x.id === lastRule); let d, lx, ly;
+    const events = [...new Set(list.map((x) => x.event))], label = events.length > 3 ? events.slice(0, 2).join(", ") + ` +${events.length - 2}` : events.join(", ");
+    if (r.source === r.target) {
+      const lift = 30; d = `M ${a.x - 14} ${a.y - 15} C ${a.x - 30} ${a.y - 15 - lift}, ${a.x + 30} ${a.y - 15 - lift}, ${a.x + 14} ${a.y - 15}`; lx = a.x; ly = a.y - 17 - lift * 0.75 - 4;
+    } else {
+      const dx = z.x - a.x, dy = z.y - a.y, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, nx = uy, ny = -ux;
+      const reach = Math.min(L.half / Math.max(Math.abs(ux), 0.001), 15 / Math.max(Math.abs(uy), 0.001));
+      const twoWay = !!pairs[r.target + ">" + r.source], bend = twoWay ? 16 : 9;
+      const sx = a.x + ux * reach + nx * 4, sy = a.y + uy * reach + ny * 4, ex = z.x - ux * (reach + 3) + nx * 4, ey = z.y - uy * (reach + 3) + ny * 4;
+      const cx = (sx + ex) / 2 + nx * bend * 1.6, cy = (sy + ey) / 2 + ny * bend * 1.6; d = `M ${sx} ${sy} Q ${cx} ${cy} ${ex} ${ey}`;
+      lx = (sx + 2 * cx + ex) / 4 + nx * 8; ly = (sy + 2 * cy + ey) / 4 + ny * 8;
+    }
+    svg.append(sv("path", { class: "edge" + (on ? " on" : ""), d, "marker-end": "url(#ah)" }, sv("title", {}, list.map((x) => `rule ${x.id}`).join(", "))));
+    svg.append(sv("text", { class: "elabel", x: lx, y: ly, "text-anchor": "middle", "dominant-baseline": "middle" }, label));
+  });
+  b.axes.states.forEach((s) => {
+    const p = L.pos[s], on = S.sim && S.sim.state === s;
+    svg.append(sv("g", { class: "node" + (on ? " on" : "") + (L.reached.has(s) ? "" : " unreached"), tabindex: 0, role: "button", "aria-label": `Set the state to ${s}`,
+      onclick: () => { S.sim.state = s; S.sim.trace = []; render(); }, onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); S.sim.state = s; S.sim.trace = []; render(); } } },
+      sv("rect", { x: p.x - L.half, y: p.y - 15, width: L.half * 2, height: 30, rx: 15 }), sv("text", { x: p.x, y: p.y, "text-anchor": "middle", "dominant-baseline": "central" }, s.length > L.chars ? s.slice(0, L.chars - 1) + "…" : s),
+      s === b.axes.initial ? sv("text", { x: p.x, y: p.y + 27, "text-anchor": "middle", style: "font-size:10.5px", class: "elabel" }, "start") : null));
+  });
+  return svg;
+}
+function options(values, current, pick, assumed, labels) {
+  return h("div", { class: "opts" }, values.map((v, n) => h("button", { class: "opt" + (assumed ? " assumed" : ""), "aria-pressed": String(v === current), onclick: () => pick(v) }, labels ? labels[n] : String(v))));
+}
+function range(lo, hi) { const out = []; for (let n = lo; n <= hi; n++) out.push(n); return out; }
+function integer(name, lo, hi, current, pick, assumed) {          /* a short range as buttons, a long one as a number field */
+  if (hi - lo < 12) return options(range(lo, hi), current, pick, assumed);
+  const box = h("input", { class: "numbox" + (assumed ? " assumed" : ""), type: "number", min: lo, max: hi, step: 1, value: current, "aria-label": `${name}, ${lo} to ${hi}`,
+    onchange: (e) => { const v = Math.round(Number(e.target.value)); pick(Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : current); } });
+  return h("div", { class: "opts" }, box, h("span", { class: "note" }, `${lo} to ${hi}`));
+}
+function tree(node) {
+  if (node == null || typeof node !== "object") return h("span", {}, String(node));
+  const op = node.operator, kids = node.operands || [];
+  const lit = (text, extra) => h("span", { class: "tv", "data-v": String(node.value) }, text, extra ? h("span", { class: "val" }, ` (${extra})`) : null);
+  const term = (t) => !t ? "" : t.operator === "int" ? String(t.value) : ["var", "var_next", "input"].includes(t.operator) ? `${t.name}${t.operator === "var_next" ? "′" : ""}=${t.value}`
+    : ["add", "sub"].includes(t.operator) ? `(${(t.operands || []).map(term).join(t.operator === "add" ? " + " : " − ")} = ${t.value})` : String(t.value);
+  if (op === "true" || op === "false") return lit(op);
+  if (op === "fact") return lit(node.name);
+  if (op === "event") return lit(`event is ${node.expected}`, node.value ? null : `it is ${node.observed}`);
+  if (op === "state") return lit(`state is ${node.expected}`, node.value ? null : `it is ${node.observed}`);
+  if (op === "state_next") return lit(`state after is ${node.expected}`, node.value ? null : `it is ${node.observed}`);
+  if (op === "accepted") return lit("accepted", node.value ? null : String(node.observed));
+  if (op === "cmp") return lit(`${term(node.left)} ${node.comparison} ${term(node.right)}`);
+  if (op === "not") return h("span", { class: "tv", "data-v": String(node.value) }, h("span", { class: "op" }, "not"), tree(kids[0]));
+  const words = { and: "and", or: "or", implies: "implies", iff: "if and only if" };
+  if (words[op]) return h("span", {}, "(", kids.map((k, n) => [n ? h("span", { class: "op" }, words[op]) : null, tree(k)]), ")", h("span", { class: "val" }, node.value ? " holds" : " does not hold"));
+  return lit(`${op}`, String(node.value));
+}
+function symTree(b, node, top, seen) {                          /* ZAL's truth tree of one formula, written in symbols: each part carries its truth on this input */
+  const sp = b.key.spelling, op = node.operator, kids = node.operands || [], told = (v) => v === true ? "t" : v === false ? "f" : null;
+  const pad = (text, k, v) => { const core = text.trim(), at = text.indexOf(core); return [text.slice(0, at), symbol(b, core, k, told(v)), text.slice(at + core.length)]; };
+  const named = (n, v, primed) => { const el = symbol(b, n, "name:" + n); seen.set(n + (primed ? sp.prime : ""), v); el.setAttribute("title", `${n}${primed ? sp.prime : ""} = ${v} on this input`); return el; };
+  const atom = (parts) => h("span", { class: "tv", "data-v": String(node.value) }, parts);
+  if (op === "int") return [String(node.value)];
+  if (op === "var" || op === "input") return [named(node.name, node.value)];
+  if (op === "var_next") return [named(node.name, node.value, true), symbol(b, sp.prime, "prime")];
+  if (op === "add" || op === "sub") return [symTree(b, kids[0], false, seen), pad(sp[op], op), symTree(b, kids[1], false, seen)];
+  if (op === "true" || op === "false") return [atom([symbol(b, op, op)])];
+  if (op === "fact") return [atom([named(node.name, node.value)])];
+  if (op === "accepted") { seen.set("accepted", node.value); return [atom([symbol(b, "accepted", "accepted")])]; }
+  if (op === "state" || op === "state_next" || op === "event") {
+    const word = op === "event" ? "event" : "state"; seen.set(word + (op === "state_next" ? sp.prime : ""), node.observed);
+    return [atom([symbol(b, word, word), op === "state_next" ? symbol(b, sp.prime, "prime") : null, pad(sp["=="], "eq"), node.expected])];
+  }
+  if (op === "cmp") return [atom([symTree(b, node.left, false, seen), pad(sp[node.comparison], CMP[node.comparison]), symTree(b, node.right, false, seen)])];
+  if (op === "not") {
+    const inner = symTree(b, kids[0], false, seen), grouped = ["true", "false", "accepted", "fact", "and", "or", "implies", "iff"].includes(kids[0].operator);
+    return [symbol(b, sp.not, "not", told(node.value)), grouped ? inner : ["(", inner, ")"]];
+  }
+  const parts = kids.map((kid, n) => [n ? pad(sp[op], op, node.value) : null, symTree(b, kid, false, seen)]);
+  return top ? parts : ["(", parts, ")"];
+}
+function stated(b, concept, id) {                              /* a claim's line in symbols, as the statement has it */
+  const clause = b.declared.find((c) => c.concept === concept && c.id === id);
+  return clause && clause.formal ? h("div", { "data-clause": lineKey(b, clause) }, formula(b, clause)) : null;
+}
+function truthLine(b, node, key) {                             /* one formula on the input being tried, and the values it read */
+  const seen = new Map(), body = symTree(b, node, true, seen);
+  return h("div", { class: "truth", "data-clause": key }, h("div", { class: "fm" }, body),
+    seen.size ? h("div", { class: "where" }, "where ", [...seen].map(([name, value], n) => [n ? ", " : "", h("i", {}, name), " = ", String(value)])) : null);
+}
+function renderTry(panel) {
+  const b = B(), a = b.axes, sim = S.sim, tabled = b.decisions.status === "complete";
+  if (!tabled && !LIVE) { panel.append(h("section", { class: "block" }, h("h3", {}, "Try an input"), h("p", { class: "empty" }, "This snapshot holds no decision table for this statement: " + b.decisions.reason + ". With review_desk.py serve, ZAL explains any input on request."))); return; }
+  const given = { state: sim.state, variables: { ...sim.variables }, event: sim.event, context: { ...sim.context } }, key = keyOf(b, given);
+  const dec = tabled ? decision(b, given) : (S.live && S.live.key === key ? S.live : null);
+  if (!tabled && !dec && S.liveKey !== key) explainLive(key, given);          /* asks ZAL; the page renders again when it answers */
+  const set = (fn) => { fn(); render(); };
+  const now = h("div", { class: "ctl" }, h("h4", {}, "The machine is in"),
+    h("div", { class: "field" }, h("span", { class: "lab" }, "state"), options(a.states, sim.state, (v) => set(() => { sim.state = v; sim.trace = []; }))),
+    a.variables.map((v) => h("div", { class: "field" }, h("span", { class: "lab" }, v.name), integer(v.name, v.low, v.high, sim.variables[v.name], (x) => set(() => { sim.variables[v.name] = x; sim.trace = []; })))));
+  const owner = (b.model.players || []).find((pl) => pl[1].includes(sim.state));
+  const arrives = h("div", { class: "ctl" }, h("h4", {}, owner ? `What arrives (${owner[0]} chooses the event in this state)` : "What arrives"),
+    h("div", { class: "field" }, h("span", { class: "lab" }, "event"), options(a.events, sim.event, (v) => set(() => { sim.event = v; }))),
+    a.facts.length + a.inputs.length ? h("div", { class: "ctx" }, h("h5", {}, "Context: assumed on every step, not authenticated"),
+      a.facts.map((fct) => h("div", { class: "field" }, h("span", { class: "lab" }, fct), options([true, false], !!sim.context[fct], (x) => set(() => { sim.context[fct] = x; }), true, ["true", "false"]))),
+      a.inputs.map((x) => h("div", { class: "field" }, h("span", { class: "lab" }, x.name), integer(x.name, x.low, x.high, sim.context[x.name], (v) => set(() => { sim.context[x.name] = v; }), true)))) : null);
+  const reach = b.reachable ? b.reachable.includes(configKey(b, sim.state, sim.variables)) : null;
+  panel.append(h("section", { class: "block" }, h("h3", {}, "Try an input"),
+    h("p", { class: "lede" }, "Pick a situation and see exactly what the machine decides, and why. Nothing here is estimated: every answer is ZAL's evaluation of the typed model."),
+    renderMap(b, sim.trace.length ? sim.trace[sim.trace.length - 1].rule : null), h("div", { class: "controls" }, now, arrives),
+    reach === false ? h("p", { class: "note", style: "margin-top:8px" }, "This configuration is not reachable from the start. It is still a declared input, and the checks cover it.") : null));
+  if (!dec) { panel.append(h("section", { class: "block" }, h("p", { class: "empty" }, tabled ? "No decision is available for this input." : "Asking ZAL…"))); return; }
+  if (dec.error) { panel.append(h("section", { class: "block" }, h("p", { class: "empty" }, "ZAL did not answer for this input: ", h("span", { class: "en", style: "font-size:15px" }, dec.error)))); return; }
+  const o = dec.outcome, moved = o.class === "Accept", words = S.read.english || !S.read.symbols;
+  const decider = b.declared.find((c) => o.rule === "default" ? c.concept === "default" : c.concept === "rule" && c.id === o.rule);
+  const next = moved ? `${o.state}${a.variables.length ? " with " + a.variables.map((v) => `${v.name}=${(o.variables || {})[v.name]}`).join(", ") : ""}` : null;
+  const res = h("section", { class: "result", "data-c": o.class, "aria-live": "polite" },
+    h("p", { class: "say" }, dec.sentence || `${o.class}: ${o.rule}`),
+    h("div", { class: "rrow" }, h("span", { class: "oc", "data-c": o.class }, o.class), h("span", {}, o.rule === "default" ? ["by the default, reason ", h("code", {}, o.reason)] : ["by rule ", h("code", {}, o.rule)]),
+      decider ? h("button", { class: "link", onclick: () => showLine(lineKey(b, decider)) }, "Show it in the statement") : null,
+      moved ? h("button", { class: "btn primary", onclick: () => set(() => { sim.trace.push({ sentence: dec.sentence, rule: o.rule }); sim.state = o.state; a.variables.forEach((v) => { sim.variables[v.name] = (o.variables || {})[v.name]; }); }) }, "Take this step") : null,
+      sim.trace.length ? h("button", { class: "btn", onclick: () => { S.sim = startInput(b); render(); } }, "Back to the start") : null),
+    dec.admissible === false ? h("p", { class: "note" }, "This configuration breaks an invariant, so the requirements are not checked from it.") : null);
+  panel.append(res);
+  if (dec.nearest) {
+    const fl = dec.nearest, first = fl.first;
+    panel.append(h("section", { class: "block" }, h("h3", {}, fl.want === "Accept" ? "What would it take to be accepted?" : "What would make it rejected?"),
+      first ? h("p", { style: "max-width:74ch" }, `The nearest declared input needs ${plural(fl.distance, "change")}: `, first.changes.map((c, n) => [n ? "; " : "", h("code", {}, c.input), ` from ${c.from} to ${c.to}`]), ". ",
+        fl.count > 1 ? `${fl.count} inputs are that near. ` : "", h("button", { class: "link", onclick: () => tryInput(first.input) }, "Go there"))
+        : h("p", {}, `No declared input gives ${fl.want}. `, status(fl.status))));
+  }
+  const live = dec.rules.filter((r) => r.state_matches && r.event_matches), rest = dec.rules.length - live.length;
+  const table = h("table", { class: "why" }, h("thead", {}, h("tr", {}, h("th", {}, "Rule"), h("th", {}, "Its guard, on this input"), h("th", {}, "Updates"), h("th", {}, "Fires"))),
+    h("tbody", {}, live.map((r) => h("tr", { class: r.enabled ? "fired" : "" }, h("td", {}, h("code", {}, r.id)),
+      h("td", {}, words ? h("div", { class: "en", style: "font-size:14.5px" }, r.guard_english) : null, S.read.symbols ? truthLine(b, r.guard, "rule:" + r.id) : h("div", { class: "tree" }, tree(r.guard))),
+      h("td", {}, (r.updates || []).length ? r.updates.map((u) => h("div", {}, h("code", {}, u.variable), ` ${u.before} → ${u.after}`, u.in_range === false ? h("b", { style: "color:var(--fail)" }, " out of range") : null)) : h("span", { class: "note" }, "none")),
+      h("td", {}, h("span", { class: "tick " + (r.enabled ? "y" : "n") }, r.enabled ? "yes" : "no"))))));
+  panel.append(h("section", { class: "block" }, h("h3", {}, "Why"),
+    live.length ? h("div", { class: "scroll-x" }, table) : h("p", {}, `No rule is written for ${sim.state} + ${sim.event}, so the default decides.`),
+    rest ? h("p", { class: "note", style: "margin-top:6px" }, `${plural(rest, "other rule")} ${rest === 1 ? "is" : "are"} for a different state or event.`) : null,
+    live.length && S.read.symbols ? h("p", { class: "note" }, "A shaded part is true on this input and a grey part is false. A symbol takes the colour of the formula it joins.") : null));
+  if (dec.requirements.length || dec.invariants.length) {
+    panel.append(h("section", { class: "block" }, h("h3", {}, "The claims, on this one step"),
+      h("div", { class: "reqs" }, dec.invariants.filter((r) => "before" in r).map((r) => h("div", { class: "req" },   /* ZAL evaluates an invariant before and after the step */
+        h("span", { class: "status", "data-s": r.before && r.after ? "pass" : "fail" }, !r.before ? "broken here" : !r.after ? "broken by this step" : "holds"),
+        h("div", {}, h("code", { style: "color:var(--claim);font-size:12px" }, r.id), words ? h("div", { class: "en" }, r.english) : null, S.read.symbols ? stated(b, "invariant", r.id) : null))),
+        dec.requirements.map((r) => h("div", { class: "req" }, h("span", { class: "status", "data-s": r.value ? "pass" : "fail" }, r.value ? "holds" : "violated"),
+        h("div", {}, h("code", { style: "color:var(--claim);font-size:12px" }, r.id), words ? h("div", { class: "en" }, r.english) : null,
+          S.read.symbols && r.tree ? truthLine(b, r.tree, "require:" + r.id) : h("details", {}, h("summary", { style: "font-weight:500;font-size:12.5px" }, "truth of each part"), h("div", { class: "tree" }, tree(r.tree))))))),
+      (b.model.properties || []).length + (b.model.games || []).length ? h("p", { class: "note", style: "margin-top:8px" }, "Properties are about whole executions, so a single step cannot show them holding or failing.") : null));
+  }
+  if (sim.trace.length) panel.append(h("section", { class: "block" }, h("h3", {}, "The run so far"), h("ol", { class: "trace" }, sim.trace.map((t) => h("li", {}, t.sentence)))));
+}
+
+/* ---------- review a change ---------- */
+function refusal(d, text) {                                      /* ZAL's located diagnostic for a source it does not accept */
+  if (!d || !d.reason) return [h("p", { class: "en", style: "font-size:15px" }, text || "ZAL gave no reason.")];
+  const where = d.location && d.location.line ? `line ${d.location.line}` : null;
+  return [d.source_line ? h("div", { class: "redline" }, h("div", {}, where ? h("span", { class: "gone" }, where + "   ") : null, d.source_line)) : where ? h("p", { class: "note" }, where) : null,
+    h("p", { class: "en", style: "font-size:15px" }, d.reason),
+    d.suggested_fix ? h("p", { class: "note" }, "ZAL suggests: ", d.suggested_fix) : null];
+}
+function changeDetail(b, f, r, title, own) {
+  const out = [], diff = r.diff || { witnesses: [], witness_count: 0 }, total = b.check.input_tuples;
+  out.push(h("h3", {}, title));
+  if (r.before || r.after) out.push(h("div", { class: "redline" }, r.before ? h("div", { class: "del" }, r.before) : null, r.after ? h("div", { class: "add" }, r.after) : h("div", { class: "gone" }, "the line is deleted")));
+  if (r.status === "refused") { out.push(h("p", { class: "v-line", style: "font-size:14.5px" }, h("span", { class: "status", "data-s": "quiet" }, "refused"), h("span", {}, own ? "ZAL does not accept your candidate." : "ZAL does not accept the edited statement.")), refusal(r.source_diagnostic, r.diagnostic)); return out; }
+  const verdict = own ? (r.class === "unnoticed" ? "Every check passes on your candidate." : r.class === "no-change" ? "Every check passes on your candidate, and it decides every declared input as before."
+      : r.class === "structure" ? `Your candidate breaks the machine's structure (${r.failed_check}) before any claim is consulted.` : ["Your candidate fails ", r.failed_name ? ["the claim ", h("code", { style: "color:var(--claim)" }, r.failed_name)] : "a claim", r.failed_check ? ` (${r.failed_check}).` : "."])
+    : r.class === "unnoticed" ? "Every check still passes. No claim notices this edit."
+    : r.class === "vacuous" ? `Every check still passes, for the wrong reason: ${r.lost_assumptions.map((p) => `${p.other} can no longer bring about ${p.assumption}`).join("; ")}. A claim of the form “if the other side behaves, I get there” cannot see an edit that stops the other side from behaving.`
+    : r.class === "structure" ? `The edit breaks the machine's structure (${r.failed_check}) before any claim is consulted.`
+    : r.class === "no-change" ? "The edit changes no decision on the declared domain."
+    : r.status === "counterexample" ? [r.failed_name ? ["The claim ", h("code", { style: "color:var(--claim)" }, r.failed_name), " fails"] : "A claim fails", r.failed_check ? ` (${r.failed_check}).` : "."] : "";
+  out.push(h("p", { class: "v-line", style: "font-size:14.5px" }, status(r.status), h("span", {}, verdict)));
+  const named = r.failed_name ? b.declared.find((c) => c.id === r.failed_name) : null, said = r.failed_claim || (named ? splitEnglish(named) : null);
+  if (said) out.push(h("p", { class: "quote" }, said));
+  if ((r.noticed_by || []).includes("invariants")) out.push(h("p", {}, "The invariants fail. ZAL stops there, so no other claim is asked about this edit."));
+  else if ((r.noticed_by || []).length) out.push(h("p", {}, "Asked one at a time, ZAL names ", r.noticed_by.map((id, n) => [n ? ", " : "", h("code", { style: "color:var(--claim)" }, id)]), r.noticed_by.length === 1 ? ", and no other claim." : "."));
+  if (r.story && r.story.english) out.push(h("div", {}, h("p", { class: "note", style: "margin-bottom:6px" }, "ZAL's account of the failure"), h("ol", { class: "story" }, r.story.english.map((line) => h("li", {}, line)))));
+  if (diff.witness_count) {
+    out.push(h("p", {}, h("b", {}, `${plural(diff.witness_count, "input")}${total ? " of " + num(total) : ""} `), diff.witness_count === 1 ? "is decided differently." : "are decided differently.", diff.witness_count > diff.witnesses.length ? ` ZAL's sentences for the first ${diff.witnesses.length}:` : ""));
+    const card = (w) => w.sentences ? h("div", { class: "wit" },
+      h("div", {}, h("span", { class: "tag" }, "Before"), h("p", { class: "en" }, w.sentences.before)), h("div", {}, h("span", { class: "tag" }, "After"), h("p", { class: "en" }, w.sentences.after)),
+      b.decisions.status === "complete" || LIVE ? h("div", {}, h("button", { class: "link", onclick: () => tryInput({ state: w.state, variables: w.variables || {}, event: w.event, context: w.context || {} }) }, own ? "Open this input in the current machine" : "Open this input in the unedited machine")) : null)
+      : h("div", { class: "wit" }, h("p", {}, !w.event || !w.before || !w.after ? "The initial configuration differs."
+        : [h("code", {}, describe(b, { state: w.state, variables: w.variables || {}, event: w.event, context: w.context || {} })), `: ${w.before.class} by ${w.before.rule} before, ${w.after.class} by ${w.after.rule} after.`]));
+    const lead = diff.witnesses.slice(0, 2), rest = diff.witnesses.slice(2);
+    out.push(h("div", {}, lead.map(card), rest.length ? h("details", { class: "more" }, h("summary", {}, `Show ${rest.length} more`), rest.map(card)) : null));
+  } else if (diff.comparison && diff.comparison !== "different") out.push(h("p", { class: "note" }, "ZAL's comparison: ", h("code", {}, diff.comparison)));
+  return out;
+}
+function renderChanges(panel) {
+  const b = B(), f = facts(b);
+  panel.append(h("section", { class: "block" }, h("h3", {}, "Review a change"),
+    h("p", { class: "lede" }, "Judge an edit by what it does, not by how it reads. ZAL compares the two statements on every declared input and reports each one that is decided differently.")));
+  if (LIVE) {
+    const area = h("textarea", { class: "src", id: "candidate", spellcheck: "false", "aria-label": "Candidate statement" }); area.value = S.draft != null ? S.draft : b.symbolic;
+    area.addEventListener("input", () => { S.draft = area.value; });
+    panel.append(h("section", { class: "block" }, h("h3", {}, "Your candidate"), h("p", { class: "lede" }, "Edit the statement and ask ZAL what would change. Nothing is saved and nothing is agreed."), area,
+      h("div", { class: "rrow", style: "margin-top:8px" }, h("button", { class: "btn primary", disabled: S.busy, onclick: checkCandidate }, S.busy ? "Checking…" : "Check this candidate"),
+        h("button", { class: "btn", onclick: () => { S.draft = null; S.candidate = null; render(); } }, "Reset to the current statement"))));
+    if (S.candidate) panel.append(h("section", { class: "block", id: "cand-result", "aria-live": "polite" }, changeDetail(b, f, S.candidate, "What your candidate would change", true)));
+  }
+  if (f.rows.length) {
+    const list = h("div", { class: "chg-list" }, f.rows.map((r, n) => h("button", { class: "chg", "aria-pressed": String(S.change === n), onclick: () => { S.change = n; render(); scrollTo("chg-detail"); } },
+      h("i", { class: "m " + r.class }), h("span", { class: "lab" }, r.label), h("span", { class: "res " + r.class }, CLASS_WORDS[r.class]))));
+    panel.append(h("section", { class: "block" }, h("h3", {}, LIVE ? "Planted edits" : "Edits to examine"), h("p", { class: "lede" }, LIVE ? "The same small edits the Evidence tab plants." : "A snapshot cannot check a new candidate, so these are the planted edits. With review_desk.py serve you can paste your own."), list));
+    if (S.change != null && f.rows[S.change]) panel.append(h("section", { class: "block", id: "chg-detail" }, changeDetail(b, f, f.rows[S.change], f.rows[S.change].label)));
+  } else if (!LIVE) panel.append(h("p", { class: "empty" }, b.edits ? "This statement has no rules to edit." : "No edits were planted, because the statement itself does not pass."));
+  panel.append(h("p", { class: "note" }, "Agreeing to a change is the owner's act. This page shows consequences and records no agreement."));
+}
+
+/* ---------- live calls ---------- */
+async function api(route, body) {
+  const res = await fetch("/api/" + route, { method: "POST", headers: { "Content-Type": "application/json", "X-ZAL-Review-Desk": TOKEN }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "The desk refused the request");
+  return data;
+}
+async function checkCandidate() {
+  const b = B(); S.busy = true; render();
+  try { const told = await api("candidate", { revision: b.revision, source: S.draft != null ? S.draft : b.symbolic });
+    const structural = !!(told.failed_check && CHECKS[told.failed_check] && CHECKS[told.failed_check][1] === "s");
+    S.candidate = { ...told, noticed_by: [], lost_assumptions: [],
+      class: told.status === "refused" ? "refused" : told.status === "counterexample" ? (structural ? "structure" : "claim") : told.diff && told.diff.comparison === "different" ? "unnoticed" : "no-change" };
+  } catch (e) { S.candidate = { status: "refused", class: "refused", diagnostic: e.message }; }
+  S.busy = false; render(); scrollTo("cand-result");
+}
+async function explainLive(key, given) {
+  const b = B(); let told; S.liveKey = key;
+  try { const a = await api("explain", { revision: b.revision, input: given });
+    told = { key, outcome: a.outcome, admissible: a.admissible !== false, rules: a.rules, requirements: a.requirements || [], invariants: a.invariants || [], sentence: a.sentence, nearest: a.nearest };
+  } catch (e) { told = { key, error: e.message }; }
+  if (S.liveKey !== key) return;                                /* a newer question is already out */
+  S.live = told; render();
+}
+
+/* ---------- render ---------- */
+function renderTabs() {
+  const b = B(), f = facts(b), tabs = $("tabs"); tabs.replaceChildren();
+  const defs = [["statement", "Statement", null], ["evidence", "Evidence", null], ["try", "Try an input", null], ["changes", "Review a change", f.rows.length || null]];
+  defs.forEach(([id, label, count]) => tabs.append(h("button", { class: "tab", role: "tab", id: "tab-" + id, "data-tab": id, "aria-selected": String(S.tab === id), "aria-controls": "panel", tabindex: S.tab === id ? 0 : -1,
+    onclick: () => go(id), onkeydown: (e) => { const order = defs.map((d) => d[0]).filter((d) => d !== "statement" || !wide.matches), at = order.indexOf(id);
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const to = order[(at + (e.key === "ArrowRight" ? 1 : order.length - 1)) % order.length]; go(to, () => $("tab-" + to).focus()); } } },
+    label, count ? h("span", { class: "count" }, count) : null)));
+}
+function focusMark() {                                           /* where the keyboard is: nearest ancestor with an id, then child positions */
+  let n = document.activeElement; const path = [];
+  if (!n || n === document.body || !$("app").contains(n)) return null;
+  for (; n && n.id !== "app"; n = n.parentNode) { if (n.id) return { id: n.id, path }; path.unshift([...n.parentNode.children].indexOf(n)); }
+  return null;
+}
+function refocus(mark) {
+  let n = $(mark.id);
+  for (const at of mark.path) n = n && n.children[at];
+  if (n && n !== document.activeElement && typeof n.focus === "function") n.focus({ preventScroll: true });
+}
+let shown = { tab: null, i: null };
+function renderRefused() {
+  const e = DESK && DESK.error;
+  $("app").replaceChildren(h("div", { class: "wrap", style: "padding-block:40px;max-width:860px;display:grid;gap:12px" }, h("h1", { style: "font-size:22px" }, "ZAL review desk"),
+    e ? [e.unexpected ? h("p", { class: "v-line" }, h("span", { class: "status", "data-s": "fail" }, "error"), h("span", {}, "Reading ", h("code", {}, DESK.file), " raised an error. This is not a refusal by ZAL, and the source may be fine."))
+           : h("p", { class: "v-line" }, h("span", { class: "status", "data-s": "quiet" }, "refused"), h("span", {}, "ZAL does not accept ", h("code", {}, DESK.file), ".")), refusal(e, e.reason),
+         LIVE ? h("p", { class: "note" }, "Fix the file and save it. This page reloads by itself.") : null]
+      : h("p", { class: "empty" }, "No statement is loaded.")));
+}
+function render() {
+  if (!DESK || !DESK.bundles.length) { renderRefused(); return; }
+  if (S.tab === "statement" && wide.matches) S.tab = "evidence";
+  const mark = focusMark(), same = shown.tab === S.tab && shown.i === S.i, sheet = $("statement"), keepSheet = $("doc") ? $("doc").scrollTop : 0;
+  renderTop(); renderVerdict(); renderStatement(sheet, true); renderTabs(); renderFoot();
+  const panel = $("panel"), keep = same ? panel.scrollTop : 0; panel.replaceChildren(); panel.setAttribute("aria-labelledby", "tab-" + S.tab);
+  if (S.tab === "statement") { const holder = h("div", { class: "statement" }); renderStatement(holder, false); panel.append(holder); }
+  else if (S.tab === "evidence") renderEvidence(panel);
+  else if (S.tab === "try") renderTry(panel);
+  else renderChanges(panel);
+  panel.scrollTop = keep; $("doc").scrollTop = shown.i === S.i ? keepSheet : 0;
+  if (mark && (same || mark.id !== "panel")) refocus(mark);
+  shown = { tab: S.tab, i: S.i };
+}
+function boot() {
+  if (!DESK) { document.body.textContent = "This page was opened without its data."; return; }
+  const theme = store("zal-review-desk-theme"); if (theme) document.documentElement.setAttribute("data-theme", theme);
+  const readings = (store("zal-review-desk-readings") || "").split(" "); if (READINGS.some(([id]) => readings.includes(id))) READINGS.forEach(([id]) => { S.read[id] = readings.includes(id); });
+  try { K.known = new Set(JSON.parse(store("zal-review-desk-learned") || "[]")); } catch (e) { K.known = new Set(); }
+  K.hidden = store("zal-review-desk-key") === "hidden";
+  const wanted = store("zal-review-desk-model"), at = DESK.bundles.findIndex((b) => b.file === wanted); if (at >= 0) S.i = at;
+  const hash = location.hash.replace("#", ""); if (["statement", "evidence", "try", "changes"].includes(hash)) S.tab = hash;
+  else if (!wide.matches) S.tab = "statement";
+  if (DESK.bundles.length) S.sim = startInput(B());
+  wide.addEventListener("change", render);
+  [$("statement"), $("panel")].forEach((pane) => { pane.addEventListener("mouseover", onPoint); pane.addEventListener("focusin", onPoint); pane.addEventListener("mouseleave", () => light(null)); });
+  window.addEventListener("hashchange", () => { const t = location.hash.replace("#", ""); if (["statement", "evidence", "try", "changes"].includes(t) && t !== S.tab) { S.tab = t; render(); } });
+  render();
+  if (LIVE) setInterval(async () => {                         /* notice when the file on disk moves on */
+    try { const r = await fetch("/api/changed", { headers: { "X-ZAL-Review-Desk": TOKEN } }), d = await r.json();
+      if (!d.changed || S.stale) return;
+      if (!DESK.bundles.length) location.reload(); else { S.stale = true; renderVerdict(); }
+    } catch (e) { /* the server has stopped; the page keeps what it has */ }
+  }, 2000);
+}
+boot();
+</script>
+</body>
+</html>
