@@ -1,0 +1,139 @@
+{
+  "schema": "zenofcis/tier1-allocation-order-reversal-independent-audit/1",
+  "date_utc": "2026-11-11",
+  "status": "CI-success; original artifact independently rechecked; runtime-benefit-NOT-qualified",
+  "sources": {
+    "experiment_commit": "f17ee3b61796eb3d26beef4594e9dc8dd98978e3",
+    "branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "upstream_wasmtime_cranelift": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "original_producer_commit": "e99ab17875bbb6d294c9f0cfef80c2b51d28a4f6",
+    "producer_run": 42951667233,
+    "experiment_run": 43047879710,
+    "experiment_artifact": 13868870663,
+    "artifact_zip_sha256": "cf7a1d16a84757e521bd8a95f1fb006e52a6c6d671294d43c43688882eec3f0e",
+    "harness_source_sha256": "797ef32a7c52959c5959e0b2ae9076f6767d7a4cd31e27be2bd9d933a707bcc9",
+    "rustc": "1.97.1",
+    "host": "GitHub-hosted Azure x86-64 VM, Intel Xeon Platinum 8573C",
+    "wasm_sha256": "050492a09a7531e05d4aea3572589e44d381171d7ffc348f288910c683ef923d"
+  },
+  "method": {
+    "six_modes": "ab/ab_rev, aa/aa_rev, bb/bb_rev: identical original/patched AOT; reverse suffix flips order of constructing the two guest module instances without relabeling timing slots",
+    "calls_per_timed_sample": 50000,
+    "blocks_per_function_per_mode": 8,
+    "functions": 6,
+    "samples_per_mode": 192,
+    "total_timed_samples": 1152,
+    "total_guest_calls": 57600000,
+    "independently_recomputed_block_ratios": 288,
+    "arithmetic_and_trap_checks": "source-pinned CI passed finite preflight and trap checks for both module instances in every mode, before timed calls",
+    "recheck": "Independently parsed all six original raw CSV files from the original ZIP. Verified mode metadata, 192 records per mode, exact ABBA/BAAB slot ordering, all 288 within-block pair ratios against the six CI-qualified JSON receipts, and all raw CSV SHA-256 hashes. No external timing calibration; no claim of fixed code addresses.",
+    "ratio_interpretation": "median over 8 within-block (right/left elapsed ns) ratios; <1 means second/right slot measured lower elapsed time; sham modes compare identical AOT binaries"
+  },
+  "functions": [
+    "divrem_pair",
+    "divrem_offset",
+    "divrem_reverse",
+    "divrem_swapped",
+    "div_only",
+    "signed_divrem"
+  ],
+  "ratios": {
+    "ab": {
+      "divrem_pair": 0.9807129207449718,
+      "divrem_offset": 1.0229323305959075,
+      "divrem_reverse": 0.9784370658717536,
+      "divrem_swapped": 1.0838586527412617,
+      "div_only": 1.0798339958563399,
+      "signed_divrem": 1.0782306541180426
+    },
+    "ab_rev": {
+      "divrem_pair": 1.0017036545230318,
+      "divrem_offset": 0.9577493195628346,
+      "divrem_reverse": 1.060644942370991,
+      "divrem_swapped": 1.0029013556268036,
+      "div_only": 1.0077303908631037,
+      "signed_divrem": 1.0542152115339687
+    },
+    "aa": {
+      "divrem_pair": 0.9863351461358789,
+      "divrem_offset": 1.0189008957034544,
+      "divrem_reverse": 0.9910359472946245,
+      "divrem_swapped": 1.0699645244696359,
+      "div_only": 1.0785715781564305,
+      "signed_divrem": 1.0505933023807263
+    },
+    "aa_rev": {
+      "divrem_pair": 1.017519858196502,
+      "divrem_offset": 0.9414465599682589,
+      "divrem_reverse": 1.057999953409714,
+      "divrem_swapped": 0.990045256498479,
+      "div_only": 1.0116762195263265,
+      "signed_divrem": 1.0668123552498368
+    },
+    "bb": {
+      "divrem_pair": 0.9811395441300633,
+      "divrem_offset": 1.01248068063439,
+      "divrem_reverse": 0.9954622573882058,
+      "divrem_swapped": 1.0603720851872067,
+      "div_only": 1.0654742313187233,
+      "signed_divrem": 1.0423772371966138
+    },
+    "bb_rev": {
+      "divrem_pair": 1.0242076893304128,
+      "divrem_offset": 0.9636061065390032,
+      "divrem_reverse": 1.0559810128264226,
+      "divrem_swapped": 0.9935429621704164,
+      "div_only": 1.0029133183181682,
+      "signed_divrem": 1.0587681716864508
+    }
+  },
+  "original_files_sha256": {
+    "ab": {
+      "raw_csv_sha256": "952ac221ecdc6daf30b47c0c4187988554a4e9c292313607b59493643b07b826",
+      "qualified_json_sha256": "4b3a354dc12dd9a8fdf8ad1da094ee3d110eb0e6cd3d17218f2ef4a99cd8bf21"
+    },
+    "ab_rev": {
+      "raw_csv_sha256": "a9eab6cde1793cb55e6b065d5077f26666f829babe75e1f2553b4a5e8f0904e9",
+      "qualified_json_sha256": "211f27c2ed578ba1bc446790576ea80b4d694e55e58e3e12c3caddff5f5b3c4d"
+    },
+    "aa": {
+      "raw_csv_sha256": "1bdfa887c85231c5a4ff7afdb25d449d626d5437be7b35217da11abf7bca033b",
+      "qualified_json_sha256": "e20e97f1da2a7b71d95f9755dfc59910a9889421f5d3237ea08f5aa18f9fb007"
+    },
+    "aa_rev": {
+      "raw_csv_sha256": "450a4b676533f0a0ffe47503a26ecfbc62f265533c3d20a40073d747ef864244",
+      "qualified_json_sha256": "63e7dc8034dea3ce64fdd628aaea9a46a976eb1faa6359b3a8adb9b6832944bc"
+    },
+    "bb": {
+      "raw_csv_sha256": "da177af337b8f075f9a0d134b566487b8fde58d16bc4fa74ca4bf73ab72562ef",
+      "qualified_json_sha256": "8f8b551a3e5e9b7ff93abccda77b5129787c90ae7363450133a9d41492717580"
+    },
+    "bb_rev": {
+      "raw_csv_sha256": "12107b2ed0b25248226759a06071d13a31c6d26d5947eb7bd34dcbc9c0c193f8",
+      "qualified_json_sha256": "8004974094bdf02fd089520eac24cdfc38ba4f7a99feadb5ffcbfc2a3ec75ac6"
+    }
+  },
+  "same_rust_generated_wasm_native_instruction_byte_savings_reused_from_separate_qualified_producer": {
+    "divrem_pair": 13,
+    "divrem_offset": 13,
+    "divrem_reverse": 13,
+    "divrem_swapped": 0,
+    "div_only": 0,
+    "signed_divrem": 0
+  },
+  "interpretation": [
+    "Reversing module construction order reverses the direction of the baseline/patched timing result for divrem_pair, divrem_offset, and divrem_reverse. This undermines any prior claim of repeatable runtime benefit.",
+    "Same-AOT sham measurements also move in similar directions when module construction order reverses; allocation order, code placement and/or other host effects can explain much of the A/B signal.",
+    "Example: divrem_offset AB ratio 1.0229 becomes 0.9577 on reversing load order; identical-baseline AA changes 1.0189 to 0.9414. No compiler optimization causes the latter change.",
+    "Static 13-byte per-function x86 native instruction savings in the three positive Rust-generated Wasm fixtures remain independently qualified; no whole AOT size reduction or portable speedup established."
+  ],
+  "limitations": [
+    "Single Microsoft Azure virtualized x86-64 host; not CPU-affinity controlled, hardware-counter controlled or code-address-alignment controlled.",
+    "Allocation-order reversal is a confounder probe, not fixed executable code layout; both Wasmtime guest instances can occupy different addresses.",
+    "Elapsed time includes guest-call overhead; no representative application-level benefit or general target profitability.",
+    "Finite execution plus Euclidean mathematical proof do not prove the complete Cranelift pass, flag/liveness, poison, ABI, or cross-target correctness.",
+    "The current optimized-Rust remainder reconstruction patch is manually engineered, not produced by a new ZenoFCIS instruction-sequence search.",
+    "All archived sample values remain in the original GitHub Actions artifact (30-day retention), identified by the original ZIP SHA-256. This checkpoint preserves only its independently checked medians and file digests."
+  ],
+  "next": "Prefer same-code-address or address-alignment-controlled tests and representative Wasmtime workloads, and examine actual compiler-pass soundness/liveness before upstream submission."
+}
