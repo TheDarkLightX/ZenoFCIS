@@ -29,10 +29,7 @@ def patch_context(source):
     return source.replace('impl Context {', HELPER + 'impl Context {', 1).replace(CALL, AFTER, 1)
 
 def self_test():
-    source = 'HEAD
-' + CALL + 'TAIL
-impl Context {
-'
+    source = 'HEAD\n' + CALL + 'TAIL\nimpl Context {\n'
     assert 'udivrem(x, y)' in patch_context(source)
     assert 'remove_inst(minst)' not in HELPER
     for bad in (source.replace(CALL, ''), source.replace(CALL, CALL + CALL),
@@ -68,8 +65,7 @@ def install(root, out):
         'target':'x86-64, unsigned i64 only; no signed or poison assumptions',
         'intermediate_imul':'retained; its other SSA uses are not assumed absent',
         'assurance':'NOT compiler-pass proved; executable qualification required',
-    }, indent=2, sort_keys=True)+'
-')
+    }, indent=2, sort_keys=True)+'\n')
 
 def main():
     p = argparse.ArgumentParser()
