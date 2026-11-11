@@ -116,13 +116,19 @@ impl Guest {
 
 fn run() -> Result<(), E> {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 5 {
-        return Err("usage: bench OPTIMIZED_RESULTS_DIR CALLS BLOCKS SEED".into());
+    if args.len() != 6 {
+        return Err("usage: bench OPTIMIZED_RESULTS_DIR CALLS BLOCKS SEED ab|aa|bb".into());
     }
     let root = &args[1];
     let calls: usize = args[2].parse()?;
     let blocks: usize = args[3].parse()?;
     let seed: usize = args[4].parse()?;
+    let (left, right) = match args[5].as_str() {
+        "ab" => ("baseline", "patched"),
+        "aa" => ("baseline", "baseline"),
+        "bb" => ("patched", "patched"),
+        _ => return Err("unrecognized A/B or sham comparison mode".into()),
+    };
     if !(20_000..=500_000).contains(&calls)
         || !(4..=32).contains(&blocks) || blocks % 2 != 0 || seed != 5623
     {
@@ -130,10 +136,10 @@ fn run() -> Result<(), E> {
     }
     let engine = Engine::default();
     let inputs = vectors();
-    println!("META,{SCHEMA},{calls},{blocks},{seed}");
+    println!("META,{SCHEMA},{calls},{blocks},{seed},{}", args[5]);
     for name in FUNCS {
-        let aot_b = format!("{root}/baseline/native.cwasm");
-        let aot_p = format!("{root}/patched/native.cwasm");
+        let aot_b = format!("{root}/{left}/native.cwasm");
+        let aot_p = format!("{root}/{right}/native.cwasm");
         let mut baseline = Guest::new(&engine, &aot_b, name)?;
         let mut patched = Guest::new(&engine, &aot_p, name)?;
         baseline.check(name, &inputs)?;
