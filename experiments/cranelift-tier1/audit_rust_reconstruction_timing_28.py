@@ -18,7 +18,7 @@ UPSTREAM = "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49"
 PRODUCER_HEAD = "e99ab17875bbb6d294c9f0cfef80c2b51d28a4f6"
 PRODUCER_RUN = 42951667233
 PRODUCER_ARTIFACT = 13825142647
-SCHEMA = "zenofcis/tier1-rust-reconstruction-call-timing/1"
+SCHEMA = "zenofcis/tier1-rust-reconstruction-call-timing/2"
 FUNCS = ("divrem_pair", "divrem_offset", "divrem_reverse",
          "divrem_swapped", "div_only", "signed_divrem")
 MASK = (1 << 64) - 1
@@ -148,8 +148,13 @@ def validate_producer(folder: Path) -> dict:
 
 
 def audit(folder: Path, raw: Path, cargo_lock: Path, calls: int, blocks: int, mode: str) -> dict:
-    base_mode = mode.removesuffix("_rev")
-    if base_mode not in ("ab","aa","bb") or mode not in ("ab","aa","bb","ab_rev","aa_rev","bb_rev") or not (20_000 <= calls <= 500_000 and 4 <= blocks <= 32
+    supported_modes = (
+        "ab", "ab_rev", "aa", "aa_rev", "bb", "bb_rev",
+        "aa_shared", "aa_shared_rev", "bb_shared", "bb_shared_rev",
+    )
+    base_mode = mode.removesuffix("_rev").removesuffix("_shared")
+    shared_module = "_shared" in mode
+    if base_mode not in ("ab","aa","bb") or mode not in supported_modes or not (20_000 <= calls <= 500_000 and 4 <= blocks <= 32
             and blocks % 2 == 0):
         raise ValueError("invalid timing bounds")
     src = validate_producer(folder)
@@ -223,6 +228,12 @@ def audit(folder: Path, raw: Path, cargo_lock: Path, calls: int, blocks: int, mo
         "comparison_mode": mode,
         "source_mapping": {"ab":["baseline","patched"],"aa":["baseline","baseline"],"bb":["patched","patched"]}[base_mode],
         "module_construction_order": "right-then-left" if mode.endswith("_rev") else "left-then-right",
+        "same_deserialized_module_for_both_instances": shared_module,
+        "module_code_placement_control": (
+            "two distinct Stores/Instances sharing one deserialized Module and compiled guest code"
+            if shared_module else
+            "two separately deserialized Module objects; guest code placement may differ"
+        ),
         "timing_harness_source_sha256": sha(HERE/"inprocess_rust_reconstruction_28/src/main.rs"),
         "raw_sha256": sha(raw),
         "cost_audit_source_sha256": sha(native_path),
@@ -243,6 +254,7 @@ def audit(folder: Path, raw: Path, cargo_lock: Path, calls: int, blocks: int, mo
             "even with balanced ABBA/BAAB order, unchanged-code control drift can confound causality",
             "sham runs compare identical AOT files in separate module instances with distinct code locations",
             "reversing module construction order probes one code-placement confound but does not fix page layout or native function alignment",
+            "shared-module shams reuse compiled guest code, but do not fix Store/Instance, trampoline, VMContext or call-site layout",
             "elapsed call time includes Wasmtime invocation and loop overhead",
             "proof-and-cost artifact separately establishes only per-function native byte savings",
             "no compiler-pass proof, machine-ISA proof, register-flag theorem or general target coverage",
@@ -260,7 +272,12 @@ def self_test() -> None:
     assert oracle("div_only",-1,2) == (1<<63)-1
     assert len(inputs()) >= 270
     assert expected_checksum("div_only",20_000) >= 0
-    print("independent Rust native-value oracle and bounded timing self-tests passed")
+    supported = ("ab","ab_rev","aa","aa_rev","bb","bb_rev",
+                 "aa_shared","aa_shared_rev","bb_shared","bb_shared_rev")
+    assert len(supported) == len(set(supported)) == 10
+    assert {m.removesuffix("_rev").removesuffix("_shared") for m in supported} == {"ab","aa","bb"}
+    assert all(m.startswith(("aa","bb")) for m in supported if "_shared" in m)
+    print("independent Rust native-value oracle and 10-mode timing self-tests passed")
 
 
 if __name__ == "__main__":

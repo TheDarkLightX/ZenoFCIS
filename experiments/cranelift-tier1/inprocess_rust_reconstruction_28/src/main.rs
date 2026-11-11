@@ -5,7 +5,7 @@ use std::{hint::black_box, time::Instant};
 use wasmtime::{Engine, Instance, Module, Store, TypedFunc};
 
 type E = Box<dyn std::error::Error>;
-const SCHEMA: &str = "zenofcis/tier1-rust-reconstruction-call-timing/1";
+const SCHEMA: &str = "zenofcis/tier1-rust-reconstruction-call-timing/2";
 const FUNCS: [&str; 6] = [
     "divrem_pair", "divrem_offset", "divrem_reverse",
     "divrem_swapped", "div_only", "signed_divrem",
@@ -66,14 +66,17 @@ struct Guest {
     f: TypedFunc<(i64, i64), i64>,
 }
 impl Guest {
-    fn new(engine: &Engine, aot: &str, export: &str) -> Result<Self, E> {
-        // SAFETY: file is SHA-256-checked against the archived producer's
-        // exact Wasmtime+Rust+Wasm receipt by CI before reaching this loader.
-        let module = unsafe { Module::deserialize_file(engine, aot) }?;
+    fn from_module(engine: &Engine, module: &Module, export: &str) -> Result<Self, E> {
         let mut store = Store::new(engine, ());
-        let instance = Instance::new(&mut store, &module, &[])?;
+        let instance = Instance::new(&mut store, module, &[])?;
         let f = instance.get_typed_func::<(i64, i64), i64>(&mut store, export)?;
         Ok(Self { store, f })
+    }
+    fn new(engine: &Engine, aot: &str, export: &str) -> Result<Self, E> {
+        // SAFETY: CI verifies the archived producer's source, Wasm, and
+        // AOT SHA-256 receipts before this deserialization.
+        let module = unsafe { Module::deserialize_file(engine, aot) }?;
+        Self::from_module(engine, &module, export)
     }
     fn check(&mut self, name: &str, inputs: &[(i64, i64)]) -> Result<(), E> {
         for &(x, y) in inputs {
@@ -117,7 +120,7 @@ impl Guest {
 fn run() -> Result<(), E> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 6 {
-        return Err("usage: bench OPTIMIZED_RESULTS_DIR CALLS BLOCKS SEED ab|aa|bb|ab_rev|aa_rev|bb_rev".into());
+        return Err("usage: bench OPTIMIZED_RESULTS_DIR CALLS BLOCKS SEED ab|aa|bb|ab_rev|aa_rev|bb_rev|aa_shared|bb_shared|aa_shared_rev|bb_shared_rev".into());
     }
     let root = &args[1];
     let calls: usize = args[2].parse()?;
@@ -126,12 +129,21 @@ fn run() -> Result<(), E> {
     // Reverse-order modes invert *which module is loaded first*, not the
     // measured A/B labels. This probes the code-placement confound observed
     // in the same-AOT sham runs; it does NOT pin executable addresses.
+    const MODES: [&str; 10] = [
+        "ab", "ab_rev", "aa", "aa_rev", "bb", "bb_rev",
+        "aa_shared", "aa_shared_rev", "bb_shared", "bb_shared_rev",
+    ];
+    if !MODES.contains(&args[5].as_str()) {
+        return Err("unrecognized A/B or sham comparison mode".into());
+    }
     let reverse_load = args[5].ends_with("_rev");
-    let (left, right) = match args[5].trim_end_matches("_rev") {
+    let token = args[5].trim_end_matches("_rev");
+    let shared_module = token.ends_with("_shared");
+    let (left, right) = match token.trim_end_matches("_shared") {
         "ab" => ("baseline", "patched"),
         "aa" => ("baseline", "baseline"),
         "bb" => ("patched", "patched"),
-        _ => return Err("unrecognized A/B or sham comparison mode".into()),
+        _ => unreachable!("modes checked above"),
     };
     if !(20_000..=500_000).contains(&calls)
         || !(4..=32).contains(&blocks) || blocks % 2 != 0 || seed != 5623
@@ -147,7 +159,25 @@ fn run() -> Result<(), E> {
         // Both Guest objects remain alive throughout this function's
         // measurements. Reverse only construction order to counterbalance
         // the first-loaded versus second-loaded module addresses.
-        let (mut baseline, mut patched) = if reverse_load {
+        let (mut baseline, mut patched) = if shared_module {
+            if aot_b != aot_p {
+                return Err("shared module sham requires one identical AOT path".into());
+            }
+            // SAFETY: CI validates the exact archived producer/AOT hashes.
+            // Unlike the separately-deserialized A/A and B/B shams, both
+            // instances here reference the SAME compiled Module allocation.
+            // Distinct Store/Instance contexts and call wrappers remain.
+            let module = unsafe { Module::deserialize_file(&engine, &aot_b) }?;
+            if reverse_load {
+                let second = Guest::from_module(&engine, &module, name)?;
+                let first = Guest::from_module(&engine, &module, name)?;
+                (first, second)
+            } else {
+                let first = Guest::from_module(&engine, &module, name)?;
+                let second = Guest::from_module(&engine, &module, name)?;
+                (first, second)
+            }
+        } else if reverse_load {
             let second = Guest::new(&engine, &aot_p, name)?;
             let first = Guest::new(&engine, &aot_b, name)?;
             (first, second)

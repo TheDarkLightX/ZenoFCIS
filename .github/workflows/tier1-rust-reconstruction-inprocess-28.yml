@@ -63,12 +63,12 @@ jobs:
           cargo build --locked --release --manifest-path experiments/cranelift-tier1/inprocess_rust_reconstruction_28/Cargo.toml >tier1-rust-reconstruction-perf/build.stdout 2>tier1-rust-reconstruction-perf/build.stderr
           cp experiments/cranelift-tier1/inprocess_rust_reconstruction_28/Cargo.lock tier1-rust-reconstruction-perf/Cargo.lock
           { git rev-parse HEAD; git -C upstream rev-parse HEAD; rustc --version; cargo --version; uname -a; lscpu; } >tier1-rust-reconstruction-perf/host-tools.txt
-      - name: Balanced A/B and two sham pairs in both module construction orders
+      - name: Balanced A/B, independent-module shams and same-module code-sharing shams
         run: |
           set -euo pipefail
           root="$(cat tier1-rust-reconstruction-perf/source-root.txt)"
           bin=experiments/cranelift-tier1/inprocess_rust_reconstruction_28/target/release/tier1-rust-reconstruction-call-timing-28
-          for mode in ab ab_rev aa aa_rev bb bb_rev; do
+          for mode in ab ab_rev aa aa_rev bb bb_rev aa_shared aa_shared_rev bb_shared bb_shared_rev; do
             "$bin" "$root/results/optimized" 50000 8 5623 "$mode" >"tier1-rust-reconstruction-perf/raw-${mode}.csv"
             python3 -B experiments/cranelift-tier1/audit_rust_reconstruction_timing_28.py \
               --source-root tier1-rust-reconstruction-perf/source \
