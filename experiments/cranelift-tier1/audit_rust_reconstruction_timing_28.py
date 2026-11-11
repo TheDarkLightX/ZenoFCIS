@@ -288,7 +288,9 @@ if __name__ == "__main__":
     p.add_argument("--out", type=Path)
     p.add_argument("--calls", type=int, default=50_000)
     p.add_argument("--blocks", type=int, default=8)
-    p.add_argument("--mode", choices=("ab","aa","bb","ab_rev","aa_rev","bb_rev"), default="ab")
+    p.add_argument("--mode", choices=("ab","ab_rev","aa","aa_rev","bb","bb_rev",
+                                      "aa_shared","aa_shared_rev","bb_shared","bb_shared_rev"),
+                   default="ab")
     p.add_argument("--self-test", action="store_true")
     a = p.parse_args()
     if a.self_test:
