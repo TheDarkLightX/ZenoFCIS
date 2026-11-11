@@ -1,0 +1,56 @@
+name: tier1-udivrem-euclidean-theorem-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-udivrem-euclidean-theorem-28.yml'
+      - 'experiments/cranelift-tier1/verify_udivrem_euclidean_28.py'
+      - 'experiments/cranelift-tier1/verify_udivrem_reconstruction_qfbv_28.py'
+      - 'experiments/cranelift-tier1/install_udivrem_reconstruction_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tier1-udivrem-euclidean-theorem-28
+  cancel-in-progress: true
+jobs:
+  independent-unbounded-integer-semantics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Validate independent verifier sources and exact compiler transformation source
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/verify_udivrem_euclidean_28.py
+          python3 -B experiments/cranelift-tier1/verify_udivrem_reconstruction_qfbv_28.py --self-test
+      - name: Install hash-pinned Z3
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/tier1-euclidean-z3"
+          "$RUNNER_TEMP/tier1-euclidean-z3/bin/python" -m pip install \
+            --only-binary=:all: --require-hashes \
+            -r tools/machine_code_requirements.txt
+      - name: Check all unsigned 64-bit bounded integer identities; classify UNKNOWN as unproved
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-euclidean
+          {
+            git rev-parse HEAD
+            git hash-object experiments/cranelift-tier1/install_udivrem_reconstruction_28.py
+            sha256sum experiments/cranelift-tier1/verify_udivrem_euclidean_28.py
+            "$RUNNER_TEMP/tier1-euclidean-z3/bin/python" -c 'import z3; print(z3.get_version_string())'
+          } > tier1-euclidean/pins.txt
+          "$RUNNER_TEMP/tier1-euclidean-z3/bin/python" -B \
+            experiments/cranelift-tier1/verify_udivrem_euclidean_28.py \
+            --timeout-ms 30000 --out tier1-euclidean/receipt.json
+      - name: Archive independently classified proof or UNKNOWN checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-udivrem-euclidean-theorem-28
+          path: tier1-euclidean/
+          retention-days: 30
+          if-no-files-found: warn
