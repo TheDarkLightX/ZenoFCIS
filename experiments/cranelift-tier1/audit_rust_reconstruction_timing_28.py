@@ -192,16 +192,48 @@ def audit(folder: Path, raw: Path, cargo_lock: Path, calls: int, blocks: int) ->
             "patched_faster_blocks": sum(r < 1 for r in blocks_ratios)}
     if cursor != len(lines):
         raise ValueError("unexpected extra or missing timing entries")
+    # This heuristic is a CAUSAL INTERPRETATION CHECK, not a statistical
+    # significance test. In the archived byte audit all three controls have
+    # unchanged native instruction bytes. Large control timing shifts must
+    # invalidate any compiler-optimization speedup interpretation.
+    native_path = HERE / "evidence/rust_reconstruction_native_audit_20261111.json"
+    native = json.loads(native_path.read_text())
+    if (native.get("experimental_zenofcis_commit") != PRODUCER_HEAD
+            or native.get("upstream_source_commit") != UPSTREAM
+            or native.get("artifact_id") != PRODUCER_ARTIFACT):
+        raise ValueError("native code cost provenance mismatch")
+    cost = native["native_code_bytes"]["profile_optimized"]
+    expected_savings = {"divrem_pair":13, "divrem_offset":13, "divrem_reverse":13,
+                        "divrem_swapped":0, "div_only":0, "signed_divrem":0}
+    if any(cost[n].get("saved_instruction_bytes") != v
+           for n,v in expected_savings.items()):
+        raise ValueError("negative control changed or native cost audit mismatch")
+    controls = ("divrem_swapped","div_only","signed_divrem")
+    out_of_band = {n:ratios[n]["median_of_paired_block_ratios"]
+                   for n in controls
+                   if not 0.98 <= ratios[n]["median_of_paired_block_ratios"] <= 1.02}
+    attribution = ("CONFOUNDED-unchanged-code-controls-outside-2pct-heuristic"
+                   if out_of_band else
+                   "controls-within-heuristic-NOT-a-portable-speedup-proof")
     return {
         "schema": SCHEMA, "status": "source-bound-finite-checked-exploratory-runtime",
         "producer": src, "host_lock_sha256": sha(cargo_lock),
-        "raw_sha256": sha(raw), "timing": {
+        "raw_sha256": sha(raw),
+        "cost_audit_source_sha256": sha(native_path),
+        "unchanged_instruction_byte_controls": list(controls),
+        "causal_attribution_status": attribution,
+        "control_drift_heuristic": {"tolerance": "ratio in [0.98,1.02] for each unchanged-code function",
+                                    "out_of_band_ratios": out_of_band,
+                                    "basis": "heuristic only; not a formal causal/statistical guarantee"},
+        "native_instruction_byte_savings_by_function": expected_savings,
+        "timing": {
             "calls_per_sample": calls, "balanced_blocks": blocks,
             "sample_count": sample_count, "functions": ratios},
         "contract": "identical optimized Rust WebAssembly per baseline/patched compiler; each output verified by independent signed/unsigned Python oracle",
         "negative_controls": ["divrem_swapped", "div_only", "signed_divrem"],
         "nonclaims": [
             "one virtualized host, no portable throughput or steady-state speedup conclusion",
+            "even with balanced ABBA/BAAB order, unchanged-code control drift can confound causality",
             "elapsed call time includes Wasmtime invocation and loop overhead",
             "proof-and-cost artifact separately establishes only per-function native byte savings",
             "no compiler-pass proof, machine-ISA proof, register-flag theorem or general target coverage",
