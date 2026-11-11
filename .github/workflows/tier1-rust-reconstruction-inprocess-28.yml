@@ -1,0 +1,92 @@
+name: tier1-rust-reconstruction-inprocess-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-rust-reconstruction-inprocess-28.yml'
+      - 'experiments/cranelift-tier1/inprocess_rust_reconstruction_28/**'
+      - 'experiments/cranelift-tier1/audit_rust_reconstruction_timing_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: tier1-rust-reconstruction-inprocess-28
+  cancel-in-progress: true
+jobs:
+  source-checked-balanced-inprocess:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 105
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Download exact successful baseline/patched Rust-Wasm producer
+        uses: actions/download-artifact@v4
+        with:
+          repository: TheDarkLightX/ZenoFCIS
+          run-id: 42951667233
+          github-token: ${{ github.token }}
+          name: tier1-udivrem-llvm-reconstruction-28
+          path: tier1-rust-reconstruction-perf/source
+      - name: Fail closed on upstream and source, compiler, AOT and oracle pins
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          python3 -m py_compile experiments/cranelift-tier1/audit_rust_reconstruction_timing_28.py
+          python3 -B experiments/cranelift-tier1/audit_rust_reconstruction_timing_28.py --self-test
+          python3 -B - <<'PY'
+          from pathlib import Path
+          import sys, json
+          sys.path.insert(0, "experiments/cranelift-tier1")
+          from audit_rust_reconstruction_timing_28 import validate_producer
+          row = validate_producer(Path("tier1-rust-reconstruction-perf/source"))
+          print(json.dumps(row, sort_keys=True))
+          Path("tier1-rust-reconstruction-perf/source-root.txt").write_text(row["root"]+"\n")
+          PY
+      - name: Build source-pinned Wasmtime in-process runtime
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal
+          cargo generate-lockfile --manifest-path experiments/cranelift-tier1/inprocess_rust_reconstruction_28/Cargo.toml
+          cargo build --locked --release --manifest-path experiments/cranelift-tier1/inprocess_rust_reconstruction_28/Cargo.toml >tier1-rust-reconstruction-perf/build.stdout 2>tier1-rust-reconstruction-perf/build.stderr
+          cp experiments/cranelift-tier1/inprocess_rust_reconstruction_28/Cargo.lock tier1-rust-reconstruction-perf/Cargo.lock
+          { git rev-parse HEAD; git -C upstream rev-parse HEAD; rustc --version; cargo --version; uname -a; lscpu; } >tier1-rust-reconstruction-perf/host-tools.txt
+      - name: Paired ABBA/BAAB native-call timings for three positive and three negative controls
+        run: |
+          set -euo pipefail
+          root="$(cat tier1-rust-reconstruction-perf/source-root.txt)"
+          bin=experiments/cranelift-tier1/inprocess_rust_reconstruction_28/target/release/tier1-rust-reconstruction-call-timing-28
+          "$bin" "$root/results/optimized" 50000 8 5623 >tier1-rust-reconstruction-perf/raw.csv
+          python3 -B experiments/cranelift-tier1/audit_rust_reconstruction_timing_28.py \
+            --source-root tier1-rust-reconstruction-perf/source \
+            --raw tier1-rust-reconstruction-perf/raw.csv \
+            --cargo-lock tier1-rust-reconstruction-perf/Cargo.lock \
+            --calls 50000 --blocks 8 \
+            --out tier1-rust-reconstruction-perf/qualified.json
+      - name: Archive original source and independently audited exploratory timing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-rust-reconstruction-inprocess-28
+          path: |
+            tier1-rust-reconstruction-perf/source-root.txt
+            tier1-rust-reconstruction-perf/host-tools.txt
+            tier1-rust-reconstruction-perf/Cargo.lock
+            tier1-rust-reconstruction-perf/build.stdout
+            tier1-rust-reconstruction-perf/build.stderr
+            tier1-rust-reconstruction-perf/raw.csv
+            tier1-rust-reconstruction-perf/qualified.json
+          retention-days: 30
+          if-no-files-found: warn
