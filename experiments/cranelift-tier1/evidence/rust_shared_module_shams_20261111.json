@@ -1,0 +1,161 @@
+{
+  "schema": "zenofcis/tier1-shared-module-shams-independent-audit/1",
+  "date_utc": "2026-11-11",
+  "classification": "CI succeeded; original archived raw CSV and receipts independently rechecked; speedup NOT established",
+  "pins": {
+    "experiment_commit": "2e8792973a088755dd08ddabfb06d1d904953063",
+    "wasmtime_cranelift": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "rustc": "1.97.1",
+    "rust_wasm_producer": "e99ab17875bbb6d294c9f0cfef80c2b51d28a4f6",
+    "wasm_sha256": "050492a09a7531e05d4aea3572589e44d381171d7ffc348f288910c683ef923d",
+    "compiler_sha256": {
+      "baseline": "a2dd8ba4b12fd86bf0c4aeca76d543bc4f57ae067a215749a6ef5350aeb41c3c",
+      "patched": "67bb8411c3b07305d4cc66ed5540f755c3c8bb31fce34ff8f458f1f452dfd975"
+    }
+  },
+  "source": {
+    "branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "job_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43105645305",
+    "run_id": 43105645305,
+    "artifact_id": 13894935198,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43105645305/artifacts/13894935198",
+    "downloaded_artifact_zip_sha256": "5edc0a9772aca64c0db623ddd39338e929dc2629f0e6fe10261636128db3081c",
+    "CI_job_conclusion": "success",
+    "host_cpu": "AMD EPYC 7763 (GitHub-hosted Azure x86-64 VM)"
+  },
+  "method": {
+    "modes": [
+      "ab",
+      "ab_rev",
+      "aa",
+      "aa_rev",
+      "bb",
+      "bb_rev",
+      "aa_shared",
+      "aa_shared_rev",
+      "bb_shared",
+      "bb_shared_rev"
+    ],
+    "functions": [
+      "divrem_pair",
+      "divrem_offset",
+      "divrem_reverse",
+      "divrem_swapped",
+      "div_only",
+      "signed_divrem"
+    ],
+    "AB_AA_BB_distinct_module_pair": "A/B always deserializes two separate compiled Module objects; independent A/A B/B shams also deserialize twice",
+    "shared_module_sham": "two distinct Store/Instance contexts share one Module object and its guest code, in both instance construction orders",
+    "calls_per_sample": 50000,
+    "blocks_per_function": 8,
+    "samples_per_mode": 192,
+    "total_samples": 1920,
+    "total_guest_calls": 96000000,
+    "independent_audit": "Downloaded original artifact; re-parsed all 10 CSVs and 10 JSON receipts; recomputed 480 block ratios, 60 function-level medians, all 1920 checksum values from a separate 64-bit oracle, all raw SHA-256 digests, receipt modes and code-sharing metadata; no measurement was inferred from CI pass alone"
+  },
+  "median_right_over_left_elapsed_ratios": {
+    "ab": {
+      "div_only": 1.0187203058292362,
+      "divrem_offset": 1.004153079737085,
+      "divrem_pair": 1.0130623292687286,
+      "divrem_reverse": 1.0000124577373195,
+      "divrem_swapped": 1.0142064672809814,
+      "signed_divrem": 1.0324564927495965
+    },
+    "ab_rev": {
+      "div_only": 0.985377551915137,
+      "divrem_offset": 0.9790365132572258,
+      "divrem_pair": 1.0064275121316,
+      "divrem_reverse": 1.0238913859337637,
+      "divrem_swapped": 0.9950260853860153,
+      "signed_divrem": 1.0342535395853507
+    },
+    "aa": {
+      "div_only": 1.0122894513937561,
+      "divrem_offset": 1.0028547212203547,
+      "divrem_pair": 0.9995483792487072,
+      "divrem_reverse": 1.0030195549323468,
+      "divrem_swapped": 1.0200130046866094,
+      "signed_divrem": 1.0149220371497507
+    },
+    "aa_rev": {
+      "div_only": 1.008239323217334,
+      "divrem_offset": 0.9765742084760624,
+      "divrem_pair": 1.0088327334009546,
+      "divrem_reverse": 1.031281757005488,
+      "divrem_swapped": 1.000031468879473,
+      "signed_divrem": 1.0427808851856295
+    },
+    "bb": {
+      "div_only": 1.0041262529588164,
+      "divrem_offset": 0.9959336668099159,
+      "divrem_pair": 1.0091288494994899,
+      "divrem_reverse": 1.0123855382197178,
+      "divrem_swapped": 1.0109873241152592,
+      "signed_divrem": 1.015241688100199
+    },
+    "bb_rev": {
+      "div_only": 0.9966964250674148,
+      "divrem_offset": 0.9869291096931367,
+      "divrem_pair": 0.9338847531545872,
+      "divrem_reverse": 1.0226505535778183,
+      "divrem_swapped": 1.007143134104858,
+      "signed_divrem": 1.011564181446071
+    },
+    "aa_shared": {
+      "div_only": 0.9896992520840748,
+      "divrem_offset": 1.0229566317206262,
+      "divrem_pair": 1.0179976966338722,
+      "divrem_reverse": 1.004187067797881,
+      "divrem_swapped": 1.0004770424573444,
+      "signed_divrem": 0.9855748213270012
+    },
+    "aa_shared_rev": {
+      "div_only": 0.998412044911489,
+      "divrem_offset": 1.0248744830750756,
+      "divrem_pair": 0.990960784000062,
+      "divrem_reverse": 0.9956986932340055,
+      "divrem_swapped": 0.9909340876003452,
+      "signed_divrem": 1.005161908302424
+    },
+    "bb_shared": {
+      "div_only": 1.0027479634230723,
+      "divrem_offset": 1.025751336236771,
+      "divrem_pair": 1.0274298301207423,
+      "divrem_reverse": 1.0013395009166328,
+      "divrem_swapped": 1.0144240527791686,
+      "signed_divrem": 0.9868082517702668
+    },
+    "bb_shared_rev": {
+      "div_only": 0.9904445205151372,
+      "divrem_offset": 1.0117630645079148,
+      "divrem_pair": 0.9957810616645312,
+      "divrem_reverse": 0.994993119098035,
+      "divrem_swapped": 0.9923037592888204,
+      "signed_divrem": 1.0231006051600489
+    }
+  },
+  "independent_cross_mode_findings": {
+    "separate_module_sham_max_abs_deviation_from_one": 0.06611524684541281,
+    "shared_module_sham_max_abs_deviation_from_one": 0.027429830120742293,
+    "separately_deserialized_sham_function_modes_outside_2pct_of_one": 6,
+    "shared_module_sham_function_modes_outside_2pct_of_one": 5,
+    "interpretation": "Same compiled guest code reduces some observed confounds but does not remove slot drift, even within sham controls. A/B compiler optimization throughput remains inconclusive."
+  },
+  "distinct_native_cost_evidence": {
+    "source_run": 42951667233,
+    "optimized_Rust_positive_functions_saved_decoded_x86_64_instruction_bytes_each": 13,
+    "number_positive_functions": 3,
+    "negative_controls_without_native_instruction_byte_delta": 3,
+    "whole_aot_bytes_per_variant": 66264,
+    "note": "Separate cost evidence, not measured anew here; saved bytes are per native function, not whole-AOT bytes or CLIF op costs."
+  },
+  "limitations": [
+    "No fixed VMContext/trampoline/call-site addresses or CPU frequency; a shared Module does not share instances",
+    "Single hosted VM, call overhead and different source code locations in A/B remain",
+    "Causal compiler runtime improvement or slowdown NOT established",
+    "Pure-result math and finite checks do not constitute a verified compiler-pass, flag, poison or ABI proof",
+    "This pilot rewrite was manually developed rather than autonomously synthesized by ZenoFCIS",
+    "No Bytecode Alliance upstream PR or branch mutation"
+  ]
+}
