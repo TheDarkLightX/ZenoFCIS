@@ -1,0 +1,94 @@
+{
+  "schema": "zenofcis/tier1-rust-reconstruction-causality-checkpoint/1",
+  "observed_date_utc": "2026-11-11",
+  "status": "independently-verified-source-bound-arithmetic-theorem-and-exploratory-timing; native-runtime-causality-NOT-established",
+  "pins": {
+    "zenofcis_reconstruction_producer": "e99ab17875bbb6d294c9f0cfef80c2b51d28a4f6",
+    "cranelift_wasmtime_source": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "rustc": "1.97.1",
+    "reconstruction_installer_git_blob": "466a4608fca3a19e063a86303521257ae45ba589",
+    "isolation_branch": "research/2.8-tier1-cranelift-performance-20261102"
+  },
+  "independent_arithmetic_checks": {
+    "qfbv64": {
+      "run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42997689131",
+      "artifact_id": 13844358020,
+      "source-pinned-exhaustive-width8": "65280/65280 nonzero-divisor inputs; 256 zero-divisor cases excluded as traps",
+      "SMT_64": "UNKNOWN after 120000 ms; NOT a formal bitvector proof"
+    },
+    "integer_euclidean": {
+      "run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42998843004",
+      "artifact_id": 13845531113,
+      "assumptions": "x,y mathematical integers: 0 <= x <= 2^64-1; 1 <= y <= 2^64-1",
+      "query_results": [
+        [
+          "x - (x div y)*y != x mod y",
+          "unsat"
+        ],
+        [
+          "(x div y)*y < 0 or >x or >2^64-1",
+          "unsat"
+        ],
+        [
+          "x - (x div y)*y <0 or >=y",
+          "unsat"
+        ],
+        [
+          "x div y <0 or >2^64-1",
+          "unsat"
+        ]
+      ],
+      "scope": "All-input integer Euclidean semantics and no-wrap transfer to CLIF unsigned 64-bit pure values; NOT a verified Rust compiler pass or machine-code proof"
+    }
+  },
+  "compiled_native_evidence": {
+    "run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42951667233",
+    "artifact_id": 13825142647,
+    "rust_source": "identical optimized Rust-generated Wasm input per baseline/patched Cranelift",
+    "native_decoded_instruction_byte_savings": {
+      "divrem_pair": 13,
+      "divrem_offset": 13,
+      "divrem_reverse": 13,
+      "divrem_swapped": 0,
+      "div_only": 0,
+      "signed_divrem": 0
+    },
+    "whole_aot_bytes": {
+      "baseline": 66264,
+      "patched": 66264
+    },
+    "scope": "Per-function decoded x86-64 emitted instruction bytes; not whole-module bytes, CLIF costs, or general target cost"
+  },
+  "initial_exploratory_runtime": {
+    "run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42998525421",
+    "artifact_id": 13845057121,
+    "host": "single GitHub-hosted Ubuntu x86-64 runner; exact host information in CI artifact",
+    "inputs_per_variant_per_export": 272,
+    "independently_checked_traps": "zero-divisor; swapped numerator zero; signed MIN/-1",
+    "samples": 192,
+    "guest_calls": 9600000,
+    "balanced_blocks": 8,
+    "calls_per_sample": 50000,
+    "patched_over_baseline_median_elapsed_ratio": {
+      "divrem_pair": 0.926308016903354,
+      "divrem_offset": 0.9817476280965295,
+      "divrem_reverse": 1.07373198744145,
+      "divrem_swapped": 0.9287953659557185,
+      "div_only": 0.9120628379211917,
+      "signed_divrem": 0.9175590643189724
+    },
+    "interpretation": "NOT a speedup qualification: the three negative controls have unchanged per-function native instruction bytes but all favor patched at approximately 7–9%; function-layout/runtime/call site confounds remain. One positive function is slower."
+  },
+  "follow_up": {
+    "causality_audit_commit": "4a35ac129fdfefb8855bf61e473061f1660b635b",
+    "causality_audit_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42999084559",
+    "status_at_creation": "CI in progress; no claim that the rerun has passed",
+    "next": "qualify a layout-controlled same-function comparison or matched sham A/A,B/B before attributing native runtime differences; inspect compiler-pass invariants and liveness; do not submit upstream PR"
+  },
+  "boundaries": [
+    "The matched arithmetic rewrite was manually derived from optimized Rust CLIF, not shown to have been synthesized by ZenoFCIS.",
+    "8-bit exhaustive checking, mathematical integer SMT proofs, 64-bit SMT UNKNOWN, finite native tests and timing are distinct assurance categories.",
+    "Signed division, zero-divisor trap ordering, LLVM poison, flags, ABI, liveness, arbitrary compiler control flow and general ISLE/VeriISLE rule correctness remain outside formal proof scope.",
+    "No main/release/Bytecode Alliance upstream changes and no upstream PR."
+  ]
+}
