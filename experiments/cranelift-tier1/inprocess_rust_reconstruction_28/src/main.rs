@@ -117,13 +117,17 @@ impl Guest {
 fn run() -> Result<(), E> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 6 {
-        return Err("usage: bench OPTIMIZED_RESULTS_DIR CALLS BLOCKS SEED ab|aa|bb".into());
+        return Err("usage: bench OPTIMIZED_RESULTS_DIR CALLS BLOCKS SEED ab|aa|bb|ab_rev|aa_rev|bb_rev".into());
     }
     let root = &args[1];
     let calls: usize = args[2].parse()?;
     let blocks: usize = args[3].parse()?;
     let seed: usize = args[4].parse()?;
-    let (left, right) = match args[5].as_str() {
+    // Reverse-order modes invert *which module is loaded first*, not the
+    // measured A/B labels. This probes the code-placement confound observed
+    // in the same-AOT sham runs; it does NOT pin executable addresses.
+    let reverse_load = args[5].ends_with("_rev");
+    let (left, right) = match args[5].trim_end_matches("_rev") {
         "ab" => ("baseline", "patched"),
         "aa" => ("baseline", "baseline"),
         "bb" => ("patched", "patched"),
@@ -140,8 +144,18 @@ fn run() -> Result<(), E> {
     for name in FUNCS {
         let aot_b = format!("{root}/{left}/native.cwasm");
         let aot_p = format!("{root}/{right}/native.cwasm");
-        let mut baseline = Guest::new(&engine, &aot_b, name)?;
-        let mut patched = Guest::new(&engine, &aot_p, name)?;
+        // Both Guest objects remain alive throughout this function's
+        // measurements. Reverse only construction order to counterbalance
+        // the first-loaded versus second-loaded module addresses.
+        let (mut baseline, mut patched) = if reverse_load {
+            let second = Guest::new(&engine, &aot_p, name)?;
+            let first = Guest::new(&engine, &aot_b, name)?;
+            (first, second)
+        } else {
+            let first = Guest::new(&engine, &aot_b, name)?;
+            let second = Guest::new(&engine, &aot_p, name)?;
+            (first, second)
+        };
         baseline.check(name, &inputs)?;
         patched.check(name, &inputs)?;
         println!("CHECK,{name},baseline,{}", inputs.len());
