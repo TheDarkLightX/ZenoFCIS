@@ -1,0 +1,116 @@
+{
+  "schema": "zenofcis/tier1-llvm-quotient-reconstruction-cost-audit/1",
+  "observed_date_utc": "2026-11-11",
+  "status": "pinned-CI-success-and-independent-raw-artifact-recalculation",
+  "experimental_zenofcis_commit": "e99ab17875bbb6d294c9f0cfef80c2b51d28a4f6",
+  "upstream_source_commit": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "git_workflow_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42951667233",
+  "artifact_id": 13825142647,
+  "artifact_sha256": "e2dd3570b3f29c75948e6e2daad28174faa88e7ef31c59ce6135770ecedf8010",
+  "compiler_sha256": {
+    "baseline": "a2dd8ba4b12fd86bf0c4aeca76d543bc4f57ae067a215749a6ef5350aeb41c3c",
+    "patched": "67bb8411c3b07305d4cc66ed5540f755c3c8bb31fce34ff8f458f1f452dfd975"
+  },
+  "rustc": "1.97.1",
+  "source_kind": "Identical Rust-generated WebAssembly per profile; opt-level 0 and 3 are different input modules",
+  "tool_scope": "Pinned x86-64 Wasmtime CLI Cranelift with experimental i64 unsigned udiv+imul+isub to multi-result udivrem; exact adjacent same-block SSA match",
+  "verdict": {
+    "ci": "Both source-controls and identical-rust-wasm jobs success",
+    "finite_producer": "569 value + 79 trap/panic cases per compiler per profile (648 x 4 = 2592 executions); all passed",
+    "finite_rechecker": "984 fresh executions; independent arithmetic oracle and SHA/cost checks passed",
+    "formal_equivalence": "NOT a full compiler-pass, machine-ISA or flag/ABI/poison proof; no all-64-bit SMT result claimed",
+    "exhaustive_small_model": "Independent 8-bit unsigned nonzero-divisor Python check passed all 65,280 pairs (mathematical identity, not Cranelift execution)"
+  },
+  "native_code_bytes": {
+    "interpretation": "Number of decoded instruction bytes printed by wasmtime objdump per function, NOT CLIF cost, whole AOT size, nor necessarily ELF symbol size. prefix = instructions through first retq, all = all printed instructions including cold trap tails.",
+    "profile_debug": "AOT byte-identical; native costs unchanged",
+    "profile_optimized": {
+      "divrem_offset": {
+        "baseline": {
+          "prefix_bytes": 78,
+          "all_bytes": 95,
+          "all_instructions": 29
+        },
+        "patched": {
+          "prefix_bytes": 65,
+          "all_bytes": 82,
+          "all_instructions": 25
+        },
+        "saved_instruction_bytes": 13
+      },
+      "divrem_pair": {
+        "baseline": {
+          "prefix_bytes": 77,
+          "all_bytes": 94,
+          "all_instructions": 29
+        },
+        "patched": {
+          "prefix_bytes": 64,
+          "all_bytes": 81,
+          "all_instructions": 25
+        },
+        "saved_instruction_bytes": 13
+      },
+      "divrem_reverse": {
+        "baseline": {
+          "prefix_bytes": 77,
+          "all_bytes": 94,
+          "all_instructions": 29
+        },
+        "patched": {
+          "prefix_bytes": 64,
+          "all_bytes": 81,
+          "all_instructions": 25
+        },
+        "saved_instruction_bytes": 13
+      },
+      "divrem_swapped": {
+        "baseline": {
+          "prefix_bytes": 91,
+          "all_bytes": 123
+        },
+        "patched": {
+          "prefix_bytes": 91,
+          "all_bytes": 123
+        },
+        "saved_instruction_bytes": 0
+      },
+      "div_only": {
+        "baseline": {
+          "prefix_bytes": 51,
+          "all_bytes": 68
+        },
+        "patched": {
+          "prefix_bytes": 51,
+          "all_bytes": 68
+        },
+        "saved_instruction_bytes": 0
+      },
+      "signed_divrem": {
+        "baseline": {
+          "prefix_bytes": 105,
+          "all_bytes": 151
+        },
+        "patched": {
+          "prefix_bytes": 105,
+          "all_bytes": 151
+        },
+        "saved_instruction_bytes": 0
+      },
+      "three_eligible_functions_saved_total_instruction_bytes": 39,
+      "observed_static_divq": "6 baseline / 6 patched module-wide, since one division is already present per matching function",
+      "observed_imulq_and_subq": "Each of the 3 positive functions removes one imulq and one subq; there are four fewer decoded instructions per positive function",
+      "whole_AOT_bytes": "66264 baseline and patched (unchanged)",
+      "ELF_text_bytes": "28672 baseline and patched (page-aligned section size unchanged)",
+      "cost_limitations": "No runtime speedup benchmark; no whole-AOT size reduction; bytes are per-function emitted listing only"
+    }
+  },
+  "scope_and_caveats": [
+    "Source-backed optimizer reachability established for only three deliberately constructed optimized Rust functions. This is not a prevalence study.",
+    "Intermediate CLIF imul retained by patch for conservative possible other consumers; dead native code disappeared after lowering.",
+    "Diff was found in the raw emitted code under identical Rust Wasm; signed, swapped-operand and quotient-only controls unchanged",
+    "The earlier adjacent udiv/urem optimization did not trigger for these Rust inputs; this is a new shape",
+    "Standalone arithmetic identity does not prove all compiler/SSA/register-pressure/flag/poison cases",
+    "No upstream Wasmtime PR, main branch mutation, or production deployment"
+  ]
+}
