@@ -433,7 +433,7 @@ function store(key, value) { try { if (value === undefined) return localStorage.
 
 /* ---------- state ---------- */
 const S = { i: 0, tab: "evidence", read: { english: true, symbols: true, typed: false }, sel: null, sim: null, change: null, col: null,
-            candidate: null, draft: null, busy: false, stale: false, live: null, liveKey: null };   /* the last five matter only when live */
+            candidate: null, candidateRequest: null, draft: null, busy: false, stale: false, live: null, liveKey: null };   /* the last five matter only when live */
 /* The reading key: the line it explains, the symbol it shows in full, the symbols this reader has learned, and what the pointer is on. */
 const K = { at: null, peek: null, said: null, hidden: false, known: new Set(), hot: null, lines: [], marks: [] };
 const wide = window.matchMedia("(min-width: 1060px)");
@@ -555,7 +555,7 @@ function go(tab, after) {
   render();
   if (after) after();
 }
-function select(i) { S.i = i; S.sel = null; K.at = null; K.peek = null; K.said = null; S.sim = startInput(B()); S.change = null; S.col = null; S.candidate = null; S.draft = null; S.live = null; S.liveKey = null; store("zal-review-desk-model", B().file); render(); }
+function select(i) { S.i = i; S.sel = null; K.at = null; K.peek = null; K.said = null; S.sim = startInput(B()); S.change = null; S.col = null; S.candidate = null; S.candidateRequest = null; S.busy = false; S.draft = null; S.live = null; S.liveKey = null; store("zal-review-desk-model", B().file); render(); }
 function tryInput(given) { S.sim = { ...given, variables: { ...given.variables }, context: { ...given.context }, trace: [] }; go("try"); }
 function pickClause(key) { S.sel = S.sel === key ? null : key; if (K.at !== key) { K.at = key; K.peek = null; K.said = null; } render(); }
 
@@ -1126,7 +1126,8 @@ function changeDetail(b, f, r, title, own) {
   out.push(h("h3", {}, title));
   if (r.before || r.after) out.push(h("div", { class: "redline" }, r.before ? h("div", { class: "del" }, r.before) : null, r.after ? h("div", { class: "add" }, r.after) : h("div", { class: "gone" }, "the line is deleted")));
   if (r.status === "refused") { out.push(h("p", { class: "v-line", style: "font-size:14.5px" }, h("span", { class: "status", "data-s": "quiet" }, "refused"), h("span", {}, own ? "ZAL does not accept your candidate." : "ZAL does not accept the edited statement.")), refusal(r.source_diagnostic, r.diagnostic)); return out; }
-  const verdict = own ? (r.class === "unnoticed" ? "Every check passes on your candidate." : r.class === "no-change" ? "Every check passes on your candidate, and it decides every declared input as before."
+  const verdict = r.status === "unsupported" ? "The statement includes unsupported obligations; this is not a full pass."
+    : own ? (r.class === "not-compared" ? "The candidate was checked, but equivalence to the current statement was not established." : r.class === "unnoticed" ? "Every check passes on your candidate." : r.class === "no-change" ? "Every check passes on your candidate, and it decides every declared input as before."
       : r.class === "structure" ? `Your candidate breaks the machine's structure (${r.failed_check}) before any claim is consulted.` : ["Your candidate fails ", r.failed_name ? ["the claim ", h("code", { style: "color:var(--claim)" }, r.failed_name)] : "a claim", r.failed_check ? ` (${r.failed_check}).` : "."])
     : r.class === "unnoticed" ? "Every check still passes. No claim notices this edit."
     : r.class === "vacuous" ? `Every check still passes, for the wrong reason: ${r.lost_assumptions.map((p) => `${p.other} can no longer bring about ${p.assumption}`).join("; ")}. A claim of the form “if the other side behaves, I get there” cannot see an edit that stops the other side from behaving.`
@@ -1134,6 +1135,7 @@ function changeDetail(b, f, r, title, own) {
     : r.class === "no-change" ? "The edit changes no decision on the declared domain."
     : r.status === "counterexample" ? [r.failed_name ? ["The claim ", h("code", { style: "color:var(--claim)" }, r.failed_name), " fails"] : "A claim fails", r.failed_check ? ` (${r.failed_check}).` : "."] : "";
   out.push(h("p", { class: "v-line", style: "font-size:14.5px" }, status(r.status), h("span", {}, verdict)));
+  for (const advisory of r.advisories || []) out.push(h("p", { class: "adv" }, advisory.kind, ": ", advisory.message));
   const named = r.failed_name ? b.declared.find((c) => c.id === r.failed_name) : null, said = r.failed_claim || (named ? splitEnglish(named) : null);
   if (said) out.push(h("p", { class: "quote" }, said));
   if ((r.noticed_by || []).includes("invariants")) out.push(h("p", {}, "The invariants fail. ZAL stops there, so no other claim is asked about this edit."));
@@ -1157,10 +1159,10 @@ function renderChanges(panel) {
     h("p", { class: "lede" }, "Judge an edit by what it does, not by how it reads. ZAL compares the two statements on every declared input and reports each one that is decided differently.")));
   if (LIVE) {
     const area = h("textarea", { class: "src", id: "candidate", spellcheck: "false", "aria-label": "Candidate statement" }); area.value = S.draft != null ? S.draft : b.symbolic;
-    area.addEventListener("input", () => { S.draft = area.value; });
+    area.addEventListener("input", () => { S.draft = area.value; S.candidate = null; const result = $("cand-result"); if (result) result.replaceChildren(); });
     panel.append(h("section", { class: "block" }, h("h3", {}, "Your candidate"), h("p", { class: "lede" }, "Edit the statement and ask ZAL what would change. Nothing is saved and nothing is agreed."), area,
       h("div", { class: "rrow", style: "margin-top:8px" }, h("button", { class: "btn primary", disabled: S.busy, onclick: checkCandidate }, S.busy ? "Checking…" : "Check this candidate"),
-        h("button", { class: "btn", onclick: () => { S.draft = null; S.candidate = null; render(); } }, "Reset to the current statement"))));
+        h("button", { class: "btn", onclick: () => { S.draft = null; S.candidate = null; S.candidateRequest = null; S.busy = false; render(); } }, "Reset to the current statement"))));
     if (S.candidate) panel.append(h("section", { class: "block", id: "cand-result", "aria-live": "polite" }, changeDetail(b, f, S.candidate, "What your candidate would change", true)));
   }
   if (f.rows.length) {
@@ -1180,13 +1182,18 @@ async function api(route, body) {
   return data;
 }
 async function checkCandidate() {
-  const b = B(); S.busy = true; render();
-  try { const told = await api("candidate", { revision: b.revision, source: S.draft != null ? S.draft : b.symbolic });
+  const b = B(), request = { revision: b.revision, source: S.draft != null ? S.draft : b.symbolic };
+  S.candidateRequest = request; S.candidate = null; S.busy = true; render();
+  let candidate;
+  try { const told = await api("candidate", request);
     const structural = !!(told.failed_check && CHECKS[told.failed_check] && CHECKS[told.failed_check][1] === "s");
-    S.candidate = { ...told, noticed_by: [], lost_assumptions: [],
-      class: told.status === "refused" ? "refused" : told.status === "counterexample" ? (structural ? "structure" : "claim") : told.diff && told.diff.comparison === "different" ? "unnoticed" : "no-change" };
-  } catch (e) { S.candidate = { status: "refused", class: "refused", diagnostic: e.message }; }
-  S.busy = false; render(); scrollTo("cand-result");
+    candidate = { ...told, noticed_by: [], lost_assumptions: [],
+      class: told.status === "refused" ? "refused" : told.status === "counterexample" ? (structural ? "structure" : "claim") : told.diff && told.diff.comparison === "different" ? "unnoticed" : told.diff && told.diff.comparison === "same-functional-observations-on-declared-domain" ? "no-change" : "not-compared" };
+  } catch (e) { candidate = { status: "refused", class: "refused", diagnostic: e.message }; }
+  if (S.candidateRequest !== request) return;                  /* Reset or a newer question invalidated this request. */
+  S.candidateRequest = null; S.busy = false;
+  if (B().revision === request.revision && (S.draft != null ? S.draft : B().symbolic) === request.source) S.candidate = candidate;
+  render(); if (S.candidate) scrollTo("cand-result");
 }
 async function explainLive(key, given) {
   const b = B(); let told; S.liveKey = key;

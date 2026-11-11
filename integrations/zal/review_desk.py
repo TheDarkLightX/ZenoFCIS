@@ -506,8 +506,10 @@ ZAL_OPERATOR = {"not": "!", "and": "&", "or": "|", "implies": "=>", "iff": "<=>"
 WORDING = {"rule": "In symbols a rule is a step formula: on a step where everything left of the main arrow holds, this rule "
                    "decides the step and everything right of the arrow holds.",
            "default": "In symbols, “otherwise” stands for a step on which the left side of no rule holds.",
-           "require": "Which steps the check covered is in its scope sentence, under Evidence. With an invariant declared, "
-                      "that can be fewer than every declared pre-state."}
+           "require": "The registry wording above is broader than this checker's implemented scope. Requirements are checked "
+                      "on reachable steps and from declared configurations satisfying every invariant, not from "
+                      "every declared pre-state. A pass does not cover invariant-excluded configurations. "
+                      "See the checker's exact scope under Evidence."}
 
 
 def reading_key(model, profile, declared):

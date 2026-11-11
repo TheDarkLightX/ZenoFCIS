@@ -246,6 +246,19 @@ class ZalResults(unittest.TestCase):
         self.assertEqual(compared, sum(bundle["decisions"]["count"] for bundle, _, _ in self.built.values()))
         self.assertGreater(compared, 200)
 
+    def test_requirement_scope_does_not_claim_invariant_excluded_configurations(self):
+        text = LEDGER + "require no_excluded: state == closed => pending == 0;\n"
+        bundle, model, profile = bundle_of(text, with_edits=False)
+        self.assertEqual(bundle["check"]["status"], "pass-with-scope")
+        given = {"state": "closed", "variables": {"pending": 1}, "event": "post", "context": {}}
+        told = desk.explain_input(model, profile, given, bundle["checker"])
+        self.assertFalse(told["admissible"])
+        self.assertFalse(next(r for r in told["requirements"] if r["id"] == "no_excluded")["value"])
+        note = bundle["key"]["wording"]["require"]
+        self.assertIn("not from every declared pre-state", note)
+        self.assertIn("A pass does not cover invariant-excluded configurations", note)
+        self.assertEqual(bundle["key"]["kinds"]["require"], behavior2.CONSTRUCTS["require"][2])
+
     def test_a_changed_why_not_line_refuses_the_statement_instead_of_showing_a_stale_sentence(self):
         _, model, profile = self.built["limit"]
         actual = desk.why_not

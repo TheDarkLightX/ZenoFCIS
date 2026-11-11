@@ -33,7 +33,10 @@ for given in desk.input_tuples(model, profile):
     told['nearest'] = desk.nearest_opposite(model, profile, given, told['outcome'], checker)
     answers[desk.input_key(asked['axes'], given)] = told
 broken = LIMIT.replace('rule take:', 'rule take now:')
-candidates = {'same': desk.compare_candidate(model, profile, asked['symbolic'], checker)[0],
+candidates = {'different_profile': desk.compare_candidate(model, profile, example('order.zal'), checker)[0],
+              'different_domain': desk.compare_candidate(model, profile, LIMIT.replace('0..=3', '0..=4'), checker)[0],
+              'unsupported': desk.compare_candidate(model, profile, UNRESOLVED, checker)[0],
+              'same': desk.compare_candidate(model, profile, asked['symbolic'], checker)[0],
               'overflows': desk.compare_candidate(model, profile, asked['symbolic'].replace('[used < 3]', '[true]'), checker)[0],
               'freer': desk.compare_candidate(model, profile, asked['symbolic'].replace('rule lock_it: unlocked + lock [true] -> accept locked;\\n', ''), checker)[0],
               'refused': desk.compare_candidate(model, profile, asked['symbolic'].replace('rule take:', 'rule take now:'), checker)[0]}
@@ -119,6 +122,8 @@ function load(html, { wide = true, hash = '', storage = 'works', answer = null, 
 }
 
 const checks = [];
+let finished = false;                                            // a wait that never ends would otherwise end the run quietly, as if it had passed
+process.on('exit', (code) => { if (!finished && code === 0) { console.error('The checks did not run to the end.'); process.exitCode = 1; } });
 const check = (name, condition) => { assert(condition, name); checks.push(name); };
 const count = (bundle, kind) => bundle.edits.rows.filter((row) => row.class === kind).length;
 const named = (name) => fixture.bundles.findIndex((bundle) => bundle.file === name);
@@ -383,6 +388,38 @@ const NOISE = /undefined|NaN|\[object Object\]|\bnull\b/;
   await press(tagged(live.get('verdict'), 'button').find((node) => node.textContent === 'Reload'));
   check('Reload asks the browser for the page again', live.location.reloads === 1);
 
+  for (const kind of ['different_profile', 'different_domain', 'unsupported']) {
+    const told = fixture.candidates[kind];
+    const different = load(fixture.live, { hash: '#changes', answer: () => ({ body: told }) });
+    await different.run('checkCandidate()');
+    check(kind + ': no equivalence or full-pass claim without that evidence', !different.text('panel').includes('Every check passes on your candidate, and it decides every declared input as before.') &&
+      (kind === 'unsupported' ? different.text('panel').includes('unsupported obligations; this is not a full pass.') && told.advisories.every((a) => different.text('panel').includes(a.message))
+        : different.text('panel').includes('equivalence to the current statement was not established.')));
+  }
+
+  // A result belongs to the exact submitted source, never the text typed or reset while it was pending.
+  const waiting = [];
+  const racing = load(fixture.live, { hash: '#changes', answer: (call) => new Promise((resolve) => waiting.push({ call, resolve })) });
+  const candidateBox = () => tagged(racing.get('panel'), 'textarea')[0];
+  const original = candidateBox().value;
+  const firstRequest = racing.run('checkCandidate()');
+  candidateBox().value = original.replace('[used < 3]', '[true]'); await fire(candidateBox(), 'input');
+  waiting[0].resolve({ body: fixture.candidates.same }); await firstRequest;
+  check('a verdict for an earlier draft is discarded after typing', !racing.run('S.candidate') && !racing.run('S.busy') && !racing.text('panel').includes('Every check passes on your candidate'));
+  const secondRequest = racing.run('checkCandidate()');
+  await press(button(racing.get('panel'), 'Reset to the current statement'));
+  const thirdRequest = racing.run('checkCandidate()');
+  waiting[1].resolve({ body: fixture.candidates.overflows }); await secondRequest;
+  check('a reset invalidates the old answer without clearing a newer pending request', !racing.run('S.candidate') && racing.run('S.busy'));
+  waiting[2].resolve({ body: fixture.candidates.same }); await thirdRequest;
+  check('the current candidate result is still shown after superseding a request', racing.text('panel').includes('Every check passes on your candidate, and it decides every declared input as before.'));
+  const sameBox = candidateBox(); sameBox.value = original.replace('[used < 3]', '[true]'); await fire(sameBox, 'input');
+  check('editing a checked candidate removes its old verdict without replacing the editor', !racing.run('S.candidate') && !racing.text('panel').includes('Every check passes on your candidate') && candidateBox() === sameBox);
+  const fourthRequest = racing.run('checkCandidate()');
+  await press(button(racing.get('panel'), 'Reset to the current statement'));
+  waiting[3].resolve({ status: 400, body: { error: 'old request failed' } }); await fourthRequest;
+  check('a reset also discards a late error', !racing.run('S.candidate') && !racing.run('S.busy') && !racing.text('panel').includes('old request failed'));
+
   // ---- live, no table in the page: every decision is asked of ZAL
   const pending = [];
   const asking = load(fixture.live_asked, { hash: '#try', answer: (call) => call.url === '/api/changed' ? { body: { changed: false } } : new Promise((resolve) => pending.push({ call, resolve })) });
@@ -414,5 +451,6 @@ const NOISE = /undefined|NaN|\[object Object\]|\bnull\b/;
   check('a corrected file reloads the page by itself', refused.location.reloads === 1);
   check('an error is not presented as a refusal by ZAL', (() => { const failed = load(fixture.live_error).document.body.textContent; return failed.includes('raised an error. This is not a refusal by ZAL, and the source may be fine.') && failed.includes('TypeError: planted') && !failed.includes('ZAL does not accept'); })());
 
+  finished = true;
   console.log(`${checks.length} review desk checks passed (DOM double; no browser, network or provider)`);
 })().catch((error) => { console.error(error); process.exit(1); });
