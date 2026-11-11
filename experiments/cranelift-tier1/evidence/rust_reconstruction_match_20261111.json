@@ -1,0 +1,85 @@
+{
+  "schema": "zenofcis/tier1-rust-reconstructed-remainder-lexical-audit/1",
+  "date_utc": "2026-11-11",
+  "status": "independent archived-CLIF lexical analysis; compiler patch compilation pending",
+  "input": {
+    "github_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42902938104",
+    "artifact_id": 13817244391,
+    "artifact_sha256": "9b8ce57bff48d63eae52a3802924b206d7f09d97c92dd50246e853731091a145",
+    "zenofcis_source": "a76e119f91397816df3b6c29d92f13fed7a558b0",
+    "wasmtime_compiler_source": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "rustc": "1.97.1",
+    "profile": "optimized (-C opt-level=3)"
+  },
+  "method": "Independent Python zipfile/hashlib/re regex scan of CLIF text; require three consecutive nonblank code lines udiv.i64(x,y), imul(q,y), isub.i64(x,m) with exact SSA identities; no dominance, pass application or verifier claim",
+  "observations": {
+    "debug": {
+      "baseline": {
+        "clif_files": 107,
+        "matching_triads": 0
+      },
+      "patched": {
+        "clif_files": 107,
+        "matching_triads": 0
+      }
+    },
+    "optimized": {
+      "baseline": {
+        "clif_files": 104,
+        "matching_triads": 3
+      },
+      "patched": {
+        "clif_files": 104,
+        "matching_triads": 3
+      }
+    },
+    "matches": [
+      {
+        "function": "divrem_offset",
+        "lines": [
+          18,
+          19,
+          20
+        ],
+        "ssa": "q=v8; m=v9; r=v10; x=v2; y=v3",
+        "sha256": "f06c258b8e36b90f924eab3a86c75e7b6b76115195b3e6c136cb1fe144770418"
+      },
+      {
+        "function": "divrem_pair",
+        "lines": [
+          18,
+          19,
+          20
+        ],
+        "ssa": "q=v8; m=v9; r=v10; x=v2; y=v3",
+        "sha256": "6a6e030eb2f8462b3b66080856a9a6e690a6892d5efff5f5496ce12ecc0ed8db"
+      },
+      {
+        "function": "divrem_reverse",
+        "lines": [
+          18,
+          19,
+          20
+        ],
+        "ssa": "q=v8; m=v9; r=v10; x=v2; y=v3",
+        "sha256": "3c9c4e2113ea7517ceab4a308df2ecd656f32e9958c7c90a3613596e81d90c79"
+      }
+    ]
+  },
+  "new_pilot": {
+    "installer_commit": "e99ab17875bbb6d294c9f0cfef80c2b51d28a4f6",
+    "workflow_commit": "5e8c7149c2438785cc9328d48b0c3390138a8b9e",
+    "workflow_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42951667233",
+    "scope": "x86-64 unsigned i64 exact adjacent SSA triad; source patched only in disposable pinned upstream checkout",
+    "status": "source-control preflight passed; compiler build and identical-Rust-Wasm comparison not yet qualified"
+  },
+  "prior_native_cost_delta": "zero observed baseline/patched in Rust probe before this new patch",
+  "proof_status": "lexical pattern observation, NOT compiler-pass proof, 64-bit SMT proof or cost saving",
+  "semantics": "for unsigned x and nonzero y, Euclidean quotient q=floor(x/y), m=q*y <= x, r=x-m=x mod y; y=0 must trap at prior udiv. Signed min/-1, poison and observable flags are outside the admitted model",
+  "limitations": [
+    "Matching CLIF textual triad does not prove match survives egraph or the inserted compiler pass runs",
+    "Candidate patch preserves quotient and remainder SSA identities but is not verified for arbitrary control flow, alias, flags or register liveness",
+    "Intermediate imul intentionally retained pending safe use-def analysis",
+    "No same-Wasm byte, throughput or verified codegen saving yet"
+  ]
+}
