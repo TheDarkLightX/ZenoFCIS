@@ -1,0 +1,11 @@
+[package]
+name = "tier1-rust-reconstruction-call-timing-28"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+# Must match producer Wasmtime source revision, enforced in workflow.
+wasmtime = { path = "../../../upstream/crates/wasmtime", default-features = false, features = ["runtime", "std", "component-model-async"] }
