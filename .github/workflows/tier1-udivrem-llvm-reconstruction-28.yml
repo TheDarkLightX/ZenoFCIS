@@ -1,0 +1,97 @@
+name: tier1-udivrem-llvm-reconstruction-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-udivrem-llvm-reconstruction-28.yml'
+      - 'experiments/cranelift-tier1/install_udivrem_reconstruction_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tier1-udivrem-llvm-reconstruction-28
+  cancel-in-progress: true
+jobs:
+  source-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Check Python syntax, exact-source guards and negative controls
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/install_udivrem_reconstruction_28.py
+          python3 -B experiments/cranelift-tier1/install_udivrem_reconstruction_28.py --self-test
+  identical-rust-wasm:
+    needs: source-controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Build pristine same-source baseline
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal
+          rustup target add wasm32-unknown-unknown --toolchain 1.97.1
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          test -z "$(git -C upstream status --porcelain)"
+          mkdir -p tier1-reconstruction/compilers/{baseline,patched}
+          git rev-parse HEAD >tier1-reconstruction/zenofcis-head.txt
+          git -C upstream rev-parse HEAD >tier1-reconstruction/wasmtime-source-head.txt
+          cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump >tier1-reconstruction/baseline-build.stdout 2>tier1-reconstruction/baseline-build.stderr
+          cp upstream/target/debug/wasmtime tier1-reconstruction/compilers/baseline/wasmtime
+      - name: Install pinned experimental x86-64 i64 reconstruction and build
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/install_udivrem_reconstruction_28.py --upstream upstream --out tier1-reconstruction/installer.json
+          git -C upstream diff >tier1-reconstruction/experimental.patch
+          test -s tier1-reconstruction/experimental.patch
+          cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump >tier1-reconstruction/patched-build.stdout 2>tier1-reconstruction/patched-build.stderr
+          cp upstream/target/debug/wasmtime tier1-reconstruction/compilers/patched/wasmtime
+      - name: Declare/compiler-pin exact binary provenance and independently test same Rust Wasm
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          root=Path('tier1-reconstruction/compilers')
+          sha=lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+          row={'upstream':'b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49',
+               'target':'x86_64-unknown-linux','results':{
+                   v:{'compiler_sha256':sha(root/v/'wasmtime')} for v in ('baseline','patched')}}
+          (root/'qualification.json').write_text(json.dumps(row,sort_keys=True,indent=2)+'\n')
+          assert row['results']['baseline']['compiler_sha256'] != row['results']['patched']['compiler_sha256']
+          print(json.dumps(row,sort_keys=True))
+          PY
+          chmod u+x tier1-reconstruction/compilers/{baseline,patched}/wasmtime
+          python3 -B experiments/cranelift-tier1/qualify_rust_divrem_28.py --archive tier1-reconstruction/compilers --out tier1-reconstruction/results
+          python3 -B experiments/cranelift-tier1/recheck_rust_divrem_28.py --archive tier1-reconstruction/compilers --results tier1-reconstruction/results | tee tier1-reconstruction/independent-recheck.json
+      - name: Preserve raw Rust-generated Wasm, emitted CLIF, AOT, disassembly, source patch and exact pins
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-udivrem-llvm-reconstruction-28
+          path: |
+            tier1-reconstruction
+            experiments/cranelift-tier1/install_udivrem_reconstruction_28.py
+            experiments/cranelift-tier1/install_udivrem_multivalue_28.py
+            experiments/cranelift-tier1/qualify_rust_divrem_28.py
+            experiments/cranelift-tier1/recheck_rust_divrem_28.py
+            experiments/cranelift-tier1/idiom_divrem_28.rs
+          retention-days: 30
+          if-no-files-found: warn
