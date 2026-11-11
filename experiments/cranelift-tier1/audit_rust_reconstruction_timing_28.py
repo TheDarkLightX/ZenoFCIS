@@ -147,15 +147,15 @@ def validate_producer(folder: Path) -> dict:
             "artifact": PRODUCER_ARTIFACT, "upstream": UPSTREAM}
 
 
-def audit(folder: Path, raw: Path, cargo_lock: Path, calls: int, blocks: int) -> dict:
-    if not (20_000 <= calls <= 500_000 and 4 <= blocks <= 32
+def audit(folder: Path, raw: Path, cargo_lock: Path, calls: int, blocks: int, mode: str) -> dict:
+    if mode not in ("ab","aa","bb") or not (20_000 <= calls <= 500_000 and 4 <= blocks <= 32
             and blocks % 2 == 0):
         raise ValueError("invalid timing bounds")
     src = validate_producer(folder)
     if b'name = "wasmtime"' not in cargo_lock.read_bytes():
         raise ValueError("missing runtime dependency lock")
     lines = [line.strip() for line in raw.read_text().splitlines() if line.strip()]
-    if not lines or lines[0] != f"META,{SCHEMA},{calls},{blocks},5623":
+    if not lines or lines[0] != f"META,{SCHEMA},{calls},{blocks},5623,{mode}":
         raise ValueError("bad timing metadata")
     cursor = 1
     ratios = {}
@@ -208,16 +208,19 @@ def audit(folder: Path, raw: Path, cargo_lock: Path, calls: int, blocks: int) ->
     if any(cost[n].get("saved_instruction_bytes") != v
            for n,v in expected_savings.items()):
         raise ValueError("negative control changed or native cost audit mismatch")
-    controls = ("divrem_swapped","div_only","signed_divrem")
+    controls = ("divrem_swapped","div_only","signed_divrem") if mode == "ab" else FUNCS
     out_of_band = {n:ratios[n]["median_of_paired_block_ratios"]
                    for n in controls
                    if not 0.98 <= ratios[n]["median_of_paired_block_ratios"] <= 1.02}
-    attribution = ("CONFOUNDED-unchanged-code-controls-outside-2pct-heuristic"
+    attribution = (("AB-CONFOUNDED" if mode == "ab" else "SHAM-INSTANCE-LOCATION-DRIFT")
                    if out_of_band else
-                   "controls-within-heuristic-NOT-a-portable-speedup-proof")
+                   ("AB-controls-within-heuristic-NOT-speedup-proof" if mode == "ab"
+                    else "SHAM-within-heuristic-NOT-a-performance-proof"))
     return {
         "schema": SCHEMA, "status": "source-bound-finite-checked-exploratory-runtime",
         "producer": src, "host_lock_sha256": sha(cargo_lock),
+        "comparison_mode": mode,
+        "source_mapping": {"ab":["baseline","patched"],"aa":["baseline","baseline"],"bb":["patched","patched"]}[mode],
         "raw_sha256": sha(raw),
         "cost_audit_source_sha256": sha(native_path),
         "unchanged_instruction_byte_controls": list(controls),
@@ -225,7 +228,8 @@ def audit(folder: Path, raw: Path, cargo_lock: Path, calls: int, blocks: int) ->
         "control_drift_heuristic": {"tolerance": "ratio in [0.98,1.02] for each unchanged-code function",
                                     "out_of_band_ratios": out_of_band,
                                     "basis": "heuristic only; not a formal causal/statistical guarantee"},
-        "native_instruction_byte_savings_by_function": expected_savings,
+        "native_instruction_byte_savings_by_function": expected_savings if mode == "ab"
+            else {n:0 for n in FUNCS},
         "timing": {
             "calls_per_sample": calls, "balanced_blocks": blocks,
             "sample_count": sample_count, "functions": ratios},
@@ -234,6 +238,7 @@ def audit(folder: Path, raw: Path, cargo_lock: Path, calls: int, blocks: int) ->
         "nonclaims": [
             "one virtualized host, no portable throughput or steady-state speedup conclusion",
             "even with balanced ABBA/BAAB order, unchanged-code control drift can confound causality",
+            "sham runs compare identical AOT files in separate module instances with distinct code locations",
             "elapsed call time includes Wasmtime invocation and loop overhead",
             "proof-and-cost artifact separately establishes only per-function native byte savings",
             "no compiler-pass proof, machine-ISA proof, register-flag theorem or general target coverage",
@@ -262,6 +267,7 @@ if __name__ == "__main__":
     p.add_argument("--out", type=Path)
     p.add_argument("--calls", type=int, default=50_000)
     p.add_argument("--blocks", type=int, default=8)
+    p.add_argument("--mode", choices=("ab","aa","bb"), default="ab")
     p.add_argument("--self-test", action="store_true")
     a = p.parse_args()
     if a.self_test:
@@ -271,7 +277,7 @@ if __name__ == "__main__":
             or a.cargo_lock is None or a.out is None or a.out.exists()):
             p.error("source-root/raw/cargo-lock/new out required")
         result = audit(a.source_root.resolve(),a.raw.resolve(),
-                       a.cargo_lock.resolve(),a.calls,a.blocks)
+                       a.cargo_lock.resolve(),a.calls,a.blocks,a.mode)
         a.out.parent.mkdir(parents=True,exist_ok=True)
         a.out.write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
         print(json.dumps(result["timing"],sort_keys=True))
