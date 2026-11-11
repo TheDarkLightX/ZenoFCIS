@@ -1,0 +1,85 @@
+{
+  "schema": "zenofcis/tier1-rust-reconstruction-sham-timing-checkpoint/1",
+  "date_utc": "2026-11-11",
+  "status": "source-pinned-CI-success; sham controls show timing drift; compiler-speedup-NOT-qualified",
+  "source": {
+    "zenofcis_branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "zenofcis_test_revision": "c770e6243dca683939de774cfbea8be1e695d0cc",
+    "producer_revision": "e99ab17875bbb6d294c9f0cfef80c2b51d28a4f6",
+    "wasmtime_cranelift_source": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "rustc": "1.97.1",
+    "producer_CI": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42951667233",
+    "replay_CI": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42999516838",
+    "replay_artifact_id": 13845053890
+  },
+  "method": {
+    "inputs": "same optimized Rust-generated Wasm compiled with baseline/patched Cranelift; exact archived AOT and compiler hashes checked before unsafe Wasmtime deserialization",
+    "modes": {
+      "ab": "baseline AOT vs patched AOT",
+      "aa": "baseline AOT instance vs a second baseline AOT instance",
+      "bb": "patched AOT instance vs a second patched AOT instance"
+    },
+    "per_mode": {
+      "exports": 6,
+      "checked_input_pairs_per_export_per_slot": 272,
+      "blocks": 8,
+      "samples": 192,
+      "guest_calls_measured": 9600000,
+      "calls_per_sample": 50000
+    },
+    "total": {
+      "samples": 576,
+      "guest_calls_measured": 28800000
+    },
+    "methodology": "ABBA/BAAB within-block balanced elapsed time, checksums validated against independent signed/unsigned Python arithmetic oracle; trap cases checked in Rust harness",
+    "ratio": "median of each mode's 8 paired within-block patched-slot/baseline-slot ratios; values below 1 indicate lower elapsed time for second slot in that particular mode"
+  },
+  "median_ratios": {
+    "ab": {
+      "divrem_pair": 1.028672669736972,
+      "divrem_offset": 1.010370294669674,
+      "divrem_reverse": 1.0100078578039795,
+      "divrem_swapped": 1.0320771265459308,
+      "div_only": 0.9903810058987672,
+      "signed_divrem": 0.9854432158025048
+    },
+    "aa": {
+      "divrem_pair": 0.9811586758665016,
+      "divrem_offset": 1.0276719465502124,
+      "divrem_reverse": 0.9917723568378218,
+      "divrem_swapped": 1.0245167478227155,
+      "div_only": 1.0152141654390547,
+      "signed_divrem": 1.012162742104226
+    },
+    "bb": {
+      "divrem_pair": 0.9975348165952203,
+      "divrem_offset": 1.0235419671715293,
+      "divrem_reverse": 0.9918301926612181,
+      "divrem_swapped": 0.9984040690808748,
+      "div_only": 0.9706541484746076,
+      "signed_divrem": 1.0007987266149538
+    }
+  },
+  "confirmed_native_instruction_byte_savings_from_separate_producer_A_B": {
+    "divrem_pair": 13,
+    "divrem_offset": 13,
+    "divrem_reverse": 13,
+    "divrem_swapped": 0,
+    "div_only": 0,
+    "signed_divrem": 0
+  },
+  "interpretation": [
+    "In the new A/B run, all three positive functions have patched/baseline median ratios slightly above 1; this conflicts with earlier single-host timing patterns, preventing a robust speedup claim.",
+    "Even when compared A/A or B/B using the SAME AOT bytes in separate module instances, several within-block median ratios depart from 1 by about 2–3% or more. Therefore location, environment and/or call-site timing effects can mimic the scale of candidate changes.",
+    "Negative controls with zero emitted byte-count savings also show A/B timing drift, so no causal performance attribution is supported.",
+    "Static per-function x86-64 byte savings remain real within their admitted fixture and are not invalidated by inconclusive timing."
+  ],
+  "assurance": [
+    "All three modes passed source pin, AOT hash, finite guest-value, trap and raw timing checksum controls in the identified CI.",
+    "No paired confidence interval, independent CPU model, hardware counters, or code-address alignment control; no portable performance conclusion.",
+    "The compiler transformation is manually developed and not a synthesized instruction sequence.",
+    "No general compiler-pass/VeriISLE or x86 flag/ABI/poison proof; mathematical Euclidean proof is separate.",
+    "Zero whole AOT module size saving demonstrated; native decoded instruction bytes are not CLIF operation costs."
+  ],
+  "next": "Use stable code-address/layout-controlled microbenchmarks, confirm meaningful workloads, then assess register liveness and wider compiler-pass verification before upstream proposal."
+}
