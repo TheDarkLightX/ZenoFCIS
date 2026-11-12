@@ -120,7 +120,7 @@ impl Guest {
 fn run() -> Result<(), E> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 6 {
-        return Err("usage: bench OPTIMIZED_RESULTS_DIR CALLS BLOCKS SEED ab|aa|bb|ab_rev|aa_rev|bb_rev|aa_shared|bb_shared|aa_shared_rev|bb_shared_rev".into());
+        return Err("usage: bench OPTIMIZED_RESULTS_DIR CALLS BLOCKS SEED ab|aa|bb|ab_rev|aa_rev|bb_rev|aa_shared|bb_shared|aa_shared_rev|bb_shared_rev|aa_sameguest|bb_sameguest|aa_sameguest_rev|bb_sameguest_rev".into());
     }
     let root = &args[1];
     let calls: usize = args[2].parse()?;
@@ -129,17 +129,23 @@ fn run() -> Result<(), E> {
     // Reverse-order modes invert *which module is loaded first*, not the
     // measured A/B labels. This probes the code-placement confound observed
     // in the same-AOT sham runs; it does NOT pin executable addresses.
-    const MODES: [&str; 10] = [
+    const MODES: [&str; 14] = [
         "ab", "ab_rev", "aa", "aa_rev", "bb", "bb_rev",
         "aa_shared", "aa_shared_rev", "bb_shared", "bb_shared_rev",
+        "aa_sameguest", "aa_sameguest_rev", "bb_sameguest", "bb_sameguest_rev",
     ];
     if !MODES.contains(&args[5].as_str()) {
         return Err("unrecognized A/B or sham comparison mode".into());
     }
     let reverse_load = args[5].ends_with("_rev");
     let token = args[5].trim_end_matches("_rev");
-    let shared_module = token.ends_with("_shared");
-    let (left, right) = match token.trim_end_matches("_shared") {
+    // In sameguest modes BOTH timing labels call exactly the same TypedFunc,
+    // Store and Instance. The unused second Guest is still constructed, so
+    // allocation/setup is comparable to the shared-module shams. This isolates
+    // order/host drift from VMContext/instance/trampoline-placement differences.
+    let same_guest = token.ends_with("_sameguest");
+    let shared_module = token.ends_with("_shared") || same_guest;
+    let (left, right) = match token.trim_end_matches("_sameguest").trim_end_matches("_shared") {
         "ab" => ("baseline", "patched"),
         "aa" => ("baseline", "baseline"),
         "bb" => ("patched", "patched"),
@@ -187,7 +193,8 @@ fn run() -> Result<(), E> {
             (first, second)
         };
         baseline.check(name, &inputs)?;
-        patched.check(name, &inputs)?;
+        if same_guest { baseline.check(name, &inputs)?; }
+        else { patched.check(name, &inputs)?; }
         println!("CHECK,{name},baseline,{}", inputs.len());
         println!("CHECK,{name},patched,{}", inputs.len());
         let mut expected = 0_u64;
@@ -206,7 +213,7 @@ fn run() -> Result<(), E> {
                 ["patched", "baseline", "baseline", "patched"]
             };
             for (position, variant) in order.into_iter().enumerate() {
-                let guest = if variant == "baseline" { &mut baseline } else { &mut patched };
+                let guest = if same_guest || variant == "baseline" { &mut baseline } else { &mut patched };
                 let start = Instant::now();
                 guest.batch(&inputs, calls, expected)?;
                 let ns = start.elapsed().as_nanos();
