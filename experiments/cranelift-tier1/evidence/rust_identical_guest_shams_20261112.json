@@ -1,0 +1,216 @@
+{
+  "schema": "zenofcis/tier1-identical-guest-independent-audit/1",
+  "date_utc": "2026-11-12",
+  "classification": "CI success; archived raw timing samples, checksums, hashes and per-block ratios independently rechecked; no compiler speedup established",
+  "pins": {
+    "experimental_source_commit": "539cc77cf39ba28da5005cf1edb1280a3939e6cf",
+    "branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "wasmtime_cranelift": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "rustc": "1.97.1",
+    "rust_wasm_producer": "e99ab17875bbb6d294c9f0cfef80c2b51d28a4f6"
+  },
+  "CI": {
+    "run_id": 43149683392,
+    "job_id": 130955675900,
+    "run_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43149683392",
+    "conclusion": "success",
+    "artifact_id": 13913675419,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43149683392/artifacts/13913675419",
+    "artifact_zip_sha256": "15d564f3babb873f48b889c21a1cee3b199756b68056cca3a9954b44560385d7",
+    "host_cpu": "AMD EPYC 7763 (GitHub-hosted VM)"
+  },
+  "method": {
+    "mode_order": [
+      "ab",
+      "ab_rev",
+      "aa",
+      "aa_rev",
+      "bb",
+      "bb_rev",
+      "aa_shared",
+      "aa_shared_rev",
+      "bb_shared",
+      "bb_shared_rev",
+      "aa_sameguest",
+      "aa_sameguest_rev",
+      "bb_sameguest",
+      "bb_sameguest_rev"
+    ],
+    "functions": [
+      "divrem_pair",
+      "divrem_offset",
+      "divrem_reverse",
+      "divrem_swapped",
+      "div_only",
+      "signed_divrem"
+    ],
+    "calls_per_sample": 50000,
+    "balanced_blocks_per_function": 8,
+    "samples_per_mode": 192,
+    "total_samples": 2688,
+    "total_timed_guest_calls": 134400000,
+    "paired_block_ratios_independently_recomputed": 672,
+    "oracle": "independent standard-library Python signed/unsigned 64-bit arithmetic and rotate reference; checked each archived sample checksum",
+    "independent_recheck": "Original artifact ZIP SHA matched GitHub SHA-256 digest. Reparsed all 14 original raw CSVs and 14 JSON receipts, checked 2688 samples and arithmetic checksums, exact order and source-bound metadata, recomputed all 672 block ratios and 84 function/mode medians; zero discrepancies.",
+    "mode_semantics": {
+      "separate_module_identical_AOT": "same AOT bytes deserialized separately and distinct Stores/Instances",
+      "shared_module_distinct_instances": "same compiled Module, two different Stores/Instances",
+      "identical_guest_store_instance": "one exact TypedFunc/Store/Instance/Module invoked from both logical timing slots; second Guest constructed but never invoked"
+    }
+  },
+  "group_summary": {
+    "compiler_AB": {
+      "function_mode_medians": 12,
+      "max_abs_deviation_from_1": 0.03173568591559217,
+      "median_abs_deviation_from_1": 0.010311163483413543,
+      "outside_exploratory_2pct_band": 2
+    },
+    "separate_module_identical_AOT": {
+      "function_mode_medians": 24,
+      "max_abs_deviation_from_1": 0.14346295974905932,
+      "median_abs_deviation_from_1": 0.009604200109228245,
+      "outside_exploratory_2pct_band": 7
+    },
+    "shared_module_distinct_instances": {
+      "function_mode_medians": 24,
+      "max_abs_deviation_from_1": 0.03104383634059893,
+      "median_abs_deviation_from_1": 0.013285041958246202,
+      "outside_exploratory_2pct_band": 7
+    },
+    "identical_guest_store_instance": {
+      "function_mode_medians": 24,
+      "max_abs_deviation_from_1": 0.0094404952112348,
+      "median_abs_deviation_from_1": 0.0015052603451051194,
+      "outside_exploratory_2pct_band": 0
+    }
+  },
+  "median_right_over_left_elapsed_ratios": {
+    "ab": {
+      "div_only": 1.012282499759049,
+      "divrem_offset": 1.0130818354192979,
+      "divrem_pair": 1.0317356859155922,
+      "divrem_reverse": 0.9932363580920349,
+      "divrem_swapped": 1.0079931768603385,
+      "signed_divrem": 0.999445209271578
+    },
+    "ab_rev": {
+      "div_only": 0.9949977790368496,
+      "divrem_offset": 0.9813809210882243,
+      "divrem_pair": 1.0083398272077781,
+      "divrem_reverse": 1.0123486800343366,
+      "divrem_swapped": 1.0015613139279609,
+      "signed_divrem": 1.0271368541383852
+    },
+    "aa": {
+      "div_only": 1.0773491999059688,
+      "divrem_offset": 1.0074521624963704,
+      "divrem_pair": 1.0080357303299539,
+      "divrem_reverse": 0.9988600182685989,
+      "divrem_swapped": 1.1434629597490593,
+      "signed_divrem": 1.0749313384564432
+    },
+    "aa_rev": {
+      "div_only": 0.9905328016544155,
+      "divrem_offset": 0.977923417645732,
+      "divrem_pair": 1.009741201872872,
+      "divrem_reverse": 1.02141398862064,
+      "divrem_swapped": 1.0041570236939368,
+      "signed_divrem": 1.0149442038867464
+    },
+    "bb": {
+      "div_only": 0.993865577973968,
+      "divrem_offset": 1.0032354224960187,
+      "divrem_pair": 0.9885933188698911,
+      "divrem_reverse": 1.000853823901549,
+      "divrem_swapped": 1.0087404877061958,
+      "signed_divrem": 1.0256241895229228
+    },
+    "bb_rev": {
+      "div_only": 0.9986492533370099,
+      "divrem_offset": 0.9890334687295288,
+      "divrem_pair": 1.0061572846765716,
+      "divrem_reverse": 1.01308337605085,
+      "divrem_swapped": 1.0036281150691297,
+      "signed_divrem": 1.0474352776279017
+    },
+    "aa_shared": {
+      "div_only": 0.9802309060112164,
+      "divrem_offset": 1.0237885789263814,
+      "divrem_pair": 1.0121024129564082,
+      "divrem_reverse": 1.017707068321095,
+      "divrem_swapped": 0.9997649445550335,
+      "signed_divrem": 0.973416578403612
+    },
+    "aa_shared_rev": {
+      "div_only": 1.011642259689778,
+      "divrem_offset": 1.031043836340599,
+      "divrem_pair": 0.9766499319912669,
+      "divrem_reverse": 1.0049079356700954,
+      "divrem_swapped": 0.9890930719777976,
+      "signed_divrem": 1.0010950661563207
+    },
+    "bb_shared": {
+      "div_only": 1.0104970233230235,
+      "divrem_offset": 1.0135305184243995,
+      "divrem_pair": 1.0086268251795238,
+      "divrem_reverse": 1.0283156494220802,
+      "divrem_swapped": 1.0071762237429285,
+      "signed_divrem": 0.9809842053649576
+    },
+    "bb_shared_rev": {
+      "div_only": 1.0123641813838569,
+      "divrem_offset": 1.0298987011703407,
+      "divrem_pair": 0.9711405890134694,
+      "divrem_reverse": 0.986960434507907,
+      "divrem_swapped": 0.9841412385572541,
+      "signed_divrem": 1.0063482053799069
+    },
+    "aa_sameguest": {
+      "div_only": 0.9969798800536287,
+      "divrem_offset": 0.9999987110117696,
+      "divrem_pair": 1.0015976455731264,
+      "divrem_reverse": 0.9998964462783357,
+      "divrem_swapped": 1.0026206926642942,
+      "signed_divrem": 0.9983652727710872
+    },
+    "aa_sameguest_rev": {
+      "div_only": 0.9994944383064286,
+      "divrem_offset": 1.0009976577873194,
+      "divrem_pair": 0.9905595047887652,
+      "divrem_reverse": 1.0007610442913561,
+      "divrem_swapped": 0.9952728382993826,
+      "signed_divrem": 0.9985871248829161
+    },
+    "bb_sameguest": {
+      "div_only": 0.999959312373321,
+      "divrem_offset": 0.9994049828435669,
+      "divrem_pair": 0.9947267565278568,
+      "divrem_reverse": 1.0025249738118052,
+      "divrem_swapped": 0.9972110536247671,
+      "signed_divrem": 0.9994625023667799
+    },
+    "bb_sameguest_rev": {
+      "div_only": 0.9989999764725159,
+      "divrem_offset": 1.001921815304267,
+      "divrem_pair": 0.9973699300574108,
+      "divrem_reverse": 0.9996120457156128,
+      "divrem_swapped": 0.9990327324613533,
+      "signed_divrem": 0.9967896141963634
+    }
+  },
+  "interpretation": "In this one hosted run the identical-Guest shams have considerably lower timing-slot drift than separate-Instance shams, even when they share compiled guest code. This supports an instance/context or placement confound, but does not isolate a cause and cannot be used to infer that the compiler rewrite is faster.",
+  "distinct_static_evidence": {
+    "source_run": 42951667233,
+    "three_Rust_functions_saved_decoded_x86_64_instruction_bytes_each": 13,
+    "whole_aot_bytes_unchanged": 66264,
+    "not_measured_anew": true
+  },
+  "limitations": [
+    "Exploratory one-host observational comparison; ±2% is only a heuristic, not a statistical inference",
+    "Guest state/cache warmup, host CPU frequency, scheduler, timing-slot ordering and call overhead remain uncontrolled",
+    "The different-AOT A/B modes do not share identical compiled code addresses, and results do not establish a compiler-caused speedup or slowdown",
+    "Arithmetic identity receipts do not constitute a complete compiler-pass, flag, undefined/poison, ABI or register-allocation proof",
+    "Manually engineered Cranelift experimental rewrite; not a newly synthesized ZenoFCIS instruction sequence",
+    "No Bytecode Alliance branch changed and no upstream PR submitted"
+  ]
+}
