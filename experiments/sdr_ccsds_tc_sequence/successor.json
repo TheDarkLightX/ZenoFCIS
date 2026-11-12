@@ -1,0 +1,174 @@
+{
+  "schema": "zeno-fcis/synthesis-problem/1",
+  "profile": "zeno-fcis/finite-i128/1",
+  "inputs": [
+    {
+      "name": "sequence",
+      "type": {
+        "kind": "int",
+        "min": 0,
+        "max": 255
+      }
+    },
+    {
+      "name": "bypass",
+      "type": {
+        "kind": "bool"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "name": "successor",
+      "type": {
+        "kind": "int",
+        "min": 0,
+        "max": 255
+      }
+    }
+  ],
+  "contract": {
+    "nodes": [
+      [
+        "input",
+        0
+      ],
+      [
+        "input",
+        1
+      ],
+      [
+        "input",
+        2
+      ],
+      [
+        "int",
+        255
+      ],
+      [
+        "lt",
+        0,
+        3
+      ],
+      [
+        "int",
+        1
+      ],
+      [
+        "add",
+        0,
+        5
+      ],
+      [
+        "int",
+        0
+      ],
+      [
+        "select",
+        4,
+        6,
+        7
+      ],
+      [
+        "select",
+        1,
+        7,
+        8
+      ],
+      [
+        "eq",
+        2,
+        9
+      ]
+    ],
+    "roots": [
+      10
+    ]
+  },
+  "sketch": {
+    "nodes": [
+      [
+        "input",
+        0
+      ],
+      [
+        "input",
+        1
+      ],
+      [
+        "int",
+        1
+      ],
+      [
+        "add",
+        0,
+        2
+      ],
+      {
+        "hole": 1,
+        "alternatives": [
+          [
+            "int",
+            254
+          ],
+          [
+            "int",
+            255
+          ],
+          [
+            "int",
+            256
+          ]
+        ]
+      },
+      [
+        "lt",
+        0,
+        4
+      ],
+      {
+        "hole": 2,
+        "alternatives": [
+          [
+            "int",
+            0
+          ],
+          [
+            "int",
+            1
+          ]
+        ]
+      },
+      [
+        "select",
+        5,
+        3,
+        6
+      ],
+      {
+        "hole": 3,
+        "alternatives": [
+          [
+            "select",
+            1,
+            6,
+            7
+          ],
+          [
+            "select",
+            1,
+            7,
+            6
+          ],
+          [
+            "input",
+            0
+          ]
+        ]
+      }
+    ],
+    "roots": [
+      8
+    ]
+  }
+}
