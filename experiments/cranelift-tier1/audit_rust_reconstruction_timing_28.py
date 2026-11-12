@@ -151,9 +151,12 @@ def audit(folder: Path, raw: Path, cargo_lock: Path, calls: int, blocks: int, mo
     supported_modes = (
         "ab", "ab_rev", "aa", "aa_rev", "bb", "bb_rev",
         "aa_shared", "aa_shared_rev", "bb_shared", "bb_shared_rev",
+        "aa_sameguest", "aa_sameguest_rev", "bb_sameguest", "bb_sameguest_rev",
     )
-    base_mode = mode.removesuffix("_rev").removesuffix("_shared")
-    shared_module = "_shared" in mode
+    token = mode.removesuffix("_rev")
+    same_guest = token.endswith("_sameguest")
+    shared_module = token.endswith("_shared") or same_guest
+    base_mode = token.removesuffix("_sameguest").removesuffix("_shared")
     if base_mode not in ("ab","aa","bb") or mode not in supported_modes or not (20_000 <= calls <= 500_000 and 4 <= blocks <= 32
             and blocks % 2 == 0):
         raise ValueError("invalid timing bounds")
@@ -218,7 +221,9 @@ def audit(folder: Path, raw: Path, cargo_lock: Path, calls: int, blocks: int, mo
     out_of_band = {n:ratios[n]["median_of_paired_block_ratios"]
                    for n in controls
                    if not 0.98 <= ratios[n]["median_of_paired_block_ratios"] <= 1.02}
-    attribution = (("AB-CONFOUNDED" if base_mode == "ab" else "SHAM-INSTANCE-LOCATION-DRIFT")
+    attribution = (("AB-CONFOUNDED" if base_mode == "ab" else
+                    "SHAM-IDENTICAL-GUEST-HOST-OR-ORDER-DRIFT" if same_guest else
+                    "SHAM-INSTANCE-LOCATION-DRIFT")
                    if out_of_band else
                    ("AB-controls-within-heuristic-NOT-speedup-proof" if base_mode == "ab"
                     else "SHAM-within-heuristic-NOT-a-performance-proof"))
@@ -229,7 +234,11 @@ def audit(folder: Path, raw: Path, cargo_lock: Path, calls: int, blocks: int, mo
         "source_mapping": {"ab":["baseline","patched"],"aa":["baseline","baseline"],"bb":["patched","patched"]}[base_mode],
         "module_construction_order": "right-then-left" if mode.endswith("_rev") else "left-then-right",
         "same_deserialized_module_for_both_instances": shared_module,
+        "same_guest_store_instance_and_typedfunc_for_both_timing_labels": same_guest,
         "module_code_placement_control": (
+            "the same TypedFunc, Store, Instance and Module is called in both timing slots; "
+            "a second Guest is constructed but not called"
+            if same_guest else
             "two distinct Stores/Instances sharing one deserialized Module and compiled guest code"
             if shared_module else
             "two separately deserialized Module objects; guest code placement may differ"
@@ -255,6 +264,7 @@ def audit(folder: Path, raw: Path, cargo_lock: Path, calls: int, blocks: int, mo
             "sham runs compare identical AOT files in separate module instances with distinct code locations",
             "reversing module construction order probes one code-placement confound but does not fix page layout or native function alignment",
             "shared-module shams reuse compiled guest code, but do not fix Store/Instance, trampoline, VMContext or call-site layout",
+            "sameguest shams additionally reuse Store/Instance/TypedFunc, but host scheduling, cache, CPU frequency and sampling order remain uncontrolled",
             "elapsed call time includes Wasmtime invocation and loop overhead",
             "proof-and-cost artifact separately establishes only per-function native byte savings",
             "no compiler-pass proof, machine-ISA proof, register-flag theorem or general target coverage",
@@ -273,11 +283,12 @@ def self_test() -> None:
     assert len(inputs()) >= 270
     assert expected_checksum("div_only",20_000) >= 0
     supported = ("ab","ab_rev","aa","aa_rev","bb","bb_rev",
-                 "aa_shared","aa_shared_rev","bb_shared","bb_shared_rev")
-    assert len(supported) == len(set(supported)) == 10
-    assert {m.removesuffix("_rev").removesuffix("_shared") for m in supported} == {"ab","aa","bb"}
-    assert all(m.startswith(("aa","bb")) for m in supported if "_shared" in m)
-    print("independent Rust native-value oracle and 10-mode timing self-tests passed")
+                 "aa_shared","aa_shared_rev","bb_shared","bb_shared_rev",
+                 "aa_sameguest","aa_sameguest_rev","bb_sameguest","bb_sameguest_rev")
+    assert len(supported) == len(set(supported)) == 14
+    assert {m.removesuffix("_rev").removesuffix("_sameguest").removesuffix("_shared") for m in supported} == {"ab","aa","bb"}
+    assert all(m.startswith(("aa","bb")) for m in supported if "_shared" in m or "_sameguest" in m)
+    print("independent Rust native-value oracle and 14-mode timing self-tests passed")
 
 
 if __name__ == "__main__":
@@ -289,7 +300,8 @@ if __name__ == "__main__":
     p.add_argument("--calls", type=int, default=50_000)
     p.add_argument("--blocks", type=int, default=8)
     p.add_argument("--mode", choices=("ab","ab_rev","aa","aa_rev","bb","bb_rev",
-                                      "aa_shared","aa_shared_rev","bb_shared","bb_shared_rev"),
+                                      "aa_shared","aa_shared_rev","bb_shared","bb_shared_rev",
+                                      "aa_sameguest","aa_sameguest_rev","bb_sameguest","bb_sameguest_rev"),
                    default="ab")
     p.add_argument("--self-test", action="store_true")
     a = p.parse_args()
