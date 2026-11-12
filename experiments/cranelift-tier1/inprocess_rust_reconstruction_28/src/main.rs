@@ -1,11 +1,11 @@
 //! Identical optimized Rust-generated Wasm, baseline versus patched Cranelift.
 //! Balanced in-process calls; one virtual host, NOT a general speedup claim.
 //! AOT files must pass the Python source/hash preflight before deserialization.
-use std::{hint::black_box, time::Instant};
+use std::{cell::RefCell, hint::black_box, rc::Rc, time::Instant};
 use wasmtime::{Engine, Instance, Module, Store, TypedFunc};
 
 type E = Box<dyn std::error::Error>;
-const SCHEMA: &str = "zenofcis/tier1-rust-reconstruction-call-timing/2";
+const SCHEMA: &str = "zenofcis/tier1-rust-reconstruction-call-timing/3";
 const FUNCS: [&str; 6] = [
     "divrem_pair", "divrem_offset", "divrem_reverse",
     "divrem_swapped", "div_only", "signed_divrem",
@@ -62,15 +62,41 @@ fn oracle(kind: &str, x: i64, y: i64) -> Result<i64, E> {
 }
 
 struct Guest {
-    store: Store<()>,
+    store: Rc<RefCell<Store<()>>>,
     f: TypedFunc<(i64, i64), i64>,
 }
 impl Guest {
     fn from_module(engine: &Engine, module: &Module, export: &str) -> Result<Self, E> {
-        let mut store = Store::new(engine, ());
-        let instance = Instance::new(&mut store, module, &[])?;
-        let f = instance.get_typed_func::<(i64, i64), i64>(&mut store, export)?;
+        let store = Rc::new(RefCell::new(Store::new(engine, ())));
+        let f = {
+            let mut borrowed = store.borrow_mut();
+            let instance = Instance::new(&mut *borrowed, module, &[])?;
+            instance.get_typed_func::<(i64, i64), i64>(&mut *borrowed, export)?
+        };
         Ok(Self { store, f })
+    }
+    fn pair_same_store(
+        engine: &Engine, left: &Module, right: &Module, export: &str, reverse: bool,
+    ) -> Result<(Self, Self), E> {
+        // Both functions share a Store, but calls remain strictly sequential.
+        // For A/A and B/B, the caller also supplies the SAME Module object.
+        let store = Rc::new(RefCell::new(Store::new(engine, ())));
+        let (left_func, right_func) = {
+            let mut borrowed = store.borrow_mut();
+            if reverse {
+                let second = Instance::new(&mut *borrowed, right, &[])?;
+                let first = Instance::new(&mut *borrowed, left, &[])?;
+                (first.get_typed_func::<(i64, i64), i64>(&mut *borrowed, export)?,
+                 second.get_typed_func::<(i64, i64), i64>(&mut *borrowed, export)?)
+            } else {
+                let first = Instance::new(&mut *borrowed, left, &[])?;
+                let second = Instance::new(&mut *borrowed, right, &[])?;
+                (first.get_typed_func::<(i64, i64), i64>(&mut *borrowed, export)?,
+                 second.get_typed_func::<(i64, i64), i64>(&mut *borrowed, export)?)
+            }
+        };
+        Ok((Self { store: Rc::clone(&store), f: left_func },
+            Self { store, f: right_func }))
     }
     fn new(engine: &Engine, aot: &str, export: &str) -> Result<Self, E> {
         // SAFETY: CI verifies the archived producer's source, Wasm, and
@@ -79,23 +105,24 @@ impl Guest {
         Self::from_module(engine, &module, export)
     }
     fn check(&mut self, name: &str, inputs: &[(i64, i64)]) -> Result<(), E> {
+        let mut borrowed = self.store.borrow_mut();
         for &(x, y) in inputs {
             let expected = oracle(name, x, y)?;
-            let got = self.f.call(&mut self.store, (x, y))?;
+            let got = self.f.call(&mut *borrowed, (x, y))?;
             if got != expected {
                 return Err(format!("mismatch {name}({x},{y}): {got} != {expected}").into());
             }
         }
-        if self.f.call(&mut self.store, (7, 0)).is_ok() {
+        if self.f.call(&mut *borrowed, (7, 0)).is_ok() {
             return Err("zero divisor did not trap".into());
         }
         if name == "divrem_swapped"
-            && self.f.call(&mut self.store, (0, 7)).is_ok()
+            && self.f.call(&mut *borrowed, (0, 7)).is_ok()
         {
             return Err("swapped numerator zero divisor did not trap".into());
         }
         if name == "signed_divrem"
-            && self.f.call(&mut self.store, (i64::MIN, -1)).is_ok()
+            && self.f.call(&mut *borrowed, (i64::MIN, -1)).is_ok()
         {
             return Err("signed MIN/-1 overflow did not trap".into());
         }
@@ -104,10 +131,11 @@ impl Guest {
     fn batch(&mut self, inputs: &[(i64, i64)], calls: usize, expected: u64)
         -> Result<(), E>
     {
+        let mut borrowed = self.store.borrow_mut();
         let mut checksum = 0_u64;
         for k in 0..calls {
             let (x, y) = black_box(inputs[k % inputs.len()]);
-            let got = self.f.call(&mut self.store, (x, y))?;
+            let got = self.f.call(&mut *borrowed, (x, y))?;
             checksum = checksum.wrapping_add(black_box(got as u64));
         }
         if checksum != expected {
@@ -120,7 +148,7 @@ impl Guest {
 fn run() -> Result<(), E> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 6 {
-        return Err("usage: bench OPTIMIZED_RESULTS_DIR CALLS BLOCKS SEED ab|aa|bb|ab_rev|aa_rev|bb_rev|aa_shared|bb_shared|aa_shared_rev|bb_shared_rev|aa_sameguest|bb_sameguest|aa_sameguest_rev|bb_sameguest_rev".into());
+        return Err("usage: bench OPTIMIZED_RESULTS_DIR CALLS BLOCKS SEED <one of 20 pinned modes>".into());
     }
     let root = &args[1];
     let calls: usize = args[2].parse()?;
@@ -129,10 +157,12 @@ fn run() -> Result<(), E> {
     // Reverse-order modes invert *which module is loaded first*, not the
     // measured A/B labels. This probes the code-placement confound observed
     // in the same-AOT sham runs; it does NOT pin executable addresses.
-    const MODES: [&str; 14] = [
+    const MODES: [&str; 20] = [
         "ab", "ab_rev", "aa", "aa_rev", "bb", "bb_rev",
         "aa_shared", "aa_shared_rev", "bb_shared", "bb_shared_rev",
         "aa_sameguest", "aa_sameguest_rev", "bb_sameguest", "bb_sameguest_rev",
+        "ab_samestore", "ab_samestore_rev", "aa_samestore", "aa_samestore_rev",
+        "bb_samestore", "bb_samestore_rev",
     ];
     if !MODES.contains(&args[5].as_str()) {
         return Err("unrecognized A/B or sham comparison mode".into());
@@ -144,8 +174,9 @@ fn run() -> Result<(), E> {
     // allocation/setup is comparable to the shared-module shams. This isolates
     // order/host drift from VMContext/instance/trampoline-placement differences.
     let same_guest = token.ends_with("_sameguest");
+    let same_store = token.ends_with("_samestore");
     let shared_module = token.ends_with("_shared") || same_guest;
-    let (left, right) = match token.trim_end_matches("_sameguest").trim_end_matches("_shared") {
+    let (left, right) = match token.trim_end_matches("_samestore").trim_end_matches("_sameguest").trim_end_matches("_shared") {
         "ab" => ("baseline", "patched"),
         "aa" => ("baseline", "baseline"),
         "bb" => ("patched", "patched"),
@@ -165,7 +196,22 @@ fn run() -> Result<(), E> {
         // Both Guest objects remain alive throughout this function's
         // measurements. Reverse only construction order to counterbalance
         // the first-loaded versus second-loaded module addresses.
-        let (mut baseline, mut patched) = if shared_module {
+        let (mut baseline, mut patched) = if same_store {
+            // With matching AOT inputs, both Instances use one Module.
+            // With A/B, two different compiled Modules share ONE Store.
+            // Reverse changes instance construction order, NOT the order
+            // of deserializing distinct AOT Modules or their code placement.
+            let first_module = unsafe { Module::deserialize_file(&engine, &aot_b) }?;
+            let other_module = if aot_b == aot_p {
+                None
+            } else {
+                Some(unsafe { Module::deserialize_file(&engine, &aot_p) }?)
+            };
+            Guest::pair_same_store(
+                &engine, &first_module, other_module.as_ref().unwrap_or(&first_module),
+                name, reverse_load,
+            )?
+        } else if shared_module {
             if aot_b != aot_p {
                 return Err("shared module sham requires one identical AOT path".into());
             }
