@@ -1,0 +1,104 @@
+{
+  "schema": "zeno-fcis/synthesis-problem/1",
+  "profile": "zeno-fcis/finite-i128/1",
+  "inputs": [
+    {
+      "name": "sequence",
+      "type": {
+        "kind": "int",
+        "min": 0,
+        "max": 255
+      }
+    },
+    {
+      "name": "bypass",
+      "type": {
+        "kind": "bool"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "name": "sent",
+      "type": {
+        "kind": "int",
+        "min": 0,
+        "max": 255
+      }
+    }
+  ],
+  "contract": {
+    "nodes": [
+      [
+        "input",
+        0
+      ],
+      [
+        "input",
+        1
+      ],
+      [
+        "input",
+        2
+      ],
+      [
+        "int",
+        0
+      ],
+      [
+        "select",
+        1,
+        3,
+        0
+      ],
+      [
+        "eq",
+        2,
+        4
+      ]
+    ],
+    "roots": [
+      5
+    ]
+  },
+  "sketch": {
+    "nodes": [
+      [
+        "input",
+        0
+      ],
+      [
+        "input",
+        1
+      ],
+      [
+        "int",
+        0
+      ],
+      {
+        "hole": 1,
+        "alternatives": [
+          [
+            "select",
+            1,
+            2,
+            0
+          ],
+          [
+            "select",
+            1,
+            0,
+            2
+          ],
+          [
+            "input",
+            0
+          ]
+        ]
+      }
+    ],
+    "roots": [
+      3
+    ]
+  }
+}
