@@ -1,0 +1,61 @@
+name: tier1-reconstruction-ssa-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-reconstruction-ssa-28.yml'
+      - 'experiments/cranelift-tier1/qualify_reconstruction_ssa_28.py'
+      - 'experiments/cranelift-tier1/RECONSTRUCTION_SSA_CONTEXTS_28.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: tier1-reconstruction-ssa-28
+  cancel-in-progress: true
+jobs:
+  live-ssa-and-traps:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Verify source syntax, WAT contract and fail-closed native-cost controls
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/qualify_reconstruction_ssa_28.py
+          python3 -B experiments/cranelift-tier1/qualify_reconstruction_ssa_28.py --self-test
+          mkdir -p tier1-ssa
+          git rev-parse HEAD >tier1-ssa/zenofcis-head.txt
+          sha256sum experiments/cranelift-tier1/qualify_reconstruction_ssa_28.py >tier1-ssa/source.sha256
+      - name: Download prior independently qualified reconstruction compiler pair
+        uses: actions/download-artifact@v4
+        with:
+          repository: TheDarkLightX/ZenoFCIS
+          run-id: 42951667233
+          github-token: ${{ github.token }}
+          name: tier1-udivrem-llvm-reconstruction-28
+          path: tier1-ssa/source
+      - name: Run same-WAT baseline/patched full-value and zero-divisor trap checks
+        run: |
+          set -euo pipefail
+          test -f tier1-ssa/source/tier1-reconstruction/compilers/qualification.json
+          chmod u+x tier1-ssa/source/tier1-reconstruction/compilers/{baseline,patched}/wasmtime
+          python3 -B experiments/cranelift-tier1/qualify_reconstruction_ssa_28.py \
+            --archive tier1-ssa/source/tier1-reconstruction/compilers \
+            --out tier1-ssa/results | tee tier1-ssa/summary.json
+      - name: Preserve exact WAT, CLIF, AOT, native code, checks and limitations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-reconstruction-ssa-28
+          path: |
+            tier1-ssa/zenofcis-head.txt
+            tier1-ssa/source.sha256
+            tier1-ssa/summary.json
+            tier1-ssa/results
+            experiments/cranelift-tier1/qualify_reconstruction_ssa_28.py
+            experiments/cranelift-tier1/RECONSTRUCTION_SSA_CONTEXTS_28.md
+          if-no-files-found: warn
+          retention-days: 30
