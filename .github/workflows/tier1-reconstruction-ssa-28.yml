@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/tier1-reconstruction-ssa-28.yml'
       - 'experiments/cranelift-tier1/qualify_reconstruction_ssa_28.py'
+      - 'experiments/cranelift-tier1/recheck_reconstruction_ssa_28.py'
       - 'experiments/cranelift-tier1/RECONSTRUCTION_SSA_CONTEXTS_28.md'
   workflow_dispatch:
 permissions:
@@ -45,6 +46,15 @@ jobs:
           python3 -B experiments/cranelift-tier1/qualify_reconstruction_ssa_28.py \
             --archive tier1-ssa/source/tier1-reconstruction/compilers \
             --out tier1-ssa/results | tee tier1-ssa/summary.json
+      - name: Independent receipt hashes, native-cost audit and fresh executable witnesses
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/recheck_reconstruction_ssa_28.py
+          python3 -B experiments/cranelift-tier1/recheck_reconstruction_ssa_28.py --self-test
+          python3 -B experiments/cranelift-tier1/recheck_reconstruction_ssa_28.py \
+            --archive tier1-ssa/source/tier1-reconstruction/compilers \
+            --results tier1-ssa/results \
+            --out tier1-ssa/independent-recheck.json
       - name: Preserve exact WAT, CLIF, AOT, native code, checks and limitations
         if: always()
         uses: actions/upload-artifact@v4
@@ -54,8 +64,10 @@ jobs:
             tier1-ssa/zenofcis-head.txt
             tier1-ssa/source.sha256
             tier1-ssa/summary.json
+            tier1-ssa/independent-recheck.json
             tier1-ssa/results
             experiments/cranelift-tier1/qualify_reconstruction_ssa_28.py
+            experiments/cranelift-tier1/recheck_reconstruction_ssa_28.py
             experiments/cranelift-tier1/RECONSTRUCTION_SSA_CONTEXTS_28.md
           if-no-files-found: warn
           retention-days: 30
