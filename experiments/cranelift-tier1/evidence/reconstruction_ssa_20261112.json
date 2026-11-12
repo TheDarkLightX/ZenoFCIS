@@ -1,0 +1,79 @@
+{
+  "schema": "zenofcis/tier1-reconstruction-ssa-qualified-checkpoint/1",
+  "date_utc": "2026-11-12",
+  "zenofcis_qualification_head": "000ed60ef503df479223cb07cfbe2ad675f863db",
+  "wasmtime_source_commit": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "original_compiler_producer": {
+    "run_id": 42951667233,
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42951667233",
+    "artifact_id": 13825142647,
+    "artifact_zip_sha256": "e2dd3570b3f29c75948e6e2daad28174faa88e7ef31c59ce6135770ecedf8010",
+    "validation": "compiler SHA-256s checked against the producer's original qualification.json, same input WAT sent to both"
+  },
+  "new_executable_qualification": {
+    "run_id": 43312470294,
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43312470294",
+    "artifact_id": 13985723546,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43312470294/artifacts/13985723546",
+    "artifact_zip_sha256_from_actions_upload_log": "095783398657d11d88e53e46984f2f7854c616f9e0dc5e35506df6cd6cc6f99e",
+    "workflow_result": "success",
+    "cases": [
+      "live_q_m_r",
+      "reversed_mul",
+      "wrong_multiplier",
+      "stateful_between",
+      "double_reconstruction"
+    ],
+    "original_native_execution": {
+      "finite_value_agreements": 660,
+      "zero_divisor_traps": 100
+    },
+    "independent_program_recheck": {
+      "fresh_value_agreements": 600,
+      "fresh_zero_divisor_traps": 120,
+      "files_hash_checked": 65,
+      "recomputed_cost_receipts": 5
+    },
+    "per_case_baseline_minus_patched": {
+      "live_q_m_r": {
+        "decoded_guest_instruction_bytes": 0,
+        "decoded_guest_instruction_count": 0,
+        "static_divq": 0,
+        "whole_aot_bytes": 0
+      },
+      "reversed_mul": {
+        "decoded_guest_instruction_bytes": 0,
+        "decoded_guest_instruction_count": 0,
+        "static_divq": 0,
+        "whole_aot_bytes": 0
+      },
+      "wrong_multiplier": {
+        "decoded_guest_instruction_bytes": 0,
+        "decoded_guest_instruction_count": 0,
+        "static_divq": 0,
+        "whole_aot_bytes": 0
+      },
+      "stateful_between": {
+        "decoded_guest_instruction_bytes": 0,
+        "decoded_guest_instruction_count": 0,
+        "static_divq": 0,
+        "whole_aot_bytes": 0
+      },
+      "double_reconstruction": {
+        "decoded_guest_instruction_bytes": 0,
+        "decoded_guest_instruction_count": 0,
+        "static_divq": 0,
+        "whole_aot_bytes": 0
+      }
+    }
+  },
+  "interpretation": "The exact WAT forms were not changed by the pinned experimental reconstruction compiler; unlike the qualified optimized Rust-generated Wasm triplets, these directly-authored sources did not demonstrate optimizer reachability. This is a negative reachability result, not a universal correctness result.",
+  "nonclaims": [
+    "No Cranelift native code saving in this new matrix; the prior 13-byte-per-function saving remains a separate Rust-derived experiment.",
+    "No runtime speedup, whole-pass correctness, formal proof of registers/flags/traps/debug metadata, generic target support or upstream contribution established.",
+    "The independent rechecker ran within the same successful CI job on producer files; this checkpoint does not claim that the ZIP was separately downloaded and audited.",
+    "Manually designed candidate; not newly discovered by ZenoFCIS search.",
+    "All documented cost deltas describe decoded native guest instruction bytes, instruction counts, static x86 divisions and whole AOT bytes separately."
+  ],
+  "next_engineering_action": "Target the LLVM-generated optimized Rust CLIF shape with intentionally live quotient/multiply/remainder and observable trap ordering, then verify the actual compiler pass and representative profitability before upstream PR."
+}
