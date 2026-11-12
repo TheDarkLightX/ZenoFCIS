@@ -1,6 +1,6 @@
 # Tier-1: identical-Guest timing negative control (2026-11-12 UTC)
 
-**Status: implementation committed; CI not yet independently qualified.** Experimental branch only. No Bytecode Alliance submission. This control investigates noisy runtime measurements, *not* new ZenoFCIS synthesis or a compiler-pass proof.
+**Status: exact-head CI #43149683392 passed; original artifact independently audited on 2026-11-12 UTC.** Experimental branch only. No Bytecode Alliance submission. This control investigates noisy runtime measurements, *not* new ZenoFCIS synthesis or a compiler-pass proof.
 
 ## Motivation and comparison hierarchy
 
@@ -26,3 +26,17 @@ In particular, one guest can change state or warm its caches from earlier calls.
 The targeted workflow is [`.github/workflows/tier1-rust-reconstruction-inprocess-28.yml`](../../.github/workflows/tier1-rust-reconstruction-inprocess-28.yml). It checks out Wasmtime at `b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49`, reuses and SHA-checks the same Rust-generated optimized Wasm and compiler/AOT pair from [CI #42951667233](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/42951667233), builds the source-pinned Wasmtime runtime and runs all 14 modes with the independent auditor. Check the **exact workflow head**, steps, original artifacts and raw CSV receipts before upgrading status.
 
 Static native-code savings remain *separate* evidence: three positive Rust functions saved 13 decoded x86-64 instruction bytes per function on one pinned compiler configuration, with unchanged whole-AOT size. A causal runtime benefit is still unproven, and this manually developed candidate is not a newly ZenoFCIS-synthesized sequence.
+
+## Verified result: same Guest substantially reduces sham drift
+
+[GitHub Actions #43149683392](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43149683392) passed at experimental source commit `539cc77cf39ba28da5005cf1edb1280a3939e6cf`. The original [artifact #13913675419](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43149683392/artifacts/13913675419) has ZIP SHA-256 `15d564f3babb873f48b889c21a1cee3b199756b68056cca3a9954b44560385d7`, matching the downloaded bytes. Separately from the workflow's own auditor, a standard-library Python rechecker parsed all 14 raw CSVs and 14 JSON receipts, verified all 2,688 individual arithmetic checksums and samples, and recomputed 672 balanced block ratios and 84 function/mode medians with no discrepancies. Host: AMD EPYC 7763 virtualized runner. **134.4 million timed guest calls**, across all fourteen modes, including negative controls.
+
+| Sham control | Function/mode medians | Largest absolute deviation from 1.0 | Outside exploratory ±2% |
+| --- | ---: | ---: | ---: |
+| Identical AOT in two separately deserialized Modules | 24 | 14.35% | 7 |
+| Same compiled Module, distinct Stores/Instances | 24 | 3.10% | 7 |
+| **Same Guest/Store/Instance/TypedFunc in both timing slots** | **24** | **0.94%** | **0** |
+
+The medians' median absolute deviation from 1.0 is **0.15%** in the identical-Guest controls versus **1.33%** in the shared-Module/different-Instance controls. These are observational **within this one run**, not confidence bounds or a proof of causality. Their contrast implicates differences beyond guest *code* location (e.g. Wasmtime instance/context path) as a plausible source of earlier noisy sham timings. But it does not isolate a single variable or establish that the native optimization is faster.
+
+The baseline-vs-patched comparison still showed a largest absolute median deviation of 3.17% (12 function/mode medians), with unchanged-native-code negative controls mixed into that comparison. Source and artifact receipts are persisted in [`evidence/rust_identical_guest_shams_20261112.json`](evidence/rust_identical_guest_shams_20261112.json). **No causal runtime improvement, portable benefit, or complete compiler-pass safety is established.**
