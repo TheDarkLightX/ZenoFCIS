@@ -30,6 +30,11 @@ def parse(disasm: str) -> dict:
         raise ValueError("missing target-specific guest function headings")
     out = {}
     for index, m in enumerate(heads):
+        # The five experiment exports precede Rust runtime helpers. Helper
+        # disassembly embeds noninstruction literal/data rows that cannot be
+        # treated as native instructions by this deliberately narrow auditor.
+        if index >= len(EXPECTED):
+            break
         symbol_id = int(m.group(1))
         name = m.group(2)
         # Every observed guest function must have a unique index.
