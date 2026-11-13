@@ -1,0 +1,65 @@
+{
+  "schema": "zenofcis/tier1-adjacent-udivrem-native-trap-checkpoint/1",
+  "date_utc": "2026-11-13",
+  "status": "qualified-narrow-native-trap-signal-differential-not-upstream-ready",
+  "source": {
+    "zenofcis_experiment_commit": "1237a26b4d9392f7ba296ffbe5f64105f49d51df",
+    "zenofcis_branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "zenofcis_main_at_inspection": "4160086fb9d19f3ebe25047e69b1caa467aa74fd",
+    "zenofcis_release_2_7_at_inspection": "5738b7a2a0313b56f71cbc2d3a74b602da4b813e",
+    "wasmtime_pinned_compiler": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "wasmtime_main_at_inspection": "1d4f64d4ca7c6bab6399b251bbcf3ca4e396bd99",
+    "new_checker_path": "experiments/cranelift-tier1/native_trap_udivrem_pair_28.py",
+    "new_checker_git_blob_sha": "5b3c0c2f8e8ac10d7cb9ef326572b60ea15d1547",
+    "generated_c_sha256": "bf7ea3d63a4ee1cd10c04671384002325a75bdb0aaaaa0afac87acff1059ebd0",
+    "workflow_path": ".github/workflows/tier1-udivrem-pair-clif-matrix-28.yml",
+    "target": "x86-64 Linux SysV",
+    "toolchain": "Rust 1.97.1; GCC C native signal oracle"
+  },
+  "verification": {
+    "run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43512100900",
+    "conclusion": "success",
+    "run_source_sha": "1237a26b4d9392f7ba296ffbe5f64105f49d51df",
+    "artifact": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43512100900/artifacts/14078837274",
+    "artifact_id": 14078837274,
+    "artifact_sha256": "167a30a8a90d6289af57527be359eeee791fb018124cf97901ab140124abf02b",
+    "artifact_receipt_path": "tier1-clif/native-trap-receipt.json",
+    "artifact_compiled_reference_path": "tier1-clif/native-trap-audit-source.c",
+    "native_trap_scenarios": 18,
+    "paired_baseline_patched_native_trap_calls": 36,
+    "fixtures": 8,
+    "standard_inputs_per_fixture": [
+      "x=7,y=0",
+      "x=0,y=0"
+    ],
+    "additional_inputs": [
+      "signed quotient x=INT64_MIN,y=-1",
+      "negative_other_divisor x=0,y=7"
+    ],
+    "acceptance": "both baseline and patched concrete native objects raised the same Linux SIGFPE or SIGILL on each case, with no normal return",
+    "checker_separation": "Independent GCC-compiled fork/waitpid signal oracle applied to two pinned Cranelift-produced object sets, not a simulation of patched ISLE",
+    "other_CI_checks": "Existing 243339 finite native values, 65280 exhaustive i8 nonzero divisor pairs, six strict negative controls and source-pinned compiler A/B steps passed again in this run"
+  },
+  "static_cost_reference": {
+    "source_receipt": "experiments/cranelift-tier1/evidence/udivrem_pair_clif_qualified_20261113.json",
+    "metric": "decoded x86-64 instruction bytes within the specific CLIF function symbol, not CLIF cost or whole-AOT size",
+    "baseline_bytes": 36,
+    "patched_bytes": 21,
+    "baseline_div_instructions": 2,
+    "patched_div_instructions": 1,
+    "status": "existing independently audited static result requalified by unchanged CI A/B, not a new runtime measurement"
+  },
+  "candidate": {
+    "semantics": "unsigned i64 same-operand adjacent udiv followed by urem; first operation traps on y=0",
+    "origin": "human-authored bounded two-form vocabulary, not a new ZenoFCIS synthesized result",
+    "compiler_change": "experimental dual-result udivrem opcode and x64 lowering applied only in disposable pinned source checkout"
+  },
+  "limitations": [
+    "Observed native POSIX signal equality does not prove matching fault PC, Wasmtime trap metadata, trap source location or catchability",
+    "Only exact finite probes on one x86-64 Linux host; not all x86 machine states, other targets, or complete compiler-pass correctness",
+    "Generic SSA dominance, liveness, optimizer phase movement, register pressure, flags, poison and undefined behavior remain under review",
+    "No full 64-bit QF_BV proof or complete ISA proof; existing Euclidean model is a separate mathematical theorem",
+    "No representative runtime speedup, full AOT saving, optimized Rust/Wasm reachability for new paired opcode or upstream Bytecode Alliance PR",
+    "Neither protected ZenoFCIS branch nor Bytecode Alliance upstream source was changed"
+  ]
+}
