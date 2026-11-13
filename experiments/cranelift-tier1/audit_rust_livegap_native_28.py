@@ -18,7 +18,7 @@ UPSTREAM = "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49"
 EXPECTED = ("live_original_rem", "live_q_m_r", "live_reversed_mul",
             "live_two_chains", "wrong_multiplier")
 POSITIVE = EXPECTED[:3]
-HEADING = re.compile(r"(?m)^wasm\\[0\\]::function\\[(\\d+)\\]::([^:\\n]+):\\s*$")
+HEADING = re.compile(r"(?m)^wasm\[0\]::function\[(\d+)\]::([^:\n]+):\s*$")
 HEX = re.compile(r"^[0-9a-f]{2}$")
 
 def hash_file(p: Path) -> str:
@@ -40,7 +40,7 @@ def parse(disasm: str) -> dict:
         count = bytes_ = divisions = 0
         opcodes = []
         for line in raw.splitlines():
-            if not re.match(r"^ {12}[0-9a-f]{2}(?:\\s|$)", line):
+            if not re.match(r"^ {12}[0-9a-f]{2}(?:\s|$)", line):
                 continue
             tokens = line.strip().split()
             k = 0
@@ -59,7 +59,7 @@ def parse(disasm: str) -> dict:
                      "decoded_guest_instruction_bytes": bytes_,
                      "decoded_guest_instruction_count": count,
                      "static_divq": divisions,
-                     "mnemonic_sha256": hashlib.sha256(("\\n".join(opcodes)).encode()).hexdigest()}
+                     "mnemonic_sha256": hashlib.sha256(("\n".join(opcodes)).encode()).hexdigest()}
     for i, name in enumerate(EXPECTED):
         if name not in out or out[name]["function_index"] != i:
             raise ValueError("wrong target-function export/index mapping")
@@ -154,12 +154,12 @@ def audit(root: Path) -> dict:
     }
 
 def self_test() -> None:
-    sample = ("wasm[0]::function[0]::live_original_rem:\\n"
-              "            48 f7 f1     divq %rcx\\n"
-              "            c3           retq\\n")
+    sample = ("wasm[0]::function[0]::live_original_rem:\n"
+              "            48 f7 f1     divq %rcx\n"
+              "            c3           retq\n")
     for i, name in enumerate(EXPECTED[1:], 1):
-        sample += f"wasm[0]::function[{i}]::{name}:\\n"
-        sample += "            c3           retq\\n"
+        sample += f"wasm[0]::function[{i}]::{name}:\n"
+        sample += "            c3           retq\n"
     found = parse(sample)
     assert found[EXPECTED[0]]["decoded_guest_instruction_bytes"] == 4
     assert found[EXPECTED[0]]["static_divq"] == 1
