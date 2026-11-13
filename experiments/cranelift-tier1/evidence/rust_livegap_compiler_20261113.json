@@ -1,0 +1,164 @@
+{
+  "schema": "zenofcis/tier1-rust-livegap-qualified-native-catalog/1",
+  "dated_utc": "2026-11-13",
+  "status": "passed-independent-source-and-symbol-audit",
+  "observation": "Manually developed, source-pinned bounded two-intervening-instruction compiler rewrite yielded 9 fewer decoded x86-64 guest instruction bytes and 3 fewer decoded guest instructions in three Rust-generated Wasm exports while keeping other live uses of intermediate product. Correctness evidence is finite Wasm executions/traps and separate arithmetic proofs of the pure unsigned relation, not a whole-compiler-pass proof.",
+  "source_pins": {
+    "zenofcis_experiment_head": "9e918603e0dda3e04177b884280db7e58086df02",
+    "zenofcis_auditor_head": "775ac6a28332ee435a48a226a824b6196b03e4e0",
+    "wasmtime_upstream_compiler_source": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "target": "x86_64-unknown-linux",
+    "wasm_input_sha256": "2f525c5bbbfcfd23ffc38fbc7fd71950912f6562ca9eb2e6ab1551ff7bbb6d24",
+    "rust_source_sha256": "b1ce1470eff8c1f81e33801073985b59225472fac0ce7eac2d3972cd7cbb6ce3",
+    "auditor_source_sha256": "e4d8e107eb5723d1be532588783dab24cc914ca5f7c2f4559e18c92319144309"
+  },
+  "compiler_sha256": {
+    "baseline": "a2dd8ba4b12fd86bf0c4aeca76d543bc4f57ae067a215749a6ef5350aeb41c3c",
+    "patched": "9add07e69faa97a1425e8d0164ec4f959bc27cba06dd8ada0ff9b7d609fe1927"
+  },
+  "compiled_artifact_sha256": {
+    "baseline": "1b25bb79c3e5abc87643f7ad63cf10b33dd05146a223402337eda5a80e123a64",
+    "patched": "45ab93d3b3a2a878f62d274fd6a77e35b4bdc810fc4ea28dae5e67e09dafd183",
+    "byte_identical": false
+  },
+  "native_cost_metric": "count of decoded instruction encoding bytes in each named Wasmtime guest function, including trap paths; NOT whole-AOT or ELF .text bytes, NOT CLIF/ISLE costs, NOT dynamic throughput",
+  "target_export_receipts": {
+    "live_original_rem": {
+      "function_index": 0,
+      "baseline": {
+        "decoded_native_bytes": 101,
+        "decoded_instructions": 31,
+        "divq": 1
+      },
+      "patched": {
+        "decoded_native_bytes": 92,
+        "decoded_instructions": 28,
+        "divq": 1
+      },
+      "saved_bytes": 9,
+      "saved_instructions": 3
+    },
+    "live_q_m_r": {
+      "function_index": 1,
+      "baseline": {
+        "decoded_native_bytes": 101,
+        "decoded_instructions": 31,
+        "divq": 1
+      },
+      "patched": {
+        "decoded_native_bytes": 92,
+        "decoded_instructions": 28,
+        "divq": 1
+      },
+      "saved_bytes": 9,
+      "saved_instructions": 3
+    },
+    "live_reversed_mul": {
+      "function_index": 2,
+      "baseline": {
+        "decoded_native_bytes": 101,
+        "decoded_instructions": 31,
+        "divq": 1
+      },
+      "patched": {
+        "decoded_native_bytes": 92,
+        "decoded_instructions": 28,
+        "divq": 1
+      },
+      "saved_bytes": 9,
+      "saved_instructions": 3
+    },
+    "live_two_chains": {
+      "function_index": 3,
+      "baseline": {
+        "decoded_native_bytes": 157,
+        "decoded_instructions": 48,
+        "divq": 2
+      },
+      "patched": {
+        "decoded_native_bytes": 157,
+        "decoded_instructions": 48,
+        "divq": 2
+      },
+      "saved_bytes": 0,
+      "saved_instructions": 0
+    },
+    "wrong_multiplier": {
+      "function_index": 4,
+      "baseline": {
+        "decoded_native_bytes": 104,
+        "decoded_instructions": 32,
+        "divq": 1
+      },
+      "patched": {
+        "decoded_native_bytes": 104,
+        "decoded_instructions": 32,
+        "divq": 1
+      },
+      "saved_bytes": 0,
+      "saved_instructions": 0
+    }
+  },
+  "source_and_machine_reachability": {
+    "admitted_match": "same-block i64 udiv(x,y); imul(q,y); iconst c; rotl(m,c); isub(x,m) with exact SSA edges, positive target x86-64, non-none optimization; retain imul for other uses",
+    "unsupported": "generic scheduler/nonadjacent operations, intervening calls/memory/traps, arbitrary register liveness, flags/poison/native state, signed division",
+    "emitted_effect": "3 target exports eliminate a redundant native subtraction and adjust moves; imul remains live, hardware divq count unchanged",
+    "controls": "negative wrong_multiplier and out-of-vocabulary dual-chain exports show zero change in parsed native instruction-byte/instruction counts"
+  },
+  "whole_module": {
+    "baseline_aot_bytes": 65696,
+    "patched_aot_bytes": 65696,
+    "baseline_executable_elf_text_bytes": 28672,
+    "patched_executable_elf_text_bytes": 28672,
+    "baseline_static_module_divq": 6,
+    "patched_static_module_divq": 6,
+    "note": "Whole-AOT and .text size are unchanged despite verified per-function native instruction savings; function layout/ELF padding prevents conflating metrics."
+  },
+  "executable_semantics": {
+    "producer_per_compiler": {
+      "finite_value_agreements": 480,
+      "expected_division_by_zero_traps_or_rust_panics": 60
+    },
+    "producer_aggregate": {
+      "finite_value_agreements": 960,
+      "expected_traps_or_panics": 120
+    },
+    "independent_recheck": {
+      "fresh_native_executions": 410,
+      "status": "passed, SHA and original native/AOT/CLIF cost receipt replay"
+    },
+    "independent_oracle_controls": {
+      "cases": 1310,
+      "status": "passed"
+    }
+  },
+  "original_compiler_run": {
+    "id": 43361471035,
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43361471035",
+    "artifact_id": 14007454958,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43361471035/artifacts/14007454958",
+    "downloaded_zip_sha256": "872b5bb0f799ff61543b1837618064db689a9958321534249fa1c1b734236009",
+    "result": "success"
+  },
+  "separate_independent_symbol_audit": {
+    "id": 43362353414,
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43362353414",
+    "auditor_commit": "775ac6a28332ee435a48a226a824b6196b03e4e0",
+    "artifact_id": 14009065903,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43362353414/artifacts/14009065903",
+    "downloaded_zip_sha256": "b21520f78b7ad3a3f783aaf01a65964aa976c96a8b6df63a4441c9302958e598",
+    "result": "success",
+    "audited": "five named guest symbols, same original archived Rust Wasm, disassembly, native cost, AOT/CLIF/ELF source and hash receipts, controls and finite test evidence"
+  },
+  "qualifications_and_nonclaims": [
+    "This result is a manually designed Cranelift compiler-rewrite pilot, not a newly ZenoFCIS-synthesized sequence or a demonstration of general optimality.",
+    "Finite values and trap/panic agreement are not a proof of arbitrary SSA, debug-location, register allocator, trap location/ordering, flags, undefined/poison or machine-ISA state.",
+    "The bounded local same-block rule is not a review-ready upstream ISLE rule; no unconditionally applicable VeriISLE proof was obtained.",
+    "No reliable throughput/runtime improvement, general corpus prevalence, cross-target portability or whole-AOT size reduction is established.",
+    "The first 5 exports are deliberately constructed, not external representative production workloads.",
+    "Earlier 13-byte native-function savings from a distinct optimized Rust input remain separate and are not silently combined with these 9-byte results."
+  ],
+  "next_gate": "Obtain comprehensive compiler-pass SSA/trap/register/target correctness, investigate how live uses behave across more code shapes, independently check exact emitted x86 under register pressure and align code-size savings with representative workload profitability. Only then consider a focused draft upstream PR.",
+  "branch_isolation": "Only TheDarkLightX/ZenoFCIS research/2.8-tier1-cranelift-performance-20261102 mutated; ZenoFCIS main, release/2.7.0, bytecodealliance/wasmtime upstream untouched."
+}
