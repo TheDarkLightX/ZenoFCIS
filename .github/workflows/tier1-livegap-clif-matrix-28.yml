@@ -1,0 +1,130 @@
+name: tier1-livegap-clif-matrix-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-livegap-clif-matrix-28.yml'
+      - 'experiments/cranelift-tier1/livegap_clif_matrix_28.py'
+      - 'experiments/cranelift-tier1/install_udivrem_livegap_28.py'
+      - 'experiments/cranelift-tier1/install_udivrem_reconstruction_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tier1-livegap-clif-matrix-28
+  cancel-in-progress: true
+jobs:
+  source-pinned-actual-cranelift-a-b:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      RUSTUP_TOOLCHAIN: '1.97.1'
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+    steps:
+      - name: Checkout exact experimental branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout pinned unmodified Wasmtime
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          path: upstream
+          persist-credentials: false
+      - name: Prepare toolchain, checked source and CLIF matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C upstream rev-parse HEAD)" = b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49
+          test -z "$(git -C upstream status --porcelain)"
+          python3 -B experiments/cranelift-tier1/install_udivrem_livegap_28.py --self-test
+          python3 -B experiments/cranelift-tier1/livegap_clif_matrix_28.py --self-test
+          mkdir -p tier1-clif/baseline tier1-clif/patched
+          python3 -B experiments/cranelift-tier1/livegap_clif_matrix_28.py --generate tier1-clif/matrix > tier1-clif/generation.json
+          git rev-parse HEAD > tier1-clif/zenofcis_commit.txt
+          git -C upstream rev-parse HEAD > tier1-clif/wasmtime_commit.txt
+          rustc --version > tier1-clif/toolchain.txt
+      - name: Build pristine pinned Cranelift compiler and compile each exact CLIF
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util --release \
+            > tier1-clif/baseline-build.stdout 2> tier1-clif/baseline-build.stderr
+          cp upstream/target/release/clif-util tier1-clif/clif-util-baseline
+          for src in tier1-clif/matrix/*.clif; do
+            case_name="$(basename "$src" .clif)"
+            tier1-clif/clif-util-baseline test "$src" > "tier1-clif/baseline/$case_name.test.log" 2>&1
+            tier1-clif/clif-util-baseline compile --target x86_64 --set opt_level=speed_and_size \
+              -o "tier1-clif/baseline/$case_name.o" "$src" \
+              > "tier1-clif/baseline/$case_name.compile.log" 2>&1
+            objdump -dr -Mintel "tier1-clif/baseline/$case_name.o" \
+              > "tier1-clif/baseline/$case_name.disasm.txt"
+          done
+      - name: Apply only source-pinned experimental compiler patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C upstream status --porcelain)"
+          python3 -B experiments/cranelift-tier1/install_udivrem_livegap_28.py \
+            --upstream upstream --out tier1-clif/installer-receipt.json
+          git -C upstream diff > tier1-clif/patch.diff
+          test -s tier1-clif/patch.diff
+      - name: Build patched compiler and recompile identical CLIF cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util --release \
+            > tier1-clif/patched-build.stdout 2> tier1-clif/patched-build.stderr
+          cp upstream/target/release/clif-util tier1-clif/clif-util-patched
+          sha256sum tier1-clif/clif-util-baseline tier1-clif/clif-util-patched \
+            > tier1-clif/compiler-hashes.txt
+          for src in tier1-clif/matrix/*.clif; do
+            case_name="$(basename "$src" .clif)"
+            tier1-clif/clif-util-patched test "$src" > "tier1-clif/patched/$case_name.test.log" 2>&1
+            tier1-clif/clif-util-patched compile --target x86_64 --set opt_level=speed_and_size \
+              -o "tier1-clif/patched/$case_name.o" "$src" \
+              > "tier1-clif/patched/$case_name.compile.log" 2>&1
+            objdump -dr -Mintel "tier1-clif/patched/$case_name.o" \
+              > "tier1-clif/patched/$case_name.disasm.txt"
+          done
+      - name: Independently audit source contracts, controls, native bytes and hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/livegap_clif_matrix_28.py \
+            --analyze --src tier1-clif/matrix \
+            --baseline tier1-clif/baseline --patched tier1-clif/patched \
+            --baseline-compiler tier1-clif/clif-util-baseline \
+            --patched-compiler tier1-clif/clif-util-patched \
+            --checkout "$(git rev-parse HEAD)" \
+            --out tier1-clif/matrix-receipt.json | tee tier1-clif/audit-summary.json
+      - name: Archive exact source graphs, two compilers' object receipts and negative controls
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-livegap-clif-matrix-28
+          path: |
+            tier1-clif/baseline
+            tier1-clif/patched
+            tier1-clif/matrix
+            tier1-clif/generation.json
+            tier1-clif/installer-receipt.json
+            tier1-clif/patch.diff
+            tier1-clif/compiler-hashes.txt
+            tier1-clif/zenofcis_commit.txt
+            tier1-clif/wasmtime_commit.txt
+            tier1-clif/toolchain.txt
+            tier1-clif/matrix-receipt.json
+            tier1-clif/audit-summary.json
+            tier1-clif/baseline-build.stdout
+            tier1-clif/baseline-build.stderr
+            tier1-clif/patched-build.stdout
+            tier1-clif/patched-build.stderr
+            experiments/cranelift-tier1/livegap_clif_matrix_28.py
+          if-no-files-found: warn
+          retention-days: 30
