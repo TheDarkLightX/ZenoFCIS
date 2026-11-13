@@ -1,0 +1,102 @@
+{
+  "schema": "zenofcis/tier1-optimized-rust-live-ssa-checkpoint/1",
+  "qualified_at_utc": "2026-11-13",
+  "status": "independent-artifact-audited-negative-reachability",
+  "zenofcis_head": "25f803b3b1a2f39320dbb49928bd713e2a1b3dd4",
+  "zenofcis_main_observed": "4160086fb9d19f3ebe25047e69b1caa467aa74fd",
+  "zenofcis_release_2_7_observed": "5738b7a2a0313b56f71cbc2d3a74b602da4b813e",
+  "wasmtime_compiler_source_pin": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "wasmtime_main_observed": "49a7d064f46c818008841049f86e4e7d425e1ecf",
+  "compiler_sha256": {
+    "baseline": "a2dd8ba4b12fd86bf0c4aeca76d543bc4f57ae067a215749a6ef5350aeb41c3c",
+    "patched": "67bb8411c3b07305d4cc66ed5540f755c3c8bb31fce34ff8f458f1f452dfd975"
+  },
+  "rust_compiler": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "rust_source_sha256": "b1ce1470eff8c1f81e33801073985b59225472fac0ce7eac2d3972cd7cbb6ce3",
+  "qualification_driver_sha256": "bebca604722eef5171caa27be024b5164f1abae07749c6d2d3e14b8c4447ad1e",
+  "wasm_sha256": "2f525c5bbbfcfd23ffc38fbc7fd71950912f6562ca9eb2e6ab1551ff7bbb6d24",
+  "artifact": {
+    "workflow_run": 43360722492,
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43360722492",
+    "artifact_id": 14007783315,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43360722492/artifacts/14007783315",
+    "downloaded_zip_sha256": "2612fecb7a84824e1b2a0d0d14ce487168b22b4470c475fe09b6779f14a63cf8",
+    "zip_entries": 214
+  },
+  "baseline_and_patched": {
+    "aot_sha256": "1b25bb79c3e5abc87643f7ad63cf10b33dd05146a223402337eda5a80e123a64",
+    "aot_byte_identical": true,
+    "whole_aot_bytes_each": 65696,
+    "executable_elf_text_bytes_each": 28672,
+    "static_module_divq_each": 6,
+    "clif_lexical_adjacent_candidate_pairs_each": 0,
+    "baseline_minus_patched": {
+      "whole_aot_bytes": 0,
+      "executable_elf_text_bytes": 0,
+      "module_static_divq": 0
+    }
+  },
+  "executable_checks": {
+    "producer": {
+      "finite_numeric_agreements": 960,
+      "trap_or_panic_cases": 120
+    },
+    "independent_rechecker": {
+      "fresh_executions": 410,
+      "original_native_cost_and_file_hashes": "passed"
+    },
+    "local_artifact_reinspection": {
+      "aot_hashes_equal": true,
+      "native_disassembly_byte_identical": true,
+      "baseline_patched_export_clif_identical": true
+    },
+    "independent_oracle_self_test_cases": 1310
+  },
+  "exported_clif_functions": [
+    {
+      "name": "live_q_m_r",
+      "clif_sha256": "2e9869ab5e5ce5018ca7d9747e381a228f7009ffc9e278549ad2e38d9aea5bcd",
+      "observed": "udiv.i64 v2,v3; imul v8,v3; iconst 7; rotl v9; isub.i64 v2,v9",
+      "matches_semantic_dataflow": true,
+      "adjacent_triple": false
+    },
+    {
+      "name": "live_reversed_mul",
+      "clif_sha256": "b6392a272b88d380cd5ae383042f1ef023ed0fe67e6cf08a08798b3d9140163c",
+      "observed": "udiv.i64 v2,v3; imul v8,v3; iconst 7; rotl v9; isub.i64 v2,v9",
+      "matches_semantic_dataflow": true,
+      "adjacent_triple": false
+    },
+    {
+      "name": "live_original_rem",
+      "clif_sha256": "f58153aef950b652513725e9f7f945fd7b67165f2e29787a41644e6a0ce8cbc3",
+      "observed": "udiv.i64 v2,v3; imul v8,v3; iconst 7; rotl v9; isub.i64 v2,v9",
+      "matches_semantic_dataflow": true,
+      "adjacent_triple": false
+    },
+    {
+      "name": "live_two_chains",
+      "clif_sha256": "ada3845616086469ede0cf433884390bf9b9df8cdc30c5a7d231a63e8673c301",
+      "observed": "udiv v9,v3 and udiv v2,v3; first imul v13,v3 then isub v2,v14; second imul v10,v3 then isub v9,v22; intervening operations",
+      "matches_semantic_dataflow": true,
+      "adjacent_triple": false
+    },
+    {
+      "name": "wrong_multiplier",
+      "clif_sha256": "de1ec49fd721c249d5c755e2ab948384baebbf717e7370ed68d05768b5beadc6",
+      "observed": "udiv.i64 v2,v3; imul v8,v2; isub v2,v9",
+      "matches_semantic_dataflow": false,
+      "adjacent_triple": false
+    }
+  ],
+  "explanation": "Exact output CLIF reveals dividend/divisor/quotient/product/remainder dependencies for four positive Rust exports, but iconst and rotl (and in dual case more operations) intervene between imul and isub. The experiment's existing conservative reconstruction matcher only handles an adjacent same-block triple, so the candidate source shapes do not satisfy its trigger. This is an observed source-shape mismatch, not a general proof that no other optimization could apply.",
+  "next_action": "Prototype a bounded, side-effect-safe same-block SSA-use matcher on the isolated experimental checkout, requiring preservation of udiv trap/source location, quotient/product uses and target preconditions; then requalify with original and patched compiler binaries and independent verifier. Consider whether nonadjacent live-product cases save native code before upstream action.",
+  "nonclaims": [
+    "No patched native code difference on this new optimized Rust module.",
+    "No new ZenoFCIS-synthesized rewrite; this is a manually proposed source/rewriter experiment.",
+    "No whole-pass correctness, register/flag/poison/trap-position proof or credible runtime speedup.",
+    "The old narrow 13-byte per-function saving is a distinct earlier optimized Rust source profile and remains separate.",
+    "Source CLIF structural observations were independently read from the downloaded ZIP; a full compiler optimization trace was not available.",
+    "Native emitted bytes, module .text, full-AOT length and CLIF operations are distinct quantities."
+  ]
+}
