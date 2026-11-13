@@ -1,0 +1,76 @@
+name: tier1-livegap-ssa-semantics-model-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-livegap-ssa-semantics-model-28.yml'
+      - 'experiments/cranelift-tier1/livegap_ssa_semantics_model_28.py'
+      - 'experiments/cranelift-tier1/install_udivrem_livegap_28.py'
+      - 'experiments/cranelift-tier1/install_udivrem_reconstruction_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tier1-livegap-ssa-semantics-model-28
+  cancel-in-progress: true
+jobs:
+  pure-integer-ssa-model-not-compiler-proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Verify pinned source and actual narrow matcher declaration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -B experiments/cranelift-tier1/install_udivrem_livegap_28.py --self-test
+          python3 -B experiments/cranelift-tier1/install_udivrem_reconstruction_28.py --self-test
+          python3 -B - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os
+          d=Path('experiments/cranelift-tier1')
+          live=(d/'install_udivrem_livegap_28.py').read_text()
+          base=(d/'install_udivrem_reconstruction_28.py').read_text()
+          required_live=('Opcode::Iconst','Opcode::Rotl','rv[0] != m','rv[1] != cv[0]',
+                         'remove_inst(minst)')
+          assert all(x in live for x in required_live)
+          assert '"remove_inst(minst)" not in txt' in live
+          assert 'udivrem(x, y)' in base and 'func.dfg.clear_results(qinst)' in base
+          output={'source_commit':os.environ['GITHUB_SHA'],
+                  'patched_upstream_pin':'b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49',
+                  'model_to_matcher':'static anchor review, NOT proof of Rust compiler behavior',
+                  'sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest()
+                            for p in (d/'install_udivrem_livegap_28.py',
+                                      d/'install_udivrem_reconstruction_28.py',
+                                      d/'livegap_ssa_semantics_model_28.py')}}
+          Path('livegap-matcher-anchor-pins.json').write_text(json.dumps(output,indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Exhaustively test 8-bit SSA/trap model; sample 64-bit; generate negative witnesses
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/livegap_ssa_semantics_model_28.py --out livegap-ssa-model-audit.json
+          python3 -B - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('livegap-ssa-model-audit.json').read_text())
+          assert r['status']=='passed-model-only-not-compiler-proof'
+          assert r['coverage']['i8_exhaustive']=={'value':261120,'trap':1024}
+          assert len(r['unsound_generalization_witnesses'])==6
+          assert r['contract']['no_poison_or_undefined'].startswith('not modeled')
+          print('model-level finite checks complete; NO whole-compiler correctness claimed')
+          PY
+      - name: Preserve reproducible model-level receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-livegap-ssa-semantics-model-28
+          path: |
+            livegap-ssa-model-audit.json
+            livegap-matcher-anchor-pins.json
+            experiments/cranelift-tier1/livegap_ssa_semantics_model_28.py
+          if-no-files-found: warn
+          retention-days: 30
