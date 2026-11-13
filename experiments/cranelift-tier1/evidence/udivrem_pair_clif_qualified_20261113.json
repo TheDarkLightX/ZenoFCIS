@@ -1,0 +1,84 @@
+{
+  "schema": "zenofcis/tier1-udivrem-pair-clif-qualified-checkpoint/1",
+  "observed_utc_date": "2026-11-13",
+  "status": "qualified-narrow-static-compiler-saving-not-upstream-ready",
+  "source": {
+    "zenofcis_commit": "a96e6bec01c075436fb7a71fb99ba41e54732ffd",
+    "zenofcis_branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "wasmtime_commit": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "upstream_main_at_inspection": "68f6475eac03b53a863c3e9c83ec587265fc70a4",
+    "rust_toolchain": "1.97.1",
+    "target": "x86_64",
+    "compiler_opt_level": "speed_and_size",
+    "inputs_manifest_sha256": "97b0e6c901d5aa0b924f5bdae92dfdcf64d4bfa0ff855fe04bb31e6aad111274",
+    "source_clif_sha256": "772a7ad8cfdf2a048ad54f5fd4544d1cffee36f3463b81b86501210892d6cf91",
+    "deduplication_key": "clif-sha256:772a7ad8cfdf2a048ad54f5fd4544d1cffee36f3463b81b86501210892d6cf91",
+    "compiler_sha256": {
+      "baseline": "abd727a83cf9e0e69102340119251f0cfffbb5c441c6f699dbe7602dd1e63173",
+      "patched": "b7ff9e65a12a216d478ba5cedf1022d7b9c1240720be501044b4e89b8086f18f"
+    }
+  },
+  "candidate": {
+    "selection": "human-authored bounded two-form vocabulary; not a new ZenoFCIS-synthesized discovery",
+    "before": "v2 = udiv.i64(v0,v1); v3 = urem.i64(v0,v1); return bxor(v2,v3)",
+    "after": "experimental dual-result udivrem.i64(v0,v1); return bxor(quotient,remainder)",
+    "admitted_values": "unsigned i64 x,y, y nonzero; y==0 expected first udiv trap in declared model",
+    "target_scope": "temporary patched x86-64 Cranelift with source-pinned experimental opcode",
+    "signedness": "unsigned only; signed division not matched",
+    "overflow": "unsigned div of zero-extended 64-bit dividend; quotient always fits if divisor nonzero",
+    "poison_flags_undefined": "full target/IR model and compiler-pass safety not proved",
+    "origin": "directly authored CLIF; Rust-to-Wasm compiler reachability for this new pair not proved"
+  },
+  "static_cost": {
+    "metric": "decoded native x86-64 instruction bytes inside one CLIF function symbol, not CLIF cost, whole AOT bytes or throughput",
+    "baseline_decoded_instruction_bytes": 36,
+    "patched_decoded_instruction_bytes": 21,
+    "bytes_saved": 15,
+    "baseline_decoded_instructions": 14,
+    "patched_decoded_instructions": 9,
+    "instructions_saved": 5,
+    "baseline_div_instructions": 2,
+    "patched_div_instructions": 1,
+    "baseline_object_sha256": "9d456a4b58494b7ff313797db5dc8230fd6029d9c245ca0263b8f4b9d2ddb90e",
+    "patched_object_sha256": "5e9efd7ee8e0a0e97f0b02f94fd4803b322cd336d799b78fc9ef1ff69d454661"
+  },
+  "verification": {
+    "github_actions_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43457217650",
+    "conclusion": "success",
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43457217650/artifacts/14053864852",
+    "artifact_sha256": "bdce437ea0506e0637195f6a7684badc1d98daa8b84378bf6d5cf20fb199b269",
+    "native_reference_source_sha256": "3daad7a8d808af5758197106f482082db2e976985dca24ca4a21162bca532b35",
+    "native_finite_value_checks": 243339,
+    "excluded_native_inputs": 189,
+    "exhaustive_unsigned_i8_nonzero_divisor_pairs": 65280,
+    "modeled_unsigned_i8_zero_divisor_traps": 256,
+    "baseline_and_patched_objects_rechecked": 16,
+    "independent_audit": "Downloaded original CI ZIP and independently checked 16 object SHA256 digests, decoded native byte and instruction counts, 8 source CLIF digests and native receipt",
+    "strict_negative_controls": [
+      "negative_reverse_order",
+      "negative_signed_quotient",
+      "negative_other_dividend",
+      "negative_other_divisor",
+      "negative_not_remainder",
+      "negative_double_quotient"
+    ],
+    "exploratory_optimizer_sensitive_gap": {
+      "name": "exploratory_elidable_iconst_gap",
+      "author_clif": "pure live iconst between udiv and urem",
+      "baseline_bytes": 40,
+      "patched_bytes": 25,
+      "baseline_divs": 2,
+      "patched_divs": 1,
+      "interpretation": "Observed emitted-code change despite source-level non-adjacency; optimizer-phase mechanism not traced, not a strict negative control",
+      "initial_fail_closed_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43454406968"
+    }
+  },
+  "restrictions": [
+    "Finite native checks exclude divisor-zero traps; y==0 tested only in the abstract 8-bit model",
+    "No 64-bit exhaustive finite proof or fresh QF_BV proof of this compiler transformation",
+    "No full SSA dominance, trap provenance, flag, undefined, poison, register-allocation or ABI proof",
+    "No cross-target, optimized Rust/Wasm reachability or representative-workload benchmark for this candidate",
+    "No runtime speedup claim and no upstream Bytecode Alliance pull request",
+    "New opcode and compiler patch exist only in isolated experiment; main and release/2.7.0 untouched"
+  ]
+}
