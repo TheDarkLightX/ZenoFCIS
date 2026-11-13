@@ -6,6 +6,7 @@ on:
       - '.github/workflows/tier1-udivrem-pair-clif-matrix-28.yml'
       - 'experiments/cranelift-tier1/udivrem_pair_matrix_28.py'
       - 'experiments/cranelift-tier1/native_verify_udivrem_pair_28.py'
+      - 'experiments/cranelift-tier1/native_trap_udivrem_pair_28.py'
       - 'experiments/cranelift-tier1/livegap_clif_matrix_28.py'
       - 'experiments/cranelift-tier1/install_udivrem_pair_28.py'
       - 'experiments/cranelift-tier1/install_udivrem_reconstruction_28.py'
@@ -113,6 +114,15 @@ jobs:
             --baseline tier1-clif/baseline --patched tier1-clif/patched \
             --out tier1-clif/independent-native-receipt.json \
             | tee tier1-clif/independent-native-summary.txt
+      - name: Independently exercise native zero-divisor and signed-overflow traps
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/native_trap_udivrem_pair_28.py --self-test
+          python3 -B experiments/cranelift-tier1/native_trap_udivrem_pair_28.py \
+            --baseline tier1-clif/baseline --patched tier1-clif/patched \
+            --out tier1-clif/native-trap-receipt.json \
+            | tee tier1-clif/native-trap-summary.txt
       - name: Archive exact source graphs, two compilers' object receipts and negative controls
         if: always()
         uses: actions/upload-artifact@v4
@@ -133,6 +143,10 @@ jobs:
             tier1-clif/audit-summary.json
             tier1-clif/independent-native-receipt.json
             tier1-clif/independent-native-summary.txt
+            tier1-clif/native-trap-receipt.json
+            tier1-clif/native-trap-summary.txt
+            tier1-clif/native-trap-audit-source.c
+            experiments/cranelift-tier1/native_trap_udivrem_pair_28.py
             experiments/cranelift-tier1/native_verify_udivrem_pair_28.py
             tier1-clif/baseline-build.stdout
             tier1-clif/baseline-build.stderr
