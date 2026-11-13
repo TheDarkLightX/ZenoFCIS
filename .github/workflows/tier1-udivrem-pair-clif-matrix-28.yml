@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/tier1-udivrem-pair-clif-matrix-28.yml'
       - 'experiments/cranelift-tier1/udivrem_pair_matrix_28.py'
+      - 'experiments/cranelift-tier1/native_verify_udivrem_pair_28.py'
       - 'experiments/cranelift-tier1/livegap_clif_matrix_28.py'
       - 'experiments/cranelift-tier1/install_udivrem_pair_28.py'
       - 'experiments/cranelift-tier1/install_udivrem_reconstruction_28.py'
@@ -104,6 +105,14 @@ jobs:
             --patched-compiler tier1-clif/clif-util-patched \
             --checkout "$(git rev-parse HEAD)" \
             --out tier1-clif/matrix-receipt.json | tee tier1-clif/audit-summary.json
+      - name: Independently execute the exact baseline and patched native objects against GCC C oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/native_verify_udivrem_pair_28.py \
+            --baseline tier1-clif/baseline --patched tier1-clif/patched \
+            --out tier1-clif/independent-native-receipt.json \
+            | tee tier1-clif/independent-native-summary.txt
       - name: Archive exact source graphs, two compilers' object receipts and negative controls
         if: always()
         uses: actions/upload-artifact@v4
@@ -122,6 +131,9 @@ jobs:
             tier1-clif/toolchain.txt
             tier1-clif/matrix-receipt.json
             tier1-clif/audit-summary.json
+            tier1-clif/independent-native-receipt.json
+            tier1-clif/independent-native-summary.txt
+            experiments/cranelift-tier1/native_verify_udivrem_pair_28.py
             tier1-clif/baseline-build.stdout
             tier1-clif/baseline-build.stderr
             tier1-clif/patched-build.stdout
