@@ -1,0 +1,51 @@
+{
+  "schema": "zenofcis/tier1-livegap-ssa-model-qualification/1",
+  "date_utc": "2026-11-13",
+  "status": "model-check-complete-ci-success-NOT-complete-compiler-pass-proof",
+  "experiment_branch": "research/2.8-tier1-cranelift-performance-20261102",
+  "source_commit": "6a1ff6f08132b5983116ed3df94e5420a517158b",
+  "qualified_workflow_commit": "f67ef7beeb2b56a54de202d04b08c333d75ddd3f",
+  "wasmtime_compiler_source_pin": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "workflow": {
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43399842165",
+    "run_id": 43399842165,
+    "job_id": 131799669695,
+    "result": "success",
+    "steps": [
+      "livegap and base installer source-pinned self-tests passed",
+      "model executable crosschecked Python unsigned arithmetic and independent bit-serial division",
+      "exhaustive i8 value/zero-divisor trap and downstream-live-SSA states",
+      "finite i64 targeted edge and pseudorandom values",
+      "negative unsound operand-shape mutation witnesses"
+    ],
+    "artifact_id": 14024832567,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43399842165/artifacts/14024832567",
+    "artifact_zip_sha256": "bb7f973a06a5e5380d329019dcd0d357d0fa54b835b54ea0c25516d2ccea1286",
+    "artifact_retention": "30 days"
+  },
+  "observable_semantics": {
+    "widths": "i8 exhaustive (all 256x256 x/y, four rotation constants); i64 sampled (2,169 x/y pairs, five rotations)",
+    "definedness": "zero-divisor traps at first instruction; same modeled trap order",
+    "overflow": "unsigned fixed-width modulo 2^width multiplication and subtraction",
+    "live_values": "quotient, intermediate multiplication, its rotl use, remainder, and a combined downstream result",
+    "negative_operands": "wrong multiplication operand, reversed subtraction and different dividend yield concrete witnesses",
+    "not_modeled": "poison/undefined CLIF, flags, physical registers/ABI, trap-code/source-location metadata, arbitrary SSA scheduling, target-specific machine behavior"
+  },
+  "checks": {
+    "i8_exhaustive_values": 261120,
+    "i8_exhaustive_traps": 1024,
+    "i64_finite_values": 10790,
+    "i64_finite_traps": 55,
+    "negative_mutation_witnesses": 6
+  },
+  "limitations": [
+    "Source matcher static anchors and installer self-tests establish only narrow source intention, not semantic equivalence to real compiled Cranelift.",
+    "No full i64 SMT proof from this work; earlier separately evidenced arithmetic proofs must not be conflated.",
+    "Zero-divisor trap ordering is simulated; exact Cranelift trap code/provenance isn't rechecked here.",
+    "No actual AOT native-code change, performance speedup, target register-state or general compiler-pass soundness qualified by this model.",
+    "Previous per-function 9-byte savings remain separate experimental machine evidence, not derived from this model.",
+    "Do not upstream the compiler patch solely on this receipt."
+  ],
+  "next_engineering_gate": "Independent Cranelift pass-level SSA/register/flag/trap-code correctness and realistic target workload value, preferably matching actual source to model/VeriISLE with authoritative specifications.",
+  "branch_isolation": "ZenoFCIS main, release/2.7.0, bytecodealliance/wasmtime unchanged"
+}
