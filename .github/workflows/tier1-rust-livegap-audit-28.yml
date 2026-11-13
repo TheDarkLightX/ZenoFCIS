@@ -1,0 +1,56 @@
+name: tier1-rust-livegap-audit-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-rust-livegap-audit-28.yml'
+      - 'experiments/cranelift-tier1/audit_rust_livegap_native_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: tier1-rust-livegap-audit-28
+  cancel-in-progress: true
+jobs:
+  replay-native-export-costs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Replayable independent parser self-tests
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/audit_rust_livegap_native_28.py
+          python3 -B experiments/cranelift-tier1/audit_rust_livegap_native_28.py --self-test
+          mkdir -p tier1-native-audit
+          git rev-parse HEAD >tier1-native-audit/auditor-head.txt
+          sha256sum experiments/cranelift-tier1/audit_rust_livegap_native_28.py >tier1-native-audit/auditor-sha256.txt
+      - name: Download original completed independent compiler A/B artifact (not a reproduced summary)
+        uses: actions/download-artifact@v4
+        with:
+          repository: TheDarkLightX/ZenoFCIS
+          run-id: 43361471035
+          github-token: ${{ github.token }}
+          name: tier1-rust-livegap-28
+          path: tier1-native-audit/original
+      - name: Independently check exact source and compiler pins and per-export native code metrics
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/audit_rust_livegap_native_28.py \
+            --root tier1-native-audit/original \
+            --out tier1-native-audit/independent-symbol-cost-replay.json
+      - name: Preserve exact original audit receipts and parsing code
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-rust-livegap-symbol-audit-28
+          path: |
+            tier1-native-audit/auditor-head.txt
+            tier1-native-audit/auditor-sha256.txt
+            tier1-native-audit/independent-symbol-cost-replay.json
+            experiments/cranelift-tier1/audit_rust_livegap_native_28.py
+          if-no-files-found: warn
+          retention-days: 30
