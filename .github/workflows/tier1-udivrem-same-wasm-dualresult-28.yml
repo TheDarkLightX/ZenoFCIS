@@ -9,6 +9,7 @@ on:
       - 'experiments/cranelift-tier1/qualify_udivrem_contexts_28.py'
       - 'experiments/cranelift-tier1/guest_trap_metadata_28.rs'
       - 'experiments/cranelift-tier1/audit_guest_trap_metadata_28.py'
+      - 'experiments/cranelift-tier1/audit_udivrem_context_stress_28.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -29,6 +30,8 @@ jobs:
           python3 -m py_compile experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py experiments/cranelift-tier1/install_udivrem_combiner_28.py experiments/cranelift-tier1/qualify_udivrem_contexts_28.py
           python3 -B experiments/cranelift-tier1/install_udivrem_combiner_28.py --self-test
           python3 -B experiments/cranelift-tier1/audit_guest_trap_metadata_28.py --self-test
+          python3 -m py_compile experiments/cranelift-tier1/audit_udivrem_context_stress_28.py
+          python3 -B experiments/cranelift-tier1/audit_udivrem_context_stress_28.py --self-test
   identical-wasm-two-compilers:
     needs: source-controls
     runs-on: ubuntu-24.04
@@ -118,6 +121,12 @@ jobs:
             --baseline-bin tier1-dual-same-wasm/baseline/wasmtime \
             --patched-bin tier1-dual-same-wasm/patched/wasmtime \
             --out tier1-dual-same-wasm/context-controls
+      - name: Independently rehash context AOTs, recount native division cost, replay new cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/audit_udivrem_context_stress_28.py \
+            --out tier1-dual-same-wasm
       - name: Archive exact WAT, binaries, source diff and all receipts even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -130,5 +139,6 @@ jobs:
             experiments/cranelift-tier1/qualify_udivrem_contexts_28.py
             experiments/cranelift-tier1/guest_trap_metadata_28.rs
             experiments/cranelift-tier1/audit_guest_trap_metadata_28.py
+            experiments/cranelift-tier1/audit_udivrem_context_stress_28.py
           retention-days: 30
           if-no-files-found: warn
