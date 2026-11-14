@@ -1,0 +1,94 @@
+{
+  "schema": "zenofcis/tier1-udivrem-pair-fault-pc-checkpoint/1",
+  "date_utc": "2026-11-14",
+  "status": "passed-narrow-native-host-fault-instruction-and-signal-code-check-not-upstream-ready",
+  "source": {
+    "experiment_branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "ci_source_commit": "ebcf326bd9c6017f7187daead0dc9bbcb6485ac1",
+    "new_signal_pc_runner_commit": "4823f0e57e01338a5db0ebb6c12657bf541d9f38",
+    "workflow_integration_commit": "ebcf326bd9c6017f7187daead0dc9bbcb6485ac1",
+    "zenofcis_main_inspected": "4160086fb9d19f3ebe25047e69b1caa467aa74fd",
+    "zenofcis_release_2_7_inspected": "5738b7a2a0313b56f71cbc2d3a74b602da4b813e",
+    "wasmtime_pinned_compiler": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "wasmtime_main_inspected": "c52bc6d8fc7ebf2ba3f7e39ab3203a3c13c1d272",
+    "target": "x86-64 Linux SysV, direct CLIF object calls",
+    "rust": "1.97.1"
+  },
+  "github_actions": {
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43552091202",
+    "run_id": 43552091202,
+    "conclusion": "success",
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43552091202/artifacts/14096584157",
+    "artifact_id": 14096584157,
+    "artifact_sha256": "69bb5874710d5e3f56b4d502b879030492efbd47a6d1d5569e05de6db30e6b8f",
+    "new_runner": "experiments/cranelift-tier1/native_trap_pc_udivrem_pair_28.py",
+    "runner_sha256": "db8214aff739205e2522ed58ac02ba19b06f2270d49885f5946da93d8c8b964e",
+    "generated_c_sha256": "0d582ac748d28964db516b54727a60234b80829d7098d041c590672250ae7e1d",
+    "source_receipt_sha256": "dfef16ba676bd7df547b003244e0854acd5c68221a1aacdf44e13add43b040f5",
+    "matrix_receipt_sha256": "a2334d9a297b1d75a4bd802f2742f5ac7e0bad2a639f38b77e43018a214489fb",
+    "standalone_value_oracle_receipt_sha256": "55d659b71d418637f6e5be14ef25afd611e045ca8109b5623de359f5b3dfc5ec",
+    "old_signal_receipt_sha256": "e5fef4fd94ae428f14fad53c664a67ad1a80c58dcaa4e352554b3e469705711a"
+  },
+  "new_host_observation": {
+    "case_count": 8,
+    "paired_scenarios": 18,
+    "isolated_native_calls": 36,
+    "paired_matching_signal_and_si_code": 18,
+    "faulting_PC_mapped_to_decoded_div_idiv_ud2": 36,
+    "signal_code_distribution": {
+      "SIGFPE_si_code_1": 16,
+      "SIGILL_si_code_2": 2
+    },
+    "faulting_instruction_pair_distribution": {
+      "div_div": 15,
+      "idiv_idiv": 1,
+      "ud2_ud2": 2
+    },
+    "same_function_relative_PC_in_this_fixture": 18,
+    "note": "PC offsets happen to be equal in these exact eight cases; no universal equal-offset requirement is asserted"
+  },
+  "independent_archive_recheck": {
+    "status": "passed",
+    "method": "Downloaded original ZIP, verified GitHub-published SHA-256, independently decoded all archived x86 object disassemblies using system objdump, checked all 16 .o hashes against three receipts, independently recomputed instruction-byte counts, instruction counts and unsigned-div counts, checked all 18 recorded fault rows, then relinked the exact 16 .o artifacts and reran the recorded fault-PC C oracle with separately installed GCC 14.2.0 on a second x86-64 Linux container.",
+    "results": {
+      "object_pairs": 8,
+      "object_files_hashed_and_redecoded": 16,
+      "positive_native_decoded_bytes": [
+        36,
+        21
+      ],
+      "positive_native_instructions": [
+        14,
+        9
+      ],
+      "positive_native_unsigned_divisions": [
+        2,
+        1
+      ],
+      "unchanged_strict_negative_controls": 6,
+      "rerun_paired_scenarios": 18,
+      "rerun_native_child_calls": 36,
+      "rerun_matching_archived_host_signal_and_si_code": 18
+    },
+    "caution": "Fresh host reexecution reused the original generated C host oracle; the independent archive rechecker and objdump cost parser were implemented separately. This is additional finite native execution, not an independent formal proof."
+  },
+  "candidate": {
+    "origin": "human-authored bounded two-form adjacent udiv.i64 + urem.i64 to dual-result udivrem prototype; not ZenoFCIS-synthesized",
+    "semantic_domain": "exact same SSA operands, adjacent same-block unsigned i64 udiv then urem; original udiv traps first on divisor zero",
+    "cost_measure": "decoded x86-64 per-function instruction bytes/instructions/divisions, never CLIF cost or whole-AOT size",
+    "savings": {
+      "decoded_instruction_bytes": 15,
+      "decoded_instruction_count": 5,
+      "static_division_instructions": 1
+    },
+    "status": "static saving only, no proven representative throughput benefit"
+  },
+  "limitations": [
+    "Equal host POSIX si_code and mapped fault RIP do not establish Wasmtime trap tables, guest-visible trap code, catchability, source-map metadata or source locations.",
+    "Identical native fault offsets in observed fixtures are not guaranteed after layout or target changes.",
+    "No machine-ISA-wide, compiler-pass, SSA dominance, register-liveness, trap metadata, flags, poison/UB, register-allocation or cross-target proof.",
+    "No representative runtime profitability, whole-module/AOT reduction or upstream submission.",
+    "Do not claim a newly synthesized result; a human-authored compiler prototype remains under qualification."
+  ],
+  "repo_changes": "Two experimental-branch commits plus this persistent evidence record; no ZenoFCIS main/release branch or Bytecode Alliance upstream modification; existing research PR #175 remains draft."
+}
