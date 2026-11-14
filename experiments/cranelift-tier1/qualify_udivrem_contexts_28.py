@@ -65,6 +65,27 @@ i64.xor
     "intervening_load": wat(DIV + "i32.const 0\ni64.load\ni64.add\n" + REM + ROT + XOR, "  (memory 1)\n"),
     "branch": wat("local.get $x\ni64.const 1\ni64.and\ni64.eqz\nif (result i64)\n" +
                   DIV + REM + ROT + XOR + "else\n" + DIV + REM + ROT + XOR + "end\n"),
+    # Both quotient/remainder pairs stay live through two distinct computation
+    # chains. The second denominator wraps at u64::MAX, and must still trap.
+    "two_live_pairs": wat(
+        DIV + REM + ROT + XOR
+        + "local.get $x\ni64.const 1\ni64.add\n"
+        + "local.get $y\ni64.const 1\ni64.add\ni64.div_u\n"
+        + "local.get $x\ni64.const 1\ni64.add\n"
+        + "local.get $y\ni64.const 1\ni64.add\ni64.rem_u\n"
+        + ROT + XOR + XOR),
+    # No path evaluates both operators: cross-basic-block pairing is unsound.
+    "exclusive_branches": wat(
+        "local.get $x\ni64.const 1\ni64.and\ni64.eqz\n"
+        "if (result i64)\n" + DIV + "else\n" + REM + "end\n"),
+    # Both results survive unrelated integer operations and remain separately
+    # observable. Local declarations are required before the first instruction.
+    "long_lived_results": wat(
+        "(local $q i64) (local $r i64)\n" + DIV + "local.set $q\n"
+        + REM + "local.set $r\n"
+        + "local.get $q\nlocal.get $x\ni64.const 13\ni64.rotl\ni64.xor\n"
+        + "local.get $y\ni64.const 7\ni64.rotr\ni64.xor\n"
+        + "local.get $r\n" + ROT + XOR),
 }
 
 def hash_bytes(b):
@@ -99,6 +120,18 @@ def oracle(name, x, y):
     if not uy or (name == "swapped_rem_inputs" and not ux):
         return None
     q, r = divmod(ux, uy)
+    if name == "two_live_pairs":
+        shifted_y = (uy + 1) & MASK
+        if shifted_y == 0:
+            return None  # second udiv traps despite nonzero original y
+        q2, r2 = divmod((ux + 1) & MASK, shifted_y)
+        return signed((q ^ rotation(r)) ^ (q2 ^ rotation(r2)), 64)
+    if name == "exclusive_branches":
+        return signed(q if (ux & 1) == 0 else r, 64)
+    if name == "long_lived_results":
+        x_rot13 = ((ux << 13) | (ux >> 51)) & MASK
+        y_ror7 = ((uy >> 7) | (uy << 57)) & MASK
+        return signed(q ^ x_rot13 ^ y_ror7 ^ rotation(r), 64)
     if name == "quotient_only":
         return signed(q, 64)
     if name == "remainder_only":
@@ -116,6 +149,7 @@ def vectors():
     seed = list(zip(xs, ys)) + [(0, 0), (1, 0), (MIN, -1), (MIN, 1),
         (MAX, MAX), (-1, -1), (1, 1), (-1, 1), (1 << 32, 1 << 32)]
     rng = random.Random(0x56232026)
+    seed.extend([(-1, -1), (1, -1), (0, -1), (MIN, -1), (MAX, -1), (-1, 1)])
     seed.extend((signed(rng.getrandbits(64), 64),
                  signed(rng.getrandbits(64), 64)) for _ in range(16))
     return tuple(dict.fromkeys(seed))
@@ -180,7 +214,8 @@ def qualify(baseline, patched, output):
         if name == "adjacent" and (b, p) != (2, 1):
             raise AssertionError("no positive adjacent-pair fusion")
         if name in ("reverse_order", "swapped_rem_inputs", "quotient_only",
-                    "remainder_only", "signed_64", "signed_32", "unsigned_32") and b != p:
+                    "remainder_only", "signed_64", "signed_32", "unsigned_32",
+                    "exclusive_branches") and b != p:
             raise AssertionError("incorrect out-of-scope fusion: " + name)
         items[name] = {"wat_sha256": hash_bytes(source.encode()),
                        "results": variants, "static_div_savings": b - p}
