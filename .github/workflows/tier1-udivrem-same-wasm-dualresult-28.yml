@@ -10,6 +10,8 @@ on:
       - 'experiments/cranelift-tier1/guest_trap_metadata_28.rs'
       - 'experiments/cranelift-tier1/audit_guest_trap_metadata_28.py'
       - 'experiments/cranelift-tier1/audit_udivrem_context_stress_28.py'
+      - 'experiments/cranelift-tier1/guest_second_trap_28.rs'
+      - 'experiments/cranelift-tier1/audit_second_trap_28.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -32,6 +34,8 @@ jobs:
           python3 -B experiments/cranelift-tier1/audit_guest_trap_metadata_28.py --self-test
           python3 -m py_compile experiments/cranelift-tier1/audit_udivrem_context_stress_28.py
           python3 -B experiments/cranelift-tier1/audit_udivrem_context_stress_28.py --self-test
+          python3 -m py_compile experiments/cranelift-tier1/audit_second_trap_28.py
+          python3 -B experiments/cranelift-tier1/audit_second_trap_28.py --self-test
   identical-wasm-two-compilers:
     needs: source-controls
     runs-on: ubuntu-24.04
@@ -67,6 +71,8 @@ jobs:
           sys.path.insert(0,'experiments/cranelift-tier1')
           from qualify_udivrem_source_palette_28 import WATS
           Path('tier1-dual-same-wasm/input.wat').write_text(WATS['direct'])
+          from qualify_udivrem_contexts_28 import CASES
+          Path('tier1-dual-same-wasm/two-live-pairs.wat').write_text(CASES['two_live_pairs'])
           PY
           cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump >tier1-dual-same-wasm/baseline-build.stdout 2>tier1-dual-same-wasm/baseline-build.stderr
           cp upstream/target/debug/wasmtime tier1-dual-same-wasm/baseline/wasmtime
@@ -82,6 +88,16 @@ jobs:
             -- tier1-dual-same-wasm/input.wat > tier1-dual-same-wasm/baseline-guest-trap-api.txt
           rm upstream/crates/wasmtime/examples/tier1_guest_trap_metadata_28.rs
           test -z "$(git -C upstream status --porcelain)"
+      - name: Pristine compiler: check guest trap sites for first and wrapped second divisor
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp experiments/cranelift-tier1/guest_second_trap_28.rs upstream/crates/wasmtime/examples/tier1_second_trap_28.rs
+          cargo run --locked --manifest-path upstream/Cargo.toml -p wasmtime \
+            --example tier1_second_trap_28 --no-default-features \
+            --features anyhow,backtrace,cranelift,runtime,wat \
+            -- tier1-dual-same-wasm/two-live-pairs.wat > tier1-dual-same-wasm/baseline-second-trap-api.txt
+          rm upstream/crates/wasmtime/examples/tier1_second_trap_28.rs
       - name: Patch only disposable compiler and build experimental Wasmtime
         shell: bash
         run: |
@@ -102,6 +118,16 @@ jobs:
             --features anyhow,backtrace,cranelift,runtime,wat \
             -- tier1-dual-same-wasm/input.wat > tier1-dual-same-wasm/patched-guest-trap-api.txt
           rm upstream/crates/wasmtime/examples/tier1_guest_trap_metadata_28.rs
+      - name: Patched compiler: check guest trap sites for first and wrapped second divisor
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp experiments/cranelift-tier1/guest_second_trap_28.rs upstream/crates/wasmtime/examples/tier1_second_trap_28.rs
+          cargo run --locked --manifest-path upstream/Cargo.toml -p wasmtime \
+            --example tier1_second_trap_28 --no-default-features \
+            --features anyhow,backtrace,cranelift,runtime,wat \
+            -- tier1-dual-same-wasm/two-live-pairs.wat > tier1-dual-same-wasm/patched-second-trap-api.txt
+          rm upstream/crates/wasmtime/examples/tier1_second_trap_28.rs
       - name: Audit two compilers against identical Wasm, real code bytes, arithmetic and traps
         shell: bash
         run: |
@@ -127,6 +153,11 @@ jobs:
           set -euo pipefail
           python3 -B experiments/cranelift-tier1/audit_udivrem_context_stress_28.py \
             --out tier1-dual-same-wasm
+      - name: Audit exact guest arithmetic and two distinct original-Wasm trap offsets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/audit_second_trap_28.py --out tier1-dual-same-wasm
       - name: Archive exact WAT, binaries, source diff and all receipts even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -140,5 +171,7 @@ jobs:
             experiments/cranelift-tier1/guest_trap_metadata_28.rs
             experiments/cranelift-tier1/audit_guest_trap_metadata_28.py
             experiments/cranelift-tier1/audit_udivrem_context_stress_28.py
+            experiments/cranelift-tier1/guest_second_trap_28.rs
+            experiments/cranelift-tier1/audit_second_trap_28.py
           retention-days: 30
           if-no-files-found: warn
