@@ -1,0 +1,128 @@
+{
+  "schema": "zenofcis/tier1-udivrem-context-stress-independent-checkpoint/1",
+  "date_utc": "2026-11-14",
+  "status": "qualified-finite-x86_64-only-not-upstream-ready",
+  "source": {
+    "zenofcis_executable_ci_commit": "a1e05e0618bbfab05dcef7edc2f363d240bcd159",
+    "isolated_branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "zenofcis_main_inspected": "4160086fb9d19f3ebe25047e69b1caa467aa74fd",
+    "zenofcis_release_2_7_inspected": "5738b7a2a0313b56f71cbc2d3a74b602da4b813e",
+    "wasmtime_compiler_source": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "wasmtime_main_inspected": "c52bc6d8fc7ebf2ba3f7e39ab3203a3c13c1d272",
+    "target": "x86-64 Linux, WebAssembly i64 unsigned division/remainder; explicit zero-divisor traps",
+    "compiler_settings": "Pinned Wasmtime 51.0.0-dev, speed_and_size; baseline/experimental built separately from identical WAT",
+    "compiler_binary_sha256": {
+      "baseline": "a2dd8ba4b12fd86bf0c4aeca76d543bc4f57ae067a215749a6ef5350aeb41c3c",
+      "patched": "ab2fbe4db027dc51d9b1c16bba5ea39d1006e94cf5213b099751002e3e0e05eb"
+    }
+  },
+  "ci": {
+    "run_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43609235482",
+    "run_id": 43609235482,
+    "source_controls": "passed",
+    "baseline_patched_compiler_and_wasmtime_guest_api": "passed",
+    "independent_context_archive_auditor": "passed",
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43609235482/artifacts/14119364697",
+    "artifact_id": 14119364697,
+    "original_artifact_sha256": "3f4c22d97587a56b64b109767b5e7038dfe4a578dfa8194861cedb12be63c616",
+    "context_qualification_sha256": "0c40fe57f5d7d9fb129e1b51a003fc35322b0e560bbaff616707c11395c97fd6"
+  },
+  "contract": {
+    "kind": "same-WAT compiler A/B, bounded adjacent same-SSA-operands i64 udiv then urem to one two-result opcode, x86-64 only",
+    "domain": "unsigned 64-bit bit patterns, y!=0 with quotient/remainder; y==0 must trap. Derived second denominator (y+1) wraps and must trap when original y == UINT64_MAX",
+    "signedness": "unsigned division and remainder only; separately checked signed-division controls are out of scope",
+    "overflow": "64-bit wrapping additions for derived operands, neither compiler is permitted to silently remove observable division traps",
+    "poison_or_undefined": "WebAssembly integer operations in selected fixtures have no admitted LLVM poison; machine-state flags, register liveness, and generic Cranelift pass safety are not globally proved",
+    "comparison_scope": "decoded x86-64 static instruction bytes and counts for each wasm function, not CLIF operation cost, whole-AOT size benefit, latency or throughput"
+  },
+  "qualification": {
+    "contexts": 14,
+    "finite_vectors_per_context_per_compiler": 40,
+    "total_reported_finite_wasmtime_executions": 1120,
+    "independent_auditor_native_replays_in_ci": 54,
+    "independent_second_environment_native_replays": 54,
+    "independent_second_environment_value_calls": 44,
+    "independent_second_environment_trap_calls": 10,
+    "independent_archive_sha256_checked_against_github": true,
+    "independent_disassembly_and_aot_hash_checks": "all 14 contexts x both compilers; static instructions, divisions and decoded bytes recounted separately",
+    "guest_trap_code_and_wasm_origin_offset_audit": "passed for original same-WAT primary fixture, not a complete internal trap-map proof"
+  },
+  "measured_cases": {
+    "two_live_pairs": {
+      "wat_sha256": "763d99565f7ec0530db081209bd6cea968a2bdcf58deb84b690209394cba634d",
+      "baseline_aot_sha256": "93488250bbf60ef19a62a0de96f571ae6b97597ee5632c4b7492b3f09692d21b",
+      "patched_aot_sha256": "3667f7d8247ecc6ff29fc906f22aa79222d152a12892e72f6e1865517bb601da",
+      "decoded_native_bytes": [
+        97,
+        73
+      ],
+      "native_instructions": [
+        31,
+        24
+      ],
+      "static_unsigned_divisions": [
+        4,
+        2
+      ],
+      "whole_aot_bytes": [
+        13608,
+        13608
+      ],
+      "finite_traps_per_compiler": 9,
+      "comment": "two independently derived quotient/remainder pairs; second denominator wrapping to zero remains a trap"
+    },
+    "long_lived_results": {
+      "wat_sha256": "6bac213185462eb1bae7b47a6982948ba86827d5a38c41474fed57d9464ccecf",
+      "baseline_aot_sha256": "ccaca95eb307972cdbb4ac0f5d5117e46e64487160ae9afe02e062c7673935f3",
+      "patched_aot_sha256": "f69ed97d40a0d0c637c2779e16efc05d81ad57960dd755d028650d1b73b7122a",
+      "decoded_native_bytes": [
+        57,
+        42
+      ],
+      "native_instructions": [
+        20,
+        15
+      ],
+      "static_unsigned_divisions": [
+        2,
+        1
+      ],
+      "whole_aot_bytes": [
+        13608,
+        13608
+      ],
+      "finite_traps_per_compiler": 4
+    },
+    "exclusive_branches": {
+      "wat_sha256": "297c7480253be378f8ee05f2c7436c840c8eec9d5de59b3a85d6de6661bafcad",
+      "baseline_aot_sha256": "0cbabacbba622a71b8c55de32744571551639ee62038a6d22c740fa5006b476f",
+      "patched_aot_sha256": "0cbabacbba622a71b8c55de32744571551639ee62038a6d22c740fa5006b476f",
+      "decoded_native_bytes": [
+        45,
+        45
+      ],
+      "native_instructions": [
+        14,
+        14
+      ],
+      "static_unsigned_divisions": [
+        2,
+        2
+      ],
+      "whole_aot_bytes": [
+        13608,
+        13608
+      ],
+      "finite_traps_per_compiler": 4,
+      "comment": "control case with quotient/remainder on mutually exclusive branches; experimental combiner made no change here"
+    }
+  },
+  "limitations": [
+    "These are human-authored test contexts for an existing human-authored experimental pass, not new sequences discovered by the ZenoFCIS enumerator.",
+    "Finite original Wasmtime executions and independent native replays do not establish full 64-bit SMT proof, SSA/dominance/register-allocation correctness for arbitrary functions, flag/poison safety, or all-target correctness.",
+    "Compiler-pass and internal trap-table integrity require independent review; trap API and original-Wasm offsets were checked only for a narrow primary case.",
+    "Savings are static decoded x86-64 native instruction bytes; the whole AOT remains unchanged in these contexts, and representative runtime profitability is not established.",
+    "No Bytecode Alliance upstream PR or main/release branch mutation was made."
+  ],
+  "next": "Prioritize compiler integration correctness (SSA/dominance/register-liveness/trap table), then representative workload profitability and a truly ZenoFCIS-discovered alternative before considering upstream submission."
+}
