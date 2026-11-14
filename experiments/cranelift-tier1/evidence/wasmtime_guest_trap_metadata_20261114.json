@@ -1,0 +1,78 @@
+{
+  "schema": "zenofcis/tier1-wasmtime-guest-trap-metadata-independent-archive-audit/1",
+  "date_utc": "2026-11-14",
+  "status": "passed-narrow-guest-visible-trap-code-and-wasm-backtrace-source-offset-check",
+  "source": {
+    "zenofcis_branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "zenofcis_ci_commit": "9c8020bef9fafaf115d0c0b7e35c322168bc3e00",
+    "main_inspected": "4160086fb9d19f3ebe25047e69b1caa467aa74fd",
+    "release_2_7_inspected": "5738b7a2a0313b56f71cbc2d3a74b602da4b813e",
+    "wasmtime_compiler": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "upstream_main_inspected": "c52bc6d8fc7ebf2ba3f7e39ab3203a3c13c1d272",
+    "target": "x86-64 Linux, Wasmtime API, opt_level=speed_and_size, generate_address_map=true",
+    "wat_sha256": "28498a86ecb6e00bd5968ee94ee001f3fa42cfa2b0a5cc9f43342c0a5c7231c3",
+    "guest_probe_sha256": "02f3942d5d1d03fab1fee38da3c33adf3405f46a3ec498d844804dac352352e8",
+    "guest_auditor_sha256": "d300564d29845cf3673999bba5c6e9f67dd987dce56595564e7ab6f37480f1b0",
+    "compiler_patch_sha256": "996f8914159321b3e522978898cb2572c6efaf2bb7b701abc9b1f686e41e2570"
+  },
+  "ci": {
+    "run_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43581441610",
+    "run_id": 43581441610,
+    "source_controls": "success",
+    "identical_wasm_two_compilers": "success",
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43581441610/artifacts/14108722075",
+    "artifact_id": 14108722075,
+    "artifact_zip_sha256": "ed943e47cf3f2e2bdc10ab4f7405de46255a9a15633cdd0aa513e637af73476e",
+    "guest_metadata_receipt_sha256": "4eab57164a9ad5f797b214fcb95111a0c71acc06babdd8e2e12d4afd3d5e41de"
+  },
+  "observed": {
+    "identical_wat_source": true,
+    "guest_api_valid_inputs_per_compiler": 10,
+    "guest_api_divide_by_zero_traps_per_compiler": 5,
+    "guest_trap_kind": "wasmtime::Trap::IntegerDivisionByZero",
+    "guest_backtrace_frames": 1,
+    "guest_backtrace_function_index": 0,
+    "guest_backtrace_func_offset": 5,
+    "guest_backtrace_module_offset": 40,
+    "original_vs_patched_values_equal": true,
+    "original_vs_patched_guest_trap_code_equal": true,
+    "original_vs_patched_guest_source_offsets_equal": true,
+    "native_positive_case": {
+      "baseline_decoded_x86_instruction_bytes_through_ret": 43,
+      "patched_decoded_x86_instruction_bytes_through_ret": 25,
+      "bytes_saved": 18,
+      "baseline_instructions": 16,
+      "patched_instructions": 10,
+      "baseline_static_divs": 2,
+      "patched_static_divs": 1,
+      "elf_text_bytes_saved": 0,
+      "whole_aot_bytes_saved": 0,
+      "semantics": "unsigned-i64 quotient XOR rol64(unsigned-i64 remainder,17); zero divisor traps"
+    },
+    "supplementary_finite_cli_values_per_compiler": 51,
+    "supplementary_finite_cli_trap_per_compiler": 1,
+    "context_control_cases": 11,
+    "context_control_vectors_per_case_per_compiler": 38
+  },
+  "independent_archive_audit": {
+    "status": "passed",
+    "method": "Downloaded exact CI artifact and SHA-256 validated against GitHub digest; reopened both compiler binaries and AOT objects, rehashed all against qualification and guest-metadata receipts, rehashed same WAT, probe and auditor; independently parsed both disassemblies to count x86 opcode bytes/instructions/divs; checked guest trap/value equivalence and source offsets; extracted both exact Wasmtime/AOT binaries and re-executed ten values and five zero-divisor cases per compiler on a separate x86-64 Linux container.",
+    "independently_reexecuted_value_calls": 20,
+    "independently_reexecuted_guest_traps": 10,
+    "matched_value_calls": 20,
+    "matched_divide_by_zero_traps": 10,
+    "mismatch_count": 0,
+    "local_reexecution_trap_exit_code": 134,
+    "separate_local_reexecution_qualifier": "CLI stderr 'wasm trap: integer divide by zero' and original-Wasm backtrace 0x28; API classification and offsets were checked by CI Rust probe, not rerun independently with a separate Rust build",
+    "x86_instruction_byte_recount": "baseline 43 bytes/16 instructions/2 divisions; patched 25 bytes/10 instructions/1 division"
+  },
+  "limitations": [
+    "This establishes finite guest-visible Wasmtime API Trap classification and original-Wasm backtrace offsets for the same direct WAT fixture, not proof of internal compiled trap-table entries, native fault PCs or all source locations.",
+    "Compiler optimizer SSA/liveness/flags, poison/UB, register allocation, all target assumptions and full compiler-pass safety have not been proved.",
+    "The patched compiler is in a disposable checkout; no Bytecode Alliance upstream branch was modified.",
+    "The same-WAT x86-64 per-function static cost reduction does not imply whole-AOT savings, runtime throughput or representative workload profitability.",
+    "This is a human-authored experimental dual-result udivrem pass, not a new instruction sequence discovered through ZenoFCIS search.",
+    "The previously demonstrated narrow ZenoFCIS search, semantic-check and receipt catalog readiness is separate from upstream production-readiness of this candidate."
+  ],
+  "next": "Qualify correct internal Wasmtime trap maps and compiler-pass SSA/regalloc safety across effectful contexts; then evaluate representative workloads before any upstream submission."
+}
