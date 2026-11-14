@@ -7,6 +7,8 @@ on:
       - 'experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py'
       - 'experiments/cranelift-tier1/install_udivrem_combiner_28.py'
       - 'experiments/cranelift-tier1/qualify_udivrem_contexts_28.py'
+      - 'experiments/cranelift-tier1/guest_trap_metadata_28.rs'
+      - 'experiments/cranelift-tier1/audit_guest_trap_metadata_28.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,6 +28,7 @@ jobs:
           set -euo pipefail
           python3 -m py_compile experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py experiments/cranelift-tier1/install_udivrem_combiner_28.py experiments/cranelift-tier1/qualify_udivrem_contexts_28.py
           python3 -B experiments/cranelift-tier1/install_udivrem_combiner_28.py --self-test
+          python3 -B experiments/cranelift-tier1/audit_guest_trap_metadata_28.py --self-test
   identical-wasm-two-compilers:
     needs: source-controls
     runs-on: ubuntu-24.04
@@ -64,6 +67,18 @@ jobs:
           PY
           cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump >tier1-dual-same-wasm/baseline-build.stdout 2>tier1-dual-same-wasm/baseline-build.stderr
           cp upstream/target/debug/wasmtime tier1-dual-same-wasm/baseline/wasmtime
+      - name: Check pristine compiler's actual guest Trap and WasmBacktrace metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p upstream/crates/wasmtime/examples
+          cp experiments/cranelift-tier1/guest_trap_metadata_28.rs upstream/crates/wasmtime/examples/tier1_guest_trap_metadata_28.rs
+          cargo run --locked --manifest-path upstream/Cargo.toml -p wasmtime \
+            --example tier1_guest_trap_metadata_28 --no-default-features \
+            --features anyhow,backtrace,cranelift,runtime,wat \
+            -- tier1-dual-same-wasm/input.wat > tier1-dual-same-wasm/baseline-guest-trap-api.txt
+          rm upstream/crates/wasmtime/examples/tier1_guest_trap_metadata_28.rs
+          test -z "$(git -C upstream status --porcelain)"
       - name: Patch only disposable compiler and build experimental Wasmtime
         shell: bash
         run: |
@@ -73,12 +88,28 @@ jobs:
           test -s tier1-dual-same-wasm/compiler.patch
           cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump >tier1-dual-same-wasm/patched-build.stdout 2>tier1-dual-same-wasm/patched-build.stderr
           cp upstream/target/debug/wasmtime tier1-dual-same-wasm/patched/wasmtime
+      - name: Check patched compiler's actual guest Trap and WasmBacktrace metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p upstream/crates/wasmtime/examples
+          cp experiments/cranelift-tier1/guest_trap_metadata_28.rs upstream/crates/wasmtime/examples/tier1_guest_trap_metadata_28.rs
+          cargo run --locked --manifest-path upstream/Cargo.toml -p wasmtime \
+            --example tier1_guest_trap_metadata_28 --no-default-features \
+            --features anyhow,backtrace,cranelift,runtime,wat \
+            -- tier1-dual-same-wasm/input.wat > tier1-dual-same-wasm/patched-guest-trap-api.txt
+          rm upstream/crates/wasmtime/examples/tier1_guest_trap_metadata_28.rs
       - name: Audit two compilers against identical Wasm, real code bytes, arithmetic and traps
         shell: bash
         run: |
           set -euo pipefail
           python3 -B experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py --mode collect --out tier1-dual-same-wasm --source tier1-dual-same-wasm/input.wat
           python3 -B experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py --mode audit --out tier1-dual-same-wasm --source tier1-dual-same-wasm/input.wat
+      - name: Independently audit guest trap code and original-Wasm source offsets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/audit_guest_trap_metadata_28.py --out tier1-dual-same-wasm
       - name: Finite same-Wasm context and out-of-scope negative controls
         shell: bash
         run: |
@@ -97,5 +128,7 @@ jobs:
             experiments/cranelift-tier1/install_udivrem_combiner_28.py
             experiments/cranelift-tier1/qualify_same_wasm_dualresult_28.py
             experiments/cranelift-tier1/qualify_udivrem_contexts_28.py
+            experiments/cranelift-tier1/guest_trap_metadata_28.rs
+            experiments/cranelift-tier1/audit_guest_trap_metadata_28.py
           retention-days: 30
           if-no-files-found: warn
