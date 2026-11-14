@@ -75,12 +75,12 @@ def expected(case: str, x: int, y: int) -> int | None:
 def native_counts(disasm: str) -> dict:
     # CLI objdump's 12-space-prefixed decoded x86 instruction rows.
     rows = [line for line in disasm.splitlines()
-            if re.match(r"^ {12}[0-9a-fA-F]{2}(?:\\s|$)", line)]
+            if re.match(r"^ {12}[0-9a-fA-F]{2}(?:\s|$)", line)]
     if not rows:
         raise ValueError("no decodable instruction lines")
     return {
         "decoded_instructions": len(rows),
-        "static_divisions": sum(bool(re.search(r"\\b(?:idiv|div)(?:q|l)?\\b", line))
+        "static_divisions": sum(bool(re.search(r"\b(?:idiv|div)(?:q|l)?\b", line))
                                 for line in rows),
     }
 
