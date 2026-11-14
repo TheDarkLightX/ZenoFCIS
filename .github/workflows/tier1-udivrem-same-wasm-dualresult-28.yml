@@ -88,7 +88,7 @@ jobs:
             -- tier1-dual-same-wasm/input.wat > tier1-dual-same-wasm/baseline-guest-trap-api.txt
           rm upstream/crates/wasmtime/examples/tier1_guest_trap_metadata_28.rs
           test -z "$(git -C upstream status --porcelain)"
-      - name: Pristine compiler: check guest trap sites for first and wrapped second divisor
+      - name: "Pristine compiler - check guest trap sites for first and wrapped second divisor"
         shell: bash
         run: |
           set -euo pipefail
@@ -118,7 +118,7 @@ jobs:
             --features anyhow,backtrace,cranelift,runtime,wat \
             -- tier1-dual-same-wasm/input.wat > tier1-dual-same-wasm/patched-guest-trap-api.txt
           rm upstream/crates/wasmtime/examples/tier1_guest_trap_metadata_28.rs
-      - name: Patched compiler: check guest trap sites for first and wrapped second divisor
+      - name: "Patched compiler - check guest trap sites for first and wrapped second divisor"
         shell: bash
         run: |
           set -euo pipefail
