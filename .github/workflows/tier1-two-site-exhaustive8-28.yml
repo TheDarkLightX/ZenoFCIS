@@ -1,0 +1,40 @@
+name: tier1-two-site-exhaustive8-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-two-site-exhaustive8-28.yml'
+      - 'experiments/cranelift-tier1/tier1_two_site_exhaustive8_28.py'
+      - 'experiments/cranelift-tier1/qualify_udivrem_contexts_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exhaustive-two-site-model:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Exhaust all 65536 narrow-domain inputs with independent algorithms and fault witnesses
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/tier1_two_site_exhaustive8_28.py > tier1-two-site-exhaustive8.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open('tier1-two-site-exhaustive8.json'))
+          assert r['result']=='passed-exhaustive-8-bit-model'
+          assert r['all_input_pairs']==65536
+          assert r['case_counts']=={'value':65024,'trap:first':256,'trap:second':256}
+          assert len(r['negative_mutation_witnesses'])==4
+          print('Source-WAT-pinned exhaustive small-domain verification and four mutations passed')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tier1-two-site-exhaustive8-28
+          path: tier1-two-site-exhaustive8.json
+          retention-days: 30
+          if-no-files-found: warn
