@@ -1,0 +1,64 @@
+{
+  "schema": "zenofcis/tier1-independent-two-site-archive-replay/1",
+  "status": "passed-independent-archive-recompile-and-finite-replay",
+  "source_tested": {
+    "zenofcis": "354f3f14338c69b65d1d131b366c870f87d4e42e",
+    "wasmtime": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "input_wat_sha256": "763d99565f7ec0530db081209bd6cea968a2bdcf58deb84b690209394cba634d"
+  },
+  "ci": {
+    "run_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43644159249",
+    "conclusion": "success",
+    "artifact_id": 14132584599,
+    "artifact_sha256": "44e1d1d9389858f1eae2ab751574503eb4674d59e4cbe1211251ffdd15627f07",
+    "artifact_zip_size_bytes": 32258524,
+    "both_jobs_passed": true
+  },
+  "independent_replay": {
+    "environment": "Linux 6.18.57 x86_64 glibc 2.41; Python 3.13.5",
+    "method": "Downloaded original CI ZIP; verified SHA256; extracted prebuilt pinned baseline and modified Wasmtime CLI compilers; recompiled exact same WAT to fresh AOTs with x86_64-unknown-linux target; required byte-identical AOT and disassembly against CI archive; independently enumerated decoded native bytes and division instructions; independently evaluated finite arithmetic with Python divmod and wrap/rotate semantics, compared 8 values and 7 distinct-site traps per compiler; replayed original source-pinned audit (positive and eight mutation controls) and compared its JSON byte-for-byte.",
+    "original_auditor_status": "passed-finite-identical-WAT-two-distinct-original-Wasm-trap-sites",
+    "original_auditor_byte_identical_replay": true,
+    "local_replay_program_sha256": "15192657f0b7b654c1c4e336cf5f1dcc8842d4fecdd70443894243a40cd614d0",
+    "local_replay_result_sha256": "4ac919c954a7e26bf0553aacafe2f2792846e983fa1efe01a1ef3b08ba8292d1",
+    "modes": {
+      "baseline": {
+        "cli_sha256": "a2dd8ba4b12fd86bf0c4aeca76d543bc4f57ae067a215749a6ef5350aeb41c3c",
+        "fresh_aot_sha256": "93488250bbf60ef19a62a0de96f571ae6b97597ee5632c4b7492b3f09692d21b",
+        "aot_bytes": 13608,
+        "decoded_native_function_bytes": 97,
+        "instructions": 31,
+        "static_divisions": 4,
+        "finite_values_checked": 8,
+        "guest_zero_division_traps_checked": 7
+      },
+      "patched": {
+        "cli_sha256": "ab2fbe4db027dc51d9b1c16bba5ea39d1006e94cf5213b099751002e3e0e05eb",
+        "fresh_aot_sha256": "3667f7d8247ecc6ff29fc906f22aa79222d152a12892e72f6e1865517bb601da",
+        "aot_bytes": 13608,
+        "decoded_native_function_bytes": 73,
+        "instructions": 24,
+        "static_divisions": 2,
+        "finite_values_checked": 8,
+        "guest_zero_division_traps_checked": 7
+      }
+    },
+    "original_wasm_guest_trap_module_offsets": {
+      "first": 40,
+      "second": 60
+    },
+    "delta": {
+      "decoded_native_function_bytes_saved": 24,
+      "static_divisions_removed": 2,
+      "whole_aot_bytes_saved": 0
+    }
+  },
+  "assurance_limits": [
+    "This audit reuses exact precompiled experimental compilers; it independently reruns their emitted-code and guest-execution results but does not independently rebuild compilers from source.",
+    "AOT hash equality, native bytes, and finite guest traps are not a formal proof of Cranelift pass, SSA, dominance, liveness, trap metadata table, target-state, flag or poison correctness.",
+    "Unsigned i64 arithmetic only; signed overflow not part of the selected admissible semantics; no global compiler or cross-target claim.",
+    "No ZenoFCIS-new instruction discovery, runtime throughput improvement, or whole-AOT reduction is established.",
+    "The archive digest is a source/artifact integrity reference, not a guarantee of correctness."
+  ],
+  "followup": "Review actual compiler-pass IR verification and trap-table mapping; test full backend and nonmatching cases before upstream proposal. Keep experimental branch draft."
+}
