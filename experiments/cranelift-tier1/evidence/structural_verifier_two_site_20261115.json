@@ -1,0 +1,78 @@
+{
+  "schema": "zenofcis/tier1-structural-verifier-two-site-bitserial/1",
+  "date_utc": "2026-11-15",
+  "status": "qualified-narrow-pinned-experiment-not-upstream-ready",
+  "isolation": {
+    "repo": "TheDarkLightX/ZenoFCIS",
+    "branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "first_verifier_change": "d490675f0746048d334d874e39b663f59c08bd84",
+    "exhaustive_checker_commit": "17a09a38ecea2a0edb631dde3b0050dee445d36a",
+    "hosted_model_ci_commit": "8ea018d2699e517eabdbef696a53077dcc967c56",
+    "main_inspected": "4160086fb9d19f3ebe25047e69b1caa467aa74fd",
+    "release_2_7_inspected": "5738b7a2a0313b56f71cbc2d3a74b602da4b813e",
+    "wasmtime_source": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "branch_or_upstream_merge": false
+  },
+  "structural_verification": {
+    "source": "experiments/cranelift-tier1/install_udivrem_combiner_28.py",
+    "change": "After the adjacent same-block i64 unsigned division/remainder fusion on x86_64, call Context::verify(isa) unconditionally instead of verify_if(isa) gated by enable_verifier. Fail compiler compilation on structural-verifier errors.",
+    "upstream_verifier_source": "cranelift/codegen/src/verifier/mod.rs",
+    "checked_properties": "Cranelift verification of existing/defined SSA values, dominance, result arity, type constraints, block integrity, CFG and dominator consistency; not semantic equivalence of machine code or target states.",
+    "real_build_test_results": [
+      {
+        "ci": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43698912588",
+        "result": "success",
+        "jobs": [
+          "source-controls",
+          "identical-clif-baseline-vs-patched"
+        ],
+        "artifact_id": 14155946071,
+        "github_artifact_sha256": "49e7d358bd043603493f5ea10d505f197db5561aaf997c7701c753bddc3dfdb3"
+      },
+      {
+        "ci": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43698912579",
+        "result": "success",
+        "jobs": [
+          "source-controls",
+          "identical-wasm-two-compilers"
+        ],
+        "artifact_id": 14156200001,
+        "github_artifact_sha256": "402ad0024c0319919335f0d9ea76f3cf388f8139dde8a3b2bb0d1fcec61f7067"
+      }
+    ]
+  },
+  "exhaustive_scaled_model": {
+    "source": "experiments/cranelift-tier1/tier1_two_site_exhaustive8_28.py",
+    "script_sha256": "19955f5646fa53e4576383b75f598b703df12d5866be49f3dd710505bfa4c731",
+    "source_wat_sha256": "763d99565f7ec0530db081209bd6cea968a2bdcf58deb84b690209394cba634d",
+    "domain": "All 256x256 unsigned 8-bit x/y inputs of a width-scaled two-live-pair WAT semantics; bit-serial quotient/remainder candidate vs independent Python // and % reference",
+    "outcomes": {
+      "finite_values": 65024,
+      "first_divisor_traps": 256,
+      "second_derived_divisor_wraps_to_zero_traps": 256,
+      "total": 65536
+    },
+    "negative_controls": [
+      "wrong second divisor",
+      "wrong second trap site",
+      "reused old live remainder",
+      "forgot derived-operand bitwidth wrapping"
+    ],
+    "local": "Python 3.13 local exhaustive execution and four negative mutation controls passed",
+    "hosted": {
+      "ci": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43699318875",
+      "result": "success",
+      "artifact_id": 14155921555,
+      "github_artifact_sha256": "8cd271f364aa6a0ea825c4f6ef6ad4082c138da1d467377e2a1047ea7e9eeb00"
+    }
+  },
+  "existing_x64_cost_evidence": "Prior source-pinned identical-WAT two-live-pair native instruction bytes 97->73, divisions 4->2, whole-AOT 13608->13608; not re-proved here as novel or faster.",
+  "limits": [
+    "8-bit exhaustiveness cannot prove arbitrary unsigned 64-bit semantics or whole x86 lowering.",
+    "Unconditional Cranelift structural verification detects malformed CLIF/SSA/CFG; it does not prove transformation semantics, flags, undefined state, poison, all native trap-table/PC mappings or general compiler-pass soundness.",
+    "Current combined-div/rem candidate and compiler patch remain human-authored; no novel ZenoFCIS-synthesized instruction-discovery claim.",
+    "No general throughput or representative workload profitability; no upstream PR.",
+    "GitHub-reported artifact digest and CI success attest hosted run outputs, not an external security audit."
+  ],
+  "next": "Reconcile general trap metadata and target-state semantics with upstream VeriISLE limitations; independently test representative throughput and assess the upstream egraph reuse/cost risk before draft submission."
+}
