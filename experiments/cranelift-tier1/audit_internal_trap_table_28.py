@@ -219,7 +219,8 @@ def self_test() -> None:
     good += bytes([INTEGER_DIVISION_BY_ZERO, 0, 8])
     assert decode(good) == [(16, 7), (20, 7)]
     bad = [good[:-1], good + b"\0", b"", good[:4] + b"\0\0\0\0" + good[8:],
-           good[:8] + (17).to_bytes(4, "little") + good[12:]]
+           good[:12] + (1).to_bytes(4, "little") + good[16:],
+           good[:-2] + bytes([2, 8]), good[:-1] + b"\\0"]
     for candidate in bad:
         try:
             decode(candidate)
@@ -238,7 +239,7 @@ def self_test() -> None:
         pass
     else:
         raise AssertionError("missing DIV native evidence accepted")
-    print("independent Wasmtime trap-table decoder: positive and six negative controls passed")
+    print("independent Wasmtime trap-table decoder: positive and seven malformed-table controls passed")
 
 
 if __name__ == "__main__":
