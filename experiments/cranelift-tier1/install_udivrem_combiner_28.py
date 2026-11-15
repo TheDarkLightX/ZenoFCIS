@@ -27,7 +27,7 @@ AFTER='''        if opt_level != OptLevel::None {
         // EXPERIMENTAL: only x64 i64 adjacent unsigned div/rem with identical operands.
         if opt_level != OptLevel::None && isa.triple().architecture == Architecture::X86_64 {
             tier1_combine_adjacent_unsigned_divrem(&mut self.func);
-            self.verify_if(isa)?;
+            // Experimental qualification: verify SSA, dominance, types and CFG\n            // unconditionally, even when the compiler's enable_verifier flag\n            // is false. This does not prove semantic or trap-map equivalence.\n            self.verify(isa)?;
         }
 
         Ok(())
@@ -98,6 +98,7 @@ def self_test():
     original='a\n'+CALL+'b\nimpl Context {\nc\n'
     patched=patch_context(original)
     assert patched.count('udivrem(x, y)')==1 and 'clear_results(rinst)' in patched
+    assert 'self.verify(isa)?;' in patched and 'self.verify_if(isa)?;' not in patched
     negatives=[original.replace(CALL, ''), original.replace(CALL, CALL+CALL),
                original.replace('impl Context {',''), patched]
     for s in negatives:
@@ -131,7 +132,8 @@ def run(root,out):
         'modified_source_paths':sorted(replacements),
         'opt_gate':'x86_64 and opt_level != None',
         'match':'adjacent same-block udiv followed by urem, exact identical SSA operands, both i64',
-        'proof_status':'NOT proved as a compiler pass; finite execution and actual lowering required',
+        'structural_validation':'unconditional post-rewrite Context::verify(isa), even when enable_verifier=false',
+        'proof_status':'Verifier checks CLIF structural invariants, NOT semantic/trap-table equivalence or generic compiler-pass soundness',
     },indent=2,sort_keys=True)+'\n')
 
 def main():
