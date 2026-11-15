@@ -12,6 +12,7 @@ on:
       - 'experiments/cranelift-tier1/audit_udivrem_context_stress_28.py'
       - 'experiments/cranelift-tier1/guest_second_trap_28.rs'
       - 'experiments/cranelift-tier1/audit_second_trap_28.py'
+      - 'experiments/cranelift-tier1/audit_internal_trap_table_28.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -36,6 +37,8 @@ jobs:
           python3 -B experiments/cranelift-tier1/audit_udivrem_context_stress_28.py --self-test
           python3 -m py_compile experiments/cranelift-tier1/audit_second_trap_28.py
           python3 -B experiments/cranelift-tier1/audit_second_trap_28.py --self-test
+          python3 -m py_compile experiments/cranelift-tier1/audit_internal_trap_table_28.py
+          python3 -B experiments/cranelift-tier1/audit_internal_trap_table_28.py --self-test
   identical-wasm-two-compilers:
     needs: source-controls
     runs-on: ubuntu-24.04
@@ -158,6 +161,12 @@ jobs:
         run: |
           set -euo pipefail
           python3 -B experiments/cranelift-tier1/audit_second_trap_28.py --out tier1-dual-same-wasm
+      - name: Independently decode Wasmtime native trap table and audit exact DIV PCs
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v objcopy
+          python3 -B experiments/cranelift-tier1/audit_internal_trap_table_28.py --out tier1-dual-same-wasm
       - name: Archive exact WAT, binaries, source diff and all receipts even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -173,5 +182,6 @@ jobs:
             experiments/cranelift-tier1/audit_udivrem_context_stress_28.py
             experiments/cranelift-tier1/guest_second_trap_28.rs
             experiments/cranelift-tier1/audit_second_trap_28.py
+            experiments/cranelift-tier1/audit_internal_trap_table_28.py
           retention-days: 30
           if-no-files-found: warn
