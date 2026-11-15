@@ -1,0 +1,58 @@
+name: tier1-two-site-symbolic64-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-two-site-symbolic64-28.yml'
+      - 'experiments/cranelift-tier1/tier1_two_site_symbolic64_28.py'
+      - 'experiments/cranelift-tier1/install_udivrem_combiner_28.py'
+      - 'experiments/cranelift-tier1/install_udivrem_multivalue_28.py'
+      - 'experiments/cranelift-tier1/qualify_udivrem_contexts_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  conditional-trace-theorem:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Check script syntax and exact source pin
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/tier1_two_site_symbolic64_28.py
+          python3 - <<'PY'
+          import sys
+          sys.path.insert(0, "experiments/cranelift-tier1")
+          from tier1_two_site_symbolic64_28 import pins
+          assert len(pins()["installer_blobs"]) == 2
+          PY
+      - name: Install hash-pinned Z3 4.15.4
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/tier1-symbolic-z3"
+          "$RUNNER_TEMP/tier1-symbolic-z3/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+      - name: Check all-u64 conditional contracts, trap precedence and three mutants
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-two-site-symbolic64
+          git rev-parse HEAD > tier1-two-site-symbolic64/zenofcis-source-pin.txt
+          "$RUNNER_TEMP/tier1-symbolic-z3/bin/python" -B \
+            experiments/cranelift-tier1/tier1_two_site_symbolic64_28.py \
+            --timeout-ms 15000 --out tier1-two-site-symbolic64/receipt.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open('tier1-two-site-symbolic64/receipt.json'))
+          assert r["all_contract_obligations_proved"] and r["all_negative_mutants_found"]
+          assert len(r["checks"]) == 7 and len(r["negative_mutants"]) == 3
+          print("Qualified exact scoped conditional trace theorem")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tier1-two-site-symbolic64-28
+          path: tier1-two-site-symbolic64/
+          retention-days: 30
+          if-no-files-found: warn
