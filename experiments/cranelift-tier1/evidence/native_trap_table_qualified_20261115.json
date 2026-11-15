@@ -1,0 +1,43 @@
+{
+  "schema": "zenofcis/tier1-cranelift-native-trap-table-checkpoint/1",
+  "date_utc": "2026-11-15",
+  "status": "CI-passed-source-pinned-internal-trap-table-qualification",
+  "experiment_source_commit": "33b235d87057b5c57ce1ac65f9ef3507c1cf9501",
+  "branch": "research/2.8-tier1-cranelift-performance-20261102",
+  "wasmtime_source_commit": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "workflow": {
+    "run_id": 43764894051,
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43764894051",
+    "source_controls": "success",
+    "identical_wasm_two_compilers": "success",
+    "observed_log_line": "{\"status\": \"passed-exact-pc-division-trap-encoding-crosscheck\"}",
+    "archive_artifact_id": 14181392982,
+    "archive_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43764894051/artifacts/14181392982",
+    "archive_zip_sha256": "27288fdd3c4a5482922851f8445b17758c30ee4be21effc4eac73b9a335a545d"
+  },
+  "fixture": "two_live_pairs / identical WAT / x86_64-unknown-linux",
+  "checks": {
+    "source_validation": "Python syntax + positive trap-table fixture + seven malformed binary controls passed",
+    "aot_provenance": "Pristine and experimental pinned Wasmtime builds; original two_live_pairs WAT and compiler/AOT SHA-256 values checked against saved context receipts",
+    "binary_format": "Independent Python decoder of .wasmtime.traps: indexed 128-entry blocks, little-endian offsets, delta/flag ULEB tokens, explicit/default codes, monotonic native PCs",
+    "native_pc_equality": "All decoded IntegerDivisionByZero instruction PCs equal the Wasmtime objdump trap annotations and decoded x64 DIV instruction addresses within the function",
+    "expected_and_qualified_division_sites": {
+      "baseline": 4,
+      "experimental": 2
+    },
+    "guest_trap_precondition": "Previously saved two-site Wasmtime Trap and WasmBacktrace guest-offset receipt rechecked in workflow",
+    "archived_receipts": "Raw trap-table section dumps, full disassembly, compiler AOT/binaries and JSON receipt archived in CI artifact"
+  },
+  "prior_cost_evidence": {
+    "same_wat_context": "two-live-pair native instruction bytes baseline 97, patched 73, 4 to 2 divisions",
+    "measurement_kind": "decoded x86-64 native function instruction bytes; not CLIF, AOT footprint, or runtime speed",
+    "note": "Cost values are prior same-source fixture evidence, not a new runtime benchmark in the trap-table audit"
+  },
+  "assurance_boundary": [
+    "Checked exact encoded machine-PC trap entries for only the pinned x86-64 two-live-pair fixture, not a general Wasmtime trap-table theorem",
+    "Independent parser is implementation of documented pinned Wasmtime section layout, cross-checked against its own objdump annotations; not a proof of the Wasmtime decoder for all encodings",
+    "Does not prove full Rust compiler-pass semantic preservation, flags, register allocation, cross-target lowering or representative throughput",
+    "The optimization is human-authored, not a newly ZenoFCIS-synthesized discovery",
+    "No Bytecode Alliance upstream submission, ZenoFCIS main mutation, or release merge"
+  ]
+}
