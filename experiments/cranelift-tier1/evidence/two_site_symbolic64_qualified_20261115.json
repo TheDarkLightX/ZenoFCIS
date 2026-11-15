@@ -1,0 +1,63 @@
+{
+  "schema": "zenofcis/tier1-two-site-u64-symbolic-qualification-checkpoint/1",
+  "date_utc": "2026-11-15",
+  "status": "successful-CI-conditional-symbolic-contract-check-not-compiler-pass-proof",
+  "isolation": {
+    "repository": "TheDarkLightX/ZenoFCIS",
+    "branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "source_commit": "5f561b690563aca2bc90239bad88f96bc2a52c1d",
+    "main_untouched": true,
+    "release_2_7_untouched": true,
+    "bytecodealliance_upstream_untouched": true
+  },
+  "source_pins": {
+    "wasmtime": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "combiner_installer_blob": "1e5ad0cc46b8ce791b14cad6998df4f32ea474ec",
+    "dualresult_installer_blob": "01b92461269b5ee354287a48a6750143e7564dc9",
+    "two_pair_wat_sha256": "763d99565f7ec0530db081209bd6cea968a2bdcf58deb84b690209394cba634d",
+    "new_checker_blob": "0bdb04d465e5f5ab47597a625772b5c04b349acc",
+    "workflow_blob": "ed4fd779d305effe0b27d167b4255d3cf01ea387"
+  },
+  "hosted": {
+    "workflow": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43732389013",
+    "job_id": 132867493876,
+    "result": "success",
+    "artifact_id": 14169002491,
+    "artifact_digest": "sha256:7529b57103ee7437f9e2953c014797d3d3a4d326e10a99f7b32dc7ea451e0ff2",
+    "z3": "4.15.4.0 pinned wheel",
+    "runner": "ubuntu-24.04",
+    "evidence": "full original solver verdict list printed in job logs; JSON receipt archived with 30-day retention"
+  },
+  "theorem_scope": "Two unsigned i64 quotient/remainder pairs, with x2=(x+1) mod 2^64, y2=(y+1) mod 2^64; first-trap site when y=0, second-trap site when y=UINT64_MAX, finite otherwise. Euclidean quotient and remainder contract assumed. No native compiler proof.",
+  "all_positive_counterexample_queries_unsat": [
+    "first-remainder-exact",
+    "second-remainder-exact",
+    "first-product-no-u64-overflow",
+    "second-product-no-u64-overflow",
+    "first-trap-exactly-y-zero",
+    "second-trap-exactly-y-max",
+    "finite-exactly-nonzero-nonmax"
+  ],
+  "negative_mutants_sat_witness_found": [
+    "MUTANT-collapse-second-site",
+    "MUTANT-no-second-divisor-wrap",
+    "MUTANT-first-divisor-swapped"
+  ],
+  "semantics": {
+    "signedness": "unsigned u64",
+    "overflow": "u64 wrapping of derived x+1,y+1",
+    "flags": "unobserved abstract IR flags, not machine-verified",
+    "poison_undefined": "no LLVM poison or undefined machine state admitted by symbolic contract",
+    "trap_priority": "first zero divisor y=0; second wrapped divisor y=2^64-1; different trap site retained",
+    "target_assumptions": "x86-64 pinned Wasmtime experimental prototype; symbolic algebra has no target code generator"
+  },
+  "cost_evidence": "No new native cost measurement; previous identical-WAT two-live-pair x86-64 function 97->73 decoded instruction bytes, four-to-two DIV instructions, whole AOT 13,608 bytes unchanged; existing separately archived measurements.",
+  "limits": [
+    "Conditional integer proof assumes quotient/remainder Euclidean laws; it does not prove those laws for lowered x64 DIV.",
+    "SMT trap model compares visible trap categories/order, not the internal Wasmtime machine PC trap table.",
+    "No proof of the Rust compiler-pass matcher, SSA semantics, flag/poison machine state, register allocation, arbitrary target correctness or a speedup.",
+    "Candidate is human-authored; this qualification is not a new synthesizer discovery.",
+    "No upstream submission is justified by this check alone."
+  ],
+  "next": "Audit internal Cranelift/Wasmtime trap tables and register-liveness integration, then measure representative workloads across CPUs before upstream draft."
+}
