@@ -1,0 +1,30 @@
+{
+  "schema": "zenofcis/tier1-upstream-collision-check/1",
+  "observed_utc_date": "2026-11-14",
+  "pinned_wasmtime_main_at_inspection": "c52bc6d8fc7ebf2ba3f7e39ab3203a3c13c1d272",
+  "upstream_issue": {
+    "url": "https://github.com/bytecodealliance/wasmtime/issues/5623",
+    "state": "open",
+    "concern": "Multi-result pairing (udiv + urem, imul/umulhi) may reduce native instructions; merging may extend live ranges and increase register pressure."
+  },
+  "active_relevant_pr": {
+    "url": "https://github.com/bytecodealliance/wasmtime/pull/15258",
+    "state_at_inspection": "open",
+    "created_at": "2026-11-13T00:11:33Z",
+    "source_head": "b90e650e14a693376b53075c4a3af2447f3d7c12",
+    "title": "Add Souper-synthesized mid-end ISLE optimizations",
+    "pipeline_claim": "Souper RHS of SpiderMonkey-Wasm mined LHS; some generalized by Hydra",
+    "scope": "mid-end arithmetic, bitops, icmp, shifts; no udivrem multi-result rewrite in the changed-file list or inspected patches",
+    "caveat": "PR reports no statistically significant Sightglass change; some icmp optimizations were excluded due to redundant computation under egraph extraction that did not reason about reuse."
+  },
+  "active_performance_pr": {
+    "url": "https://github.com/bytecodealliance/wasmtime/pull/15269",
+    "state_at_inspection": "open",
+    "created_at": "2026-11-13T19:30:37Z",
+    "source_head": "5fe473625cc6f275aeeb491bbb5d718861b21388",
+    "title": "fix: Cranelift: egraph: performance: elaborating a running sum makes compile time at least quadratic in the number of calls",
+    "relevance": "Careful long-live-range and compilation-time stress tests needed for mid-end graph rewrites."
+  },
+  "positioning": "Retain the narrower distinct udiv/urem dual-result experiment rather than re-submitting overlapping standalone Souper/bitmask/shift rules. Verify SSA/traps, live range pressure, compile time, and representative runtime against a current upstream pin before upstream proposal.",
+  "limits": "Issue/PR status and contents observed at time of inspection; this is a research scoping note, not proof of novelty, formal correctness or upstream acceptance."
+}
