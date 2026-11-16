@@ -1,0 +1,37 @@
+{
+  "schema": "zenofcis/tier1-udivrem-catalog-checkout-identity-checkpoint/1",
+  "date_utc": "2026-11-16",
+  "classification": "qualified catalog provenance guard; not a new native optimization or correctness proof",
+  "branch": "research/2.8-tier1-cranelift-performance-20261102",
+  "qualified_source_commit": "673c8c73591a0f64b4d14726f5661167513f40a8",
+  "prior_source_commit": "b6274ddd7781d63ae9a9101d9ed6f294bf2585df",
+  "upstream_wasmtime_pin": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "code": "experiments/cranelift-tier1/catalog_udivrem_reconciled_28.py",
+  "change": "Replayed catalog source_revision must match actual git rev-parse HEAD; '--revision' must also agree with HEAD; reject validly rehashed catalog that claims a forged checkout revision",
+  "ci": {
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43892178412",
+    "run_id": 43892178412,
+    "head_sha": "673c8c73591a0f64b4d14726f5661167513f40a8",
+    "status": "completed",
+    "conclusion": "success",
+    "jobs": [
+      "pinned-catalog-reconcile"
+    ],
+    "self_test": "passed six negative controls including a rehashed false source revision",
+    "generated_catalog_replay": "passed",
+    "artifacts": {
+      "id": 14237561197,
+      "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43892178412/artifacts/14237561197",
+      "zip_sha256": "de5862040fd797e1d266c63206d9cf7ce44ca67fec810c0c36ff3659514a5c5f"
+    },
+    "canonical_catalog_receipt_sha256": "74ae90a176186ae278076b9627393dfcb2a89d5259aa5e5d6a013897209670bf"
+  },
+  "persisted_cases": 5,
+  "verified_delta_scope": "Previously measured native x86-64 instruction bytes per distinct fixture; current CI did not compile or execute native code",
+  "limits": [
+    "Proof and cost receipts predate this run; this change makes catalog provenance more defensible, not machine behavior",
+    "A replay of an archived catalog now requires a checkout at its recorded commit, not merely an arbitrary newer branch HEAD",
+    "No new ZenoFCIS synthesis result, CLIF/ISLE verifier run, AOT code-size reduction or throughput measurement",
+    "No upstream submission; protected main/release branches untouched"
+  ]
+}
