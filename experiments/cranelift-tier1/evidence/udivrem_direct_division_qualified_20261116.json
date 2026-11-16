@@ -1,0 +1,48 @@
+{
+  "schema": "zenofcis/tier1-udivrem-direct-integer-division-qualified/1",
+  "date_utc": "2026-11-16",
+  "branch": "research/2.8-tier1-cranelift-performance-20261102",
+  "source_commit": "938a15fd7efde7e1954c274d41a6c7a9fbb5321c",
+  "predecessor": "7f6e01032af8565159fcd7e0884c7ecb39183fe1",
+  "upstream_wasmtime": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "compiler_installer_blob_pins": {
+    "install_udivrem_combiner_28.py": "1e5ad0cc46b8ce791b14cad6998df4f32ea474ec",
+    "install_udivrem_multivalue_28.py": "01b92461269b5ee354287a48a6750143e7564dc9"
+  },
+  "wat_sha256": "763d99565f7ec0530db081209bd6cea968a2bdcf58deb84b690209394cba634d",
+  "theorem_script": "experiments/cranelift-tier1/prove_udivrem_direct_division_28.py",
+  "workflow": ".github/workflows/tier1-udivrem-direct-int-division-28.yml",
+  "initial_failed_attempt": {
+    "run": 43959466896,
+    "commit": "4388204ec4a9fc642d4b03f69e94c2036daf5161",
+    "reason": "source pin Git blob separator was escaped incorrectly; failed before solver"
+  },
+  "qualified_ci": {
+    "run": 43959545282,
+    "commit": "938a15fd7efde7e1954c274d41a6c7a9fbb5321c",
+    "conclusion": "success",
+    "job": "direct-division-semantics",
+    "python_8bit_finite_oracle_pairs": 65280,
+    "positive_obligations_unsat": 7,
+    "mutant_counterexamples_sat": 3,
+    "solver": "hash-pinned z3-solver 4.15.4",
+    "artifact_id": 14274305075,
+    "artifact_zip_sha256": "a24b31ddb460d86a75428949e92cb73e48ef22d2dd494d6f8cb4aa9e8580d698",
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43959545282/artifacts/14274305075"
+  },
+  "theorem_scope": "SMT integer div/mod over nonnegative <=2^64-1 and positive <=2^64-1 divisor; directly checked quotient*divisor fits u64, exact Euclidean remainder reconstruction, admissible second wrapped input, disjoint and exact two-site zero trap predicates; no q/r Euclidean premises assumed",
+  "negative_witness_classes": [
+    "quotient taken using wrong divisor",
+    "second divide-by-zero trap suppressed",
+    "unsigned division replaced by signed division"
+  ],
+  "classification": "successful direct SMT arithmetic theorem and negative controls; NOT a full native or compiler pass verification",
+  "nonclaims": [
+    "No new instruction sequence synthesized or compiler build performed",
+    "No new native instruction-byte, throughput, ELF text, or whole-AOT measurement",
+    "Bitvector/native unsigned-div instruction refinement not proved by SMT Int theorem",
+    "Compiler SSA/liveness/register allocation, flags/poison/undef and real trap table generality unproved",
+    "Earlier 97-to-73 decoded x86 guest-function bytes remain a separate narrow measured fixture, not a new observation"
+  ],
+  "next": "Independently validate compiler-pass and machine-state refinement, and representative profitability before an upstream draft PR; retain this proof as a source-pinned catalog receipt."
+}
