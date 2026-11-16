@@ -150,14 +150,23 @@ def build(root,revision):
       ],
     }
     return {"payload":payload,"digest_sha256":digest(encoding(payload))}
+def checkout_revision(root):
+    """Bind replay to the *actual* checkout, not a caller-supplied 40-hex label."""
+    head=subprocess.check_output(["git","rev-parse","HEAD"],cwd=root,text=True).strip()
+    need(len(head)==40 and all(c in "0123456789abcdef" for c in head),"invalid checkout revision")
+    return head
 def replay(root,doc):
     need(set(doc)=={"payload","digest_sha256"},"bad envelope")
-    need(doc==build(root,doc["payload"]["source_revision"]),"forged/stale catalog")
+    need(isinstance(doc["payload"],dict),"bad catalog payload")
+    head=checkout_revision(root)
+    need(doc["payload"].get("source_revision")==head,"catalog revision is not checkout HEAD")
+    need(doc==build(root,head),"forged/stale catalog")
 def test(root=None):
     assert blob(b"test\n")=="9daeafb9864cf43055ae93beb0afd6c7d144bfa4"
     assert digest(encoding({"a":1,"b":2}))==digest(encoding({"b":2,"a":1}))
     if root is not None:
-        ref=build(root,"a"*40)
+        head=checkout_revision(root)
+        ref=build(root,head)
         replay(root,ref)
         defects=[]
         x=copy.deepcopy(ref);x["payload"]["contexts"][0]["decoded_native_bytes_saved"]+=1;defects.append(x)
@@ -165,11 +174,15 @@ def test(root=None):
         x=copy.deepcopy(ref);x["payload"]["candidate_sequence"].append("fabricated");defects.append(x)
         x=copy.deepcopy(ref);x["payload"]["pinned_input_sha256"].clear();defects.append(x)
         x=copy.deepcopy(ref);x["payload"]["receipt_classes"]["SMT-conditional-u64-contract"]=["unconditional-machine-proof"];defects.append(x)
+        # Crucial negative: a *self-consistent*, freshly rehashed catalog
+        # claiming a different source revision must still be rejected.
+        other="a"*40 if head!="a"*40 else "b"*40
+        defects.append(build(root,other))
         for x in defects:
             try: replay(root,x)
             except ValueError: pass
             else: raise AssertionError("catalog mutation accepted")
-        print("pinned source/receipts and five negative catalog mutation controls passed")
+        print("pinned source/receipts and six negative catalog mutations (including rehashed fake revision) passed")
     else:
         print("canonicalization and Git blob self-test passed")
 def main():
@@ -185,7 +198,8 @@ def main():
         replay(a.source,json.loads(a.replay.read_text()))
         print("pinned catalog replay passed");return
     if not a.out or a.out.exists():p.error("new --out required")
-    revision=a.revision or subprocess.check_output(["git","rev-parse","HEAD"],cwd=a.source,text=True).strip()
+    revision=checkout_revision(a.source)
+    need(a.revision is None or a.revision==revision,"--revision does not match checkout HEAD")
     doc=build(a.source,revision)
     replay(a.source,doc)
     a.out.parent.mkdir(parents=True,exist_ok=True)
