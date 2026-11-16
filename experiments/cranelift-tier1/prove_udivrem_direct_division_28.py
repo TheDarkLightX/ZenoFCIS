@@ -21,7 +21,7 @@ PIN_INSTALLERS = {
 U64 = (1 << 64) - 1
 
 def git_blob(raw: bytes) -> str:
-    return hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\\0" + raw).hexdigest()
+    return hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
 
 def source_pins() -> dict:
     from qualify_udivrem_contexts_28 import CASES
