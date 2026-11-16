@@ -1,0 +1,96 @@
+{
+  "schema": "zenofcis/tier1-cranelift-predicate-flag-context-qualification/1",
+  "qualification_date_utc": "2026-11-16",
+  "status": "ci-passed-and-independently-replayed-narrow-flag-predicate-contexts",
+  "experiment_source_commit": "5682dc6308c95c0d67415c78af4418f47113ffe2",
+  "base_research_commit": "e70bdb8cebf88354ef0cbcdbf3d7ece59df27c57",
+  "branch": "research/2.8-tier1-cranelift-performance-20261102",
+  "wasmtime_source_commit": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "workflow": {
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43799948356",
+    "run_id": 43799948356,
+    "source_controls": "success",
+    "identical_wasm_two_compilers": "success",
+    "artifact_id": 14196087423,
+    "artifact_sha256": "d64f9a2889fb6b33e76b92ecba2be186f743945fd87a3fdaca094faece27623a",
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43799948356/artifacts/14196087423",
+    "all_contexts": 16,
+    "ci_vectors_per_case_per_compiler": 40,
+    "novel_contexts_source_and_AOTs_archived": true,
+    "independent_CI_replays_total_all_priority_cases": 120
+  },
+  "extra_independent_replay": {
+    "actual_linux_x86_64": "native Wasmtime binaries and AOT objects extracted from exact CI ZIP; compiler/AOT/disassembly hashes checked",
+    "oracle": "separate bit-serial unsigned 64-bit quotient/remainder, not Python //, %, or divmod",
+    "source_sha256": "6972dbac14963b80663190033ee7e3f2ffe2fc19462a5134abdf3225d0db014e",
+    "input_pairs_per_case_per_compiler": 298,
+    "total_real_precompiled_Wasmtime_executions": 1192,
+    "per_mode_per_case": {
+      "values": 285,
+      "divide_by_zero_traps": 13
+    },
+    "arm_coverage": {
+      "predicate_carried_across_pair": {
+        "true": 138,
+        "false": 147
+      },
+      "quotient_remainder_branch": {
+        "true": 199,
+        "false": 86
+      }
+    },
+    "result": "no mismatches in 1192 actual native executions",
+    "caveat": "The independent replay source is a separate local auditor; the original CI artifact and committed context runner/auditor remain the public reproduction route"
+  },
+  "cases": {
+    "predicate_carried_across_pair": {
+      "contract": "Unsigned x<y predicate produced before quotient/remainder, consumed in select after both operations",
+      "wat_sha256": "54c105607917237698c273befa020fb27d4193b10336fdb2c7c5b152446713ea",
+      "baseline": {
+        "decoded_x86_64_native_instruction_bytes": 52,
+        "instructions": 19,
+        "div_instructions": 2,
+        "aot_bytes": 13608
+      },
+      "patched": {
+        "decoded_x86_64_native_instruction_bytes": 40,
+        "instructions": 15,
+        "div_instructions": 1,
+        "aot_bytes": 13608
+      },
+      "delta_native_bytes": 12,
+      "delta_instructions": 4,
+      "delta_divisions": 1,
+      "delta_AOT_bytes": 0
+    },
+    "quotient_remainder_branch": {
+      "contract": "Both unsigned quotient and remainder feed comparison and branch; both alternatives remain observable",
+      "wat_sha256": "c4b1e62c836eefcbf2e9f5d843b05b026443bb485b459dc2b3b0e79062ff1674",
+      "baseline": {
+        "decoded_x86_64_native_instruction_bytes": 62,
+        "instructions": 21,
+        "div_instructions": 2,
+        "aot_bytes": 13608
+      },
+      "patched": {
+        "decoded_x86_64_native_instruction_bytes": 47,
+        "instructions": 16,
+        "div_instructions": 1,
+        "aot_bytes": 13608
+      },
+      "delta_native_bytes": 15,
+      "delta_instructions": 5,
+      "delta_divisions": 1,
+      "delta_AOT_bytes": 0
+    }
+  },
+  "verification_boundaries": [
+    "The original unchanged-WAT vs patched-compiler measurements are pinned x86-64 native code results, not native CLIF cost or generic throughput",
+    "64-bit input tests are finite; no exhaustive all-u64 symbolic compiler-pass or machine-state verification",
+    "The post-division compare and pre-division predicate are behavioral canaries, not formal verification of arbitrary x86 flag state",
+    "No LLVM poison/undef is admitted in these concrete WebAssembly typed unsigned integer fixtures; arbitrary CLIF poison and ISA ABI invariants unproved",
+    "Source and Wasmtime originals are pinned; unrelated workloads/targets, register allocation, flag liveness, and performance profitability remain unproved",
+    "Candidate remains human-authored, not a newly synthesized cheaper instruction sequence",
+    "No Bytecode Alliance upstream PR and no changes to ZenoFCIS main/release/2.7"
+  ]
+}
