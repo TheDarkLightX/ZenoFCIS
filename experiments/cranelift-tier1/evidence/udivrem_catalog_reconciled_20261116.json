@@ -1,0 +1,118 @@
+{
+  "schema": "zenofcis/tier1-udivrem-catalog-checkpoint/1",
+  "date_utc": "2026-11-16",
+  "status": "qualified-prior-evidence-reconciliation-not-new-native-proof",
+  "branch": "research/2.8-tier1-cranelift-performance-20261102",
+  "source_commit": "39165d92c8f37f4aaa9a9c3cd2e3f61c782b5ada",
+  "zeno_main_inspected": "4160086fb9d19f3ebe25047e69b1caa467aa74fd",
+  "zeno_release_2_7_inspected": "5738b7a2a0313b56f71cbc2d3a74b602da4b813e",
+  "pinned_wasmtime": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+  "wasmtime_main_inspected": "c52bc6d8fc7ebf2ba3f7e39ab3203a3c13c1d272",
+  "implementation": {
+    "source": "experiments/cranelift-tier1/catalog_udivrem_reconciled_28.py",
+    "workflow": ".github/workflows/tier1-udivrem-catalog-28.yml",
+    "purpose": "One content-key candidate, five source-pinned contexts, contracts and classified original proof/cost receipts; replay refuses stale receipt/source data and fabricated deltas",
+    "not_done": "The job does not recompile upstream, execute native code or re-prove the previously recorded machine/SMT results"
+  },
+  "ci": {
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43844588748",
+    "run_id": 43844588748,
+    "status": "completed",
+    "conclusion": "success",
+    "source_pin": "39165d92c8f37f4aaa9a9c3cd2e3f61c782b5ada",
+    "artifact_id": 14214362243,
+    "artifact_zip_sha256": "61d5c9e032d107bd75b6cd879a2594a66edeb7258eec6bee49736bcb56e5dcca",
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/43844588748/artifacts/14214362243",
+    "candidate_catalog_key": "50609c81dd869ecab1057116e9d3ae3dde50e1d0b631f74c3c6a6b1584c1f224",
+    "canonical_catalog_payload_sha256": "fabd893d80d049bd450e12a7b6649eef9dca257ea059be419325ce646f6d6f32",
+    "source_blob_and_evidence_receipt_guards": "passed",
+    "independent_negative_catalog_mutations": 5,
+    "canonical_generate_then_replay": "passed"
+  },
+  "five_native_function_fixture_costs": [
+    {
+      "fixture": "two_live_pairs",
+      "native_instruction_bytes": [
+        97,
+        73
+      ],
+      "divisions": [
+        4,
+        2
+      ],
+      "whole_aot_bytes": [
+        13608,
+        13608
+      ]
+    },
+    {
+      "fixture": "long_lived_results",
+      "native_instruction_bytes": [
+        57,
+        42
+      ],
+      "divisions": [
+        2,
+        1
+      ],
+      "whole_aot_bytes": [
+        13608,
+        13608
+      ]
+    },
+    {
+      "fixture": "exclusive_branches",
+      "native_instruction_bytes": [
+        45,
+        45
+      ],
+      "divisions": [
+        2,
+        2
+      ],
+      "whole_aot_bytes": [
+        13608,
+        13608
+      ]
+    },
+    {
+      "fixture": "predicate_carried_across_pair",
+      "native_instruction_bytes": [
+        52,
+        40
+      ],
+      "divisions": [
+        2,
+        1
+      ],
+      "whole_aot_bytes": [
+        13608,
+        13608
+      ]
+    },
+    {
+      "fixture": "quotient_remainder_branch",
+      "native_instruction_bytes": [
+        62,
+        47
+      ],
+      "divisions": [
+        2,
+        1
+      ],
+      "whole_aot_bytes": [
+        13608,
+        13608
+      ]
+    }
+  ],
+  "nonadditivity": "Five fixture byte deltas sum to 66 but are NOT an aggregate real-world code-size or runtime saving.",
+  "verification_scope": "Previously established finite native values, guest traps, exhaustive scaled 8-bit model, conditional 64-bit SMT, source-pinned CLIF verifier, and machine trap-table PCs; provenance is reconciled, not freshly rerun.",
+  "limitations": [
+    "One human-authored udiv/urem fusion, not new ZenoFCIS-synthesized instruction discovery",
+    "No representative workload speedup, whole-AOT size saving, or all-target profitability",
+    "No unconditional complete compiler-pass/machine-state flags, poison/undef, SSA/liveness/register allocator correctness",
+    "Original archived compiler binaries and AOTs are not rerun by new catalog CI",
+    "Keep existing PR #175 draft; no Bytecode Alliance upstream PR and no main/release merge"
+  ]
+}
