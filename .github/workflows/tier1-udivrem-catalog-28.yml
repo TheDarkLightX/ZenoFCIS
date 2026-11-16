@@ -1,0 +1,49 @@
+name: tier1-udivrem-catalog-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-udivrem-catalog-28.yml'
+      - 'experiments/cranelift-tier1/catalog_udivrem_reconciled_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pinned-catalog-reconcile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Check source identity, prior receipts and mutation controls
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/catalog_udivrem_reconciled_28.py
+          python3 -B experiments/cranelift-tier1/catalog_udivrem_reconciled_28.py --self-test
+      - name: Produce source-pinned deduplicated proof and cost catalog
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-udivrem-catalog
+          git rev-parse HEAD > tier1-udivrem-catalog/zenofcis-commit.txt
+          python3 -B experiments/cranelift-tier1/catalog_udivrem_reconciled_28.py --out tier1-udivrem-catalog/catalog.json
+          python3 -B experiments/cranelift-tier1/catalog_udivrem_reconciled_28.py --replay tier1-udivrem-catalog/catalog.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('tier1-udivrem-catalog/catalog.json').read_text())
+          rows=r['payload']['contexts']
+          assert len(rows)==5 and len({x['name'] for x in rows})==5
+          assert r['payload']['classification']=='pinned reconciliation of prior native measurements; no new compiler run'
+          assert sum(x['decoded_native_bytes_saved'] for x in rows)==66
+          assert sum(x['static_divisions_removed'] for x in rows)==5
+          assert sum(x['whole_aot_bytes_saved'] for x in rows)==0
+          print('5 pinned contexts: decoded x86-64 byte savings [per fixture, NOT additive real-workload savings] checked')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tier1-udivrem-catalog-28
+          path: tier1-udivrem-catalog/
+          retention-days: 30
+          if-no-files-found: warn
