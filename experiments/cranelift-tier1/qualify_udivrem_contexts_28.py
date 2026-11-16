@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Finite context controls for the pinned same-Wasm dual-result division experiment.
 
+Includes two predicate-liveness/compare-branch canaries; finite tests do not
+prove x86 flags or compiler-pass soundness for arbitrary machine states.
+
 Same WAT for baseline/patched. Numeric equality, traps, and native static
 division counts are checked independently. Not a whole-compiler proof or
 runtime benchmark. Outputs a source/compilers/results receipt.
@@ -86,6 +89,20 @@ i64.xor
         + "local.get $q\nlocal.get $x\ni64.const 13\ni64.rotl\ni64.xor\n"
         + "local.get $y\ni64.const 7\ni64.rotr\ni64.xor\n"
         + "local.get $r\n" + ROT + XOR),
+
+    # The machine-state/flag-sensitive pathways that a dual-result DIV might
+    # affect after lowering. Both retain quotient and remainder users.
+    "predicate_carried_across_pair": wat(
+        "(local $pred i32) (local $q i64) (local $r i64)\n"
+        + "local.get $x\nlocal.get $y\ni64.lt_u\nlocal.set $pred\n"
+        + DIV + "local.set $q\n" + REM + "local.set $r\n"
+        + "local.get $q\nlocal.get $r\nlocal.get $pred\nselect\n"),
+    "quotient_remainder_branch": wat(
+        "(local $q i64) (local $r i64)\n"
+        + DIV + "local.set $q\n" + REM + "local.set $r\n"
+        + "local.get $q\nlocal.get $r\ni64.lt_u\n"
+        + "if (result i64)\nlocal.get $q\nlocal.get $x\ni64.xor\n"
+        + "else\nlocal.get $r\nlocal.get $y\ni64.xor\nend\n"),
 }
 
 def hash_bytes(b):
@@ -132,6 +149,10 @@ def oracle(name, x, y):
         x_rot13 = ((ux << 13) | (ux >> 51)) & MASK
         y_ror7 = ((uy >> 7) | (uy << 57)) & MASK
         return signed(q ^ x_rot13 ^ y_ror7 ^ rotation(r), 64)
+    if name == "predicate_carried_across_pair":
+        return signed(q if ux < uy else r, 64)
+    if name == "quotient_remainder_branch":
+        return signed((q ^ ux) if q < r else (r ^ uy), 64)
     if name == "quotient_only":
         return signed(q, 64)
     if name == "remainder_only":

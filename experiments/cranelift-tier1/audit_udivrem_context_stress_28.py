@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent finite artifact audit for the 14-context dual-result division screen.
+"""Independent finite artifact audit for the 16-context dual-result division screen.
 
 Rehash original WAT/AOT/disassembly and both compiler binaries; independently
 recount x86 divisions and verify recorded trap totals. Execute the three added
@@ -19,7 +19,8 @@ from qualify_udivrem_contexts_28 import CASES, vectors
 PIN = "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49"
 MASK = (1 << 64) - 1
 MIN = -(1 << 63)
-NOVEL = {"two_live_pairs", "exclusive_branches", "long_lived_results"}
+NOVEL = {"two_live_pairs", "exclusive_branches", "long_lived_results",
+         "predicate_carried_across_pair", "quotient_remainder_branch"}
 NAMES = {
     "adjacent", "reverse_order", "swapped_rem_inputs", "quotient_only",
     "remainder_only", "signed_64", "unsigned_32", "signed_32",
@@ -27,7 +28,7 @@ NAMES = {
 }
 SAMPLES = (
     (0, 1), (1, 1), (7, 3), (-1, -1), (MIN, -1), (1, 0),
-    (MIN, 1), (-(1 << 32), 2), (-7, 3),
+    (MIN, 1), (-(1 << 32), 2), (-7, 3), (7, 4), (1, 3), (-1, 2),
 )
 
 def digest(path: Path) -> str:
@@ -70,7 +71,11 @@ def expected(case: str, x: int, y: int) -> int | None:
         return s64(q if not (ux & 1) else r)
     if case == "long_lived_results":
         return s64(q ^ rol(ux, 13) ^ ror(uy, 7) ^ rol(r, 17))
-    raise ValueError("independent value oracle restricted to three novel cases")
+    if case == "predicate_carried_across_pair":
+        return s64(q if ux < uy else r)
+    if case == "quotient_remainder_branch":
+        return s64((q ^ ux) if q < r else (r ^ uy))
+    raise ValueError("independent value oracle restricted to five novel cases")
 
 def native_counts(disasm: str) -> dict:
     # CLI objdump's 12-space-prefixed decoded x86 instruction rows.
@@ -179,7 +184,7 @@ def audit(root: Path) -> dict:
         "new_case_replay_details": replays,
         "division_savings_by_case": measurements,
         "limitations": [
-            "Independent arithmetic re-execution covers three added cases, nine chosen inputs each, two compiler AOTs",
+            "Independent arithmetic re-execution covers five priority cases, twelve chosen inputs each, two compiler AOTs",
             "Other contexts receive separately recomputed archive hashes, costs and finite trap totals, not fresh value-by-value replay",
             "Compiled code is x86-64 and pinned Wasmtime; this is not SMT or complete compiler-pass correctness",
             "Static division-count changes do not establish a native speedup, AOT reduction or a newly synthesized discovery",
@@ -196,6 +201,11 @@ def self_test() -> None:
     assert expected("exclusive_branches", 7, 3) == 7 % 3
     assert expected("exclusive_branches", 8, 3) == 8 // 3
     assert expected("long_lived_results", 7, 3) is not None
+    assert expected("predicate_carried_across_pair", 1, 3) == 0
+    assert expected("predicate_carried_across_pair", 7, 3) == 1
+    assert expected("quotient_remainder_branch", 7, 3) == 2
+    assert expected("quotient_remainder_branch", 7, 4) == 6
+    assert len(SAMPLES) == 12
     assert traps("signed_32", 1 << 31, -1)
     assert traps("signed_64", MIN, -1)
     assert not traps("long_lived_results", MIN, -1)
