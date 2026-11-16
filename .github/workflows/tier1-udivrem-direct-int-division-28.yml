@@ -1,0 +1,49 @@
+name: tier1-udivrem-direct-int-division-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-udivrem-direct-int-division-28.yml'
+      - 'experiments/cranelift-tier1/prove_udivrem_direct_division_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  direct-division-semantics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Check exact pinned compiler installer and finite oracle
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/prove_udivrem_direct_division_28.py
+          python3 -B experiments/cranelift-tier1/prove_udivrem_direct_division_28.py --self-test
+      - name: Install hash-pinned Z3 4.15.4
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/tier1-direct-z3"
+          "$RUNNER_TEMP/tier1-direct-z3/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+      - name: Check direct division/remainder theorem and mutants
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-direct-division
+          git rev-parse HEAD >tier1-direct-division/zenofcis-source-pin.txt
+          "$RUNNER_TEMP/tier1-direct-z3/bin/python" -B \
+            experiments/cranelift-tier1/prove_udivrem_direct_division_28.py \
+            --out tier1-direct-division/receipt.json --timeout-ms 30000
+          python3 - <<'PY'
+          import json
+          r=json.load(open('tier1-direct-division/receipt.json'))
+          assert r['all_obligations_unsat'] and r['all_mutants_sat']
+          assert len(r['obligations']) == 7 and len(r['negative_controls']) == 3
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tier1-udivrem-direct-int-division-28
+          path: tier1-direct-division/
+          retention-days: 30
+          if-no-files-found: warn
