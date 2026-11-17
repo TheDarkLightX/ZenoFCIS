@@ -1,0 +1,331 @@
+{
+  "schema": "zenofcis/tier1-post-souper-merged-upstream-qualified/1",
+  "qualified_utc": "2026-11-17",
+  "subject": "test-only same-WAT adjacent udiv.i64/urem.i64 => udivrem.i64 on Cranelift x86_64; human-authored prototype, not a novel ZenoFCIS synthesis result",
+  "source": {
+    "zenofcis_original": "fb14c4e4c7b071e9359f8ae38653e6a0e2d5e0e5",
+    "zenofcis_runtime": "f6edf2bdeea71f2f2b43111370496857601aa65f",
+    "wasmtime": "8b19f199f89da864c529b3fa3ca2f7e40d5de609",
+    "wasmtime_merged_pr": "https://github.com/bytecodealliance/wasmtime/pull/15258",
+    "rust": "1.98.0 (88d9e12ae 2026-08-18)",
+    "target": "x86_64-unknown-linux",
+    "compiler_source_files_changed": [
+      "cranelift/codegen/src/context.rs",
+      "cranelift/codegen/meta/src/shared/instructions.rs",
+      "cranelift/codegen/src/isa/x64/lower.isle",
+      "cranelift/interpreter/src/step.rs"
+    ]
+  },
+  "contract": {
+    "input": "same block, directly adjacent unsigned i64 div then rem, identical SSA operands",
+    "defined_value": "for unsigned 64-bit x and nonzero y, quotient floor(x/y) and remainder x - quotient*y",
+    "trap": "y==0 traps at original first divide site; no intervening trap or effect",
+    "signedness": "unsigned i64 only; i32/signed or swapped divisor excluded",
+    "overflow": "Wasm integer operations wrap modulo 2^64; Euclidean remainder reconstruction is exact for nonzero divisor",
+    "flags_machine_state": "no complete x86 flag-state refinement theorem",
+    "poison_undefined": "Wasm input fixtures have defined typed integer semantics; arbitrary CLIF poison/undef contexts not proved",
+    "cost_unit": "decoded native x86-64 instruction bytes per AOT guest function, not CLIF cost, whole AOT or representative throughput"
+  },
+  "verification_classes": [
+    {
+      "kind": "CI reproducible build, same-WAT static cost plus finite value/trap tests",
+      "run": 44011871379,
+      "commit": "fb14c4e4c7b071e9359f8ae38653e6a0e2d5e0e5",
+      "status": "passed",
+      "context_count": 16,
+      "finite_calls": 1280,
+      "independent_stress_calls": 120
+    },
+    {
+      "kind": "CI 5-million-iteration AOT microbenchmark with independent Python oracle and same-WAT source",
+      "run": 44056104464,
+      "commit": "f6edf2bdeea71f2f2b43111370496857601aa65f",
+      "status": "passed",
+      "samples": 40
+    },
+    {
+      "kind": "independent Linux x86-64 replay of archived original compiler binaries and real AOT images",
+      "archive_sha256": "b29567576ed12a5569eaceebe54c2ed92fb27654ed86f8d49813cd6cbfd91653",
+      "status": "passed",
+      "native_executions": 160,
+      "values": 122,
+      "traps": 38,
+      "contexts": 5
+    },
+    {
+      "kind": "independent archive hash and disassembly check",
+      "status": "passed",
+      "AOT_and_disassembly_pairs": 32,
+      "contexts": 16
+    },
+    {
+      "kind": "bounded SMT and structural/finite prior qualifications",
+      "status": "historically qualified under earlier Wasmtime pin, not rerun against merged upstream; cannot infer general compiler-pass correctness"
+    }
+  ],
+  "artifacts": [
+    {
+      "run": 44011871379,
+      "id": 14296942898,
+      "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44011871379/artifacts/14296942898",
+      "zip_sha256": "b29567576ed12a5569eaceebe54c2ed92fb27654ed86f8d49813cd6cbfd91653",
+      "post_souper_cost_audit_sha256": "33f0fa2c508bf3af3ec9d8d16025e79be1e303c0657caaa42041154ba32c52b1"
+    },
+    {
+      "run": 44056104464,
+      "id": 14316481158,
+      "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44056104464/artifacts/14316481158",
+      "zip_sha256": "26cbebdc06190cd407296f9ca61cb1ef7347c5ddc3a5398a9bb2e6ad60653ab7",
+      "runtime_screen_sha256": "4a5ebf4f50c43338f663138fe870bc5bc6095bd8aeb7e54b696b2eacc302bf1e"
+    }
+  ],
+  "static_contexts": [
+    {
+      "name": "adjacent",
+      "decoded_native_bytes": {
+        "baseline": 43,
+        "experimental": 25
+      },
+      "static_div_instructions": {
+        "baseline": 2,
+        "experimental": 1
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "branch",
+      "decoded_native_bytes": {
+        "baseline": 92,
+        "experimental": 56
+      },
+      "static_div_instructions": {
+        "baseline": 4,
+        "experimental": 2
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "exclusive_branches",
+      "decoded_native_bytes": {
+        "baseline": 45,
+        "experimental": 45
+      },
+      "static_div_instructions": {
+        "baseline": 2,
+        "experimental": 2
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "intervening_add",
+      "decoded_native_bytes": {
+        "baseline": 50,
+        "experimental": 32
+      },
+      "static_div_instructions": {
+        "baseline": 2,
+        "experimental": 1
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "intervening_load",
+      "decoded_native_bytes": {
+        "baseline": 53,
+        "experimental": 53
+      },
+      "static_div_instructions": {
+        "baseline": 2,
+        "experimental": 2
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "long_lived_results",
+      "decoded_native_bytes": {
+        "baseline": 57,
+        "experimental": 42
+      },
+      "static_div_instructions": {
+        "baseline": 2,
+        "experimental": 1
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "predicate_carried_across_pair",
+      "decoded_native_bytes": {
+        "baseline": 52,
+        "experimental": 40
+      },
+      "static_div_instructions": {
+        "baseline": 2,
+        "experimental": 1
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "quotient_only",
+      "decoded_native_bytes": {
+        "baseline": 18,
+        "experimental": 18
+      },
+      "static_div_instructions": {
+        "baseline": 1,
+        "experimental": 1
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "quotient_remainder_branch",
+      "decoded_native_bytes": {
+        "baseline": 62,
+        "experimental": 47
+      },
+      "static_div_instructions": {
+        "baseline": 2,
+        "experimental": 1
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "remainder_only",
+      "decoded_native_bytes": {
+        "baseline": 21,
+        "experimental": 21
+      },
+      "static_div_instructions": {
+        "baseline": 1,
+        "experimental": 1
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "reverse_order",
+      "decoded_native_bytes": {
+        "baseline": 49,
+        "experimental": 49
+      },
+      "static_div_instructions": {
+        "baseline": 2,
+        "experimental": 2
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "signed_32",
+      "decoded_native_bytes": {
+        "baseline": 64,
+        "experimental": 64
+      },
+      "static_div_instructions": {
+        "baseline": 2,
+        "experimental": 2
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "signed_64",
+      "decoded_native_bytes": {
+        "baseline": 78,
+        "experimental": 78
+      },
+      "static_div_instructions": {
+        "baseline": 2,
+        "experimental": 2
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "swapped_rem_inputs",
+      "decoded_native_bytes": {
+        "baseline": 43,
+        "experimental": 43
+      },
+      "static_div_instructions": {
+        "baseline": 2,
+        "experimental": 2
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "two_live_pairs",
+      "decoded_native_bytes": {
+        "baseline": 97,
+        "experimental": 73
+      },
+      "static_div_instructions": {
+        "baseline": 4,
+        "experimental": 2
+      },
+      "whole_AOT_byte_delta": 0
+    },
+    {
+      "name": "unsigned_32",
+      "decoded_native_bytes": {
+        "baseline": 36,
+        "experimental": 36
+      },
+      "static_div_instructions": {
+        "baseline": 2,
+        "experimental": 2
+      },
+      "whole_AOT_byte_delta": 0
+    }
+  ],
+  "runtime_screen": {
+    "fixture": "5,000,000 dynamic unsigned-division iterations in AOT WebAssembly loop, Linux x86_64 Xeon 6975P-C CI host, 5 cycles ABBA/BAAB, 10 samples per compiler per fixture",
+    "pair": {
+      "median_ms": {
+        "baseline": 30.3857225,
+        "experimental": 17.379319
+      },
+      "experimental_over_baseline_ratio": 0.5719567471202964,
+      "static_div_instructions": {
+        "baseline": 2,
+        "experimental": 1
+      },
+      "whole_aot_bytes": {
+        "baseline": 13608,
+        "experimental": 13608
+      }
+    },
+    "quotient_only_no_fusion_control": {
+      "median_ms": {
+        "baseline": 17.2755515,
+        "experimental": 17.17912
+      },
+      "experimental_over_baseline_ratio": 0.9944180363793307,
+      "identical_AOT_sha256": "e0e8c0023885673d8765927d14c2e28b0ae5b0e70cb0d65a1f42a3821fba89d2e28b"
+    },
+    "separate_linux_environment_replay": {
+      "pair_ratio": 0.5523766369023929,
+      "quotient_only_control_ratio": 0.9830138547889186,
+      "pair_baseline_ms": [
+        64.951273,
+        54.397627
+      ],
+      "pair_experimental_ms": [
+        34.628996,
+        31.296548
+      ],
+      "control_baseline_ms": [
+        34.582251,
+        31.683284
+      ],
+      "control_experimental_ms": [
+        26.847705,
+        38.292234
+      ],
+      "classification": "four invocations per fixture, only a limited consistency replay"
+    }
+  },
+  "limits": [
+    "Runtime timings include process startup, AOT loading, OS scheduling and cannot establish production workload speedup or CPU performance generality",
+    "Artifact ZIP receipts and native disassemblies were independently rehashed; CI runtime oracle checks are finite and therefore do not prove arbitrary machine-state correctness",
+    "The post-merge source revisions differ from older SMT/VeriISLE qualifications; no proof of the actual four-file compiler pass across all states, targets or flags",
+    "The original compiler transformation is human-authored and no new sequence was synthesized in this round",
+    "Whole-AOT byte size did not change in any of the 16 static contexts or the two runtime fixtures",
+    "No upstream PR or merge is justified by these results alone; representative workloads and general correctness gates remain"
+  ]
+}
