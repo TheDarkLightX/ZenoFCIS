@@ -1,0 +1,89 @@
+name: tier1-post-souper-divrem-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-post-souper-divrem-28.yml'
+      - 'experiments/cranelift-tier1/post_souper_portability_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tier1-post-souper-divrem-28
+  cancel-in-progress: true
+jobs:
+  source-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Syntax and fail-closed source/decoder negative controls
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/post_souper_portability_28.py
+          python3 -B experiments/cranelift-tier1/post_souper_portability_28.py --mode self-test
+  same-wasm-post-souper-aot:
+    needs: [source-controls]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: 8b19f199f89da864c529b3fa3ca2f7e40d5de609 # #15258 merge
+          path: upstream
+          persist-credentials: false
+      - name: Refuse compiler pin drift; preserve exact checkout metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-post-souper/baseline tier1-post-souper/patched
+          git rev-parse HEAD > tier1-post-souper/zenofcis-head.txt
+          git -C upstream rev-parse HEAD > tier1-post-souper/wasmtime-head.txt
+          python3 -B experiments/cranelift-tier1/post_souper_portability_28.py --mode preflight --upstream upstream
+          rustup toolchain install 1.97.1 --profile minimal
+          rustc -Vv > tier1-post-souper/rustc-version.txt
+      - name: Build pristine post-Souper merged upstream baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump >tier1-post-souper/baseline-build.stdout 2>tier1-post-souper/baseline-build.stderr
+          cp upstream/target/debug/wasmtime tier1-post-souper/baseline/wasmtime
+      - name: Apply four-file test-only compiler transformation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/post_souper_portability_28.py --mode install --upstream upstream --out tier1-post-souper
+          git -C upstream diff --check
+          git -C upstream diff -- cranelift/codegen/src/context.rs cranelift/codegen/meta/src/shared/instructions.rs cranelift/codegen/src/isa/x64/lower.isle cranelift/interpreter/src/step.rs >tier1-post-souper/compiler-patch.diff
+          test -s tier1-post-souper/compiler-patch.diff
+          cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump >tier1-post-souper/patched-build.stdout 2>tier1-post-souper/patched-build.stderr
+          cp upstream/target/debug/wasmtime tier1-post-souper/patched/wasmtime
+      - name: Compile byte-identical WebAssembly across sixteen contexts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/post_souper_portability_28.py --mode qualify --out tier1-post-souper
+      - name: Independently replay native AOT values and recalculate byte costs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/post_souper_portability_28.py --mode audit --out tier1-post-souper --upstream upstream
+      - name: Preserve actual sources, binaries, disassemblies, tests and receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-post-souper-divrem-28
+          path: tier1-post-souper/
+          retention-days: 30
+          if-no-files-found: warn
