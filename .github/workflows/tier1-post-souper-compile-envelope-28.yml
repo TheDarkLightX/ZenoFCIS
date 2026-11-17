@@ -1,0 +1,57 @@
+name: tier1-post-souper-compile-envelope-28
+on:
+  push:
+    branches: [research/2.8-tier1-cranelift-performance-20261102]
+    paths:
+      - '.github/workflows/tier1-post-souper-compile-envelope-28.yml'
+      - 'experiments/cranelift-tier1/post_souper_compile_envelope_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: tier1-post-souper-compile-envelope-28
+  cancel-in-progress: true
+jobs:
+  pinned-compile-serialize-envelope:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Syntax, generated-WAT and five deliberate malformed-receipt controls
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/post_souper_compile_envelope_28.py
+          python3 -B experiments/cranelift-tier1/post_souper_compile_envelope_28.py --mode self-test
+      - name: Fetch exact previous independently qualified pristine and experimental compilers
+        uses: actions/download-artifact@v4
+        with:
+          repository: TheDarkLightX/ZenoFCIS
+          run-id: 44056104464
+          github-token: ${{ github.token }}
+          name: tier1-post-souper-divrem-28
+          path: tier1-compile-envelope/source
+      - name: Run controlled alternating compile plus serialize measurements
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/post_souper_compile_envelope_28.py \
+            --mode run --source-root tier1-compile-envelope/source \
+            --out tier1-compile-envelope/measurements
+      - name: Recalculate durations and reject changed WAT, compilers and native image digests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/post_souper_compile_envelope_28.py \
+            --mode audit --source-root tier1-compile-envelope/source \
+            --out tier1-compile-envelope/measurements
+      - name: Preserve exact source generation, AOT bytes and timing receipts on success/failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-post-souper-compile-envelope-28
+          path: tier1-compile-envelope/measurements/
+          retention-days: 30
+          if-no-files-found: warn
