@@ -174,7 +174,7 @@ def self_test() -> None:
     broken = [list(rows) for _ in range(4)]
     broken[0][3] = broken[0][3].replace(",baseline,", ",patched,")
     broken[1][3] = broken[1][3].replace(",1000,", ",0,")
-    broken[2][3] = broken[2][3][:-1] + "9"
+    broken[2][3] = broken[2][3].rsplit(",", 1)[0] + "," + str(original.expected("pair", n, SEED) + 1)
     broken[3].pop()
     for case in broken:
         try:
