@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/tier1-post-souper-divrem-28.yml'
       - 'experiments/cranelift-tier1/post_souper_portability_28.py'
+      - 'experiments/cranelift-tier1/bench_udivrem_post_souper_28.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,6 +25,7 @@ jobs:
           set -euo pipefail
           python3 -m py_compile experiments/cranelift-tier1/post_souper_portability_28.py
           python3 -B experiments/cranelift-tier1/post_souper_portability_28.py --mode self-test
+          python3 -B experiments/cranelift-tier1/bench_udivrem_post_souper_28.py --self-test
   same-wasm-post-souper-aot:
     needs: [source-controls]
     runs-on: ubuntu-24.04
@@ -79,6 +81,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 -B experiments/cranelift-tier1/post_souper_portability_28.py --mode audit --out tier1-post-souper --upstream upstream
+      - name: Measure a balanced pinned-AOT runtime screen with independent arithmetic oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/bench_udivrem_post_souper_28.py --out tier1-post-souper --iterations 5000000 --cycles 5
       - name: Preserve actual sources, binaries, disassemblies, tests and receipts
         if: always()
         uses: actions/upload-artifact@v4
