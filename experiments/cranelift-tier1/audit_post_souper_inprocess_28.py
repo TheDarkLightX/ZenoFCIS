@@ -146,7 +146,7 @@ def audit(root: Path, raw: Path, lock: Path, iterations: int, cycles: int) -> di
                            for m in ("baseline", "patched")} for k in original.TYPES},
         "method": {"iterations": iterations, "cycles": cycles,
                    "samples": 8 * cycles, "includes_process_start_or_aot_load": False,
-                   "one Rust process, one Wasmtime Engine, four Stores, balanced ABBA/BAAB"},
+                   "execution_scope": "one Rust process, one Wasmtime Engine, four Stores, balanced ABBA/BAAB"},
         **parsed,
         "nonclaims": [
             "Single virtualized CI host and CPU: no representative workload or universal speedup",
