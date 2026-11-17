@@ -1,0 +1,70 @@
+{
+  "schema": "zenofcis/tier1-post-souper-inprocess-independent-checkpoint/1",
+  "qualified_utc": "2026-11-17",
+  "status": "qualified-narrow-finite-same-AOT-inprocess-microbenchmark",
+  "source": {
+    "zenofcis_experiment_sha": "69ea65c0a14783866ebbb6fece3e718ee60ab278",
+    "experiment_branch": "research/2.8-tier1-cranelift-performance-20261102",
+    "wasmtime_source_sha": "8b19f199f89da864c529b3fa3ca2f7e40d5de609",
+    "rust": "1.98.0",
+    "target": "x86_64-unknown-linux",
+    "wasmtime_optimizer_merge": "https://github.com/bytecodealliance/wasmtime/pull/15258"
+  },
+  "producer": {
+    "ci_run": 44056104464,
+    "ci_artifact": 14316481158,
+    "zenofcis_sha": "f6edf2bdeea71f2f2b43111370496857601aa65f",
+    "artifact_zip_sha256": "26cbebdc06190cd407296f9ca61cb1ef7347c5ddc3a5398a9bb2e6ad60653ab7",
+    "runtime_screen_json_sha256": "4a5ebf4f50c43338f663138fe870bc5bc6095bd8aeb7e54b696b2eacc302bf1e"
+  },
+  "qualification": {
+    "ci_run": 44115441561,
+    "ci_run_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44115441561",
+    "ci_status": "success",
+    "artifact_id": 14343086156,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44115441561/artifacts/14343086156",
+    "artifact_zip_sha256": "296f5f3bf6885cbfcb5b605ad85c1a737d22d985a39a9c91b050c7eda3add94f",
+    "qualified_json_sha256": "432c88c4aa05b3bb61fdac162a49394a482d06f13189a0e8656bfa332ca4486f",
+    "raw_csv_sha256": "5e234ed3c2a30fcfa08c9c68c93a8a35d20f27e19c2ee09c93a899f9434d2cd0",
+    "negative_auditor_mutants": 4,
+    "producer_hash_checks": "passed before deserialization",
+    "independent_result_recalculation": "passed; recalculated the medians, 6 alternating order blocks, 12 samples per compiler per fixture, 51 CSV rows"
+  },
+  "benchmark": {
+    "execution": "one Rust process, one Wasmtime Engine, four Stores; original AOTs deserialized once; Wasmtime guest calls timed",
+    "iterations_per_call": 5000000,
+    "cycles": 6,
+    "samples_per_variant_per_fixture": 12,
+    "order": "ABBA/BAAB alternating",
+    "pair": {
+      "median_ms": {
+        "baseline": 26.168749,
+        "experimental": 13.0609875
+      },
+      "experimental_over_baseline_ratio": 0.4991063004196341,
+      "static_DIV": {
+        "baseline": 2,
+        "experimental": 1
+      }
+    },
+    "quotient_only_control": {
+      "median_ms": {
+        "baseline": 13.0719585,
+        "experimental": 13.0592125
+      },
+      "experimental_over_baseline_ratio": 0.999024935704929,
+      "byte_identical_AOT_sha256": "e0e8c0023885673d8765927d1a011a6a61a70cb0d65a1f42a3821fba89d2c28b"
+    },
+    "whole_AOT_size_change_bytes": 0,
+    "method_limitations": [
+      "Measured wall time includes Wasmtime guest-call overhead and OS scheduling but excludes process startup, AOT load and Wasm compilation",
+      "One virtualized x86_64 CI host and one narrow workload; no general production speedup or statistical cross-host claim",
+      "Same guest Wasm and archived AOT bytes; the compiler patch changes Cranelift internals only in detached disposable source checkout",
+      "Neither an unconditional compiler-pass correctness proof nor a complete x86 machine-state/flags/ABI refinement proof",
+      "No new ZenoFCIS synthesis discovery; human-authored udiv/urem combiner only",
+      "Dynamic loop timing not an ISLE, native CLIF, static x86-byte or whole-AOT-size cost"
+    ]
+  },
+  "provenance_note": "This checkpoint was constructed after downloading the original CI artifact, verifying its ZIP SHA-256, opening raw.csv and qualified.json, and independently recalculating balanced sample medians. The benchmark is not a representative workload claim.",
+  "next_gate": "Compiler-pass/machine-state refinement and representative workload profitability; only then consider speculative-free upstream PR"
+}
