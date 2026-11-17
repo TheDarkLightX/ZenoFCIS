@@ -33,6 +33,22 @@ jobs:
           github-token: ${{ github.token }}
           name: tier1-post-souper-divrem-28
           path: tier1-compile-envelope/source
+      - name: Verify compiler bytes before restoring artifact executable permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, 'experiments/cranelift-tier1')
+          from audit_post_souper_inprocess_28 import producer
+          source = Path('tier1-compile-envelope/source')
+          producer(source)
+          for mode in ('baseline', 'patched'):
+              path = source / mode / 'wasmtime'
+              path.chmod(0o755)
+          print('pinned compiler SHA-256 verified; ZIP-stripped executable permission restored')
+          PY
       - name: Run controlled alternating compile plus serialize measurements
         shell: bash
         run: |
