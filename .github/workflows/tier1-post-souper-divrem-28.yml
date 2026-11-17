@@ -32,7 +32,7 @@ jobs:
       CARGO_BUILD_JOBS: '3'
       CARGO_INCREMENTAL: '0'
       CARGO_PROFILE_DEV_DEBUG: '0'
-      RUSTUP_TOOLCHAIN: '1.97.1'
+      RUSTUP_TOOLCHAIN: '1.98.0'
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -51,7 +51,7 @@ jobs:
           git rev-parse HEAD > tier1-post-souper/zenofcis-head.txt
           git -C upstream rev-parse HEAD > tier1-post-souper/wasmtime-head.txt
           python3 -B experiments/cranelift-tier1/post_souper_portability_28.py --mode preflight --upstream upstream
-          rustup toolchain install 1.97.1 --profile minimal
+          rustup toolchain install 1.98.0 --profile minimal
           rustc -Vv > tier1-post-souper/rustc-version.txt
       - name: Build pristine post-Souper merged upstream baseline
         shell: bash
