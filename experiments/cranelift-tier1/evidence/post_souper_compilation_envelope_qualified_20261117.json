@@ -1,0 +1,69 @@
+{
+  "schema": "zenofcis/tier1-post-souper-compilation-independent-checkpoint/1",
+  "qualified_date_utc": "2026-11-17",
+  "status": "narrow-compilation-envelope-qualified",
+  "source": {
+    "zenofcis_experiment_sha": "ceee6e7b51bf41a4de05dbf7428ed8d01219a887",
+    "wasmtime_sha": "8b19f199f89da864c529b3fa3ca2f7e40d5de609",
+    "original_compiler_producer_sha": "f6edf2bdeea71f2f2b43111370496857601aa65f",
+    "original_producer_ci_run": 44056104464,
+    "original_producer_artifact": 14316481158,
+    "target": "x86_64-unknown-linux"
+  },
+  "qualification": {
+    "workflow_run": 44179088018,
+    "workflow_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44179088018",
+    "ci_status": "success",
+    "artifact_id": 14371550978,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44179088018/artifacts/14371550978",
+    "artifact_zip_sha256": "a1c20fba9aef8317885955a5f72db6c2abf8ffd6d82583c6a4ee27e1aa8de24a",
+    "independently_recomputed": "Four WAT source hashes and operation counts; eight AOT SHA-256 and lengths; 64 timing rows and medians/ratios; two quotient-only AOT byte-identity controls; finite-check count receipts",
+    "archived_verified_finite_executions": 120,
+    "control_corruption_mutants": 5
+  },
+  "cost_metric": "On one Ubuntu 24.04 x86_64 GitHub runner, end-to-end Wasmtime CLI subprocess compile+serialize elapsed wall time; includes startup, frontend, compiler and AOT serialization; eight per compiler per case; alternating ABBA/BAAB for four cycles",
+  "results": {
+    "pair_64": {
+      "baseline_aot_bytes": 42336,
+      "patched_aot_bytes": 38232,
+      "saved_aot_bytes": 4104,
+      "baseline_median_ms": 132.6525975,
+      "patched_median_ms": 133.727514,
+      "latency_ratio": 1.0081032450193823
+    },
+    "pair_256": {
+      "baseline_aot_bytes": 142456,
+      "patched_aot_bytes": 134224,
+      "saved_aot_bytes": 8232,
+      "baseline_median_ms": 503.748576,
+      "patched_median_ms": 510.393254,
+      "latency_ratio": 1.013190465078357
+    },
+    "quotient_control_64": {
+      "baseline_aot_bytes": 38232,
+      "patched_aot_bytes": 38232,
+      "byte_identical": true,
+      "baseline_median_ms": 120.6269545,
+      "patched_median_ms": 129.3491475,
+      "latency_ratio": 1.072307164150447
+    },
+    "quotient_control_256": {
+      "baseline_aot_bytes": 134224,
+      "patched_aot_bytes": 134224,
+      "byte_identical": true,
+      "baseline_median_ms": 454.4200525,
+      "patched_median_ms": 491.384085,
+      "latency_ratio": 1.0813433128591965
+    }
+  },
+  "diagnostic": "The patched compiler calls a structural verifier on every optimized x86-64 function, including the quotient-only negative control whose AOT bytes remain identical. The control's apparent 7-8% end-to-end compile-time regression is consistent with verifier overhead but not isolated causally; a conditional-verifier A/B on the same host would test this hypothesis.",
+  "limits": [
+    "Artificial modules comprise 64 or 256 copies of one simple exported function; not representative applications",
+    "One shared CI virtual machine, eight samples per compiler/fixture, exploratory timing only",
+    "Observed whole-AOT size deltas are not CLIF costs, x86 instruction-byte counts, or native throughput",
+    "The two compiler binaries are source- and SHA-256-pinned to the archived post-Souper producer run; no upstream branch was modified",
+    "Finite native arithmetic/trap observations and prior separate SMT/CLIF checks do not prove compiler-pass/ISA/flags/poison correctness",
+    "No new synthesis-discovered sequence; the evaluated div/rem combiner is human-authored",
+    "Full proof of cross-target compiler semantics and representative profitability remain outstanding"
+  ]
+}
