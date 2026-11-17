@@ -1,0 +1,12 @@
+[package]
+name = "tier1-udivrem-post-souper-inprocess-28"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+# Verified in workflow against Wasmtime merge 8b19f199f89da864c529b3fa3ca2f7e40d5de609.
+# Deserialize-only runtime: never recompile the same-WAT AOT in the timed region.
+wasmtime = { path = "../../../upstream/crates/wasmtime", default-features = false, features = ["runtime", "std", "component-model-async"] }
