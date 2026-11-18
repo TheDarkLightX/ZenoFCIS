@@ -1,0 +1,76 @@
+name: tier1-quotrem-expression-palette-28
+on:
+  push:
+    branches: [research/2.8-tier1-quotrem-expression-palette-20261118]
+    paths:
+      - '.github/workflows/tier1-quotrem-expression-palette-28.yml'
+      - 'experiments/cranelift-tier1/search_quotrem_expressions_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: tier1-quotrem-expression-palette-28
+  cancel-in-progress: true
+jobs:
+  bounded-wat-palette:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Install source-hash-pinned SMT checker
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/tier1-palette-venv"
+          "$RUNNER_TEMP/tier1-palette-venv/bin/python" -m pip install \
+            --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          printf '%s\n' "$RUNNER_TEMP/tier1-palette-venv/bin" >> "$GITHUB_PATH"
+      - name: Validate complete small grammar and deliberate incorrect variant
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/search_quotrem_expressions_28.py
+          python3 -B experiments/cranelift-tier1/search_quotrem_expressions_28.py --mode self-test
+      - name: Download independently qualified post-Souper Wasmtime compilers
+        uses: actions/download-artifact@v4
+        with:
+          repository: TheDarkLightX/ZenoFCIS
+          run-id: 44056104464
+          github-token: ${{ github.token }}
+          name: tier1-post-souper-divrem-28
+          path: tier1-palette-state/compilers
+      - name: Validate compiler source and binary receipts
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, 'experiments/cranelift-tier1')
+          from audit_post_souper_inprocess_28 import producer
+          root = Path('tier1-palette-state/compilers')
+          producer(root)
+          for mode in ('baseline', 'patched'):
+              (root / mode / 'wasmtime').chmod(0o755)
+          print('Existing compiler source and binary pins independently checked')
+          PY
+      - name: Search bounded WAT candidate palette using real native cost oracle
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/search_quotrem_expressions_28.py \
+            --mode run --root tier1-palette-state/compilers \
+            --out tier1-palette-state/results
+      - name: Independently regenerate proof and replay exact native code and costs
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/search_quotrem_expressions_28.py \
+            --mode audit --root tier1-palette-state/compilers \
+            --out tier1-palette-state/results
+      - name: Preserve raw WAT, AOT, disassembly, receipts and failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-quotrem-expression-palette-28
+          path: tier1-palette-state/results/
+          retention-days: 30
+          if-no-files-found: warn
