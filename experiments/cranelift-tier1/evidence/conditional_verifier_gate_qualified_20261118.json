@@ -1,0 +1,94 @@
+{
+  "schema": "zenofcis/tier1-conditional-verifier-gate-independent-checkpoint/1",
+  "qualified_date_utc": "2026-11-18",
+  "result": "passed_on_one_host_exploratory",
+  "source": {
+    "zenofcis_benchmark_head": "b3213de6f304d2e4918643fb740c14d07c5318c3",
+    "zenofcis_parent": "37707fcb5ae76d34972e831330847c8dd9060a55",
+    "wasmtime_pristine_upstream": "8b19f199f89da864c529b3fa3ca2f7e40d5de609",
+    "previous_producer_head": "f6edf2bdeea71f2f2b43111370496857601aa65f",
+    "previous_pinned_compiler_run": 44056104464,
+    "target": "x86_64-unknown-linux",
+    "rust_toolchain": "1.98.0",
+    "change": "Context::verify(isa) executes only if tier1_combine_adjacent_unsigned_divrem rewrites at least one instruction"
+  },
+  "workflow": {
+    "run_id": 44230813420,
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44230813420",
+    "job_id": 134555106416,
+    "conclusion": "success",
+    "artifact_id": 14394343571,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44230813420/artifacts/14394343571",
+    "downloaded_zip_sha256": "bf2f586bae4955e7805001c4b0ff0ca0e194e16cefcadce5ad7e49ef6b97d894",
+    "github_artifact_reported_sha256": "bf2f586bae4955e7805001c4b0ff0ca0e194e16cefcadce5ad7e49ef6b97d894",
+    "zip_manifest_path": "measurements/manifest.json",
+    "zip_samples_path": "measurements/raw.csv",
+    "raw_csv_sha256": "0becc04169e33697c4b7c1250042b5bd3288d999ffe88aefa25d556e8eb01d1a",
+    "conditional_patch_install_receipt_sha256": "ad9fcdf905c6726a3fc55b56bf8893e97ca4d1af7c7edc60e5c19fe8e534ad18",
+    "raw_samples": 96,
+    "samples_per_compiler_per_fixture": 8,
+    "balanced_cycles": 4,
+    "finite_wasm_calls_receipted": 180,
+    "mutated_receipt_negative_controls": 5
+  },
+  "compiler_sha256": {
+    "baseline": "b9f0d8ffcb759369ac53d8cf51729438b775f8fe2c3b85edc9532b370ac109e1",
+    "ungated": "7b9428dbe94a13aeab304fbc05abebb27b65a3ed39846c27ba6e1fa3a1c8beb5",
+    "gated": "206fbef6048ac6ec0b2eb3a2eb334ac5bbd3895bfa64f85c617c5a65004afc8a"
+  },
+  "cost_metric": "Median wall time per CLI process compile+serialize, includes process startup and WAT frontend/codegen/AOT output, not isolated Cranelift codegen",
+  "results": {
+    "pair_64": {
+      "baseline_ms": 133.494016,
+      "ungated_ms": 138.0588065,
+      "gated_ms": 131.6146545,
+      "gated_over_ungated": 0.9533231369778645,
+      "baseline_aot_bytes": 42336,
+      "ungated_aot_bytes": 38232,
+      "gated_aot_bytes": 38232
+    },
+    "pair_256": {
+      "baseline_ms": 509.75756,
+      "ungated_ms": 528.4854105,
+      "gated_ms": 503.6513275,
+      "gated_over_ungated": 0.9530089525527214,
+      "baseline_aot_bytes": 142456,
+      "ungated_aot_bytes": 134224,
+      "gated_aot_bytes": 134224
+    },
+    "quotient_control_64": {
+      "baseline_ms": 121.4883245,
+      "ungated_ms": 130.6451965,
+      "gated_ms": 121.340662,
+      "gated_over_ungated": 0.9287801254904922,
+      "baseline_aot_bytes": 38232,
+      "ungated_aot_bytes": 38232,
+      "gated_aot_bytes": 38232
+    },
+    "quotient_control_256": {
+      "baseline_ms": 467.6726235,
+      "ungated_ms": 503.151402,
+      "gated_ms": 466.7187805,
+      "gated_over_ungated": 0.9275911358784209,
+      "baseline_aot_bytes": 134224,
+      "ungated_aot_bytes": 134224,
+      "gated_aot_bytes": 134224
+    }
+  },
+  "rechecks": [
+    "Independently downloaded original CI artifact and matched its SHA-256 against GitHub's artifact digest",
+    "Independently parsed archived raw.csv, recomputed all 12 median durations, four conditional/ungated ratios and 96 sample counts",
+    "Independently matched raw CSV SHA-256 to manifest and source installer receipt SHA-256 to manifest",
+    "Independently SHA-256 checked 12 archived AOT binaries against manifest and enforced byte identity for all ungated-vs-gated fixtures",
+    "Four quotient-only AOT pairs across 64 and 256 controls are byte-identical to baseline; 64 and 256 pair AOTs preserve savings",
+    "CI compile, finite guest arithmetic/trap checks, sampled timing and independent on-run audit all passed"
+  ],
+  "limits": [
+    "Experimental narrow x86-64 unsigned i64 adjacent udiv/urem pair; no general compiler-pass/x86 machine-state/poison/flags proof",
+    "8 timing samples per compiler/fixture on one shared virtualized Ubuntu host; exploratory, not confidence intervals or representative workloads",
+    "No new synthesis-discovered instruction sequence: human-authored compiler combiner and manually hypothesized verifier optimization",
+    "One local compiler source-edit is not an upstream contribution; do not merge or submit until representative profitability and semantic refinement",
+    "AOT size measurements are not decoded x86 instruction byte counts or CLIF cost",
+    "Archived finite checks and separate SMT results remain distinct classes of evidence"
+  ]
+}
