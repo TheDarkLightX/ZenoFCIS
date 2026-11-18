@@ -24,7 +24,7 @@ MASK = (1 << 64) - 1
 TARGET = "x86_64-unknown-linux"
 PIN = "8b19f199f89da864c529b3fa3ca2f7e40d5de609"
 SCHEMA = "zenofcis/tier1-register-pressure-contexts/1"
-KINDS = ("pressure", "arithmetic_reuse", "mismatched_operands")
+KINDS = ("pressure", "arithmetic_reuse", "incoming_live_args", "mismatched_operands")
 MODES = ("baseline", "patched")
 
 def sha(path: Path) -> str:
@@ -43,10 +43,17 @@ def rotl(x: int, k: int) -> int:
     x &= MASK
     return ((x << k) | (x >> (64 - k))) & MASK if k else x
 
+def live_values(x: int, y: int) -> tuple[int, ...]:
+    """Eight independent incoming ABI parameters, deterministic for each test vector."""
+    return tuple(signed(u(u(x) * 0x9E3779B97F4A7C15 +
+                          u(y) * 0xD1B54A32D192ED03 +
+                          (i + 1) * 0x94D049BB133111EB)) for i in range(8))
+
 def wats(kind: str) -> str:
     if kind not in KINDS:
         raise ValueError("unadmitted fixture")
-    head = '(module\n  (func (export "work") (param $x i64) (param $y i64) (result i64)\n'
+    extras = "".join(f" (param $v{i} i64)" for i in range(8)) if kind == "incoming_live_args" else ""
+    head = '(module\n  (func (export "work") (param $x i64) (param $y i64)' + extras + ' (result i64)\n'
     q = "local.get $x\nlocal.get $y\ni64.div_u\nlocal.set $q\n"
     r = "local.get $x\nlocal.get $y\ni64.rem_u\nlocal.set $r\n"
     if kind == "pressure":
@@ -64,6 +71,11 @@ def wats(kind: str) -> str:
                  "local.get $q\ni64.const 7\ni64.mul",
                  "local.get $r\ni64.const 13\ni64.mul",
                  "i64.add", "local.get $q\nlocal.get $r\ni64.xor", "i64.add"]
+    elif kind == "incoming_live_args":
+        lines = ["(local $q i64) (local $r i64)", q, r,
+                 "local.get $q\nlocal.get $r\ni64.xor"]
+        for i in range(8):
+            lines.append(f"local.get $v{i}\ni64.const {i * 7 + 1}\ni64.rotl\ni64.xor")
     else:
         lines = ["local.get $x\nlocal.get $y\ni64.div_u",
                  "local.get $y\nlocal.get $x\ni64.rem_u", "i64.xor"]
@@ -80,6 +92,10 @@ def oracle(kind: str, x: int, y: int) -> int | None:
             value ^= u(rotl(x, 7*i+1) + (y ^ (101 + 23*i)))
     elif kind == "arithmetic_reuse":
         value = u(7*q + 13*r + (q ^ r))
+    elif kind == "incoming_live_args":
+        value = q ^ r
+        for i, extra in enumerate(live_values(x, y)):
+            value ^= rotl(extra, i * 7 + 1)
     elif kind == "mismatched_operands":
         value = q ^ (y % x)
     else:
@@ -95,15 +111,18 @@ def vectors() -> tuple[tuple[int, int], ...]:
               for _ in range(32)]
     return tuple(dict.fromkeys(pairs))
 
-def call(exe: Path, aot: Path, x: int, y: int) -> subprocess.CompletedProcess[str]:
+def call(exe: Path, aot: Path, x: int, y: int, kind: str) -> subprocess.CompletedProcess[str]:
+    arguments = [str(x), str(y)]
+    if kind == "incoming_live_args":
+        arguments.extend(str(z) for z in live_values(x, y))
     return subprocess.run(
         [str(exe), "run", "--allow-precompiled", "--invoke", "work",
-         str(aot), str(x), str(y)], text=True, capture_output=True, timeout=45)
+         str(aot), *arguments], text=True, capture_output=True, timeout=45)
 
 def finite_check(exe: Path, aot: Path, kind: str) -> dict:
     counts = {"value": 0, "trap": 0}
     for x, y in vectors():
-        p = call(exe, aot, x, y)
+        p = call(exe, aot, x, y, kind)
         want = oracle(kind, x, y)
         if want is None:
             if p.returncode == 0 or "trap" not in p.stderr.lower():
@@ -179,6 +198,8 @@ def run(root: Path, out: Path) -> None:
         "cases": cases,
         "limits": [
             "Finite guest-Wasm value/trap executions, not compiler-pass, ISA or arbitrary flag/ABI proof",
+            "Incoming live arguments are semantically live after the division pair; no proof that all eight occupy physical registers at the DIV instruction",
+            "The earlier pressure fixture may be reordered by codegen; WAT-local lifetime is not a register-liveness certificate",
             "Single pinned x86-64 target; no cross-target or poison/undefined behavior model",
             "Decoded per-function native bytes differ from CLIF cost and whole-AOT bytes",
             "No newly synthesized instruction sequence and no representative profitability claim",
@@ -238,6 +259,8 @@ def self_test() -> None:
     assert oracle("mismatched_operands", 0, 7) is None
     assert oracle("arithmetic_reuse", 7, 3) == signed(7*2 + 13*1 + (2 ^ 1))
     assert oracle("pressure", -1, 7) is not None
+    assert wats("incoming_live_args").count("(param $v") == 8
+    assert oracle("incoming_live_args", 7, 3) is not None
     assert len(vectors()) >= 60
     print("Deterministic, bounded live-register arithmetic/trap oracle self-test passed")
 
