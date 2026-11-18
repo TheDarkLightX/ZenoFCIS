@@ -26,8 +26,10 @@ AFTER='''        if opt_level != OptLevel::None {
         }
         // EXPERIMENTAL: only x64 i64 adjacent unsigned div/rem with identical operands.
         if opt_level != OptLevel::None && isa.triple().architecture == Architecture::X86_64 {
-            tier1_combine_adjacent_unsigned_divrem(&mut self.func);
-            // Experimental qualification: verify SSA, dominance, types and CFG\n            // unconditionally, even when the compiler's enable_verifier flag\n            // is false. This does not prove semantic or trap-map equivalence.\n            self.verify(isa)?;
+            let tier1_changes = tier1_combine_adjacent_unsigned_divrem(&mut self.func);
+            // Experimental qualification: verify SSA, dominance, types and CFG\n            // whenever a rewrite occurred, even if enable_verifier is false.\n            // This does not prove semantic or trap-map equivalence.\n            if tier1_changes != 0 {
+                self.verify(isa)?;
+            }
         }
 
         Ok(())
@@ -98,7 +100,8 @@ def self_test():
     original='a\n'+CALL+'b\nimpl Context {\nc\n'
     patched=patch_context(original)
     assert patched.count('udivrem(x, y)')==1 and 'clear_results(rinst)' in patched
-    assert 'self.verify(isa)?;' in patched and 'self.verify_if(isa)?;' not in patched
+    assert 'if tier1_changes != 0 {' in patched and 'self.verify(isa)?;' in patched
+    assert 'self.verify_if(isa)?;' not in patched
     negatives=[original.replace(CALL, ''), original.replace(CALL, CALL+CALL),
                original.replace('impl Context {',''), patched]
     for s in negatives:
@@ -132,7 +135,7 @@ def run(root,out):
         'modified_source_paths':sorted(replacements),
         'opt_gate':'x86_64 and opt_level != None',
         'match':'adjacent same-block udiv followed by urem, exact identical SSA operands, both i64',
-        'structural_validation':'unconditional post-rewrite Context::verify(isa), even when enable_verifier=false',
+        'structural_validation':'post-rewrite Context::verify(isa) unconditional only when tier1_changes > 0; skips unchanged functions even when enable_verifier=false',
         'proof_status':'Verifier checks CLIF structural invariants, NOT semantic/trap-table equivalence or generic compiler-pass soundness',
     },indent=2,sort_keys=True)+'\n')
 
