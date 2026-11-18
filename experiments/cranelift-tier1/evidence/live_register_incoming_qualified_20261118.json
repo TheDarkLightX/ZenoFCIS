@@ -1,0 +1,96 @@
+{
+  "schema": "zenofcis/tier1-incoming-live-context-independent-checkpoint/1",
+  "qualified_date_utc": "2026-11-18",
+  "status": "finite-native-qualified-on-pinned-x86_64-host",
+  "source": {
+    "zenofcis_test_commit": "53ca4e6dc99baceddce2000b58b26937224cd723",
+    "wasmtime_commit": "8b19f199f89da864c529b3fa3ca2f7e40d5de609",
+    "source_script": "experiments/cranelift-tier1/stress_live_registers_28.py",
+    "source_script_sha256": "8928b64c8ba4c51ad1e585da718275687be74f0e611ced04ddda5329995da3e9",
+    "target": "x86_64-unknown-linux",
+    "original_compiler_producer_run": 44056104464,
+    "original_compiler_receipt_sha256": "4a5ebf4f50c43338f663138fe870bc5bc6095bd8aeb7e54b696b2eacc302bf1e",
+    "compiler_sha256": {
+      "baseline": "b9f0d8ffcb759369ac53d8cf51729438b775f8fe2c3b85edc9532b370ac109e1",
+      "patched": "7b9428dbe94a13aeab304fbc05abebb27b65a3ed39846c27ba6e1fa3a1c8beb5"
+    }
+  },
+  "ci": {
+    "original_three_context_run": 44232763787,
+    "original_three_context_artifact_id": 14396930098,
+    "original_three_context_artifact_zip_sha256": "60655a1d3debc1c87cf4414c8bceadd69e835df315095cdc19436ed73504a8df",
+    "new_four_context_run": 44278828679,
+    "new_four_context_job_id": 134713815090,
+    "new_four_context_artifact_id": 14416685486,
+    "new_four_context_artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44278828679/artifacts/14416685486",
+    "new_four_context_artifact_zip_sha256": "2d7e596c08d6ab9bb6bbdb0e31e753c8e9444ed470cabc2aeecb38283ad99ea3",
+    "run_conclusion": "success",
+    "vectors_per_context_per_compiler": 87,
+    "native_guest_executions_total": 696,
+    "successful_guest_values": 600,
+    "expected_guest_traps": 96
+  },
+  "measured": {
+    "cost_unit": "decoded native x86-64 instruction bytes in complete wasm function disassembly, including prologue/epilogue/trap stubs; not CLIF cost or whole-AOT size",
+    "cases": {
+      "arithmetic_reuse": {
+        "baseline_bytes": 53,
+        "patched_bytes": 35,
+        "baseline_div": 2,
+        "patched_div": 1
+      },
+      "incoming_live_args": {
+        "baseline_bytes": 189,
+        "patched_bytes": 151,
+        "baseline_instructions": 53,
+        "patched_instructions": 43,
+        "baseline_div": 2,
+        "patched_div": 1,
+        "aot_bytes_per_mode": 13624,
+        "wasm_source_sha256": "40ade10b2d2edff57475a218dc42161c9bb7caf6f7a27d593031f18df15b0a00",
+        "baseline_aot_sha256": "ad5b358a8edd334c67cfaa880153d9958e29fdaeab659865e84aa354e0353c47",
+        "patched_aot_sha256": "b152ced9937b4518d8868ed7b528fa20cdaf53cfd44ea51a005286c129408b56",
+        "baseline_disassembly_sha256": "b8813117f77583a5c6d0447f1cd7b0f42e32a81d01a69344d074868c202e6fd6",
+        "patched_disassembly_sha256": "e04b378db11aec088d7f693e85a8c537c38a4393a58df3775ca54542e418dee6"
+      },
+      "mismatched_operands": {
+        "baseline_bytes": 39,
+        "patched_bytes": 39,
+        "baseline_div": 2,
+        "patched_div": 2,
+        "aot_hashes_identical": true
+      },
+      "pressure": {
+        "baseline_bytes": 213,
+        "patched_bytes": 195,
+        "baseline_div": 2,
+        "patched_div": 1
+      }
+    }
+  },
+  "independent_artifact_audit": [
+    "Downloaded both original GitHub CI ZIPs and matched SHA-256 against GitHub artifact digests",
+    "Inspected all 21 files in new artifact and checked WAT, AOT and disassembly SHA-256 receipts for every context and compiler",
+    "Independently tokenized hex-encoded machine instructions from all eight disassemblies and recovered every declared native-byte count",
+    "Recomputed all native-byte savings and DIV reductions without trusting reported deltas",
+    "Inspected incoming-live x86 code and observed input registers occupied through DIV and later consumed; no universal machine-state proof is implied",
+    "Examined original fixture: nominally pre-div local computations can be rescheduled after DIV, motivating the new ten-independent-argument fixture",
+    "CI ran real AOT guest calls with deterministic Python oracle and trap checks, then repeated them in audit mode"
+  ],
+  "upstream_alignment": {
+    "issue_url": "https://github.com/bytecodealliance/wasmtime/issues/5623",
+    "issue_state_at_check": "open",
+    "issue_description": "Explicitly asks for udiv/urem deduplication on x86 and notes possible register-pressure tradeoff",
+    "proposed_upstream_approach": "Multi-result udivrem instruction and target-aware egraph rules (not yet implemented by this experiment)"
+  },
+  "limits": [
+    "Human-authored adjacent udiv/urem transformation, not newly synthesized candidate",
+    "Not a complete compiler-pass or x86 register, flags, ABI, poison/undefined, or trap refinement proof",
+    "Incoming eight arguments are used after division; bytecode and one disassembly show machine register pressure, not a proof for arbitrary register allocation or all target variants",
+    "The earlier pressure fixture is not proof of eight physical registers live through DIV because codegen can reorder its computations",
+    "One x86-64 target and one CI host; no cross-target safety conclusion",
+    "No representative workload throughput or overall compilation-profitability conclusion from this artifact",
+    "Artifact retention 30 days; persistent structured checkpoint pins the original audit inputs, but replay must use the test commit rather than the changing research branch tip",
+    "Do not merge to main/release or submit upstream until stronger compiler-pass/machine-state assurance and broader benchmarking"
+  ]
+}
