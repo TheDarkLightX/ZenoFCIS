@@ -1,0 +1,110 @@
+name: tier1-gated-register-crosscheck-28
+on:
+  push:
+    branches: [research/2.8-tier1-gated-register-crosscheck-20261118]
+    paths:
+      - '.github/workflows/tier1-gated-register-crosscheck-28.yml'
+      - 'experiments/cranelift-tier1/stress_gated_live_registers_28.py'
+      - 'experiments/cranelift-tier1/stress_live_registers_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: tier1-gated-register-crosscheck-28
+  cancel-in-progress: true
+jobs:
+  native-gated-register-refinement:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.98.0'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Preflight exact fixtures, compiler digest declarations and known upstream source
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/stress_gated_live_registers_28.py experiments/cranelift-tier1/stress_live_registers_28.py
+          python3 -B experiments/cranelift-tier1/stress_gated_live_registers_28.py --mode self-test
+          python3 -B experiments/cranelift-tier1/post_souper_portability_28.py --mode self-test
+      - name: Recover independently qualified unchanged and ungated compiler binaries
+        uses: actions/download-artifact@v4
+        with:
+          repository: TheDarkLightX/ZenoFCIS
+          run-id: 44056104464
+          github-token: ${{ github.token }}
+          name: tier1-post-souper-divrem-28
+          path: tier1-gated-state/compilers
+      - name: Check exact source and binary receipts before execution
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, 'experiments/cranelift-tier1')
+          from audit_post_souper_inprocess_28 import producer
+          root = Path('tier1-gated-state/compilers')
+          producer(root)
+          for m in ('baseline', 'patched'):
+              (root / m / 'wasmtime').chmod(0o755)
+          print('Independent original compiler source/SHA-256 audit passed')
+          PY
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: 8b19f199f89da864c529b3fa3ca2f7e40d5de609
+          path: upstream
+          persist-credentials: false
+      - name: Install exact conditional-verifier source changes in disposable upstream checkout
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-gated-state/compiler-source
+          python3 -B experiments/cranelift-tier1/post_souper_portability_28.py --mode preflight --upstream upstream
+          python3 -B experiments/cranelift-tier1/post_souper_portability_28.py --mode install \
+            --upstream upstream --out tier1-gated-state/compiler-source
+          cp tier1-gated-state/compiler-source/install.json tier1-gated-state/compilers/conditional-install.json
+          git -C upstream diff --check
+          git -C upstream diff -- \
+            cranelift/codegen/src/context.rs \
+            cranelift/codegen/meta/src/shared/instructions.rs \
+            cranelift/codegen/src/isa/x64/lower.isle \
+            cranelift/interpreter/src/step.rs > tier1-gated-state/compiler-source/patch.diff
+          test -s tier1-gated-state/compiler-source/patch.diff
+      - name: Build exact gated compiler under pinned Rust and Wasmtime Cargo.lock
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.98.0 --profile minimal
+          rustc -Vv > tier1-gated-state/compiler-source/rustc-version.txt
+          cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli \
+            --bin wasmtime --no-default-features --features run,compile,wat,objdump \
+            > tier1-gated-state/compiler-source/build.stdout \
+            2> tier1-gated-state/compiler-source/build.stderr
+          mkdir -p tier1-gated-state/compilers/conditional
+          cp upstream/target/debug/wasmtime tier1-gated-state/compilers/conditional/wasmtime
+          sha256sum tier1-gated-state/compilers/{baseline,patched,conditional}/wasmtime \
+            > tier1-gated-state/compiler-source/compiler-binary-digests.txt
+      - name: Check compiler hashes, compile three identical WATs and run finite native oracles
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/stress_gated_live_registers_28.py \
+            --mode run --root tier1-gated-state/compilers --out tier1-gated-state/evidence
+      - name: Replay all 12 AOT outputs, disassemblies, costs and native values/traps
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/stress_gated_live_registers_28.py \
+            --mode audit --root tier1-gated-state/compilers --out tier1-gated-state/evidence
+      - name: Preserve source receipts, raw evidence and failures for independent review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-gated-register-crosscheck-28
+          path: |
+            tier1-gated-state/evidence/
+            tier1-gated-state/compiler-source/
+          retention-days: 30
+          if-no-files-found: warn

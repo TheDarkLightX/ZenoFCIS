@@ -1,0 +1,90 @@
+{
+  "schema": "zenofcis/tier1-gated-live-register-crosscheck-independent-checkpoint/1",
+  "qualified_date_utc": "2026-11-18",
+  "status": "passed-finite-x86_64-native-three-compiler-qualification",
+  "source": {
+    "zenofcis_test_commit": "cabb5b5bdbcaa1c88302fc3af2d4a1bd6973aa31",
+    "upstream_wasmtime": "8b19f199f89da864c529b3fa3ca2f7e40d5de609",
+    "parent_experiment": "b6540eedc033591024cca32975710f9c8f6edee7",
+    "original_live_stress_fixture_commit": "fc7ed09884eafdf95d4ce771bbf7247a734a7eeb",
+    "program": "experiments/cranelift-tier1/stress_gated_live_registers_28.py",
+    "program_sha256": "c9cfec9b9865c621be6b28aac3d957c8504c0ecfe279747f97f31bfcc943f29e",
+    "original_fixtures_sha256": "8928b64c8ba4c51ad1e585da718275687be74f0e611ced04ddda5329995da3e9",
+    "rustc": "1.98.0 (88d9e12ae, LLVM 22.1.8)",
+    "target": "x86_64-unknown-linux"
+  },
+  "ci": {
+    "run_id": 44335394857,
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44335394857",
+    "job_id": 134910577257,
+    "conclusion": "success",
+    "artifact_id": 14441870738,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44335394857/artifacts/14441870738",
+    "artifact_zip_sha256": "f07cb55bd843e1b0f18eda14d3c895f09c2205c84b27a76998c5a5351803d229",
+    "artifact_files": 35,
+    "producer_run": 44056104464,
+    "prior_gated_compiler_run": 44230813420
+  },
+  "compiler_sha256": {
+    "baseline": "b9f0d8ffcb759369ac53d8cf51729438b775f8fe2c3b85edc9532b370ac109e1",
+    "ungated": "7b9428dbe94a13aeab304fbc05abebb27b65a3ed39846c27ba6e1fa3a1c8beb5",
+    "gated": "206fbef6048ac6ec0b2eb3a2eb334ac5bbd3895bfa64f85c617c5a65004afc8a",
+    "conditional_install_receipt_sha256": "ad9fcdf905c6726a3fc55b56bf8893e97ca4d1af7c7edc60e5c19fe8e534ad18"
+  },
+  "results": {
+    "cost_unit": "decoded native function instruction bytes, not CLIF operations or whole serialized AOT",
+    "per_fixture": {
+      "arithmetic_reuse": {
+        "baseline_bytes": 53,
+        "ungated_bytes": 35,
+        "gated_bytes": 35,
+        "baseline_div": 2,
+        "gated_div": 1
+      },
+      "incoming_live_args": {
+        "baseline_bytes": 189,
+        "ungated_bytes": 151,
+        "gated_bytes": 151,
+        "baseline_div": 2,
+        "gated_div": 1
+      },
+      "mismatched_operands": {
+        "baseline_bytes": 39,
+        "ungated_bytes": 39,
+        "gated_bytes": 39,
+        "baseline_div": 2,
+        "gated_div": 2
+      },
+      "pressure": {
+        "baseline_bytes": 213,
+        "ungated_bytes": 195,
+        "gated_bytes": 195,
+        "baseline_div": 2,
+        "gated_div": 1
+      }
+    },
+    "native_guest_checks_initial": 1044,
+    "native_guest_checks_replay": 1044,
+    "vector_count_per_context_per_compiler": 87,
+    "aot_hashes_ungated_equals_gated_all_four": true,
+    "disassembly_hashes_ungated_equals_gated_all_four": true,
+    "mismatched_operand_negative_control_aot_hash_equals_baseline": true
+  },
+  "independent_audit": [
+    "Downloaded GitHub artifact ZIP and matched its SHA-256 byte-for-byte with GitHub artifact digest",
+    "Inspected 35 archived files including all 12 AOT images and native disassemblies",
+    "Independently SHA-256 checked all source WATs, AOTs, disassemblies and installer receipt against manifest",
+    "Retokenized actual native instruction hex bytes from all 12 disassemblies independently and recomputed four deltas",
+    "Checked gated and ungated AOT/disassembly identity and negative-control baseline identity",
+    "Independently checked compiler binary identity list; gated binary rebuilt to exactly the earlier source-pinned SHA-256"
+  ],
+  "limits": [
+    "Exactly three human-authored compiler variants (not new sequence synthesis); all target compilation source unchanged other than experimental Cranelift patch",
+    "Finite value/trap executions on one x86-64 hosted runner are not a complete compiler-pass, arbitrary SSA, ABI, flags, poison/undefined, machine-state or cross-target proof",
+    "Incoming arguments semantically live after div/rem but this does not establish all physical registers always live across the transform",
+    "Matched output AOT hash equality means changed verifier policy did not change these four emitted images; it does not prove compiler correctness generally",
+    "Decoded native per-function bytes are not whole-AOT footprint, CLIF complexity or real workload runtime profitability",
+    "Old source pin from Souper merge and a later upstream main revision coexist; do not extrapolate to untested latest upstream",
+    "Draft research only. Do not merge to ZenoFCIS main or release branch or submit upstream without additional compiler-state proof and representative profitability"
+  ]
+}
