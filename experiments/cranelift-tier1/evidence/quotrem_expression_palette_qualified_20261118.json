@@ -1,0 +1,99 @@
+{
+  "schema": "zenofcis/tier1-quotrem-expression-palette-qualification/1",
+  "status": "qualified-with-explicit-conditional-proof-boundary",
+  "date_utc": "2026-11-18",
+  "tested_zenofcis_commit": "3e36c8dd13f3b7fa6d2d1a78bc529f20ec3c8566",
+  "upstream_wasmtime_commit": "8b19f199f89da864c529b3fa3ca2f7e40d5de609",
+  "target": "x86_64-unknown-linux",
+  "source_script": "experiments/cranelift-tier1/search_quotrem_expressions_28.py",
+  "source_script_sha256": "51f8c9335f5cc53e4e21288b4d10e662716dbaf3ddc9d3cbe87837522f662d9d",
+  "compiler_binary_sha256": {
+    "baseline": "b9f0d8ffcb759369ac53d8cf51729438b775f8fe2c3b85edc9532b370ac109e1",
+    "experimental": "7b9428dbe94a13aeab304fbc05abebb27b65a3ed39846c27ba6e1fa3a1c8beb5"
+  },
+  "workflow_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44403677635",
+  "original_artifact": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44403677635/artifacts/14473058118",
+  "artifact_zip_sha256": "cf80a553b39dbce6914825b0f736648c1557c7d4178a72f5349493e67b9bb067",
+  "source_palette": [
+    "direct",
+    "multiply_subtract",
+    "commuted_product",
+    "negative_product"
+  ],
+  "search_stop_reason": "all four human-authored source expressions evaluated; not machine-code synthesis",
+  "contract": "unsigned 64-bit x/y; zero divisor traps first; quotient and remainder from Euclidean unsigned division; intermediate arithmetic modulo 2^64; returned q XOR rotl64(r,17)",
+  "finite_checks": {
+    "exhaustive_8bit_input_pairs_per_positive_candidate": 65536,
+    "native_vectors_per_candidate_per_compiler": 87,
+    "native_value_checks_per_candidate_per_compiler": 76,
+    "native_expected_zero_divisor_traps_per_candidate_per_compiler": 11,
+    "native_executions": 696,
+    "independent_replay_executions": 696
+  },
+  "proof_statuses": {
+    "direct": {
+      "direct_qf_bv_64": "unsat",
+      "euclidean_integer_qf_nia": "unsat"
+    },
+    "multiply_subtract": {
+      "direct_qf_bv_64": "unknown-timeout",
+      "euclidean_integer_qf_nia": "unsat"
+    },
+    "commuted_product": {
+      "direct_qf_bv_64": "unknown-timeout",
+      "euclidean_integer_qf_nia": "unsat"
+    },
+    "negative_product": {
+      "direct_qf_bv_64": "unknown-timeout",
+      "euclidean_integer_qf_nia": "unsat"
+    },
+    "deliberate_wrong_plus": {
+      "direct_qf_bv_64": "sat-counterexample",
+      "euclidean_integer_qf_nia": "sat-counterexample",
+      "exhaustive_8bit_disagreements": 32385
+    }
+  },
+  "costs": {
+    "metric": "decoded x86-64 function instruction bytes; NOT CLIF operations or whole-AOT size",
+    "baseline_compiler": {
+      "direct": 43,
+      "multiply_subtract": 41,
+      "commuted_product": 38,
+      "negative_product": 41
+    },
+    "experimental_compiler": {
+      "direct": 25,
+      "multiply_subtract": 41,
+      "commuted_product": 38,
+      "negative_product": 41
+    },
+    "static_div_counts": {
+      "baseline_compiler": {
+        "direct": 2,
+        "multiply_subtract": 1,
+        "commuted_product": 1,
+        "negative_product": 1
+      },
+      "experimental_compiler": {
+        "direct": 1,
+        "multiply_subtract": 1,
+        "commuted_product": 1,
+        "negative_product": 1
+      }
+    },
+    "whole_aot_bytes_every_fixture": 13608,
+    "cost_based_choice_under_conditional_euclidean_proof": {
+      "baseline_compiler": "commuted_product",
+      "experimental_compiler": "direct"
+    }
+  },
+  "limits": [
+    "Direct QF_BV obligations for three reconstruction variants timed out after 30 seconds each; do NOT relabel them full-width bitvector proofs",
+    "The QF_NIA proofs rely on precisely stated Euclidean premises x=q*y+r, 0<=r<y, y>0 for the mathematical quotient/remainder; this representation shift proves the conditional arithmetic identity, not the compiler implementation",
+    "Finite 64-bit native Wasm executions independently check results and traps but do not establish all-input machine-state refinement",
+    "These are human-authored WAT source expressions, not ZenoFCIS-synthesized x86 instruction sequences, ISLE patches or validated upstream rules",
+    "Source representation choices affect native register allocation and static size; the winning form changes between pristine and experimentally modified compilers",
+    "One x86-64 target and a single function, no representative throughput, machine flags, ABI, trap-map, poison/undefined or cross-target proof",
+    "Artifacts are retained for 30 days by GitHub Actions; source-pinned workflow can regenerate the complete catalog and binaries"
+  ]
+}
