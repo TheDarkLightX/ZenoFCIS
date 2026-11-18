@@ -1,0 +1,69 @@
+name: tier1-live-register-stress-28
+on:
+  push:
+    branches: [research/2.8-tier1-live-register-stress-20261118]
+    paths:
+      - '.github/workflows/tier1-live-register-stress-28.yml'
+      - 'experiments/cranelift-tier1/stress_live_registers_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: tier1-live-register-stress-28
+  cancel-in-progress: true
+jobs:
+  pinned-native-live-state:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Check exact finite vector and WAT oracle
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/stress_live_registers_28.py
+          python3 -B experiments/cranelift-tier1/stress_live_registers_28.py --mode self-test
+      - name: Retrieve two post-Souper compilers from independent source-pinned CI producer
+        uses: actions/download-artifact@v4
+        with:
+          repository: TheDarkLightX/ZenoFCIS
+          run-id: 44056104464
+          github-token: ${{ github.token }}
+          name: tier1-post-souper-divrem-28
+          path: tier1-register-stress/compilers
+      - name: Check source/byte identities before permitting execution
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, 'experiments/cranelift-tier1')
+          from audit_post_souper_inprocess_28 import producer
+          root = Path('tier1-register-stress/compilers')
+          producer(root)
+          for mode in ('baseline', 'patched'):
+              (root / mode / 'wasmtime').chmod(0o755)
+          print('Independent compiler binary and source receipts verified')
+          PY
+      - name: Compile identical Wasm contexts and test real x86-64 outputs and traps
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/stress_live_registers_28.py \
+            --mode run --source-root tier1-register-stress/compilers \
+            --out tier1-register-stress/evidence
+      - name: Replay finite vectors and verify all AOT/disassembly/cost/source receipts
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/stress_live_registers_28.py \
+            --mode audit --source-root tier1-register-stress/compilers \
+            --out tier1-register-stress/evidence
+      - name: Preserve raw WAT, AOT, disassembly and manifest for independent review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-live-register-stress-28
+          path: tier1-register-stress/evidence/
+          retention-days: 30
+          if-no-files-found: warn
