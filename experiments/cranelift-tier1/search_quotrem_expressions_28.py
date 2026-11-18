@@ -133,6 +133,52 @@ def proof(name: str) -> dict:
         data["reason_unknown"] = s.reason_unknown()
     return data
 
+def shifted_integer_proof(name: str) -> dict:
+    """Check a representation shift under the explicit Euclidean division law.
+
+    The premises constrain the *mathematical* quotient/remainder, not the
+    native Cranelift implementation or the QF_BV encoding. A successful
+    result cannot silently replace an unknown direct 64-bit BV query.
+    """
+    import z3
+    x, y, q, r = z3.Ints("ix iy iq ir")
+    word = 1 << 64
+    premises = [x >= 0, x < word, y >= 1, y < word,
+                q >= 0, r >= 0, r < y, x == q * y + r]
+    if name == "direct":
+        candidate = r
+    elif name in ("multiply_subtract", "commuted_product"):
+        candidate = (x - q * y) % word
+    elif name == "negative_product":
+        candidate = (x + ((-q * y) % word)) % word
+    elif name == NEGATIVE:
+        candidate = (x + q * y) % word
+    else:
+        raise ValueError("outside admitted integer expression")
+    s = z3.SolverFor("QF_NIA")
+    s.set(timeout=PROOF_TIMEOUT_MS)
+    s.add(*premises)
+    s.add(candidate != r)
+    result = s.check()
+    receipt = {
+        "logic": "QF_NIA",
+        "domain": "0<=x<2^64, 1<=y<2^64, q>=0, 0<=r<y, x=q*y+r",
+        "status": str(result),
+        "qualification": ("proved-under-euclidean-premises" if result == z3.unsat
+                          else "counterexample-sat" if result == z3.sat else "unknown"),
+        "solver": z3.get_version_string(),
+        "timeout_ms": PROOF_TIMEOUT_MS,
+        "scope": "mathematical quotient/remainder reconstruction; not direct QF_BV or compiler-machine verification",
+    }
+    if result == z3.sat:
+        m = s.model()
+        receipt["counterexample"] = {
+            field: m.eval(term, model_completion=True).as_long()
+            for field, term in (("x", x), ("y", y), ("q", q), ("r", r))}
+    if result == z3.unknown:
+        receipt["reason_unknown"] = s.reason_unknown()
+    return receipt
+
 def vectors() -> tuple[tuple[int, int], ...]:
     return stress.vectors()
 
@@ -200,13 +246,17 @@ def run(root: Path, out: Path) -> None:
     out.mkdir(parents=True)
     rejected = exhaustive8(NEGATIVE)
     negative_proof = proof(NEGATIVE)
-    if rejected["disagree"] == 0 or negative_proof["status"] != "sat":
+    negative_shift = shifted_integer_proof(NEGATIVE)
+    if (rejected["disagree"] == 0 or negative_proof["status"] != "sat"
+        or negative_shift["status"] != "sat"):
         raise AssertionError("known-incorrect palette control was not rejected")
     entries = {}
     for name in PALETTE:
         eight = exhaustive8(name)
         verdict = proof(name)
-        if eight["disagree"] or verdict["status"] == "sat":
+        shifted = shifted_integer_proof(name)
+        if (eight["disagree"] or verdict["status"] == "sat"
+            or shifted["status"] != "unsat"):
             raise AssertionError("candidate refuted; cannot retain in comparison")
         folder = out / name
         folder.mkdir()
@@ -226,9 +276,10 @@ def run(root: Path, out: Path) -> None:
         entries[key] = {
             "key": key, "name": name, "input_sha256": digest(src),
             "exhaustive8": eight, "full_width_smt": verdict,
+            "euclidean_shift_smt": shifted,
             "verification_class": (
-                "QF_BV-64-proved-and-finite-native" if verdict["status"] == "unsat"
-                else "finite-tested-SMT-unknown"),
+                "QF_BV-64-proved-plus-shifted-SMT-plus-native" if verdict["status"] == "unsat"
+                else "euclidean-conditional-SMT-plus-finite-native;direct-BV-unknown"),
             "cost": candidates, "provenance": "human-authored finite palette",
         }
     by_name = {row["name"]: row for row in entries.values()}
@@ -241,7 +292,7 @@ def run(root: Path, out: Path) -> None:
                                - row["cost"][mode]["aot_bytes"])}
             for mode in MODES}
     qualified = [row for row in entries.values()
-                 if row["full_width_smt"]["status"] == "unsat"]
+                 if row["euclidean_shift_smt"]["status"] == "unsat"]
     winner = {mode: min(qualified,
                         key=lambda row: (row["cost"][mode]["native_instruction_bytes"],
                                          row["key"]))["name"]
@@ -253,14 +304,17 @@ def run(root: Path, out: Path) -> None:
            "script_sha256": digest(Path(__file__)), "semantic_contract": SEMANTICS,
            "palette": list(PALETTE), "max_candidates": len(PALETTE),
            "search_stop_reason": "candidate palette exhausted",
-           "negative_control": {"exhaustive8": rejected, "smt": negative_proof},
+           "negative_control": {"exhaustive8": rejected, "smt": negative_proof,
+                                "euclidean_shift_smt": negative_shift},
            "entries": sorted(entries.values(), key=lambda r: r["key"]),
-           "winners_on_native_bytes_only": winner,
+           "winners_on_native_bytes_under_euclidean_contract": winner,
            "limits": [
                "WAT representation search over human-authored candidates; not ZenoFCIS native instruction synthesis",
                "Even a QF_BV proof is for the WAT arithmetic expression, not a compiler-pass, flags, ISA, or trap-map proof",
                "Exhaustive 8-bit checking is not exhaustive 64-bit checking",
-               "SMT unknown is not equivalence, and finite native tests are never promoted to proof",
+               "Direct QF_BV unknown is NOT a full-bitvector proof, even if shifted integer SMT proves the Euclidean identity",
+               "The shifted integer proof assumes quotient/remainder satisfy x=q*y+r and 0<=r<y; no native implementation refinement is proved",
+               "Finite native tests are never promoted to proof",
                "Native decoded instruction bytes, AOT file bytes and CLIF costs are separate metrics",
                "One pinned x86-64 Linux compiler and workload; no representative throughput or all-target profitability",
                "Any future upstream rewrite requires independent ISLE/VeriISLE and machine-state checks",
@@ -285,7 +339,8 @@ def audit(root: Path, out: Path) -> None:
         or d.get("search_stop_reason") != "candidate palette exhausted"):
         raise ValueError("catalog/source/compiler/contract pin drift")
     if d.get("negative_control") != {
-        "exhaustive8": exhaustive8(NEGATIVE), "smt": proof(NEGATIVE)}:
+        "exhaustive8": exhaustive8(NEGATIVE), "smt": proof(NEGATIVE),
+        "euclidean_shift_smt": shifted_integer_proof(NEGATIVE)}:
         raise ValueError("negative control receipt drift")
     entries = d.get("entries")
     if not isinstance(entries, list) or len(entries) != len(PALETTE):
@@ -299,11 +354,13 @@ def audit(root: Path, out: Path) -> None:
         src = folder / "input.wat"
         if src.read_text() != wat(name) or digest(src) != row["input_sha256"]:
             raise ValueError("candidate input drift")
-        if row["exhaustive8"] != exhaustive8(name) or row["full_width_smt"] != proof(name):
+        if (row["exhaustive8"] != exhaustive8(name)
+            or row["full_width_smt"] != proof(name)
+            or row["euclidean_shift_smt"] != shifted_integer_proof(name)):
             raise ValueError("equivalence/unknown/counterexample receipt drift")
-        expected_class = ("QF_BV-64-proved-and-finite-native"
+        expected_class = ("QF_BV-64-proved-plus-shifted-SMT-plus-native"
                           if row["full_width_smt"]["status"] == "unsat"
-                          else "finite-tested-SMT-unknown")
+                          else "euclidean-conditional-SMT-plus-finite-native;direct-BV-unknown")
         if row["verification_class"] != expected_class:
             raise ValueError("false equivalence classification")
         for mode in MODES:
@@ -333,12 +390,12 @@ def audit(root: Path, out: Path) -> None:
             for mode in MODES}
         if row.get("vs_direct") != expected_delta:
             raise ValueError("cost deltas fabricated")
-    qualified = [r for r in entries if r["full_width_smt"]["status"] == "unsat"]
+    qualified = [r for r in entries if r["euclidean_shift_smt"]["status"] == "unsat"]
     winners = {mode: min(qualified,
                          key=lambda row: (row["cost"][mode]["native_instruction_bytes"],
                                           row["key"]))["name"]
                for mode in MODES}
-    if winners != d["winners_on_native_bytes_only"]:
+    if winners != d["winners_on_native_bytes_under_euclidean_contract"]:
         raise ValueError("winner was not derived from verified native code")
     print("Bounded palette audited: source/solver, 8-bit exhaustion, AOT, native costs and guest replay")
 
