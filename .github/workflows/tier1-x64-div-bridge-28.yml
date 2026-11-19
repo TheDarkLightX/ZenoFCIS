@@ -1,0 +1,66 @@
+name: tier1-x64-div-bridge-28
+on:
+  push:
+    branches: [research/2.8-tier1-x64-div-refinement-20261119]
+    paths:
+      - '.github/workflows/tier1-x64-div-bridge-28.yml'
+      - 'experiments/cranelift-tier1/x64_div_machine_refinement_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-div-bridge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: 8b19f199f89da864c529b3fa3ca2f7e40d5de609
+          path: upstream
+          persist-credentials: false
+          sparse-checkout: |
+            cranelift/codegen/src/isa/x64/lower.isle
+          sparse-checkout-cone-mode: false
+      - name: Source guard, Python syntax and finite-domain preflight
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/x64_div_machine_refinement_28.py
+          python3 -B experiments/cranelift-tier1/x64_div_machine_refinement_28.py --mode self-test
+          test "$(git -C upstream rev-parse HEAD)" = 8b19f199f89da864c529b3fa3ca2f7e40d5de609
+          test "$(git -C upstream hash-object cranelift/codegen/src/isa/x64/lower.isle)" = 654189182a09c1e22478faa157cd421ff8ed8894
+      - name: Install independently hash-pinned Z3
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/tier1-div-venv"
+          "$RUNNER_TEMP/tier1-div-venv/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          printf '%s\n' "$RUNNER_TEMP/tier1-div-venv/bin" >> "$GITHUB_PATH"
+      - name: Native x64 DIV trap/value differential and exact-width SMT obligation
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-div-bridge-pins
+          {
+            git rev-parse HEAD
+            git -C upstream rev-parse HEAD
+            cc --version | head -n 1
+            python3 -c 'import z3; print(z3.get_full_version())'
+            uname -m
+          } > tier1-div-bridge-pins/environment.txt
+          python3 -B experiments/cranelift-tier1/x64_div_machine_refinement_28.py --mode run --upstream upstream --out tier1-div-bridge-output
+      - name: Independent deterministic receipt replay
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/x64_div_machine_refinement_28.py --mode audit --upstream upstream --out tier1-div-bridge-output
+      - name: Archive actual C source, native bytes, independent outcomes, SMT and source pins
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-x64-div-bridge-28
+          path: |
+            tier1-div-bridge-output/
+            tier1-div-bridge-pins/
+          retention-days: 30
+          if-no-files-found: warn

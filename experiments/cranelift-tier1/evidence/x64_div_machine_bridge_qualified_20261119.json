@@ -1,0 +1,81 @@
+{
+  "schema": "zenofcis/tier1-x64-div-machine-bridge-qualification/1",
+  "classification": "source-pinned standalone native x86-64 DIV differential + replay; full 128-bit bitvector query timed out (UNKNOWN)",
+  "date_utc": "2026-11-19",
+  "zenofcis": {
+    "experiment_base_sha": "05029062fbfd1438855b47f74a8340d8c0dfe5c3",
+    "tested_sha": "71b73a9c03a618530de1026330a8d364ac8f7a6f",
+    "branch": "research/2.8-tier1-x64-div-refinement-20261119"
+  },
+  "upstream": {
+    "repository": "bytecodealliance/wasmtime",
+    "commit": "8b19f199f89da864c529b3fa3ca2f7e40d5de609",
+    "file": "cranelift/codegen/src/isa/x64/lower.isle",
+    "blob": "654189182a09c1e22478faa157cd421ff8ed8894"
+  },
+  "ci": {
+    "run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44621541684",
+    "job_id": 135904221723,
+    "conclusion": "success",
+    "artifact_id": 14575983730,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44621541684/artifacts/14575983730",
+    "artifact_zip_sha256": "48a046f8164bccde9fed535ae9bd89e4f372f95aa021cb04b6ac30b137e4d32b"
+  },
+  "contract": {
+    "width_bits": 64,
+    "signedness": "unsigned",
+    "dividend": "RDX:RAX=0:x",
+    "inputs": "any x in [0,2^64); y in [1,2^64) for defined values",
+    "output": "RAX=floor(x/y), RDX=x mod y",
+    "zero_divisor": "x86 #DE; observed SIGFPE for y=0",
+    "overflow": "quotient overflow impossible under high=0 and positive 64-bit divisor",
+    "flags": "DIV arithmetic flags undefined, not compared",
+    "poison": "no poison model; only declared machine arithmetic"
+  },
+  "checks": {
+    "upstream_and_experimental_rule_anchor": "passed textual guards, NOT compiler lowering AST proof",
+    "native": {
+      "classification": "finite executed x86-64 assembly against independent Python integer oracle",
+      "pairs": 75406,
+      "boundary_pairs": 546,
+      "signal_zero_divisor": "SIGFPE",
+      "gcc": "13.3.0",
+      "code_sha256": "3f46baf40948502fdda1c41417b070d9c2cd95580b00aad795c4157ab88d8cdc",
+      "binary_sha256": "5444271c0c774f14e8773d70bf6566e6d41f842c907a170ff1de9005af80feee",
+      "trap_binary_sha256": "583ed03445fac09518b703a92fc461f55a3947f7ff46ae0fc74a5fca2d553fe3",
+      "independent_objdump": "endbr64; mov rcx,rdx; mov rax,rdi; xor edx,edx; div rsi; mov [rcx],rdx; ret",
+      "exact_zero_high_and_single_native_div": true
+    },
+    "smt": {
+      "classification": "QF_BV full-width counterexample query (zero extend 64-bit dividend/divisor into 128-bit unsigned DIV)",
+      "solver": "Z3 4.15.4.0",
+      "timeout_ms": 10000,
+      "result": "unknown",
+      "reason": "timeout",
+      "all_input_proof": false
+    },
+    "out_of_domain_high_half": {
+      "high": 1,
+      "low": 18446744073709552000,
+      "divisor": 1,
+      "classification": "invalid input premise induces quotient overflow"
+    },
+    "receipt_replay": "passed on same CI host, second independent execution of all finite cases and solver query",
+    "static_bytes": {
+      "source": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44449965859",
+      "earlier_x64_decoded_function_bytes": {
+        "pristine": 43,
+        "prototype": 25
+      },
+      "new_measurement": "none; this proof does not repeat cost benchmark"
+    }
+  },
+  "limits": [
+    "Native standalone GNU C inline assembler code is not Cranelift-emitted code or an instruction-by-instruction verification of compiled x64 lowering",
+    "No general machine-state, physical-flag, register allocation, ABI, liveness, guest PC/trap-map or optimization-pass refinement proof",
+    "Mixed-width SMT query returned unknown, not unsat; do not classify as universal ISA equivalence",
+    "No new synthesis-generated candidate or upstream patch; previously human-authored quotient/remainder fusion",
+    "Native instruction-byte evidence from the earlier pinned compiler qualification is distinct from this standalone DIV test and from CLIF/AOT cost"
+  ],
+  "next": "Check actual emitted patched machine code, trap PC mapping and register-allocation contracts under a formal validation harness; separately use ZenoFCIS synthesis on a new targeted instruction palette before any speculative upstream PR"
+}
