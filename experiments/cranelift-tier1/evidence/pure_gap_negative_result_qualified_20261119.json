@@ -1,0 +1,57 @@
+{
+  "schema": "zenofcis/tier1-pure-gap-qualification/1",
+  "qualified_utc": "2026-11-19",
+  "classification": "source-pinned finite native guest qualification and negative search result; NO observed nonadjacent optimizer match",
+  "source": {
+    "zenofcis_tested_commit": "2ae85183be9c27ea090e32745b0765ddc9574651",
+    "wasmtime_pinned_commit": "8b19f199f89da864c529b3fa3ca2f7e40d5de609",
+    "baseline_wasmtime_sha256": "b9f0d8ffcb759369ac53d8cf51729438b775f8fe2c3b85edc9532b370ac109e1",
+    "experimental_wasmtime_sha256": "9eeaca6b08a87da10afe04edcee4cf7f7e8b2d2463f75b5b0d469506d5ddc3b5",
+    "source_install_receipt_sha256": "c8014144dd1bf42a5f3bfd8ef8bf8bb71d99376ae00182a604c24112760d6a4f",
+    "toolchain": "Rust 1.98.0, Wasmtime's pinned Cargo.lock",
+    "target": "x86_64-unknown-linux"
+  },
+  "ci": {
+    "run_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44501047247",
+    "result": "success",
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44501047247/artifacts/14517576440",
+    "artifact_zip_sha256": "ceb95d9c56efdea87489d50c616805171781905795e8cf6e39d560c80e13c583",
+    "artifact_digest_verified_against_github": true,
+    "finite_native_guest_executions": 870,
+    "finite_native_guest_values": 752,
+    "finite_native_guest_expected_traps": 118,
+    "ci_replay_guest_executions": 870,
+    "independent_zip_sha256_checks": {
+      "wat_sources": 5,
+      "aot_images": 10,
+      "disassemblies": 10,
+      "compiler_traces": 10
+    },
+    "independent_instruction_byte_instruction_count_and_div_count_checks": 10
+  },
+  "measured_native_instruction_bytes": {
+    "forward_adjacent": {"baseline": 43, "experimental": 25, "experimental_div_count": 1, "actual_trace": "forward adjacent"},
+    "forward_wat_iadd_gap": {"baseline": 56, "experimental": 38, "experimental_div_count": 1, "actual_trace": "forward adjacent"},
+    "reverse_wat_iadd_gap": {"baseline": 53, "experimental": 35, "experimental_div_count": 1, "actual_trace": "reverse adjacent"},
+    "intervening_potential_trap": {"baseline": 63, "experimental": 63, "experimental_div_count": 3, "actual_trace": "none"},
+    "different_operand_control": {"baseline": 50, "experimental": 50, "experimental_div_count": 2, "actual_trace": "none"}
+  },
+  "source_order_distinction": {
+    "number_of_actual_one_iadd_gap_fusions_observed": 0,
+    "finding": "The compiler's pre-lowering traces classify both WAT iadd-gap positive contexts as adjacent after earlier compiler transformations. Savings are measured but do not exercise or establish usefulness of the proposed one-iadd-gap extension.",
+    "negative_memory": "Do not report 56-to-38 or 53-to-35 as a novel nonadjacent fusion; avoid upstream proposal or merging this extension without a fixture that demonstrably hits the one_iadd trace and passes a stronger semantic-refinement check."
+  },
+  "semantics_and_limits": {
+    "inputs": "Unsigned i64 x,y; same original SSA values in each candidate div/rem pair",
+    "overflow": "Pure CLIF iadd is modeled as wrapping modular addition",
+    "traps": "y=0 traps; an extra gap_div control also traps for x=0; trap source maps not universally verified",
+    "signedness": "Only unsigned division/remainder; signed divisions excluded",
+    "flags_and_abi": "Full x86 machine flags, register allocator, ABI and live-state refinement not proved",
+    "undefined_poison": "No Wasm integer poison, but complete CLIF/ISA semantics not verified",
+    "verification_type": "Finite original guest executions and replay, compiler pre-lowering diagnostic, checksum and emitted-byte audit; no SMT/VeriISLE proof for the new gap case",
+    "cost_type": "Decoded x86-64 function instruction bytes, NOT CLIF cost or total AOT size",
+    "whole_aot_bytes_each": 13608,
+    "newly_synthesized_machine_instruction_sequence": false
+  },
+  "follow_up": "Prioritize an actual post-egraph nonadjacent CLIF fixture and safety proof, or drop this relaxation; current observed savings are already explained by adjacent fusion. Re-pin and inspect upstream x64 lower.isle before any production proposal."
+}
