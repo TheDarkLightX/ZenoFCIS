@@ -1,0 +1,66 @@
+name: tier1-clif-divrem-refinement-28
+on:
+  push:
+    branches: [research/2.8-tier1-clif-refinement-20261119]
+    paths:
+      - '.github/workflows/tier1-clif-divrem-refinement-28.yml'
+      - 'experiments/cranelift-tier1/prove_divrem_clif_refinement_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-anchored-clif-model:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Set up pinned independent SMT dependency
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/tier1-refinement-venv"
+          "$RUNNER_TEMP/tier1-refinement-venv/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          printf '%s\n' "$RUNNER_TEMP/tier1-refinement-venv/bin" >> "$GITHUB_PATH"
+      - name: Python syntax and exhaustive reduced-width reference
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/prove_divrem_clif_refinement_28.py
+          python3 -B experiments/cranelift-tier1/prove_divrem_clif_refinement_28.py --mode self-test
+      - name: Prove full-width CLIF observational model and reject bad rules
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-refinement-evidence
+          python3 -B experiments/cranelift-tier1/prove_divrem_clif_refinement_28.py --mode prove --timeout-ms 20000 --out tier1-refinement-evidence/clif-refinement-receipt.json
+          sha256sum experiments/cranelift-tier1/prove_divrem_clif_refinement_28.py > tier1-refinement-evidence/script-sha256.txt
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          d=json.loads(Path('tier1-refinement-evidence/clif-refinement-receipt.json').read_text())
+          assert d['schema']=='zenofcis/tier1-adjacent-clif-refinement/1'
+          assert d['pins']['checker_sha256']==hashlib.sha256(Path('experiments/cranelift-tier1/prove_divrem_clif_refinement_28.py').read_bytes()).hexdigest()
+          assert {x['solver_result'] for x in d['checks']['full_width_smt'].values()}=={'unsat'}
+          assert {x['classification'] for x in d['checks']['bad_rewrite_witnesses'].values()}=={'sat-confirmed-counterexample'}
+          assert all(x['pairs']==65536 and x['zero_divisor_traps']==256 for x in d['checks']['finite_exhaustive_8bit'].values())
+          # Independent mathematical witness replay (no Z3 helper used).
+          neg=d['checks']['bad_rewrite_witnesses']
+          x,y=(neg['swap_quotient_remainder'][k] for k in ('x','y'))
+          assert x//y!=x%y
+          x,y=(neg['mismatched_remainder_divisor'][k] for k in ('x','y'))
+          assert x%y!=x%(y|1)
+          x,y=(neg['signed_division_substitution'][k] for k in ('x','y'))
+          assert x>=2**63 and y!=0
+          signed=x-(1<<64)
+          assert abs(signed)//y != x//y or signed<0
+          assert neg['drop_zero_divisor_trap']['y']==0
+          assert neg['change_first_trap_location']['y']==0
+          print('Independent receipt checks and arithmetic counterexample replay passed')
+          PY
+      - name: Preserve exact model/proof receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-clif-divrem-refinement-28
+          path: tier1-refinement-evidence/
+          retention-days: 30
+          if-no-files-found: warn
