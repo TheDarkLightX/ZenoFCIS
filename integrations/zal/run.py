@@ -85,6 +85,9 @@ def syntax_mismatch(source, syntax):
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else list(argv)
+    if argv and argv[0] in ("film-check", "film-render"):
+        from zal_notation.__main__ import main as notation_main
+        return notation_main(argv)
     if argv[:1] == ["word-kernel"]:
         from word_kernel import main as word_kernel_main
         return word_kernel_main(argv[1:])
@@ -93,6 +96,8 @@ def main(argv=None):
     exit_help = "Exit 0 positive/answered, 1 counterexample/different/none-in-scope, 2 UNKNOWN/unfinished/unsupported/refused."
     parser = argparse.ArgumentParser(description=__doc__, epilog=exit_help + example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("film-check", help="Replay a search storyboard and inspect its checked results")
+    sub.add_parser("film-render", help="Render a checked storyboard to light and dark films")
     sub.add_parser("word-kernel", help="Read, question, synthesize and replay source-bound u64 machine kernels")
     import loop_coverage
     loop_coverage.add_command(sub)

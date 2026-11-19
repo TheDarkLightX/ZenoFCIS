@@ -1,0 +1,334 @@
+{
+  "schema": "zal.mcp-document/1",
+  "definition": {
+    "lower": 48,
+    "profile": "byte-interval",
+    "upper": 160
+  },
+  "context_digest": "fe2681192ad8520a9193aafb0467d245342cb531e2cdce31d849bed311bd5ea8",
+  "source_digest": "138294e67be19ba662069d3cbd713176eafe63f32c369a2262505075993664e9",
+  "records": [
+    {
+      "context_digest": "fe2681192ad8520a9193aafb0467d245342cb531e2cdce31d849bed311bd5ea8",
+      "id": "r1",
+      "request": {
+        "kind": "byte-synthesize"
+      },
+      "result": {
+        "authority": "none",
+        "candidate_digest": "2a9c5b92e3c0783522c28c752237c17f05a01a3c3b5b5593e468293dce62d0a6",
+        "candidates": [
+          {
+            "candidate": {
+              "lower": 47,
+              "upper": 159
+            },
+            "result": {
+              "authority": "none",
+              "candidate": {
+                "lower": 47,
+                "upper": 159
+              },
+              "candidate_digest": "8b6b0f42f8ad58534d96bdc2c50cddaaefd908ffece867d7c0f283bff9292e8c",
+              "checked_cases": 256,
+              "checker": "zal.byte-enumeration/1",
+              "code": "pub fn byte_classifier(b: u8) -> bool {\n    let value = u16::from(b);\n    !(value < 47) && value < 159\n}\n",
+              "code_digest": "c3101273ded4f6322d723cd966848c584f332e58321e900224584259a106a0e7",
+              "counterexample": {
+                "actual": true,
+                "byte": 47,
+                "expected": false
+              },
+              "evidence": "exhaustive-javascript-model-check",
+              "formal_proof": "not-run",
+              "mismatch_count": 2,
+              "native_execution": "not-run",
+              "schema": "zal.byte-check/1",
+              "scope": "All 256 byte inputs for this interval specification and separately evaluated interval candidate; generated Rust has not been executed by this operation.",
+              "status": "refuted",
+              "table_digest": "b71a4fb2b3387e21eb0b809b210a0b8342406870ca454742e246a024ec0486fd",
+              "target_context_digest": "fe2681192ad8520a9193aafb0467d245342cb531e2cdce31d849bed311bd5ea8",
+              "target_model_digest": "038d3bf84ef618c912be017845f9339b66c2c6191b6d7b67d2723f29ea58a5cb"
+            }
+          },
+          {
+            "candidate": {
+              "lower": 47,
+              "upper": 160
+            },
+            "result": {
+              "authority": "none",
+              "candidate": {
+                "lower": 47,
+                "upper": 160
+              },
+              "candidate_digest": "f9f7e78611a814acfe7ba8ead3bfd398e7b51d8c1b7d6a58e7f1753a2f9616d6",
+              "checked_cases": 256,
+              "checker": "zal.byte-enumeration/1",
+              "code": "pub fn byte_classifier(b: u8) -> bool {\n    let value = u16::from(b);\n    !(value < 47) && value < 160\n}\n",
+              "code_digest": "8fabe412e3715115d25dfb5687b30379a7ecf90fc5a8f28b59ecfb422f6b75c5",
+              "counterexample": {
+                "actual": true,
+                "byte": 47,
+                "expected": false
+              },
+              "evidence": "exhaustive-javascript-model-check",
+              "formal_proof": "not-run",
+              "mismatch_count": 1,
+              "native_execution": "not-run",
+              "schema": "zal.byte-check/1",
+              "scope": "All 256 byte inputs for this interval specification and separately evaluated interval candidate; generated Rust has not been executed by this operation.",
+              "status": "refuted",
+              "table_digest": "46817d3627ec837e846392d1e70d8be60c8569e7e99914f44a9375f21101fc21",
+              "target_context_digest": "fe2681192ad8520a9193aafb0467d245342cb531e2cdce31d849bed311bd5ea8",
+              "target_model_digest": "038d3bf84ef618c912be017845f9339b66c2c6191b6d7b67d2723f29ea58a5cb"
+            }
+          },
+          {
+            "candidate": {
+              "lower": 47,
+              "upper": 161
+            },
+            "result": {
+              "authority": "none",
+              "candidate": {
+                "lower": 47,
+                "upper": 161
+              },
+              "candidate_digest": "789546861b7fd4cc91968c9cb9c7a2701fd59cd715a2f4f0483afca0a1d331a7",
+              "checked_cases": 256,
+              "checker": "zal.byte-enumeration/1",
+              "code": "pub fn byte_classifier(b: u8) -> bool {\n    let value = u16::from(b);\n    !(value < 47) && value < 161\n}\n",
+              "code_digest": "292a6d08e36fc4b5db5194ba15fb118ec66fe6deff268f4d541c81444e854392",
+              "counterexample": {
+                "actual": true,
+                "byte": 47,
+                "expected": false
+              },
+              "evidence": "exhaustive-javascript-model-check",
+              "formal_proof": "not-run",
+              "mismatch_count": 2,
+              "native_execution": "not-run",
+              "schema": "zal.byte-check/1",
+              "scope": "All 256 byte inputs for this interval specification and separately evaluated interval candidate; generated Rust has not been executed by this operation.",
+              "status": "refuted",
+              "table_digest": "1d931fe0fc6cf2da3fe211b3f92223c48fec9cc6ecc4eb1bf5f7b45bb4b507c8",
+              "target_context_digest": "fe2681192ad8520a9193aafb0467d245342cb531e2cdce31d849bed311bd5ea8",
+              "target_model_digest": "038d3bf84ef618c912be017845f9339b66c2c6191b6d7b67d2723f29ea58a5cb"
+            }
+          },
+          {
+            "candidate": {
+              "lower": 48,
+              "upper": 159
+            },
+            "result": {
+              "authority": "none",
+              "candidate": {
+                "lower": 48,
+                "upper": 159
+              },
+              "candidate_digest": "bc8022734b27ca0f60171724c9f5f24d7b02cfbd23ee83b44f7e6dd307bfe3fb",
+              "checked_cases": 256,
+              "checker": "zal.byte-enumeration/1",
+              "code": "pub fn byte_classifier(b: u8) -> bool {\n    let value = u16::from(b);\n    !(value < 48) && value < 159\n}\n",
+              "code_digest": "a592a44c792c5b791183e76892686e4869432afb0f3ea4fc127091bacf9a4792",
+              "counterexample": {
+                "actual": false,
+                "byte": 159,
+                "expected": true
+              },
+              "evidence": "exhaustive-javascript-model-check",
+              "formal_proof": "not-run",
+              "mismatch_count": 1,
+              "native_execution": "not-run",
+              "schema": "zal.byte-check/1",
+              "scope": "All 256 byte inputs for this interval specification and separately evaluated interval candidate; generated Rust has not been executed by this operation.",
+              "status": "refuted",
+              "table_digest": "6cc010a96cfe813fa452d842ea5ae350dea79599bb14301f4475d74a3a903d48",
+              "target_context_digest": "fe2681192ad8520a9193aafb0467d245342cb531e2cdce31d849bed311bd5ea8",
+              "target_model_digest": "038d3bf84ef618c912be017845f9339b66c2c6191b6d7b67d2723f29ea58a5cb"
+            }
+          },
+          {
+            "candidate": {
+              "lower": 48,
+              "upper": 160
+            },
+            "result": {
+              "authority": "none",
+              "candidate": {
+                "lower": 48,
+                "upper": 160
+              },
+              "candidate_digest": "2a9c5b92e3c0783522c28c752237c17f05a01a3c3b5b5593e468293dce62d0a6",
+              "checked_cases": 256,
+              "checker": "zal.byte-enumeration/1",
+              "code": "pub fn byte_classifier(b: u8) -> bool {\n    let value = u16::from(b);\n    !(value < 48) && value < 160\n}\n",
+              "code_digest": "211854bb2fb77fbf6100f8de0c490a8dc9c15a904c2c7fd223eba882ab07dd33",
+              "counterexample": null,
+              "evidence": "exhaustive-javascript-model-check",
+              "formal_proof": "not-run",
+              "mismatch_count": 0,
+              "native_execution": "not-run",
+              "schema": "zal.byte-check/1",
+              "scope": "All 256 byte inputs for this interval specification and separately evaluated interval candidate; generated Rust has not been executed by this operation.",
+              "status": "checked",
+              "table_digest": "6e5d9e79f76379add6d3bbcb4178f0b34c6c45ee4383886a3bc40708a6b14ef8",
+              "target_context_digest": "fe2681192ad8520a9193aafb0467d245342cb531e2cdce31d849bed311bd5ea8",
+              "target_model_digest": "038d3bf84ef618c912be017845f9339b66c2c6191b6d7b67d2723f29ea58a5cb"
+            }
+          },
+          {
+            "candidate": {
+              "lower": 48,
+              "upper": 161
+            },
+            "result": {
+              "authority": "none",
+              "candidate": {
+                "lower": 48,
+                "upper": 161
+              },
+              "candidate_digest": "cac596d1be0a50239cd334ae93c5cdd162026da53ec514caa833dbf2df5caa9d",
+              "checked_cases": 256,
+              "checker": "zal.byte-enumeration/1",
+              "code": "pub fn byte_classifier(b: u8) -> bool {\n    let value = u16::from(b);\n    !(value < 48) && value < 161\n}\n",
+              "code_digest": "b025ca586f47b66020f4525ba385cfa8a4820d0ea17c06515f1cf37c9b64c1b2",
+              "counterexample": {
+                "actual": true,
+                "byte": 160,
+                "expected": false
+              },
+              "evidence": "exhaustive-javascript-model-check",
+              "formal_proof": "not-run",
+              "mismatch_count": 1,
+              "native_execution": "not-run",
+              "schema": "zal.byte-check/1",
+              "scope": "All 256 byte inputs for this interval specification and separately evaluated interval candidate; generated Rust has not been executed by this operation.",
+              "status": "refuted",
+              "table_digest": "e5f54a188cd2d2cc5a52091de437045df887e03c27fe815d75e3e68f08d2b21f",
+              "target_context_digest": "fe2681192ad8520a9193aafb0467d245342cb531e2cdce31d849bed311bd5ea8",
+              "target_model_digest": "038d3bf84ef618c912be017845f9339b66c2c6191b6d7b67d2723f29ea58a5cb"
+            }
+          },
+          {
+            "candidate": {
+              "lower": 49,
+              "upper": 159
+            },
+            "result": {
+              "authority": "none",
+              "candidate": {
+                "lower": 49,
+                "upper": 159
+              },
+              "candidate_digest": "95ac8bbb5eadb206629bf61ab78c74df9661e3003ed7b85c8f23e5e806464d6c",
+              "checked_cases": 256,
+              "checker": "zal.byte-enumeration/1",
+              "code": "pub fn byte_classifier(b: u8) -> bool {\n    let value = u16::from(b);\n    !(value < 49) && value < 159\n}\n",
+              "code_digest": "abe221afb60895b9d1817d49e3e832e15e30f63b4c5133fd289ae2f0098baede",
+              "counterexample": {
+                "actual": false,
+                "byte": 48,
+                "expected": true
+              },
+              "evidence": "exhaustive-javascript-model-check",
+              "formal_proof": "not-run",
+              "mismatch_count": 2,
+              "native_execution": "not-run",
+              "schema": "zal.byte-check/1",
+              "scope": "All 256 byte inputs for this interval specification and separately evaluated interval candidate; generated Rust has not been executed by this operation.",
+              "status": "refuted",
+              "table_digest": "871a591eef2b6049562d5cdc75e52d84304afb2c8bedc3d570778950a625e65f",
+              "target_context_digest": "fe2681192ad8520a9193aafb0467d245342cb531e2cdce31d849bed311bd5ea8",
+              "target_model_digest": "038d3bf84ef618c912be017845f9339b66c2c6191b6d7b67d2723f29ea58a5cb"
+            }
+          },
+          {
+            "candidate": {
+              "lower": 49,
+              "upper": 160
+            },
+            "result": {
+              "authority": "none",
+              "candidate": {
+                "lower": 49,
+                "upper": 160
+              },
+              "candidate_digest": "1e5b270b9226796c20aef1b30ab81254e105a02dfb57db2695f63dcd9e01ebcf",
+              "checked_cases": 256,
+              "checker": "zal.byte-enumeration/1",
+              "code": "pub fn byte_classifier(b: u8) -> bool {\n    let value = u16::from(b);\n    !(value < 49) && value < 160\n}\n",
+              "code_digest": "b35f3f0a22586e3ff5260a091be3810d02711b797b61a8341d20faed957ec0f7",
+              "counterexample": {
+                "actual": false,
+                "byte": 48,
+                "expected": true
+              },
+              "evidence": "exhaustive-javascript-model-check",
+              "formal_proof": "not-run",
+              "mismatch_count": 1,
+              "native_execution": "not-run",
+              "schema": "zal.byte-check/1",
+              "scope": "All 256 byte inputs for this interval specification and separately evaluated interval candidate; generated Rust has not been executed by this operation.",
+              "status": "refuted",
+              "table_digest": "97a00820e7141eaaa1f1c214b05d7890ff177fbe2e43cdd8b8a669d59abf731b",
+              "target_context_digest": "fe2681192ad8520a9193aafb0467d245342cb531e2cdce31d849bed311bd5ea8",
+              "target_model_digest": "038d3bf84ef618c912be017845f9339b66c2c6191b6d7b67d2723f29ea58a5cb"
+            }
+          },
+          {
+            "candidate": {
+              "lower": 49,
+              "upper": 161
+            },
+            "result": {
+              "authority": "none",
+              "candidate": {
+                "lower": 49,
+                "upper": 161
+              },
+              "candidate_digest": "814b8f5b691bfdae099ad585ed4c2d313dbeeb50eb2bea772d8ed53cd9ea02ff",
+              "checked_cases": 256,
+              "checker": "zal.byte-enumeration/1",
+              "code": "pub fn byte_classifier(b: u8) -> bool {\n    let value = u16::from(b);\n    !(value < 49) && value < 161\n}\n",
+              "code_digest": "39eeb4ea484a5fd3a6b952691bf9764d621512551ed3d64946688c23e34f88d3",
+              "counterexample": {
+                "actual": false,
+                "byte": 48,
+                "expected": true
+              },
+              "evidence": "exhaustive-javascript-model-check",
+              "formal_proof": "not-run",
+              "mismatch_count": 2,
+              "native_execution": "not-run",
+              "schema": "zal.byte-check/1",
+              "scope": "All 256 byte inputs for this interval specification and separately evaluated interval candidate; generated Rust has not been executed by this operation.",
+              "status": "refuted",
+              "table_digest": "b3bdd7080e35060b0ac3ec7474a6795b4e63bf5bdce4fce911c95d0bcc2e9cc5",
+              "target_context_digest": "fe2681192ad8520a9193aafb0467d245342cb531e2cdce31d849bed311bd5ea8",
+              "target_model_digest": "038d3bf84ef618c912be017845f9339b66c2c6191b6d7b67d2723f29ea58a5cb"
+            }
+          }
+        ],
+        "checked_cases": 2304,
+        "checker": "zal.byte-neighborhood-search/1",
+        "code": "pub fn byte_classifier(b: u8) -> bool {\n    let value = u16::from(b);\n    !(value < 48) && value < 160\n}\n",
+        "code_digest": "211854bb2fb77fbf6100f8de0c490a8dc9c15a904c2c7fd223eba882ab07dd33",
+        "evidence": "exhaustive-javascript-model-check",
+        "formal_proof": "not-run",
+        "native_execution": "not-run",
+        "schema": "zal.byte-synthesis/1",
+        "scope": "Enumerate valid intervals from target bounds plus -1, 0, +1 (clamped to 0..256); test every candidate on all 256 inputs and select the first match. No optimality or unrestricted synthesis claim.",
+        "selected": {
+          "lower": 48,
+          "upper": 160
+        },
+        "selected_index": 5,
+        "status": "checked",
+        "target_context_digest": "fe2681192ad8520a9193aafb0467d245342cb531e2cdce31d849bed311bd5ea8"
+      }
+    }
+  ]
+}

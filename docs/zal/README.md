@@ -40,6 +40,11 @@ optional for the file-based journey above.
 
 Read the [specification](SPECIFICATION.md), [exact grammar](GRAMMAR.md),
 and [factory source map](../ZAL_SOURCE_MAP.md).
+Use `python3 integrations/zal/run.py film-check STORY.json` to inspect a search
+storyboard. `film-render STORY.json --output NEW_DIRECTORY` builds both themed
+films, captions, the route figure and a replayable plan. The
+[film authoring guide](../../integrations/zal/zal_notation/README.md#author-a-search-film)
+includes the two worked examples and renderer dependencies.
 Use [observation contracts](OBSERVATION_CONTRACTS.md) to check what a controller
 can know, compare complete finite paired histories, and inspect generated ZAL
 arena and belief diagrams with explicit service and cost bounds.

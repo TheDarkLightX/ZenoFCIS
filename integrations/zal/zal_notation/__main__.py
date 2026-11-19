@@ -92,8 +92,23 @@ def main(argv=None):
     discuss.add_argument("--request", required=True)
     discuss.add_argument("--output")
     commands.add_parser("tools-stdio")
+    for name in ("film-check", "film-render"):
+        command = commands.add_parser(name, help="Check a search film or render both themes")
+        command.add_argument("source", help="path to the authored JSON storyboard")
+        command.add_argument("--output", required=name == "film-render",
+                             help="new plan file for check, or new directory for render")
     args = parser.parse_args(argv)
     try:
+        if args.command.startswith("film-"):
+            from . import film_cli
+            if args.command == "film-render":
+                emit(film_cli.render(args.source, args.output))
+            else:
+                plan = core.loads(film_cli.read_plan(args.source))
+                if args.output:
+                    emit(plan, args.output)
+                emit(film_cli.summary(plan))
+            return 0
         if args.command == "tools-stdio":
             return stdio()
         if args.command == "toolkit":

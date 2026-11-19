@@ -1,0 +1,22 @@
+{
+  "format": "zal.search-film/1",
+  "title": "Reach a different square",
+  "walk": {
+    "right": 2,
+    "up": 2
+  },
+  "shots": [
+    {
+      "view": "trace",
+      "seconds": 4,
+      "title": "Can you reach a different square?",
+      "caption": "Use {moves} moves, each right or up."
+    },
+    {
+      "view": "merge",
+      "seconds": 4,
+      "title": "Which routes share their endpoint?",
+      "caption": "There are {solutions} solutions for this target."
+    }
+  ]
+}

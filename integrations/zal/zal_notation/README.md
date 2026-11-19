@@ -45,6 +45,63 @@ The menu stores the source text and complete supplied alternatives; it does not 
 
 `sharing.toolkit()` lists the discussion, story proposal and ontology functions supported by `sharing.dispatch_tool`. Human-facing `story.vote` is deliberately not a proposal tool. These functions do not modify the behavioral review workspace. The ontology family has the CLI and read-only MCP routes described above; general discussion/story transport, authenticated collaboration, interpretation generation, runtime lowering and application qualification remain separate work.
 
+## Author a search film
+
+A storyboard chooses the goal, shot order, wording and duration. The compiler
+binds route histories and their endpoint groups to a native ZAL state-machine
+model. Each full history retains its turn cost when the drawing merges paths.
+The [83-second example](../examples/search-film/Problem-Solving-as-Search.json)
+and [eight-second example](../examples/search-film/Another-Goal.json) use the
+same compiler and renderer.
+
+Run these commands from `integrations/zal`. Checking uses Python's standard
+library. Rendering also requires Node.js 20 or later and FFmpeg with libx264.
+
+```sh
+python3 -m zal_notation film-check examples/search-film/Problem-Solving-as-Search.json
+npm ci --prefix zal_notation/film_renderer
+python3 -m zal_notation film-render examples/search-film/Problem-Solving-as-Search.json --output films
+```
+
+A build writes a light MP4, a dark MP4, WebVTT captions, an adaptive SVG
+of the route model and the checked JSON plan into a new directory. Both
+videos use that plan at 30 frames per second. Use `film-check --output PLAN`
+to export the plan alone. The original `essay-film/1` pilot storyboards can
+also be read with their sibling evidence files.
+
+| Shot | What the viewer sees |
+|---|---|
+| `trace` | Replay a history through the grid. An optional `path` such as `"RU"` selects a particular legal prefix. |
+| `branch` | Extend each history with the next available choice. |
+| `merge` | Bring equal endpoints together and label each with the number of histories it contains. |
+| `select` | Compare feasible histories by direction changes and show every minimum-cost route. |
+
+The additional views are `budget`, `language`, `programs`, `reuse` and
+`relation`. In `zal.search-film/1`, the two positive `walk` coordinates sum
+to at most six moves. A `reuse` shot takes a `transfer` goal of up to ten moves.
+Shots last 2–120 seconds each, up to 64 shots and ten minutes per film.
+Durations are rounded to frames. Titles and captions can interpolate
+`{moves}`, `{routes}`, `{endpoints}`, `{solutions}`, `{optima}`, `{budget}`,
+`{first}` (one-based first successful trial), `{trialHits}` and `{untested}`.
+Authors supply the prose around the model values.
+
+For the essay's `programs` shot the compiler checks the complete synthesis
+document and its registered replay against their pinned identities, then
+independently evaluates the interval candidates on all 256 bytes. For a new
+byte example, replace the `evidence` and `replay` fields with an `interval`
+such as `{"lower": 8, "upper": 12}`. This runs the local finite checker on the
+valid neighboring bounds and records the mismatching inputs. Both paths check
+interval semantics. The generated Rust and theorem proving have separate
+execution and evidence requirements.
+
+The Python operations in `search_film` also accept deterministic, possibly
+partial native ZAL state machines. `transition_table(model)` supplies the start
+and transitions to `trace_path` and `branch_on_choice`. `merge_equivalent_states`
+groups histories by an observable key. `select_by_cost` accepts a cost function
+and returns all tied witnesses in input order. The built-in paintings cover
+right/up grids and byte intervals. Other domains can reuse the operations and
+provide their own drawings.
+
 ## Source and checks
 
 The package retains the original [MIT notice](LICENSE). The abstraction, story, normalizer, supplied-tick clock, sharing and Lens APIs described here are the locally integrated package. Component identities for the finite Lens adapter are recorded in `LENS_UPSTREAM.json`; they identify shipped files rather than asserting a public upstream publication or a proof. `examples.py` retains the custom grammar example.
