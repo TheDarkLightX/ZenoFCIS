@@ -1,0 +1,76 @@
+{
+  "schema": "zenofcis/tier1-bidirectional-divrem-qualification/1",
+  "classification": "source-pinned finite guest semantics, exact native instruction-byte cost and pre-lowering order trace; NOT compiler-pass or ISA proof",
+  "qualified_utc": "2026-11-19",
+  "tested_zenofcis_commit": "1c6ff83c47265900d751d9f157cb4d57d0f7713a",
+  "tested_wasmtime_commit": "8b19f199f89da864c529b3fa3ca2f7e40d5de609",
+  "source_script": "experiments/cranelift-tier1/reverse_order_udivrem_28.py",
+  "source_script_sha256": "e39def0173fb1f152b8db45259af203122124eaa5c42135e1b65e97ddfd96236",
+  "source_install_receipt_sha256": "2ab720f55374fcf642283fddfee0e88b87b1dbc47a788b0c16653891ea4e3934",
+  "rust_toolchain": "1.98.0",
+  "target": "x86_64-unknown-linux",
+  "ci_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44449965859",
+  "ci_artifact": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44449965859/artifacts/14494344176",
+  "ci_artifact_zip_sha256": "096d0ed169ff771bd28bef36096cd393407eb5bfab350715138f0a9056d7337e",
+  "compiler_sha256": {
+    "baseline": "b9f0d8ffcb759369ac53d8cf51729438b775f8fe2c3b85edc9532b370ac109e1",
+    "bidirectional": "3cfa0b530a6b90e3c008d53738ebb3d633e8ea821052224c2b37174d23a05d98"
+  },
+  "semantics": {
+    "inputs": "x,y are unsigned 64-bit bit patterns",
+    "defined": "y != 0: q=floor(x/y), r=x mod y; in negative control r=x mod (y|1)",
+    "trap": "y==0 produces WebAssembly integer-divide-by-zero trap",
+    "output": "q XOR rotate-left-64(r,17), wrapping i64 arithmetic",
+    "machine_flags": "not observable by the guest; full x86 flags and ABI not checked"
+  },
+  "contexts": {
+    "forward": {
+      "baseline_decoded_native_instruction_bytes": 43,
+      "bidirectional_decoded_native_instruction_bytes": 25,
+      "baseline_static_div": 2,
+      "bidirectional_static_div": 1,
+      "observed_compiler_fusion": "forward"
+    },
+    "reverse": {
+      "baseline_decoded_native_instruction_bytes": 43,
+      "bidirectional_decoded_native_instruction_bytes": 25,
+      "baseline_static_div": 2,
+      "bidirectional_static_div": 1,
+      "observed_compiler_fusion": "reverse"
+    },
+    "mismatched": {
+      "baseline_decoded_native_instruction_bytes": 50,
+      "bidirectional_decoded_native_instruction_bytes": 50,
+      "baseline_static_div": 2,
+      "bidirectional_static_div": 2,
+      "observed_compiler_fusion": "none"
+    }
+  },
+  "finite_native_vectors_per_compiler_per_context": 87,
+  "finite_native_value_checks": 456,
+  "finite_native_trap_checks": 66,
+  "total_native_executions": 522,
+  "independent_ci_replay_native_executions": 522,
+  "whole_aot_bytes_per_compiler_per_context": 13608,
+  "independent_artifact_audit": {
+    "zip_digest_matched_github": true,
+    "aot_disassembly_trace_sha256_checks": 18,
+    "independently_recalculated_native_instruction_byte_counts": 6,
+    "all_recalculated_costs_match_receipts": true,
+    "native_execution_replay_performed_by_ci": true,
+    "independent_external_native_replay": false
+  },
+  "conclusions": [
+    "Both Udiv/Urem and Urem/Udiv matching orders were observed at the compiler's adjacent-pair pass, not inferred merely from WAT source order",
+    "On a single pinned x86-64 compiler and arithmetic expression, each reduced two physical DIV instructions to one and 43 decoded instruction bytes to 25",
+    "Two structurally nonidentical divisors did not match; pristine and experimental emitted identical 50-byte native function and AOT bytes",
+    "The new reverse-order extension is manually authored and does not satisfy the stronger goal of discovering an x86 instruction sequence through ZenoFCIS synthesis"
+  ],
+  "limits": [
+    "This is finite WebAssembly guest execution and structural IR verification; no universal pass correctness or full machine-state/flags/ABI/undefined/poison/trap-table refinement",
+    "The sampled native x86 function instruction bytes are NOT CLIF instruction costs or total AOT savings",
+    "Three artificial contexts, one target and one compiler revision do not establish representative performance or cross-target profitability",
+    "The original archived CI compiler executable is not included in the new artifact; compiler binary digest and source/install receipts bind it",
+    "No upstream Bytecode Alliance branch changed, no upstream contribution submitted; this checkpoint belongs only to isolated draft PR #188"
+  ]
+}
