@@ -35,7 +35,7 @@ jobs:
         with:
           repository: TheDarkLightX/ZenoFCIS
           run-id: 44056104464
-          github-token: \${{ github.token }}
+          github-token: ${{ github.token }}
           name: tier1-post-souper-divrem-28
           path: tier1-bidirectional-state/compilers
       - name: Verify compiler source and exact baseline SHA-256
