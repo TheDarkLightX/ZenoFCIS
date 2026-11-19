@@ -1,0 +1,72 @@
+{
+  "format": "zal.search-film/1",
+  "title": "Problem solving as search",
+  "essay": "https://www.danaedwards.info/essays/program-synthesis-is-program-search-and-selection.html",
+  "walk": {
+    "right": 3,
+    "up": 2
+  },
+  "transfer": {
+    "right": 5,
+    "up": 3
+  },
+  "budget": 3,
+  "evidence": "evidence/interval-synthesis.json",
+  "shots": [
+    {
+      "view": "trace",
+      "seconds": 8,
+      "title": "Which routes reach the marked spot?",
+      "caption": "Write a route with {moves} moves. At each step, choose right or up."
+    },
+    {
+      "view": "branch",
+      "seconds": 8,
+      "title": "Each choice opens another branch.",
+      "caption": "Each leaf is a possible route. One more move doubles the number of possibilities."
+    },
+    {
+      "view": "budget",
+      "seconds": 9,
+      "title": "What do the first trials establish?",
+      "caption": "Try {budget} routes. Of those, {trialHits} reach the goal. The other {untested} routes are still untested."
+    },
+    {
+      "view": "merge",
+      "seconds": 12,
+      "title": "Look at where the paths meet.",
+      "caption": "The order of the moves does not change the endpoint. Each number counts the routes that meet there."
+    },
+    {
+      "view": "select",
+      "seconds": 9,
+      "title": "Which correct route would you keep?",
+      "caption": "All {solutions} routes reach the same square. Count their turns and {optima} tie for the minimum."
+    },
+    {
+      "view": "language",
+      "seconds": 7,
+      "title": "What can the language express?",
+      "caption": "A right-only language can reach only the bottom row. Adding “up” makes a solution expressible."
+    },
+    {
+      "view": "programs",
+      "seconds": 13,
+      "title": "In program synthesis, each candidate is a program.",
+      "caption": "Test each program on every byte. Only the interval with both boundaries in the right places survives."
+    },
+    {
+      "view": "reuse",
+      "seconds": 9,
+      "title": "Carry the discovery to a new problem.",
+      "caption": "On an open grid, the move counts determine the endpoint. Use them to build a route directly."
+    },
+    {
+      "view": "relation",
+      "seconds": 8,
+      "title": "Every well-defined problem can be modeled as search.",
+      "caption": "The problem tells us which answers count. A good method discovers how much search we can avoid."
+    }
+  ],
+  "replay": "evidence/replay.json"
+}
