@@ -1,0 +1,91 @@
+{
+  "schema": "zenofcis/tier1-adjacent-clif-refinement-qualification/1",
+  "date_utc": "2026-11-19",
+  "classification": "Conditional CLIF-level Udiv/Urem -> Udivrem observational model verified for both adjacent orders; NOT verified compiler-pass or x86 ISA correctness",
+  "source": {
+    "tested_head": "4d65d90e4fb9f1ad5d5b0a0b6ab9cfc60e2812a5",
+    "base": "9ffe52508898e76ef5026ac15b7d17351bbb60fb",
+    "wasmtime": "8b19f199f89da864c529b3fa3ca2f7e40d5de609",
+    "script": "experiments/cranelift-tier1/prove_divrem_clif_refinement_28.py",
+    "script_sha256": "8f0e7bc3d31f39ed62ab803c786703238aca6fe98bf7a10857e8f0b1ae8928f4",
+    "z3": "4.15.4"
+  },
+  "ci": {
+    "workflow": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44559081670",
+    "job_id": 135683081152,
+    "conclusion": "success",
+    "artifact": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44559081670/artifacts/14548305248",
+    "zip_sha256": "a521a67895919f64a9664de57dc150f53cee60868bc439c48bf655dfcbfcd93c",
+    "original_json_sha256": "f651f95d6fa3e2cd08e35660b84bebbe297bcfc86ea9d72e003aef4ec202bd52",
+    "source_file_sha256_in_artifact": "8f0e7bc3d31f39ed62ab803c786703238aca6fe98bf7a10857e8f0b1ae8928f4",
+    "independent_review": "Downloaded 2-file original ZIP; matched GitHub artifact digest, parsed the exact receipt, checked both theorem statuses, five counterexample vectors, and pinned source hashes."
+  },
+  "proof": {
+    "logic": "QF_UFBV",
+    "width": 64,
+    "forward": "unsat",
+    "reverse": "unsat",
+    "theorem": "No input or arbitrary pure result consumer distinguishes same-SSA-operand adjacent scalar unsigned div/rem from a correctly implemented paired Udivrem under identical zero-divisor trap and first-opcode source-location semantics",
+    "qualification": "Conditional, abstract CLIF operational model; combined opcode correctness assumed, not proved by this theorem",
+    "timeout_ms": 20000,
+    "unknown_policy": "fail closed"
+  },
+  "finite": {
+    "input_bits": 8,
+    "all_pairs_per_order": 65536,
+    "orders": 2,
+    "total_pairs": 131072,
+    "zero_divisor_traps_per_order": 256,
+    "status": "exhaustive-equivalent under independent integer reference"
+  },
+  "intentional_negative_witnesses": {
+    "swap_quotient_remainder": {
+      "x": 10,
+      "y": 3
+    },
+    "mismatched_remainder_divisor": {
+      "x": 5,
+      "y": 2
+    },
+    "signed_division_substitution": {
+      "x": "9223372036854775808",
+      "y": 2
+    },
+    "drop_zero_divisor_trap": {
+      "x": 0,
+      "y": 0
+    },
+    "change_first_trap_location": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  "source_shape": {
+    "guard": "Exact-string check of both forward/reverse same-block adjacent i64 SSA matches and first srcloc, source interpreter, x64 lower.isle and meta opcode declarations",
+    "helper_sha256": "94d9e09802ef5f5112db21ffaf68c49bd3d5804a9f72d43f990cee31703ca5e7",
+    "interpreter_sha256": "180c7db7af520fea02a9dac591e55967b438c5f6d0b9d1901a97ac50dd86804d",
+    "opcode_sha256": "60faea5caa55b933dfe68cd9f427a4909b425dd3a35e71081cfc4619f0d9a2d6",
+    "lowering_sha256": "13c3c710872cb3dcc80451cf0af02032391e3b9cee1cc8db7a5f11566d8abf34"
+  },
+  "prior_cost_evidence": {
+    "bidirectional_pr": "https://github.com/TheDarkLightX/ZenoFCIS/pull/188",
+    "ci": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44449965859",
+    "metric": "decoded x86-64 function instruction bytes; not CLIF cost or total AOT size",
+    "forward": {
+      "baseline": 43,
+      "experimental": 25
+    },
+    "reverse": {
+      "baseline": 43,
+      "experimental": 25
+    },
+    "note": "Prior independently qualified native cost evidence, not remeasured or implied by the current proof-only run"
+  },
+  "limits": [
+    "This proof assumes Udivrem produces exactly scalar unsigned quotient/remainder and zero-divisor traps, hence is not a new independent ISA/VeriISLE proof of its implementation",
+    "No general compiler-pass correctness, Rust source semantics, register allocation, implicit x86 flags, ABI, poison/undef, full machine state, or trap-table layout proof",
+    "No newly synthesized x86 instruction sequence; the optimized compiler transformation remains human-authored",
+    "No nonadjacent rule: the one-iadd gap experiment #189 observed zero genuine gap matches",
+    "Keep draft branch isolated; do not merge into ZenoFCIS main/release/2.7.0 or Bytecode Alliance upstream"
+  ]
+}
