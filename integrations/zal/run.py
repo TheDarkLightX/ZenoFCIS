@@ -86,8 +86,8 @@ def syntax_mismatch(source, syntax):
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else list(argv)
     if argv and argv[0] in ("film-check", "film-render"):
-        from zal_notation.__main__ import main as notation_main
-        return notation_main(argv)
+        from zal_notation.film_cli import main as film_main
+        return film_main(argv)
     if argv[:1] == ["word-kernel"]:
         from word_kernel import main as word_kernel_main
         return word_kernel_main(argv[1:])

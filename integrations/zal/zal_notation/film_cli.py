@@ -1,4 +1,5 @@
 """Local file and encoder boundary for the checked film plan."""
+import argparse
 import os
 from pathlib import Path
 import subprocess
@@ -59,3 +60,31 @@ def render(source, destination):
             output.rmdir()
             raise
     return {**summary(core.loads(plan)), "directory": str(output)}
+
+
+def main(argv=None):
+    from .__main__ import emit
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    for name in ("film-check", "film-render"):
+        command = commands.add_parser(name)
+        command.add_argument("source", help="path to the authored JSON storyboard")
+        command.add_argument("--output", required=name == "film-render",
+                             help="new plan file for check, or new directory for render")
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "film-render":
+            emit(render(args.source, args.output))
+        else:
+            plan = core.loads(read_plan(args.source))
+            if args.output:
+                emit(plan, args.output)
+            emit(summary(plan))
+        return 0
+    except (ValueError, TypeError, KeyError, OSError, RecursionError) as error:
+        emit({"status": "refused", "diagnostic": str(error)[:2000], "authority": "none"})
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
