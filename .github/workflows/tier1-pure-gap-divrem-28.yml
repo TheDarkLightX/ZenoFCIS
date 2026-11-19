@@ -1,0 +1,92 @@
+name: tier1-pure-gap-divrem-28
+on:
+  push:
+    branches: [research/2.8-tier1-pure-gap-20261119]
+    paths:
+      - '.github/workflows/tier1-pure-gap-divrem-28.yml'
+      - 'experiments/cranelift-tier1/pure_gap_divrem_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  one-pure-iadd-gap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.98.0'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Preflight one-gap source guards
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/pure_gap_divrem_28.py
+          python3 -B experiments/cranelift-tier1/pure_gap_divrem_28.py --mode self-test
+      - name: Download pinned baseline
+        uses: actions/download-artifact@v4
+        with:
+          repository: TheDarkLightX/ZenoFCIS
+          run-id: 44056104464
+          github-token: ${{ github.token }}
+          name: tier1-post-souper-divrem-28
+          path: tier1-pure-gap-state/compilers
+      - name: Validate pinned compiler
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, 'experiments/cranelift-tier1')
+          from audit_post_souper_inprocess_28 import producer
+          root=Path('tier1-pure-gap-state/compilers')
+          assert producer(root)['compiler_pins']['baseline']['sha256']=='b9f0d8ffcb759369ac53d8cf51729438b775f8fe2c3b85edc9532b370ac109e1'
+          for mode in ('baseline','patched'):
+              (root / mode / 'wasmtime').chmod(0o755)
+          PY
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: 8b19f199f89da864c529b3fa3ca2f7e40d5de609
+          path: upstream
+          persist-credentials: false
+      - name: Install compiler experiment in disposable checkout
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/pure_gap_divrem_28.py --mode install --upstream upstream --out tier1-pure-gap-state/compilers/pure-gap-install.json
+          mkdir -p tier1-pure-gap-state/compiler-source
+          cp tier1-pure-gap-state/compilers/pure-gap-install.json tier1-pure-gap-state/compiler-source/install.json
+          git -C upstream diff --check
+          git -C upstream diff > tier1-pure-gap-state/compiler-source/patch.diff
+          test -s tier1-pure-gap-state/compiler-source/patch.diff
+      - name: Build pinned compiler
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.98.0 --profile minimal
+          rustc -Vv > tier1-pure-gap-state/compiler-source/rustc-version.txt
+          cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump > tier1-pure-gap-state/compiler-source/build.stdout 2> tier1-pure-gap-state/compiler-source/build.stderr
+          mkdir -p tier1-pure-gap-state/compilers/experimental
+          cp upstream/target/debug/wasmtime tier1-pure-gap-state/compilers/experimental/wasmtime
+          sha256sum tier1-pure-gap-state/compilers/{baseline,experimental}/wasmtime > tier1-pure-gap-state/compiler-source/compiler-digests.txt
+      - name: Check native values traps and emitted bytes
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/pure_gap_divrem_28.py --mode run --root tier1-pure-gap-state/compilers --out tier1-pure-gap-state/evidence
+      - name: Independently replay saved evidence
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/pure_gap_divrem_28.py --mode audit --root tier1-pure-gap-state/compilers --out tier1-pure-gap-state/evidence
+      - name: Archive raw evidence and source patch
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-pure-gap-divrem-28
+          path: |
+            tier1-pure-gap-state/evidence/
+            tier1-pure-gap-state/compiler-source/
+          retention-days: 30
+          if-no-files-found: warn
