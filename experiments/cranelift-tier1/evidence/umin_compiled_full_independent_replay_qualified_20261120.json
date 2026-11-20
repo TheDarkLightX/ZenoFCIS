@@ -1,0 +1,62 @@
+{
+  "schema": "zenofcis/tier1-independent-umin-exact-clif-replay/1",
+  "date_utc": "2026-11-20",
+  "summary": "Pending strict compiled-body requalification passed. The actual Cranelift full-ELF function, independently rebuilt synthesized kernel, and frame-neutralized compiler arithmetic core were each replayed natively against the same unsigned-i64 oracle. Zero arithmetic-core bytes saved; this is a known-kernel rediscovery, not an upstream optimization.",
+  "tested_ci": {
+    "workflow": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44768647246",
+    "job_id": 136400037880,
+    "conclusion": "success",
+    "source_commit": "82f1bfd9559136f73bb2127250abeba98a13fc44",
+    "upstream_commit": "e355dc640d047ab76dbf4402567d0c124bfdecd6",
+    "artifact_id": 14652649067,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44768647246/artifacts/14652649067",
+    "zip_sha256": "37b0b881c10d80dc8fe4a1487466c6b44cfdb19aab8fd63c06512ae10842ee91",
+    "artifact_files": 33
+  },
+  "comparison": {
+    "clif_full_function_bytes": 19,
+    "clif_prologue_and_epilogue_bytes_excluding_ret": 8,
+    "clif_arithmetic_core_bytes_including_ret": 11,
+    "zenofcis_unseeded_rediscovery_kernel_bytes_including_ret": 11,
+    "established_arithmetic_saving_bytes": 0,
+    "throughput": "unmeasured",
+    "novelty": "rediscovery"
+  },
+  "model": {
+    "contract": "pure unsigned minimum on two 64-bit inputs; no arithmetic overflow or traps",
+    "solver": "Z3 4.15.4.0",
+    "compiled_core_status": "unsat (no mismatch in conditional QF_BV returned-result model)",
+    "machine_profile2_proxy": "equivalent for alternative 0x39 CMP encoding; NOT a proof of actual 0x3B encoding",
+    "semantics_scope": "exact CMP/CMOVB result semantics and registered narrow Zeno profile; not full flags/ABI/poison/unwind/compiler-pass proof"
+  },
+  "independent_replay": {
+    "runner": "local x86-64 Linux; gcc, objcopy, Python ctypes",
+    "script": "experiments/cranelift-tier1/replay_umin_compiled_full_20261120.py",
+    "local_script_sha256": "0f24b372447ef6bf5037891797a63a7c9600c4f96275d4328c303849fbd720e5",
+    "artifact_input": "original GitHub CI artifact 14652649067 with independently checked SHA-256",
+    "subjects": [
+      "actual full linked Cranelift object %tier1_umin",
+      "Zeno synthesized kernel assembled from archived kernel.S",
+      "exact extracted compiled core assembled from archived compiled-core/kernel.S"
+    ],
+    "edge_pairs": 225,
+    "random_pairs": 100000,
+    "seed": 20261120,
+    "cases_per_subject": 100225,
+    "total_native_calls": 300675,
+    "failures": 0,
+    "expected_core_hex": "483bf74889f8480f42c6c3",
+    "expected_zeno_hex": "4839f74889f0480f42c7c3",
+    "expected_full_function_hex": "554889e5483bf74889f8480f42c64889ec5dc3",
+    "replay_command": "python3 experiments/cranelift-tier1/replay_umin_compiled_full_20261120.py <downloaded-original-artifact.zip> --zip-sha256 37b0b881c10d80dc8fe4a1487466c6b44cfdb19aab8fd63c06512ae10842ee91"
+  },
+  "evidence_limits": [
+    "Source contract in the catalog uses the pretty-printed source-file digest; the emitted problem JSON is normalized and has a different byte hash, separately recorded in the artifact manifest. Do not conflate them.",
+    "No newly cheaper machine instruction sequence: reconstructed Cranelift arithmetic body and Zeno kernel both 11 bytes.",
+    "The independent replay tests finite native return values only, not complete caller-visible physical state.",
+    "The strict compiled-core solver establishes conditional pure-return-model equivalence; status unsat is not a universal machine-refinement proof.",
+    "No same-input patched-versus-unpatched compiler A/B or representative workload benchmark.",
+    "Do not submit this umin result upstream; prioritize search for novel provably cheaper lowering with matching target cost."
+  ],
+  "safety": "Draft research branch only; no merge or upstream submission."
+}
