@@ -1,0 +1,163 @@
+{
+  "schema": "zenofcis/tier1-upstream-requalification/qualified/1",
+  "qualified_utc_date": "2026-11-20",
+  "claim": "Pinned pristine-versus-disposable-patched Wasmtime x86-64 udiv/urem forward adjacent-pair experimental A/B passed finite execution and archive hash/static-cost replay. No upstream-ready proof.",
+  "source_pins": {
+    "zenofcis_experiment": "e30556bf8e7f22701d73e27e0a865cec232a63fb",
+    "wasmtime": "e355dc640d047ab76dbf4402567d0c124bfdecd6",
+    "rust": "1.98.0",
+    "runner": "ubuntu-24.04"
+  },
+  "ci": {
+    "run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44667340618",
+    "conclusion": "success",
+    "artifact_id": 14603308612,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44667340618/artifacts/14603308612",
+    "artifact_zip_sha256": "144fa027f2fb7207792f7c535158fb059e47191314a944f7328cfbb71bb1473d",
+    "archive_file_count": 100,
+    "artifact_expires_at": "2026-12-20T05:13:28Z"
+  },
+  "verification": {
+    "ci_finite_guest_calls": 1280,
+    "ci_independent_native_replays": 120,
+    "semantics": "unsigned i64 div/rem on matching SSA operands; negative controls include signed widths, other operands, reverse order, unmatched one-output contexts, trapping memory operations, and branches; test-only Wasm traps recorded",
+    "proof_class": "finite execution only; no universal compiler-pass proof; no independent VeriISLE proof",
+    "local_independent_archive_audit": "ZIP digest matched GitHub and CI; rechecked 32 x86-64 disassemblies for decoded native byte and [I]DIV counts; checked 32 AOT and disassembly SHA-256 values; verified 16 WAT SHA-256 values, 2 compiler binary SHA-256 values and full AOT sizes",
+    "local_independent_reexecution": "No: compiler builds/guest execution occurred in CI, not the local audit",
+    "negative_controls": "Expected zero savings for unsigned_32/signed_32/signed_64/reverse_order/swapped_rem_inputs/quotient_only/remainder_only/intervening_load/exclusive_branches"
+  },
+  "cost_model": {
+    "target": "x86_64",
+    "kind": "decoded native function instruction bytes plus static DIV instruction count; whole AOT bytes tracked separately",
+    "baseline": "pristine Wasmtime same pin and same WAT inputs; patched Wasmtime built on same runner at same pin",
+    "whole_aot_byte_savings_all_contexts": 0,
+    "context_costs": [
+      {
+        "name": "adjacent",
+        "baseline_native_bytes": 43,
+        "patched_native_bytes": 25,
+        "baseline_div": 2,
+        "patched_div": 1
+      },
+      {
+        "name": "branch",
+        "baseline_native_bytes": 92,
+        "patched_native_bytes": 56,
+        "baseline_div": 4,
+        "patched_div": 2
+      },
+      {
+        "name": "exclusive_branches",
+        "baseline_native_bytes": 45,
+        "patched_native_bytes": 45,
+        "baseline_div": 2,
+        "patched_div": 2
+      },
+      {
+        "name": "intervening_add",
+        "baseline_native_bytes": 50,
+        "patched_native_bytes": 32,
+        "baseline_div": 2,
+        "patched_div": 1
+      },
+      {
+        "name": "intervening_load",
+        "baseline_native_bytes": 53,
+        "patched_native_bytes": 53,
+        "baseline_div": 2,
+        "patched_div": 2
+      },
+      {
+        "name": "long_lived_results",
+        "baseline_native_bytes": 57,
+        "patched_native_bytes": 42,
+        "baseline_div": 2,
+        "patched_div": 1
+      },
+      {
+        "name": "predicate_carried_across_pair",
+        "baseline_native_bytes": 52,
+        "patched_native_bytes": 40,
+        "baseline_div": 2,
+        "patched_div": 1
+      },
+      {
+        "name": "quotient_only",
+        "baseline_native_bytes": 18,
+        "patched_native_bytes": 18,
+        "baseline_div": 1,
+        "patched_div": 1
+      },
+      {
+        "name": "quotient_remainder_branch",
+        "baseline_native_bytes": 62,
+        "patched_native_bytes": 47,
+        "baseline_div": 2,
+        "patched_div": 1
+      },
+      {
+        "name": "remainder_only",
+        "baseline_native_bytes": 21,
+        "patched_native_bytes": 21,
+        "baseline_div": 1,
+        "patched_div": 1
+      },
+      {
+        "name": "reverse_order",
+        "baseline_native_bytes": 49,
+        "patched_native_bytes": 49,
+        "baseline_div": 2,
+        "patched_div": 2
+      },
+      {
+        "name": "signed_32",
+        "baseline_native_bytes": 64,
+        "patched_native_bytes": 64,
+        "baseline_div": 2,
+        "patched_div": 2
+      },
+      {
+        "name": "signed_64",
+        "baseline_native_bytes": 78,
+        "patched_native_bytes": 78,
+        "baseline_div": 2,
+        "patched_div": 2
+      },
+      {
+        "name": "swapped_rem_inputs",
+        "baseline_native_bytes": 43,
+        "patched_native_bytes": 43,
+        "baseline_div": 2,
+        "patched_div": 2
+      },
+      {
+        "name": "two_live_pairs",
+        "baseline_native_bytes": 97,
+        "patched_native_bytes": 73,
+        "baseline_div": 4,
+        "patched_div": 2
+      },
+      {
+        "name": "unsigned_32",
+        "baseline_native_bytes": 36,
+        "patched_native_bytes": 36,
+        "baseline_div": 2,
+        "patched_div": 2
+      }
+    ]
+  },
+  "prior_evidence": "Existing adjacent CLIF semantic-model SMT proof #191 and standalone hardware tests #192 are separate from this compiler A/B; results do not bridge flags, ABI, trap maps or all machine states",
+  "limits": [
+    "This patch is human authored and only runs for adjacent same-block forward unsigned i64 udiv then urem in optimized x86_64 lowering",
+    "No new ZenoFCIS-synthesized machine sequence in this experiment",
+    "Finite guest vectors and replay are not full correctness proofs, and exact flags/undefined/poison/ABI/trap-location obligations remain",
+    "Native instruction bytes are not CLIF-native cost, whole-AOT size or runtime throughput",
+    "No representative workload profitability; do not submit upstream based on this artifact alone",
+    "Source, cost and tool receipts are archival metadata; original binaries and WAT are in a 30-day GitHub Actions artifact"
+  ],
+  "followup": [
+    "Persist machine-state/trap-table proof or an independent concrete compiled-lowering refinement check",
+    "Run ZenoFCIS search for a genuinely new bounded instruction-palette candidate and record the evaluated alternative set",
+    "Benchmark representative workload speed and compiler time before deciding on upstream draft"
+  ]
+}
