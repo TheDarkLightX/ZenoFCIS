@@ -32,7 +32,7 @@
   "independent_replay": {
     "runner": "local x86-64 Linux; gcc, objcopy, Python ctypes",
     "script": "experiments/cranelift-tier1/replay_umin_compiled_full_20261120.py",
-    "local_script_sha256": "0f24b372447ef6bf5037891797a63a7c9600c4f96275d4328c303849fbd720e5",
+    "local_script_sha256": "4b4e1f8f19dc133f8ce5b31b0567d2a1733846e2e4839b2068ad4dea75dad92a",
     "artifact_input": "original GitHub CI artifact 14652649067 with independently checked SHA-256",
     "subjects": [
       "actual full linked Cranelift object %tier1_umin",
@@ -48,7 +48,8 @@
     "expected_core_hex": "483bf74889f8480f42c6c3",
     "expected_zeno_hex": "4839f74889f0480f42c7c3",
     "expected_full_function_hex": "554889e5483bf74889f8480f42c64889ec5dc3",
-    "replay_command": "python3 experiments/cranelift-tier1/replay_umin_compiled_full_20261120.py <downloaded-original-artifact.zip> --zip-sha256 37b0b881c10d80dc8fe4a1487466c6b44cfdb19aab8fd63c06512ae10842ee91"
+    "replay_command": "python3 experiments/cranelift-tier1/replay_umin_compiled_full_20261120.py <downloaded-original-artifact.zip> --zip-sha256 37b0b881c10d80dc8fe4a1487466c6b44cfdb19aab8fd63c06512ae10842ee91",
+    "optimized_python_guard": "Replay deliberately refuses Python -O/-OO, which would disable assertions; independently checked refusal on -O"
   },
   "evidence_limits": [
     "Source contract in the catalog uses the pretty-printed source-file digest; the emitted problem JSON is normalized and has a different byte hash, separately recorded in the artifact manifest. Do not conflate them.",
