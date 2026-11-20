@@ -170,32 +170,74 @@ def check_compiled_machine_core(out: Path, obj: Path, expected_symbol_bytes: int
     if not raw.startswith(prologue) or not raw.endswith(epilogue):
         raise ValueError("frame differs from EXACT recognized pattern; refuse body attribution")
     core = raw[len(prologue):-len(epilogue)] + b"\xc3"
+    # Current Cranelift uses opcode 3B (CMP reg, r/m). The Zeno profile-2
+    # encoder admits the semantically identical opcode 39 (CMP r/m, reg)
+    # form, NOT this exact byte encoding: never call a Zeno receipt proof
+    # of the 3B instruction's machine-state effects.
+    if core != bytes.fromhex("483bf74889f8480f42c6c3"):
+        raise ValueError("unrecognized x86 CMP-reg/rm, MOV, CMOVB, RET instruction bytes")
+    import z3
+    x, y = z3.BitVecs("x y", 64)
+    # x in rdi, y in rsi. CMP rsi,rdi defines CF=(y<x). MOV rax,rdi;
+    # CMOVB rax,rsi conditionally moves y. No flags are live afterwards
+    # in this *pure result* CLIF function. Proving this modeled mapping
+    # is NOT a proof about all physical state or the compiler pass.
+    machine_pure_result = z3.If(z3.ULT(y, x), y, x)
+    contract_result = z3.If(z3.ULE(x, y), x, y)
+    solver = z3.SolverFor("QF_BV")
+    solver.set(timeout=10000)
+    solver.add(machine_pure_result != contract_result)
+    answer = solver.check()
+    if answer != z3.unsat:
+        raise ValueError("compiled-body pure-result SMT unproved: " + str(answer)
+                         + " " + solver.reason_unknown())
+    exact_model = {
+        "proof_class": "conditional bitvector SMT pure-result proof from decoded CMP/CMOVB semantics",
+        "status": "unsat", "logic": "QF_BV",
+        "domain": "all pairs unsigned i64; no trap",
+        "query_sha256": sha(solver.to_smt2().encode()),
+        "solver": z3.get_full_version(),
+        "assumptions": [
+            "exact bytes 48 3b f7 are CMP rsi,rdi setting CF=(y<x)",
+            "exact bytes 48 89 f8 move x to rax",
+            "exact bytes 48 0f 42 c6 are CMOVB rax,rsi using CF",
+            "ret returns rax in the admitted SysV model",
+        ],
+        "not_proved": "full physical flags/ABI/unwind/poison/Cranelift compiler-state refinement",
+    }
+    # The registered Zeno model uses the opposite *encoding* of the same
+    # CMP operand order. Independently check its admitted equivalent and
+    # explicitly preserve the encoding distinction in the receipt.
     body_instructions = [["cmp", "rsi", "rdi"], ["mov", "rax", "rdi"],
                          ["cmovb", "rax", "rsi"]]
-    if core != targets.encode_program(TARGET, body_instructions):
-        raise ValueError("actual native body changed; do not reuse a stale instruction model")
+    normalized = targets.encode_program(TARGET, body_instructions)
     admitted_problem = read_json(PROBLEM)
     admitted(admitted_problem)
     forms = {tuple(row) for row in admitted_problem["grammar"]}
     expanded = dict(admitted_problem)
     expanded["grammar"] = admitted_problem["grammar"] + [
         row for row in body_instructions if tuple(row) not in forms]
-    verdict = verify2.check(expanded, core, timeout_ms=3000)
-    if verdict["status"] != "equivalent":
-        raise ValueError("actual compiled arithmetic body not independently SMT verified: " + repr(verdict))
+    normalized_verdict = verify2.check(expanded, normalized, timeout_ms=3000)
+    if normalized_verdict["status"] != "equivalent":
+        raise ValueError("normalized CMP encoding model check failed: " + repr(normalized_verdict))
     native_dir = out / "compiled-core"
     native_dir.mkdir()
     (native_dir / "kernel.S").write_bytes(targets.assembly_source(core))
     native = native_test(native_dir, native_dir)
     return {
-        "status": "compiled-arithmetic-body-model-and-native-qualified",
-        "scope": "exact recognized x86 frame removed; NOT compiler-pass/ABI/flags/unwind/trap-table proof",
+        "status": "compiled-arithmetic-body-conditional-SMT-and-native-qualified",
+        "scope": "exact recognized x86 frame and decoded pure result only; NOT full flags/ABI/compiler-pass proof",
         "frame": {"prologue_hex": prologue.hex(), "epilogue_hex": epilogue.hex(),
                   "prologue_bytes": len(prologue), "epilogue_bytes_excluding_ret": len(epilogue)-1},
         "full_symbol_bytes": expected_symbol_bytes, "body_including_ret_bytes": len(core),
         "core_hex": core.hex(), "core_sha256": sha(core),
-        "model_verdict": verdict, "native_finite": native,
+        "exact_compiled_model": exact_model,
+        "registered_profile2": {
+            "status": "equivalent", "encoding": "alternative 39 form, not actual 3B form",
+            "code_hex": normalized.hex(), "verification": normalized_verdict},
+        "native_finite": native,
     }
+
 
 def measure(out: Path, upstream: Path, obj: Path) -> None:
     report = json.loads((out / "synthesis.json").read_text())
