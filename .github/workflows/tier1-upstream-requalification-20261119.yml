@@ -47,8 +47,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p tier1-upstream-requal/baseline tier1-upstream-requal/patched
-          git rev-parse HEAD > tier1-upstream-requal/experiment-head.txt
-          git -C upstream rev-parse HEAD > tier1-upstream-requal/upstream-head.txt
+          git rev-parse HEAD > tier1-upstream-requal/zenofcis-head.txt
+          git -C upstream rev-parse HEAD > tier1-upstream-requal/wasmtime-head.txt
           test "$(git -C upstream rev-parse HEAD)" = e355dc640d047ab76dbf4402567d0c124bfdecd6
           python3 -B experiments/cranelift-tier1/requalify_upstream_20261119_28.py --mode preflight --upstream upstream > tier1-upstream-requal/initial-source-preflight.json
           rustup toolchain install 1.98.0 --profile minimal
