@@ -23,8 +23,10 @@
     "semantics": "unsigned i64 div/rem on matching SSA operands; negative controls include signed widths, other operands, reverse order, unmatched one-output contexts, trapping memory operations, and branches; test-only Wasm traps recorded",
     "proof_class": "finite execution only; no universal compiler-pass proof; no independent VeriISLE proof",
     "local_independent_archive_audit": "ZIP digest matched GitHub and CI; rechecked 32 x86-64 disassemblies for decoded native byte and [I]DIV counts; checked 32 AOT and disassembly SHA-256 values; verified 16 WAT SHA-256 values, 2 compiler binary SHA-256 values and full AOT sizes",
-    "local_independent_reexecution": "No: compiler builds/guest execution occurred in CI, not the local audit",
-    "negative_controls": "Expected zero savings for unsigned_32/signed_32/signed_64/reverse_order/swapped_rem_inputs/quotient_only/remainder_only/intervening_load/exclusive_branches"
+    "local_independent_reexecution": "Passed: 76 executions on Linux x86-64 using both archived actual Wasmtime binaries against the archived adjacent WAT, 66 reference-matched values and 10 expected divide-by-zero traps (38 vectors per compiler). Independent Python 64-bit unsigned quotient/remainder/rotate/XOR oracle; deterministic random seed 20261120; verified archived WAT/binary/ZIP digests before executing.",
+    "negative_controls": "Expected zero savings for unsigned_32/signed_32/signed_64/reverse_order/swapped_rem_inputs/quotient_only/remainder_only/intervening_load/exclusive_branches",
+    "local_replay_source": "experiments/cranelift-tier1/replay_upstream_requalification_20261120.py",
+    "local_replay_source_commit": "b131eeb376f7adf5181a822571e1552f57101e61"
   },
   "cost_model": {
     "target": "x86_64",
@@ -153,7 +155,8 @@
     "Finite guest vectors and replay are not full correctness proofs, and exact flags/undefined/poison/ABI/trap-location obligations remain",
     "Native instruction bytes are not CLIF-native cost, whole-AOT size or runtime throughput",
     "No representative workload profitability; do not submit upstream based on this artifact alone",
-    "Source, cost and tool receipts are archival metadata; original binaries and WAT are in a 30-day GitHub Actions artifact"
+    "Source, cost and tool receipts are archival metadata; original binaries and WAT are in a 30-day GitHub Actions artifact",
+    "Additional independent local execution only covers one adjacent fixture with 76 calls, not every compiler context."
   ],
   "followup": [
     "Persist machine-state/trap-table proof or an independent concrete compiled-lowering refinement check",
