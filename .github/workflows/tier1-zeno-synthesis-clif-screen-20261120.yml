@@ -1,0 +1,80 @@
+name: tier1-zeno-unseeded-synthesis-clif-screen-20261120
+on:
+  push:
+    branches: [research/2.8-tier1-zeno-synthesis-clif-screen-20261120]
+    paths:
+      - '.github/workflows/tier1-zeno-synthesis-clif-screen-20261120.yml'
+      - 'experiments/cranelift-tier1/synthesis_clif_screen_20261120.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tier1-zeno-synthesis-clif-screen-20261120
+  cancel-in-progress: true
+jobs:
+  independent-search-and-compiler-screen:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.98.0'
+    steps:
+      - name: Checkout exact research source without write credentials
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Pin Python and solver; validate experiment syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/synthesis_clif_screen_20261120.py
+          python3 -m venv "$RUNNER_TEMP/zeno-synth-venv"
+          "$RUNNER_TEMP/zeno-synth-venv/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          echo "$RUNNER_TEMP/zeno-synth-venv/bin" >> "$GITHUB_PATH"
+      - name: Run genuinely unseeded bounded ZenoFCIS x86-64 search and independent native test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/synthesis_clif_screen_20261120.py --mode run --out tier1-umin-screen
+      - name: Checkout exact Wasmtime Cranelift upstream source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: e355dc640d047ab76dbf4402567d0c124bfdecd6
+          path: upstream
+          persist-credentials: false
+      - name: Record pinned target, toolchain and compiler source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = e355dc640d047ab76dbf4402567d0c124bfdecd6
+          git rev-parse HEAD > tier1-umin-screen/zenofcis-source-commit.txt
+          git -C upstream rev-parse HEAD > tier1-umin-screen/wasmtime-source-commit.txt
+          rustup toolchain install 1.98.0 --profile minimal
+          rustc -Vv > tier1-umin-screen/rustc.txt
+          cargo --version > tier1-umin-screen/cargo.txt
+          gcc --version | head -n 1 > tier1-umin-screen/gcc.txt
+          python3 -c 'import z3;print(z3.get_full_version())' > tier1-umin-screen/z3.txt
+      - name: Independently test and compile the same mathematical unsigned-min result in CLIF
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- test "$GITHUB_WORKSPACE/tier1-umin-screen/umin.clif"
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 --set opt_level=speed_and_size -D -o "$GITHUB_WORKSPACE/tier1-umin-screen/umin-clif.o" "$GITHUB_WORKSPACE/tier1-umin-screen/umin.clif" > tier1-umin-screen/clif-compile.txt
+          readelf -h tier1-umin-screen/umin-clif.o > tier1-umin-screen/clif-elf-header.txt
+          objdump -dr -Mintel tier1-umin-screen/umin-clif.o > tier1-umin-screen/clif-object-disassembly.txt
+      - name: Content-deduplicated source/verification/cost catalog; explicitly refuse unsupported saving claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/synthesis_clif_screen_20261120.py --mode measure --out tier1-umin-screen --upstream upstream --obj tier1-umin-screen/umin-clif.o
+      - name: Preserve search ledger, rejected controls, native binary, pinned CLIF objects and all receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-unseeded-zenofcis-clif-screen-20261120
+          path: tier1-umin-screen/
+          retention-days: 30
+          if-no-files-found: warn

@@ -1,0 +1,91 @@
+{
+  "schema": "zenofcis/tier1-unseeded-umin-clif-screen/qualified-evidence/1",
+  "qualified_utc_date": "2026-11-20",
+  "scope": "Unseeded ZenoFCIS profile-2 synthesis rediscovered a known unsigned-i64 min kernel; Cranelift CLIF baseline measured independently. No new optimization claimed.",
+  "source_pins": {
+    "zenofcis": "f06c063ceda53a6b2015265f8b5e4d7dfda2043a",
+    "wasmtime": "e355dc640d047ab76dbf4402567d0c124bfdecd6",
+    "compiler": "Rust 1.98.0; cranelift 0.139.0-dev",
+    "os": "ubuntu-24.04",
+    "z3": "4.15.4"
+  },
+  "ci": {
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44767164342",
+    "conclusion": "success",
+    "artifact_id": 14643953462,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44767164342/artifacts/14643953462",
+    "artifact_zip_sha256": "5803499a5e0eef44e218f8f3b62fa37bc19700040747b38dc1240c2edaaa354b",
+    "synthesis_receipt_sha256": "9271f837dad57732a606c3d1b231f8c535e7904ac7a10652512ea700325e198c",
+    "catalog_sha256": "0da56f7ae393785f9e810445ce087c4891ebe26b12003a96f055e3bacbe7c41b",
+    "artifact_files": 30,
+    "artifact_expiry": "2026-12-20T15:51:01Z"
+  },
+  "problem": {
+    "name": "unsigned_min_64",
+    "inputs": "all unsigned x,y in {0,...,2^64-1}",
+    "result": "x if x <= y else y",
+    "overflow": "none",
+    "traps": "none",
+    "flags": "intermediate x86 flags modeled under Zeno profile2; full compiled machine-state/flags liveness not proved",
+    "undefined_poison": "no poison/undefined in admitted pure integer model, general CLIF refinement unproved",
+    "target": "x86_64-sysv-register/2"
+  },
+  "search": {
+    "engine": "tools.machine_code.session.search",
+    "seeded_proposal": false,
+    "budget": {
+      "max_candidates": 5000,
+      "max_checks": 8,
+      "deadline_ms": 20000,
+      "solver_timeout_ms": 1000
+    },
+    "result": "checked-candidate",
+    "stop_reason": "grammar-exhausted",
+    "proposed": 43,
+    "concrete_refutations": 25,
+    "smt_solver_checks": 2,
+    "global_optimality": false,
+    "classification": "rediscovery of existing umin-x86 library entry",
+    "candidate_hex": "4839f74889f0480f42c7c3",
+    "candidate_sha256": "fb5ebb7dfc739886e123e0ffe6b8eba7c84c203b8f90078e291455dfa538a6be",
+    "candidate_cost": {
+      "raw_x86_bytes_including_ret": 11,
+      "body_instructions": 3
+    },
+    "verification": "equivalent under Zeno profile-2 SMT model; emitted kernel and receipt replay passed",
+    "negative_control": "mov rax,rdi;ret correctly refuted with counterexample",
+    "finite_native_execution": {
+      "total": 10144,
+      "boundary": 144,
+      "pseudorandom": 10000,
+      "failures": 0
+    }
+  },
+  "cranelift": {
+    "clif_expression": "icmp ult x,y; select condition,x,y",
+    "compiler_settings": {
+      "target": "x86_64",
+      "opt_level": "speed_and_size"
+    },
+    "filetest": "clif-util test passed",
+    "full_function_symbol_bytes": 19,
+    "prologue_bytes": 4,
+    "epilogue_bytes_excluding_ret": 4,
+    "decoded_arithmetic_body_bytes_including_ret": 11,
+    "actual_body_disassembly": [
+      "cmp rsi,rdi",
+      "mov rax,rdi",
+      "cmovb rax,rsi",
+      "ret"
+    ],
+    "raw_byte_saving_established": 0,
+    "note": "The apparent raw 19-vs-11 byte gap comes entirely from compiler prologue/epilogue. The raw candidate is NOT a valid full-compiler replacement. The emitted CMP instruction uses reg,r/m opcode 3B rather than the Zeno profile-2 encoder's r/m,reg opcode 39; this exact encoding is not covered by the registered decoder."
+  },
+  "limits": [
+    "Not a novel synthesized instruction-sequence optimization",
+    "Original CI proves pure returned result under registered machine-code model and finite native test, not full Cranelift ABI/flags/unwind/poison/trap-table refinement",
+    "No same-Wasm baseline-versus-patched compiler A/B",
+    "No throughput improvement or global optimum claimed",
+    "The separate enhanced compiled-body SMT/native-recheck on source after f06c063c requires its own successful CI run"
+  ]
+}
