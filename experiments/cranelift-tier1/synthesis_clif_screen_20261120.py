@@ -153,6 +153,50 @@ def run(out: Path) -> None:
                       "checks": result["solver_checks"], "bytes": len(code),
                       "native_vectors": native["checked"]}, sort_keys=True))
 
+def check_compiled_machine_core(out: Path, obj: Path, expected_symbol_bytes: int) -> dict:
+    """Verify the ACTUAL compiler-emitted core only for one exact x86 frame.
+
+    A recognized frame and proof of its inner body do not establish a full
+    compiler, ABI, flag-liveness, unwind, poison or trap-table refinement.
+    """
+    raw_path = out / "clif-text.bin"
+    subprocess.run(["objcopy", "--only-section=.text", "-O", "binary",
+                    str(obj), str(raw_path)], check=True, capture_output=True, text=True)
+    raw = raw_path.read_bytes()
+    if len(raw) != expected_symbol_bytes:
+        raise ValueError("unexpected .text size or multiple functions; cannot isolate body")
+    prologue = bytes.fromhex("554889e5")       # push rbp; mov rbp,rsp
+    epilogue = bytes.fromhex("4889ec5dc3")     # mov rsp,rbp; pop rbp; ret
+    if not raw.startswith(prologue) or not raw.endswith(epilogue):
+        raise ValueError("frame differs from EXACT recognized pattern; refuse body attribution")
+    core = raw[len(prologue):-len(epilogue)] + b"\xc3"
+    body_instructions = [["cmp", "rsi", "rdi"], ["mov", "rax", "rdi"],
+                         ["cmovb", "rax", "rsi"]]
+    if core != targets.encode_program(TARGET, body_instructions):
+        raise ValueError("actual native body changed; do not reuse a stale instruction model")
+    admitted_problem = read_json(PROBLEM)
+    admitted(admitted_problem)
+    forms = {tuple(row) for row in admitted_problem["grammar"]}
+    expanded = dict(admitted_problem)
+    expanded["grammar"] = admitted_problem["grammar"] + [
+        row for row in body_instructions if tuple(row) not in forms]
+    verdict = verify2.check(expanded, core, timeout_ms=3000)
+    if verdict["status"] != "equivalent":
+        raise ValueError("actual compiled arithmetic body not independently SMT verified: " + repr(verdict))
+    native_dir = out / "compiled-core"
+    native_dir.mkdir()
+    (native_dir / "kernel.S").write_bytes(targets.assembly_source(core))
+    native = native_test(native_dir, native_dir)
+    return {
+        "status": "compiled-arithmetic-body-model-and-native-qualified",
+        "scope": "exact recognized x86 frame removed; NOT compiler-pass/ABI/flags/unwind/trap-table proof",
+        "frame": {"prologue_hex": prologue.hex(), "epilogue_hex": epilogue.hex(),
+                  "prologue_bytes": len(prologue), "epilogue_bytes_excluding_ret": len(epilogue)-1},
+        "full_symbol_bytes": expected_symbol_bytes, "body_including_ret_bytes": len(core),
+        "core_hex": core.hex(), "core_sha256": sha(core),
+        "model_verdict": verdict, "native_finite": native,
+    }
+
 def measure(out: Path, upstream: Path, obj: Path) -> None:
     report = json.loads((out / "synthesis.json").read_text())
     if report["schema"] != SCHEMA or report["zenofcis_commit"] != git("rev-parse", "HEAD"):
@@ -174,6 +218,8 @@ def measure(out: Path, upstream: Path, obj: Path) -> None:
     (out / "cranelift-disassembly.txt").write_text(dump)
     native_bytes = report["candidate"]["cost"]["bytes"]
     symbol_bytes = sized[0][1]
+    compiled = check_compiled_machine_core(out, obj, symbol_bytes)
+    core_bytes = compiled["body_including_ret_bytes"]
     catalog = {
         "schema": "zenofcis/tier1-synthesized-clif-cost-catalog/1",
         "experiment": report["zenofcis_commit"], "upstream": WASMTIME,
@@ -193,9 +239,13 @@ def measure(out: Path, upstream: Path, obj: Path) -> None:
         "costs": {
             "raw_zeno_sysv_machine_code_bytes_including_ret": native_bytes,
             "cranelift_compiled_full_function_symbol_bytes": symbol_bytes,
+            "cranelift_exact_frame_neutralized_body_bytes_including_ret": core_bytes,
+            "compiler_core_vs_zeno_core_bytes_saved": core_bytes - native_bytes,
+            "cranelift_frame_overhead_bytes": symbol_bytes - core_bytes,
             "cranelift_opt_level": "speed_and_size", "cranelift_target": "x86_64",
             "difference_arithmetic_only_not_a_valid_saving_claim": symbol_bytes-native_bytes,
         },
+        "compiled_body_refinement": compiled,
         "qualification": "measured separate code paths; not a same-WAT patched-versus-unpatched compiler A/B",
         "limits": report["limits"] + [
             "CLIF calling convention/physical registers not independently bridged to raw SysV kernel",
