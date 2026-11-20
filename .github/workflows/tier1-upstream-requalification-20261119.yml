@@ -1,0 +1,91 @@
+name: tier1-upstream-requalification-20261119
+on:
+  push:
+    branches: [research/2.8-tier1-upstream-requal-20261119]
+    paths:
+      - '.github/workflows/tier1-upstream-requalification-20261119.yml'
+      - 'experiments/cranelift-tier1/requalify_upstream_20261119_28.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tier1-upstream-requalification-20261119
+  cancel-in-progress: true
+jobs:
+  exact-source-guards:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Python syntax and deterministic installer/source negative controls
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/requalify_upstream_20261119_28.py
+          python3 -B experiments/cranelift-tier1/requalify_upstream_20261119_28.py --mode self-test
+  pristine-versus-patched-aot:
+    needs: [exact-source-guards]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.98.0'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: e355dc640d047ab76dbf4402567d0c124bfdecd6
+          path: upstream
+          persist-credentials: false
+      - name: Preserve source and toolchain identities; fail on stale pins
+        run: |
+          set -euo pipefail
+          mkdir -p tier1-upstream-requal/baseline tier1-upstream-requal/patched
+          git rev-parse HEAD > tier1-upstream-requal/experiment-head.txt
+          git -C upstream rev-parse HEAD > tier1-upstream-requal/upstream-head.txt
+          test "$(git -C upstream rev-parse HEAD)" = e355dc640d047ab76dbf4402567d0c124bfdecd6
+          python3 -B experiments/cranelift-tier1/requalify_upstream_20261119_28.py --mode preflight --upstream upstream > tier1-upstream-requal/initial-source-preflight.json
+          rustup toolchain install 1.98.0 --profile minimal
+          rustc -Vv > tier1-upstream-requal/rustc-version.txt
+          cargo --version > tier1-upstream-requal/cargo-version.txt
+      - name: Build pristine pinned baseline Wasmtime
+        run: |
+          set -euo pipefail
+          cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump >tier1-upstream-requal/baseline-build.stdout 2>tier1-upstream-requal/baseline-build.stderr
+          cp upstream/target/debug/wasmtime tier1-upstream-requal/baseline/wasmtime
+          sha256sum tier1-upstream-requal/baseline/wasmtime > tier1-upstream-requal/baseline-binary.sha256
+      - name: Apply the existing human-authored forward div/rem rule to disposable sources
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/requalify_upstream_20261119_28.py --mode install --upstream upstream --out tier1-upstream-requal
+          git -C upstream diff --check
+          git -C upstream diff -- cranelift/codegen/src/context.rs cranelift/codegen/meta/src/shared/instructions.rs cranelift/codegen/src/isa/x64/lower.isle cranelift/interpreter/src/step.rs > tier1-upstream-requal/experimental-compiler.patch
+          test -s tier1-upstream-requal/experimental-compiler.patch
+      - name: Build patched pinned Wasmtime and preserve binary identity
+        run: |
+          set -euo pipefail
+          cargo build --locked --manifest-path upstream/Cargo.toml -p wasmtime-cli --bin wasmtime --no-default-features --features run,compile,wat,objdump >tier1-upstream-requal/patched-build.stdout 2>tier1-upstream-requal/patched-build.stderr
+          cp upstream/target/debug/wasmtime tier1-upstream-requal/patched/wasmtime
+          sha256sum tier1-upstream-requal/patched/wasmtime > tier1-upstream-requal/patched-binary.sha256
+      - name: Execute same WebAssembly finite controls and read exact native bytes
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/requalify_upstream_20261119_28.py --mode qualify --out tier1-upstream-requal
+      - name: Independently replay guest outcomes, receipts and native costs
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/requalify_upstream_20261119_28.py --mode audit --upstream upstream --out tier1-upstream-requal
+      - name: Archive source pins, compiler patch, WAT, AOT, disassembly and receipts even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-upstream-requalification-20261119
+          path: tier1-upstream-requal/
+          retention-days: 30
+          if-no-files-found: warn
