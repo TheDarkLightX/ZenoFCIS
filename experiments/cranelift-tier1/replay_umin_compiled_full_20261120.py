@@ -14,6 +14,7 @@ import platform
 from pathlib import Path
 import random
 import subprocess
+import sys
 import tempfile
 import zipfile
 
@@ -25,6 +26,8 @@ ZENOK = bytes.fromhex("4839f74889f0480f42c7c3")
 
 
 def run(args):
+    if sys.flags.optimize:
+        raise RuntimeError("Replay forbids Python -O: required assertions would be stripped")
     assert platform.machine().lower() in {"x86_64", "amd64"}
     assert 0 <= args.random_pairs <= 1000000
     archive = args.artifact.read_bytes()
