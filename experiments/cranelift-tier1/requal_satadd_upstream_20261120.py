@@ -112,7 +112,10 @@ def patch(root: Path, out: Path) -> None:
 
 
 def prefix(path: Path) -> dict:
-    dump = subprocess.check_output(["objdump", "-d", "-Mintel", str(path)], text=True)
+    # -w prevents objdump wrapping 10-byte movabs and memory operands into
+    # continuation byte rows, which otherwise appear as false instruction gaps.
+    # Keep the existing strict contiguous-offset and first-RET checks.
+    dump = subprocess.check_output(["objdump", "-d", "-w", "-Mintel", str(path)], text=True)
     lines = []
     pat = re.compile(r"^\s*([0-9a-f]+):\s+((?:[0-9a-f]{2}\s+)+)\s*(\S.*)$", re.I)
     for line in dump.splitlines():
