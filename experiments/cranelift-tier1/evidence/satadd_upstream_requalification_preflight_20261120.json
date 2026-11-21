@@ -1,0 +1,49 @@
+{
+  "schema": "zenofcis/tier1-satadd-new-upstream-preflight/1",
+  "status": "ci-queued-not-qualified",
+  "date_utc": "2026-11-21",
+  "experiment": "Requalify prior human-authored signed-i64 saturating-add clamp mid-end ISLE rule against a newer upstream; same CLIF A/B, independent QF_BV clamp proof, native finite reference and exact instruction/symbol costs",
+  "source": {
+    "zenofcis_qualifying_code_commit": "ab9445639e0c76a4c83416c2177fba64b81852ce",
+    "branch": "research/2.8-tier1-satadd-upstream-20261120",
+    "script": "experiments/cranelift-tier1/requal_satadd_upstream_20261120.py",
+    "workflow": ".github/workflows/tier1-satadd-upstream-requalification-20261120.yml",
+    "fixture": "experiments/cranelift-tier1/satadd.clif",
+    "existing_synthesis_calibration": "https://github.com/TheDarkLightX/ZenoFCIS/pull/194",
+    "existing_satadd_research": "https://github.com/TheDarkLightX/ZenoFCIS/pull/175"
+  },
+  "upstream": {
+    "repository": "bytecodealliance/wasmtime",
+    "commit": "e355dc640d047ab76dbf4402567d0c124bfdecd6",
+    "reviewed_selects_isle_blob": "5ec428ceefedfc89c49392875a3fad7299a5f884",
+    "comparison_old_pin": "b1f81d2ad4fc64fbe0e70a7cc5fccac1a7864c49",
+    "same_semantic_rule_already_in_upstream": false,
+    "preflight_diff": "new upstream selects.isle adds select simplifications unrelated to the proposed signed saturation-clamp form; no rule of proposed name seen"
+  },
+  "history": {
+    "older_reported_x64_symbol_bytes_baseline": 56,
+    "older_reported_x64_symbol_bytes_patched": 39,
+    "older_reported_executable_byte_saving": 7,
+    "status": "historical only; these numbers are NOT results on the new pin"
+  },
+  "ci": {
+    "run_id": 44860710209,
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44860710209",
+    "observed_status": "queued",
+    "conclusion": null
+  },
+  "qualification": {
+    "new_pin_cranelift_compilation": "not-yet-observed",
+    "new_pin_qf_bv": "not-yet-observed",
+    "new_pin_native_executions": "not-yet-observed",
+    "new_pin_cost_delta": "not-yet-observed",
+    "veriisle": "not-tested; old verifier required unreviewed experimental select spec",
+    "synthesis_novelty": "none; this is a historical human-authored rewrite"
+  },
+  "limits": [
+    "do not claim compiler size or runtime savings before new-pin A/B receipts",
+    "do not substitute proof of pure clamp identity for target x86, physical flags, ABI, poison, or complete ISLE chain",
+    "do not open upstream PR until independently qualified and target-beneficial",
+    "do not merge into main or release branch"
+  ]
+}
