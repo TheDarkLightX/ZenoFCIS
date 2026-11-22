@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/tier1-veriisle-popcnt-names-20261122.yml'
       - 'experiments/cranelift-tier1/veriisle_popcnt_qualification_20261122.py'
+      - 'experiments/cranelift-tier1/veriisle_popcnt_wide_matrix_20261122.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -51,11 +52,19 @@ jobs:
           cd upstream
           timeout 900s cargo test --locked -p cranelift-isle-veri --test filetests -- --nocapture > "$RUNNER_TEMP/tier1-popcnt-veri/full_filetests.log" 2>&1
           grep -E 'test result:|passed;|FAILED' "$RUNNER_TEMP/tier1-popcnt-veri/full_filetests.log" | tail -20
+      - name: Compare full-width fresh SMT names against inlined expressions with bounded proof workloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/veriisle_popcnt_wide_matrix_20261122.py
+          python3 -B experiments/cranelift-tier1/veriisle_popcnt_wide_matrix_20261122.py
       - name: Keep exact source patch, command receipts and raw logs regardless of verdict
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: tier1-popcnt-veriisle-fresh-names-20261122
-          path: ${{ runner.temp }}/tier1-popcnt-veri/
+          path: |
+            ${{ runner.temp }}/tier1-popcnt-veri/
+            ${{ runner.temp }}/tier1-popcnt-wide-matrix/
           retention-days: 30
           if-no-files-found: warn
