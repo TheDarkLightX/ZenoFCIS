@@ -28,7 +28,7 @@ Pinned [GitHub Actions run 45037715900](https://github.com/TheDarkLightX/ZenoFCI
 | 64-bit scalar popcount identity | Not run before patch | PASS (1 verification) | Same primitive encoded on both sides; **not an independent popcount proof** |
 | Existing lane double-negation filetest | Not rerun before patch | PASS (2 verifications) | Basic collateral check |
 
-Every successful verifier result above reported zero expansion errors, zero verification failures and zero unknowns. A second workflow run is adding the **full VeriISLE filetest suite** check: [run 45037934928](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/45037934928). Confirm its conclusion and analyze its artifact before any stronger claim.
+Every successful verifier result above reported zero expansion errors, zero verification failures and zero unknowns. A second [pinned CI run 45037934928](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/45037934928) **passed the complete VeriISLE filetest suite: 17 passed, 0 failed, 0 ignored**. This includes expected-negative fixtures, whose individual reported verification errors are intentional test outcomes. Its [full-suite artifact 14760850243](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/45037934928/artifacts/14760850243) has ZIP SHA-256 `d2feca856ff9dde69c9c5e5e0ff0641e4c5812c41cdb244701b4ead1c2b1bed2`, and preserves the regression A/B logs and exact source patch. See [qualified evidence](evidence/veriisle_popcnt_freshnames_qualified_20261122.json).
 
 The first artifact ZIP has SHA-256 `43b53958b7ea416395c439f732fabe19b76b70db22af13c363bd6c8812a9152a`. An independent parser checked all recorded log hashes, the exact baseline diagnostic, the four success logs, and that the patch changes only `solver.rs`.
 
