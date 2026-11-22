@@ -44,6 +44,13 @@ jobs:
         run: |
           set -euo pipefail
           python3 -B experiments/cranelift-tier1/veriisle_popcnt_qualification_20261122.py
+      - name: Run entire VeriISLE filetest suite after applying the candidate patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd upstream
+          timeout 900s cargo test --locked -p cranelift-isle-veri --test filetests -- --nocapture > "$RUNNER_TEMP/tier1-popcnt-veri/full_filetests.log" 2>&1
+          grep -E 'test result:|passed;|FAILED' "$RUNNER_TEMP/tier1-popcnt-veri/full_filetests.log" | tail -20
       - name: Keep exact source patch, command receipts and raw logs regardless of verdict
         if: always()
         uses: actions/upload-artifact@v4
