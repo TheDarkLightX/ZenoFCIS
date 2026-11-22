@@ -1,0 +1,40 @@
+{
+  "schema": "zenofcis/tier1-veriisle-popcnt-symbol-names/qualified-v1",
+  "date_utc": "2026-11-22",
+  "status": "source_pinned_targeted_red_green_and_full_filetests_passed",
+  "upstream": {
+    "repository": "bytecodealliance/wasmtime",
+    "commit": "fb792bf7a143801c22c0ba5b16fe2c6085a8598b",
+    "solver_git_blob_before": "8d3b5eb63482b9b6f438a517fa15e22d9c0accd9",
+    "popcnt_git_blob": "418c77c4b7c9b3bd477d31b0757de2488faacf1a",
+    "solver_git_blob_after": "79e6cfe6f3042d082a56f885c6910c4224464aad"
+  },
+  "ci": {
+    "first_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/45037715900",
+    "full_suite_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/45037934928",
+    "tested_research_commit": "8c19c4c2dce0cee7c5f03a4d1ee1445959ee8aeb",
+    "artifact_id": 14760850243,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/45037934928/artifacts/14760850243",
+    "artifact_zip_sha256": "d2feca856ff9dde69c9c5e5e0ff0641e4c5812c41cdb244701b4ead1c2b1bed2",
+    "patch_sha256": "6974aae70360aca1e25c4addf2264f7271512e76846b774b78f703735ffd7475",
+    "result": "success",
+    "toolchain": "Rust 1.98.0; Ubuntu 24.04; apt-provided Z3 4.8.12 and cvc5 1.1.2, exact text recorded in artifact"
+  },
+  "regression": {
+    "before": "8-bit pair; exit 101; duplicate declaration popcnt_8_10 confirmed",
+    "after": [
+      "8-bit two-lane filetest: 1 verification success, 0 failure/unknown",
+      "32-bit two-lane filetest: 1 verification success, 0 failure/unknown",
+      "64-bit scalar popcnt self-consistency filetest: 1 verification success, 0 failure/unknown",
+      "existing lane double-negation filetest: 2 verification successes, 0 failure/unknown"
+    ],
+    "full_suite": "17/17 filetests pass, including expected-negative fixtures"
+  },
+  "limitations": [
+    "Fresh solver-local names preserve named popcount equations, but full production 64-bit verifier query workloads and timeout behavior have not been qualified.",
+    "The scalar width-64 fixture compares the same primitive on both sides, not an independent popcount oracle.",
+    "This candidate changes VeriISLE solver declarations, not x86 ISA selection, CLIF cost, performance, or code size.",
+    "No independent formal proof of complete compiler/SMT encoding soundness, end-to-end machine state, ABI, undefined/poison, flags or traps.",
+    "No upstream PR was created or commented upon. Only a human may submit to Wasmtime."
+  ]
+}
