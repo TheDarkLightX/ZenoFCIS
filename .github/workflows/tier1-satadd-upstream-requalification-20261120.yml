@@ -1,0 +1,95 @@
+name: tier1-satadd-upstream-requalification-20261120
+on:
+  push:
+    branches: [research/2.8-tier1-satadd-upstream-20261120]
+    paths:
+      - 'experiments/cranelift-tier1/requal_satadd_upstream_20261120.py'
+      - '.github/workflows/tier1-satadd-upstream-requalification-20261120.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tier1-satadd-upstream-requalification-20261120
+  cancel-in-progress: true
+
+jobs:
+  exact-pinned-compiler-ab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.98.0'
+    steps:
+      - name: Checkout experiment without write credentials
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout exact reviewed Wasmtime source in a disposable directory
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: fb792bf7a143801c22c0ba5b16fe2c6085a8598b
+          path: upstream
+          persist-credentials: false
+      - name: Syntax and hash-pinned independent SMT checker
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/requal_satadd_upstream_20261120.py
+          python3 -m venv "$RUNNER_TEMP/tier1-satadd-env"
+          "$RUNNER_TEMP/tier1-satadd-env/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          echo "$RUNNER_TEMP/tier1-satadd-env/bin" >> "$GITHUB_PATH"
+      - name: Establish source and compiler identities and independent QF_BV proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tier1-satadd-newpin"
+          test "$(git -C upstream rev-parse HEAD)" = fb792bf7a143801c22c0ba5b16fe2c6085a8598b
+          git rev-parse HEAD > "$RUNNER_TEMP/tier1-satadd-newpin/zenofcis-commit.txt"
+          git -C upstream rev-parse HEAD > "$RUNNER_TEMP/tier1-satadd-newpin/wasmtime-commit.txt"
+          rustup toolchain install 1.98.0 --profile minimal
+          rustc -Vv > "$RUNNER_TEMP/tier1-satadd-newpin/rustc.txt"
+          cargo --version > "$RUNNER_TEMP/tier1-satadd-newpin/cargo.txt"
+          python3 -c 'import z3;print(z3.get_full_version())' > "$RUNNER_TEMP/tier1-satadd-newpin/z3.txt"
+          python3 -B experiments/cranelift-tier1/requal_satadd_upstream_20261120.py \
+            --phase prove --out "$RUNNER_TEMP/tier1-satadd-newpin/proof.json"
+      - name: Run original CLIF test and compile pristine compiler object
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- test "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif"
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 --set opt_level=speed_and_size -D -o "$RUNNER_TEMP/tier1-satadd-newpin/pristine.o" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif" > "$RUNNER_TEMP/tier1-satadd-newpin/pristine-compile.txt"
+      - name: Apply exactly one experimental ISLE rule in disposable compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/requal_satadd_upstream_20261120.py \
+            --phase patch --upstream upstream --out "$RUNNER_TEMP/tier1-satadd-newpin/patch.json"
+          git -C upstream diff -- cranelift/codegen/src/opts/selects.isle > "$RUNNER_TEMP/tier1-satadd-newpin/experimental-isle.patch"
+      - name: Run patched compiler, exact-input cost analysis and native independent oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- test "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif"
+          cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 --set opt_level=speed_and_size -D -o "$RUNNER_TEMP/tier1-satadd-newpin/experimental.o" "$GITHUB_WORKSPACE/experiments/cranelift-tier1/satadd.clif" > "$RUNNER_TEMP/tier1-satadd-newpin/experimental-compile.txt"
+          python3 -B experiments/cranelift-tier1/requal_satadd_upstream_20261120.py \
+            --phase measure --upstream upstream \
+            --baseline "$RUNNER_TEMP/tier1-satadd-newpin/pristine.o" \
+            --candidate "$RUNNER_TEMP/tier1-satadd-newpin/experimental.o" \
+            --proof "$RUNNER_TEMP/tier1-satadd-newpin/proof.json" \
+            --patch "$RUNNER_TEMP/tier1-satadd-newpin/patch.json" \
+            --out "$RUNNER_TEMP/tier1-satadd-newpin/qualification.json"
+          cp experiments/cranelift-tier1/satadd.clif "$RUNNER_TEMP/tier1-satadd-newpin/"
+          printf '%s\n' 'Experimental same-CLIF compiler A/B. Code-size measurement is not performance, generalized soundness or a synthesis discovery.' > "$RUNNER_TEMP/tier1-satadd-newpin/scope.txt"
+      - name: Preserve exact objects, patch, proof, finite native oracle and cost receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-satadd-nov21-upstream-20261122
+          path: ${{ runner.temp }}/tier1-satadd-newpin/
+          retention-days: 30
+          if-no-files-found: warn

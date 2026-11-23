@@ -1,0 +1,77 @@
+name: tier1-satadd-object-throughput-20261123
+on:
+  push:
+    branches: [research/2.8-tier1-satadd-upstream-20261120]
+    paths:
+      - '.github/workflows/tier1-satadd-object-throughput-20261123.yml'
+      - 'experiments/cranelift-tier1/bench_satadd_objects_20261123.c'
+      - 'experiments/cranelift-tier1/analyze_satadd_microbench_20261123.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: tier1-satadd-object-throughput-20261123
+  cancel-in-progress: true
+
+jobs:
+  native-satadd-a-b:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated research branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Download exact earlier compiler-generated objects, check SHA-256 and source pins
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tier1-satadd-throughput/artifact"
+          gh run download 45107263287 --repo TheDarkLightX/ZenoFCIS --name tier1-satadd-nov21-upstream-20261122 --dir "$RUNNER_TEMP/tier1-satadd-throughput/artifact"
+          cd "$RUNNER_TEMP/tier1-satadd-throughput/artifact"
+          printf '%s  %s\n' '5179f3985e49772b4656ca261e64eb0d8ba57802b78abc9c1ee02d2d7cf03268' pristine.o '06e9bb768ebb06a1067b1a1bb23bcb48e5bfbcd04e4281db07332e22d501b960' experimental.o | sha256sum --check
+          test "$(cat wasmtime-commit.txt)" = fb792bf7a143801c22c0ba5b16fe2c6085a8598b
+          test "$(cat zenofcis-commit.txt)" = 3988929316efba6ce037994af9a2b95c43dbbc95
+          cp qualification.json proof.json "$RUNNER_TEMP/tier1-satadd-throughput/"
+      - name: Compile independent benchmark and run input-oracle/AB/BA/A-A controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/tier1-satadd-throughput"
+          art="$root/artifact"
+          clang -shared -o "$art/pristine.so" "$art/pristine.o"
+          clang -shared -o "$art/experimental.so" "$art/experimental.o"
+          clang -O3 -Wall -Wextra -Werror -std=gnu11 experiments/cranelift-tier1/bench_satadd_objects_20261123.c -ldl -o "$root/bench_satadd"
+          {
+            uname -a
+            lscpu
+            clang --version
+            sha256sum experiments/cranelift-tier1/bench_satadd_objects_20261123.c experiments/cranelift-tier1/analyze_satadd_microbench_20261123.py
+            sha256sum "$art/pristine.o" "$art/experimental.o"
+          } > "$root/host-and-pins.txt"
+          "$root/bench_satadd" "$art/pristine.so" "$art/experimental.so" 24 20 > "$root/forward.csv" 2> "$root/forward.stderr"
+          "$root/bench_satadd" "$art/experimental.so" "$art/pristine.so" 24 20 > "$root/reverse.csv" 2> "$root/reverse.stderr"
+          "$root/bench_satadd" "$art/pristine.so" "$art/pristine.so" 16 16 > "$root/aa-control.csv" 2> "$root/aa-control.stderr"
+          python3 experiments/cranelift-tier1/analyze_satadd_microbench_20261123.py "$root/forward.csv" --out "$root/forward.json"
+          python3 experiments/cranelift-tier1/analyze_satadd_microbench_20261123.py "$root/reverse.csv" --swapped --out "$root/reverse.json"
+          python3 experiments/cranelift-tier1/analyze_satadd_microbench_20261123.py "$root/aa-control.csv" --out "$root/aa-control.json"
+          python3 - <<'PY'
+          import json, os, pathlib
+          root=pathlib.Path(os.environ["RUNNER_TEMP"])/"tier1-satadd-throughput"
+          for key in ("forward","reverse","aa-control"):
+              r=json.loads((root/f"{key}.json").read_text())
+              print(key,{k:round(v["ratio_baseline_time_divided_by_experimental_time"],4) for k,v in r["results"].items()})
+          PY
+      - name: Preserve all raw paired observations, negative control, exact pins and verdicts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-satadd-throughput-currentpin-20261123
+          path: ${{ runner.temp }}/tier1-satadd-throughput/
+          retention-days: 30
+          if-no-files-found: warn

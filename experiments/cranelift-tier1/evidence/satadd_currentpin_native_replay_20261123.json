@@ -1,0 +1,64 @@
+{
+  "artifact_members_sha256": {
+    "baseline-objdump.txt": "a7c86d37650105df97b9ca1b08c8ef47f27a3e7de886a382f1da4800cd6f8923",
+    "cargo.txt": "fb3f25aefd6d5441842d285f5a9b125b3f0f0b0bf2013d9a32677f9e99c6c854",
+    "experimental-compile.txt": "616f17ad170754eeb0ba41a14390d30b700cadb6d18f15039991f8bc439a0af7",
+    "experimental-isle.patch": "a2082d2a6b90084aa3abe2dcd70ce4297471ec06a41ee02cfbdb8aee86000460",
+    "experimental-objdump.txt": "2bd2a56721f0c2b121389bef8e15427d5d2cb6b8c6b4ff1ae5574f427ecc7941",
+    "experimental.o": "06e9bb768ebb06a1067b1a1bb23bcb48e5bfbcd04e4281db07332e22d501b960",
+    "patch.json": "b4719d204613640c524a9da37862a6e72bd7ed63fa3a5a6a44bdc946c08f6402",
+    "pristine-compile.txt": "1dfe1de7622c4f98524a87b5fce1fd0f8b75be1019be56101df43bebcd680e3d",
+    "pristine.o": "5179f3985e49772b4656ca261e64eb0d8ba57802b78abc9c1ee02d2d7cf03268",
+    "proof.json": "c435e4cff0bbc7c06fdf6a583f5a9f0b70bca9258b8a61aafb716fe265844c8d",
+    "qualification.json": "5e8c7c1c291de5ff7aaea6854883d832cfc18ad5993fab300d505477e3847037",
+    "rustc.txt": "3975d062e234a9f3921955bf6ae5b90f5819df94fa825d057f76b34a35ed0f4d",
+    "satadd.clif": "579244793d801ad907d3ed3c611b156103379e4d91c68d44c6ad4226ea85312e",
+    "scope.txt": "204f615824030d8e1da350286fa70ffe90cab5c1020f6971e7c64ed1bf43bef1",
+    "wasmtime-commit.txt": "b3391a6b9d4cfd9bf4e5820dfb0e896831e67e499cb45b4ee76c20cf9d6aa03b",
+    "z3.txt": "26b423b234848f652721f3791a013d18051fc04b57bc7aba709b1f67ae6b1e81",
+    "zenofcis-commit.txt": "44bf7568f554b18e4266a676b9554cc7c07c60b0cea63477df1846599a4f22c6"
+  },
+  "objects": {
+    "baseline": {
+      "object_sha256": "5179f3985e49772b4656ca261e64eb0d8ba57802b78abc9c1ee02d2d7cf03268",
+      "symbol_bytes": 56,
+      "through_ret_bytes": 46,
+      "through_ret_instructions": 13
+    },
+    "experimental": {
+      "object_sha256": "06e9bb768ebb06a1067b1a1bb23bcb48e5bfbcd04e4281db07332e22d501b960",
+      "symbol_bytes": 39,
+      "through_ret_bytes": 39,
+      "through_ret_instructions": 12
+    }
+  },
+  "result": "passed",
+  "schema": "tier1-satadd-artifact-independent-native-audit/1",
+  "sizes": {
+    "decoded_bytes_through_first_ret_delta": 7,
+    "whole_elf_symbol_byte_delta": 17
+  },
+  "source": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/45107263287/artifacts/14792876411",
+  "source_commit": "3988929316efba6ce037994af9a2b95c43dbbc95",
+  "target": "linux x86_64 host (not a performance measurement)",
+  "upstream_source_blob": "5ec428ceefedfc89c49392875a3fad7299a5f884",
+  "verification": {
+    "boundary_grid_pairs": 484,
+    "failures": 0,
+    "method": "local link+ctypes native execution via SysV x86_64 ABI, independent Python unlimited-precision signed saturation",
+    "pairs_per_object": 100484,
+    "pseudorandom_pairs": 100000,
+    "smt": "CI unsat receipt pinned to pure sign-clamp QF_BV; receipt hash checked but solver NOT rerun",
+    "total_native_calls": 200968,
+    "unproven": [
+      "all 2^128 saturating-add inputs under native machine semantics",
+      "all ISLE rule chains",
+      "non-x86 targets",
+      "compiler ABI/flags preservation in all contexts",
+      "undefined/poison",
+      "runtime speedup",
+      "whole-program size"
+    ]
+  },
+  "wasmtime_commit": "fb792bf7a143801c22c0ba5b16fe2c6085a8598b"
+}

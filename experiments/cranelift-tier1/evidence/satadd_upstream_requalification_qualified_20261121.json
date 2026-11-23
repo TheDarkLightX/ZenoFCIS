@@ -1,0 +1,88 @@
+{
+  "schema": "zenofcis/tier1-satadd-upstream-requalification/qualified-v1",
+  "status": "ci_passed_and_independently_replayed",
+  "date_utc": "2026-11-21",
+  "experimental_branch": "research/2.8-tier1-satadd-upstream-20261120",
+  "qualification_revision": "eb6f716e4ef54370cadad30e0f8752267f1c566b",
+  "upstream": {
+    "repository": "bytecodealliance/wasmtime",
+    "commit": "e355dc640d047ab76dbf4402567d0c124bfdecd6",
+    "selects_isle_git_blob": "5ec428ceefedfc89c49392875a3fad7299a5f884"
+  },
+  "subject": "Human-authored signed-i64 saturation-clamp mid-end ISLE rewrite, same CLIF compiled with pristine versus one-rule patched x86_64 Cranelift at opt_level=speed_and_size",
+  "dedup_identity": {
+    "rule_sha256": "f3ef723b7578f3b848f06f5882cb89eb85b1f37c6478405a74bb53627ea4342a",
+    "fixture_sha256": "579244793d801ad907d3ed3c611b156103379e4d91c68d44c6ad4226ea85312e",
+    "upstream_commit": "e355dc640d047ab76dbf4402567d0c124bfdecd6"
+  },
+  "ci": {
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44888175343",
+    "run_id": 44888175343,
+    "job_id": 136797944648,
+    "job_conclusion": "success",
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/44888175343/artifacts/14700970848",
+    "artifact_sha256": "20df259788ff1fdba6bcb5d5c762c99da062953eebdfcf45c498b1ca94163d47",
+    "artifact_file_count": 17
+  },
+  "proof": {
+    "solver": "Z3 4.15.4.0",
+    "logic": "QF_BV",
+    "status": "unsat",
+    "scope": "Pure sign-clamp identity for all signed i64 values; conditional on declared expression semantics, not full ISLE-chain or machine-state correctness",
+    "proof_receipt_sha256": "6a3edeeb7467a0b23d33006d7c540de86a57262856821803283f304a638a1137"
+  },
+  "compiler": {
+    "target": "x86_64",
+    "optimization_level": "speed_and_size",
+    "pristine_sha256": "5179f3985e49772b4656ca261e64eb0d8ba57802b78abc9c1ee02d2d7cf03268",
+    "experimental_sha256": "06e9bb768ebb06a1067b1a1bb23bcb48e5bfbcd04e4281db07332e22d501b960",
+    "isle_diff_sha256": "a2082d2a6b90084aa3abe2dcd70ce4297471ec06a41ee02cfbdb8aee86000460",
+    "patch_receipt_sha256": "11d393217ac3b73b3b5fb978675a44ec0cbb0537b31acf905aa3e62a4f7c6e11"
+  },
+  "costs": {
+    "pristine": {
+      "elf_function_symbol_bytes": 56,
+      "decoded_bytes_through_first_ret": 46,
+      "decoded_instructions_through_first_ret": 13
+    },
+    "experimental": {
+      "elf_function_symbol_bytes": 39,
+      "decoded_bytes_through_first_ret": 39,
+      "decoded_instructions_through_first_ret": 12
+    },
+    "symbol_byte_reduction": 17,
+    "decoded_executable_prefix_byte_reduction": 7,
+    "interpretation": "ELF function symbol baseline includes trailing data/padding; x86 instruction prefix is a distinct metric, not abstract CLIF or whole-AOT"
+  },
+  "finite_oracle": {
+    "domain": "signed 64-bit integer pairs",
+    "oracle": "Python arbitrary-precision clamp of x+y into [-2^63,2^63-1]",
+    "edge_grid_pairs_per_object": 289,
+    "deterministic_random_pairs_per_object": 20000,
+    "pairs_per_object": 20289,
+    "ci_native_calls": 40578,
+    "independently_replayed_native_calls": 40578,
+    "ci_failures": 0,
+    "replay_failures": 0,
+    "exhaustive": false
+  },
+  "independent_replay": {
+    "method": "download original Actions artifact; verify archive SHA-256, object hashes, proof/patch receipts, separately run GNU objdump -d -w -Mintel and readelf -Ws on each archived object, link and execute both SysV x86-64 objects against Python oracle",
+    "reconstruction": "46 executable instruction bytes over 13 decoded instructions vs 39 over 12; 56 vs 39 full symbol bytes",
+    "note": "objdump full-text SHA is path-sensitive; independent replay compared object hashes and decoded instructions rather than comparing host-specific dump-header hashes"
+  },
+  "history": {
+    "first_run_id": 44860710209,
+    "first_run_conclusion": "failure",
+    "reason": "GNU objdump default wrapped long x86 instructions, falsely yielding a disassembly-gap rejection",
+    "fix": "use objdump -d -w -Mintel and preserve strict contiguous address checks",
+    "fixed_run_id": 44888175343
+  },
+  "nonclaims": [
+    "No newly synthesized sequence; rewrite was already human authored",
+    "No verified upstream ISLE rule beyond declared pure clamp identity; unchanged upstream VeriISLE specs remain insufficient for this rule",
+    "No full physical flags, register allocation, ABI, poison, undefined state, unwinding or machine-code proof",
+    "No representative throughput improvement or cross-target profitability",
+    "No upstream Wasmtime PR, merge, or general optimization claim"
+  ]
+}
