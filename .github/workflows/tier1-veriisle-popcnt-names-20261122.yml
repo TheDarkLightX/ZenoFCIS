@@ -1,0 +1,70 @@
+name: tier1-veriisle-popcnt-names-20261122
+on:
+  push:
+    branches: [research/tier1-veriisle-popcnt-names-20261122]
+    paths:
+      - '.github/workflows/tier1-veriisle-popcnt-names-20261122.yml'
+      - 'experiments/cranelift-tier1/veriisle_popcnt_qualification_20261122.py'
+      - 'experiments/cranelift-tier1/veriisle_popcnt_wide_matrix_20261122.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tier1-veriisle-popcnt-names-20261122
+  cancel-in-progress: true
+jobs:
+  pinned-popcnt-verifier:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    env:
+      RUSTUP_TOOLCHAIN: '1.98.0'
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - name: Checkout research branch without write credentials
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Checkout exact Wasmtime source (disposable and uncommitted)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: fb792bf7a143801c22c0ba5b16fe2c6085a8598b
+          path: upstream
+          persist-credentials: false
+      - name: Install pinned Rust and declared SMT solvers
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.98.0 --profile minimal
+          sudo apt-get update -qq
+          sudo apt-get install -y z3 cvc5
+          python3 -m py_compile experiments/cranelift-tier1/veriisle_popcnt_qualification_20261122.py
+      - name: Expected baseline failure then fresh-name verifier regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B experiments/cranelift-tier1/veriisle_popcnt_qualification_20261122.py
+      - name: Run entire VeriISLE filetest suite after applying the candidate patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd upstream
+          timeout 900s cargo test --locked -p cranelift-isle-veri --test filetests -- --nocapture > "$RUNNER_TEMP/tier1-popcnt-veri/full_filetests.log" 2>&1
+          grep -E 'test result:|passed;|FAILED' "$RUNNER_TEMP/tier1-popcnt-veri/full_filetests.log" | tail -20
+      - name: Compare full-width fresh SMT names against inlined expressions with bounded proof workloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile experiments/cranelift-tier1/veriisle_popcnt_wide_matrix_20261122.py
+          python3 -B experiments/cranelift-tier1/veriisle_popcnt_wide_matrix_20261122.py
+      - name: Keep exact source patch, command receipts and raw logs regardless of verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-popcnt-veriisle-fresh-names-20261122
+          path: |
+            ${{ runner.temp }}/tier1-popcnt-veri/
+            ${{ runner.temp }}/tier1-popcnt-wide-matrix/
+          retention-days: 30
+          if-no-files-found: warn
