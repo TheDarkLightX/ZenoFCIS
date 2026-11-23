@@ -103,8 +103,9 @@ def complement_case(width):
     return name,body,{"oracle":"symbolic popcnt complement identity", "width":width}
 
 def test(variant,name,rep,seconds=120):
+    # Exact match: substring filtering accidentally also executes the _mutant negative control.
     argv=["cargo","test","--locked","-p","cranelift-isle-veri","--test","filetests",
-          "pass_"+name,"--","--nocapture"]
+          "pass_"+name,"--","--exact","--nocapture"]
     rc,out,timeout,elapsed=cmd(argv,seconds)
     log=OUT/f"{variant}_{name}_{rep}.log";log.write_text(out)
     keys=["Applicable:","Verification passed:","Verification failed:","Verification unknown:","Expansion errors:"]
