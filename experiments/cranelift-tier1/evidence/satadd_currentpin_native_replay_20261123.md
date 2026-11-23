@@ -39,3 +39,5 @@ The CI proof receipt contains `unsat` for the **pure signed-i64 sign-clamp equiv
 **Current-source compiler A/B passes; keep draft/research status.** The smaller emitted function is confirmed at the new source pin with additional independent native execution. Before human upstream submission: measure representative workload speed/size under relevant targets, quantify compile-time and code-quality regressions, assess applicability and flag/poison semantics, and seek maintainer input on an architecture-neutral mid-end rule that can be profitable on multiple backends.
 
 No edits were applied to Wasmtime or ZenoFCIS `main`; CI patches only a disposable checkout. Upstream Wasmtime agents must not open PRs or comment, per its pinned `AGENTS.md` and Bytecode Alliance policy.
+
+The full [replay Python source](../audit_satadd_currentpin.py) and [machine-readable replay receipt](satadd_currentpin_native_replay_20261123.json) are also committed on this **research branch**, separately from the retained original binary artifact. Those files describe a replay of experiment commit `3988929`, not a newly compiled run at the later documentation-only branch head.
