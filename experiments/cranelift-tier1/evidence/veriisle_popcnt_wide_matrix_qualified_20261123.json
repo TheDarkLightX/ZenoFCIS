@@ -1,0 +1,86 @@
+{
+  "schema": "zenofcis/tier1-veriisle-popcnt-wide-matrix/qualified-v1",
+  "audit_date_utc": "2026-11-23",
+  "experimental_branch": "research/tier1-veriisle-popcnt-names-20261122",
+  "experiment_commit": "d8ab478be0ea957ceb12dd8638cb712cfd23c13a",
+  "upstream_commit": "fb792bf7a143801c22c0ba5b16fe2c6085a8598b",
+  "upstream_original_blobs": {
+    "cranelift/isle/veri/veri/src/solver.rs": "8d3b5eb63482b9b6f438a517fa15e22d9c0accd9",
+    "cranelift/isle/veri/veri/src/encoded/popcnt.rs": "418c77c4b7c9b3bd477d31b0757de2488faacf1a"
+  },
+  "tool_versions": {
+    "rustc": "1.98.0 (88d9e12ae 2026-08-18)",
+    "z3": "4.8.12",
+    "cvc5": "1.1.2",
+    "runner": "ubuntu-24.04"
+  },
+  "targeted_ci": {
+    "run_id": 45106914623,
+    "job_id": 137470205099,
+    "url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/45106914623",
+    "conclusion": "success",
+    "artifact_id": 14788160616,
+    "artifact_url": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/45106914623/artifacts/14788160616",
+    "artifact_zip_sha256": "d9a999bd08fea2f559d74492a19596a8a0aca3d62e7d14ee8b590373a2aaf7e4",
+    "files": 33
+  },
+  "qualification": {
+    "initial_bug": "Unmodified upstream lane popcnt8 filetest fails with duplicate SMT declaration popcnt_8_10",
+    "patched_full_filetests": "17 passed; 0 failed; 0 ignored",
+    "selected_cases": [
+      "wide_popcnt16x8",
+      "wide_popcnt64x2",
+      "symbolic_popcnt_complement32",
+      "symbolic_popcnt_complement64"
+    ],
+    "variants": [
+      "fresh_named",
+      "inlined"
+    ],
+    "selected_cases_smt_passes": 16,
+    "selected_cases_failed": 0,
+    "negative_control": "wide_popcnt64x2_mutant",
+    "negative_control_expected_solver_refutations": 2,
+    "negative_control_observed_refutations": 2,
+    "build_warmup_checks_passed": 2,
+    "counts_scope": "2 repetitions of each of 4 fixtures under each of 2 variants; repeated observations, not 16 independent mathematical theorems",
+    "independent_log_sha256_checks": "all case logs match logged SHA-256 in matrix_receipt.json",
+    "matrix_status": "qualified_fixed_lanes_and_negative_control"
+  },
+  "variant_source_git_blobs": {
+    "fresh_named": {
+      "solver.rs": "4329c7baaf6a8b4b7b2c6559f65c674315d12c57",
+      "popcnt.rs": "418c77c4b7c9b3bd477d31b0757de2488faacf1a"
+    },
+    "inlined": {
+      "solver.rs": "8d3b5eb63482b9b6f438a517fa15e22d9c0accd9",
+      "popcnt.rs": "42ef51aeb0e3528e70264928260e874aa9efc50b"
+    }
+  },
+  "negative_memory": {
+    "false_failure_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/45069376226",
+    "cause": "Rust cargo test substring selection pass_wide_popcnt64x2 unintentionally also ran pass_wide_popcnt64x2_mutant. The intended positive passed but process exited 101 because the required mutant failed.",
+    "repair_commit": "d8ab478be0ea957ceb12dd8638cb712cfd23c13a",
+    "repair": "Pass --exact after -- to Cargo test harness, isolating the test under evaluation from its negative control",
+    "consequence": "Prior reported 64x2 failed_or_not_applicable is a harness classification mistake, not a demonstrated SMT counterexample"
+  },
+  "contract": {
+    "fixed_domains": "one specified constant BV128 input for each of BV16x8 and BV64x2, compared against Python int.bit_count oracle",
+    "symbolic_domain": "SMT BV32/BV64 complement identity for all fixed-width bit patterns under encoded BV semantics",
+    "signedness": "popcnt is independent of signed interpretation",
+    "overflow": "modular fixed-width bitvectors; no machine UB modeled",
+    "flags": "physical flags not modeled",
+    "undefined_poison": "not modeled",
+    "costs": "filetest wall-clock screening, not native code size or runtime benchmark",
+    "scope_limitations": [
+      "No full native ISA state proof",
+      "No Cranelift CLIF or x86 code-size/throughput improvement established",
+      "No general global optimization or cross-target profitability established",
+      "The chosen fixed-width 128-bit witnesses are not exhaustive over BV128",
+      "Only two warm execution repetitions per solver configuration; no statistical performance superiority established",
+      "Correctness of fresh-name strategy beyond tested cases or solver model not globally proven"
+    ]
+  },
+  "status": "qualified_targeted_verifier_correctness_only",
+  "upstream_submission": false
+}
