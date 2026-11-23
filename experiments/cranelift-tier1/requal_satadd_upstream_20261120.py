@@ -22,7 +22,7 @@ from pathlib import Path
 from install_isle_candidate import RULE, RULE_NAME, SOURCE
 from measure_ab import profile
 
-UPSTREAM = "e355dc640d047ab76dbf4402567d0c124bfdecd6"
+UPSTREAM = "fb792bf7a143801c22c0ba5b16fe2c6085a8598b"
 SOURCE_BLOB = "5ec428ceefedfc89c49392875a3fad7299a5f884"
 CLIF = Path(__file__).with_name("satadd.clif")
 SYMBOL = "%tier1_signed_satadd"

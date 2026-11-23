@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           repository: bytecodealliance/wasmtime
-          ref: e355dc640d047ab76dbf4402567d0c124bfdecd6
+          ref: fb792bf7a143801c22c0ba5b16fe2c6085a8598b
           path: upstream
           persist-credentials: false
       - name: Syntax and hash-pinned independent SMT checker
@@ -48,7 +48,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/tier1-satadd-newpin"
-          test "$(git -C upstream rev-parse HEAD)" = e355dc640d047ab76dbf4402567d0c124bfdecd6
+          test "$(git -C upstream rev-parse HEAD)" = fb792bf7a143801c22c0ba5b16fe2c6085a8598b
           git rev-parse HEAD > "$RUNNER_TEMP/tier1-satadd-newpin/zenofcis-commit.txt"
           git -C upstream rev-parse HEAD > "$RUNNER_TEMP/tier1-satadd-newpin/wasmtime-commit.txt"
           rustup toolchain install 1.98.0 --profile minimal
@@ -89,7 +89,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tier1-satadd-nov19-upstream-20261120
+          name: tier1-satadd-nov21-upstream-20261122
           path: ${{ runner.temp }}/tier1-satadd-newpin/
           retention-days: 30
           if-no-files-found: warn
