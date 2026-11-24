@@ -45,15 +45,15 @@ def make_cases():
     for i,n in enumerate(("mask","true","false")):
         add(n+"_live",3,None,bit+f"    v4 = iadd v3, v{i}\n    return v4",
             lambda x,i=i:(select(*x[:3])+x[i])&M)
-    add("all_live",3,None,bit+"    v4 = iadd v0, v1\n    v5 = ixor v4, v2\n    v6 = iadd v3, v5\n    return v6",
+    add("all_live",3,None,bit+"    v4 = iadd v0, v1\n    v5 = bxor v4, v2\n    v6 = iadd v3, v5\n    return v6",
         lambda x:(select(*x[:3])+(((x[0]+x[1])&M)^x[2]))&M)
     for i,n in enumerate(("mask","true","false")):
         args=[f"v{j}" for j in range(3)]
         args[i]="v3"
         ops=f"    v3 = load.i64 v{i}\n    v4 = bitselect "+", ".join(args)+"\n    return v4"
         add("load_"+n,3,i,ops,lambda x:select(*x[:3]))
-    add("pressure6",6,None,"    v6 = bitselect v0, v1, v2\n    v7 = iadd v6, v3\n    v8 = ixor v7, v4\n    v9 = iadd v8, v5\n    v10 = ixor v9, v0\n    v11 = iadd v10, v1\n    v12 = ixor v11, v2\n    return v12",
-        lambda x:(((((((select(*x[:3])+x[3])&M)^x[4])+x[5])&M)^x[0])+x[1]&M)^x[2])
+    add("pressure6",6,None,"    v6 = bitselect v0, v1, v2\n    v7 = iadd v6, v3\n    v8 = bxor v7, v4\n    v9 = iadd v8, v5\n    v10 = bxor v9, v0\n    v11 = iadd v10, v1\n    v12 = bxor v11, v2\n    return v12",
+        lambda x:(((((((select(*x[:3])+x[3])&M)^x[4])+x[5])&M)^x[0])+x[1])&M)^x[2])
     add("comparison_live",3,None,bit+"    v4 = icmp ult v0, v1\n    v5 = select v4, v3, v2\n    return v5",
         lambda x:select(*x[:3]) if x[0]<x[1] else x[2])
     add("constant_mask",3,None,"    v3 = iconst.i64 6148914691236517205\n    v4 = bitselect v3, v1, v2\n    return v4",
@@ -67,7 +67,7 @@ def prepare(out):
         types=", ".join(["i64"]*arity)
         params=", ".join(f"v{i}: i64" for i in range(arity))
         (out/(name+".clif")).write_text(
-            "test verifier\nset opt_level=speed_and_size\ntarget x86_64\n"+
+            "test verifier\ntarget x86_64\n"+
             f"function %tier1_{name}({types}) -> i64 {{\nblock0({params}):\n{ops}\n}}\n")
     save(out/"contracts.json",{"word":"unsigned interpretation only for icmp ult; otherwise modular 64-bit bitwise/addition", "overflow":"wrap in iadd, no trap/poison from bitselect", "flags":"not CLIF values, live comparison fixture observes unsigned predicate", "loads":"valid readable 8-byte address; no invalid/trapping or concurrent memory claim", "features":"x86_64 SysV, BMI1 explicitly toggled; candidate uses only generic operations", "cases":{n:{"arity":a,"load_arg":p,"clif_sha256":sha(out/(n+".clif"))} for n,(a,p,_,_) in CASES.items()}})
 def patch(out,up):
@@ -123,12 +123,12 @@ def matrix(out,up):
     assert run("git","rev-parse","HEAD",cwd=up).strip()==UP
     assert run("git","hash-object",SOURCE,cwd=up).strip()==BLOB
     assert "bmi1" in Path("/proc/cpuinfo").read_text().split("flags")[1].splitlines()[0].split()
-    env=dict(os.environ,CARGO_TARGET_DIR=str(out/"target"))
+    env=dict(os.environ,CARGO_TARGET_DIR=str(out.parent/"bitselect-context-target"))
     rows=[]
     for stage in ("baseline","xor"):
         if stage=="xor":patch(out,up)
         logged(out/(stage+"-build.log"),["cargo","build","--locked","--manifest-path",up/"cranelift/Cargo.toml","--bin","clif-util"],env=env)
-        clif=out/"target/debug/clif-util"
+        clif=out.parent/"bitselect-context-target/debug/clif-util"
         for name,case in CASES.items():
             fixture=out/(name+".clif")
             logged(out/(stage+"-"+name+"-verify.log"),[clif,"test",fixture])
