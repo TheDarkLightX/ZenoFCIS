@@ -36,6 +36,15 @@ def logged(path,args,cwd=None,env=None):
 # Case = arity, optional single load argument, instructions, independent oracle.
 # Pointer inputs are valid, aligned, readable uint64_t slots, no volatile,
 # atomic, concurrency or invalid-address behavior is claimed.
+def pressure_oracle(x):
+    v=select(*x[:3])
+    v=(v+x[3])&M
+    v^=x[4]
+    v=(v+x[5])&M
+    v^=x[0]
+    v=(v+x[1])&M
+    return v^x[2]
+
 def make_cases():
     cases={}
     def add(name, arity, ptr, ops, ref):
@@ -53,7 +62,7 @@ def make_cases():
         ops=f"    v3 = load.i64 v{i}\n    v4 = bitselect "+", ".join(args)+"\n    return v4"
         add("load_"+n,3,i,ops,lambda x:select(*x[:3]))
     add("pressure6",6,None,"    v6 = bitselect v0, v1, v2\n    v7 = iadd v6, v3\n    v8 = bxor v7, v4\n    v9 = iadd v8, v5\n    v10 = bxor v9, v0\n    v11 = iadd v10, v1\n    v12 = bxor v11, v2\n    return v12",
-        lambda x:(((((((select(*x[:3])+x[3])&M)^x[4])+x[5])&M)^x[0])+x[1])&M)^x[2])
+        pressure_oracle)
     add("comparison_live",3,None,bit+"    v4 = icmp ult v0, v1\n    v5 = select v4, v3, v2\n    return v5",
         lambda x:select(*x[:3]) if x[0]<x[1] else x[2])
     add("constant_mask",3,None,"    v3 = iconst.i64 6148914691236517205\n    v4 = bitselect v3, v1, v2\n    return v4",
