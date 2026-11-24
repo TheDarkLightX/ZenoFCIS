@@ -63,14 +63,16 @@ elif phase=="patch":
     old=path.read_text()
     needle="(rule 4 (lower (bitselect (ty_int_ref_scalar_64_extract ty) c t f))"
     assert old.count(needle)==1
-    # Higher priority i64-only rules. BMI1 ANDN is already used by adjacent band-not lowering.
+    # ISLE conservatively treats ty_scalar_float extractor as overlapping $I64.
+    # Keep priorities distinct from the existing float rule (5); no change to its semantics.
+    # BMI1 ANDN is already used by adjacent band-not lowering.
     rule=""";; Experimental Tier-1 bitselect: keep generic rule for other types.
-(rule 6 (lower (bitselect $I64 c t f))
+(rule 7 (lower (bitselect $I64 c t f))
       (if-let true (has_bmi1))
       (let ((a Gpr (x64_and $I64 c t))
             (b Gpr (x64_andn $I64 c f)))
         (x64_or $I64 a b)))
-(rule 5 (lower (bitselect $I64 c t f))
+(rule 6 (lower (bitselect $I64 c t f))
       (let ((d Gpr (x64_xor $I64 t f))
             (a Gpr (x64_and $I64 c d)))
         (x64_xor $I64 a f)))
