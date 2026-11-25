@@ -1,0 +1,125 @@
+name: tier1-bitselect-upstream-filetests-20261125
+on:
+  push:
+    branches: [research/tier1-bitselect-x64-20261123]
+    paths:
+      - '.github/workflows/tier1-bitselect-upstream-filetests-20261125.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  CARGO_BUILD_JOBS: '3'
+  CARGO_INCREMENTAL: '0'
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  RUSTUP_TOOLCHAIN: '1.98.0'
+  CRANELIFT_FILETESTS_THREADS: '3'
+jobs:
+  upstream-filetests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: fcbcdd4d2d9b60b4a843dba07517924d71deb908
+          path: upstream
+          persist-credentials: false
+      - name: A/B current upstream filetests and compile-only multi-load regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/bitselect-filetests"
+          mkdir -p "$out"
+          rustup toolchain install 1.98.0 --profile minimal
+          rustc -Vv > "$out/rustc.txt"
+          git rev-parse HEAD > "$out/zenofcis.txt"
+          git -C upstream rev-parse HEAD > "$out/wasmtime.txt"
+          test "$(git -C upstream hash-object cranelift/codegen/src/isa/x64/lower.isle)" = 545c79528cbb10fb1280623f23f53880b9762e49
+          cat > "$out/multi-load.clif" <<'CLIF'
+          test compile
+          set opt_level=none
+          target x86_64
+          set opt_level=speed
+          target x86_64
+          target x86_64 has_bmi1
+          set opt_level=speed_and_size
+          target x86_64
+          target x86_64 has_bmi1
+
+          function %three_loads(i64, i64, i64) -> i64 {
+          block0(v0: i64, v1: i64, v2: i64):
+              v3 = load.i64 v0
+              v4 = load.i64 v1
+              v5 = load.i64 v2
+              v6 = bitselect v3, v4, v5
+              return v6
+          }
+
+          function %false_load(i64, i64, i64) -> i64 {
+          block0(v0: i64, v1: i64, v2: i64):
+              v3 = load.i64 v2
+              v4 = bitselect v0, v1, v3
+              return v4
+          }
+
+          function %alias_mask_false(i64, i64) -> i64 {
+          block0(v0: i64, v1: i64):
+              v2 = load.i64 v0
+              v3 = bitselect v2, v1, v2
+              return v3
+          }
+
+          function %loads_around_store(i64, i64, i64, i64) -> i64 {
+          block0(v0: i64, v1: i64, v2: i64, v3: i64):
+              v4 = load.i64 v0
+              store v3, v2
+              v5 = load.i64 v2
+              v6 = bitselect v4, v1, v5
+              return v6
+          }
+          CLIF
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/bitselect-filetests-target"
+          clif="$CARGO_TARGET_DIR/debug/clif-util"
+          ft="$PWD/upstream/cranelift/filetests/filetests"
+          for stage in baseline xor; do
+            if test "$stage" = xor; then
+              python3 - "$out" <<'PY'
+          import importlib.util, pathlib, sys
+          s = importlib.util.spec_from_file_location("matrix", "experiments/cranelift-tier1/bitselect_context_matrix_20261124.py")
+          m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+          m.UP = "fcbcdd4d2d9b60b4a843dba07517924d71deb908"
+          m.patch(pathlib.Path(sys.argv[1]), pathlib.Path("upstream"))
+          PY
+            fi
+            cargo build --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util > "$out/$stage-build.log" 2>&1
+            for suite in bitselect multi-load x64 runtests; do
+              case "$suite" in
+                bitselect) args=("$ft/runtests/bitselect.clif" "$ft/isa/x64/scalar-bitselect-load.clif" "$ft/isa/x64/simd-bitselect.clif" "$ft/runtests/i128-bitselect.clif" "$ft/runtests/bitselect-float.clif");;
+                multi-load) args=("$out/multi-load.clif");;
+                x64) args=("$ft/isa/x64");;
+                runtests) args=("$ft/runtests");;
+              esac
+              set +e
+              timeout 20m "$clif" test "${args[@]}" > "$out/$stage-$suite.log" 2>&1
+              status=$?
+              set -e
+              printf '%s\n' "$status" > "$out/$stage-$suite.exit"
+              echo "$stage $suite exit=$status"
+              tail -20 "$out/$stage-$suite.log"
+            done
+          done
+          # No hidden baseline failures or automatic blessing of changed output.
+          # A nonzero baseline or candidate exit needs separate diagnosis.
+          for f in "$out"/*.exit; do
+            test "$(cat "$f")" = 0
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tier1-bitselect-upstream-filetests
+          path: ${{ runner.temp }}/bitselect-filetests/
+          retention-days: 30
+          if-no-files-found: warn
