@@ -13,11 +13,16 @@ BLOB = "545c79528cbb10fb1280623f23f53880b9762e49"
 SOURCE = "cranelift/codegen/src/isa/x64/lower.isle"
 RULE = "tier1_i64_bitselect_xor"
 NEEDLE = "(rule 4 (lower (bitselect (ty_int_ref_scalar_64_extract ty) c t f))"
-PATCH = """;; Experimental i64 only: compare XOR with baseline, including BMI1 hosts.
+PATCH = """;; Experimental i64 only: explicitly materialize each input before reuse.
+;; In particular f occurs twice: implicit GprMemImm conversion can sink a
+;; single-use CLIF load, then the second conversion can access a sunk inst.
 (rule tier1_i64_bitselect_xor 6 (lower (bitselect $I64 c t f))
-      (let ((d Gpr (x64_xor $I64 t f))
-            (a Gpr (x64_and $I64 c d)))
-        (x64_xor $I64 a f)))
+      (let ((cg Gpr (put_in_gpr c))
+            (tg Gpr (put_in_gpr t))
+            (fg Gpr (put_in_gpr f))
+            (d Gpr (x64_xor $I64 tg fg))
+            (a Gpr (x64_and $I64 cg d)))
+        (x64_xor $I64 a fg)))
 
 """
 M = (1 << 64) - 1
@@ -31,7 +36,10 @@ def run(*args, cwd=None, env=None):
     return subprocess.check_output(list(map(str,args)),cwd=cwd,env=env,text=True,stderr=subprocess.STDOUT)
 def logged(path,args,cwd=None,env=None):
     with Path(path).open("w") as f:
-        subprocess.run(list(map(str,args)),cwd=cwd,env=env,stdout=f,stderr=subprocess.STDOUT,check=True)
+        result=subprocess.run(list(map(str,args)),cwd=cwd,env=env,stdout=f,stderr=subprocess.STDOUT)
+    if result.returncode:
+        print(Path(path).read_text()[-12000:],file=sys.stderr)
+        result.check_returncode()
 
 # Case = arity, optional single load argument, instructions, independent oracle.
 # Pointer inputs are valid, aligned, readable uint64_t slots, no volatile,
@@ -61,6 +69,15 @@ def make_cases():
         args[i]="v3"
         ops=f"    v3 = load.i64 v{i}\n    v4 = bitselect "+", ".join(args)+"\n    return v4"
         add("load_"+n,3,i,ops,lambda x:select(*x[:3]))
+    # Aliased operands: even with one CLIF load, lowering must not attempt
+    # to sink it twice. Some identities may be removed by the optimizer.
+    for i,j,n in ((0,2,"mask_false"),(0,1,"mask_true"),(1,2,"true_false")):
+        args=[f"v{k}" for k in range(3)]
+        args[i]=args[j]="v3"
+        ops=f"    v3 = load.i64 v{i}\n    v4 = bitselect "+", ".join(args)+"\n    return v4"
+        def alias_ref(x,i=i,j=j):
+            y=list(x[:3]); y[j]=y[i]; return select(*y)
+        add("alias_load_"+n,3,i,ops,alias_ref)
     add("pressure6",6,None,"    v6 = bitselect v0, v1, v2\n    v7 = iadd v6, v3\n    v8 = bxor v7, v4\n    v9 = iadd v8, v5\n    v10 = bxor v9, v0\n    v11 = iadd v10, v1\n    v12 = bxor v11, v2\n    return v12",
         pressure_oracle)
     add("comparison_live",3,None,bit+"    v4 = icmp ult v0, v1\n    v5 = select v4, v3, v2\n    return v5",
