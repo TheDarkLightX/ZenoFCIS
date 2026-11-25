@@ -1,0 +1,151 @@
+name: tier1-bitselect-native-memory-20261125
+on:
+  push:
+    branches: [research/tier1-bitselect-x64-20261123]
+    paths: ['.github/workflows/tier1-bitselect-native-memory-20261125.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  CARGO_BUILD_JOBS: '3'
+  CARGO_INCREMENTAL: '0'
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  RUSTUP_TOOLCHAIN: '1.98.0'
+jobs:
+  native-memory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: 6ddc5743e5e8cd3130151e30c1cd2b96b1d17e63
+          path: upstream
+          persist-credentials: false
+      - name: Execute compiled memory-effect regressions against independent oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/bitselect-native-memory"
+          mkdir -p "$out"
+          rustup toolchain install 1.98.0 --profile minimal
+          rustc -Vv > "$out/rustc.txt"
+          git rev-parse HEAD > "$out/zenofcis.txt"
+          git -C upstream rev-parse HEAD > "$out/wasmtime.txt"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/bitselect-memory-target"
+          python3 - "$out" <<'PY'
+          import ctypes as C, hashlib, importlib.util, itertools, json, os, pathlib, random, re, subprocess, sys
+          out=pathlib.Path(sys.argv[1])
+          up=pathlib.Path("upstream").resolve()
+          spec=importlib.util.spec_from_file_location("matrix","experiments/cranelift-tier1/bitselect_context_matrix_20261124.py")
+          m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+          m.UP="6ddc5743e5e8cd3130151e30c1cd2b96b1d17e63"
+          assert m.run("git","rev-parse","HEAD",cwd=up).strip()==m.UP
+          assert m.run("git","hash-object",m.SOURCE,cwd=up).strip()==m.BLOB
+          # A slot is a valid aligned readable/writable uint64_t. A, B, C
+          # may all alias. Only final memory and return value are observed.
+          cases={
+            "three_loads": """v4 = load.i64 v0
+              v5 = load.i64 v1
+              v6 = load.i64 v2
+              v7 = bitselect v4, v5, v6
+              return v7""",
+            "store_between": """v4 = load.i64 v0
+              store v3, v2
+              v5 = load.i64 v1
+              v6 = load.i64 v2
+              v7 = bitselect v4, v5, v6
+              return v7""",
+            "store_after": """v4 = load.i64 v0
+              v5 = load.i64 v1
+              v6 = load.i64 v2
+              v7 = bitselect v4, v5, v6
+              store v7, v2
+              return v7""",
+            "shared_ssa_load": """v4 = load.i64 v0
+              store v3, v0
+              v5 = load.i64 v1
+              v6 = bitselect v4, v5, v4
+              return v6""",
+          }
+          mask=(1<<64)-1
+          def select(c,t,f): return (c&t)|((mask^c)&f)
+          def oracle(name,slots,indices,new):
+              a,b,c=indices
+              mem=list(slots)
+              if name=="store_between":
+                  x=mem[a]; mem[c]=new; result=select(x,mem[b],mem[c])
+              elif name=="shared_ssa_load":
+                  x=mem[a]; mem[a]=new; result=select(x,mem[b],x)
+              else:
+                  result=select(mem[a],mem[b],mem[c])
+                  if name=="store_after": mem[c]=result
+              return result,mem
+          for name,ops in cases.items():
+              (out/(name+".clif")).write_text("function %"+name+"(i64, i64, i64, i64) -> i64 {\nblock0(v0: i64, v1: i64, v2: i64, v3: i64):\n    "+ops+"\n}\n")
+          rng=random.Random(20261125)
+          edge=[0,1,mask,1<<63,0x5555555555555555,0xaaaaaaaaaaaaaaaa]
+          samples=list(itertools.product(edge,repeat=4))
+          samples += [tuple(rng.getrandbits(64) for _ in range(4)) for _ in range(128)]
+          aliases=list(itertools.product(range(3),repeat=3))
+          configs=list(itertools.product(("none","speed","speed_and_size"),("false","true")))
+          assert "bmi1" in pathlib.Path("/proc/cpuinfo").read_text().split("flags")[1].splitlines()[0].split()
+          rows=[]
+          clif=pathlib.Path(os.environ["CARGO_TARGET_DIR"])/"debug/clif-util"
+          def write_json(path,obj): path.write_text(json.dumps(obj,indent=2,sort_keys=True)+"\n")
+          def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
+          for stage in ("baseline","xor"):
+              if stage=="xor": m.patch(out,up)
+              m.logged(out/(stage+"-build.log"),["cargo","build","--locked","--manifest-path",up/"cranelift/Cargo.toml","--bin","clif-util"])
+              for name in cases:
+                  for opt,bmi in configs:
+                      stem=stage+"-"+name+"-"+opt+"-bmi1_"+bmi
+                      obj=out/(stem+".o"); so=out/(stem+".so")
+                      m.logged(out/(stem+".compile.log"),[clif,"compile","--target","x86_64","--set","opt_level="+opt,"--set","has_bmi1="+bmi,"-o",obj,out/(name+".clif")])
+                      dump=m.run("objdump","-dw","-Mintel",obj)
+                      (out/(stem+".disasm")).write_text(dump)
+                      syms=[s.split() for s in m.run("nm","-S","--defined-only","--format=posix",obj).splitlines()]
+                      syms=[s for s in syms if len(s)==4 and s[0]=="%"+name and s[1] in ("T","t")]
+                      assert len(syms)==1,syms
+                      start,size=int(syms[0][2],16),int(syms[0][3],16)
+                      ins=[]
+                      for line in dump.splitlines():
+                          z=re.match(r"^\s*([0-9a-f]+):\s+((?:[0-9a-f]{2}\s+)+)\s*(\S.*)$",line)
+                          if z and start<=int(z[1],16)<start+size: ins.append((int(z[1],16),bytes.fromhex(z[2])))
+                      assert ins and ins[0][0]==start and all(a[0]+len(a[1])==b[0] for a,b in zip(ins,ins[1:]))
+                      body=b"".join(b for _,b in ins); assert len(body)==size
+                      m.logged(out/(stem+".link.log"),["gcc","-shared","-o",so,obj])
+                      lib=C.CDLL(str(so)); fn=getattr(lib,"%"+name)
+                      fn.argtypes=[C.c_uint64]*4; fn.restype=C.c_uint64
+                      count=0
+                      for values in samples:
+                          for indices in aliases:
+                              mem=(C.c_uint64*3)(*values[:3])
+                              ptrs=[C.addressof(mem)+8*i for i in indices]
+                              expected,expected_mem=oracle(name,values[:3],indices,values[3])
+                              got=fn(*ptrs,values[3])
+                              assert (got,list(mem))==(expected,expected_mem),(stem,values,indices,got,list(mem),expected,expected_mem)
+                              count+=1
+                      rows.append(dict(stage=stage,case=name,opt=opt,bmi1=bmi,checks=count,bytes=size,instructions=len(ins),object_sha256=sha(obj),body_sha256=hashlib.sha256(body).hexdigest(),fixture_sha256=sha(out/(name+".clif"))))
+                      write_json(out/"partial.json",rows)
+                      print(stem,count,size,flush=True)
+          # A mutant that moves the first load after the store must differ.
+          assert oracle("store_between",[0,0,0],(0,1,0),mask)[0] != select(mask,0,mask)
+          by={(r["case"],r["opt"],r["bmi1"],r["stage"]):r for r in rows}
+          comparisons=[]
+          for name in cases:
+              for opt,bmi in configs:
+                  a=by[name,opt,bmi,"baseline"]; b=by[name,opt,bmi,"xor"]
+                  comparisons.append(dict(case=name,opt=opt,bmi1=bmi,delta_bytes=b["bytes"]-a["bytes"],delta_instructions=b["instructions"]-a["instructions"]))
+          write_json(out/"catalog.json",dict(upstream=m.UP,lower_blob=m.BLOB,zenofcis=(out/"zenofcis.txt").read_text().strip(),patch_sha256=sha(out/"experimental.patch"),rows=rows,comparisons=comparisons,scope="valid aligned SysV x64 uint64 slots; final memory and returned bit pattern; 27 pointer alias assignments; no trap/concurrency/flag or full refinement claim; no throughput measurement"))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tier1-bitselect-native-memory
+          path: ${{ runner.temp }}/bitselect-native-memory/
+          retention-days: 30
+          if-no-files-found: warn
