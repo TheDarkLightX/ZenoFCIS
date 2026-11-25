@@ -158,13 +158,21 @@ def matrix(out,up):
         for name,case in CASES.items():
             fixture=out/(name+".clif")
             logged(out/(stage+"-"+name+"-verify.log"),[clif,"test",fixture])
+            # Keep target directive for filetest, but not for compile: clif-util
+            # prefers a matching file ISA over CLI settings in handle_module.
+            # Also avoid -D: object-mode recompiles the function and print_all
+            # can use the first compilation size with the second code buffer.
+            compile_fixture=out/(name+".compile.clif")
+            original=fixture.read_text()
+            assert original.count("target x86_64\n")==1
+            compile_fixture.write_text(original.replace("target x86_64\n",""))
             for opt in ("speed","speed_and_size"):
                 for bmi in ("false","true"):
                     stem=f"{stage}-{name}-{opt}-bmi1_{bmi}"
                     obj=out/(stem+".o")
-                    logged(out/(stem+".compile.log"),[clif,"compile","--target","x86_64","--set","opt_level="+opt,"--set","has_bmi1="+bmi,"-D","-o",obj,fixture])
+                    logged(out/(stem+".compile.log"),[clif,"compile","--target","x86_64","--set","opt_level="+opt,"--set","has_bmi1="+bmi,"-o",obj,compile_fixture])
                     row=measure(obj,name,case)
-                    row.update(stage=stage,case=name,opt=opt,bmi1=bmi,fixture_sha256=sha(fixture))
+                    row.update(stage=stage,case=name,opt=opt,bmi1=bmi,fixture_sha256=sha(fixture),compile_fixture_sha256=sha(compile_fixture))
                     rows.append(row)
                     save(out/"partial-rows.json",rows)
     by={(r["case"],r["opt"],r["bmi1"],r["stage"]):r for r in rows}
