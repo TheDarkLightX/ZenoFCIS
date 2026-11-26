@@ -61,6 +61,8 @@ jobs:
           for name in names:
               assert (sg/name).read_bytes()[:4]==b"\x00asm",name
           exe=P(os.environ["CARGO_TARGET_DIR"])/"debug/wasmtime"
+          # CLI accepts 0,1,2,s (not CLIF enum strings); pinned cli-flags TOML tests map 2 and s.
+          # Previous run 45746822754 failed before the first module due to this mismatch.
           rows=[]
           def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
           def save():
@@ -75,7 +77,7 @@ jobs:
                       a=d/"module.cwasm"; t=d/"text.bin"
                       # Minimal build has no cache feature. Emit CLIF as
                       # supplementary evidence (not necessarily post-opt).
-                      m.logged(d/"compile.log",[exe,"compile","--target","x86_64-unknown-linux-gnu","-Oopt-level="+opt,"--emit-clif",clif,"-o",a,sg/name])
+                      m.logged(d/"compile.log",[exe,"compile","--target","x86_64-unknown-linux-gnu","-Oopt-level="+{"speed":"2","speed-and-size":"s"}[opt],"--emit-clif",clif,"-o",a,sg/name])
                       m.logged(d/"text.log",["objcopy","--dump-section",f".text={t}",a])
                       assert t.exists() and t.stat().st_size>0
                       (d/"sections.txt").write_text(m.run("readelf","-SW",a))
