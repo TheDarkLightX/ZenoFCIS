@@ -70,7 +70,8 @@ jobs:
                       x=emit(f"bxor {x}, {acc[0]}");acc[0]=emit(f"clz {x}")
                   else: new.append(emit(f"iadd {acc[i]}, "+emit(f"clz {x}")))
               if mode=="dependent":new=acc
-              np=emit(f"iadd_imm {p}, {4*(w//8)}");nn=emit(f"iadd_imm {n}, -1")
+              stride=emit(f"iconst.i64 {4*(w//8)}");minus_one=emit("iconst.i64 -1")
+              np=emit(f"iadd {p}, {stride}");nn=emit(f"iadd {n}, {minus_one}")
               br=f"    brif {nn}, block1({np}, {nn}, "+", ".join(new)+"), block2"
               loop=a;a=[]
               val=new[0]
