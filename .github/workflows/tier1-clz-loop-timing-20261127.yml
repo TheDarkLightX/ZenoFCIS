@@ -1,0 +1,201 @@
+name: tier1-clz-loop-timing-20261127
+on:
+  push:
+    branches: [research/tier1-bitselect-x64-20261123]
+    paths: ['.github/workflows/tier1-clz-loop-timing-20261127.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  CARGO_BUILD_JOBS: '3'
+  CARGO_INCREMENTAL: '0'
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  RUSTUP_TOOLCHAIN: '1.98.0'
+jobs:
+  loop-timing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b738a89287bb78e51c06ac9624014bbda3c1429f
+          path: upstream
+          persist-credentials: false
+      - name: Compile and measure independent and dependent CLZ loops
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/clz-loop-timing"
+          mkdir -p "$out"
+          rustup toolchain install 1.98.0 --profile minimal
+          rustc -Vv > "$out/rustc.txt"
+          gcc --version > "$out/gcc.txt"
+          objdump --version > "$out/objdump.txt"
+          git rev-parse HEAD > "$out/zenofcis.txt"
+          cp /proc/cpuinfo "$out/cpuinfo.txt"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/clz-loop-target"
+          cat > "$out/experiment.py" <<'PY'
+          import ctypes as C, hashlib, json, os, pathlib, random, re, statistics, subprocess, sys, time
+          P=pathlib.Path
+          out=P(sys.argv[1]); up=P("upstream").resolve()
+          UP="b738a89287bb78e51c06ac9624014bbda3c1429f"
+          SOURCE="cranelift/codegen/src/isa/x64/lower.isle"
+          BLOB="545c79528cbb10fb1280623f23f53880b9762e49"
+          PATCH="4660b63ade3d188b47c1dac5a420072922cbdf68055b6674090d4d6652d9fab3"
+          def run(*a,cwd=None): return subprocess.check_output(list(map(str,a)),cwd=cwd,text=True,stderr=subprocess.STDOUT)
+          def logged(path,*a):
+              with path.open("w") as f: r=subprocess.run(list(map(str,a)),stdout=f,stderr=subprocess.STDOUT)
+              if r.returncode:
+                  print(path.read_text()[-12000:],file=sys.stderr);r.check_returncode()
+          def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
+          def save(name,obj): (out/name).write_text(json.dumps(obj,indent=2,sort_keys=True)+"\n")
+          def fixture(w,mode):
+              ty=f"i{w}"; a=[]; k=2
+              def emit(op):
+                  nonlocal k
+                  v=f"v{k}"; k+=1; a.append(f"    {v} = {op}");return v
+              zero=emit(f"iconst.{ty} 0")
+              start=f"    jump block1(v0, v1, "+", ".join([zero]*(4 if mode=="independent" else 1))+")"
+              p,n="v"+str(k),"v"+str(k+1);k+=2
+              acc=[f"v{k+i}" for i in range(4 if mode=="independent" else 1)];k+=len(acc)
+              hdr=f"block1({p}: i64, {n}: i64, "+", ".join(v+": "+ty for v in acc)+"):"
+              pre=a;a=[];new=[]
+              for i in range(4):
+                  x=emit(f"load.{ty} {p}"+(f"+{i*(w//8)}" if i else ""))
+                  if mode=="dependent":
+                      x=emit(f"bxor {x}, {acc[0]}");acc[0]=emit(f"clz {x}")
+                  else: new.append(emit(f"iadd {acc[i]}, "+emit(f"clz {x}")))
+              if mode=="dependent":new=acc
+              np=emit(f"iadd_imm {p}, {4*(w//8)}");nn=emit(f"iadd_imm {n}, -1")
+              br=f"    brif {nn}, block1({np}, {nn}, "+", ".join(new)+"), block2"
+              loop=a;a=[]
+              val=new[0]
+              for x in new[1:]:val=emit(f"iadd {val}, {x}")
+              return "\n".join([f"function %tier1_loop_{w}_{mode}(i64, i64) -> {ty} {{","block0(v0: i64, v1: i64):",*pre,start,hdr,*loop,br,"block2:",*a,"    return "+val,"}",""])
+          def ref(xs,w,mode):
+              mask=(1<<w)-1
+              if mode=="independent":return sum(w-x.bit_length() for x in xs)&mask
+              acc=0
+              for x in xs:acc=w-(x^acc).bit_length()
+              return acc
+          def vals(w,n,seed):
+              r=random.Random(seed)
+              return [0 if r.randrange(16)==0 else r.getrandbits(r.randrange(1,w+1)) for _ in range(4*n)]
+          def bench(order):
+              cpu=min(os.sched_getaffinity(0));os.sched_setaffinity(0,{cpu})
+              funcs={};libs=[];rows=[]
+              for stage in order:
+                  for w in (32,64):
+                      T=C.c_uint32 if w==32 else C.c_uint64
+                      for mode in ("independent","dependent"):
+                          for opt in ("speed","speed_and_size"):
+                              stem=f"{stage}-{w}-{mode}-{opt}-false";lib=C.CDLL(str(out/(stem+".so")));libs.append(lib)
+                              fn=getattr(lib,f"%tier1_loop_{w}_{mode}");fn.argtypes=[C.POINTER(T),C.c_uint64];fn.restype=T
+                              funcs[stage,w,mode,opt]=fn
+              rng=random.Random(12345)
+              for w in (32,64):
+                  T=C.c_uint32 if w==32 else C.c_uint64
+                  for mode in ("independent","dependent"):
+                      for opt in ("speed","speed_and_size"):
+                          fns={s:funcs[s,w,mode,opt] for s in order}
+                          xs=vals(w,4096,20261127+w);arr=(T*len(xs))(*xs);expected=ref(xs,w,mode)
+                          for f in fns.values(): assert f(arr,4096)==expected
+                          for f in fns.values():
+                              for _ in range(16):f(arr,4096)
+                          for block in range(48):
+                              perm=list(order);rng.shuffle(perm);row=dict(width=w,mode=mode,opt=opt,block=block,order=perm)
+                              for s in perm:
+                                  f=fns[s];t=time.perf_counter_ns();total=0
+                                  for _ in range(64):total+=f(arr,4096)
+                                  elapsed=time.perf_counter_ns()-t
+                                  assert total==64*expected
+                                  row[s]=elapsed
+                              rows.append(row)
+              save("timing-"+"-".join(order)+".json",dict(cpu=cpu,rows=rows,ops_per_measurement=64*4096*4,clock="perf_counter_ns",limits="single runner, paired blocks, Python calls amortized across 16384 CLZs per call, wall clock, no universal throughput claim"))
+          if len(sys.argv)>2:
+              bench(sys.argv[2:]);sys.exit(0)
+          assert run("git","rev-parse","HEAD",cwd=up).strip()==UP
+          assert run("git","hash-object",SOURCE,cwd=up).strip()==BLOB
+          assert not run("git","diff","--name-only",cwd=up).strip()
+          needle="(rule 0 (do_clz ty orig_ty src)"
+          rules=""";; Experimental fallback only; BSR zero destination is discarded by CMOVZ.
+          (rule tier1_clz32_xor 2 (do_clz $I32 $I32 src)
+                (if-let false (has_lzcnt))
+                (x64_xor $I32 (bsr_or_else $I32 src (imm_i64 $I64 63)) (RegMemImm.Imm 31)))
+          (rule tier1_clz64_narrow_result 3 (do_clz $I64 $I64 src)
+                (if-let false (has_lzcnt))
+                (let ((alt Gpr (imm_i64 $I64 127))
+                      (scan ProducesFlags (x64_bsr $I64 src))
+                      (idx Gpr (produces_flags_get_reg scan))
+                      (fix ConsumesFlags (cmove $I32 (CC.Z) alt idx))
+                      (selected Gpr (with_flags_reg (produces_flags_ignore scan) fix)))
+                  (x64_xor $I32 selected (RegMemImm.Imm 63))))
+          
+          """
+          fixtures={}
+          for w in (32,64):
+              for mode in ("independent","dependent"):
+                  p=out/f"loop-{w}-{mode}.clif";p.write_text(fixture(w,mode));fixtures[w,mode]=p
+          rows=[]
+          for stage in ("baseline","xor"):
+              if stage=="xor":
+                  p=up/SOURCE;old=p.read_text();assert old.count(needle)==1;p.write_text(old.replace(needle,rules+needle))
+                  (out/"experimental.patch").write_text(run("git","diff","--",SOURCE,cwd=up));assert sha(out/"experimental.patch")==PATCH
+              logged(out/(stage+"-build.log"),"cargo","build","--locked","--manifest-path",up/"cranelift/Cargo.toml","--bin","clif-util")
+              clif=P(os.environ["CARGO_TARGET_DIR"])/"debug/clif-util"
+              for (w,mode),p in fixtures.items():
+                  for opt in ("speed","speed_and_size"):
+                      for feat in ("false","true"):
+                          stem=f"{stage}-{w}-{mode}-{opt}-{feat}";obj=out/(stem+".o")
+                          logged(out/(stem+".compile.log"),clif,"compile","--target","x86_64","--set","opt_level="+opt,"--set","has_lzcnt="+feat,"-o",obj,p)
+                          dis=run("objdump","-dw","-Mintel",obj);(out/(stem+".disasm")).write_text(dis)
+                          syms=[s.split() for s in run("nm","-S","--defined-only","--format=posix",obj).splitlines()]
+                          sym=f"%tier1_loop_{w}_{mode}";ss=[s for s in syms if len(s)==4 and s[0]==sym and s[1] in ("T","t")];assert len(ss)==1,ss
+                          start,size=int(ss[0][2],16),int(ss[0][3],16)
+                          ins=[]
+                          for l in dis.splitlines():
+                              m=re.match(r"^\s*([0-9a-f]+):\s+((?:[0-9a-f]{2}\s+)+)\s*(\S.*)$",l)
+                              if m and start<=int(m[1],16)<start+size:ins.append((int(m[1],16),bytes.fromhex(m[2]),m[3]))
+                          assert ins and ins[0][0]==start and all(a[0]+len(a[1])==b[0] for a,b in zip(ins,ins[1:]))
+                          code=b"".join(x[1] for x in ins);assert len(code)==size
+                          mnemonic="bsr" if feat=="false" else "lzcnt"
+                          assert sum(bool(re.match(r"^"+mnemonic+r"\s",x[2])) for x in ins)==4,(stem,dis)
+                          so=out/(stem+".so");logged(out/(stem+".link.log"),"gcc","-shared","-o",so,obj)
+                          T=C.c_uint32 if w==32 else C.c_uint64
+                          cases=0
+                          # Do not execute LZCNT controls on hosts that lack the instruction.
+                          cpu=(out/"cpuinfo.txt").read_text().split("flags")[1].splitlines()[0].split()
+                          if feat=="false" or "abm" in cpu or "lzcnt" in cpu:
+                              lib=C.CDLL(str(so));fn=getattr(lib,sym);fn.argtypes=[C.POINTER(T),C.c_uint64];fn.restype=T
+                              for n in (1,2,7,32,4096):
+                                  for xs in ([0]*(4*n),[(1<<w)-1]*(4*n),vals(w,n,w+n),vals(w,n,w+n+100)):
+                                      arr=(T*len(xs))(*xs);assert fn(arr,n)==ref(xs,w,mode),(stem,n);cases+=1
+                          rows.append(dict(stage=stage,width=w,mode=mode,opt=opt,lzcnt=feat,bytes=size,instructions=len(ins),body_sha256=hashlib.sha256(code).hexdigest(),obj_sha256=sha(obj),native_cases=cases))
+                          save("objects.json",rows)
+          for order in (("baseline","xor"),("xor","baseline")):
+              subprocess.run([sys.executable,__file__,str(out),*order],check=True)
+          summary=[]
+          for order in (("baseline","xor"),("xor","baseline")):
+              data=json.loads((out/("timing-"+"-".join(order)+".json")).read_text())
+              for w in (32,64):
+                  for mode in ("independent","dependent"):
+                      for opt in ("speed","speed_and_size"):
+                          rr=[r for r in data["rows"] if (r["width"],r["mode"],r["opt"])==(w,mode,opt)]
+                          d=[100*(r["xor"]/r["baseline"]-1) for r in rr];rng=random.Random(42)
+                          boot=sorted(statistics.median(rng.choices(d,k=len(d))) for _ in range(5000))
+                          summary.append(dict(order=order,width=w,mode=mode,opt=opt,median_pct=statistics.median(d),bootstrap95=[boot[125],boot[4874]],n=len(d)))
+          save("summary.json",summary)
+          print(json.dumps(summary,indent=2))
+          
+          PY
+          python3 "$out/experiment.py" "$out"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tier1-clz-loop-timing
+          path: ${{ runner.temp }}/clz-loop-timing/
+          retention-days: 30
