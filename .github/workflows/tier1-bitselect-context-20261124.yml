@@ -1,0 +1,105 @@
+name: tier1-bitselect-context-20261124
+on:
+  push:
+    branches: [research/tier1-bitselect-x64-20261123]
+    paths:
+      - 'experiments/cranelift-tier1/bitselect_context_matrix_20261124.py'
+      - '.github/workflows/tier1-bitselect-context-20261124.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  CARGO_BUILD_JOBS: '3'
+  CARGO_INCREMENTAL: '0'
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  RUSTUP_TOOLCHAIN: '1.98.0'
+jobs:
+  context-matrix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: d49635a71351df82f3320095801848d8f128b938
+          path: upstream
+          persist-credentials: false
+      - name: Run compiler context matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/bitselect-context"
+          mkdir -p "$out"
+          rustup toolchain install 1.98.0 --profile minimal
+          rustc -Vv > "$out/rustc.txt"
+          gcc --version > "$out/gcc.txt"
+          objdump --version > "$out/objdump.txt"
+          cp /proc/cpuinfo "$out/cpuinfo.txt"
+          python3 -m py_compile experiments/cranelift-tier1/bitselect_context_matrix_20261124.py
+          python3 experiments/cranelift-tier1/bitselect_context_matrix_20261124.py matrix "$out" upstream
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tier1-bitselect-context-matrix
+          path: ${{ runner.temp }}/bitselect-context/
+          retention-days: 30
+          if-no-files-found: warn
+  named-rule-veriisle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: d49635a71351df82f3320095801848d8f128b938
+          path: upstream
+          persist-credentials: false
+      - name: Patch only named generic XOR rule
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/bitselect-veriisle"
+          mkdir -p "$out"
+          rustup toolchain install 1.98.0 --profile minimal
+          rustc -Vv > "$out/rustc.txt"
+          python3 experiments/cranelift-tier1/bitselect_context_matrix_20261124.py patch "$out" upstream
+          mkdir -p "$RUNNER_TEMP/veri-solvers/bin"
+          bash upstream/cranelift/isle/veri/setup/install-cvc5.sh -i "$RUNNER_TEMP/veri-solvers" -v 1.2.0
+          bash upstream/cranelift/isle/veri/setup/install-z3.sh -b "$RUNNER_TEMP/veri-solvers/bin" -v 4.13.0
+          echo "$RUNNER_TEMP/veri-solvers/bin" >> "$GITHUB_PATH"
+      - name: Targeted VeriISLE coverage (not CLIF structural verifier)
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/bitselect-veriisle"
+          cvc5 --version > "$out/cvc5.txt"
+          z3 --version > "$out/z3.txt"
+          sha256sum "$(command -v cvc5)" "$(command -v z3)" > "$out/solver-hashes.txt"
+          cd upstream
+          # First build the binary so the time limit below bounds solver work, not compilation.
+          cargo build --locked -p cranelift-isle-veri --bin veri > "$out/build.log" 2>&1
+          set +e
+          timeout 30m target/debug/veri --name x64 --rule tier1_i64_bitselect_xor --num-threads=3 > "$out/veri.log" 2>&1
+          status=$?
+          set -e
+          printf '%s\n' "$status" > "$out/exit-status.txt"
+          cat "$out/veri.log"
+          find . -name errors.out -type f -not -path './target/*' -print -exec cat {} \; > "$out/expansion-errors.txt"
+          # Exit zero alone is insufficient: audit the counts and any expansion gaps.
+          test "$status" = 0
+          grep -Eq 'Verification passed:[[:space:]]*[1-9][0-9]*' "$out/veri.log"
+          grep -Eq 'Verification failed:[[:space:]]*0([[:space:]]|$)' "$out/veri.log"
+          grep -Eq 'Verification unknown:[[:space:]]*0([[:space:]]|$)' "$out/veri.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tier1-bitselect-veriisle-named-rule
+          path: ${{ runner.temp }}/bitselect-veriisle/
+          retention-days: 30
+          if-no-files-found: warn

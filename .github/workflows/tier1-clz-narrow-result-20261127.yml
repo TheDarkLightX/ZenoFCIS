@@ -1,0 +1,167 @@
+name: tier1-clz-narrow-result-20261127
+on:
+  push:
+    branches: [research/tier1-bitselect-x64-20261123]
+    paths: ['.github/workflows/tier1-clz-narrow-result-20261127.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  CARGO_BUILD_JOBS: '3'
+  CARGO_INCREMENTAL: '0'
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  RUSTUP_TOOLCHAIN: '1.98.0'
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b738a89287bb78e51c06ac9624014bbda3c1429f
+          path: upstream
+          persist-credentials: false
+      - name: Qualify narrow-result BSR64/CMOV32/XOR32 against baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/clz-narrow-result"
+          mkdir -p "$out"
+          rustup toolchain install 1.98.0 --profile minimal
+          rustc -Vv > "$out/rustc.txt"
+          gcc --version > "$out/gcc.txt"
+          objdump --version > "$out/objdump.txt"
+          git rev-parse HEAD > "$out/zenofcis.txt"
+          cp /proc/cpuinfo "$out/cpuinfo.txt"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/clz-narrow-result-target"
+          python3 -m venv "$RUNNER_TEMP/clz-proof"
+          "$RUNNER_TEMP/clz-proof/bin/pip" install z3-solver==4.13.3.0
+          "$RUNNER_TEMP/clz-proof/bin/python" - "$out" <<'PY'
+          import ctypes as C, hashlib, json, os, pathlib, random, re, subprocess, sys
+          import z3
+          P=pathlib.Path; out=P(sys.argv[1]); up=P("upstream").resolve()
+          UP="b738a89287bb78e51c06ac9624014bbda3c1429f"
+          SOURCE="cranelift/codegen/src/isa/x64/lower.isle"
+          BLOB="545c79528cbb10fb1280623f23f53880b9762e49"
+          def run(*a,cwd=None):
+              return subprocess.check_output(list(map(str,a)),cwd=cwd,text=True,stderr=subprocess.STDOUT)
+          def logged(path,*a):
+              with path.open("w") as f:
+                  r=subprocess.run(list(map(str,a)),stdout=f,stderr=subprocess.STDOUT)
+              if r.returncode:
+                  print(path.read_text()[-12000:],file=sys.stderr);r.check_returncode()
+          def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+          def save(p,o):p.write_text(json.dumps(o,indent=2,sort_keys=True)+"\n")
+          assert run("git","rev-parse","HEAD",cwd=up).strip()==UP
+          assert run("git","hash-object",SOURCE,cwd=up).strip()==BLOB
+          assert not run("git","diff","--name-only",cwd=up).strip()
+          # Bounded independent abstract palette, not registered Zeno machine BSR semantics.
+          proof={}; candidates=[]; proposals=0
+          for w in (32,64):
+              for sentinel in range(2*w):
+                  for op in ("xor","sub_from_const"):
+                      for k in range(2*w):
+                          proposals+=1
+                          def f(i):return i^k if op=="xor" else (k-i)% (1<<w)
+                          if all(f(i)==w-1-i for i in range(w)) and f(sentinel)==w:
+                              candidates.append((w,sentinel,op,k))
+              assert (w,2*w-1,"xor",w-1) in candidates
+              x=z3.BitVec("x",w); arbitrary=z3.BitVec("undefined_bsr_dest",w)
+              bsr=arbitrary
+              for i in range(w):
+                  bsr=z3.If(z3.Extract(i,i,x)==1,z3.BitVecVal(i,w),bsr)
+              ref=sum((z3.If(z3.LShR(x,i)==0,z3.BitVecVal(1,w),z3.BitVecVal(0,w)) for i in range(w)))
+              # Ref counts zero prefixes for i=0..w-1.
+              for label,sentinel,expected in (("candidate",2*w-1,z3.unsat),("mutant",2*w-2,z3.sat)):
+                  selected=z3.If(x==0,z3.BitVecVal(sentinel,w),bsr)
+                  val=(z3.ZeroExt(32,z3.Extract(31,0,selected)^z3.BitVecVal(w-1,32)) if w==64 else selected ^ (w-1))
+                  s=z3.SolverFor("QF_BV");s.set(timeout=30000);s.add(val!=ref)
+                  (out/f"{w}-{label}.smt2").write_text(s.to_smt2())
+                  result=s.check();proof[f"{w}-{label}"]=str(result);assert result==expected,result
+          save(out/"proof.json",dict(proposals=proposals,candidates=candidates,proof=proof,z3=z3.get_full_version(),limits="BSR index defined for nonzero, arbitrary for zero, CMOVZ selects sentinel using BSR ZF; i64 candidate CMOV and XOR at 32 bits, upper result zero by architectural zero extension; modular words, flags dead on return, pure CLZ; no full ISA/VeriISLE proof"))
+          fixtures={}
+          for w in (32,64):
+              for context in ("plain","live","load"):
+                  name=f"clz{w}_{context}"; ty=f"i{w}"; arg="i64" if context=="load" else ty
+                  ops=(f"    v1 = load.{ty} v0\n    v2 = clz v1\n    return v2" if context=="load" else "    v1 = clz v0\n    v2 = bxor v1, v0\n    return v2" if context=="live" else "    v1 = clz v0\n    return v1")
+                  p=out/(name+".clif")
+                  p.write_text(f"test verifier\nfunction %tier1_{name}({arg}) -> {ty} {{\nblock0(v0: {arg}):\n{ops}\n}}\n")
+                  fixtures[name]=(w,context,p)
+          # Add two narrowly typed rules above generic fallback; preserve LZCNT priority/path.
+          needle="(rule 0 (do_clz ty orig_ty src)"
+          rules=""";; Experimental fallback only; BSR zero destination is discarded by CMOVZ.
+          (rule tier1_clz32_xor 2 (do_clz $I32 $I32 src)
+                (if-let false (has_lzcnt))
+                (x64_xor $I32 (bsr_or_else $I32 src (imm_i64 $I64 63)) (RegMemImm.Imm 31)))
+          (rule tier1_clz64_narrow_result 3 (do_clz $I64 $I64 src)
+                (if-let false (has_lzcnt))
+                (let ((alt Gpr (imm_i64 $I64 127))
+                      (scan ProducesFlags (x64_bsr $I64 src))
+                      (idx Gpr (produces_flags_get_reg scan))
+                      (fix ConsumesFlags (cmove $I32 (CC.Z) alt idx))
+                      (selected Gpr (with_flags_reg (produces_flags_ignore scan) fix)))
+                  (x64_xor $I32 selected (RegMemImm.Imm 63))))
+
+          """
+          rows=[]; rng=random.Random(20261126)
+          cpu=(out/"cpuinfo.txt").read_text().split("flags")[1].splitlines()[0].split()
+          assert "abm" in cpu or "lzcnt" in cpu
+          for stage in ("baseline","xor"):
+              if stage=="xor":
+                  p=up/SOURCE;old=p.read_text();assert old.count(needle)==1
+                  p.write_text(old.replace(needle,rules+needle))
+                  assert run("git","diff","--name-only",cwd=up).strip()==SOURCE
+                  (out/"experimental.patch").write_text(run("git","diff","--",SOURCE,cwd=up))
+              logged(out/(stage+"-build.log"),"cargo","build","--locked","--manifest-path",up/"cranelift/Cargo.toml","--bin","clif-util")
+              clif=P(os.environ["CARGO_TARGET_DIR"])/"debug/clif-util"
+              for name,(w,context,p) in fixtures.items():
+                  logged(out/(stage+"-"+name+"-verify.log"),clif,"test",p)
+                  for opt in ("speed","speed_and_size"):
+                      for feature in ("false","true"):
+                          stem=f"{stage}-{name}-{opt}-lzcnt_{feature}";obj=out/(stem+".o")
+                          logged(out/(stem+".compile.log"),clif,"compile","--target","x86_64","--set","opt_level="+opt,"--set","has_lzcnt="+feature,"-o",obj,p)
+                          dump=run("objdump","-dw","-Mintel",obj);(out/(stem+".disasm")).write_text(dump)
+                          syms=[l.split() for l in run("nm","-S","--defined-only","--format=posix",obj).splitlines()]
+                          syms=[s for s in syms if len(s)==4 and s[0]=="%tier1_"+name and s[1] in ("T","t")];assert len(syms)==1,syms
+                          start,size=int(syms[0][2],16),int(syms[0][3],16)
+                          ins=[]
+                          for l in dump.splitlines():
+                              m=re.match(r"^\s*([0-9a-f]+):\s+((?:[0-9a-f]{2}\s+)+)\s*(\S.*)$",l)
+                              if m and start<=int(m[1],16)<start+size:ins.append((int(m[1],16),bytes.fromhex(m[2]),m[3]))
+                          assert ins and ins[0][0]==start and all(a[0]+len(a[1])==b[0] for a,b in zip(ins,ins[1:]))
+                          code=b"".join(v[1] for v in ins);assert len(code)==size
+                          so=out/(stem+".so");logged(out/(stem+".link.log"),"gcc","-shared","-o",so,obj)
+                          lib=C.CDLL(str(so));fn=getattr(lib,"%tier1_"+name);T=C.c_uint64 if w==64 else C.c_uint32
+                          fn.argtypes=[C.c_uint64 if context=="load" else T];fn.restype=T
+                          vals=[0,(1<<w)-1]+[v for i in range(w) for v in ((1<<i)-1,1<<i,(1<<i)+1) if v<1<<w]
+                          # Same seed each object gives paired input samples.
+                          rr=random.Random(20261126+w);vals += [rr.getrandbits(w) for _ in range(4096)]
+                          for v in vals:
+                              expected=w-v.bit_length()
+                              if context=="live":expected^=v
+                              if context=="load":
+                                  slot=T(v);got=fn(C.addressof(slot))
+                              else:got=fn(v)
+                              assert got==expected,(stem,v,got,expected)
+                          rows.append(dict(stage=stage,name=name,width=w,context=context,opt=opt,lzcnt=feature,symbol_bytes=size,instructions=len(ins),native_tests=len(vals),object_sha256=sha(obj),body_sha256=hashlib.sha256(code).hexdigest(),fixture_sha256=sha(p)))
+                          save(out/"rows.json",rows)
+          by={(r["name"],r["opt"],r["lzcnt"],r["stage"]):r for r in rows}
+          pairs=[]
+          for (name,opt,feature,stage),a in by.items():
+              if stage!="baseline":continue
+              b=by[(name,opt,feature,"xor")]
+              pairs.append(dict(name=name,opt=opt,lzcnt=feature,baseline=a["symbol_bytes"],candidate=b["symbol_bytes"],delta=b["symbol_bytes"]-a["symbol_bytes"],identical_body=a["body_sha256"]==b["body_sha256"]))
+          assert len(pairs)==24
+          save(out/"catalog.json",dict(upstream=UP,source_blob=BLOB,zenofcis=(out/"zenofcis.txt").read_text().strip(),patch_sha256=sha(out/"experimental.patch"),proof_sha256=sha(out/"proof.json"),rows=rows,pairs=pairs,limits="exact emitted symbol sizes and finite native tests; valid readable memory only; static post-BSR proof not compiler refinement; no throughput claim"))
+          print(pairs)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tier1-clz-narrow-result
+          path: ${{ runner.temp }}/clz-narrow-result/
+          retention-days: 30

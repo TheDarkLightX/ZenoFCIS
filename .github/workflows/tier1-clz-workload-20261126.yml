@@ -1,0 +1,134 @@
+name: tier1-clz-workload-20261126
+on:
+  push:
+    branches: [research/tier1-bitselect-x64-20261123]
+    paths: ['.github/workflows/tier1-clz-workload-20261126.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  CARGO_BUILD_JOBS: '3'
+  CARGO_INCREMENTAL: '0'
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  RUSTUP_TOOLCHAIN: '1.98.0'
+jobs:
+  corpus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: b738a89287bb78e51c06ac9624014bbda3c1429f
+          path: upstream
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: bytecodealliance/sightglass
+          ref: f0d2040f4b1c521be5b763241f5c3b1146efff97
+          path: sightglass
+          persist-credentials: false
+      - name: Compare actual compiled workload text and inspect emitted CLIF
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/clz-workload"
+          mkdir -p "$out"
+          rustup toolchain install 1.98.0 --profile minimal
+          rustc -Vv > "$out/rustc.txt"
+          git rev-parse HEAD > "$out/zenofcis.txt"
+          git -C upstream rev-parse HEAD > "$out/wasmtime.txt"
+          git -C sightglass rev-parse HEAD > "$out/sightglass.txt"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/clz-workload-target"
+          python3 - "$out" <<'PY'
+          import collections, hashlib, importlib.util, json, os, pathlib, re, subprocess, sys
+          P=pathlib.Path; out=P(sys.argv[1]); up=P("upstream").resolve()
+          spec=importlib.util.spec_from_file_location("matrix","experiments/cranelift-tier1/bitselect_context_matrix_20261124.py")
+          m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+          m.UP="b738a89287bb78e51c06ac9624014bbda3c1429f"
+          assert m.run("git","rev-parse","HEAD",cwd=up).strip()==m.UP
+          assert m.run("git","hash-object",m.SOURCE,cwd=up).strip()==m.BLOB
+          sg=P("sightglass/benchmarks").resolve()
+          assert m.run("git","rev-parse","HEAD",cwd=sg).strip()=="f0d2040f4b1c521be5b763241f5c3b1146efff97"
+          suite=(sg/"default.suite").read_text()
+          # Bounded first six entries of the pinned default suite; do not
+          # substitute synthetic modules or silently skip missing entries.
+          names=[l.strip() for l in suite.splitlines() if l.strip() and not l.lstrip().startswith("#")][:6]
+          assert len(names)==6 and len(set(names))==6
+          for name in names:
+              assert (sg/name).read_bytes()[:4]==b"\x00asm",name
+          exe=P(os.environ["CARGO_TARGET_DIR"])/"debug/wasmtime"
+          # CLI accepts 0,1,2,s (not CLIF enum strings); pinned cli-flags TOML tests map 2 and s.
+          # Previous run 45746822754 failed before the first module due to this mismatch.
+          # Run 45795585224 compiled two core modules but failed on the first component.
+          # The pinned compile.rs explicitly gates components on the component-model feature.
+          rows=[]
+          failures=[]
+          def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+          def save():
+              (out/"rows.json").write_text(json.dumps(rows,indent=2,sort_keys=True)+"\n")
+          for stage in ("baseline","xor"):
+              if stage=="xor":
+                  p=up/m.SOURCE; old=p.read_text(); needle="(rule 0 (do_clz ty orig_ty src)"
+                  rules=";; Experimental fallback only; BSR zero destination is discarded by CMOVZ.\n(rule tier1_clz32_xor 2 (do_clz $I32 $I32 src)\n      (if-let false (has_lzcnt))\n      (x64_xor $I32 (bsr_or_else $I32 src (imm_i64 $I64 63)) (RegMemImm.Imm 31)))\n(rule tier1_clz64_xor 3 (do_clz $I64 $I64 src)\n      (if-let false (has_lzcnt))\n      (x64_xor $I64 (bsr_or_else $I64 src (imm_i64 $I64 127)) (RegMemImm.Imm 63)))\n\n"
+                  assert old.count(needle)==1
+                  p.write_text(old.replace(needle,rules+needle))
+                  assert m.run("git","diff","--name-only",cwd=up).strip()==m.SOURCE
+                  (out/"experimental.patch").write_text(m.run("git","diff","--",m.SOURCE,cwd=up))
+              m.logged(out/(stage+"-build.log"),["cargo","build","--locked","--manifest-path",up/"Cargo.toml","--bin","wasmtime","--no-default-features","--features","compile,cranelift,wat,component-model"])
+              for i,name in enumerate(names):
+                  for opt in ("speed","speed-and-size"):
+                      stem=f"{stage}-{i}-{opt}"
+                      d=out/stem; d.mkdir(); clif=d/"clif";clif.mkdir()
+                      a=d/"module.cwasm"; t=d/"text.bin"
+                      # Minimal build has no cache feature. Emit CLIF as
+                      # supplementary evidence: pinned compiler.rs writes context.func after compile_maybe_cached.
+                      # This is static IR, not dynamic counts or a rule-fire trace.
+                      try:
+                          m.logged(d/"compile.log",[exe,"compile","--target","x86_64-unknown-linux-gnu","-Oopt-level="+{"speed":"2","speed-and-size":"s"}[opt],"-Ccranelift-has-lzcnt=false","--emit-clif",clif,"-o",a,sg/name])
+                      except subprocess.CalledProcessError as e:
+                          failures.append(dict(stage=stage,name=name,opt=opt,returncode=e.returncode,log=str((d/"compile.log").relative_to(out))))
+                          (out/"failures.json").write_text(json.dumps(failures,indent=2)+"\n")
+                          continue
+                      m.logged(d/"text.log",["objcopy","--dump-section",f".text={t}",a])
+                      assert t.exists() and t.stat().st_size>0
+                      (d/"sections.txt").write_text(m.run("readelf","-SW",a))
+                      files=list(clif.rglob("*.clif")); assert files,(name,opt)
+                      occurrences=[]
+                      opcodes=collections.Counter()
+                      for p in files:
+                          for line in p.read_text().splitlines():
+                              match=re.search(r"\bv\d+(?:\s*,\s*v\d+)*\s*=\s*([a-z][a-z0-9_]*(?:\.[a-z0-9_]+)?)\b",line)
+                              if match: opcodes[match[1]]+=1
+                              if re.search(r"\bclz(?:\.|\s)",line):
+                                  occurrences.append(dict(file=str(p.relative_to(clif)),line=line.strip()))
+                      (d/"clz-lines.json").write_text(json.dumps(occurrences,indent=2)+"\n")
+                      rows.append(dict(stage=stage,name=name,opt=opt,wasm_sha256=sha(sg/name),text_bytes=t.stat().st_size,text_sha256=sha(t),serialized_bytes=a.stat().st_size,clif_files=len(files),clz_lines=len(occurrences),wasm_version_bytes=(sg/name).read_bytes()[4:8].hex(),ssa_assignment_opcodes=dict(opcodes)))
+                      save()
+                      # Keep section hashes and CLIF occurrences, not huge
+                      # whole-module serialized binaries or full CLIF dumps.
+                      (d/"symbols.txt").write_text(m.run("readelf","-sW",a))
+                      a.unlink();t.unlink()
+                      for p in files:p.unlink()
+                      print(rows[-1],flush=True)
+          by={(r["name"],r["opt"],r["stage"]):r for r in rows};pairs=[]
+          for name in names:
+              for opt in ("speed","speed-and-size"):
+                  if (name,opt,"baseline") not in by or (name,opt,"xor") not in by: continue
+                  a=by[name,opt,"baseline"];b=by[name,opt,"xor"]
+                  assert a["wasm_sha256"]==b["wasm_sha256"]
+                  pairs.append(dict(name=name,opt=opt,text_delta=b["text_bytes"]-a["text_bytes"],identical_text=a["text_sha256"]==b["text_sha256"]))
+          (out/"catalog.json").write_text(json.dumps(dict(upstream=m.UP,zenofcis=(out/"zenofcis.txt").read_text().strip(),sightglass=(out/"sightglass.txt").read_text().strip(),patch_sha256=sha(out/"experimental.patch"),rows=rows,pairs=pairs,failures=failures,scope="first six pinned default-suite wasm modules, explicit has_lzcnt=false; compile-only, .text section including possible padding; no dynamic hit counts, no runtime benefit or correctness claim"),indent=2,sort_keys=True)+"\n")
+          print(pairs)
+          assert len(pairs)>=10, "fewer than ten completed pairs; inspect failures.json and catalog.json"
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tier1-clz-workload-reachability
+          path: ${{ runner.temp }}/clz-workload/
+          retention-days: 30
+          if-no-files-found: warn

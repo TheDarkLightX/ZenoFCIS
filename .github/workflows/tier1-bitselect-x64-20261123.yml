@@ -1,0 +1,61 @@
+name: tier1-bitselect-x64-20261123
+on:
+  push:
+    branches: [research/tier1-bitselect-x64-20261123]
+    paths:
+      - 'experiments/cranelift-tier1/bitselect_x64_20261123.py'
+      - '.github/workflows/tier1-bitselect-x64-20261123.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bitselect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.98.0'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: cef75a9fea591317bb076ec04d1f1a99ccfedb63
+          path: upstream
+          persist-credentials: false
+      - name: Bounded Zeno search and independent proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/bitselect-env"
+          "$RUNNER_TEMP/bitselect-env/bin/python" -m pip install --only-binary=:all: --require-hashes -r tools/machine_code_requirements.txt
+          "$RUNNER_TEMP/bitselect-env/bin/python" experiments/cranelift-tier1/bitselect_x64_20261123.py search "$RUNNER_TEMP/bitselect"
+          rustup toolchain install 1.98.0 --profile minimal
+          rustc -Vv > "$RUNNER_TEMP/bitselect/rustc.txt"
+      - name: Compile pristine and patched same CLIF
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/bitselect"
+          test "$(git -C upstream rev-parse HEAD)" = cef75a9fea591317bb076ec04d1f1a99ccfedb63
+          grep -qw bmi1 /proc/cpuinfo
+          compile() {
+            cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- test "$out/bitselect.clif"
+            cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 --set opt_level=speed_and_size --set has_bmi1=false -D -o "$out/generic-$1.o" "$out/bitselect.clif" > "$out/generic-$1.txt"
+            cargo run --locked --manifest-path upstream/cranelift/Cargo.toml --bin clif-util -- compile --target x86_64 --set opt_level=speed_and_size --set has_bmi1=true -D -o "$out/bmi1-$1.o" "$out/bitselect.clif" > "$out/bmi1-$1.txt"
+          }
+          compile baseline
+          "$RUNNER_TEMP/bitselect-env/bin/python" experiments/cranelift-tier1/bitselect_x64_20261123.py patch "$out" upstream
+          compile candidate
+          "$RUNNER_TEMP/bitselect-env/bin/python" experiments/cranelift-tier1/bitselect_x64_20261123.py measure "$out"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tier1-bitselect-x64
+          path: ${{ runner.temp }}/bitselect/
+          retention-days: 30
+          if-no-files-found: warn

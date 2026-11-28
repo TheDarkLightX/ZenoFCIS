@@ -1,0 +1,17 @@
+# Object-pipeline checkpoint — 2026-11-25
+
+Resume draft PR #197. ZenoFCIS main still 4160086fb9d19f3ebe25047e69b1caa467aa74fd; Wasmtime main fcbcdd4d2d9b60b4a843dba07517924d71deb908. Matrix remains deliberately pinned to d49635a71351df82f3320095801848d8f128b938 (lower.isle blob 545c79528cbb10fb1280623f23f53880b9762e49); no current-main performance claim. Readiness gate remains previously qualified, not rerun this session.
+
+## Corrected lowering run did not reach the corrected lowering
+[Push CI 45539885192](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/45539885192), source ba424c4beb1f053dae4724d847b2535979245c06, both jobs failed. Job 138955540009 stopped in the **baseline** alias_load_true_false fixture, with -D, before any candidate build. Exact panic at cranelift/src/disasm.rs:110:38: range end index 27 out of range for slice of length 12. Printed bytes: 55 48 89 e5 48 8b 06 48 89 ec 5d c3. This is distinct from the prior candidate load-sinking assertion. It does not establish either success or failure of the all-register correction.
+
+Pinned [compile.rs](https://github.com/bytecodealliance/wasmtime/blob/d49635a71351df82f3320095801848d8f128b938/cranelift/src/compile.rs#L85-L145) chooses the file ISA when triples match; the object module is instead built from CLI settings (lines 49-66). It compiles once, saves code_info, then defines the function using the object module, and passes the original size and current buffer to print_all. [disasm.rs](https://github.com/bytecodealliance/wasmtime/blob/d49635a71351df82f3320095801848d8f128b938/cranelift/src/disasm.rs#L99-L111) slices the buffer by that size. This explains why file ISA directives and CLI flags are not interchangeable and suggests the observed size discrepancy comes from the two compilations. The original emitted object byte measurements and native executions remain evidence for those exact objects, not for the printed disassembly or claimed comprehensive flag coverage; do not infer effective settings from the old -D output.
+
+Harness-only correction e4ae19899492095ee0982a6da061a83b9b096e89 removes -D (objdump already measures the emitted ELF), uses separate compile fixtures without the file target directive so CLI flags apply consistently, and records both fixture hashes. No upstream modifications. [Rerun 45583997361](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/45583997361) was in progress at inspection; no corrected object counts claimed. Preserve both aliases and all 14 contexts. Inspect the full 112-object catalog and compare against original measurements only after success.
+
+## VeriISLE
+Job 138955539646: one expansion error #308, missing spec for gpr_to_gpr_mem_imm; 0 passed/failed/unknown solver queries. Pinned inst.isle declares the conversion as extern; lower/isle.rs:1162 implements GprMemImm::from(gpr). An independently justified register-wrapper model or direct sized instructions may be useful, but no new spec or proof is asserted. Avoid circular specs for the entire candidate. No claim of verifier qualification.
+
+Artifacts listed by GitHub (not independently downloaded this run): 14991262489 sha256:7c06808beb75a9754bd79a52a6d374b4f7a685fd6ee0b954b75dfea80dbae77c; 14991436952 sha256:13ad73b99bb7de6b0ac7faa2b3496a3a3e0d2937588d7fb4a59ea9cf186e3530. Source and CI job logs inspected directly.
+
+Next: inspect push-triggered run 45583997361, audit emitted objects and all-register candidate load/alias cases, then targeted verifier coverage. Keep PR draft; no upstream submission or main mutation.
